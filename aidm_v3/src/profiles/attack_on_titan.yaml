@@ -1,0 +1,87 @@
+id: attack_on_titan
+name: Attack on Titan
+source_anime: Attack on Titan
+media_type: anime
+status: completed
+generated_at: '2026-01-06T21:15:33.767781'
+confidence: 95
+research_method: bundled_parallel
+dna_scales:
+  introspection_vs_action: 5
+  comedy_vs_drama: 1
+  simple_vs_complex: 9
+  power_fantasy_vs_struggle: 8
+  explained_vs_mysterious: 4
+  fast_paced_vs_slow_burn: 4
+  episodic_vs_serialized: 10
+  grounded_vs_absurd: 3
+  tactical_vs_instinctive: 2
+  hopeful_vs_cynical: 8
+  ensemble_vs_solo: 3
+tropes:
+  tournament_arc: false
+  training_montage: true
+  power_of_friendship: false
+  mentor_death: true
+  chosen_one: true
+  tragic_backstory: true
+  redemption_arc: true
+  betrayal: true
+  sacrifice: true
+  transformation: true
+  forbidden_technique: true
+  time_loop: true
+  false_identity: true
+  ensemble_focus: true
+  slow_burn_romance: true
+combat_system: tactical
+power_system:
+  name: Titan Powers (The Nine Titans)
+  mechanics: A biological and metaphysical network rooted in 'The Paths,' a transcendental
+    dimension connecting all Subjects of Ymir. This network allows for the instantaneous
+    transfer of mass to form Titan bodies, memories of past and future inheritors,
+    and commands from the Founding Titan. Transformation is triggered by physical
+    injury (blood loss) combined with a specific mental goal.
+  limitations: The Curse of Ymir restricts Shifters to a 13-year lifespan after inheriting
+    their power. The Founding Titan's full power is generally restricted to those
+    of royal blood. If a Shifter dies without being eaten, their power is randomly
+    transferred to a newborn Eldian baby via the Paths.
+  tiers:
+  - 'Tier 0: The Founding Titan (Full Power / The Rumbling)'
+  - 'Tier 1: High-Tier Shifters (Colossal, War Hammer, Evolved Attack Titan)'
+  - 'Tier 2: Standard Shifters (Armored, Female, Beast, Jaw, Cart)'
+  - 'Tier 3: Abnormal Titans'
+  - 'Tier 4: Pure Titans (Mindless)'
+tone:
+  comedy_level: 2
+  darkness_level: 9
+  optimism: 3
+director_personality: You are the director for a Attack on Titan-style campaign. You
+  maintain dramatic weight; comedy is rare and earned. You explain strategies and
+  tactics in detail. The protagonist is powerful; challenges come from elsewhere.
+pacing:
+  scene_length: moderate
+  arc_length_sessions: 4-6
+sources_consulted:
+- power_system
+- combat
+- tone
+- characters
+- factions
+- locations
+- arcs
+- sequels
+- adaptations
+- recent
+aliases:
+- aot
+- attack on titan
+- attack on titans
+- attackontitan
+- shingeki no kyojin
+- shingeki no kyojun
+- shingeki no kyoujin
+- snk
+- 進撃の巨人
+series_group: attack_on_titan
+series_position: 1

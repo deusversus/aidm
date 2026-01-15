@@ -1,0 +1,18 @@
+{
+  "description": "Mastery tier progression (Hunter x Hunter Nen system)",
+  "type": "mastery_tiers",
+  "parameters": {
+    "system_name": "Nen",
+    "mastery_levels": ["Novice", "Initiate", "Practitioner", "Expert", "Master"],
+    "categories": [
+      "Enhancement",
+      "Transmutation",
+      "Emission",
+      "Conjuration",
+      "Manipulation",
+      "Specialization"
+    ],
+    "advancement_method": "training_arc"
+  },
+  "use_case": "Skill-based mastery with multiple tiers and specialization paths. Characters advance through training and breakthroughs. Common in cultivation/power system anime (HxH, Naruto chakra nature, JJK cursed techniques)."
+}

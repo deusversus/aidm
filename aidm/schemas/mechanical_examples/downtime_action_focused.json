@@ -1,0 +1,7 @@
+{
+  "description": "Action-focused anime with training and social elements",
+  "enabled_modes": ["training_arcs", "social_links", "investigation"],
+  "default_mode": "training_arcs",
+  "time_tracking": true,
+  "use_case": "Typical shonen anime. Characters train between battles (Hunter x Hunter), develop relationships (social links), and investigate mysteries. Default for most battle/adventure anime."
+}

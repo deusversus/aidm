@@ -1,0 +1,77 @@
+id: nonexistentanime123
+name: NonExistentAnime123
+source_anime: NonExistentAnime123
+media_type: anime
+status: completed
+generated_at: '2026-01-07T12:53:39.705002'
+confidence: 95
+research_method: bundled_parallel
+dna_scales:
+  introspection_vs_action: 2
+  comedy_vs_drama: 6
+  simple_vs_complex: 8
+  power_fantasy_vs_struggle: 9
+  explained_vs_mysterious: 8
+  fast_paced_vs_slow_burn: 7
+  episodic_vs_serialized: 8
+  grounded_vs_absurd: 9
+  tactical_vs_instinctive: 4
+  hopeful_vs_cynical: 5
+  ensemble_vs_solo: 7
+tropes:
+  tournament_arc: false
+  training_montage: false
+  power_of_friendship: true
+  mentor_death: false
+  chosen_one: false
+  tragic_backstory: true
+  redemption_arc: false
+  betrayal: false
+  sacrifice: false
+  transformation: false
+  forbidden_technique: false
+  time_loop: false
+  false_identity: false
+  ensemble_focus: true
+  slow_burn_romance: false
+combat_system: tactical
+power_system:
+  name: The Null-Stream
+  mechanics: Users known as Nulls draw from the Non-Existent Plane to create pockets
+    of nothingness, manifest weightless objects, and perform conceptual erasure or
+    non-linear teleportation.
+  limitations: Requires a Real Anchor such as sacrificing a memory or physical sensation;
+    excessive use can trigger a Feedback Loop that erases the user from the memories
+    of others.
+  tiers:
+  - Flicker
+  - Void-Smith
+  - Eraser
+  - Absolute Zero
+tone:
+  comedy_level: 6
+  darkness_level: 7
+  optimism: 6
+director_personality: You are the director for a NonExistentAnime123-style campaign.
+  You favor action and momentum over lengthy contemplation. Embrace the absurd. Reality
+  is a suggestion. The protagonist is powerful; challenges come from elsewhere.
+pacing:
+  scene_length: moderate
+  arc_length_sessions: 4-6
+sources_consulted:
+- power_system
+- combat
+- tone
+- characters
+- factions
+- locations
+- arcs
+- sequels
+- adaptations
+- recent
+aliases:
+- N/A
+- na
+- nonexistentanime123
+series_group: nonexistentanime123
+series_position: 1

@@ -1,0 +1,7 @@
+{
+  "description": "Travel/Adventure anime",
+  "enabled_modes": ["travel", "social_links", "slice_of_life"],
+  "default_mode": "travel",
+  "time_tracking": true,
+  "use_case": "One Piece, Kino's Journey, Frieren. Heavy focus on journeys with random encounters. Social bonding during travel. Slice-of-life moments at destinations."
+}

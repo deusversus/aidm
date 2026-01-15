@@ -1,0 +1,89 @@
+id: bleach
+name: Bleach
+source_anime: Bleach
+media_type: anime
+status: completed
+generated_at: '2026-01-06T20:21:08.881623'
+confidence: 95
+research_method: bundled_parallel
+dna_scales:
+  introspection_vs_action: 8
+  comedy_vs_drama: 2
+  simple_vs_complex: 7
+  power_fantasy_vs_struggle: 5
+  explained_vs_mysterious: 4
+  fast_paced_vs_slow_burn: 5
+  episodic_vs_serialized: 9
+  grounded_vs_absurd: 6
+  tactical_vs_instinctive: 8
+  hopeful_vs_cynical: 2
+  ensemble_vs_solo: 3
+tropes:
+  tournament_arc: false
+  training_montage: true
+  power_of_friendship: true
+  mentor_death: false
+  chosen_one: false
+  tragic_backstory: false
+  redemption_arc: false
+  betrayal: false
+  sacrifice: false
+  transformation: false
+  forbidden_technique: false
+  time_loop: false
+  false_identity: false
+  ensemble_focus: true
+  slow_burn_romance: false
+combat_system: spectacle
+power_system:
+  name: Reiryoku and Reiatsu
+  mechanics: 'The system is based on Reiryoku (potential spiritual energy), Reiatsu
+    (the physical force exerted when energy is released), and Reishi (spirit particles
+    that form the matter of spiritual dimensions). Battles are often determined by
+    the density of Reiatsu, which can negate the special abilities of weaker opponents.
+    Different races utilize these energies through specific methods: Shinigami use
+    Zanpakuto (Shikai and Bankai) and Kido; Hollows use Cero and Resurrección; Quincies
+    manipulate external Reishi from the environment; and Fullbringers manipulate the
+    souls of inanimate objects.'
+  limitations: The system is governed by the Soul Balance, where erasing souls instead
+    of purifying them threatens universal stability. Hybrids risk 'Soul Suicide' due
+    to internal instability. Bankai usage causes extreme physical strain and typically
+    cannot be repaired if broken. Additionally, Hollow power acts as a biological
+    poison to Quincies, who lack natural resistance to it.
+  tiers:
+  - Spirit Class 20-10 (Standard Soldiers)
+  - Spirit Class 6-4 (Lieutenant-level)
+  - Spirit Class 3 and above (Captain-level)
+  - Transcendent Beings
+  - Gillian (Menos Grande)
+  - Adjuchas
+  - Vasto Lorde
+tone:
+  comedy_level: 4
+  darkness_level: 7
+  optimism: 8
+director_personality: You are the director for a Bleach-style campaign. You explore
+  character thoughts and feelings deeply. You maintain dramatic weight; comedy is
+  rare and earned. Battles are won by willpower and instinct, not chess moves.
+pacing:
+  scene_length: moderate
+  arc_length_sessions: 4-6
+sources_consulted:
+- power_system
+- combat
+- tone
+- characters
+- factions
+- locations
+- arcs
+- sequels
+- adaptations
+- recent
+aliases:
+- bleach
+- bleeach
+- bleech
+- burchi
+- ブリーチ
+series_group: bleach
+series_position: 1

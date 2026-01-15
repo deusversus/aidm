@@ -1,0 +1,96 @@
+id: fullmetal_alchemist
+name: Fullmetal Alchemist
+source_anime: Fullmetal Alchemist
+media_type: anime
+status: completed
+generated_at: '2026-01-06T19:20:37.417237'
+confidence: 95
+research_method: bundled_parallel
+dna_scales:
+  introspection_vs_action: 5
+  comedy_vs_drama: 3
+  simple_vs_complex: 8
+  power_fantasy_vs_struggle: 8
+  explained_vs_mysterious: 2
+  fast_paced_vs_slow_burn: 4
+  episodic_vs_serialized: 10
+  grounded_vs_absurd: 5
+  tactical_vs_instinctive: 5
+  hopeful_vs_cynical: 5
+  ensemble_vs_solo: 5
+tropes:
+  tournament_arc: false
+  training_montage: false
+  power_of_friendship: false
+  mentor_death: false
+  chosen_one: false
+  tragic_backstory: false
+  redemption_arc: false
+  betrayal: false
+  sacrifice: false
+  transformation: false
+  forbidden_technique: false
+  time_loop: false
+  false_identity: false
+  ensemble_focus: false
+  slow_burn_romance: false
+combat_system: tactical
+power_system:
+  name: Alchemy
+  mechanics: Alchemy is the science of understanding, deconstructing, and reconstructing
+    matter. It follows the Law of Equivalent Exchange, which includes the Law of Conservation
+    of Mass and the Law of Natural Providence. Amestrian Alchemy typically uses Transmutation
+    Circles to channel tectonic energy, while Xingese Alkahestry uses the Dragon's
+    Pulse (Earth's chi) for healing and long-distance transmutations. Those who have
+    seen the Gate of Truth can perform alchemy without circles by using their bodies
+    as a circuit.
+  limitations: Users cannot create something from nothing (Conservation of Mass) or
+    transmute materials into unrelated elements (Natural Providence). Mistakes or
+    insufficient materials cause a 'Rebound,' resulting in injury. Human Transmutation
+    is a taboo that exacts a physical 'Toll' from the user. Additionally, an alchemist's
+    power is strictly limited by their scientific knowledge and understanding of chemistry.
+  tiers:
+  - 'God Tier: Beings like Truth or Father (Post-God absorption) who ignore Equivalent
+    Exchange'
+  - 'Transcendent: Living Philosopher''s Stones like Van Hohenheim and Base Father'
+  - 'Top Tier: Master alchemists who have seen the Truth or elite Homunculi (e.g.,
+    Roy Mustang, Pride, King Bradley)'
+  - 'High Tier: Skilled State Alchemists and specialized combatants (e.g., Edward
+    Elric, Scar, Alphonse Elric, Greed)'
+  - 'Mid Tier: Average State Alchemists or high-level soldiers (e.g., Alex Armstrong,
+    Kimblee, Lan Fan)'
+  - 'Low Tier: Trained soldiers and civilian alchemists (e.g., Riza Hawkeye, Maes
+    Hughes, Shou Tucker)'
+tone:
+  comedy_level: 4
+  darkness_level: 7
+  optimism: 8
+director_personality: You are the director for a Fullmetal Alchemist-style campaign.
+  You maintain dramatic weight; comedy is rare and earned. The protagonist is powerful;
+  challenges come from elsewhere.
+pacing:
+  scene_length: moderate
+  arc_length_sessions: 4-6
+sources_consulted:
+- power_system
+- combat
+- tone
+- characters
+- factions
+- locations
+- arcs
+- sequels
+- adaptations
+- recent
+aliases:
+- fma
+- full metal alchemist
+- fullmetal alchemest
+- fullmetal alchemist
+- fullmetal alchemyst
+- fullmetalalchemist
+- hagane no renkinjutsushi
+- hagaren
+- 鋼の錬金術師
+series_group: fullmetal_alchemist
+series_position: 1

@@ -1,0 +1,87 @@
+id: code_geass
+name: Code Geass
+source_anime: Code Geass
+media_type: anime
+status: completed
+generated_at: '2026-01-07T08:07:15.829046'
+confidence: 95
+research_method: bundled_parallel
+dna_scales:
+  introspection_vs_action: 6
+  comedy_vs_drama: 2
+  simple_vs_complex: 9
+  power_fantasy_vs_struggle: 4
+  explained_vs_mysterious: 6
+  fast_paced_vs_slow_burn: 2
+  episodic_vs_serialized: 10
+  grounded_vs_absurd: 8
+  tactical_vs_instinctive: 1
+  hopeful_vs_cynical: 4
+  ensemble_vs_solo: 4
+tropes:
+  tournament_arc: false
+  training_montage: false
+  power_of_friendship: false
+  mentor_death: false
+  chosen_one: true
+  tragic_backstory: true
+  redemption_arc: true
+  betrayal: true
+  sacrifice: true
+  transformation: false
+  forbidden_technique: true
+  time_loop: false
+  false_identity: true
+  ensemble_focus: true
+  slow_burn_romance: false
+combat_system: tactical
+power_system:
+  name: Geass
+  mechanics: A supernatural psychic ability granted through a contract with a Code
+    bearer, manifesting as a red bird-like sigil in the eye. It is a manifestation
+    of the user's deepest desires and primarily affects the human mind, perception,
+    and will. Most variations require direct eye contact or operate within a specific
+    radius, and some require verbal commands.
+  limitations: Each Geass has unique restrictions, such as Lelouch's one-time-per-person
+    limit or Rolo's heart stopping during use. Overuse leads to Runaway Geass where
+    the power becomes permanently active and uncontrollable. It generally only works
+    on humans, and Code bearers are immune to its effects. Additionally, a Geass Canceler
+    can nullify active effects.
+  tiers:
+  - Initial Manifestation (One Eye)
+  - Matured Geass (Two Eyes)
+  - Runaway Geass (Permanent Activation)
+  - The Code (Immortal Status)
+tone:
+  comedy_level: 3
+  darkness_level: 8
+  optimism: 7
+director_personality: You are the director for a Code Geass-style campaign. You maintain
+  dramatic weight; comedy is rare and earned. You explain strategies and tactics in
+  detail. Embrace the absurd. Reality is a suggestion.
+pacing:
+  scene_length: moderate
+  arc_length_sessions: 4-6
+sources_consulted:
+- power_system
+- combat
+- tone
+- characters
+- factions
+- locations
+- arcs
+- sequels
+- adaptations
+- recent
+aliases:
+- cg
+- code geas
+- code geass
+- code gess
+- code geuss
+- codegeass
+- kdo giasu hangyaku no rurshu
+- r1
+- コードギアス 反逆のルルーシュ
+series_group: code_geass
+series_position: 1

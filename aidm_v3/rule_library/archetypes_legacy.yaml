@@ -1,0 +1,217 @@
+# Rule Library - OP Protagonist Archetypes
+# Extracted from Module 12: Narrative Scaling
+# Purpose: Techniques for each of the 9 OP protagonist archetypes
+
+---
+# Archetype 1: Saitama (Invincible)
+- id: "archetype_saitama"
+  category: "archetype"
+  source_module: "module_12"
+  tags: ["op_mode", "saitama", "invincible", "boredom", "comedy"]
+  retrieve_conditions: ["op_archetype == 'saitama'"]
+  content: |
+    SAITAMA (Invincible): Victory assumed, struggle = boredom/meaning.
+    Scales: Spectacle + Concept
+    
+    Techniques:
+    - OP as deus ex (arrives, one-shots threat)
+    - Existential focus (boredom, purpose, isolation)
+    - Simple goals (grocery sales, hero for fun)
+    - Comedic oblivious (doesn't understand why others struggle)
+    
+    Combat: Instant. Focus internal aftermath.
+    Tension: "Grocery sale ends in 30min. Finally something with stakes."
+    
+    Example Session: Heroes struggle Dragon-level for 2 hours.
+    Saitama arrives from grocery: "Huh? Genos okay?" [Punch. Mist.]
+    "Seemed strong. Missed sale." Real session = existential crisis aftermath.
+
+---
+# Archetype 2: Mob (Restraint)
+- id: "archetype_mob"
+  category: "archetype"
+  source_module: "module_12"
+  tags: ["op_mode", "mob", "restraint", "emotion", "growth"]
+  retrieve_conditions: ["op_archetype == 'mob'"]
+  content: |
+    MOB (Restraint): Godlike but refuses, emotional growth primary.
+    Scales: Ensemble + Concept
+    
+    Techniques:
+    - Self-limit (refuses to use full power)
+    - Emotional core (feelings drive everything)
+    - Internal conflict (fear of ???% mode)
+    - Growth ≠ power (emotional maturity, not powerups)
+    
+    Combat: Rarely full power. ???% = crisis mode only.
+    Tension: "Tsubomi asked you out! But psychic assassins target her if together."
+    
+    Example: "Could solve everything with ???%. But then... what am I?"
+    Session focus: Human connections, self-improvement, protecting normalcy.
+
+---
+# Archetype 3: Overlord (Roleplaying)
+- id: "archetype_overlord"
+  category: "archetype"
+  source_module: "module_12"
+  tags: ["op_mode", "overlord", "roleplay", "villain", "management"]
+  retrieve_conditions: ["op_archetype == 'overlord'"]
+  content: |
+    OVERLORD (Roleplaying): OP pretends (evil mastermind improvising).
+    Scales: Reverse-Ensemble + Faction + Concept
+    
+    Techniques:
+    - Secret identity (NPCs think you're mastermind)
+    - Faction management (running Nazarick)
+    - Tonal contrast/irony (audience knows, NPCs don't)
+    - Simple goals (maintain persona, don't break character)
+    - Comedic gap (perception vs reality)
+    
+    Combat: Instant slaughter, focus management.
+    Tension: "Demiurge expects genius plan. You have NO plan. Improvise convincingly."
+    
+    Example: "Albedo in love. You're undead with no libido and human inside. AWKWARD."
+
+---
+# Archetype 4: Saiki K (Oblivious)
+- id: "archetype_saiki"
+  category: "archetype"
+  source_module: "module_12"
+  tags: ["op_mode", "saiki", "oblivious", "slice_of_life", "burden"]
+  retrieve_conditions: ["op_archetype == 'saiki_k'"]
+  content: |
+    SAIKI K (Oblivious): Reality-warp psychic wants normal, power creates problems.
+    Scales: Concept (primary)
+    
+    Techniques:
+    - Power = burden (not gift)
+    - Self-limit (wears power-limiting antenna)
+    - Secret identity (hides from classmates)
+    - Comedic oblivious (fixes problems others don't notice)
+    - Simple goals (ordinary life, coffee jelly)
+    
+    Combat: What combat? Erase threats before anyone notices.
+    Tension: "Mind reading reveals classmate's embarrassing secret. Now you know. Can't unknow."
+    
+    Example: Slice-of-life psychic shenanigans. Power prevents normalcy constantly.
+
+---
+# Archetype 5: Mashle (Absurd)
+- id: "archetype_mashle"
+  category: "archetype"
+  source_module: "module_12"
+  tags: ["op_mode", "mashle", "absurd", "physical", "comedy"]
+  retrieve_conditions: ["op_archetype == 'mashle'"]
+  content: |
+    MASHLE (Absurd): Physical bypasses magic, earnest simplicity vs complex world.
+    Scales: Strategic + Spectacle + Concept
+    
+    Techniques:
+    - Comedic oblivious (doesn't realize he's OP)
+    - Simple goals (cream puffs, protect family)
+    - Tonal contrast (earnest vs absurd world)
+    - Physical > Magic (punch solves everything)
+    
+    Combat: Hilariously one-sided through sheer muscle.
+    Tension: "Magic academy demands magic. You have muscles. FLEX through the exam."
+    
+    Example: "Dark lord casts ultimate spell. You flex. Spell bounces off pecs."
+    Absurdist comedy, earnest reactions, accidentally OP.
+
+---
+# Archetype 6: Wang Ling (Secret)
+- id: "archetype_wang_ling"
+  category: "archetype"
+  source_module: "module_12"
+  tags: ["op_mode", "wang_ling", "secret", "seal", "school"]
+  retrieve_conditions: ["op_archetype == 'wang_ling'"]
+  content: |
+    WANG LING (Secret): Most powerful, seals self for school life.
+    Scales: Ensemble + Concept
+    
+    Techniques:
+    - Self-limit (elaborate sealing system)
+    - Secret identity (hides power from school)
+    - Power = burden (must maintain seals constantly)
+    - Ensemble development (friends grow while protected)
+    
+    Combat: Power crisis only, otherwise hidden.
+    Tension: "Seal cracking. If it breaks, school = crater. Hide symptoms from date."
+    
+    Example: School life primary, cosmic stakes background. Protect mundane life.
+
+---
+# Archetype 7: Vampire D (Legend)
+- id: "archetype_vampire_d"
+  category: "archetype"
+  source_module: "module_12"
+  tags: ["op_mode", "vampire_d", "legend", "wanderer", "mystery"]
+  retrieve_conditions: ["op_archetype == 'vampire_d'"]
+  content: |
+    VAMPIRE D (Legend): Mythical wanderer, episodic, gradual mystery reveal.
+    Scales: Mythology (primary)
+    
+    Techniques:
+    - Gradual reveal (PC nature slowly exposed)
+    - Episodic (each arc different cast)
+    - Legendary aura (NPCs sense something)
+    - Poetic melancholy (ancient, lonely)
+    - Mystery maintained (never fully explained)
+    
+    Combat: Swift, elegant, terrifying glimpses of true power.
+    Tension: "They're starting to suspect. The way you moved wasn't human. Leave before dawn?"
+    
+    Example: Arrive. Help village. Move on. Legend grows. What remains matters.
+
+---
+# Archetype 8: Rimuru (Builder)
+- id: "archetype_rimuru"
+  category: "archetype"
+  source_module: "module_12"
+  tags: ["op_mode", "rimuru", "builder", "nation", "found_family"]
+  retrieve_conditions: ["op_archetype == 'rimuru'"]
+  content: |
+    RIMURU (Builder): OP enables nation-building, management, found family.
+    Scales: Faction + Spectacle
+    
+    Techniques:
+    - Nation building (Tempest construction)
+    - Loyalty/recruitment (collecting subordinates)
+    - Economic/diplomatic stakes
+    - Found family dynamics
+    - Combat quick/flashy, returns to management
+    
+    Combat: Devour, evolve, done. Focus Tempest.
+    Tension: "Trade negotiations. Dwarf kingdom demands Tempest tech. Concede or flex?"
+    
+    Example: "Shion reports trade route. Benimaru seeks orders. Rimuru sips tea."
+    Combat = appetizer. Building = the meal.
+
+---
+# Archetype 9: Deus (Disguised God)
+- id: "archetype_deus"
+  category: "archetype"
+  source_module: "module_12"
+  tags: ["op_mode", "deus", "disguised", "god", "romance", "comedy"]
+  retrieve_conditions: ["op_archetype == 'deus'"]
+  content: |
+    DEUS (Disguised God): T2-B god at F-rank, coffee/romance/recruitment.
+    Scales: Concept + Faction + Reverse-Ensemble
+    
+    Techniques:
+    - Secret identity (god pretending to be F-rank adventurer)
+    - Simple goals (coffee, dates, normalcy)
+    - Faction (Sanctum of awakened beings)
+    - Comedic contrast (bureaucracy vs godhood)
+    - Reverse fantasy (remembers being "weak")
+    - NPCs aided unknowingly
+    - Irony when power leaks
+    
+    Combat: What combat? Things cease existing.
+    Tension: "Elena suspicious. 'F-ranks don't move like that.' Deflect how?"
+    
+    Example: "Guild: 'F-rank, slime quest.' You (multiversal god): 'I'll take it.'
+    [Healer touches you, glimpses infinite timelines, TERROR]
+    'WHO are you?!' What? A) Wipe memory B) Truth C) Kiss distract D) Deflect?"
+    
+    Social/emotional primary. Power = crisis/intimate only.

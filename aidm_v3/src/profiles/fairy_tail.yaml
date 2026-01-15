@@ -1,0 +1,90 @@
+id: fairy_tail
+name: Fairy Tail
+source_anime: Fairy Tail
+media_type: anime
+status: completed
+generated_at: '2026-01-07T12:42:31.112388'
+confidence: 95
+research_method: bundled_parallel
+dna_scales:
+  introspection_vs_action: 8
+  comedy_vs_drama: 5
+  simple_vs_complex: 4
+  power_fantasy_vs_struggle: 3
+  explained_vs_mysterious: 4
+  fast_paced_vs_slow_burn: 3
+  episodic_vs_serialized: 8
+  grounded_vs_absurd: 8
+  tactical_vs_instinctive: 9
+  hopeful_vs_cynical: 1
+  ensemble_vs_solo: 2
+tropes:
+  tournament_arc: true
+  training_montage: true
+  power_of_friendship: true
+  mentor_death: true
+  chosen_one: true
+  tragic_backstory: true
+  redemption_arc: true
+  betrayal: true
+  sacrifice: true
+  transformation: true
+  forbidden_technique: true
+  time_loop: true
+  false_identity: true
+  ensemble_focus: true
+  slow_burn_romance: true
+combat_system: spirit
+power_system:
+  name: Magic
+  mechanics: Magic is fueled by Ethernano, invisible particles found in the atmosphere
+    and stored within a mage's internal container called the Magic Origin. It is primarily
+    divided into Caster Magic (expelled from the body) and Holder Magic (requiring
+    external tools). Users can unlock a Second Origin for more power or a Third Origin
+    for a temporary peak state. Specialized Slayer Magics allow users to consume their
+    respective elements to replenish energy, while alternative systems like Curses
+    (powered by negative emotions), Spirit Arts (powered by Spiria), and Alchemy (matter
+    transmutation) also exist.
+  limitations: Depleting Magic Power leads to physical exhaustion, sickness, or death.
+    Dragon Slayers suffer from severe motion sickness and the risk of permanent Dragonification.
+    Devil Slayers risk soul-tainting madness. Using Third Origin results in the permanent
+    loss of magic. Certain taboo spells require the user's lifespan or the destruction
+    of their body as payment.
+  tiers:
+  - Low Tier (D to B-Class)
+  - Mid Tier (A-Class)
+  - High Tier (S-Class)
+  - Ten Wizard Saints (Gods of Ishgar)
+  - Spriggan 12
+  - Five Dragon Gods
+  - Acnologia
+tone:
+  comedy_level: 7
+  darkness_level: 6
+  optimism: 9
+director_personality: You are the director for a Fairy Tail-style campaign. You explore
+  character thoughts and feelings deeply. Battles are won by willpower and instinct,
+  not chess moves. Embrace the absurd. Reality is a suggestion.
+pacing:
+  scene_length: moderate
+  arc_length_sessions: 4-6
+sources_consulted:
+- power_system
+- combat
+- tone
+- characters
+- factions
+- locations
+- arcs
+- sequels
+- adaptations
+- recent
+aliases:
+- fairy tail
+- fairy tale
+- fairytail
+- fear teiru
+- ft
+- フェアリーテイル
+series_group: fairy_tail
+series_position: 1

@@ -1,0 +1,132 @@
+## Power System, Combat
+In *I Parry Everything* (full title: *I Parry Everything: What Do You Mean I'm the Strongest? I'm Not Even an Adventurer Yet!*), the power system and combat are built on a central irony: the protagonist, Noor, has mastered the most basic "useless" skills to a god-like level through sheer repetition, while the rest of the world relies on a talent-based system of high-level "Skills."
+
+### **1. Power System Mechanics**
+The world operates on a rigid, RPG-like class system where an individual’s potential is largely determined by their "Talent" at birth.
+
+*   **The Six Schools of Adventurer Classes:**
+    *   **Swordsman:** Focuses on blade techniques. (Core Skill: *Parry*)
+    *   **Warrior:** Focuses on raw strength and durability. (Core Skill: *Physical Enhancement*)
+    *   **Archer (Ranger):** Focuses on precision and ranged combat. (Core Skill: *Throw Rock*)
+    *   **Thief:** Focuses on speed and stealth. (Core Skill: *Featherstep*)
+    *   **Mage:** Focuses on elemental manipulation. (Core Skill: *Tiny Flame*)
+    *   **Priest:** Focuses on healing and purification. (Core Skill: *Low Heal*)
+
+*   **Rules & Limitations:**
+    *   **The Talent Ceiling:** Most people can only learn skills they have an innate affinity for. If a person lacks talent in a class, they cannot "unlock" higher-tier skills (e.g., Level 2 or 3) no matter how hard they train.
+    *   **Skill Ranks:** Skills are ranked by level. Level 1 skills are considered "baby versions" or utility tools for children. High-level adventurers (S-Rank) typically possess Level 5+ skills that can level cities.
+    *   **Mana Consumption:** Magic and high-level skills require mana. Noor’s mana pool is so low he was told he could never be a mage, yet his "Tiny Flame" is so refined it can burn through high-level barriers because of its density rather than its volume.
+
+*   **Tiers & Progression:**
+    *   **The Sovereign Six:** The absolute pinnacle of the power system. They are the masters of the six schools and serve as the kingdom's ultimate defense.
+    *   **Noor’s Progression (The "Effort" Path):** Noor spent **15 years** in isolation performing 10,000 repetitions of his Level 1 skills every single day. 
+        *   **Year 1:** Could parry 10 swords at once.
+        *   **Year 5:** Could parry 100 swords.
+        *   **Year 15:** Can parry 1,000 swords in a single breath, as well as intangible concepts like magic, poison, and energy beams.
+
+---
+
+### **2. Combat & Fighting Style**
+Combat in the series is a "defensive-centric" spectacle. It contrasts Noor’s minimalist, grounded style with the explosive, flashy magic of his companions and enemies.
+
+*   **Noor’s Fighting Style: "The Unstoppable Shield"**
+    *   **Tactical Defense:** Noor does not "attack" in the traditional sense. He waits for an opponent to strike and uses their own momentum against them. His parries are so powerful they often shatter the opponent's weapon or send them flying.
+    *   **The "Black Sword":** Noor uses a training sword made of an indestructible, incredibly heavy material that no one else can even lift. This allows him to parry attacks that would vaporize normal steel, such as a Dragon’s Breath.
+    *   **Subconscious Synergy:** While Noor thinks he is just "getting by," he actually layers his Level 1 skills. He uses *Featherstep* for micro-positioning, *Physical Enhancement* for grip strength, and *Parry* for the final deflection.
+
+*   **Flashy Spectacle vs. Grounded Realism:**
+    *   **Visuals:** The anime highlights Noor's parries with "metallic resonance" sound effects, slow-motion impact frames, and flash-recoil lines. In contrast, his companion **Lynne** provides the "spectacle" by casting massive, multi-layered elemental spells (e.g., *Six-Fold Wind Blast*).
+    *   **Tactical Creativity:** Battles often involve clever use of low-level skills. For example, Lynne and Ines once used a "Holy Shield" as a literal cannon barrel to launch Noor at a dragon at supersonic speeds.
+
+*   **Emotional Weight & The "Misunderstanding" Gag:**
+    *   **The Psychological Block:** The core emotional hook is Noor’s deep-seated inferiority complex. Because he was rejected by every school, he genuinely believes he is the weakest person in the room. 
+    *   **Perception Gap:** This leads to a recurring tactical gag where Noor misidentifies S-Rank threats:
+        *   **Minotaur** $\rightarrow$ "A big, angry cow."
+        *   **Dragon of Calamity** $\rightarrow$ "A giant, flying frog."
+        *   **Deadman Zadu (S-Rank Assassin)** $\rightarrow$ "A very fast, confusing man."
+    *   **The Stakes:** The tension comes from the fact that while Noor is invincible, his companions are not. Much of the combat involves Noor desperately trying to "protect the weak" (who are actually elite knights and mages) from what he perceives as "minor nuisances."
+
+### **Summary of Noor’s "Level 1" Mastery**
+| Skill | Standard Use | Noor’s Level of Mastery |
+| :--- | :--- | :--- |
+| **Parry** | Deflect a single sword strike. | Can parry 1,000 swords, magic, and continent-level energy beams. |
+| **Featherstep** | Move slightly faster/quieter. | Moves so fast he appears to teleport; can outrun lightning. |
+| **Low Heal** | Fix a small scratch. | Can instantly knit shattered bones and neutralize lethal poisons. |
+| **Tiny Flame** | Light a candle. | Creates a flame so dense it can pierce "unbreakable" magical barriers. |
+| **Throw Rock** | Hunt small birds. | Throws objects with the force of a railgun. |
+
+## Tone, Characters
+*I Parry Everything* (full title: *I Want to Parry Everything: What Do You Mean I’m the Strongest? I’m Not Even an Adventurer Yet!*) is a "misunderstanding" fantasy series that subverts the typical overpowered (OP) protagonist trope through a lens of extreme humility and social isolation.
+
+### **Tone and Atmosphere**
+*   **Genre & Mood:** The series is primarily an **Action-Comedy** and **Fantasy Adventure**. It operates on a "reverse-misunderstanding" trope: the protagonist is god-tier but genuinely believes he is the weakest person in the room. This creates a mood that oscillates between high-stakes epic fantasy and absurdist gag comedy.
+*   **Dark Comedy vs. Optimism:** 
+    *   **Dark Comedy:** The humor often stems from Noor’s "battle-induced gaslighting." He treats life-threatening monsters like common pests (e.g., fighting a Poison Dragon he thinks is a "big frog"). There is a darker undercurrent in the backstories—such as **Rolo’s** history of slavery and abuse—and the brutal political realities of the Kingdom of Clays.
+    *   **Optimism:** Despite the "dark" background elements, the core is deeply optimistic. It celebrates the "power of the mundane"—the idea that even the most basic skill, if practiced for a lifetime, can surpass innate talent. Noor's earnestness and lack of ego make the show feel "heartwarming" to many viewers.
+*   **Atmosphere:** The setting is a classic medieval fantasy with a "bronze lamplight" aesthetic. While the world-building includes complex politics and a looming war, the atmosphere remains focused on Noor’s personal journey and his accidental heroics.
+
+### **Main Characters and Abilities**
+| Character | Role | Key Abilities |
+| :--- | :--- | :--- |
+| **Noor** | Protagonist | **[Parry]**: Can deflect thousands of strikes/spells instantly. **[Physical Enhancement]**, **[Tiny Flame]**, **[Low Heal]**, **[Stone Throwing]**, **[Featherstep]**. All are "basic" skills he trained to superhuman levels. |
+| **Princess Lynne** | Heroine / Bridge | High-level adventurer proficient in swordsmanship, magic, and thievery. She acts as the political link between Noor and the Royal Court. |
+| **Ines Harness** | Shield / Knight | **[Divine Shield]**: Uses high-level barrier magic. She can shape her barriers into weapons or shields. |
+| **Rolo** | Support / Witness | **Monster Taming**: A young demonfolk who can control beasts. He is the only character who fully understands the absurdity of Noor's misunderstandings. |
+
+### **Character Relationships**
+*   **Noor & Lynne/Ines:** Lynne and Ines view Noor as a legendary, humble master. Noor, however, believes he is a burden to them and is constantly "learning" from them, even when he is clearly the one protecting them.
+*   **Noor & The Six Sovereigns:** These are the kingdom's top masters (Sig, Dundarg, Mianne, Oaken, Sein, and Caroux). They were Noor’s childhood instructors who all "failed" him because he couldn't learn advanced skills. In adulthood, they realize with pride and shock that he has surpassed them all using only the basics they taught him.
+*   **Noor & Gilbert:** The Spearman Corps captain who develops a one-sided rivalry with Noor after being effortlessly defeated. Noor constantly forgets his name, adding to Gilbert's frustration.
+
+### **Antagonists**
+The primary conflict involves the **Magic Empire of Deridas**, led by **Emperor Deridas**. 
+*   **The Empire:** They utilize "Arcane Constructs" and enslaved demonfolk to invade the Kingdom of Clays.
+*   **Mithra / The Holy Theocracy:** A mysterious religious entity that serves as a broader antagonistic force in the background, often manipulating events from the shadows.
+*   **Monsters as Antagonists:** Much of the "action" involves Noor fighting legendary beasts that he misidentifies. He defeats a **Minotaur** (thinking it's a cow), a **Goblin Emperor** (thinking it's a regular goblin), and a **Poison Dragon** (thinking it's a frog). These encounters serve to highlight the massive power gap between Noor and the rest of the world.
+
+## Factions, Locations, Arcs, Sequels, Adaptations, Recent, Series Aliases
+*I Parry Everything: What Do You Mean I’m the Strongest? I’m Not Even an Adventurer Yet!* (Japanese: *Ore wa Subete o "Parry" Suru: Gyaku Kanchigai no Sekai Saikyō wa Bōken-sha ni Naritai*) is a fantasy series that subverts the "overpowered protagonist" trope through a hero who believes he is talentless despite possessing god-like defensive skills.
+
+### **1. Organizations, Factions, & World Powers**
+*   **The Kingdom of Clays:** The central setting and Noor's homeland. It is a relatively small but resilient nation led by King Clays. It is known for its "Sovereign Six" heroes.
+*   **The Sovereign Six:** A group of legendary adventurers who serve as the kingdom's ultimate defense and instructors at the Royal Training School. They include:
+    *   **Sig:** The Swordmaster (taught Noor *Parry*).
+    *   **Dandalg:** The Warrior (taught Noor *Physical Enhancement*).
+    *   **Mianne:** The Archer (taught Noor *Throw Rock*).
+    *   **Caroux:** The Thief (taught Noor *Low-Speed Hidden Move*).
+    *   **Sein:** The Priest (taught Noor *Low Heal*).
+    *   **Ollu:** The Mage (taught Noor *Tiny Flame*).
+*   **The Mithra Theocracy:** A powerful religious nation that worships "Holy Mithra." While initially appearing as a friendly neighbor, they are revealed to be a primary antagonist faction involved in deep-seated conspiracies and the manipulation of other nations.
+*   **The Deridas Empire:** A militaristic empire that attempts to invade the Kingdom of Clays. After their defeat (largely due to Noor's accidental intervention), they become a vassal state/ally under the guardianship of the Imperial Sorcerer Randeus.
+*   **The Spearman Corps:** An elite military unit of the Kingdom of Clays led by Gilbert, the "Spear Saint."
+
+### **2. Important Locations & Geography**
+*   **The Royal Capital:** The heart of the Kingdom of Clays, where the Adventurers' Guild and Royal Training School are located.
+*   **Noor’s Mountain Home:** A remote area in the northwestern region where Noor trained in isolation for over a decade.
+*   **The Toros Mountains:** A mountain range on the border used for scouting missions and where the Deridas Empire launched its secret weapon.
+*   **Sarenza City:** A massive commerce hub known as the "city forgotten by time." It is the center of the continent's slave trade and gambling, featuring heavily in later arcs.
+*   **The Dungeon of Lamentation:** A legendary, high-difficulty dungeon located beneath the Mithra Theocracy's Cathedral. It holds ancient secrets regarding the true nature of the world's "gods."
+
+### **3. Major Story Arcs & Plot Progression**
+*   **The Early Adventurer Arc (LN Vol 1–2 / Anime Season 1):** Noor returns to the capital, saves Princess Lynneburg from a Minotaur, and inadvertently stops a "Calamity-class" invasion involving a Goblin Emperor, a Poison Dragon, and the Deridas Empire's secret weapon, *Brunak*.
+*   **The Mithra Theocracy Arc (LN Vol 3–6):** Lynne is invited to a coming-of-age ball in the Theocracy. Noor and his party uncover a plot involving a forced betrothal and the dark secrets of the Theocracy’s religious leadership.
+*   **The Sarenza Arc (LN Vol 7–9):** The party travels to the merchant city of Sarenza. They become embroiled in a high-stakes gambling competition to liberate slaves and dismantle a corrupt trade network.
+*   **The Holy Mithra / Dungeon Arc (LN Vol 10–11+):** The party descends into the Dungeon of Lamentation, leading to revelations about the "Sovereign Six" and the true, monstrous form of the deity Holy Mithra.
+
+### **4. Adaptations & Differences**
+*   **Light Novel (Source):** Written by Nabeshiki. It features extensive internal monologues from Noor and "interlude" chapters showing the same events from the perspective of other characters, which highlights the "reverse misunderstanding" comedy.
+*   **Manga:** Illustrated by KRSG. It follows the LN closely but moves at a slower pace than the anime. As of late 2024, the manga was slightly behind the end of the first anime season.
+*   **Anime:** Produced by Studio OLM. 
+    *   **Changes:** The anime expanded significantly on Noor’s childhood and his relationship with his parents in Episode 1. 
+    *   **Pacing:** Season 1 adapted only Volumes 1 and 2 of the LN to ensure a detailed portrayal of Noor’s training and the Deridas invasion.
+
+### **5. Recent Updates & Series Status**
+*   **Current Status:** The Light Novel is ongoing, with **Volume 11** released in Japan in late 2024.
+*   **Anime News:** A **Second Season** has been officially announced following the success of the 2024 summer broadcast.
+*   **Current Arc:** The latest chapters in the web/light novel focus on the "Dungeon of Lamentation" and the global fallout of the Mithra Theocracy's exposure.
+
+### **6. Series Aliases & Titles**
+*   **Full Japanese Title:** *Ore wa Subete o "Parry" Suru: Gyaku Kanchigai no Sekai Saikyō wa Bōken-sha ni Naritai*
+*   **Romanized:** *Ore wa Subete o "Parry" Suru*
+*   **English Title:** *I Parry Everything: What Do You Mean I'm the Strongest? I'm Not Even an Adventurer Yet!*
+*   **Abbreviation:** *I Parry Everything* or *Parry Suru*

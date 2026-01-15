@@ -1,0 +1,86 @@
+id: baki
+name: Baki
+source_anime: Baki
+media_type: anime
+status: completed
+generated_at: '2026-01-12T14:40:46.583215'
+confidence: 95
+research_method: bundled_parallel
+aliases:
+- baki
+- baki the grappler
+- baki the ultimate fighter
+- gb
+- grappler baki
+- グラップラー刃牙
+dna_scales:
+  introspection_vs_action: 8
+  comedy_vs_drama: 3
+  simple_vs_complex: 3
+  power_fantasy_vs_struggle: 4
+  explained_vs_mysterious: 2
+  fast_paced_vs_slow_burn: 4
+  episodic_vs_serialized: 9
+  grounded_vs_absurd: 10
+  tactical_vs_instinctive: 6
+  hopeful_vs_cynical: 3
+  ensemble_vs_solo: 4
+tropes:
+  tournament_arc: true
+  training_montage: true
+  power_of_friendship: false
+  mentor_death: true
+  chosen_one: true
+  tragic_backstory: true
+  redemption_arc: true
+  betrayal: true
+  sacrifice: true
+  transformation: true
+  forbidden_technique: true
+  time_loop: false
+  false_identity: true
+  ensemble_focus: true
+  slow_burn_romance: false
+combat_system: spectacle
+power_system:
+  name: Extreme Adaptation & Martial Arts (Genetics, Imagination, and Pseudo-Science)
+  mechanics: 'The system is built on three pillars: Genetics (the Hanma bloodline''s
+    Demon Back and Demon Brain), Psychology (Imagination Training that creates subjective
+    reality and physical injuries), and Pseudo-Science (manual endorphin release,
+    Aiki/Shaori force manipulation, and exploiting the 0.5-second unconsciousness
+    gap).'
+  limitations: The Knowledge Gap prevents imagining unencountered forces; non-Hanma
+    characters face strict Biological Constraints or 'hard caps'; and the Demon Back's
+    revitalization is typically a one-time trigger per fight followed by life-threatening
+    exhaustion.
+  tiers:
+  - 'Tier 0: The Ogre (Yujiro Hanma)'
+  - 'Tier 1: Transcendent (Baki Hanma, Musashi Miyamoto)'
+  - 'Tier 2: Apex Predators (Pickle, Kaku Kaioh, Jack Hanma)'
+  - 'Tier 3: World Class (Biscuit Oliva, Hanayama, Retsu Kaioh)'
+  - 'Tier 4: Masters (Doppo Orochi, Gouki Shibukawa)'
+  - 'Tier 5: Street/Jobber (Death Row Inmates, Sumo Jobbers)'
+tone:
+  comedy_level: 4
+  darkness_level: 7
+  optimism: 7
+director_personality: You are the director for a Baki-style campaign. You explore
+  character thoughts and feelings deeply. You maintain dramatic weight; comedy is
+  rare and earned. Embrace the absurd. Reality is a suggestion.
+pacing:
+  scene_length: moderate
+  arc_length_sessions: 4-6
+sources_consulted:
+- power_system
+- combat
+- tone
+- characters
+- factions
+- locations
+- arcs
+- sequels
+- series_aliases
+- adaptations
+- recent
+series_group: baki
+series_position: 1

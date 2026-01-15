@@ -1,0 +1,84 @@
+id: black_clover
+name: Black Clover
+source_anime: Black Clover
+media_type: anime
+status: completed
+generated_at: '2026-01-06T20:56:08.265390'
+confidence: 95
+research_method: bundled_parallel
+dna_scales:
+  introspection_vs_action: 8
+  comedy_vs_drama: 5
+  simple_vs_complex: 6
+  power_fantasy_vs_struggle: 8
+  explained_vs_mysterious: 4
+  fast_paced_vs_slow_burn: 2
+  episodic_vs_serialized: 9
+  grounded_vs_absurd: 8
+  tactical_vs_instinctive: 7
+  hopeful_vs_cynical: 2
+  ensemble_vs_solo: 3
+tropes:
+  tournament_arc: true
+  training_montage: true
+  power_of_friendship: true
+  mentor_death: true
+  chosen_one: true
+  tragic_backstory: true
+  redemption_arc: true
+  betrayal: true
+  sacrifice: true
+  transformation: true
+  forbidden_technique: true
+  time_loop: false
+  false_identity: true
+  ensemble_focus: true
+  slow_burn_romance: true
+combat_system: tactical
+power_system:
+  name: Magic and Grimoires
+  mechanics: Mages refine natural Mana into Magic Power (Maryoku) to cast spells.
+    Grimoires act as a focus for complex magic, with spells manifesting through growth.
+    Techniques like Mana Zone and Mana Method allow for environmental manipulation
+    and True Magic. Anti-Magic exists as a unique nullifying force for those without
+    mana.
+  limitations: Magic consumption causes physical fatigue and potential death from
+    depletion. Mages are generally restricted to one attribute and must follow elemental
+    rock-paper-scissors logic. Forbidden magic results in soul corruption known as
+    Weg.
+  tiers:
+  - Stage 9 to 1
+  - Stage 0
+  - Arcane Stage
+  - Saint Stage
+tone:
+  comedy_level: 6
+  darkness_level: 7
+  optimism: 9
+director_personality: You are the director for a Black Clover-style campaign. You
+  explore character thoughts and feelings deeply. Battles are won by willpower and
+  instinct, not chess moves. Embrace the absurd. Reality is a suggestion. The protagonist
+  is powerful; challenges come from elsewhere.
+pacing:
+  scene_length: moderate
+  arc_length_sessions: 4-6
+sources_consulted:
+- power_system
+- combat
+- tone
+- characters
+- factions
+- locations
+- arcs
+- sequels
+- adaptations
+- recent
+aliases:
+- bc
+- black clover
+- black cloverr
+- blackclover
+- burakku kurb
+- ブラッククローバー
+series_group: black_clover
+series_position: 1

@@ -1,0 +1,78 @@
+id: dandadan
+name: DanDaDan
+source_anime: DanDaDan
+media_type: anime
+status: completed
+generated_at: '2026-01-07T15:38:37.452298'
+confidence: 95
+research_method: bundled_parallel
+dna_scales:
+  introspection_vs_action: 7
+  comedy_vs_drama: 6
+  simple_vs_complex: 5
+  power_fantasy_vs_struggle: 7
+  explained_vs_mysterious: 6
+  fast_paced_vs_slow_burn: 3
+  episodic_vs_serialized: 8
+  grounded_vs_absurd: 9
+  tactical_vs_instinctive: 7
+  hopeful_vs_cynical: 2
+  ensemble_vs_solo: 3
+tropes:
+  tournament_arc: false
+  training_montage: true
+  power_of_friendship: true
+  mentor_death: false
+  chosen_one: false
+  tragic_backstory: true
+  redemption_arc: true
+  betrayal: false
+  sacrifice: false
+  transformation: true
+  forbidden_technique: false
+  time_loop: false
+  false_identity: false
+  ensemble_focus: true
+  slow_burn_romance: true
+combat_system: spectacle
+power_system:
+  name: Spiritual and Extraterrestrial Fusion
+  mechanics: A hybrid system where humans host Yokai auras for physical transformation,
+    utilize Nanoskin technology that responds to imagination, and employ Kotodama
+    to manifest spoken words into reality through conviction.
+  limitations: Usage is restricted by the 'All Out' limit (twice-daily maximum for
+    high speed), extreme physical exhaustion, the necessity for mental clarity to
+    maintain technology, and the requirement of physical anchors for spirits.
+  tiers:
+  - Physical Conditioning
+  - Spiritual Mastery
+  - Top-tier (Evil Eye/Okarun)
+tone:
+  comedy_level: 8
+  darkness_level: 6
+  optimism: 8
+director_personality: You are the director for a DanDaDan-style campaign. You explore
+  character thoughts and feelings deeply. Battles are won by willpower and instinct,
+  not chess moves. Embrace the absurd. Reality is a suggestion.
+pacing:
+  scene_length: moderate
+  arc_length_sessions: 4-6
+sources_consulted:
+- power_system
+- combat
+- tone
+- characters
+- factions
+- locations
+- arcs
+- sequels
+- adaptations
+- recent
+aliases:
+- dan da dan
+- dandadan
+- dandandan
+- ddd
+- ダンダダン
+series_group: dandadan
+series_position: 1

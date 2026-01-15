@@ -1,0 +1,85 @@
+id: hells_paradise
+name: Hell's Paradise
+source_anime: Hell's Paradise
+media_type: anime
+status: completed
+generated_at: '2026-01-11T10:38:37.930953'
+confidence: 95
+research_method: bundled_parallel
+aliases:
+- hells paradise
+- hells paradise jigokuraku
+- hellsparadise
+- jigokuraku
+- 地獄楽
+dna_scales:
+  introspection_vs_action: 6
+  comedy_vs_drama: 2
+  simple_vs_complex: 7
+  power_fantasy_vs_struggle: 8
+  explained_vs_mysterious: 4
+  fast_paced_vs_slow_burn: 3
+  episodic_vs_serialized: 10
+  grounded_vs_absurd: 7
+  tactical_vs_instinctive: 4
+  hopeful_vs_cynical: 3
+  ensemble_vs_solo: 3
+tropes:
+  tournament_arc: false
+  training_montage: true
+  power_of_friendship: true
+  mentor_death: true
+  chosen_one: false
+  tragic_backstory: true
+  redemption_arc: true
+  betrayal: true
+  sacrifice: true
+  transformation: true
+  forbidden_technique: true
+  time_loop: false
+  false_identity: true
+  ensemble_focus: true
+  slow_burn_romance: true
+combat_system: tactical
+power_system:
+  name: Tao (The Way)
+  mechanics: Tao is a life energy permeating all existence that requires users to
+    maintain the 'Middle Way'—a state of balancing contradictory emotions and physical
+    states. It is stored in the Tanden and categorized into five elements (Wood, Fire,
+    Earth, Metal, Water) that interact through cycles of Restoration (Soi) and Hindrance
+    (Sooku).
+  limitations: The primary risk is Arborification, a 'flower-disease' that turns the
+    user into a plant-human hybrid upon overuse. The Tanden serves as a vital physical
+    weak point, and users must maintain a precise psychological balance to effectively
+    harness the energy.
+  tiers:
+  - Doin (Physical Exercise)
+  - Taoku (Breathing)
+  - Shuitsu (Meditation)
+  - Chuen (Internal Pathways)
+  - Bokujutsu (Harmonization)
+  - Kishikai (Transcendental Form)
+tone:
+  comedy_level: 2
+  darkness_level: 8
+  optimism: 7
+director_personality: You are the director for a Hell's Paradise-style campaign. You
+  maintain dramatic weight; comedy is rare and earned. The protagonist is powerful;
+  challenges come from elsewhere.
+pacing:
+  scene_length: moderate
+  arc_length_sessions: 4-6
+sources_consulted:
+- power_system
+- combat
+- tone
+- characters
+- factions
+- locations
+- arcs
+- sequels
+- adaptations
+- recent
+- series_aliases
+series_group: hells_paradise
+series_position: 1

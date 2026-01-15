@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AIDM v3 - Anime Interactive Dungeon Master</title>
+    <link rel="stylesheet" href="css/main.css?v=3">
+    <script src="js/marked.min.js"></script>
+</head>
+
+<body>
+    <div class="app">
+        <!-- Navigation -->
+        <nav class="nav">
+            <div class="nav-brand">
+                <span class="brand-icon">⚔️</span>
+                <span class="brand-text">AIDM v3</span>
+            </div>
+            <div class="nav-links">
+                <a href="#game" class="nav-link active" data-page="game">Game</a>
+                <a href="#settings" class="nav-link" data-page="settings">Settings</a>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="main">
+            <!-- Game Page -->
+            <div id="game-page" class="page active">
+                <div class="game-container">
+                    <!-- Left Sidebar: Character Panel -->
+                    <aside class="sidebar sidebar-left" id="left-sidebar">
+                        <!-- Character Section -->
+                        <div class="sidebar-section" data-section="character">
+                            <div class="section-header" onclick="toggleSection('character')">
+                                <span>🎮 CHARACTER</span>
+                                <span class="collapse-icon">▼</span>
+                            </div>
+                            <div class="section-content" id="character-section">
+                                <div class="character-name" id="char-name">Loading...</div>
+                                <div class="character-level">Lvl <span id="char-level">1</span> • <span
+                                        id="char-class">Adventurer</span></div>
+
+                                <!-- HP Bar -->
+                                <div class="stat-bar">
+                                    <div class="bar-label">❤️ HP</div>
+                                    <div class="bar-container hp-bar">
+                                        <div class="bar-fill" id="hp-fill" style="width: 100%"></div>
+                                        <span class="bar-text"><span id="hp-current">100</span>/<span
+                                                id="hp-max">100</span></span>
+                                    </div>
+                                </div>
+
+                                <!-- MP Bar -->
+                                <div class="stat-bar">
+                                    <div class="bar-label">💙 MP</div>
+                                    <div class="bar-container mp-bar">
+                                        <div class="bar-fill" id="mp-fill" style="width: 100%"></div>
+                                        <span class="bar-text"><span id="mp-current">50</span>/<span
+                                                id="mp-max">50</span></span>
+                                    </div>
+                                </div>
+
+                                <!-- SP Bar -->
+                                <div class="stat-bar">
+                                    <div class="bar-label">⚡ SP</div>
+                                    <div class="bar-container sp-bar">
+                                        <div class="bar-fill" id="sp-fill" style="width: 100%"></div>
+                                        <span class="bar-text"><span id="sp-current">50</span>/<span
+                                                id="sp-max">50</span></span>
+                                    </div>
+                                </div>
+
+                                <!-- XP Bar -->
+                                <div class="stat-bar xp-bar-container">
+                                    <div class="bar-label">✨ XP</div>
+                                    <div class="bar-container xp-bar">
+                                        <div class="bar-fill" id="xp-fill" style="width: 0%"></div>
+                                        <span class="bar-text"><span id="xp-current">0</span>/<span
+                                                id="xp-max">100</span></span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Stats Section -->
+                        <div class="sidebar-section" data-section="stats">
+                            <div class="section-header" onclick="toggleSection('stats')">
+                                <span>⚔️ STATS</span>
+                                <span class="collapse-icon">▼</span>
+                            </div>
+                            <div class="section-content" id="stats-section">
+                                <div class="stats-grid" id="stats-grid">
+                                    <!-- Populated by JS -->
+                                </div>
+                                <div class="power-tier">Power: <span id="power-tier">T10</span></div>
+                            </div>
+                        </div>
+
+                        <!-- Situation Section -->
+                        <div class="sidebar-section" data-section="situation">
+                            <div class="section-header" onclick="toggleSection('situation')">
+                                <span>📍 SITUATION</span>
+                                <span class="collapse-icon">▼</span>
+                            </div>
+                            <div class="section-content" id="situation-section">
+                                <div class="context-item">
+                                    <span class="label">Profile:</span>
+                                    <span id="ctx-profile">Loading...</span>
+                                </div>
+                                <div class="context-item">
+                                    <span class="label">Location:</span>
+                                    <span id="ctx-location">-</span>
+                                </div>
+                                <div class="context-item">
+                                    <span class="label">Arc:</span>
+                                    <span id="ctx-arc">-</span>
+                                </div>
+                            </div>
+                        </div>
+                    </aside>
+
+                    <!-- Narrative Area -->
+                    <div class="narrative-area">
+                        <div id="narrative-display" class="narrative-display">
+                            <div class="welcome-message">
+                                <h2>Welcome, Adventurer</h2>
+                                <p>Type your action below to begin your story.</p>
+                            </div>
+                        </div>
+
+                        <!-- Input Area -->
+                        <div class="input-area">
+                            <textarea id="player-input" placeholder="What do you do?" rows="2"></textarea>
+                            <button id="submit-action" class="btn-primary">
+                                <span class="btn-text">Send</span>
+                                <span class="btn-loading" style="display: none;">⏳</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Right Sidebar: Relations Panel -->
+                    <aside class="sidebar sidebar-right" id="right-sidebar">
+                        <!-- NPCs Section -->
+                        <div class="sidebar-section" data-section="npcs">
+                            <div class="section-header" onclick="toggleSection('npcs')">
+                                <span>💕 NPCs</span>
+                                <span class="collapse-icon">▼</span>
+                            </div>
+                            <div class="section-content" id="npcs-section">
+                                <div class="npc-list" id="npc-list">
+                                    <div class="empty-state">No NPCs met yet</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Factions Section -->
+                        <div class="sidebar-section" data-section="factions">
+                            <div class="section-header" onclick="toggleSection('factions')">
+                                <span>⚔️ FACTIONS</span>
+                                <span class="collapse-icon">▼</span>
+                            </div>
+                            <div class="section-content" id="factions-section">
+                                <div class="faction-list" id="faction-list">
+                                    <div class="empty-state">No factions known</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Quests Section -->
+                        <div class="sidebar-section" data-section="quests">
+                            <div class="section-header" onclick="toggleSection('quests')">
+                                <span>📜 QUESTS</span>
+                                <span class="collapse-icon">▼</span>
+                            </div>
+                            <div class="section-content" id="quests-section">
+                                <div class="quest-list" id="quest-list">
+                                    <div class="empty-state">No active quests</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Debug Section (collapsed by default) -->
+                        <div class="sidebar-section collapsed" data-section="debug">
+                            <div class="section-header" onclick="toggleSection('debug')">
+                                <span>🔧 DEBUG</span>
+                                <span class="collapse-icon">▶</span>
+                            </div>
+                            <div class="section-content" id="debug-section" style="display: none;">
+                                <div class="debug-item">
+                                    <span class="label">Intent:</span>
+                                    <span id="dbg-intent">-</span>
+                                </div>
+                                <div class="debug-item">
+                                    <span class="label">Epicness:</span>
+                                    <span id="dbg-epicness">-</span>
+                                </div>
+                                <div class="debug-item">
+                                    <span class="label">Outcome:</span>
+                                    <span id="dbg-outcome">-</span>
+                                </div>
+                                <div class="debug-item">
+                                    <span class="label">Weight:</span>
+                                    <span id="dbg-weight">-</span>
+                                </div>
+                                <div class="debug-item">
+                                    <span class="label">Latency:</span>
+                                    <span id="dbg-latency">-</span>
+                                </div>
+                            </div>
+                        </div>
+                    </aside>
+                </div>
+            </div>
+
+            <!-- Settings Page -->
+            <div id="settings-page" class="page">
+                <div class="settings-container">
+                    <h2>⚙️ Model Configuration</h2>
+                    <p class="settings-desc">Configure which AI models power your experience. Set base defaults, or
+                        override for specific agents.</p>
+
+                    <!-- Settings Content (previously Advanced tab) -->
+                    <div id="settings-content">
+                        <!-- No tabs needed - single unified settings view -->
+
+                        <!-- Provider Warnings Banner (populated by JS) -->
+                        <div id="provider-warnings" class="provider-warnings" style="display: none;">
+                            <!-- JS will populate with warnings -->
+                        </div>
+
+                        <!-- Extended Thinking Toggle -->
+                        <div class="setting-card"
+                            style="margin-bottom: 1.5rem; background: linear-gradient(135deg, rgba(138, 43, 226, 0.1), rgba(75, 0, 130, 0.1));">
+                            <div style="display: flex; align-items: center; justify-content: space-between;">
+                                <div>
+                                    <h3 style="margin: 0;">🧠 Extended Thinking</h3>
+                                    <p class="setting-desc" style="margin: 0.5rem 0 0;">Enable deeper reasoning for
+                                        Director, Key Animator, Research, Combat, NPC Reaction, and Calibration
+                                        agents
+                                    </p>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                                    <span class="warning-hint"
+                                        title="⚠️ May use more tokens and increase response latency. Best for complex creative tasks.">⚠️</span>
+                                    <label class="toggle-switch">
+                                        <input type="checkbox" id="extended-thinking-toggle">
+                                        <span class="toggle-slider"></span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Base Defaults Section -->
+                        <h3 style="margin: 1rem 0 0.5rem; color: var(--accent-secondary);">📌 Base Defaults</h3>
+                        <p class="setting-desc" style="margin-bottom: 1rem;">Default models for unconfigured agents.
+                            Each tier has a specific use case.</p>
+
+                        <div class="settings-grid" style="margin-bottom: 1.5rem;">
+                            <!-- Base Fast -->
+                            <div class="setting-card">
+                                <h3>🚀 Base Fast</h3>
+                                <p class="setting-desc">For quick judgments: intent, outcome, validator, combat, etc.
+                                </p>
+                                <div class="setting-inputs">
+                                    <select id="base_fast-provider" class="provider-select" data-agent="base_fast">
+                                        <option value="google">Google</option>
+                                        <option value="anthropic">Anthropic</option>
+                                        <option value="openai">OpenAI</option>
+                                    </select>
+                                    <select id="base_fast-model" class="model-select" data-agent="base_fast"></select>
+                                </div>
+                            </div>
+
+                            <!-- Base Thinking -->
+                            <div class="setting-card">
+                                <h3>🧠 Base Thinking</h3>
+                                <p class="setting-desc">For complex reasoning: director, research</p>
+                                <div class="setting-inputs">
+                                    <select id="base_thinking-provider" class="provider-select"
+                                        data-agent="base_thinking">
+                                        <option value="google">Google</option>
+                                        <option value="anthropic">Anthropic</option>
+                                        <option value="openai">OpenAI</option>
+                                    </select>
+                                    <select id="base_thinking-model" class="model-select"
+                                        data-agent="base_thinking"></select>
+                                </div>
+                            </div>
+
+                            <!-- Base Creative -->
+                            <div class="setting-card featured">
+                                <h3>🎬 Base Creative</h3>
+                                <p class="setting-desc">For prose generation: key animator, calibration</p>
+                                <div class="setting-inputs">
+                                    <select id="base_creative-provider" class="provider-select"
+                                        data-agent="base_creative">
+                                        <option value="google">Google</option>
+                                        <option value="anthropic">Anthropic</option>
+                                        <option value="openai">OpenAI</option>
+                                    </select>
+                                    <select id="base_creative-model" class="model-select"
+                                        data-agent="base_creative"></select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Per-Agent Overrides (Collapsible) -->
+                        <div class="sidebar-section collapsed" data-section="agent-overrides">
+                            <div class="section-header" onclick="toggleSection('agent-overrides')"
+                                style="cursor: pointer; padding: 0.75rem; background: rgba(255,255,255,0.05); border-radius: 8px; margin: 1rem 0 0.5rem;">
+                                <span style="color: var(--text-secondary);">🤖 Per-Agent Overrides</span>
+                                <span class="collapse-icon">▶</span>
+                            </div>
+                            <p class="setting-desc" style="margin-bottom: 1rem;">Override the base defaults for specific
+                                agents.</p>
+
+                            <div class="section-content" id="agent-overrides-section" style="display: none;">
+                                <div class="settings-grid" id="model-settings">
+                                    <!-- Intent Classifier -->
+                                    <div class="setting-card">
+                                        <h3>🎯 Intent Classifier</h3>
+                                        <p class="setting-desc">Parses player actions into intents (fast model
+                                            preferred)</p>
+                                        <div class="setting-inputs">
+                                            <select id="intent-provider" class="provider-select"
+                                                data-agent="intent_classifier">
+                                                <option value="google">Google</option>
+                                                <option value="anthropic">Anthropic</option>
+                                                <option value="openai">OpenAI</option>
+                                            </select>
+                                            <select id="intent-model" class="model-select"
+                                                data-agent="intent_classifier"></select>
+                                        </div>
+                                    </div>
+
+                                    <!-- Outcome Judge -->
+                                    <div class="setting-card">
+                                        <h3>⚖️ Outcome Judge</h3>
+                                        <p class="setting-desc">Determines action success/failure (fast model preferred)
+                                        </p>
+                                        <div class="setting-inputs">
+                                            <select id="outcome-provider" class="provider-select"
+                                                data-agent="outcome_judge">
+                                                <option value="google">Google</option>
+                                                <option value="anthropic">Anthropic</option>
+                                                <option value="openai">OpenAI</option>
+                                            </select>
+                                            <select id="outcome-model" class="model-select"
+                                                data-agent="outcome_judge"></select>
+                                        </div>
+                                    </div>
+
+                                    <!-- Key Animator -->
+                                    <div class="setting-card featured">
+                                        <h3>🎬 Key Animator</h3>
+                                        <p class="setting-desc">Generates narrative prose output (creative model
+                                            preferred)</p>
+                                        <div class="setting-inputs">
+                                            <select id="animator-provider" class="provider-select"
+                                                data-agent="key_animator">
+                                                <option value="google">Google</option>
+                                                <option value="anthropic">Anthropic</option>
+                                                <option value="openai">OpenAI</option>
+                                            </select>
+                                            <select id="animator-model" class="model-select"
+                                                data-agent="key_animator"></select>
+                                        </div>
+                                    </div>
+
+                                    <!-- Director -->
+                                    <div class="setting-card">
+                                        <h3>🎭 Director</h3>
+                                        <p class="setting-desc">Plans campaign arcs and story beats (reasoning model
+                                            preferred)
+                                        </p>
+                                        <div class="setting-inputs">
+                                            <select id="director-provider" class="provider-select"
+                                                data-agent="director">
+                                                <option value="google">Google</option>
+                                                <option value="anthropic">Anthropic</option>
+                                                <option value="openai">OpenAI</option>
+                                            </select>
+                                            <select id="director-model" class="model-select"
+                                                data-agent="director"></select>
+                                        </div>
+                                    </div>
+
+                                    <!-- Research Agent -->
+                                    <div class="setting-card">
+                                        <h3>🔍 Research Agent</h3>
+                                        <p class="setting-desc">Researches anime via web search (search-enabled model
+                                            preferred)
+                                        </p>
+                                        <div class="setting-inputs">
+                                            <select id="research-provider" class="provider-select"
+                                                data-agent="research">
+                                                <option value="google">Google</option>
+                                                <option value="anthropic">Anthropic</option>
+                                                <option value="openai">OpenAI</option>
+                                            </select>
+                                            <select id="research-model" class="model-select"
+                                                data-agent="research"></select>
+                                        </div>
+                                    </div>
+
+                                    <!-- Scope Agent -->
+                                    <div class="setting-card">
+                                        <h3>📏 Scope Agent</h3>
+                                        <p class="setting-desc">Classifies series complexity for research depth (fast
+                                            model
+                                            preferred)
+                                        </p>
+                                        <div class="setting-inputs">
+                                            <select id="scope-provider" class="provider-select" data-agent="scope">
+                                                <option value="google">Google</option>
+                                                <option value="anthropic">Anthropic</option>
+                                                <option value="openai">OpenAI</option>
+                                            </select>
+                                            <select id="scope-model" class="model-select" data-agent="scope"></select>
+                                        </div>
+                                    </div>
+
+                                    <!-- Validator -->
+                                    <div class="setting-card">
+                                        <h3>✅ Validator</h3>
+                                        <p class="setting-desc">Validates output quality and completeness (fast model
+                                            preferred)
+                                        </p>
+                                        <div class="setting-inputs">
+                                            <select id="validator-provider" class="provider-select"
+                                                data-agent="validator">
+                                                <option value="google">Google</option>
+                                                <option value="anthropic">Anthropic</option>
+                                                <option value="openai">OpenAI</option>
+                                            </select>
+                                            <select id="validator-model" class="model-select"
+                                                data-agent="validator"></select>
+                                        </div>
+                                    </div>
+
+                                    <!-- Combat Agent -->
+                                    <div class="setting-card">
+                                        <h3>⚔️ Combat</h3>
+                                        <p class="setting-desc">Resolves combat actions and damage (fast model
+                                            preferred)</p>
+                                        <div class="setting-inputs">
+                                            <select id="combat-provider" class="provider-select" data-agent="combat">
+                                                <option value="google">Google</option>
+                                                <option value="anthropic">Anthropic</option>
+                                                <option value="openai">OpenAI</option>
+                                            </select>
+                                            <select id="combat-model" class="model-select" data-agent="combat"></select>
+                                        </div>
+                                    </div>
+
+                                    <!-- Progression Agent -->
+                                    <div class="setting-card">
+                                        <h3>📈 Progression</h3>
+                                        <p class="setting-desc">Handles XP, leveling, and ability unlocks (fast model
+                                            preferred)
+                                        </p>
+                                        <div class="setting-inputs">
+                                            <select id="progression-provider" class="provider-select"
+                                                data-agent="progression">
+                                                <option value="google">Google</option>
+                                                <option value="anthropic">Anthropic</option>
+                                                <option value="openai">OpenAI</option>
+                                            </select>
+                                            <select id="progression-model" class="model-select"
+                                                data-agent="progression"></select>
+                                        </div>
+                                    </div>
+
+                                    <!-- Scale Selector -->
+                                    <div class="setting-card">
+                                        <h3>📊 Scale Selector</h3>
+                                        <p class="setting-desc">Selects narrative scale based on power dynamics (fast
+                                            model
+                                            preferred)</p>
+                                        <div class="setting-inputs">
+                                            <select id="scale_selector-provider" class="provider-select"
+                                                data-agent="scale_selector">
+                                                <option value="google">Google</option>
+                                                <option value="anthropic">Anthropic</option>
+                                                <option value="openai">OpenAI</option>
+                                            </select>
+                                            <select id="scale_selector-model" class="model-select"
+                                                data-agent="scale_selector"></select>
+                                        </div>
+                                    </div>
+
+                                    <!-- NPC Reaction -->
+                                    <div class="setting-card">
+                                        <h3>💬 NPC Reaction</h3>
+                                        <p class="setting-desc">Calculates NPC disposition and dialogue hints (fast
+                                            model
+                                            preferred)
+                                        </p>
+                                        <div class="setting-inputs">
+                                            <select id="npc_reaction-provider" class="provider-select"
+                                                data-agent="npc_reaction">
+                                                <option value="google">Google</option>
+                                                <option value="anthropic">Anthropic</option>
+                                                <option value="openai">OpenAI</option>
+                                            </select>
+                                            <select id="npc_reaction-model" class="model-select"
+                                                data-agent="npc_reaction"></select>
+                                        </div>
+                                    </div>
+
+                                    <!-- Sakuga -->
+                                    <div class="setting-card">
+                                        <h3>✨ Sakuga</h3>
+                                        <p class="setting-desc">Detects epic moments for auto-success (fast model
+                                            preferred)</p>
+                                        <div class="setting-inputs">
+                                            <select id="sakuga-provider" class="provider-select" data-agent="sakuga">
+                                                <option value="google">Google</option>
+                                                <option value="anthropic">Anthropic</option>
+                                                <option value="openai">OpenAI</option>
+                                            </select>
+                                            <select id="sakuga-model" class="model-select" data-agent="sakuga"></select>
+                                        </div>
+                                    </div>
+
+                                    <!-- Calibration -->
+                                    <div class="setting-card">
+                                        <h3>🎛️ Calibration</h3>
+                                        <p class="setting-desc">Adjusts narrative based on player feedback (creative
+                                            model
+                                            preferred)</p>
+                                        <div class="setting-inputs">
+                                            <select id="calibration-provider" class="provider-select"
+                                                data-agent="calibration">
+                                                <option value="google">Google</option>
+                                                <option value="anthropic">Anthropic</option>
+                                                <option value="openai">OpenAI</option>
+                                            </select>
+                                            <select id="calibration-model" class="model-select"
+                                                data-agent="calibration"></select>
+                                        </div>
+                                    </div>
+
+                                    <!-- Memory Ranker -->
+                                    <div class="setting-card">
+                                        <h3>🧠 Memory Ranker</h3>
+                                        <p class="setting-desc">Ranks memory relevance for context (fast model
+                                            preferred)</p>
+                                        <div class="setting-inputs">
+                                            <select id="memory_ranker-provider" class="provider-select"
+                                                data-agent="memory_ranker">
+                                                <option value="google">Google</option>
+                                                <option value="anthropic">Anthropic</option>
+                                                <option value="openai">OpenAI</option>
+                                            </select>
+                                            <select id="memory_ranker-model" class="model-select"
+                                                data-agent="memory_ranker"></select>
+                                        </div>
+                                    </div>
+
+                                    <!-- Context Selector -->
+                                    <div class="setting-card">
+                                        <h3>📋 Context Selector</h3>
+                                        <p class="setting-desc">Assembles context for agents (fast model preferred)</p>
+                                        <div class="setting-inputs">
+                                            <select id="context_selector-provider" class="provider-select"
+                                                data-agent="context_selector">
+                                                <option value="google">Google</option>
+                                                <option value="anthropic">Anthropic</option>
+                                                <option value="openai">OpenAI</option>
+                                            </select>
+                                            <select id="context_selector-model" class="model-select"
+                                                data-agent="context_selector"></select>
+                                        </div>
+                                    </div>
+
+                                    <!-- Relationship Analyzer -->
+                                    <div class="setting-card">
+                                        <h3>💕 Relationship Analyzer</h3>
+                                        <p class="setting-desc">Detects NPC affinity changes and emotional milestones
+                                            (fast
+                                            model preferred)</p>
+                                        <div class="setting-inputs">
+                                            <select id="relationship_analyzer-provider" class="provider-select"
+                                                data-agent="relationship_analyzer">
+                                                <option value="google">Google</option>
+                                                <option value="anthropic">Anthropic</option>
+                                                <option value="openai">OpenAI</option>
+                                            </select>
+                                            <select id="relationship_analyzer-model" class="model-select"
+                                                data-agent="relationship_analyzer"></select>
+                                        </div>
+                                    </div>
+
+                                    <!-- Session Zero -->
+                                    <div class="setting-card">
+                                        <h3>🎭 Session Zero</h3>
+                                        <p class="setting-desc">Character creation dialogue (fast model preferred)</p>
+                                        <div class="setting-inputs">
+                                            <select id="session_zero-provider" class="provider-select"
+                                                data-agent="session_zero">
+                                                <option value="google">Google</option>
+                                                <option value="anthropic">Anthropic</option>
+                                                <option value="openai">OpenAI</option>
+                                            </select>
+                                            <select id="session_zero-model" class="model-select"
+                                                data-agent="session_zero"></select>
+                                        </div>
+                                    </div>
+
+                                    <!-- World Builder -->
+                                    <div class="setting-card">
+                                        <h3>🌍 World Builder</h3>
+                                        <p class="setting-desc">Validates player world-building assertions (fast model
+                                            preferred)</p>
+                                        <div class="setting-inputs">
+                                            <select id="world_builder-provider" class="provider-select"
+                                                data-agent="world_builder">
+                                                <option value="google">Google</option>
+                                                <option value="anthropic">Anthropic</option>
+                                                <option value="openai">OpenAI</option>
+                                            </select>
+                                            <select id="world_builder-model" class="model-select"
+                                                data-agent="world_builder"></select>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div> <!-- End section-content -->
+                        </div> <!-- End sidebar-section (Per-Agent Overrides) -->
+
+                        <!-- Shared Model Config Actions -->
+                        <div class="section-actions" style="margin: 1.5rem 0; text-align: center;">
+                            <button id="save-models" class="btn-primary">💾 Save Model Configuration</button>
+                            <button id="reset-settings" class="btn-secondary" style="margin-left: 1rem;">🔄 Reset to
+                                Defaults</button>
+                        </div>
+
+
+                        <!-- API Keys Section -->
+                        <h2 style="margin-top: 2rem;">🔑 API Keys</h2>
+                        <p class="settings-desc">Configure your LLM provider API keys. Keys are encrypted and stored
+                            securely.</p>
+
+                        <div class="settings-grid" id="api-key-settings">
+                            <!-- Google API Key -->
+                            <div class="setting-card" id="google-key-card">
+                                <h3>🌐 Google Gemini</h3>
+                                <div class="key-status">
+                                    <span class="status-badge" id="google-status">Not configured</span>
+                                    <span class="masked-key" id="google-masked"></span>
+                                </div>
+                                <div class="setting-inputs">
+                                    <input type="password" id="google-key-input" placeholder="AIza..."
+                                        class="key-input">
+                                    <button class="btn-small save-key-btn" data-provider="google">Save</button>
+                                    <button class="btn-small btn-danger clear-key-btn" data-provider="google"
+                                        title="Clear saved key">❌</button>
+                                </div>
+                            </div>
+
+                            <!-- Anthropic API Key -->
+                            <div class="setting-card" id="anthropic-key-card">
+                                <h3>🤖 Anthropic Claude</h3>
+                                <div class="key-status">
+                                    <span class="status-badge" id="anthropic-status">Not configured</span>
+                                    <span class="masked-key" id="anthropic-masked"></span>
+                                </div>
+                                <div class="setting-inputs">
+                                    <input type="password" id="anthropic-key-input" placeholder="sk-ant-..."
+                                        class="key-input">
+                                    <button class="btn-small save-key-btn" data-provider="anthropic">Save</button>
+                                    <button class="btn-small btn-danger clear-key-btn" data-provider="anthropic"
+                                        title="Clear saved key">❌</button>
+                                </div>
+                            </div>
+
+                            <!-- OpenAI API Key -->
+                            <div class="setting-card" id="openai-key-card">
+                                <h3>🧠 OpenAI</h3>
+                                <div class="key-status">
+                                    <span class="status-badge" id="openai-status">Not configured</span>
+                                    <span class="masked-key" id="openai-masked"></span>
+                                </div>
+                                <div class="setting-inputs">
+                                    <input type="password" id="openai-key-input" placeholder="sk-..." class="key-input">
+                                    <button class="btn-small save-key-btn" data-provider="openai">Save</button>
+                                    <button class="btn-small btn-danger clear-key-btn" data-provider="openai"
+                                        title="Clear saved key">❌</button>
+                                </div>
+                            </div>
+                        </div>
+
+
+
+                        <div id="settings-status" class="status-message"></div>
+
+                        <!-- Session Management Buttons at Bottom -->
+                        <div style="margin-top: 3rem; padding-top: 2rem; border-top: 1px solid rgba(255,255,255,0.1);">
+                            <!-- Save/Load Row -->
+                            <div style="display: flex; gap: 1rem; margin-bottom: 1rem;">
+                                <button id="save-session-btn" class="btn-secondary" style="flex: 1; padding: 1rem;"
+                                    onclick="saveSession()">
+                                    💾 Save Session
+                                </button>
+                                <button id="load-session-btn" class="btn-secondary" style="flex: 1; padding: 1rem;"
+                                    onclick="document.getElementById('load-file-input').click()">
+                                    📂 Load Session
+                                </button>
+                                <input type="file" id="load-file-input" accept=".aidm,.zip" style="display: none;"
+                                    onchange="loadSession(this.files[0])">
+                            </div>
+                            <!-- Reset Button -->
+                            <button id="reset-session-btn" class="btn-danger" onclick="resetSession()"
+                                style="width: 100%; padding: 1.25rem; font-size: 1.1rem; background: linear-gradient(135deg, #dc3545, #c82333); border: none; border-radius: 8px; color: white; cursor: pointer; font-weight: bold; transition: all 0.2s;">
+                                🗑️ Reset Session
+                            </button>
+                            <p
+                                style="text-align: center; color: var(--text-muted); font-size: 0.85rem; margin-top: 0.5rem;">
+                                This will clear your current session and start fresh. This cannot be undone!
+                            </p>
+                        </div>
+                    </div>
+                </div>
+        </main>
+    </div>
+
+    <script src="js/api.js?v=2"></script>
+    <script src="js/research-progress.js"></script>
+    <script src="js/app.js?v=2"></script>
+</body>
+
+</html>

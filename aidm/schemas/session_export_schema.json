@@ -1,0 +1,239 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "AIDM Session Export Schema",
+  "description": "Save file for campaign continuity",
+  "type": "object",
+  "required": ["schema_version", "export_version", "export_timestamp", "session_metadata", "character", "world_state", "npcs", "memory_threads"],
+  "properties": {
+    "schema_version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$", "default": "2.0.0" },
+    "export_version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$", "examples": ["2.0.0"] },
+    "export_timestamp": { "type": "string", "format": "date-time" },
+    
+    "session_metadata": {
+      "type": "object",
+      "required": ["session_id", "campaign_name", "total_sessions", "total_playtime"],
+      "properties": {
+        "session_id": { "type": "string", "pattern": "^session_[a-zA-Z0-9]{16}$" },
+        "campaign_name": { "type": "string", "maxLength": 200 },
+        "total_sessions": { "type": "integer", "minimum": 1 },
+        "total_playtime": { "type": "integer", "minimum": 0, "description": "Minutes" },
+        "last_session_date": { "type": "string", "format": "date-time" },
+        "aidm_version": { "type": "string" },
+        "player_notes": { "type": "string", "maxLength": 5000 },
+        "save_point": { "type": "string", "description": "Where game left off", "maxLength": 500 }
+      }
+    },
+    
+    "character": { "$ref": "character_schema.json" },
+    "world_state": { "$ref": "world_state_schema.json" },
+    "npcs": { "type": "array", "description": "Encountered NPCs", "items": { "$ref": "npc_schema.json" } },
+    
+    "memory_threads": {
+      "type": "object",
+      "description": "Session context hierarchy",
+      "required": ["core", "character_state", "relationships", "quests", "world_events", "consequences"],
+      "properties": {
+        "core": {
+          "type": "array",
+          "description": "Immutable memories",
+          "items": {
+            "type": "object",
+            "required": ["thread_id", "type", "priority", "content", "created_at"],
+            "properties": {
+              "thread_id": {"type": "string"},
+              "type": {"type": "string", "enum": ["origin", "unique_ability", "world_foundation"]},
+              "priority": {"type": "integer", "minimum": 1, "maximum": 10},
+              "content": {"type": "string"},
+              "created_at": {"type": "string", "format": "date-time"},
+              "heat_index": {"type": "number", "minimum": 0, "maximum": 1}
+            }
+          }
+        },
+        "character_state": {
+          "type": "array",
+          "description": "Mutable state",
+          "items": {
+            "type": "object",
+            "required": ["thread_id", "content", "last_updated"],
+            "properties": {
+              "thread_id": {"type": "string"},
+              "content": {"type": "string"},
+              "last_updated": {"type": "string", "format": "date-time"},
+              "heat_index": {"type": "number"}
+            }
+          }
+        },
+        "relationships": {
+          "type": "array",
+          "description": "NPC interactions",
+          "items": {
+            "type": "object",
+            "required": ["thread_id", "npc_id", "npc_name", "interactions"],
+            "properties": {
+              "thread_id": {"type": "string"},
+              "npc_id": {"type": "string"},
+              "npc_name": {"type": "string"},
+              "current_affinity": {"type": "integer", "minimum": -100, "maximum": 100},
+              "interactions": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "summary": {"type": "string"},
+                    "affinity_change": {"type": "integer"},
+                    "emotional_tags": {"type": "array", "items": {"type": "string"}},
+                    "timestamp": {"type": "string", "format": "date-time"}
+                  }
+                }
+              },
+              "heat_index": {"type": "number"}
+            }
+          }
+        },
+        "quests": {
+          "type": "array",
+          "description": "Quest progression",
+          "items": {
+            "type": "object",
+            "required": ["thread_id", "quest_id", "quest_name", "events"],
+            "properties": {
+              "thread_id": {"type": "string"},
+              "quest_id": {"type": "string"},
+              "quest_name": {"type": "string"},
+              "status": {"type": "string", "enum": ["active", "completed", "failed"]},
+              "events": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "event": {"type": "string"},
+                    "timestamp": {"type": "string", "format": "date-time"}
+                  }
+                }
+              },
+              "heat_index": {"type": "number"}
+            }
+          }
+        },
+        "world_events": {
+          "type": "array",
+          "description": "World changes",
+          "items": {
+            "type": "object",
+            "required": ["thread_id", "event", "timestamp"],
+            "properties": {
+              "thread_id": {"type": "string"},
+              "event": {"type": "string"},
+              "location": {"type": "string"},
+              "involved_factions": {"type": "array", "items": {"type": "string"}},
+              "player_involved": {"type": "boolean"},
+              "consequences": {"type": "array", "items": {"type": "string"}},
+              "timestamp": {"type": "string", "format": "date-time"},
+              "heat_index": {"type": "number"}
+            }
+          }
+        },
+        "consequences": {
+          "type": "array",
+          "description": "Long-term effects",
+          "items": {
+            "type": "object",
+            "required": ["thread_id", "original_action", "consequences"],
+            "properties": {
+              "thread_id": {"type": "string"},
+              "original_action": {
+                "type": "object",
+                "properties": {
+                  "description": {"type": "string"},
+                  "timestamp": {"type": "string", "format": "date-time"}
+                }
+              },
+              "consequences": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "description": {"type": "string"},
+                    "scope": {"type": "string", "enum": ["personal", "local", "regional", "global"]},
+                    "manifested_at": {"type": "string", "format": "date-time"}
+                  }
+                }
+              },
+              "heat_index": {"type": "number"}
+            }
+          }
+        },
+        "compressed_memories": {
+          "type": "array",
+          "description": "Compressed older threads",
+          "items": {
+            "type": "object",
+            "properties": {
+              "summary": {"type": "string"},
+              "original_thread_ids": {"type": "array", "items": {"type": "string"}},
+              "compressed_at": {"type": "string", "format": "date-time"}
+            }
+          }
+        }
+      }
+    },
+    
+    "recent_narrative": {
+      "type": "object",
+      "description": "Recent turns for continuity",
+      "properties": {
+        "last_player_input": {"type": "string"},
+        "last_aidm_response": {"type": "string"},
+        "recent_exchanges": {
+          "type": "array",
+          "description": "Last 5-10 exchanges",
+          "items": {
+            "type": "object",
+            "properties": {
+              "player": {"type": "string"},
+              "aidm": {"type": "string"},
+              "timestamp": {"type": "string", "format": "date-time"}
+            }
+          }
+        },
+        "active_scene": {"type": "string"}
+      }
+    },
+    
+    "system_state": {
+      "type": "object",
+      "description": "AIDM state",
+      "properties": {
+        "loaded_instruction_files": { "type": "array", "items": {"type": "string"} },
+        "loaded_libraries": { "type": "array", "items": {"type": "string"} },
+        "active_power_systems": { "type": "array", "items": {"type": "string"} },
+        "active_narrative_profile": { "description": "Narrative DNA for continuity", "$ref": "narrative_profile_schema.json" },
+        "player_preferences": {
+          "type": "object",
+          "properties": {
+            "content_preferences": {
+              "type": "object",
+              "properties": {
+                "tragedy": {"type": "string", "enum": ["none", "light", "moderate", "heavy"]},
+                "romance": {"type": "string", "enum": ["none", "light", "moderate", "heavy"]},
+                "violence": {"type": "string", "enum": ["none", "light", "moderate", "heavy", "extreme"]},
+                "explicitness": {"type": "string", "enum": ["fade_to_black", "suggestive", "moderate", "explicit"]}
+              }
+            },
+            "gameplay_preferences": {
+              "type": "object",
+              "properties": {
+                "combat_complexity": {"type": "string", "enum": ["narrative", "simple", "tactical", "advanced"]},
+                "difficulty": {"type": "string", "enum": ["power_fantasy", "easy", "normal", "hard", "brutal"]},
+                "pacing": {"type": "string", "enum": ["episodic", "moderate", "long_arc"]}
+              }
+            }
+          }
+        },
+        "validation_checksum": {"type": "string"}
+      }
+    },
+    
+    "compatibility_notes": { "type": "string", "description": "Load warnings", "maxLength": 1000 }
+  }
+}

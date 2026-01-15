@@ -1,0 +1,22 @@
+{
+  "description": "Quirk awakening progression (My Hero Academia / One Piece Devil Fruit)",
+  "type": "quirk_awakening",
+  "parameters": {
+    "power_name": "Devil Fruit",
+    "awakening_stages": [
+      "Base",
+      "Gear Second",
+      "Gear Third",
+      "Gear Fourth",
+      "Awakening"
+    ],
+    "evolution_triggers": [
+      "life_threatening_battle",
+      "emotional_breakthrough",
+      "training_with_mentor",
+      "understanding_power_nature",
+      "pushing_beyond_limits"
+    ]
+  },
+  "use_case": "Single power that evolves through dramatic moments. Power awakens/transforms at narrative peaks. Perfect for MHA quirks, One Piece Devil Fruits, JoJo Stands that evolve."
+}

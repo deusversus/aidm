@@ -1,0 +1,92 @@
+id: neon_genesis_evangelion
+name: Neon Genesis Evangelion
+source_anime: Neon Genesis Evangelion
+media_type: anime
+status: completed
+generated_at: '2026-01-13T12:44:22.817068'
+confidence: 95
+research_method: bundled_parallel
+aliases:
+- eva
+- evangelion
+- gospel of a new century
+- neon genesis evangelion
+- neongenesisevangelion
+- nge
+- shin seiki evangerion
+- shineva
+- 新世紀エヴァンゲリオン
+dna_scales:
+  introspection_vs_action: 2
+  comedy_vs_drama: 2
+  simple_vs_complex: 9
+  power_fantasy_vs_struggle: 9
+  explained_vs_mysterious: 8
+  fast_paced_vs_slow_burn: 7
+  episodic_vs_serialized: 8
+  grounded_vs_absurd: 4
+  tactical_vs_instinctive: 6
+  hopeful_vs_cynical: 8
+  ensemble_vs_solo: 4
+tropes:
+  tournament_arc: false
+  training_montage: true
+  power_of_friendship: false
+  mentor_death: true
+  chosen_one: true
+  tragic_backstory: true
+  redemption_arc: false
+  betrayal: true
+  sacrifice: true
+  transformation: true
+  forbidden_technique: false
+  time_loop: false
+  false_identity: true
+  ensemble_focus: true
+  slow_burn_romance: false
+combat_system: tactical
+power_system:
+  name: AT Field and the Two Fruits (Knowledge and Life)
+  mechanics: The system revolves around the Absolute Terror (AT) Field, a metaphysical
+    'wall of the heart' that provides nearly impenetrable defense and can be used
+    offensively to neutralize opposing fields. Power is also derived from the Fruit
+    of Life (S2 Engine for infinite energy) and the Fruit of Knowledge (human intellect).
+    Pilots operate Evangelions through a nervous system link called Synchronization,
+    where the Sync Rate determines the EVA's strength and speed.
+  limitations: Evangelions are restricted by a 5-minute internal battery life (1 minute
+    at max output) without an umbilical cable. High synchronization causes the pilot
+    to feel the EVA's physical pain. All entities are vulnerable if their red core
+    is destroyed. The Spear of Longinus acts as a unique artifact capable of piercing
+    any AT Field, and Anti-AT Fields can collapse biological forms into LCL.
+  tiers:
+  - 'Tier 1: Lilin (Humans - Physically weak, rely on technology)'
+  - 'Tier 2: Standard EVA (High power, limited by battery and pilot psyche)'
+  - 'Tier 3: High-Tier Angel (Massive energy output, S2 Engine immortality)'
+  - 'Tier 4: Berserk State (Primal soul control, ignores power limits, extreme regeneration)'
+  - 'Tier 5: Awakened/God (Possession of both Fruits, infinite power, planetary reality
+    manipulation)'
+tone:
+  comedy_level: 3
+  darkness_level: 9
+  optimism: 3
+director_personality: You are the director for a Neon Genesis Evangelion-style campaign.
+  You favor action and momentum over lengthy contemplation. You maintain dramatic
+  weight; comedy is rare and earned. The protagonist is powerful; challenges come
+  from elsewhere.
+pacing:
+  scene_length: moderate
+  arc_length_sessions: 4-6
+sources_consulted:
+- power_system
+- combat
+- tone
+- characters
+- factions
+- locations
+- arcs
+- sequels
+- adaptations
+- recent
+- series_aliases
+series_group: neon_genesis_evangelion
+series_position: 1

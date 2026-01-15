@@ -1,0 +1,329 @@
+## Locations
+Dragon Ball Heroes (and its successor *Super Dragon Ball Heroes*) expands the traditional Dragon Ball multiverse into a complex "Omniverse" involving multiple timelines, dimensions, and artificial constructs. 
+
+The setting is primarily divided between the **Time Patrol's** headquarters, the **Dark Demon Realm**, and various experimental "pocket universes" created by the antagonist **Fu**.
+
+### 1. The Time Nest (Toki no Su)
+The central hub for the Time Patrol and the series' primary "home base."
+*   **Location:** Situated at the very edge of Universe 7, existing outside the normal flow of time.
+*   **Geography:** It resembles a floating island shaped like a giant birdcage. It features lush greenery, a large pond for the divine bird **Tokitoki**, and the Supreme Kai of Time’s house.
+*   **The Time Vault:** A temple-like building within the Nest that houses the **Scrolls of Eternity**. These scrolls contain the history of all existence; if they are altered or destroyed, the corresponding timeline is erased.
+
+### 2. The Prison Planet (Kangoku Wakusei)
+The primary setting of the first major arc in the promotional anime.
+*   **Location:** A mysterious facility located in a "gap" between universes.
+*   **Geography:** It is not a single planet but a cluster of seven different planets (including a version of Planet Babari and a futuristic city) physically chained together by massive metal links. 
+*   **Function:** Created by Fu as a laboratory to observe "the ultimate battle." It is encased in a powerful barrier that can only be broken by the energy of the Special Dragon Balls or overwhelming power (like that of the Evil Saiyan Cumber).
+
+### 3. The Dark Demon Realm (Ankoku Makai)
+The home of the **Dark Empire**, led by the demon king **Mechikabura**.
+*   **Geography:** A dark, chaotic dimension that exists on the "underside" of the living universe. It is divided into several layers, including the **First, Second, and Third Demon Worlds**.
+*   **Dark Empire Fortress:** A massive, gothic castle that serves as the seat of power for Mechikabura and his Demon Gods (Towa, Mira, Shroom, etc.).
+*   **The Gates of Hell:** Often used as a transit point between the Demon Realm and the living world.
+
+### 4. The Universe Tree & Pseudo-Universe
+In the *Big Bang Mission* arc, Fu uses the **Universe Seed** to grow a galaxy-sized tree that threatens the multiverse.
+*   **The Universe Tree:** A colossal structure that roots itself across all 12 universes to drain their energy. Its "canopy" exists in a subspace where Fu conducts his final experiments.
+*   **The Pseudo-Universe (New Space-Time):** After the original multiverse is threatened, Fu creates a "copy" of Universe 7. This artificial dimension includes replicas of Earth, Planet Vegeta, and Hell. Events in this pseudo-universe directly affect the real Universe 7.
+
+### 5. The Crack of Time (Toki no Hazama)
+A recurring location in *Heroes* and *Xenoverse* lore.
+*   **Nature:** A dimension that exists between timelines, often described as a "void" or "chasm." 
+*   **Significance:** It is a place where those erased from history or lost in time-travel accidents end up. It is often used as a prison for powerful entities like Demigra.
+
+### 6. Hero Town (The "Real World")
+Unique to the *Dragon Ball Heroes* game and manga (*Victory Mission*), this is a meta-setting.
+*   **Geography:** A futuristic version of Japan where *Dragon Ball* is a popular card game. 
+*   **Function:** The protagonist, **Beat**, lives here. Using "Hero Machines," players (and characters) can digitize themselves to enter the "Dragon Ball World" to fight alongside Goku and others.
+
+### 7. The Super Space-Time Tournament Arena
+The setting for the *Ultra God Mission* arc, hosted by the former Supreme Kai of Time, **Aeos**.
+*   **Geography:** A massive, multi-layered stadium floating in a void. It features various sub-arenas modeled after iconic Dragon Ball locations (like the Cell Games arena or Namek) where warriors from different timelines compete for the survival of their respective histories.
+
+### Summary Map of the Heroes "Omniverse"
+| Location | Ruler/Faction | Primary Feature |
+| :--- | :--- | :--- |
+| **Time Nest** | Chronoa (Supreme Kai of Time) | Houses the Time Vault and Scrolls of Eternity. |
+| **Dark Demon Realm** | Mechikabura / Dark Empire | A chaotic "mirror" dimension to the living world. |
+| **Prison Planet** | Fu | Seven planets chained together for experiments. |
+| **Universe Tree** | Fu | A parasitic structure draining the 12 universes. |
+| **Crack of Time** | None (Neutral/Void) | A dimension beyond time where the lost reside. |
+| **Hero Town** | Humans (Beat/Note) | The "real world" where Dragon Ball is a game. |
+
+## Combat
+Dragon Ball Heroes (specifically the *Super Dragon Ball Heroes* series and its console/PC port *World Mission*) features a unique combat system that blends **tactical card-game strategy** with the **flashy, high-energy spectacle** characteristic of the anime. 
+
+Unlike traditional 2D or 3D arena fighters, combat is turn-based and revolves around card placement, resource management, and timing-based mini-games.
+
+### 1. Combat Fighting Style: Tactical Card-Battling
+The core fighting style is a **7-vs-7 card-based tactical battle**. Players do not control characters directly with combos; instead, they act as a "commander" on a digital board.
+*   **The Board:** The play area is divided into an **Attack Area** (top) and a **Support Area** (bottom). 
+    *   Moving cards to the Attack Area consumes **Stamina** but generates **Battle Power** and allows the character to attack.
+    *   Moving cards to the Support Area allows them to recover Stamina but prevents them from attacking that round.
+*   **Battle Types:** Every card belongs to one of three categories:
+    *   **Hero (Red):** Balanced stats; reliable for both offense and defense.
+    *   **Elite (Blue):** Focuses on Ki blasts and stunning the enemy; recovers stamina easily.
+    *   **Berserker (Purple):** High physical damage but low stamina and defense; prone to being stunned.
+
+### 2. Tactical Depth: Resource & CI Management
+Tactics are driven by the interplay between **Hero Energy** and **Charge Impact (CI)**.
+*   **Hero Energy:** This is the "mana" of the game. You generate it based on your total Battle Power. Each character’s Super Attack requires a specific amount of Hero Energy to trigger.
+*   **Charge Impact (CI):** The most critical tactical element. When two characters clash, a meter appears. Players must stop the meter as close to the top as possible. 
+    *   **Winning a CI** results in a "Perfect" or "Victory," allowing you to unleash a Super Attack or significantly reduce incoming damage.
+    *   **Tactical Manipulation:** Many cards have abilities to speed up the enemy's CI meter (making it harder for them to time) or slow down your own.
+*   **Deck Building:** Strategy begins before the fight. Players must synergize card abilities, such as "Link Lines" (connecting two cards for buffs) or "Ultimate Unit Effects" (powerful team-wide moves triggered by specific character combinations).
+
+### 3. Flashy Spectacle: Cinematic Battles
+Despite being a card game, the visual presentation is designed to mimic the most "over-the-top" moments of the anime.
+*   **CAA & TAA (Card/Touch Action Abilities):** These are mid-battle mini-games that trigger flashy cinematic sequences. 
+    *   **Examples:** Dragging a card in a "Z" shape to trigger a Z-Abilities team attack, or swiping the screen to help a character transform into a Super Saiyan or fuse into Gogeta/Vegito.
+*   **Transformations & Fusions:** Battles often feature mid-fight power-ups. Seeing a character like Goku transition from Base to Ultra Instinct or two characters performing the Fusion Dance is a core part of the visual "hype."
+*   **Super Attacks:** Every card has a unique cinematic Super Attack. High-rarity cards feature extended, high-quality animations that rival the *Dragon Ball Super* anime in intensity.
+
+### 4. Emotional Weight: Fan Service & "What-If" Scenarios
+The "emotional" side of *Dragon Ball Heroes* combat comes from its status as the ultimate **fan-service playground**.
+*   **Original Narratives:** The game features original storylines involving characters like **Fu**, **Sealas**, and the **Supreme Kai of Time**. These stories often involve high stakes, such as the literal erasure of timelines or the "Prison Planet" arc.
+*   **Impossible Matchups:** The emotional hook for many fans is seeing "What-if" battles that could never happen in the canon, such as **Super Saiyan 4 Vegito** vs. **Super Saiyan Blue Vegito**, or **Golden Cooler** vs. **Cumber (the Evil Saiyan)**.
+*   **Avatar Progression:** In the *World Mission* story, players use a custom avatar who grows from a novice card player to a hero fighting alongside Goku. This "zero-to-hero" journey provides a personal emotional connection to the tactical battles.
+
+## Characters
+*Dragon Ball Heroes* (and its successor *Super Dragon Ball Heroes*) is a Japanese trading card game that expanded into a promotional anime and several manga series. Because it is non-canon and designed for "fan service," it features unique characters, "What If" transformations, and a multiversal plot.
+
+### **1. Main Protagonists**
+The series features two sets of protagonists: the **Game/Manga Avatars** (who represent the player) and the **Time Patrol** (alternate versions of classic characters).
+
+#### **Beat (The Saiyan Hero)**
+*   **Role:** The primary protagonist of the *Dragon Ball Heroes* game and the *Victory Mission* manga. He is a human boy from the real world who enters the game world using advanced technology.
+*   **Abilities:** He can transform into every major Saiyan form, including **Super Saiyan 1–4, Super Saiyan God, Blue, and Ultra Instinct**.
+*   **Relationships:** He is mentored by **Sora** (a battle navigator) and has a close bond/rivalry with **Note**.
+
+#### **Note (The Saiyan Heroine)**
+*   **Role:** The main female protagonist and Beat’s primary partner. Like Beat, she is a human who becomes a Saiyan in the game.
+*   **Abilities:** Similar to Beat, she can access high-level Saiyan transformations like **Super Saiyan 3 and Super Saiyan Blue**.
+*   **Relationships:** She is often portrayed as Beat’s rival and potential romantic interest.
+
+#### **The Time Patrol (Xeno Characters)**
+In the promotional anime, the focus shifts to the **Time Patrol**, led by the **Supreme Kai of Time (Chronoa)**.
+*   **Xeno Goku & Xeno Vegeta:** These are alternate versions of the main characters who joined the Time Patrol. Unlike the "Mainline" Goku (who uses Super Saiyan Blue), the Xeno versions primarily use **Super Saiyan 4** and its upgraded **Limit Breaker** state.
+*   **Xeno Trunks:** The field leader of the Time Patrol. He wields the **Key Sword**, a divine weapon capable of sealing demons and neutralizing dark magic.
+
+---
+
+### **2. Main Antagonists**
+The villains in *Heroes* are often multiversal threats or ancient demons seeking to rewrite history.
+
+#### **Fu (The Scientist)**
+*   **Role:** The primary antagonist for much of the series. He is the son of the demons Towa and Mira. Unlike typical villains, Fu is motivated by **scientific curiosity** rather than pure malice; he creates "experiments" (like the Prison Planet) just to see how powerful warriors react.
+*   **Abilities:** He uses a mix of demon magic, high-tech weaponry (swords), and the ability to manipulate space-time. He eventually fuses with the bird **Dogi-Dogi** to become the **Dark King**.
+
+#### **Hearts (The God-Slayer)**
+*   **Role:** Leader of the **Core Area Warriors**. His goal is to destroy the Omni-King (Zeno) and all gods to "liberate" mortals from their control.
+*   **Abilities:** He possesses **Gravity Manipulation** and the ability to **read minds/desires**. At his peak, he uses the **Universe Seed** to achieve an "Ultimate Form" that rivals the power of a God of Destruction.
+
+#### **Mechikabura (The Dark King)**
+*   **Role:** The ancient leader of the **Dark Empire**. He is the grandfather of Towa and the primary threat in the *Dark Demon Realm* sagas.
+*   **Abilities:** He wields **Dark Factor** (corruptive energy) and can manipulate time on a massive scale. He seeks the **Dark Dragon Balls** to restore his youth and rule over all of time.
+
+#### **Cumber (The Evil Saiyan)**
+*   **Role:** An ancient, savage Saiyan imprisoned by Fu. 
+*   **Abilities:** He emits a "Shadowy Aura" that can **corrupt** other Saiyans, sending them into a berserker rage. He is strong enough to force Goku into Ultra Instinct and can transform into a **Golden Great Ape**.
+
+---
+
+### **3. Key Relationships & Roles**
+
+| Character | Role | Key Relationship |
+| :--- | :--- | :--- |
+| **Chronoa** | Commander of Time Patrol | Mentors Xeno Trunks; rivals with Mechikabura. |
+| **Towa & Mira** | Time Breakers / Villains | Parents of Fu; loyal servants to Mechikabura. |
+| **Mainline Goku** | Multiversal Ally | Often teams up with his "Xeno" counterpart to stop Fu. |
+| **Aeos** | Former Supreme Kai of Time | Antagonist/Neutral; organizes the Super Space-Time Tournament. |
+| **Demigra** | Demon God / Rival | A recurring villain who often clashes with both the heroes and other villains (like Fu) for control of time. |
+
+### **Summary of Abilities**
+*   **Saiyans:** Focus on "Limit Breaker" Super Saiyan 4 (Xeno) vs. Ultra Instinct/Blue Evolved (Mainline).
+*   **Demons:** Use **Dark Magic**, sealing spells, and "Dark Factor" to mind-control heroes (creating "Masked Saiyans").
+*   **Deities:** Use **Time Labyrinths** (sealing enemies outside of time) and **Time Freezing**.
+
+## Tone
+*Dragon Ball Heroes* (specifically the *Super Dragon Ball Heroes* promotional anime and manga) is a unique branch of the franchise that prioritizes "hype" and fanservice over traditional narrative depth. Because its primary purpose is to promote a digital card game, its tone and atmosphere differ significantly from the main series (*Z*, *Super*, or *Daima*).
+
+### **1. Genre and Mood**
+*   **Genre:** Promotional Anime / Martial Arts / Sci-Fi Multiversal.
+*   **Mood:** **Chaotic and "Unhinged."** Fans often describe it as "official fan-fiction." The mood is one of constant escalation where the "impossible" happens every few minutes (e.g., Super Saiyan 4 Goku fighting Super Saiyan Blue Goku).
+*   **Pacing:** Extremely fast. Episodes are typically 6–10 minutes long, stripping away the "slice-of-life" or training segments common in the main series to focus entirely on high-octane combat.
+
+### **2. Tone: The "Dark" vs. "Comedy" Balance**
+*   **Dark Elements:** The series leans into "edgy" aesthetics more than *Dragon Ball Super*. It features the **Dark Demon Realm**, **Dark Dragon Balls** (which merge with and corrupt their hosts), and "Xeno" versions of characters who have seen grittier timelines. However, this "darkness" is mostly stylistic; it rarely translates into mature storytelling or genuine dread.
+*   **Comedy:** Interestingly, *Heroes* is **less comedic** than the original *Dragon Ball* or *Super*. It lacks the "gag humor" and downtime that Akira Toriyama was known for. Any "comedy" found in the series is often **unintentional**, arising from the sheer absurdity of the power-ups (like "Super Saiyan 3 Rose" or "Golden Metal Cooler") and the nonsensical plot leaps.
+*   **Optimism:** The series maintains the core Shonen optimism—the idea that no matter how broken the timeline is, the "Time Patrol" (led by Xeno Trunks and Chronoa) can fix it. It’s a "hope against all odds" tone, but it’s simplified into "we just need a stronger transformation to win."
+
+### **3. Core Themes**
+*   **The Multiverse & "What-Ifs":** The central theme is the exploration of "What if?" scenarios. It brings together characters from *GT*, the Z movies, and *Super*, treating the entire franchise as a playground where continuity doesn't matter.
+*   **Legacy vs. Modernity:** A recurring thematic visual is the clash between **Super Saiyan 4** (representing the *GT*/90s era) and **Super Saiyan Blue/Ultra Instinct** (representing the modern *Super* era).
+*   **Protection of Time:** Through the **Time Patrol**, the series explores the theme of destiny and the sanctity of history, though this is usually just a backdrop for why a new villain (like Fu or Mechikabura) needs to be punched.
+
+### **4. Atmosphere**
+The atmosphere is **maximalist**. Everything is "the biggest" or "the strongest." 
+*   **Visuals:** Flashy, neon-heavy, and filled with complex character designs (masks, capes, and glowing auras). 
+*   **Stakes:** The stakes are "hyper-universal"—villains often threaten to erase all timelines or replace the entire multiverse with a new one. Because the stakes are so high and the episodes so short, the atmosphere can feel "weightless" because there isn't enough time for the audience to feel the gravity of the situation.
+
+### **Summary Table**
+| Element | Description |
+| :--- | :--- |
+| **Tone** | High-energy, fanservice-heavy, and superficially serious. |
+| **Darkness** | Stylistic (demons, masks, "dark" energy) rather than narrative. |
+| **Comedy** | Minimal; mostly unintentional due to power-scaling absurdity. |
+| **Optimism** | Standard "never give up" heroics; very black-and-white morality. |
+| **Atmosphere** | A "dream match" playground; fast-paced and sensory-overloading. |
+
+## Arcs, Sequels, Adaptations, Recent
+*Dragon Ball Heroes* (DBH) and its successor *Super Dragon Ball Heroes* (SDBH) are promotional media for the Japanese arcade digital card game. While non-canon to the main *Dragon Ball Super* timeline, the series is famous for its "what-if" scenarios, such as Super Saiyan 4 Vegito and Golden Meta-Cooler.
+
+### **1. Major Story Arcs & Timeline Progression**
+The series is divided into several major "Missions," each containing multiple sagas.
+
+| Mission Series | Major Arcs / Sagas | Key Events |
+| :--- | :--- | :--- |
+| **Dark Demon Realm** | Dark Dragon Ball, Mechikabura | The Time Patrol (Xeno Goku/Trunks) battles the Demon Realm to prevent the revival of the Dark King Mechikabura. |
+| **Universe Mission** | Prison Planet, Universal Conflict | Fu traps warriors on a Prison Planet. Later, Hearts leads the "Core Area Warriors" to destroy Zeno using the Universe Seed. |
+| **Big Bang Mission** | Universe Creation, New Space-Time War | Fu attempts to create a new universe using the Universe Tree. Goku is trapped in a "pseudo-universe" and battles a new Masked Saiyan (Goku Black). |
+| **Ultra God Mission** | Supreme Kai of Time, Kai of Space-Time | A multiversal tournament (Super Space-Time Tournament) is held by the former Supreme Kai of Time, Aios, to "select" the best timelines. |
+| **Meteor Mission** | Demonic Invader Arc (Majin Ozotto) | The final arc where Majin Ozotto (a shapeshifting villain from a 1994 arcade game) attempts to consume all gods and universes. |
+
+---
+
+### **2. Sequels, Spinoffs, and Continuity**
+*Dragon Ball Heroes* operates in a **"Meta-Canon"** or "Toybox" continuity. It pulls characters from *Dragon Ball Z*, *GT*, *Super*, and the movies into a single narrative.
+
+*   **Dragon Ball Heroes: Victory Mission:** An early manga by **Toyotaro** (before he took over *DBS*). It follows a human boy named **Beat** who enters the world of the card game. It is set in a future where *Dragon Ball* is a legendary game.
+*   **Super Dragon Ball Heroes: Avatars!!:** A more recent comedic spinoff focusing on the "Avatar" characters (Beat, Note) rather than the main Z-Fighters.
+*   **Continuity Differences:** The series distinguishes between "Main Timeline" characters (e.g., *DBS* Goku) and **"Xeno"** characters (e.g., Goku: Xeno). Xeno characters belong to the Time Patrol and typically use *GT*-inspired forms like Super Saiyan 4.
+
+---
+
+### **3. Manga vs. Anime Adaptations**
+The *SDBH* anime consists of short (8–10 minute) promotional episodes, while the manga (written by **Yoshitaka Nagayama**) offers a significantly more detailed story.
+
+*   **Pacing & Depth:** The anime often jumps between fights with little explanation. The manga includes character motivations, training sequences, and tactical explanations for transformations.
+*   **Exclusive Fights:** The manga features battles that never appeared in the anime, such as **Vegito Blue vs. Mira** or more extended sequences for the "Hooded Warriors" in the Ultra God Mission.
+*   **Power Scaling:** The manga is generally considered more "consistent." For example, it explains how certain characters can keep up with Gods, whereas the anime often makes characters appear equal for the sake of a flashy fight.
+
+---
+
+### **4. Latest Arc & Current Status (2025–2026)**
+As of **late 2024**, the *Super Dragon Ball Heroes* series has officially **concluded** to make way for a new era.
+
+*   **The Finale (Meteor Mission):** The story ended with **Episode 56** and **Manga Chapter 12** in late 2024. The final battle saw Ultra Instinct Goku and SSJ4 Xeno Goku team up to defeat Majin Ozotto from the inside out. The "Universal Spirit Bomb" restored the consumed timelines, and the Time Patrol returned to their duties.
+*   **The Successor: Dragon Ball Super Divers:** In November 2024, Bandai launched *Dragon Ball Super Divers*, a new arcade game with upgraded graphics and a different playstyle. 
+    *   **Manga Update:** Toyotaro released a special **one-shot manga** for *Divers* in October 2024 to celebrate the launch.
+    *   **Current Status:** While *SDBH* is over, *Divers* includes a "Heroes Mode" that allows players to use their old cards.
+*   **Upcoming Events:** A massive event called **"Dragon Ball Genkidamatsuri"** is scheduled for **January 25, 2026**. It is expected to provide major updates on the future of the franchise, potentially including new anime or manga projects following the conclusion of *Dragon Ball Daima*.
+
+## Power System
+The power system in *Dragon Ball Heroes* (and *Super Dragon Ball Heroes*) is a complex hybrid of traditional *Dragon Ball* lore and unique card-game mechanics. It operates on a multiversal scale, where power levels frequently surpass those seen in the main *Dragon Ball Super* continuity.
+
+### **1. Core Mechanics & Game Systems**
+The power system is fundamentally built around a **7-card deck** and the interaction between different character types and energy resources.
+
+*   **Battle Types:**
+    *   **Hero (HR):** Balanced stats; hardest to stun. Their "Perfect" bonus increases team power level.
+    *   **Elite (EL):** Ranged attackers; excel at draining enemy stamina and stunning. Their "Perfect" bonus recovers team stamina.
+    *   **Berserker (BS):** High damage output but fragile and easily stunned. Their "Perfect" bonus destroys enemy Hero Energy.
+*   **Battle Power (BP) & Hero Energy (HE):**
+    *   **BP** is generated by placing cards in the **Attack Area**. Higher stamina usage results in higher BP.
+    *   **HE** is the resource required for **Super Attacks**. Every **3,000 BP** generated grants **1 HE**.
+*   **Charge Impact (CI):** A timing-based gauge that determines the success of attacks and blocks. Winning a CI increases damage dealt or reduces damage taken and can trigger special card abilities.
+
+### **2. Abilities & Unique Power Sources**
+*   **Time Power (Time Patrol):** Used by the Supreme Kai of Time (Chronoa) and the Time Patrol.
+    *   **Abilities:** *Time Freeze* (halting time), *Time Labyrinth* (sealing targets outside of time), and *Time Dilation* (accelerating training).
+    *   **Aeos’s Space-Time Power:** The former Supreme Kai of Time uses "Time Unleashed" to manipulate infinite timelines and "Time Train Magic" to deflect attacks.
+*   **Dark Ki (Dark Empire):** Used by demons like Mechikabura and Demigra.
+    *   **Abilities:** *Mind Control* (via Time Breaker masks), *Corruption* (turning victims into berserkers), and *Dark Factor* (a concentrated demonic essence that grants near-infinite power).
+*   **The Keysword:** A divine, god-slaying weapon that can seal demons and nullify Dark Ki. It can be "Awakened" using massive amounts of Time Power to seal multiversal threats like Mechikabura.
+*   **Universe Tree/Seed:** A galaxy-sized construct that absorbs energy from all 12 universes. It grants the user (like Fu or Goku) "Universal" power, allowing them to create or destroy entire universes.
+
+### **3. Tiers & Progression**
+Progression is divided into "Missions" (Arcs), each introducing higher tiers of power:
+*   **Dark Demon Realm/Empire Saga:** Introduced **Xeno** characters (alternate timeline versions of Goku/Vegeta) who can achieve **Super Saiyan 4**.
+*   **Universe Mission (Prison Planet):** Introduced **Evil Saiyan (Cumber)**, whose Ki corrupts others on contact. Goku first accesses **Ultra Instinct** in this continuity to match him.
+*   **Big Bang Mission:** Introduced **Super Saiyan 4 Limit Breaker** (magenta-furred form achieved via a ritual) and **Universal Super Saiyan Blue** (Goku absorbing the Universe Tree's energy).
+*   **Ultra God Mission:** Focused on the **Super Space-Time Tournament**, where characters like **Aeos** and the **Warriors in Black** (alternate versions of Bardock, Gohan, etc.) reached tiers capable of threatening the entire multiverse.
+*   **Meteor Mission:** The current peak, featuring **Majin Ozotto**, who can absorb and clone any warrior, requiring the combined efforts of the Time Patrol and the main timeline heroes.
+
+### **4. Rules & Limitations**
+*   **Energy Consumption:** High-tier forms like *Universal Blue* or *SSJ4 Limit Breaker* are temporary and tied to specific external energy sources (the Universe Tree or a Ki-transfer ritual).
+*   **Counter-Measures:** The Universe Tree’s energy absorption can be blocked by a God of Destruction’s shield. Time-based hax (like *Time Freeze*) can be resisted by characters with significantly higher raw power or their own Time Power.
+*   **Avatar Promotion:** Player avatars progress through classes (**Base → Super → Ultimate → God → Super God**). Each promotion resets the level but retains **1/5th** of the previous stat boosts, allowing for infinite scaling through "Class Ups."
+*   **Friendship (Camaraderie):** Using specific characters in battle provides permanent, stacking stat bonuses to the player's avatar, representing the "bonds" formed during the journey.
+
+## Factions
+The world of *Dragon Ball Heroes* (and its promotional anime *Super Dragon Ball Heroes*) is a multiversal sandbox that brings together characters from every era of the franchise, including *Dragon Ball Z*, *GT*, *Super*, and the movies. Because the series is based on a digital card game, it features unique factions and organizations that do not exist in the main canon.
+
+### **1. Major Protagonist Factions**
+
+#### **The Time Patrol**
+The primary peacekeeping force in the series, the Time Patrol is tasked with protecting the flow of time from those who seek to alter history.
+*   **Leaders:** **Chronoa** (the Supreme Kai of Time) and **Xeno Trunks**.
+*   **Key Members:** **Xeno Goku**, **Xeno Vegeta**, **Xeno Gohan**, **Xeno Goten**, and **Xeno Pan**. These are alternate versions of the main characters who have lived through the events of *DBZ* and *GT*.
+*   **Base of Operations:** The **Time Nest**, a mystical realm outside of standard time.
+*   **Goal:** To stop "Time Paradoxes" and defeat the Dark Empire and Time Breakers.
+
+#### **The Dragon Ball Heroes (Team)**
+In the context of the *World Mission* game and manga, this group consists of the "Hero Avatars" who represent the player.
+*   **Key Members:** **Beat** (Saiyan Hero), **Note** (Saiyan Heroine), **Froze** (Frieza Race), **Kabra** (Majin), and others.
+*   **Role:** They often act as the bridge between the "real world" (where the card game is played) and the *Dragon Ball* world, fighting alongside the Time Patrol.
+
+---
+
+### **2. Major Antagonist Factions**
+
+#### **The Dark Empire**
+The most prominent villainous organization, originating from the **Dark Demon Realm**.
+*   **Leader:** **Mechikabura** (The Dark King).
+*   **Key Members:** **Towa**, **Mira**, **Dabura**, and the **Demon Gods** (Salsa, Putine, Gravy, and Shroom).
+*   **Goal:** To gather the **Dark Dragon Balls** to restore Mechikabura’s youth and eventually take over all of time and space.
+
+#### **The Time Breakers**
+A sub-faction or precursor to the Dark Empire, often led by the scientists Towa and Mira.
+*   **Goal:** To gather "Dark Energy" by causing chaos in various timelines to break the seal on the Demon Realm.
+*   **Tactics:** They use **Time Breaker Masks** to brainwash powerful warriors (such as **Masked Saiyan Bardock** or **Dark Masked King Vegeta**) to serve them.
+
+#### **The Core Area Warriors**
+A group of extremely powerful prisoners who were locked in the "Core Area" of the Prison Planet.
+*   **Leader:** **Hearts**.
+*   **Key Members:** **Fused Zamasu**, **Cumber** (the Evil Saiyan), **Oren** and **Kamin** (Tuffle Neo Machine Mutants), and **Lagss**.
+*   **Goal:** To destroy the gods—specifically **Grand Zeno**—to "free" mortals from the whims of divine beings. They use the **Universe Seed** to siphon energy from various universes to achieve this.
+
+#### **The Warriors in Black**
+Introduced in the *Ultra God Mission*, these are alternate-timeline versions of heroes who have lost everything and now serve a new master.
+*   **Leader:** **Aeos** (the former Supreme Kai of Time).
+*   **Key Members:** **The Warrior in Black** (Bardock), **The Namekian Warrior in Black** (Piccolo), **The Future Warrior in Black** (Gohan), and **The Female Warrior in Black** (Vidro).
+*   **Goal:** Aeos hosts the **Super Space-Time Tournament** to determine which timeline is "worthy" of existing, intending to erase all others to "cleanse" history.
+
+---
+
+### **3. Third Parties & Independent Powers**
+
+#### **Fu’s Organization**
+**Fu**, the son of Towa and Mira, is a rogue scientist who views the multiverse as his personal laboratory.
+*   **Allies:** He often recruits villains like **Turles**, **Bojack**, and **Dr. W** (Wheelo) by promising them power.
+*   **Goal:** Unlike the Dark Empire, Fu isn't purely "evil"; he is driven by curiosity. His major project was the **Universe Tree**, which he used to create a brand-new universe from scratch.
+
+#### **Demigra’s Army**
+**Dark King Demigra** is a former Demon God who often acts as a wild card, sometimes opposing the Time Patrol and other times competing with the Dark Empire for control.
+*   **Key Members:** **Robelu** (his loyal assistant).
+*   **Role:** He frequently attempts to usurp the position of Supreme Kai of Time for himself.
+
+#### **Majin Ozotto**
+A "Super Monster" who acts as the primary antagonist of the *Meteor Mission*.
+*   **Goal:** To devour every living being and planet in the multiverse to gain absolute power. He is a standalone threat that forces both the Time Patrol and the main timeline heroes to unite.
+
+---
+
+### **4. World Powers & Alliances**
+
+*   **The Divine Hierarchy:** The **Grand Priest** and the **Gods of Destruction** (Beerus, Champa, etc.) remain the ultimate "world powers." In *Heroes*, they are often forced to intervene when multiversal threats (like the Universe Tree) threaten the stability of all 12 universes.
+*   **Inter-Universal Alliances:** During the *Universal Conflict* arc, a massive alliance was formed between **Universe 7** (Goku/Vegeta), **Universe 6** (Hit/Cabba/Caulifla), and **Universe 11** (Jiren/Toppo) to stop the Core Area Warriors.
+*   **The Red Pants Army:** A minor faction from the distant future (Age 991), led by **General Bonn**. They are a successor to the Red Ribbon Army and have occasionally allied with the Time Breakers.

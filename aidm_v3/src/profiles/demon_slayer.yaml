@@ -1,0 +1,85 @@
+id: demon_slayer
+name: Demon Slayer
+source_anime: Demon Slayer
+media_type: anime
+status: completed
+generated_at: '2026-01-07T13:09:27.737392'
+confidence: 95
+research_method: bundled_parallel
+dna_scales:
+  introspection_vs_action: 7
+  comedy_vs_drama: 4
+  simple_vs_complex: 3
+  power_fantasy_vs_struggle: 8
+  explained_vs_mysterious: 3
+  fast_paced_vs_slow_burn: 3
+  episodic_vs_serialized: 9
+  grounded_vs_absurd: 6
+  tactical_vs_instinctive: 7
+  hopeful_vs_cynical: 2
+  ensemble_vs_solo: 4
+tropes:
+  tournament_arc: false
+  training_montage: true
+  power_of_friendship: true
+  mentor_death: true
+  chosen_one: true
+  tragic_backstory: true
+  redemption_arc: true
+  betrayal: false
+  sacrifice: true
+  transformation: true
+  forbidden_technique: true
+  time_loop: false
+  false_identity: false
+  ensemble_focus: true
+  slow_burn_romance: false
+combat_system: spectacle
+power_system:
+  name: Breathing Styles and Blood Demon Arts
+  mechanics: Humans utilize Total Concentration Breathing to accelerate heart rate
+    and oxygen flow for superhuman physical stats. Demons utilize Blood Demon Arts,
+    which are supernatural abilities fueled by Muzan Kibutsuji's blood and often reflect
+    their human pasts.
+  limitations: Breathing techniques put immense strain on the lungs and heart; the
+    Demon Slayer Mark typically causes death by age 25; Demons are destroyed by sunlight,
+    Nichirin swords, and Wisteria poison.
+  tiers:
+  - Hashira (Pillars)
+  - Twelve Kizuki (Upper and Lower Moons)
+  - Demon Slayer Mark
+  - Transparent World
+  - Selfless State
+tone:
+  comedy_level: 4
+  darkness_level: 8
+  optimism: 8
+director_personality: You are the director for a Demon Slayer-style campaign. You
+  explore character thoughts and feelings deeply. Battles are won by willpower and
+  instinct, not chess moves. The protagonist is powerful; challenges come from elsewhere.
+pacing:
+  scene_length: moderate
+  arc_length_sessions: 4-6
+sources_consulted:
+- power_system
+- combat
+- tone
+- characters
+- factions
+- locations
+- arcs
+- sequels
+- adaptations
+- recent
+aliases:
+- demon slayer
+- demon slayer kimetsu no yaiba
+- demon slayers
+- demonslayer
+- kimetsu no yaba
+- kimetsu no yaiba
+- kimetsu no yiba
+- kny
+- 鬼滅の刃
+series_group: demon_slayer
+series_position: 1

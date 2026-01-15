@@ -1,0 +1,88 @@
+id: fatezero
+name: Fate/Zero
+source_anime: Fate/Zero
+media_type: anime
+status: completed
+generated_at: '2026-01-09T09:59:07.675411'
+confidence: 95
+research_method: bundled_parallel
+aliases:
+- fatezero
+- feitozero
+- fz
+- フェイト/ゼロ
+dna_scales:
+  introspection_vs_action: 4
+  comedy_vs_drama: 1
+  simple_vs_complex: 8
+  power_fantasy_vs_struggle: 8
+  explained_vs_mysterious: 3
+  fast_paced_vs_slow_burn: 7
+  episodic_vs_serialized: 10
+  grounded_vs_absurd: 2
+  tactical_vs_instinctive: 2
+  hopeful_vs_cynical: 9
+  ensemble_vs_solo: 2
+tropes:
+  tournament_arc: true
+  training_montage: false
+  power_of_friendship: false
+  mentor_death: true
+  chosen_one: false
+  tragic_backstory: true
+  redemption_arc: false
+  betrayal: true
+  sacrifice: true
+  transformation: false
+  forbidden_technique: true
+  time_loop: false
+  false_identity: true
+  ensemble_focus: true
+  slow_burn_romance: false
+combat_system: tactical
+power_system:
+  name: Magecraft and the Servant System
+  mechanics: The system is rooted in 'Mystery' and the utilization of Prana (Magical
+    Energy), which consists of Mana (environmental) and Od (internal). Magi use Magic
+    Circuits to convert life force into Prana for Magecraft (artificial reenactment
+    of phenomena) or True Magic (miracles). In the Holy Grail War, Heroic Spirits
+    are summoned into seven classes—Saber, Lancer, Archer, Rider, Caster, Assassin,
+    and Berserker—each possessing Noble Phantasms and specific parameters.
+  limitations: Magi are restricted by the fixed number of Magic Circuits they possess
+    at birth. Servants require a constant Prana supply from their Masters to stay
+    materialized and are subject to the absolute authority of three Command Spells.
+    Revealing a Servant's True Name exposes their tactical weaknesses, and the 'Secret
+    of Magecraft' must be maintained to prevent the degradation of Mystery.
+  tiers:
+  - E-Rank (10)
+  - D-Rank (20)
+  - C-Rank (30)
+  - B-Rank (40)
+  - A-Rank (50)
+  - EX-Rank (Transcendent/Unmeasurable)
+tone:
+  comedy_level: 2
+  darkness_level: 9
+  optimism: 2
+director_personality: You are the director for a Fate/Zero-style campaign. You maintain
+  dramatic weight; comedy is rare and earned. You explain strategies and tactics in
+  detail. The protagonist is powerful; challenges come from elsewhere.
+pacing:
+  scene_length: moderate
+  arc_length_sessions: 4-6
+sources_consulted:
+- power_system
+- combat
+- tone
+- characters
+- factions
+- locations
+- arcs
+- sequels
+- adaptations
+- recent
+- series_aliases
+series_group: fate_stay_night
+series_position: 1
+related_franchise: fate_series
+relation_type: alternate_timeline

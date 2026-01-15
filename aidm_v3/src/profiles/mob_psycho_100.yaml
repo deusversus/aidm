@@ -1,0 +1,82 @@
+id: mob_psycho_100
+name: Mob Psycho 100
+source_anime: Mob Psycho 100
+media_type: anime
+status: completed
+generated_at: '2026-01-07T10:29:30.365828'
+confidence: 95
+research_method: bundled_parallel
+dna_scales:
+  introspection_vs_action: 4
+  comedy_vs_drama: 5
+  simple_vs_complex: 7
+  power_fantasy_vs_struggle: 3
+  explained_vs_mysterious: 4
+  fast_paced_vs_slow_burn: 6
+  episodic_vs_serialized: 8
+  grounded_vs_absurd: 8
+  tactical_vs_instinctive: 9
+  hopeful_vs_cynical: 1
+  ensemble_vs_solo: 4
+tropes:
+  tournament_arc: false
+  training_montage: true
+  power_of_friendship: true
+  mentor_death: false
+  chosen_one: false
+  tragic_backstory: true
+  redemption_arc: true
+  betrayal: false
+  sacrifice: false
+  transformation: true
+  forbidden_technique: false
+  time_loop: false
+  false_identity: true
+  ensemble_focus: true
+  slow_burn_romance: true
+combat_system: spirit
+power_system:
+  name: Psychic Energy (Psychokinesis)
+  mechanics: Powers are fueled by the user's spirit and mental state, with potency
+    directly tied to emotional intensity. High-level users can transfer or absorb
+    energy, and Shigeo Kageyama specifically triggers '100%' explosions or a primal
+    '???' state based on emotional stress.
+  limitations: Users typically face difficulty performing multiple psychic tasks simultaneously
+    and suffer from physical strain or bodily breakdown if they exceed their capacity
+    to contain energy.
+  tiers:
+  - God Tier (Mob ???%, Toichiro Suzuki 100%, Keiji Mogami)
+  - High Tier (Mob 100% states, Serizawa, Shimazaki)
+  - Mid Tier (Teruki Hanazawa, Sho Suzuki, Ritsu Kageyama)
+tone:
+  comedy_level: 7
+  darkness_level: 5
+  optimism: 9
+director_personality: You are the director for a Mob Psycho 100-style campaign. Battles
+  are won by willpower and instinct, not chess moves. Embrace the absurd. Reality
+  is a suggestion.
+pacing:
+  scene_length: moderate
+  arc_length_sessions: 4-6
+sources_consulted:
+- power_system
+- combat
+- tone
+- characters
+- factions
+- locations
+- arcs
+- sequels
+- adaptations
+- recent
+aliases:
+- mob physcho 100
+- mob psycho 100
+- mob psycho 1000
+- mob sycho 100
+- mobpsycho100
+- mobu saiko hyaku
+- mp100
+- モブサイコ100
+series_group: mob_psycho_100
+series_position: 1

@@ -1,0 +1,83 @@
+id: wicked_city
+name: Wicked City
+source_anime: Wicked City
+media_type: anime
+status: completed
+generated_at: '2026-01-11T10:31:13.910838'
+confidence: 95
+research_method: bundled_parallel
+aliases:
+- Yōjū Toshi
+- supernatural beast city
+- wc
+- wicked city
+- wickedcity
+- yjt
+- youjuu toshi
+- 妖獣都市
+dna_scales:
+  introspection_vs_action: 8
+  comedy_vs_drama: 3
+  simple_vs_complex: 5
+  power_fantasy_vs_struggle: 5
+  explained_vs_mysterious: 5
+  fast_paced_vs_slow_burn: 5
+  episodic_vs_serialized: 5
+  grounded_vs_absurd: 5
+  tactical_vs_instinctive: 5
+  hopeful_vs_cynical: 5
+  ensemble_vs_solo: 5
+tropes:
+  tournament_arc: false
+  training_montage: false
+  power_of_friendship: false
+  mentor_death: false
+  chosen_one: false
+  tragic_backstory: false
+  redemption_arc: false
+  betrayal: false
+  sacrifice: false
+  transformation: false
+  forbidden_technique: false
+  time_loop: false
+  false_identity: true
+  ensemble_focus: false
+  slow_burn_romance: false
+combat_system: spectacle
+power_system:
+  name: Psychic Powers (PP)
+  mechanics: A quantified energy source measured in numeric values that functions
+    as a spiritual battery. It allows for the creation of spiritual barriers to repel
+    or trap demons and matter restructuring at the molecular level to enhance physical
+    strikes or manipulate objects.
+  limitations: Overuse causes severe internal damage and physical exhaustion to human
+    agents. Demons are weakened by holy or high-frequency spiritual zones, often requiring
+    human disguises to navigate the human world.
+  tiers:
+  - Agent Ranks (e.g., Legendary agents like Miyuki)
+  - Demon Evolution (strengthening via absorption or biological events)
+  - Hybrid Boost (Space-time manipulation and teleportation via inter-species pregnancy)
+tone:
+  comedy_level: 3
+  darkness_level: 9
+  optimism: 6
+director_personality: You are the director for a Wicked City-style campaign. You explore
+  character thoughts and feelings deeply. You maintain dramatic weight; comedy is
+  rare and earned.
+pacing:
+  scene_length: moderate
+  arc_length_sessions: 4-6
+sources_consulted:
+- power_system
+- combat
+- tone
+- characters
+- factions
+- locations
+- arcs
+- sequels
+- adaptations
+- recent
+- series_aliases
+series_group: wicked_city
+series_position: 1

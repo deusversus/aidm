@@ -1,0 +1,84 @@
+id: princess_mononoke
+name: Princess Mononoke
+source_anime: Princess Mononoke
+media_type: anime
+status: completed
+generated_at: '2026-01-11T17:29:21.772527'
+confidence: 95
+research_method: bundled_parallel
+aliases:
+- mononoke
+- mononokehime
+- pm
+- princess mononoke
+- princessmononoke
+- もののけ姫
+dna_scales:
+  introspection_vs_action: 7
+  comedy_vs_drama: 1
+  simple_vs_complex: 8
+  power_fantasy_vs_struggle: 7
+  explained_vs_mysterious: 8
+  fast_paced_vs_slow_burn: 7
+  episodic_vs_serialized: 10
+  grounded_vs_absurd: 3
+  tactical_vs_instinctive: 8
+  hopeful_vs_cynical: 4
+  ensemble_vs_solo: 4
+tropes:
+  tournament_arc: false
+  training_montage: false
+  power_of_friendship: false
+  mentor_death: false
+  chosen_one: false
+  tragic_backstory: true
+  redemption_arc: true
+  betrayal: true
+  sacrifice: true
+  transformation: true
+  forbidden_technique: false
+  time_loop: false
+  false_identity: false
+  ensemble_focus: true
+  slow_burn_romance: true
+combat_system: narrative
+power_system:
+  name: Spiritual Ecology & The Curse
+  mechanics: A system rooted in Shinto animism where the natural world (Kami) interacts
+    with the human world. The Curse (Tatari-gami) manifests as parasitic 'demon worms'
+    born from hatred and pain, granting the host supernatural physical abilities like
+    enhanced strength and speed while slowly consuming their life force. The Great
+    Forest Spirit acts as the apex, capable of healing or taking life with a touch.
+  limitations: The curse is terminal, spreading further across the body whenever the
+    host feels anger or uses the granted power. Ancient gods, while powerful, are
+    vulnerable to iron weapons and industrial technology. The Forest Spirit's power
+    is neutral and indifferent to human morality, making it unpredictable.
+  tiers:
+  - 'Tier 1: The Great Forest Spirit (Shishigami)'
+  - 'Tier 2: Ancient Clan Gods (Moro, Okkoto, Nago)'
+  - 'Tier 3: Lesser Spirits (Kodama)'
+tone:
+  comedy_level: 2
+  darkness_level: 8
+  optimism: 6
+director_personality: You are the director for a Princess Mononoke-style campaign.
+  You explore character thoughts and feelings deeply. You maintain dramatic weight;
+  comedy is rare and earned. Battles are won by willpower and instinct, not chess
+  moves.
+pacing:
+  scene_length: moderate
+  arc_length_sessions: 4-6
+sources_consulted:
+- power_system
+- combat
+- tone
+- characters
+- factions
+- locations
+- arcs
+- sequels
+- adaptations
+- recent
+- series_aliases
+series_group: princess_mononoke
+series_position: 1

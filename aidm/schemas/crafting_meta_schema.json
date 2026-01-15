@@ -1,0 +1,205 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "crafting_meta_schema.json",
+  "title": "Crafting Meta-Schema",
+  "description": "Parameterized meta-schema for crafting systems. Defines how characters create items based on anime mechanics.",
+  "version": "1.0.0",
+  "type": "object",
+  "required": ["type"],
+  "properties": {
+    "type": {
+      "type": "string",
+      "description": "The crafting system type",
+      "enum": ["recipe_based", "skill_based", "experimental", "equivalent_exchange", "none"]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "type": { "const": "recipe_based" } }
+      },
+      "then": {
+        "properties": {
+          "type": { "const": "recipe_based" },
+          "parameters": {
+            "type": "object",
+            "required": ["craft_focus", "material_categories"],
+            "properties": {
+              "craft_focus": {
+                "type": "string",
+                "description": "What type of items can be crafted (e.g., 'weapons', 'cards', 'potions')"
+              },
+              "recipe_source": {
+                "type": "string",
+                "description": "How recipes are obtained",
+                "enum": ["learned", "discovered", "innate"],
+                "default": "learned"
+              },
+              "failure_chance": {
+                "type": "boolean",
+                "description": "Whether crafting can fail",
+                "default": false
+              },
+              "material_categories": {
+                "type": "array",
+                "description": "Types of materials used (e.g., ['metals', 'herbs', 'monster_parts'])",
+                "items": { "type": "string" },
+                "minItems": 1
+              }
+            }
+          },
+          "mechanics": {
+            "type": "object",
+            "properties": {
+              "crafting_action": { "type": "string", "const": "combine_materials_with_recipe" },
+              "success_determination": { "type": "string", "const": "skill_check_or_guaranteed" },
+              "output": { "type": "string", "const": "fixed_item_from_recipe" }
+            }
+          }
+        },
+        "required": ["parameters", "mechanics"]
+      }
+    },
+    {
+      "if": {
+        "properties": { "type": { "const": "skill_based" } }
+      },
+      "then": {
+        "properties": {
+          "type": { "const": "skill_based" },
+          "parameters": {
+            "type": "object",
+            "required": ["craft_focus", "skill_stat"],
+            "properties": {
+              "craft_focus": {
+                "type": "string",
+                "description": "What can be crafted (e.g., 'weapons', 'armor', 'tools')"
+              },
+              "skill_stat": {
+                "type": "string",
+                "description": "Which stat determines success",
+                "enum": ["INT", "WIS", "DEX", "STR"],
+                "default": "INT"
+              },
+              "quality_tiers": {
+                "type": "array",
+                "description": "Possible quality outcomes",
+                "items": { "type": "string" },
+                "default": ["Poor", "Common", "Fine", "Masterwork"]
+              }
+            }
+          },
+          "mechanics": {
+            "type": "object",
+            "properties": {
+              "crafting_action": { "type": "string", "const": "skill_check_with_materials" },
+              "success_determination": { "type": "string", "const": "roll_vs_difficulty" },
+              "output": { "type": "string", "const": "variable_quality_item" }
+            }
+          }
+        },
+        "required": ["parameters", "mechanics"]
+      }
+    },
+    {
+      "if": {
+        "properties": { "type": { "const": "experimental" } }
+      },
+      "then": {
+        "properties": {
+          "type": { "const": "experimental" },
+          "parameters": {
+            "type": "object",
+            "required": ["craft_focus"],
+            "properties": {
+              "craft_focus": {
+                "type": "string",
+                "description": "Focus of experimentation (e.g., 'alchemy', 'cooking', 'engineering')"
+              },
+              "discovery_mode": {
+                "type": "boolean",
+                "description": "Whether players discover new combinations",
+                "default": true
+              },
+              "side_effects": {
+                "type": "boolean",
+                "description": "Whether experiments can have unexpected results",
+                "default": true
+              }
+            }
+          },
+          "mechanics": {
+            "type": "object",
+            "properties": {
+              "crafting_action": { "type": "string", "const": "combine_materials_freely" },
+              "success_determination": { "type": "string", "const": "emergent_system" },
+              "output": { "type": "string", "const": "unpredictable_with_patterns" }
+            }
+          }
+        },
+        "required": ["parameters", "mechanics"]
+      }
+    },
+    {
+      "if": {
+        "properties": { "type": { "const": "equivalent_exchange" } }
+      },
+      "then": {
+        "properties": {
+          "type": { "const": "equivalent_exchange" },
+          "parameters": {
+            "type": "object",
+            "required": ["craft_focus", "exchange_law"],
+            "properties": {
+              "craft_focus": {
+                "type": "string",
+                "description": "What can be transmuted (e.g., 'alchemy', 'matter_transformation')"
+              },
+              "exchange_law": {
+                "type": "string",
+                "description": "The fundamental rule (e.g., 'to create, something of equal value must be lost')"
+              },
+              "forbidden_transmutations": {
+                "type": "array",
+                "description": "Things that cannot be created (e.g., ['human_life', 'gold'])",
+                "items": { "type": "string" },
+                "default": []
+              }
+            }
+          },
+          "mechanics": {
+            "type": "object",
+            "properties": {
+              "crafting_action": { "type": "string", "const": "sacrifice_equal_value" },
+              "success_determination": { "type": "string", "const": "law_of_equivalent_exchange" },
+              "output": { "type": "string", "const": "transformation_with_cost" }
+            }
+          }
+        },
+        "required": ["parameters", "mechanics"]
+      }
+    },
+    {
+      "if": {
+        "properties": { "type": { "const": "none" } }
+      },
+      "then": {
+        "properties": {
+          "type": { "const": "none" },
+          "parameters": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": false
+          },
+          "mechanics": {
+            "type": "object",
+            "properties": {
+              "crafting_action": { "type": "string", "const": "disabled" }
+            }
+          }
+        },
+        "required": ["mechanics"]
+      }
+    }
+  ]
+}

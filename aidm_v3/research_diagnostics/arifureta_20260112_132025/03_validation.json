@@ -1,0 +1,26 @@
+{
+  "is_valid": false,
+  "complete": false,
+  "missing_fields": [],
+  "issues": [
+    "The document is truncated at the end of the 'Locations' section.",
+    "Missing explicit explanation of the 'Status' system (levels, stats) which is a core mechanic of the world's power system."
+  ],
+  "errors": [],
+  "confidence": 95,
+  "suggestions": [],
+  "correction": null,
+  "has_power_system": true,
+  "has_narrative_info": true,
+  "has_combat_style": true,
+  "has_world_setting": true,
+  "recommended_supplemental": [
+    "Status plate and RPG leveling mechanics",
+    "Details on the Seven Great Labyrinths",
+    "The Holy Church of Heiligh and its political influence"
+  ],
+  "has_corruption": false,
+  "corruption_type": null,
+  "character_count": 34654,
+  "repetition_score": 0.0035460992907800915
+}

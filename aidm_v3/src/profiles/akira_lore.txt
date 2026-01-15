@@ -1,0 +1,121 @@
+## Power System, Combat
+In the world of *Akira*, power is not just a supernatural ability but a fundamental force of the universe—a "seed" of evolution that humanity is not yet ready to control. The system is explored through a blend of hard science (radiation readings, biological experimentation) and metaphysical philosophy.
+
+### **1. Power System: The "Akira" Force**
+The power system is rooted in the idea that all living things possess a latent energy that can trigger the next stage of human evolution.
+
+*   **Mechanics & Abilities:**
+    *   **Psychokinesis (PK):** The most common manifestation, ranging from moving small objects to crushing skyscrapers and punching craters into the moon.
+    *   **Telepathy & Clairvoyance:** Users can communicate mentally, see into the future (Kiyoko), or view distant events (Lady Miyako).
+    *   **Teleportation:** High-tier users like Tetsuo and the Espers can instantly relocate themselves or objects.
+    *   **Matter Manipulation:** At advanced stages, users can reshape their own biology (Tetsuo’s mechanical arm and fleshy "mutation") or the fabric of reality itself.
+    *   **Mediumship:** A unique mechanic where a non-psychic (like Kei) can be used as a "conduit" or medium for other psychics to channel their power through.
+*   **Rules & Limitations:**
+    *   **Biological Strain:** The human body acts as a container. If the power grows too fast, the "container" breaks, leading to horrific physical mutations (Tetsuo’s "flesh-baby" form).
+    *   **Drug Dependency:** The government used drugs to both awaken and suppress these powers. In the manga, Tetsuo is addicted to these pills to manage the "headaches" caused by his expanding consciousness.
+    *   **Emotional Triggers:** Powers are often volatile and tied to the user's emotional state—rage, fear, or an inferiority complex can cause a "leak" of energy (the psychic "Big Bang").
+*   **Tiers & Progression:**
+    *   **The Numbering System:** Test subjects are numbered based on their recruitment into the government's parapsychology project.
+        *   **Tier 0 (The God):** **Akira (#28)**. He is the pinnacle, a being of pure energy who has already "transcended."
+        *   **Tier 1 (The Alpha):** **Tetsuo (#41)**. Possesses raw power equal to Akira but lacks the mental or physical discipline to contain it.
+        *   **Tier 2 (The Masters):** **Lady Miyako (#19)** and the **Espers (Kiyoko #25, Takashi #26, Masaru #27)**. They have high control but lower raw output than Akira or Tetsuo.
+        *   **Tier 3 (The Mediums/Acolytes):** Characters like Kei (when possessed) or Miyako’s monks who can manifest minor effects.
+
+---
+
+### **2. Combat: Fighting Style & Spectacle**
+Combat in *Akira* evolves from grounded street brawls to "God-tier" reality-warping clashes.
+
+*   **Fighting Styles:**
+    *   **Street/Biker Style:** Characterized by Shotaro Kaneda. It is scrappy, utilizing motorcycles as weapons, high-speed maneuvers, and hand-to-hand brawling.
+    *   **Military/Tactical:** The Colonel and the Neo-Tokyo army use high-tech weaponry, including the **SOL (Satellite Orbital Laser)**, to combat psychic threats.
+    *   **Psychic Combat:** Involves "invisible" strikes, telekinetic shields, and mental assaults. In the manga, this is highly tactical, with Lady Miyako using her monks to form a "psychic net" to contain Tetsuo.
+*   **Tactical vs. Flashy Spectacle:**
+    *   **The Movie:** Focuses on **Visual Spectacle**. It is famous for its "fluid" animation, the iconic "Akira Slide," and the body-horror transformation of Tetsuo. The battles are cinematic, emphasizing the sheer scale of destruction.
+    *   **The Manga:** Focuses on **Tactical Depth**. Battles involve complex maneuvers, such as using Kei as a medium to fight Tetsuo while he is distracted, or the strategic use of the SOL satellite to target specific psychic signatures.
+*   **Emotional Weight:**
+    *   The core of every fight is the **inferiority complex** of Tetsuo. His combat style is "loud" and destructive because he is constantly trying to prove he is no longer the "runt" of the gang.
+    *   Kaneda’s combat is driven by **loyalty and guilt**. He doesn't want to kill Tetsuo but realizes he is the only one who can stop him, leading to a "tragic hero" dynamic where the spectacle is underscored by the loss of a childhood bond.
+*   **The "Big Bang" Spectacle:** The ultimate combat move in the series is the release of a singularity. It is a silent, white void that consumes everything—a visual representation of power so absolute that "fighting" it becomes impossible.
+
+## Tone, Characters
+*Akira*, created by Katsuhiro Otomo, is a cornerstone of the cyberpunk genre, known for its visceral detail, complex political themes, and philosophical depth. Whether in its 1982–1990 manga or the landmark 1988 film, it explores a world on the brink of evolution and self-destruction.
+
+### **1. Tone, Themes, and Atmosphere**
+
+*   **Genre & Mood:** *Akira* is a **cyberpunk political thriller** set in a post-apocalyptic "Neo-Tokyo." Its mood is **intense, gritty, and claustrophobic**, characterized by a constant sense of impending doom and social unrest.
+*   **Atmosphere:** The setting is a "living organism"—a neon-soaked, high-tech metropolis built over the literal and figurative ruins of the past. It balances **urban decay** (slums, protests, biker brawls) with **sterile futurism** (government labs, orbital lasers).
+*   **Dark Comedy & Satire:** While not a "dark comedy" in the traditional sense, *Akira* uses **satirical deconstruction**.
+    *   **Kaneda** is a parody of the "shonen hero"—he is a delinquent, chauvinistic, and often dim-witted thug who becomes a hero by accident.
+    *   **Dark Humor:** Levity often comes from the absurdity of the biker gangs (like the flamboyant **Clown Gang**) or Kaneda’s cocky, "bull in a china shop" attitude amidst world-ending stakes.
+*   **Optimism vs. Nihilism:** Despite its nihilistic imagery of mass destruction, the story is ultimately about **rebirth and evolution**.
+    *   **The "Amoeba" Metaphor:** The story suggests that humanity is like an amoeba given the power of a god; while it initially destroys, it is a necessary step toward a higher state of being.
+    *   **Ending Note:** The film ends with the creation of a new universe and the hauntingly hopeful line, *"I am Tetsuo,"* suggesting that consciousness survives physical destruction.
+
+---
+
+### **2. Main Characters & Roles**
+
+| Character | Role | Abilities | Key Relationships |
+| :--- | :--- | :--- | :--- |
+| **Shotaro Kaneda** | **Protagonist** | No supernatural powers; expert biker, charismatic leader, uses high-tech weaponry (laser cannon). | Best friend/rival to Tetsuo; romantic interest/ally to Kei. |
+| **Tetsuo Shima** | **Antagonist** | God-like psychokinesis, telepathy, teleportation, and matter manipulation. | Best friend to Kaneda (turns into a bitter rivalry based on an inferiority complex). |
+| **Akira** | **Titular Entity** | "Ultimate Energy"; capable of triggering singularites and destroying entire cities. | A "god" to the cults; a "weapon" to the military; a peer to the Espers. |
+| **Kei** | **Heroine** | A "medium" who can channel the psychic powers of others; skilled resistance fighter. | Ally/love interest to Kaneda; member of the anti-government resistance. |
+| **Colonel Shikishima** | **Anti-Hero** | Military leadership, tactical genius, access to the "SOL" orbital laser. | Guardian of the Espers; attempts to control Tetsuo to save Neo-Tokyo. |
+| **The Espers** | **Supporting** | (Takashi, Masaru, Kiyoko) Precognition, telekinesis, and telepathy. | Test subjects who guide Kaneda and eventually help "contain" Tetsuo. |
+
+---
+
+### **3. Character Dynamics & Abilities**
+
+*   **The Protagonist (Kaneda):** Kaneda represents the "human" element. He has no powers but survives through sheer willpower, luck, and loyalty. His role is to ground the story’s cosmic stakes in a personal struggle to "save" or stop his friend.
+*   **The Antagonist (Tetsuo):** Tetsuo’s journey is a "super-powered cautionary tale." His abilities are a physical manifestation of his **inferiority complex**. As his power grows, his body becomes unable to contain it, leading to the famous "flesh-blob" mutation—a literal representation of power out of control.
+*   **The Titular Character (Akira):** In the film, Akira is a collection of preserved organs and a "presence" that appears at the end. In the manga, he is an actual character—a mute, hollowed-out child who acts as a "blank slate" upon which others project their desires for power or salvation.
+*   **The "Pills" (The Capsules):** Kaneda’s gang is named after the drugs they take. In the manga, drug addiction is a major theme, with Tetsuo using pills to suppress the "headaches" caused by his awakening powers, while the government uses them to control the Espers.
+
+## Factions, Locations, Arcs, Sequels, Adaptations, Recent
+*Akira*, created by Katsuhiro Otomo, is a cornerstone of the cyberpunk genre. While the 1988 film is world-famous, the original 2,000-page manga provides a significantly more complex narrative involving international politics, religious cults, and a post-apocalyptic "Empire."
+
+### **1. Organizations, Factions, and World Powers**
+The world of *Akira* is defined by a power vacuum filled by various militant and ideological groups.
+*   **The Capsules:** Shotaro Kaneda’s "bōsōzoku" (motorcycle) gang. Primarily delinquents, they become central players in the resistance against the government.
+*   **The Clown Gang:** A rival drug-fueled biker gang led by Joker. In the manga, they eventually align with Kaneda to survive the Great Tokyo Empire.
+*   **The Resistance:** An anti-government cell led by **Ryu** and backed by **Nezu** (a corrupt politician). Their goal is to expose the "Akira Project."
+*   **The Neo-Tokyo Government & Military:** Led by **Colonel Shikishima**, they oversee the secret research on Espers. The Colonel eventually stages a coup to maintain order.
+*   **The Great Tokyo Empire:** Formed after Neo-Tokyo’s second destruction. **Tetsuo** serves as the "Prime Minister" with **Akira** as the figurehead Emperor. It is a fanatical, drug-addled society of survivors.
+*   **The Cult of Lady Miyako:** A religious faction that provides aid to refugees. **Lady Miyako** (Test Subject #19) uses her psychic powers to oppose Tetsuo.
+*   **International Powers (The UN/USA):** In the manga, the US military (led by George Yamada) and a fleet of international scientists intervene to study or destroy Akira, viewing the Great Tokyo Empire as a global threat.
+
+### **2. Important Locations and Geography**
+*   **Neo-Tokyo:** Built on artificial islands in Tokyo Bay after the original city was destroyed in 1988 (1992 in some versions). It is a sprawling, neon-lit megalopolis.
+*   **The Olympic Stadium:** The site of the upcoming 2020 (or 2019) Olympics. Beneath it lies the "Cryogenic Chamber," a massive underground facility where Akira was frozen at absolute zero.
+*   **The Old City:** The ruins of the original Tokyo, a wasteland where the "Great Tokyo Empire" eventually establishes its base.
+*   **Lady Miyako’s Temple:** A fortified skyscraper that serves as a sanctuary for thousands of refugees and a psychic hub for the resistance.
+*   **Harukiya Bar:** A dive bar in District 17 that serves as the Capsules' primary hangout and a neutral ground for underground dealings.
+
+### **3. Major Story Arcs (Manga Timeline)**
+The manga is divided into six volumes, following a distinct progression:
+1.  **Tetsuo Arc:** Tetsuo gains powers after a bike accident involving an Esper. He is captured by the military and begins his descent into madness.
+2.  **Akira’s Awakening:** Tetsuo breaks into the cryogenic facility. Akira is revived, and his presence triggers a second massive explosion that levels Neo-Tokyo.
+3.  **The Great Tokyo Empire Arc:** The city is a ruin. Tetsuo rules the "Empire" while Kaneda is missing (trapped in a psychic void).
+4.  **The International Intervention:** American and UN forces arrive. Yamada attempts to assassinate Akira with biological weapons and orbital lasers.
+5.  **The Final Confrontation:** Kaneda returns. Lady Miyako, the Espers, and the Resistance launch a final assault on Tetsuo as his powers begin to mutate his body into a "singularity."
+
+### **4. Manga vs. Anime: Key Differences**
+The 1988 film was produced while the manga was still being written, leading to massive divergence:
+*   **Akira’s Role:** In the movie, Akira is just a collection of preserved organs in jars. In the manga, he is a **living child** who walks, eats, and eventually becomes the Emperor of the ruins.
+*   **Lady Miyako:** In the film, she is a minor background character. In the manga, she is a **major protagonist**, a former test subject, and the tactical mastermind behind the final battle.
+*   **The Setting:** The anime ends with the destruction of Neo-Tokyo. The manga continues for thousands of pages *after* that destruction, exploring the post-apocalyptic society that emerges.
+*   **Characters:** Major manga characters like **Chiyoko** (a resistance powerhouse) and **Yamada** (the American spy) are entirely absent from the film.
+
+### **5. Sequels, Spinoffs, and Continuity**
+*   **Direct Sequels:** There are no official narrative sequels to the *Akira* manga or movie.
+*   **Related Works:** *Domu: A Child's Dream* is a 1980 manga by Otomo that features similar psychic themes and is often considered a spiritual precursor.
+*   **Video Games:** An NES game (1988) followed the movie plot, and *Akira Psycho Ball* (2002) was a pinball game for PS2.
+*   **Continuity:** The anime and manga are considered separate timelines. The upcoming "New Anime Project" is expected to follow the manga's continuity more faithfully.
+
+### **6. Recent News and Current Events (as of 2025-2026)**
+*   **The New Anime Project:** Announced by Katsuhiro Otomo and Sunrise in 2019, this series is intended to be a **complete adaptation of the manga**. While production has been slow, it remains the most anticipated update for the franchise.
+*   **Live-Action Movie:** After decades in "development hell" at Warner Bros. (with Taika Waititi most recently attached), reports in **mid-2025** indicated that the film rights have **reverted back to Kodansha**. This effectively ended the long-running Hollywood attempt and opened the door for new Japanese-led productions.
+*   **Otomo’s Complete Works:** Katsuhiro Otomo has been focused on his "Complete Works" project, which includes high-quality reprints of the *Akira* manga and rare production art, keeping the franchise active in the collector's market.

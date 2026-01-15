@@ -1,0 +1,324 @@
+## Characters
+*Fullmetal Alchemist: Brotherhood* (2009) is a faithful adaptation of Hiromu Arakawa's manga, centered on the journey of two brothers seeking to restore their bodies after a failed alchemical experiment.
+
+### **Main Characters: Protagonists**
+
+#### **Edward Elric (The Fullmetal Alchemist)**
+*   **Role:** The primary protagonist and youngest State Alchemist in history.
+*   **Abilities:** A prodigy who can perform alchemy without a transmutation circle (by clapping his hands) after seeing "The Truth." He often transmutes his metal arm into blades or manipulates the terrain.
+*   **Relationships:** Older brother to Alphonse; childhood friend and eventual husband of Winry Rockbell; subordinate/rival to Roy Mustang.
+*   **Motivation:** Driven by intense guilt to restore his brother’s body, which was lost during their attempt to resurrect their mother.
+
+#### **Alphonse Elric**
+*   **Role:** The deuteragonist; his soul is bound to a massive suit of armor.
+*   **Abilities:** Possesses an immortal, tireless body with superhuman strength. Like Edward, he eventually gains the ability to perform alchemy without circles. He is a master of hand-to-hand combat.
+*   **Relationships:** Younger brother to Edward; close friend to Winry; acts as the "voice of reason" for the impulsive Edward.
+*   **Motivation:** To regain his human body and experience physical sensations (like eating and warmth) again.
+
+---
+
+### **Primary Antagonist**
+
+#### **Father (The Dwarf in the Flask)**
+*   **Role:** The central antagonist and creator of the Homunculi.
+*   **Backstory:** Originally a shadow-like entity created in the ancient kingdom of Xerxes using the blood of Van Hohenheim (Slave #23). He orchestrated the genocide of Xerxes to gain a human form and immortality.
+*   **Abilities:** Near-omnipotent alchemical power; he can perform alchemy without movement and can suppress the alchemy of others.
+*   **Motivation:** He seeks to "swallow God" (The Truth) to become a perfect being, free from all human limitations.
+*   **Relationship to Protagonists:** He is the "dark father" figure, a literal mirror of the Elrics' father, Van Hohenheim. He views humans as mere fuel for his goals.
+
+---
+
+### **Key Supporting Characters & Anti-Heroes**
+
+| Character | Role | Abilities | Key Relationships |
+| :--- | :--- | :--- | :--- |
+| **Roy Mustang** | Tritagonist; State Alchemist | **Flame Alchemy:** Uses ignition cloth gloves to create and manipulate fire with pinpoint accuracy. | Superior to Ed; deeply bonded with Riza Hawkeye; best friend of Maes Hughes. |
+| **Winry Rockbell** | Main Support; Mechanic | **Automail Prodigy:** Expert in mechanical engineering and surgery; maintains Ed's prosthetic limbs. | Childhood friend/love interest of Ed; granddaughter of Pinako Rockbell. |
+| **Scar** | Anti-hero / Ally | **Destruction Alchemy:** Uses a tattooed arm to deconstruct matter at the molecular level without the "reconstruction" phase. | Vengeful Ishvalan survivor; initially an enemy of the Elrics, later a vital ally. |
+| **Van Hohenheim** | Mentor / Key Ally | **Living Philosopher's Stone:** Possesses immense power and centuries of knowledge; can transmute without circles. | Father of Ed and Al; the original "blueprint" for Father's human appearance. |
+
+---
+
+### **The Homunculi (Secondary Antagonists)**
+Father created seven "children" based on the seven deadly sins, each serving as a specialized agent:
+*   **Pride (Selim Bradley):** The first and most powerful; manipulates shadows.
+*   **Wrath (King Bradley):** The ruler of Amestris; possesses the "Ultimate Eye" for perfect combat prediction.
+*   **Envy:** A shapeshifter who can take any form; fueled by a deep jealousy of humans.
+*   **Greed:** Desires everything; can harden his skin into an "Ultimate Shield." He eventually defects to aid the protagonists.
+*   **Lust:** An assassin with "Ultimate Spear" fingers that can pierce anything.
+*   **Gluttony:** Can consume anything; his stomach is a failed "Gate of Truth."
+*   **Sloth:** A massive brute tasked with digging a nation-wide transmutation circle.
+
+### **Protagonist vs. Antagonist Dynamic**
+The conflict is a philosophical and physical battle over the **value of human life**. 
+*   **Father** views humanity as a resource to be consumed for personal evolution, attempting to bypass "Equivalent Exchange" by stealing the power of God. 
+*   **The Elric Brothers** represent the human struggle to accept loss and the necessity of hard work and connection. Their journey concludes with Edward choosing to sacrifice his alchemical power—the very thing that made him "special"—to save his brother, proving that human relationships are more valuable than god-like power.
+
+## Tone
+*Fullmetal Alchemist: Brotherhood* (FMAB) is widely regarded as one of the most balanced and complete stories in anime. It masterfully navigates a wide range of emotional and philosophical territories, from the horrors of genocide to the warmth of family.
+
+### **1. Genre and Atmosphere**
+*Fullmetal Alchemist: Brotherhood* is a multi-genre epic that primarily falls under **Adventure, Dark Fantasy, and Steampunk**. 
+*   **Genre Blend:** It functions as a **Military Drama** and **Geopolitical Thriller**, focusing on the internal politics of the country Amestris. It also incorporates elements of **Science Fiction** (through the "science" of alchemy) and **Horror** (body horror and psychological trauma).
+*   **Atmosphere:** The atmosphere is expansive and immersive. It evokes a sense of **industrial-era Europe** (circa early 1900s), blending the wonder of scientific discovery with the grit of a nation constantly at war. The atmosphere can shift from the cozy, rural warmth of Resembool to the oppressive, sterile tension of military headquarters in Central.
+
+### **2. Tone: The "Emotional Rollercoaster"**
+The tone of FMAB is famously dynamic. Unlike the 2003 adaptation, which leaned into a more cynical and somber tone, *Brotherhood* maintains a **"shounen" spirit of hope** while never shying away from brutal reality.
+*   **High Stakes:** The series treats death and consequence with extreme gravity. When characters die or suffer, the narrative allows the weight of that loss to linger.
+*   **Moral Complexity:** The tone is intellectual and reflective. It asks difficult questions about the value of a soul, the ethics of war, and the limits of human knowledge.
+
+### **3. Themes**
+The series is built on several core philosophical pillars:
+*   **Equivalent Exchange:** "In order to gain anything, something of equal value must be lost." This is not just a law of alchemy but a life philosophy regarding sacrifice, hard work, and the cost of ambition.
+*   **The Human Condition:** The show explores what defines "humanity." This is examined through **Alphonse Elric** (a soul in a suit of armor), the **Homunculi** (artificial humans representing sins), and **Chimeras** (blended lifeforms).
+*   **War and Genocide:** A major narrative arc involves the **Ishvalan Civil War**, exploring themes of racism, state-sponsored atrocities, and the cycle of hatred.
+*   **Brotherhood and Family:** At its heart, the story is about the unbreakable bond between Edward and Alphonse and the "found families" they build with others.
+
+### **4. Dark Comedy vs. Standard Humor**
+FMAB uses humor as a vital survival mechanism for its characters, though its implementation is often a point of discussion among fans.
+*   **The Nature of the Humor:** The comedy is often **slapstick or "chibi"** (stylized, exaggerated art). Common gags include Edward’s explosive temper regarding his height or Major Armstrong’s constant shirtless flexing.
+*   **Dark Comedy:** While much of the humor is lighthearted, there is a vein of **dark irony**. For example, the character **Barry the Chopper**—a serial killer whose soul is bound to armor—is often used for comedic relief despite his gruesome nature. 
+*   **Tonal Shifts:** The humor is used to humanize the characters, reminding the audience that despite their "State Alchemist" titles, Ed and Al are still just children. However, some viewers find the sudden shifts from tragedy to comedy jarring.
+
+### **5. Optimism and Redemption**
+Despite the "Dark Fantasy" label, FMAB is fundamentally **optimistic**.
+*   **Redemption Arcs:** The series believes in the capacity for change. Characters like **Scar** (a vengeful survivor) and **Greed** (a villainous homunculus) undergo profound transformations, moving from destruction to self-sacrifice.
+*   **The Power of Agency:** The story emphasizes that while the world is harsh, humans have the power to "stand up and walk" on their own two legs.
+*   **The Ending:** Without spoiling specifics, the series concludes on a note of profound resolution and hope, rewarding the characters' growth and their refusal to take "shortcuts" (like the Philosopher's Stone).
+
+### **6. Mood**
+The mood of the series is **earnest and epic**. It feels like a grand journey where every encounter matters. 
+*   **Intense & Visceral:** During action sequences or "Truth" encounters, the mood is one of awe and terror.
+*   **Melancholic:** There is a persistent underlying sadness regarding the brothers' lost childhood and the scars of the characters' pasts.
+*   **Triumphant:** The series excels at "payoff" moments—where the music swells and the characters' convictions finally overcome seemingly impossible odds.
+
+## Combat
+Combat in *Fullmetal Alchemist: Brotherhood* (FMAB) is celebrated for its blend of scientific logic, high-stakes strategy, and intense emotional resonance. Produced by **Studio Bones**, the series elevates standard shonen action into a "flashy spectacle" that remains grounded in a rigid, well-defined power system.
+
+### 1. Fighting Styles: Alchemy vs. Martial Arts
+Combat in FMAB is rarely just about "magic"; it is a fusion of physical prowess and alchemical science.
+*   **Combat Alchemy:** Most alchemists specialize in a specific material or element. 
+    *   **Roy Mustang (Flame Alchemy):** Uses ignition cloth gloves to create sparks, then manipulates oxygen density in the air to create directed explosions.
+    *   **Alex Louis Armstrong (Strongarm Alchemy):** Combines boxing with alchemy, punching objects to transmute them into high-speed stone spikes or walls.
+    *   **Edward Elric:** A "jack-of-all-trades" who transmutes his automail arm into blades or creates spears and earthen hands from the environment.
+*   **Martial Arts & Weaponry:** Because alchemy requires focus and time (drawing circles or clapping), many fighters rely on pure physical skill. 
+    *   **Scar:** Uses a specialized form of "deconstruction-only" alchemy combined with Ishvalan monk martial arts, making him a lethal close-quarters combatant.
+    *   **King Bradley (Wrath):** A non-alchemist who uses superhuman speed and twin sabers to overwhelm even the strongest alchemists.
+    *   **Briggs Soldiers:** Utilize real-world military tactics, including bolt-action rifles, heavy artillery, and specialized "Briggs Tanks" to combat alchemical threats.
+
+### 2. Tactical & Strategic Depth
+Battles in FMAB are often won through "fighting smarter, not harder."
+*   **Exploiting Physics:** Characters frequently use the environment to their advantage. For example, Edward once transmuted a floor into a "carbon-hardened" surface to counter a fast opponent or used the chemical composition of dynamite to create an explosion without a spark.
+*   **Homunculi Weaknesses:** The protagonists often have to find creative ways to bypass the Homunculi's near-infinite regeneration. 
+    *   **Sloth:** Defeated by the Briggs soldiers and the Armstrongs by using tank fuel to flash-freeze him, exploiting his slow mental processing despite his physical speed.
+    *   **Pride:** Countered by creating "total darkness" (using a flashbang or a dome of earth) because his shadow-based powers require a light source to cast shadows.
+*   **Alkahestry:** This Eastern form of alchemy (from Xing) uses the "Dragon’s Pulse" (earth’s chi). Tactically, it allows for **long-distance transmutation** by throwing kunai to set up remote circles, a feat Amestrian alchemy cannot perform.
+
+### 3. Emotional Weight & Narrative Impact
+The fights in FMAB are rarely just for show; they serve as the climax of character arcs.
+*   **Mustang vs. Envy:** This is less a "spectacle" and more a harrowing depiction of vengeance. Mustang’s cold, systematic incineration of Envy is framed as a tragic descent into hatred, only stopped when his friends intervene to save his soul.
+*   **The Final Battle (Father vs. Everyone):** This battle represents the collective effort of humanity. It isn't won by a single "power-up" but by the combined exhaustion of Father’s Philosopher’s Stone through the sacrifice and coordination of dozens of characters.
+*   **Trauma as a Catalyst:** Many fighting styles are born from the **Ishvalan Civil War**. The "tactics" used by veterans like Mustang and Hawkeye are often haunted by the guilt of their past, adding a layer of somber realism to their combat.
+
+### 4. Visual Spectacle (Studio Bones)
+Studio Bones is renowned for its fluid, high-frame-rate animation, which gives FMAB its "flashy" reputation.
+*   **Alchemical "Sparks":** The visual of blue (or red) alchemical lightning is used to signify the "deconstruction" phase of a battle, creating a high-energy aesthetic.
+*   **Iconic Spectacles:** 
+    *   **Mustang vs. Lust:** Famous for its "wall of fire" animation and the rhythmic snapping of Mustang's fingers.
+    *   **Alphonse vs. Pride & Kimblee:** A masterclass in "combat alchemy," showing Alphonse using a Philosopher's Stone to perform instantaneous, massive transmutations while engaging in high-speed hand-to-hand combat.
+*   **Cinematography:** The series uses "microphysiognomy"—detailed facial expressions—to show the physical and mental strain of combat, making the audience feel every punch and explosion.
+
+## Locations
+The world of *Fullmetal Alchemist: Brotherhood* is set in an alternate history roughly equivalent to the early 20th century (Edwardian era). The geography is central to the plot, as the country of Amestris was literally designed to serve a dark alchemical purpose.
+
+### **1. The Country of Amestris**
+Amestris is the primary setting of the series. It is a landlocked, militaristic state with a nearly perfect circular shape—a detail that is not a coincidence but a requirement for the **Nationwide Transmutation Circle**.
+
+*   **Central City:** The capital and heart of the country. It houses **Central Command**, the military’s headquarters, and the Führer’s residence.
+    *   **The Five Laboratories:** Secret military research facilities. **Laboratory 5**, located next to the Central Prison, is where the Elrics discover the use of human sacrifices to create Philosopher's Stones.
+    *   **Father’s Lair:** A massive underground complex directly beneath Central where the Homunculi and their creator, Father, reside.
+*   **Resembool:** A small, rural sheep-farming town in the East. It is the hometown of Edward and Alphonse Elric and Winry Rockbell. It represents the "home" the brothers burned down to ensure they could never turn back.
+*   **Liore (Reole):** A city in the East where the series begins. It was led by Father Cornello and the Church of Leto. It later becomes a site of massive civil unrest and a "Crest of Blood" for the national circle.
+*   **East City:** A major military hub and the base of operations for Colonel Roy Mustang and his team early in the series.
+*   **Dublith:** A southern city where the Elrics' teacher, Izumi Curtis, lives. 
+    *   **The Devil’s Nest:** A dive bar in Dublith that served as the hideout for the first Greed and his gang of chimeras.
+    *   **Yock Island:** A small island near Dublith where Izumi left the young Elric brothers for a month to learn the "All is One, One is All" philosophy.
+*   **Rush Valley:** Located in the South, this is the "Automail Capital of the World." It is a bustling city of engineers and the place where Winry goes to apprentice.
+*   **Fort Briggs:** A massive fortress built into the northern mountain range (the Briggs Mountains). It guards the border against Drachma and is commanded by Major General Olivier Mira Armstrong. It is famous for its "survival of the fittest" mentality.
+*   **Ishval (Ishbar):** A region in the East inhabited by the Ishvalan people, who are ethnically and religiously distinct. It was the site of the **Ishvalan Civil War** and subsequent genocide, which serves as the backstory for many characters like Scar and Roy Mustang.
+
+---
+
+### **2. World Geography & Neighboring Nations**
+Amestris is surrounded by four major nations, most of which it has been at war with for centuries.
+
+*   **Xing:** A vast empire to the East, separated from Amestris by the **Great Desert**. Its people practice **Alkahestry**, a form of alchemy focused on medicine and the "Dragon Pulse" (the flow of energy through the earth).
+*   **Drachma:** A powerful, snowy nation to the North. They have a non-aggression pact with Amestris, but tensions are high, and only the strength of Fort Briggs prevents an invasion.
+*   **Aerugo:** A principality to the South. It is a trade-focused nation that secretly supplied weapons to the Ishvalans during their rebellion to weaken Amestris.
+*   **Creta:** A nation to the West. It is a federation of various tribes and states, often engaged in border skirmishes with the Amestrian military at West City.
+*   **Xerxes:** An ancient, fallen civilization located in the desert between Amestris and Xing. It was destroyed in a single night 400 years ago when its entire population was sacrificed to create the first Philosopher's Stone and give Father his human form.
+
+---
+
+### **3. The "Crest of Blood" Locations**
+To activate the Nationwide Transmutation Circle, Father orchestrated "Crests of Blood"—massacres at specific points around the country to "etch" the circle with human souls. Key locations include:
+*   **Riviere (1558):** Northwest.
+*   **Cameron (1661):** South.
+*   **Wellesley (1811):** South.
+*   **Ishval (1901–1908):** East.
+*   **Liore (1914):** East.
+*   **Fort Briggs (1915):** North (the massacre of the Drachman army).
+*   **Baschool:** A northern mining town where Kimblee and Scar clashed.
+
+### **4. Metaphysical Locations**
+*   **The Gate of Truth:** A vast, white void that exists within every person. It is the source of all alchemical knowledge. When an alchemist performs human transmutation, they are pulled here to meet "Truth" and must pay a "toll" (part of their body) to see the secrets of the universe.
+
+## Power System
+The power system in *Fullmetal Alchemist: Brotherhood* is widely regarded as one of the most logically consistent and well-defined in anime. It is divided into two primary disciplines: **Alchemy** (practiced in Amestris) and **Alkahestry** (practiced in Xing).
+
+### 1. Core Mechanics & The Three Stages
+Alchemy is the metaphysical science of manipulating matter using natural energy. Every transmutation follows a strict three-step sequence:
+*   **Comprehension:** The alchemist must understand the atomic and molecular structure of the material. You cannot reshape what you do not understand.
+*   **Deconstruction:** Breaking down the physical structure into a malleable state.
+*   **Reconstruction:** Reshaping the matter into a new form.
+
+### 2. The Rules of Equivalent Exchange
+The system is governed by the **Law of Equivalent Exchange**, which consists of two sub-laws:
+*   **Law of Conservation of Mass:** To create an object of 1kg, you must provide 1kg of raw material. Matter cannot be created from nothing.
+*   **Law of Natural Providence:** You can only transmute an object into something of the same elemental makeup (e.g., a lead pipe can become a lead shield, but not a gold one).
+
+### 3. Abilities & Specializations
+While any alchemist can theoretically perform any transmutation, most specialize to master the "Comprehension" stage of specific materials:
+*   **Flame Alchemy (Roy Mustang):** Manipulates oxygen density in the air to create volatile pathways, ignited by sparks from "ignition cloth" gloves.
+*   **Strong Arm Alchemy (Alex Louis Armstrong):** Combines physical prowess with alchemy, imbuing kinetic energy into objects (usually stone) by punching them to create rapid-fire projectiles or spikes.
+*   **Explosion Alchemy (Solf J. Kimblee):** Uses opposing alchemical symbols on his palms to create an unstable energy imbalance in matter, causing violent kinetic explosions.
+*   **Alkahestry (May Chang):** Uses the "Dragon’s Pulse" (earth's chi). Unlike Amestrian alchemy, it excels at **medical healing** and **long-distance transmutations** by placing "purification markers" to guide energy flow.
+
+### 4. Limitations & Taboos
+*   **Transmutation Circles:** Most alchemists require a circle to act as a "circuit" for the energy. Without a circle (drawn, tattooed, or engraved), alchemy cannot be performed.
+*   **The Human Taboo:** Attempting to bring back the dead is the ultimate sin. It always fails because a human soul has "infinite value," making it impossible to provide an equivalent exchange.
+*   **Rebounds:** If an alchemist lacks the materials or makes a mistake in the circle, the energy "rebounds" on their body, often causing horrific injury or death.
+
+### 5. The Truth & The Gate
+Alchemists who attempt human transmutation are pulled before the **Gate of Truth**.
+*   **The Cost:** Truth grants "perfect knowledge" (allowing transmutation without a circle by "clapping" hands) but takes a toll based on dramatic irony:
+    *   **Edward Elric:** Lost his leg (the "stand" he took) and his brother.
+    *   **Alphonse Elric:** Lost his whole body (the warmth of a mother he sought).
+    *   **Izumi Curtis:** Lost her internal organs (the ability to bear children).
+    *   **Roy Mustang:** Lost his eyesight (his "vision" for the country's future).
+
+### 6. Tiers & Progression
+Progression in this world is not about "power levels" but **knowledge** and **energy source**.
+*   **Tier 1: God-Like (Father/Hohenheim):** These characters are living Philosopher's Stones. They ignore Equivalent Exchange by using the souls within them as fuel and can transmute without movement or circles.
+*   **Tier 2: The Homunculi:** Each possesses a unique "Ultimate" ability (Shield, Spear, Eye, etc.) and near-infinite regeneration powered by a core Philosopher's Stone.
+*   **Tier 3: Circle-less Alchemists:** Those who have seen the Truth. Their ability to transmute instantly by clapping gives them a massive tactical advantage in combat.
+*   **Tier 4: State Alchemists:** Elite, military-certified "human weapons." They are granted the rank of Major and access to secret research to refine their specialized crafts.
+*   **Tier 5: Civilian Alchemists:** Standard practitioners who use alchemy for construction, medicine, or basic research.
+
+### 7. The Philosopher’s Stone
+The "Cheat Code" of the system. It is a condensed mass of human souls that allows an alchemist to ignore the Law of Equivalent Exchange. It acts as a **battery**, providing the "mass" and "energy" required for transmutations so the alchemist doesn't have to provide them from the environment.
+
+## Factions
+In *Fullmetal Alchemist: Brotherhood*, the world is defined by a complex web of militaristic states, ancient conspiracies, and ethnic conflicts. The story centers on the country of **Amestris**, which serves as the primary setting and the hub for most factions.
+
+### **1. Major Factions & Organizations**
+
+#### **The Amestrian State Military**
+Amestris is a military dictatorship disguised as a parliamentary republic. The military is the most powerful entity in the country, divided into five regional commands:
+*   **Central Command:** Led by **Führer King Bradley**, this is the heart of the military. It is secretly controlled by Father and a group of corrupt high-ranking generals.
+*   **Northern Command (Fort Briggs):** Led by **Major General Olivier Mira Armstrong**. Known as the "Northern Wall of Briggs," this faction is fiercely independent, valuing strength and survival above all else.
+*   **Eastern Command:** Formerly led by **General Grumman**. It served as the base for Roy Mustang’s rise to power and was a key site during the Ishvalan Civil War.
+*   **State Alchemists:** A specialized branch of the military. These "Human Weapons" (like Edward Elric, the Fullmetal Alchemist) are granted the rank of Major and are often viewed with contempt by civilians as "dogs of the military."
+
+#### **The Homunculi & Father**
+The primary antagonistic force, this group operates from the shadows beneath Central City.
+*   **Father:** The creator of the Homunculi and the mastermind behind the country’s founding. His goal is to sacrifice the entire population of Amestris on the "Promised Day" to obtain god-like power.
+*   **The Seven Sins:** Artificial humans created from Father’s sins: **Pride** (Selim Bradley), **Wrath** (King Bradley), **Envy**, **Lust**, **Greed**, **Sloth**, and **Gluttony**.
+
+#### **Mustang’s Squadron**
+A small, loyalist faction within the military led by **Colonel Roy Mustang**. Their goal is to overthrow the corrupt leadership and reform Amestris into a democracy. Key members include Riza Hawkeye, Jean Havoc, Heymans Breda, Vato Falman, and Kain Fuery.
+
+---
+
+### **2. World Powers & Nations**
+
+The world of *FMAB* is a "landlocked" perspective, as Amestris is surrounded by four major neighbors, each representing a different geopolitical threat:
+
+*   **Amestris (The Center):** A militaristic superpower modeled after Prussia/Imperial Germany. Its borders are perfectly circular, a design choice made by Father for a nationwide transmutation circle.
+*   **Xing (The East):** A vast empire modeled after Imperial China. It is ruled by an Emperor and composed of **50 clans** competing for the throne. They practice **Alkahestry**, a form of alchemy focused on medicine and energy flow (Dragon Pulses).
+*   **Drachma (The North):** A massive, snowy nation modeled after Imperial Russia. They have a shaky non-aggression pact with Amestris but are a constant military threat.
+*   **Aerugo (The South):** A trade-focused principality modeled after Italy. They have been in a long-standing border war with Amestris and secretly supplied weapons to the Ishvalan resistance.
+*   **Creta (The West):** A fractured federation of states with frequent border skirmishes against Amestris.
+*   **Xerxes (The Fallen):** An ancient desert civilization located between Amestris and Xing. It was the first nation sacrificed by Father to create the original Philosopher’s Stone.
+
+---
+
+### **3. Ethnic & Resistance Groups**
+
+*   **The Ishvalans:** A deeply religious ethnic group within Amestris. Their culture was nearly destroyed during the **Ishvalan Civil War (Genocide)**, orchestrated by the Homunculi to create a "Bloody Crest" for the transmutation circle.
+*   **The Devil’s Nest:** A rogue gang of **Chimeras** (human-animal hybrids) led by the first **Greed**. They were former military experiments who sought independence before being purged by King Bradley.
+*   **Ishvalan Resistance:** Scattered survivors of the genocide, including **Scar**, who initially sought vengeance against all State Alchemists before joining the effort to stop Father.
+
+---
+
+### **4. Key Alliances & Enemies**
+
+*   **The Anti-Father Alliance:** In the final arc, several disparate groups unite: Mustang’s Squadron, the Briggs Soldiers, the Elric Brothers, the Xingese (Ling Yao and May Chang), and Scar’s group.
+*   **The Corrupt Generals:** High-ranking Amestrian officers who allied with Father in exchange for the promise of immortality. They serve as internal enemies within the military.
+*   **The Mannequin Army:** A secret "immortal army" of mindless, soul-powered mannequins created by the military leadership to serve as Father's ultimate enforcers on the Promised Day.
+
+## Arcs, Sequels, Adaptations, Recent, Series Aliases
+*Fullmetal Alchemist: Brotherhood* (FMAB) is the second anime adaptation of Hiromu Arakawa's manga series. Unlike the 2003 version, which created an original ending, *Brotherhood* is a faithful adaptation of the complete 108-chapter manga.
+
+### **1. Major Story Arcs & Plot Progression**
+The story follows brothers **Edward and Alphonse Elric**, who lost parts of their bodies (Ed's arm/leg, Al's entire body) in a failed attempt to resurrect their mother. They search for the **Philosopher's Stone** to restore themselves.
+
+| Arc Name | Episodes | Plot Summary & Key Events |
+| :--- | :--- | :--- |
+| **Prologue / Introduction** | 1–14 | The brothers become State Alchemists. They encounter the "Sewing-Life Alchemist" Shou Tucker and the serial killer Scar. Maes Hughes is murdered after discovering a national conspiracy. |
+| **Dublith & Ling Arc** | 15–26 | The Elrics visit their teacher, Izumi Curtis. They meet Prince Ling Yao of Xing, who seeks immortality. The existence of the Homunculi (Lust, Envy, Gluttony) is fully revealed. |
+| **Civil War / Ishval Arc** | 27–31 | A deep dive into the Ishvalan Civil War (1908), revealing the military's role as "human weapons" and the origin of the Philosopher's Stones used by the state. |
+| **Briggs Arc** | 32–45 | The brothers head to the northern fortress of Briggs, commanded by Olivier Mira Armstrong. They discover a massive tunnel being dug around the entire country of Amestris. |
+| **The Promised Day Arc** | 46–63 | The final confrontation in Central City. Allies from across the series unite to stop "Father" from using the nationwide transmutation circle to absorb "God" during a solar eclipse. |
+| **Epilogue** | 64 | The aftermath: Ed sacrifices his alchemy to bring Al back. They return home to Resembool and eventually set off on new journeys to the West and East. |
+
+---
+
+### **2. Timeline of Key Events**
+*   **1558:** Amestris begins its expansionist wars.
+*   **1899:** Edward Elric is born.
+*   **1900:** Alphonse Elric is born.
+*   **1904:** The brothers attempt Human Transmutation; Ed becomes the "Fullmetal Alchemist."
+*   **1910:** The brothers burn their childhood home and begin their journey.
+*   **1914 (Spring):** The main events of the series begin (Liore incident).
+*   **1915:** The "Promised Day" occurs; the conflict with Father is resolved.
+
+---
+
+### **3. Sequels, Spinoffs, and Related Series**
+*   **Fullmetal Alchemist (2003):** An alternate timeline series. It starts similarly but diverges halfway through into an original story with a different villain (Dante) and a different origin for the Homunculi.
+*   **FMA: Conqueror of Shamballa (2005):** The direct sequel movie to the **2003 series**, not *Brotherhood*.
+*   **FMA: The Sacred Star of Milos (2011):** A side-story movie set during the *Brotherhood* timeline (around episode 20), but often considered non-canon as it doesn't impact the main plot.
+*   **Live-Action Trilogy:** A 2017 film followed by two 2022 sequels (*The Revenge of Scar* and *The Last Transmutation*) that adapt the entire manga story.
+*   **OVAs:** Four special episodes (*The Blind Alchemist*, *Simple People*, *The Tale of Teacher*, and *Yet Another Man's Battlefield*) provide backstory for Izumi, Mustang, and the Elrics.
+
+---
+
+### **4. Manga vs. Anime Differences**
+*   **Pacing:** *Brotherhood* moves significantly faster through the early chapters (the first 14 episodes cover what took the 2003 series nearly 30 episodes) because producers assumed viewers were already familiar with the beginning.
+*   **Cuts:** Several minor manga chapters (like the Youswell coal mine and the train battle with Bald) were either skipped or condensed into brief cameos in *Brotherhood*.
+*   **Tone:** The manga and *Brotherhood* have a more "shonen" (action-adventure) feel with frequent humor, whereas the 2003 anime is notably darker and more philosophical.
+
+---
+
+### **5. Latest Updates & Recent Content (2021–2026)**
+*   **20th Anniversary Book (2023):** A commemorative book released by Hiromu Arakawa featuring new short manga stories, including a backstory for Shou Tucker and a side story about Havoc.
+*   **Stage Plays:** A second major stage play adaptation ran in Japan in June 2024.
+*   **Current Status:** The main story is **complete**. There are no ongoing chapters or new anime arcs planned, as the series reached a definitive conclusion.
+
+---
+
+### **6. Series Aliases & Titles**
+*   **Japanese Title:** *Hagane no Renkinjutsushi: Fullmetal Alchemist* (鋼の錬金術師 FULLMETAL ALCHEMIST).
+*   **Romanized/Abbreviation:** *Hagane no Renkinjutsushi* (lit. "Alchemist of Steel"). Commonly abbreviated as **FMAB** or **FMA:B**.
+*   **Relationship:** In Japan, the 2009 series is often distinguished by its English subtitle "Fullmetal Alchemist," while the 2003 series is just "Hagane no Renkinjutsushi." Internationally, the 2009 version added the subtitle "**Brotherhood**" to avoid confusion.

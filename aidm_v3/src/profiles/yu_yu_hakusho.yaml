@@ -1,0 +1,89 @@
+id: yu_yu_hakusho
+name: Yu Yu Hakusho
+source_anime: Yu Yu Hakusho
+media_type: anime
+status: completed
+generated_at: '2026-01-07T12:49:23.079313'
+confidence: 95
+research_method: bundled_parallel
+dna_scales:
+  introspection_vs_action: 7
+  comedy_vs_drama: 4
+  simple_vs_complex: 7
+  power_fantasy_vs_struggle: 8
+  explained_vs_mysterious: 3
+  fast_paced_vs_slow_burn: 4
+  episodic_vs_serialized: 8
+  grounded_vs_absurd: 5
+  tactical_vs_instinctive: 7
+  hopeful_vs_cynical: 6
+  ensemble_vs_solo: 3
+tropes:
+  tournament_arc: false
+  training_montage: false
+  power_of_friendship: false
+  mentor_death: false
+  chosen_one: false
+  tragic_backstory: false
+  redemption_arc: false
+  betrayal: false
+  sacrifice: false
+  transformation: false
+  forbidden_technique: false
+  time_loop: false
+  false_identity: false
+  ensemble_focus: false
+  slow_burn_romance: false
+combat_system: spectacle
+power_system:
+  name: Spirit Energy (Reiki) and Demon Energy (Youki)
+  mechanics: The system relies on the manipulation of internal energy categorized
+    into Spirit Energy (human soul energy fueled by emotions), Demon Energy (diverse
+    energy allowing elemental manipulation), and Sacred Energy (a high-level Holy
+    Aura). Users can shape this energy into physical forms like projectiles or blades,
+    utilize the Spirit Wave to turn the body into a catalyst for healing and enhancement,
+    or manifest 'Territories' which are rule-based zones that dictate reality within
+    a specific range.
+  limitations: Abilities are highly dependent on emotional state and killer instinct;
+    the Kekkai Barrier prevents high-tier entities from crossing worlds; extreme techniques
+    cause physical self-destruction or charred limbs; using Life Energy as a fuel
+    source results in permanent aging or death; and Sacred Energy typically requires
+    40 years of meditation to unlock.
+  tiers:
+  - E Class (Weakest)
+  - D Class
+  - C Class
+  - B Class (Human World Peak)
+  - A Class
+  - S Class (God Tier)
+  - Total Power (TP) Numerical Scale
+tone:
+  comedy_level: 6
+  darkness_level: 7
+  optimism: 6
+director_personality: You are the director for a Yu Yu Hakusho-style campaign. You
+  explore character thoughts and feelings deeply. Battles are won by willpower and
+  instinct, not chess moves. The protagonist is powerful; challenges come from elsewhere.
+pacing:
+  scene_length: moderate
+  arc_length_sessions: 4-6
+sources_consulted:
+- power_system
+- combat
+- tone
+- characters
+- factions
+- locations
+- arcs
+- sequels
+- adaptations
+- recent
+aliases:
+- yu yu hakusho
+- yu yu hakushu
+- yuu yuu hakusho
+- yuyuhakusho
+- yyh
+- 幽☆遊☆白書
+series_group: yu_yu_hakusho
+series_position: 1

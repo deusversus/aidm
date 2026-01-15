@@ -1,0 +1,86 @@
+id: dragon_ball_gt
+name: Dragon Ball GT
+source_anime: Dragon Ball GT
+media_type: anime
+status: completed
+generated_at: '2026-01-09T07:14:09.327490'
+confidence: 95
+research_method: bundled_parallel
+aliases:
+- dbgt
+- dragon ball grand tour
+- dragon ball gt
+- dragonballgt
+- ドラゴンボールGT
+dna_scales:
+  introspection_vs_action: 8
+  comedy_vs_drama: 4
+  simple_vs_complex: 5
+  power_fantasy_vs_struggle: 6
+  explained_vs_mysterious: 4
+  fast_paced_vs_slow_burn: 3
+  episodic_vs_serialized: 8
+  grounded_vs_absurd: 8
+  tactical_vs_instinctive: 9
+  hopeful_vs_cynical: 3
+  ensemble_vs_solo: 9
+tropes:
+  tournament_arc: true
+  training_montage: true
+  power_of_friendship: true
+  mentor_death: true
+  chosen_one: true
+  tragic_backstory: true
+  redemption_arc: true
+  betrayal: true
+  sacrifice: true
+  transformation: true
+  forbidden_technique: true
+  time_loop: false
+  false_identity: true
+  ensemble_focus: false
+  slow_burn_romance: false
+combat_system: spectacle
+power_system:
+  name: Ki and Negative Energy
+  mechanics: The system utilizes life energy (Ki) alongside Negative Energy (Minus
+    Energy) which acts as a reality-decaying pollutant born from Dragon Ball wishes.
+    It also features the Super Saiyan 4 metamorphosis, which requires a Saiyan to
+    achieve the Golden Great Ape form and regain conscious control to compress that
+    power into a humanoid state.
+  limitations: Negative energy buildup leads to the birth of Shadow Dragons and environmental
+    decay. Super Saiyan 4 causes significant energy drain, and the immense power of
+    the form reduces Fusion Dance duration from 30 minutes to 10 minutes.
+  tiers:
+  - Base Goku (Buu Saga SSJ3 level)
+  - General Rilldo
+  - Baby Vegeta
+  - Super 17
+  - Omega Shenron
+  - SSJ4 Gogeta
+tone:
+  comedy_level: 4
+  darkness_level: 6
+  optimism: 7
+director_personality: You are the director for a Dragon Ball GT-style campaign. You
+  explore character thoughts and feelings deeply. Battles are won by willpower and
+  instinct, not chess moves. Embrace the absurd. Reality is a suggestion.
+pacing:
+  scene_length: moderate
+  arc_length_sessions: 4-6
+sources_consulted:
+- power_system
+- combat
+- tone
+- characters
+- factions
+- locations
+- arcs
+- sequels
+- adaptations
+- recent
+- series_aliases
+series_group: dragon_ball_gt
+series_position: 3
+related_franchise: dragon_ball
+relation_type: alternate_timeline

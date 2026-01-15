@@ -1,0 +1,81 @@
+id: grimgar
+name: Grimgar
+source_anime: Grimgar
+media_type: anime
+status: completed
+generated_at: '2026-01-07T13:40:05.791782'
+confidence: 95
+research_method: bundled_parallel
+dna_scales:
+  introspection_vs_action: 3
+  comedy_vs_drama: 1
+  simple_vs_complex: 6
+  power_fantasy_vs_struggle: 10
+  explained_vs_mysterious: 7
+  fast_paced_vs_slow_burn: 9
+  episodic_vs_serialized: 9
+  grounded_vs_absurd: 1
+  tactical_vs_instinctive: 2
+  hopeful_vs_cynical: 7
+  ensemble_vs_solo: 1
+tropes:
+  tournament_arc: false
+  training_montage: true
+  power_of_friendship: true
+  mentor_death: true
+  chosen_one: false
+  tragic_backstory: true
+  redemption_arc: false
+  betrayal: false
+  sacrifice: true
+  transformation: false
+  forbidden_technique: false
+  time_loop: false
+  false_identity: false
+  ensemble_focus: true
+  slow_burn_romance: true
+combat_system: tactical
+power_system:
+  name: Guild System
+  mechanics: A soft RPG-inspired structure where characters join specific guilds to
+    learn skills through physical practice and financial investment. Magic is divided
+    into Elemental (drawing diagrams) and Divine (praying to gods), while physical
+    classes utilize specific techniques and muscle memory.
+  limitations: Every action drains physical and mental stamina; metal interferes with
+    elemental magic; strict class vows must be followed; death is permanent with no
+    resurrection spells.
+  tiers:
+  - Failures
+  - Veteran Soldiers
+  - Legendary Soldiers
+tone:
+  comedy_level: 2
+  darkness_level: 8
+  optimism: 4
+director_personality: You are the director for a Grimgar-style campaign. You favor
+  action and momentum over lengthy contemplation. You maintain dramatic weight; comedy
+  is rare and earned. You explain strategies and tactics in detail. The protagonist
+  is powerful; challenges come from elsewhere.
+pacing:
+  scene_length: moderate
+  arc_length_sessions: 4-6
+sources_consulted:
+- power_system
+- combat
+- tone
+- characters
+- factions
+- locations
+- arcs
+- sequels
+- adaptations
+- recent
+aliases:
+- grimgal
+- grimgar
+- grimguard
+- hai to gensou no grimgar
+- haigen
+- 灰と幻想のグリムガル
+series_group: grimgar_of_fantasy_and_ash
+series_position: 1

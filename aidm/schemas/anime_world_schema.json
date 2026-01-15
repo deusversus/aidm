@@ -1,0 +1,280 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://aidm.dev/schemas/anime_world_schema.json",
+  "title": "AIDM Anime World Schema",
+  "description": "Anime world integration: lore verification, fusion rules, consistency tracking",
+  "type": "object",
+  "required": ["schema_version", "world_id", "anime_info", "integration_status", "world_elements", "fusion_rules", "metadata"],
+  "properties": {
+    "schema_version": { "type": "string", "description": "Schema version", "pattern": "^\\d+\\.\\d+\\.\\d+$", "default": "2.0.0" },
+    "world_id": { "type": "string", "description": "Unique ID", "pattern": "^world_[a-z0-9_]+$" },
+    "anime_info": {
+      "type": "object",
+      "description": "Source anime identification",
+      "required": ["title", "genres"],
+      "properties": {
+        "title": { "type": "string" },
+        "alternate_titles": { "type": "array", "description": "English, romanized, abbreviated", "items": { "type": "string" } },
+        "genres": { "type": "array", "items": { "type": "string", "enum": ["shonen", "seinen", "shojo", "josei", "isekai", "mecha", "slice_of_life", "sports", "romance", "horror", "psychological", "supernatural", "fantasy", "sci_fi", "other"] }, "minItems": 1 },
+        "themes": { "type": "array", "items": { "type": "string" } },
+        "target_demographic": { "type": "string", "enum": ["shounen", "seinen", "shoujo", "josei", "kodomo", "general"] },
+        "content_rating": { "type": "string", "enum": ["G", "PG", "PG-13", "R", "R+", "Rx"] },
+        "episode_count": { "type": "integer", "minimum": 1 },
+        "status": { "type": "string", "enum": ["ongoing", "completed", "hiatus", "cancelled"] },
+        "studio": { "type": "string" },
+        "release_year": { "type": "integer", "minimum": 1900 }
+      }
+    },
+    "integration_status": {
+      "type": "object",
+      "description": "Campaign integration state",
+      "required": ["status", "integration_method"],
+      "properties": {
+        "status": { "type": "string", "enum": ["proposed", "researching", "approved", "active", "deprecated"] },
+        "integration_method": { "type": "string", "enum": ["full_world", "partial_import", "elements_only", "inspiration", "crossover"], "description": "Integration depth" },
+        "integration_date": { "type": "string", "format": "date-time" },
+        "player_awareness": { "type": "string", "enum": ["known", "partially_known", "discovering", "hidden"] },
+        "session_introduced": { "type": "integer", "minimum": 0 },
+        "approval_source": { "type": "string", "enum": ["player_request", "aidm_suggestion", "session_zero", "dynamic_integration"] }
+      }
+    },
+    "world_elements": {
+      "type": "object",
+      "description": "Imported components",
+      "properties": {
+        "power_systems": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["system_id", "import_level"],
+            "properties": {
+              "system_id": { "type": "string", "description": "Ref to power_system_schema" },
+              "import_level": { "type": "string", "enum": ["exact", "adapted", "inspired", "reference_only"] },
+              "modifications": { "type": "string", "description": "Balance/harmonization changes" }
+            }
+          }
+        },
+        "locations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "location_type"],
+            "properties": {
+              "location_id": { "type": "string" },
+              "name": { "type": "string", "description": "Canon name" },
+              "location_type": { "type": "string", "enum": ["city", "country", "dimension", "building", "landmark", "region", "realm"] },
+              "description": { "type": "string" },
+              "accessibility": { "type": "string", "enum": ["always_accessible", "quest_locked", "progression_locked", "hidden", "endgame"] },
+              "canon_accuracy": { "type": "string", "enum": ["exact", "high", "moderate", "inspired"] }
+            }
+          }
+        },
+        "npcs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["npc_id", "canon_name", "role"],
+            "properties": {
+              "npc_id": { "type": "string", "description": "Ref to npc_schema" },
+              "canon_name": { "type": "string" },
+              "role": { "type": "string", "enum": ["protagonist", "antagonist", "supporting", "cameo", "inspired_by"] },
+              "integration_type": { "type": "string", "enum": ["exact_character", "aged_version", "alternate_timeline", "inspired_by", "descendant"] },
+              "timeline_placement": { "type": "string", "description": "When in anime timeline" },
+              "personality_accuracy": { "type": "string", "enum": ["exact", "high", "moderate", "reinterpreted"] }
+            }
+          }
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "item_type"],
+            "properties": {
+              "name": { "type": "string" },
+              "item_type": { "type": "string", "enum": ["weapon", "armor", "artifact", "consumable", "tool", "quest_item"] },
+              "description": { "type": "string" },
+              "power_level": { "type": "string", "enum": ["mundane", "uncommon", "rare", "legendary", "artifact", "unique"] },
+              "obtainable": { "type": "boolean" },
+              "acquisition_method": { "type": "string" }
+            }
+          }
+        },
+        "factions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["faction_id", "name"],
+            "properties": {
+              "faction_id": { "type": "string" },
+              "name": { "type": "string" },
+              "type": { "type": "string", "enum": ["government", "military", "guild", "school", "religion", "criminal", "clan", "corporation", "other"] },
+              "role_in_anime": { "type": "string" },
+              "active_in_campaign": { "type": "boolean" }
+            }
+          }
+        },
+        "lore": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["category", "content"],
+            "properties": {
+              "category": { "type": "string", "enum": ["history", "mythology", "cosmology", "rules", "culture", "technology", "other"] },
+              "content": { "type": "string" },
+              "canon_compliance": { "type": "boolean", "default": true },
+              "player_knowledge": { "type": "string", "enum": ["known", "discoverable", "hidden", "forbidden"] }
+            }
+          }
+        }
+      }
+    },
+    "fusion_rules": {
+      "type": "object",
+      "description": "World harmonization",
+      "required": ["fusion_method"],
+      "properties": {
+        "fusion_method": { "type": "string", "enum": ["parallel_dimension", "shared_universe", "alternate_timeline", "historical_era", "regional_isolation", "hidden_world", "seamless_integration"] },
+        "fusion_explanation": { "type": "string", "description": "In-world justification" },
+        "access_method": { "type": "string", "description": "e.g., portal, travel, always available" },
+        "time_synchronization": { "type": "string", "enum": ["synchronized", "time_dilation", "frozen", "independent", "reverse"] },
+        "cross_contamination": {
+          "type": "object",
+          "properties": {
+            "people": { "type": "boolean", "description": "Can travel between worlds" },
+            "items": { "type": "boolean", "description": "Can transport items" },
+            "powers": { "type": "boolean", "description": "Do powers work across" },
+            "knowledge": { "type": "boolean", "description": "Can knowledge transfer" },
+            "restrictions": { "type": "array", "description": "Cannot cross", "items": { "type": "string" } }
+          }
+        },
+        "power_scaling_adjustment": { "type": "string", "description": "Balance with campaign" },
+        "contradiction_resolution": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "conflict": { "type": "string" },
+              "resolution": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "research_verification": {
+      "type": "object",
+      "description": "AIDM knowledge verification",
+      "properties": {
+        "aidm_familiarity": { "type": "string", "enum": ["expert", "familiar", "basic", "unfamiliar", "researched"] },
+        "research_completed": { "type": "boolean" },
+        "research_sources": { "type": "array", "items": { "type": "string" } },
+        "verification_date": { "type": "string", "format": "date-time" },
+        "known_gaps": { "type": "array", "description": "Aspects not fully understood", "items": { "type": "string" } },
+        "spoiler_boundary": { "type": "string", "description": "How far AIDM can reference (ep/ch)" },
+        "player_knowledge_level": { "type": "string", "enum": ["expert", "seen_it", "familiar", "heard_of", "unfamiliar"] },
+        "avoid_spoilers": { "type": "boolean", "default": true }
+      }
+    },
+    "usage_tracking": {
+      "type": "object",
+      "properties": {
+        "frequency": { "type": "string", "enum": ["constant", "frequent", "occasional", "rare", "one_time"] },
+        "prominence": { "type": "string", "enum": ["core", "major", "moderate", "minor", "background"] },
+        "player_engagement": { "type": "string", "enum": ["enthusiastic", "positive", "neutral", "negative", "uninterested"] },
+        "first_appearance": {
+          "type": "object",
+          "properties": {
+            "session": { "type": "integer" },
+            "context": { "type": "string" },
+            "player_reaction": { "type": "string" }
+          }
+        },
+        "memorable_moments": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "session": { "type": "integer" },
+              "description": { "type": "string" },
+              "impact": { "type": "string", "enum": ["minor", "moderate", "major", "pivotal"] }
+            }
+          }
+        }
+      }
+    },
+    "aidm_directives": {
+      "type": "object",
+      "description": "AIDM usage instructions",
+      "properties": {
+        "usage_frequency": { "type": "string", "enum": ["unrestricted", "frequent", "moderate", "sparingly", "special_occasions_only"] },
+        "tone_matching": { "type": "boolean", "description": "Match anime tone in its content", "default": true },
+        "canon_strictness": { "type": "string", "enum": ["absolute", "strict", "moderate", "loose", "creative_freedom"] },
+        "auto_inject_triggers": { "type": "array", "description": "Conditions bringing anime to mind", "items": { "type": "string" } },
+        "prohibited_elements": { "type": "array", "description": "NOT to use", "items": { "type": "string" } },
+        "priority_elements": { "type": "array", "description": "To emphasize", "items": { "type": "string" } },
+        "common_mistakes": { "type": "array", "description": "Errors to avoid", "items": { "type": "string" } }
+      }
+    },
+    "consistency_tracking": {
+      "type": "object",
+      "properties": {
+        "consistency_score": { "type": "integer", "description": "Integration quality (0-100)", "minimum": 0, "maximum": 100 },
+        "inconsistencies": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "issue": { "type": "string" },
+              "severity": { "type": "string", "enum": ["minor", "moderate", "major", "critical"] },
+              "resolution_status": { "type": "string", "enum": ["unresolved", "investigating", "resolved", "accepted_as_feature"] },
+              "resolution": { "type": "string" }
+            }
+          }
+        },
+        "player_feedback": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "date": { "type": "string", "format": "date-time" },
+              "feedback": { "type": "string" },
+              "action_taken": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "evolution": {
+      "type": "object",
+      "properties": {
+        "original_plan": { "type": "string" },
+        "current_state": { "type": "string" },
+        "major_changes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "date": { "type": "string", "format": "date-time" },
+              "change": { "type": "string" },
+              "reason": { "type": "string" }
+            }
+          }
+        },
+        "future_plans": { "type": "string" }
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "required": ["version"],
+      "properties": {
+        "version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+        "created_date": { "type": "string", "format": "date-time" },
+        "last_modified": { "type": "string", "format": "date-time" },
+        "created_by": { "type": "string", "description": "e.g., player name, AIDM" },
+        "integration_complexity": { "type": "string", "enum": ["trivial", "simple", "moderate", "complex", "extreme"] },
+        "recommended_familiarity": { "type": "string", "enum": ["none", "basic", "moderate", "complete"], "description": "Player knowledge for best experience" },
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "notes": { "type": "string" }
+      }
+    }
+  }
+}

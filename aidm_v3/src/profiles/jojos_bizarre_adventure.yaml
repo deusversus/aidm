@@ -1,0 +1,82 @@
+id: jojos_bizarre_adventure
+name: JoJo's Bizarre Adventure
+source_anime: JoJo's Bizarre Adventure
+media_type: anime
+status: completed
+generated_at: '2026-01-07T07:55:49.875524'
+confidence: 95
+research_method: bundled_parallel
+dna_scales:
+  introspection_vs_action: 7
+  comedy_vs_drama: 4
+  simple_vs_complex: 8
+  power_fantasy_vs_struggle: 7
+  explained_vs_mysterious: 4
+  fast_paced_vs_slow_burn: 3
+  episodic_vs_serialized: 6
+  grounded_vs_absurd: 10
+  tactical_vs_instinctive: 2
+  hopeful_vs_cynical: 3
+  ensemble_vs_solo: 3
+tropes:
+  tournament_arc: false
+  training_montage: true
+  power_of_friendship: true
+  mentor_death: true
+  chosen_one: true
+  tragic_backstory: true
+  redemption_arc: true
+  betrayal: true
+  sacrifice: true
+  transformation: true
+  forbidden_technique: true
+  time_loop: true
+  false_identity: true
+  ensemble_focus: true
+  slow_burn_romance: false
+combat_system: tactical
+power_system:
+  name: Hamon, Stands, and The Spin
+  mechanics: Hamon uses controlled breathing to generate solar energy in the blood.
+    Stands are physical manifestations of fighting spirit that reflect damage to the
+    user. The Spin utilizes the Golden Ratio to create infinite rotational energy.
+  limitations: Hamon requires constant breathing and a conductive medium. Stands reflect
+    damage to the user and are limited by range and the one-stand rule. The Spin requires
+    physical objects and specific natural geometry.
+  tiers:
+  - A (Excellent)
+  - B (Good)
+  - C (Average)
+  - D (Poor)
+  - E (Very Poor)
+  - ACTs
+  - Requiem
+  - Infinite Rotation
+tone:
+  comedy_level: 6
+  darkness_level: 7
+  optimism: 8
+director_personality: You are the director for a JoJo's Bizarre Adventure-style campaign.
+  You explore character thoughts and feelings deeply. You explain strategies and tactics
+  in detail. Embrace the absurd. Reality is a suggestion.
+pacing:
+  scene_length: moderate
+  arc_length_sessions: 4-6
+sources_consulted:
+- power_system
+- combat
+- tone
+- characters
+- factions
+- locations
+- arcs
+- sequels
+- adaptations
+- recent
+aliases:
+- jojo no kimyou na bouken
+- jojos bizarre adventure
+- jojosbizarreadventure
+- ジョジョの奇妙な冒険
+series_group: jojos_bizarre_adventure
+series_position: 1

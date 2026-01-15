@@ -1,0 +1,507 @@
+## Power System
+JoJo's Bizarre Adventure (JJBA) features one of the most influential and creative power systems in manga history. It has evolved through three primary iterations: **Hamon (The Ripple)**, **Stands**, and **The Spin**.
+
+---
+
+### 1. Hamon (The Ripple)
+Introduced in *Part 1: Phantom Blood* and central through *Part 2*, Hamon is a martial arts technique based on controlled breathing.
+
+*   **Mechanics:** Users practice "Sendo" (The Way of the Hermit) to breathe in a specific rhythm, producing energy in the bloodstream that identical to the sun's rays.
+*   **Abilities:** 
+    *   **Biological Manipulation:** Healing wounds, repelling poison, and slowing the aging process.
+    *   **Environmental Interaction:** Walking on water, sticking to surfaces, and conducting energy through objects (liquids like oil and water are the best conductors).
+    *   **Offense:** "Overdrive" attacks that can melt vampires and zombies from the inside out.
+*   **Rules & Limitations:**
+    *   **Breathing:** If the user's breathing is interrupted (e.g., by a throat strike or being submerged without air), they cannot produce Hamon.
+    *   **Conductivity:** It requires a medium to travel; it cannot pass through air effectively.
+*   **Progression:** Mastery comes through intense physical and mental training. A master can pass their entire life energy to another via the **Supreme Deep Pass Overdrive**.
+
+---
+
+### 2. Stands
+Introduced in *Part 3: Stardust Crusaders*, Stands are the series' signature power system. A Stand is a physical manifestation of the user's "fighting spirit" or life energy.
+
+*   **Mechanics:** A Stand usually appears as a humanoid figure hovering near the user, though they can also be objects, swarms, or abstract phenomena.
+*   **Abilities:** Virtually limitless. They range from simple physical prowess (Star Platinum) to reality-warping powers like time stop, gravity manipulation, and soul-swapping.
+*   **Core Rules of Stands:**
+    1.  **Visibility:** Only Stand users can see or hear other Stands.
+    2.  **Invulnerability:** Only a Stand can harm another Stand.
+    3.  **Damage Reflection:** Any damage a Stand takes is reflected onto the user (e.g., if the Stand's arm is cut, the user's arm bleeds).
+    4.  **One Stand Rule:** A person can typically only have one Stand at a time.
+*   **Tiers (Stand Parameters):** Stands are officially ranked from **A (Excellent)** to **E (Very Poor)** in six categories:
+    *   **Destructive Power:** Physical strength and capacity for destruction.
+    *   **Speed:** Agility and reaction time.
+    *   **Range:** How far the Stand can move from the user.
+    *   **Persistence:** How long an ability can be maintained.
+    *   **Precision:** Accuracy and fine motor control.
+    *   **Development Potential:** The capacity for the Stand to gain new abilities.
+*   **Progression & Evolution:**
+    *   **The Stand Arrow:** Piercing a person with a meteorite-forged arrow can awaken a Stand or grant a new ability (e.g., *Bites the Dust*).
+    *   **ACTs:** Some Stands evolve naturally as the user grows (e.g., *Echoes*, *Tusk*).
+    *   **Requiem:** If a Stand is pierced by the Arrow, it evolves into a "Requiem" form with god-like, autonomous powers (e.g., *Gold Experience Requiem*).
+    *   **The Heaven Plan:** A complex ritual involving 14 phrases and 36 "sinners' souls" to evolve a Stand into its ultimate form (*Made in Heaven*).
+
+---
+
+### 3. The Spin
+Introduced in *Part 7: Steel Ball Run* (the rebooted universe), The Spin is a refined version of Hamon's "natural energy" concept, based on mathematics.
+
+*   **Mechanics:** Users utilize the **Golden Ratio** (a mathematical constant found in nature) to create a "near-infinite" rotation in an object, typically a Steel Ball or fingernails.
+*   **Abilities:** 
+    *   **Friction & Kinetic Energy:** Can destroy rock, deflect bullets, and manipulate muscles/nerves upon contact.
+    *   **The Golden Spin:** By riding a horse in a specific "Golden Rectangle" gallop, the user harnesses the horse's power to achieve **Infinite Rotation**.
+*   **Rules & Limitations:**
+    *   **Tools:** Requires a physical object to spin.
+    *   **Environment:** The user needs to find "Golden Rectangles" in nature (leaves, shells, or the horse's movement) to achieve perfect rotation.
+*   **Progression:** 
+    *   **Basic Spin:** Standard rotational energy.
+    *   **Golden Spin:** Reaching the peak of the Golden Ratio.
+    *   **Stand Manifestation:** High-level Spin can manifest a Stand, such as *Ball Breaker* or *Tusk Act 4*, which can bypass dimensional barriers and ignore the laws of physics.
+
+---
+
+### Summary of Power Progression
+| Era | System | Source | Key Evolution |
+| :--- | :--- | :--- | :--- |
+| **Parts 1-2** | Hamon | Breathing/Blood | Supreme Deep Pass Overdrive |
+| **Parts 3-6** | Stands | Fighting Spirit / Arrow | Requiem / Heaven Plan |
+| **Parts 7-9** | The Spin | Mathematics / Nature | Infinite Rotation / Saint's Corpse |
+
+## Combat
+Combat in *JoJo’s Bizarre Adventure* (JJBA) is a unique fusion of high-stakes psychological warfare, supernatural martial arts, and avant-garde visual spectacle. Unlike many series that rely on "power levels," *JoJo* battles are won through lateral thinking, environmental manipulation, and the exploitation of strict, often bizarre rules.
+
+### 1. Core Combat Systems
+The series’ combat has evolved through three distinct power systems, each adding layers of complexity:
+
+*   **Hamon (The Ripple):** Introduced in Parts 1 and 2, Hamon is a martial art based on controlled breathing that produces energy identical to sunlight. It was primarily used to fight vampires and "Pillar Men." Combat was physical and grounded in creative uses of conductive materials (like oil, water, or even wine).
+*   **Stands:** Introduced in Part 3, Stands are the "visual manifestation of life energy." A Stand is a guardian spirit with a unique ability—ranging from simple super-strength to complex concepts like "erasing time" or "turning anything into a bomb." 
+    *   **Stand Rules:** Damage to a Stand is reflected on the user; only Stands can harm other Stands; and most users can only manifest one Stand at a time.
+    *   **Stand Stats:** Every Stand is categorized by six parameters: Destructive Power, Speed, Range, Stamina, Precision, and Development Potential.
+*   **The Spin:** Introduced in Part 7 (*Steel Ball Run*), this is a refined version of Hamon based on the "Golden Ratio." It involves rotating objects (usually steel balls) to produce infinite rotational energy, capable of bypassing dimensional barriers and manipulating gravity.
+
+### 2. Tactical Depth: The "Battle of Wits"
+JJBA pioneered the "puzzle-battle" genre. Fights rarely come down to who punches harder; instead, they are intellectual duels.
+*   **Information Warfare:** Most battles begin with the protagonist being ambushed by an unknown ability. The "combat" is actually a race to deduce the enemy’s "Stand Rule." For example, in the fight against **J. Geil**, the heroes must figure out that his Stand exists only within reflections.
+*   **Environmental Mastery:** Characters use their surroundings in absurd ways. **Jotaro Kujo** once used his Stand’s precision to "restart" his own heart, while **Josuke Higashikata** uses his ability to "fix" objects to trap enemies inside rocks or turn broken glass into homing missiles.
+*   **Psychological Gambling:** Some of the series' most famous "fights" involve no physical contact. The battles against the **D'Arby Brothers** are high-stakes games of poker and video games where the "combat" is purely psychological—bluffing, cheating, and reading the opponent's "fighting spirit."
+
+### 3. Emotional Weight and Character Psyche
+Combat in *JoJo* is deeply personal because a Stand is a literal reflection of the user’s soul.
+*   **Stands as Personality:** **Star Platinum** represents Jotaro’s repressed, explosive rage; **Crazy Diamond** reflects Josuke’s inherent kindness (it heals rather than destroys); and **Killer Queen** embodies Yoshikage Kira’s obsession with "erasing" his presence and living a quiet life.
+*   **Sacrifice and Legacy:** Battles often carry heavy emotional stakes through the "Zeppeli" archetype—mentors or friends who sacrifice themselves to pass on a final piece of tactical information or energy (e.g., **Caesar Zeppeli’s** final Hamon bubble for Joseph).
+
+### 4. Flashy Spectacle: The Visual Language
+The "Bizarre" in the title is most evident in the visual presentation of combat, which draws heavily from Italian fashion and classical sculpture.
+*   **The "JoJo Pose":** Characters often strike flamboyant, anatomically impossible poses mid-battle. These aren't just for show; they signal a shift in the "flow" of the fight or a moment of psychological dominance.
+*   **Color Shifts:** In the anime, the entire color palette of a scene will invert or shift to vibrant, non-naturalistic hues (e.g., a yellow sky or purple skin) during a tactical breakthrough or emotional climax. This visual cue tells the audience that the "vibe" of the battle has changed.
+*   **Onomatopoeia:** Large, stylized Japanese characters (like the iconic *Menacing* or *Gogogogo*) appear physically in the environment. These visual sound effects add a tactile, rhythmic quality to the action, making the "spectacle" feel like a moving manga page.
+*   **Stand Cries:** Iconic vocal refrains like Jotaro’s **"Ora Ora Ora!"** or Dio’s **"Muda Muda Muda!"** (Useless!) create a rhythmic "beat" to the finishing moves, turning a simple beatdown into a memorable spectacle.
+
+## Tone
+*JoJo’s Bizarre Adventure* (JJBA), created by Hirohiko Araki, is a generational saga famous for its radical shifts in style and tone. While it is ostensibly a "battle shonen/seinen," it functions more as a **"celebration of humanity"** that blends high-fashion aesthetics with gruesome horror and absurdist humor.
+
+### 1. Tone: The "Bizarre" Balance
+The series is defined by a "campy serious" tone. It presents inherently ridiculous scenarios—such as a cyborg Nazi fighting ancient Aztec deities or a man using a "road roller" as a weapon—with absolute, deadpan sincerity.
+*   **Melodrama:** Characters often deliver grandiose speeches about fate and justice while striking physically impossible "JoJo Poses."
+*   **Stylistic Sincerity:** The series never "winks" at the camera to mock its own weirdness. This total commitment allows it to transition from a goofy comedy scene to a tragic death without losing emotional weight.
+
+### 2. Themes: The Indomitable Human Spirit
+The core theme across all nine parts is **"The Affirmation of Humanity."** 
+*   **Humanity vs. The Divine/Mechanical:** Araki emphasizes that JoJo heroes win through their own wit, willpower, and "Golden Hearts," rather than relying on external machines or god-like destiny.
+*   **Fate and Justice:** Characters often struggle against a predetermined "Fate" (represented by the concept of "Sleeping Slaves" in Part 5). True heroism is defined as the struggle to do what is right even when the outcome is already decided.
+*   **Legacy:** The "Joestar Spirit" is a torch passed through generations, where the sacrifices of one JoJo empower the next.
+
+### 3. Dark Comedy and Juxtaposition
+JJBA uses **dark comedy** to highlight the "bizarreness" of its world. Much of the humor arises from the contrast between horrific stakes and mundane or absurd details.
+*   **Absurdist Situations:** In Part 3, a life-or-death battle involves a character being forced to lick a toilet, while in Part 5, a protagonist "drinks" a cup of urine to prove his resolve to a gang.
+*   **Gallows Humor:** Villains often have quirks that make them terrifying yet hilarious, such as Yoshikage Kira (Part 4) wanting a "quiet life" while carrying a severed hand as a "girlfriend."
+*   **Visual Irony:** Horrific body horror—like characters being melted or turned into snails—is often rendered in vibrant, neon color palettes, creating a surreal, psychedelic experience.
+
+### 4. Atmosphere and Aesthetic
+The atmosphere of JoJo is **"Aesthetic-First."** Araki is heavily influenced by Western fashion (Gucci, Versace) and classical sculpture.
+*   **Color Shifts:** In the anime, the sky might turn yellow or the grass purple during high-tension moments to reflect the characters' internal psychological states.
+*   **Fashion as Character:** Outfits are flamboyant and impractical, serving as a visual manifestation of a character's "fighting spirit" (Stand).
+*   **Musical Influence:** Almost every character and power is named after Western rock bands or songs (e.g., *Speedwagon*, *Killer Queen*, *Dirty Deeds Done Dirt Cheap*), giving the series a "Rock 'n' Roll" energy.
+
+### 5. Genre and Mood Evolution by Part
+Each part of JoJo functions as a different sub-genre, shifting the mood significantly:
+| Part | Genre / Setting | Mood |
+| :--- | :--- | :--- |
+| **1: Phantom Blood** | Gothic Horror / Victorian Drama | Tragic, Noble, Operatic |
+| **2: Battle Tendency** | Pulp Action / Adventure (1930s) | Witty, High-Energy, Trickster-led |
+| **3: Stardust Crusaders** | Road Trip / Supernatural Quest | Epic, "Monster of the Week," Brotherhood |
+| **4: Diamond is Unbreakable** | Slice of Life / Murder Mystery | Cozy yet Unsettling, Community-focused |
+| **5: Golden Wind** | Gangster Noir / Mafia Thriller | Gritty, High-Stakes, Philosophical |
+| **6: Stone Ocean** | Prison Drama / Cosmic Horror | Claustrophobic, Mind-bending, Climactic |
+| **7: Steel Ball Run** | Western / Seinen Epic | Gritty, Individualistic, Transcendent |
+| **8: JoJolion** | Psychological Mystery / Seinen | Surreal, Bizarre, Identity-focused |
+| **9: The JOJOLands** | Heist / Crime Thriller | Modern, Cynical, Resourceful |
+
+### 6. Optimism: The "Golden Heart"
+Despite the high body count and frequent tragedies, JoJo is fundamentally **optimistic**. It posits that even in a universe of "indifferent cruelty," the bonds of friendship and the "Joestar Spirit" can create a "New Path." The series suggests that while individuals may die, their "will" is immortal and will eventually lead to the defeat of evil.
+
+## Characters
+*JoJo’s Bizarre Adventure* is a multi-generational saga spanning over a century, divided into nine distinct "Parts." Each part features a new protagonist from the Joestar bloodline (nicknamed "JoJo") and a central antagonist.
+
+### **The Original Continuity (Parts 1–6)**
+This timeline follows the descendants of Jonathan Joestar and their struggle against the influence of Dio Brando.
+
+| Part | Protagonist | Ability | Main Antagonist | Antagonist Ability |
+| :--- | :--- | :--- | :--- | :--- |
+| **1: Phantom Blood** | **Jonathan Joestar** | **Hamon (Ripple):** Sunlight-based energy channeled through breathing. | **Dio Brando** | **Vampirism:** Superhuman strength, freezing, and regeneration. |
+| **2: Battle Tendency** | **Joseph Joestar** | **Hamon:** Used creatively with tools (clackers, wool). | **Kars (Pillar Men)** | **Light Mode:** Bone blades; eventually becomes the "Ultimate Lifeform." |
+| **3: Stardust Crusaders** | **Jotaro Kujo** | **Star Platinum:** Extreme speed, strength, and later **Time Stop**. | **DIO** | **The World:** Near-identical to Star Platinum; can stop time. |
+| **4: Diamond is Unbreakable** | **Josuke Higashikata** | **Crazy Diamond:** Can "fix" or restore objects and people to a previous state. | **Yoshikage Kira** | **Killer Queen:** Turns anything into a bomb; can "reset" time (Bites the Dust). |
+| **5: Golden Wind** | **Giorno Giovanna** | **Gold Experience:** Gives life to objects; later evolves to **Requiem** (nullifies cause/effect). | **Diavolo** | **King Crimson:** Can "erase" time and see into the future (Epitaph). |
+| **6: Stone Ocean** | **Jolyne Cujoh** | **Stone Free:** Can unravel her body into string for versatile combat/utility. | **Enrico Pucci** | **Made in Heaven:** Accelerates time to the point of resetting the universe. |
+
+#### **Key Relationships & Roles**
+*   **The Joestar Bloodline:** All protagonists share a star-shaped birthmark. The "Joestar Spirit" is defined by a sense of justice and noble sacrifice.
+*   **Mentors:** Characters often return in later parts to guide the new JoJo. **Joseph Joestar** mentors his grandson Jotaro in Part 3, and **Jotaro** mentors Josuke in Part 4 and aids his daughter Jolyne in Part 6.
+*   **The "JoBro":** Each JoJo has a loyal companion (e.g., **Speedwagon** for Jonathan, **Caesar Zeppeli** for Joseph, **Kakyoin** for Jotaro, **Bruno Bucciarati** for Giorno).
+
+---
+
+### **The Alternate Continuity (Parts 7–9)**
+Following the universe reset, the series moved to a Seinen (adult) demographic with a more complex, "grey" moral landscape.
+
+| Part | Protagonist | Ability | Main Antagonist | Antagonist Ability |
+| :--- | :--- | :--- | :--- | :--- |
+| **7: Steel Ball Run** | **Johnny Joestar** | **Tusk / The Spin:** Fires fingernails as spinning bullets that evolve in power. | **Funny Valentine** | **D4C:** Allows travel between parallel dimensions. |
+| **8: JoJolion** | **Josuke "Gappy" Higashikata** | **Soft & Wet:** Bubbles that "plunder" properties (e.g., sound, friction) from objects. | **Toru** | **Wonder of U:** Manipulates "Calamity" to cause freak accidents for anyone pursuing him. |
+| **9: The JOJOLands** | **Jodio Joestar** | **November Rain:** Creates localized, heavy raindrops that can crush targets. | **Acca Howler** (Current) | **Unnamed Stand:** A billionaire CEO using his wealth and a mysterious Stand to control land. |
+
+#### **Key Relationships & Roles**
+*   **Johnny & Gyro:** The relationship between Johnny and his mentor/partner **Gyro Zeppeli** is often cited as the emotional core of the series, focusing on personal growth rather than just defeating a villain.
+*   **The "Fusion":** Part 8's Josuke is a biological fusion of two people (Josefumi Kujo and Yoshikage Kira), leading to a story focused on identity and "breaking a curse."
+*   **Anti-Heroism:** Unlike the "gentleman" Jonathan, newer JoJos like **Jodio** are more morally ambiguous; Jodio is a teenage gangster whose goal is to become "filthy rich."
+
+### **Core Power Systems**
+1.  **Hamon (The Ripple):** Used in Parts 1 and 2. It mimics the energy of the sun to destroy vampires and supernatural threats.
+2.  **Stands:** Introduced in Part 3. A Stand is a "psychic manifestation" of the user's fighting spirit. They are invisible to non-users and possess unique, often highly specific rules.
+3.  **The Spin:** Introduced in Part 7. A technique involving the "Golden Rectangle" to create infinite rotational energy, capable of bypassing even dimensional barriers.
+
+## Factions
+The world of *JoJo’s Bizarre Adventure* is defined by a generational struggle between the Joestar bloodline and various supernatural or criminal entities. These conflicts are often mediated by powerful organizations, secret societies, and world powers.
+
+### **1. Major Protagonist Factions**
+These groups provide the financial, tactical, and supernatural support necessary for the Joestars to succeed.
+
+*   **The Joestar Group:** A collective term for the protagonists of each part (e.g., the Stardust Crusaders, Team Bucciarati). While members change, they are united by the "Joestar Spirit" and often the iconic star-shaped birthmark.
+*   **The Speedwagon Foundation (SPW):** Founded by Robert E. O. Speedwagon in 1910 using his American oil fortune. It is the most consistent ally of the Joestars, providing medical research, supernatural containment (via its "Supernatural Research Department"), and high-tech equipment (like Joseph’s prosthetic hand or Jolyne’s escape submarine).
+*   **Ripple (Hamon) Users:** An ancient tribe of warriors who use a sun-based breathing technique to fight vampires. Key groups include:
+    *   **Tonpetty’s Tibetan Group:** A monastery of Ripple masters including Dire and Straizo.
+    *   **The Venice Ripple Masters:** Led by Lisa Lisa on Air Supplena Island, they trained Caesar Zeppeli and Joseph Joestar.
+*   **The Higashikata Fruit Company (Part 8):** A wealthy family business in Morioh that serves as the base for Josuke Higashikata (Gappy). They are deeply involved in the mystery of the Locacaca fruit.
+
+### **2. Major Antagonist Factions**
+These organizations typically seek world domination, immortality, or the preservation of a secret criminal empire.
+
+*   **Passione (Part 5):** A massive Italian Mafia gang with over 750 members, many of whom are Stand users.
+    *   **The Boss’s Elite Guard (Unità Speciale):** Sadistic Stand users like Cioccolata and Secco who report directly to Diavolo.
+    *   **La Squadra Esecuzioni (Hitman Team):** A rogue group of assassins (led by Risotto Nero) who defected to overthrow the Boss and seize the drug trade.
+    *   **Sezione Droghe (Narcotics Team):** The division responsible for the drug trade that Giorno Giovanna seeks to destroy.
+*   **The Locacaca Organization (Part 8):** A secret syndicate of **Rock Humans** (a silicon-based species) who infiltrated human society. They control the trade of the Locacaca fruit, which facilitates "Equivalent Exchange" to heal any wound at a horrific price.
+*   **Dio’s Followers (Parts 1, 3, 6):**
+    *   **Zombies/Vampires:** Dio’s early army in Victorian England.
+    *   **Egypt 9 Glory Gods:** DIO’s elite Stand-using bodyguards in Cairo (e.g., Pet Shop, Vanilla Ice).
+    *   **Pucci’s Agents:** Prisoners and Stand users recruited by Father Enrico Pucci to achieve "Heaven."
+*   **HOWLER Company (Part 9):** A multi-billion dollar infrastructure and land development firm in Hawaii. Led by Hacca Howler, they use Stand-using agents to protect their water rights and the mysterious "Lava Rocks."
+
+### **3. World Powers & Political Alliances**
+The series occasionally intersects with real-world or alternate-history global powers.
+
+*   **The Nazi German Army (Part 2):** Led by Rudol von Stroheim, this unit sought to harness the power of the Pillar Men for military superiority. They formed a desperate alliance with Joseph Joestar to prevent the Pillar Men from achieving godhood.
+*   **The United States Government (Part 7):** In the *Steel Ball Run* universe, the 23rd President, **Funny Valentine**, is the primary antagonist. He uses the government’s resources and the "Steel Ball Run" race as a front to collect the Saint’s Corpse, intending to use its divine power to make America the world's sole superpower.
+*   **The Selva Cartel:** A powerful South American drug organization appearing in the light novel *El Aleph*. They are known for their ruthless control of the Amazonian cocaine market and their use of Stand-using mercenaries.
+
+### **4. Summary of Key Factions by Part**
+
+| Part | Protagonist Faction | Primary Enemy Faction |
+| :--- | :--- | :--- |
+| **1: Phantom Blood** | Ripple Masters (Tonpetty) | Dio's Zombies |
+| **2: Battle Tendency** | Joestars & Nazis (Stroheim) | The Pillar Men |
+| **3: Stardust Crusaders** | Stardust Crusaders (SPW-backed) | DIO's Agents (Tarot/Egyptian Gods) |
+| **4: Diamond Is Unbreakable** | Morioh Stand Users | Kira's "Family" / Nijimura's Army |
+| **5: Golden Wind** | Team Bucciarati (Passione Rebels) | Passione (Diavolo's Loyalists) |
+| **6: Stone Ocean** | Jolyne's Inmates | Pucci's Disciples |
+| **7: Steel Ball Run** | Johnny & Gyro | The US Government (Valentine) |
+| **8: JoJolion** | Higashikata Family | The Rock Human Syndicate |
+| **9: The JOJOLands** | Team Jodio (Meryl Mei’s Gang) | HOWLER Company |
+
+## Locations
+*JoJo’s Bizarre Adventure* (JJBA) is renowned for its "globe-trotting" narrative. The series is divided into two distinct continuities: the **Original Universe** (Parts 1–6) and the **SBR Universe** (Parts 7–9).
+
+### **I. The Original Universe (Parts 1–6)**
+
+#### **Part 1: Phantom Blood (1880s England)**
+*   **Joestar Mansion:** Located near Liverpool, this is the site of the childhood rivalry between Jonathan Joestar and Dio Brando. It is eventually burned down during their first major confrontation.
+*   **Ogre Street:** A dangerous, fog-laden slum in London where Jonathan meets Robert E.O. Speedwagon.
+*   **Windknight’s Lot:** A fictional medieval-style town south of London where the final battle against Dio’s vampire army takes place.
+
+#### **Part 2: Battle Tendency (1938–1939 Global)**
+*   **New York City:** Where Joseph Joestar first appears, fighting on a bridge and at a local diner.
+*   **Mexico:** The site of the underground ruins where the Pillar Man, Santana, is discovered.
+*   **Venice & Air Supplena Island:** The training ground where Lisa Lisa teaches Joseph and Caesar Zeppeli the art of Hamon.
+*   **St. Moritz, Switzerland:** The location of the "Skeleton Heel Stone" and the final battle against Kars.
+
+#### **Part 3: Stardust Crusaders (1987–1988 Tokyo to Cairo)**
+*   **Tiger Balm Garden (Hong Kong):** The site of the first battle between the Joestar group and Jean Pierre Polnareff.
+*   **The Nile River & Egyptian Cities:** The group travels through **Aswan, Kom Ombo, Luxor, and Edfu**, facing Stand users at every stop.
+*   **DIO’s Mansion (Cairo):** The final destination. A massive, dark estate where the ultimate battle against DIO occurs.
+
+#### **Part 4: Diamond Is Unbreakable (1999 Morioh, Japan)**
+*   **Morioh Town:** A fictional coastal town based on Hirohiko Araki’s hometown, **Sendai**. 
+*   **Ghost Girl’s Alley:** A supernatural "hidden" street where the spirits of Reimi Sugimoto and her dog reside.
+*   **Angelo Rock:** A landmark created when Josuke fused a villain into a boulder; it became a local meeting spot.
+
+#### **Part 5: Vento Aureo / Golden Wind (2001 Italy)**
+*   **Naples:** The starting point where Giorno Giovanna joins the Passione gang.
+*   **Pompeii:** The ruins where the group retrieves a key while fighting in the "Mirror World."
+*   **San Giorgio Maggiore (Venice):** The church where the group betrays the Boss to protect Trish Una.
+*   **The Colosseum (Rome):** The site of the final showdown against Diavolo and the awakening of Silver Chariot Requiem.
+
+#### **Part 6: Stone Ocean (2011 Florida, USA)**
+*   **Green Dolphin Street Prison:** A maximum-security facility near Port St. Lucie, nicknamed "The Aquarium." Most of the part takes place within its walls.
+*   **Kennedy Space Center (Cape Canaveral):** The site of the final battle where the gravity-shifting effects of C-Moon and Made in Heaven occur.
+
+---
+
+### **II. The SBR Universe (Parts 7–9)**
+
+#### **Part 7: Steel Ball Run (1890 USA)**
+*   **The SBR Race Route:** A 6,000 km cross-country horse race starting at **San Diego West Coast Beach** and ending at **Trinity Church in New York City**.
+*   **The Devil’s Palm:** A moving, supernatural desert area that grants Stands to those who survive it. It is intrinsically linked to the Saint’s Corpse.
+*   **Monument Valley:** A key location for Stage 3 of the race and the battle against the Boomboom Family.
+
+#### **Part 8: JoJolion (2011 Morioh, Japan)**
+*   **The Wall Eyes:** Massive, protruding earthen ridges that emerged after the 2011 Tōhoku earthquake. They possess the power of "Equivalent Exchange."
+*   **Higashikata House:** A modern, angular estate built on a hill, featuring a secret underground bunker and a fruit orchard.
+*   **Shakedown Road:** A street lined with Ginko trees where the leaves possess a Stand-like ability to move objects rapidly.
+
+#### **Part 9: The JOJOLands (Early 2020s Hawaii, USA)**
+*   **Oahu & Honolulu:** The primary setting where Jodio Joestar and his crew operate as part of a drug-running gang.
+*   **Rohan Kishibe’s Villa:** Located on **Hawaii Island (The Big Island)**, this is the target of the group's first major heist.
+*   **Mt. Hualālai:** A volcanic peak where the group encounters the mysterious "Lava Rocks" and the Howler Company's land assets.
+
+### **III. Recurring Geographical Themes**
+*   **Supernatural Landmarks:** Araki often uses specific geography to grant powers (e.g., the **Devil's Palm** in Part 7 and the **Wall Eyes** in Part 8).
+*   **Real-World Accuracy:** Parts 3 and 5 are noted for their high level of geographical and architectural accuracy, as Araki personally traveled to Egypt and Italy to sketch locations.
+
+## Arcs
+*JoJo’s Bizarre Adventure* is a multi-generational saga written and illustrated by Hirohiko Araki. The series is divided into nine major story arcs (Parts), each following a different member of the Joestar bloodline, nicknamed "JoJo." 
+
+The series is split into two distinct continuities: the **Original Continuity** (Parts 1–6) and the **SBR Continuity** (Parts 7–9).
+
+---
+
+### **The Original Continuity (Parts 1–6)**
+This timeline follows the generational struggle between the Joestar family and the immortal vampire Dio Brando (later "DIO") and his legacy.
+
+#### **Part 1: Phantom Blood**
+*   **Protagonist:** Jonathan Joestar
+*   **Setting:** 1880s, Victorian England
+*   **Plot:** Wealthy heir Jonathan Joestar meets his adopted brother, Dio Brando, who seeks to steal the Joestar fortune. Dio uses an ancient Stone Mask to become a vampire. Jonathan learns **Hamon** (Ripple)—a martial art using sun-powered breathing—to stop Dio.
+*   **Key Event:** Jonathan sacrifices himself to sink a ship and trap Dio’s severed head, but Dio survives by stealing Jonathan's body.
+
+#### **Part 2: Battle Tendency**
+*   **Protagonist:** Joseph Joestar (Jonathan’s grandson)
+*   **Setting:** 1938–1939, New York, Mexico, and Europe
+*   **Plot:** Joseph, a natural Hamon user, discovers the **Pillar Men**—ancient, god-like beings who created the Stone Masks. Alongside Caesar Zeppeli and his mentor Lisa Lisa, Joseph fights to prevent the Pillar Men from obtaining the Red Stone of Aja to become "Ultimate Beings."
+*   **Key Event:** Joseph defeats Kars, the leader of the Pillar Men, by launching him into space.
+
+#### **Part 3: Stardust Crusaders**
+*   **Protagonist:** Jotaro Kujo (Joseph’s grandson)
+*   **Setting:** 1988–1989, Japan to Egypt
+*   **Plot:** DIO awakens after 100 years. His return triggers the manifestation of **Stands** (physical manifestations of life energy) in the Joestar line. Jotaro, Joseph, and a group of allies travel to Egypt to kill DIO and save Jotaro’s mother, Holly, whose Stand is killing her.
+*   **Key Event:** Jotaro defeats DIO in Cairo after discovering his Stand, Star Platinum, can stop time.
+
+#### **Part 4: Diamond Is Unbreakable**
+*   **Protagonist:** Josuke Higashikata (Joseph’s illegitimate son)
+*   **Setting:** 1999, Morioh, Japan
+*   **Plot:** A "slice-of-life" supernatural mystery. Josuke and his friends use their Stands to protect their town from a surge of new Stand users created by a mystical Bow and Arrow. They eventually hunt down **Yoshikage Kira**, a serial killer with a hand fetish who wants a "quiet life."
+*   **Key Event:** Kira is defeated by the combined efforts of the Morioh Stand users and an ambulance.
+
+#### **Part 5: Golden Wind (Vento Aureo)**
+*   **Protagonist:** Giorno Giovanna (DIO’s son, biologically a Joestar)
+*   **Setting:** 2001, Italy
+*   **Plot:** Giorno joins the mafia gang *Passione* with the goal of becoming a "Gang-Star" to stop the drug trade. He joins Bruno Bucciarati’s squad to protect the boss’s daughter, Trish, only to realize the boss, **Diavolo**, intends to kill her to hide his identity.
+*   **Key Event:** Giorno obtains the "Requiem" arrow, evolving his Stand into Gold Experience Requiem to trap Diavolo in an infinite death loop.
+
+#### **Part 6: Stone Ocean**
+*   **Protagonist:** Jolyne Cujoh (Jotaro’s daughter)
+*   **Setting:** 2011, Green Dolphin Street Prison, Florida
+*   **Plot:** Jolyne is framed for murder and sent to prison. She discovers a plot by **Enrico Pucci**, a priest and disciple of DIO, who seeks to "achieve Heaven." Pucci steals Jotaro’s memories and Stand to fulfill DIO’s final plan.
+*   **Key Event:** Pucci uses his Stand, Made in Heaven, to accelerate time and **reset the universe**. While Pucci is killed by the child Emporio, the original timeline ends, resulting in a new world where the Joestars live peaceful lives (the "Ireneverse").
+
+---
+
+### **The SBR Continuity (Parts 7–9)**
+This is a separate "reboot" universe with altered versions of familiar characters and new lore.
+
+#### **Part 7: Steel Ball Run**
+*   **Protagonist:** Johnny Joestar & Gyro Zeppeli
+*   **Setting:** 1890, United States
+*   **Plot:** A cross-country horse race from San Diego to New York. Johnny, a paraplegic former jockey, joins the race to learn the secret of **The Spin** from Gyro. They discover the race is a front for President **Funny Valentine** to collect the "Saint’s Corpse" (Jesus Christ) to grant America divine protection.
+*   **Key Event:** Johnny masters the "Infinite Spin" to defeat Valentine’s Stand, D4C.
+
+#### **Part 8: JoJolion**
+*   **Protagonist:** Josuke "Gappy" Higashikata
+*   **Setting:** 2011, Morioh, Japan (Post-Tohoku earthquake)
+*   **Plot:** An amnesiac man is found buried at the "Wall Eyes." He is a fusion of two people (Josefumi Kujo and Yoshikage Kira). He searches for his identity while uncovering a conspiracy involving the **Rokakaka fruit**, which performs "equivalent exchange" healing, and a race of "Rock Humans."
+*   **Key Event:** Josuke defeats the "Head Doctor" (Wonder of U) using a power called "Soft & Wet: Go Beyond," which exists outside the logic of the world.
+
+#### **Part 9: The JOJOLands**
+*   **Protagonist:** Jodio Joestar
+*   **Setting:** Early 2020s, Hawaii
+*   **Plot:** Jodio, a 15-year-old gangster, aims to become "filthy rich." He and his crew (including his sibling Dragona) embark on a heist to steal a diamond from a wealthy Japanese tourist (Rohan Kishibe). They discover a mysterious **Lava Rock** that attracts valuable items.
+*   **Status:** Currently ongoing; the plot focuses on the "mechanism" of wealth and corporate warfare.
+
+## Sequels
+*JoJo’s Bizarre Adventure* (JJBA) is a multi-generational saga by Hirohiko Araki, characterized by its unique "Part" structure. The series is divided into two distinct continuities and supplemented by numerous spinoffs and light novels.
+
+### **1. The Main Series: Sequels & Prequels**
+The main series is divided into nine story arcs. Each part serves as a sequel to the previous one, following a new member of the Joestar bloodline.
+
+*   **The Original Universe (Parts 1–6):**
+    *   **Part 1: Phantom Blood** (1880s) – The "prequel" to the entire saga, detailing the origin of the Joestar-Dio feud.
+    *   **Part 2: Battle Tendency** (1930s) – Sequel following Jonathan’s grandson, Joseph.
+    *   **Part 3: Stardust Crusaders** (1980s) – Introduces "Stands" and follows Jotaro Kujo.
+    *   **Part 4: Diamond Is Unbreakable** (1999) – A "slice-of-life" supernatural mystery following Josuke Higashikata.
+    *   **Part 5: Golden Wind** (2001) – Follows Giorno Giovanna in the Italian mafia.
+    *   **Part 6: Stone Ocean** (2011) – Follows Jolyne Cujoh. This part concludes the original Joestar storyline.
+
+*   **The Reboot Universe (Parts 7–9+):**
+    *   **Part 7: Steel Ball Run** (1890s) – A total reboot set in an alternate timeline. It reimagines characters like Jonathan (Johnny) and Dio (Diego).
+    *   **Part 8: JoJolion** (2011) – Set in the same rebooted universe in a reimagined Morioh.
+    *   **Part 9: The JOJOLands** (2020s) – The current ongoing part, following Jodio Joestar in Hawaii.
+
+---
+
+### **2. Notable Spinoffs**
+Spinoffs often focus on side characters or "what-if" scenarios.
+
+*   **Manga Spinoffs:**
+    *   ***Thus Spoke Kishibe Rohan***: A series of one-shots following the Part 4 mangaka. It is the most prominent spinoff, receiving its own anime (OVA) and live-action series.
+    *   ***Deadman’s Questions***: A short story following the ghost of Yoshikage Kira (the villain of Part 4) as he works as a spirit assassin.
+    *   ***Crazy Diamond’s Demonic Heartbreak*** (2021–2023): A prequel to Part 4, starring Hol Horse (from Part 3) and Josuke Higashikata.
+    *   ***Fujiko’s Bizarre Worldly Wisdom***: A one-shot focusing on Jolyne Cujoh in prison.
+
+*   **Light Novels (Semi-Canon):**
+    *   ***Purple Haze Feedback***: A popular sequel to Part 5 focusing on Pannacotta Fugo's redemption.
+    *   ***JoJo’s Bizarre Adventure Over Heaven***: Written as DIO’s lost diary, providing insight into his motivations.
+    *   ***Jorge Joestar***: An infamous, highly "bizarre" novel involving 36 Kars on Mars and multiple alternate universes. It is generally considered non-canon.
+
+---
+
+### **3. Continuity & Universe Differences**
+The most significant "difference" in JoJo continuity is the **Universe Split** after Part 6.
+
+*   **The Reset:** At the end of *Stone Ocean*, the universe is reset. However, the "Reboot Universe" (Parts 7–9) is **not** the direct result of that reset. Instead, it is a completely separate continuity that allows Araki to retell the Joestar mythos with more mature themes (moving from Shonen to Seinen).
+*   **Mechanics:** The original universe relies on **Hamon** (Ripple) and **Stands**. The reboot universe replaces Hamon with **The Spin**, a mathematical application of the Golden Ratio, while keeping Stands as the primary power.
+*   **Character Echoes:** Characters in the reboot universe often "echo" original characters (e.g., Johnny Joestar is an alternate Jonathan), but they are legally and biologically distinct individuals with different backstories.
+
+---
+
+### **4. Related Series & Crossovers**
+Araki has written other works that occasionally cross over or share DNA with JoJo:
+*   ***Baoh the Visitor***: An early Araki work. The protagonist, Baoh, appears as a guest character in JoJo video games (like *All-Star Battle R*).
+*   ***Cool Shock B.T.***: A series about a trickster boy. A recent spinoff, *Cool Shock Old B.T.*, was written by Nisio Isin and contains heavy JoJo references, including a cameo by Rohan Kishibe.
+*   **Fashion Collaborations**: Araki has produced official one-shot "crossovers" with high-fashion brands, such as ***Rohan au Louvre*** and ***Jolyne, Fly High with Gucci***.
+
+## Adaptations
+*JoJo’s Bizarre Adventure* (JJBA) has a complex history of adaptations, ranging from faithful modern TV series to "lost" films and controversial OVAs. The following is a detailed breakdown of the different versions and the key changes made from Hirohiko Araki’s original manga.
+
+### 1. Overview of Adaptations (Versions)
+*   **The Manga (1987–Present):** The original source material by Hirohiko Araki. It is currently in its 9th part, *The JOJOLands*.
+*   **The OVAs (1993 & 2000):** Produced by Studio A.P.P.P., these 13 episodes adapt Part 3 (*Stardust Crusaders*). They are known for a darker, more cinematic tone but skip significant portions of the story.
+*   **The "Lost" Movie (2007):** A theatrical adaptation of Part 1 (*Phantom Blood*) by Studio A.P.P.P. It was pulled from theaters and never released on home video, making it one of the most famous pieces of "lost media" in anime.
+*   **The David Production TV Series (2012–Present):** The most famous and faithful adaptation, covering Parts 1 through 6. It is credited with the series' global "renaissance."
+*   **Live-Action Movie (2017):** Directed by Takashi Miike, *JoJo's Bizarre Adventure: Diamond Is Unbreakable Chapter I* adapts the beginning of Part 4.
+
+---
+
+### 2. Major Manga vs. Anime Differences (By Part)
+
+#### Part 1: Phantom Blood
+*   **Pacing:** The 2012 anime heavily compressed the manga to fit into 9 episodes. It cut much of Jonathan’s childhood, including scenes of him smoking a pipe (to maintain his "gentleman" image) and more detailed interactions with Danny.
+*   **The 2007 Movie Cuts:** This version famously **omitted Robert E.O. Speedwagon**, a fan-favorite character, and simplified the "Ripple" (Hamon) into a generic glowing energy.
+*   **Gore:** The manga is significantly more graphic (e.g., the detail of Danny’s death and the Aztec sacrifice). The anime uses black shadows or "light beams" to censor extreme violence in the TV broadcast.
+
+#### Part 2: Battle Tendency
+*   **The Ending:** The anime expanded the epilogue. While the manga ends with text blurbs about the characters' futures, the anime shows scenes of Erina’s passing, Smokey becoming mayor, and a teaser cameo of Jotaro Kujo in prison.
+*   **Visual Style:** David Production introduced "color shifts" during high-intensity moments (e.g., the background turning neon purple), mimicking Araki’s habit of changing color palettes in his cover art.
+
+#### Part 3: Stardust Crusaders
+*   **OVA vs. TV Anime:** 
+    *   The **OVA** is a "reimagining." It changes fights significantly; for example, the final battle with DIO feels like a horror movie, with less dialogue and more environmental destruction.
+    *   The **TV Anime** is almost a 1:1 panel-to-screen adaptation but is often criticized for "dragging" the pacing to fit 48 episodes.
+*   **Censorship:** In the TV anime, Jotaro’s smoking is obscured by a large black void because he is a minor (17), whereas it is shown clearly in the manga and OVA.
+
+#### Part 4: Diamond is Unbreakable
+*   **Kira’s Presence:** The anime adds "cameos" of the main villain, Yoshikage Kira, in the background of early episodes before he is officially introduced. In the manga, he does not appear until his own arc.
+*   **Tone & Color:** The anime uses a surreal yellow sky and vibrant, pop-art colors to distinguish the town of Morioh, whereas the manga’s art was transitioning into a more realistic, slender style.
+
+#### Part 5: Golden Wind
+*   **Fugo’s Backstory:** The anime adds a detailed flashback for Pannacotta Fugo, explaining his anger issues and his relationship with his professor. This was only briefly alluded to in the manga.
+*   **King Crimson:** The anime uses unique visual and sound effects (skipping frames) to make the villain’s confusing "time erasure" ability easier for the audience to understand than the static manga panels.
+
+#### Part 6: Stone Ocean
+*   **Copyright Cuts:** Due to legal issues with Western brands and celebrities, the anime changed several lines. Jolyne no longer mentions **Johnny Depp** or **Mickey Mouse** by name, and Stand names were localized (e.g., *Stone Free* became *Stone Ocean*, *Limpu Bizkit* became *Flaccid Pancake*).
+*   **Prison Entry:** Several "crude" scenes of Jolyne being processed into prison (including a physical exam and her interaction with a transgender prisoner) were shortened or removed in the anime.
+
+---
+
+### 3. Key Changes & Controversies
+
+#### The Qur'an Controversy (2008)
+In the 2000 OVA, a scene showed the villain DIO reading a book while ordering a murder. The animators used a random book for reference, which turned out to be the **Qur'an**. This sparked a massive international controversy in 2008, leading Shueisha and Studio A.P.P.P. to halt all *JoJo* distribution temporarily. This incident is widely believed to be the reason the 2007 *Phantom Blood* movie was never released on DVD.
+
+#### Name Changes (Localization)
+Because many Stands are named after Western bands and songs (e.g., *Killer Queen*, *Dirty Deeds Done Dirt Cheap*), the English anime and games use "localized" names to avoid trademark lawsuits. 
+*   **Manga:** *Golden Experience* $\rightarrow$ **Anime:** *Golden Wind*
+*   **Manga:** *Sticky Fingers* $\rightarrow$ **Anime:** *Zipper Man*
+
+#### Art Style Evolution
+One of the biggest "changes" is actually a reflection of the manga. Araki’s art style changed drastically over 35 years—from the "fist-of-the-north-star" muscular style of Part 1 to the high-fashion, slender look of Part 6. David Production chose to change the character designs for every season to match the specific era of the manga they were adapting.
+
+## Recent
+As of **January 2026**, *JoJo’s Bizarre Adventure* is in a highly active period, with the ninth manga part reaching a climax in its current arc and the long-awaited anime adaptation of Part 7 officially scheduled for release.
+
+### **1. The JOJOLands (Part 9) – Ongoing Manga Updates**
+*The JOJOLands* began serialization in February 2023 and is currently the focus of Hirohiko Araki’s monthly releases in *Ultra Jump*.
+
+*   **Current Plot Status:** The story follows **Jodio Joestar**, a 15-year-old high schooler and "gofer" for a criminal organization in Hawaii. His goal is to become "filthy rich" by exploiting the "mechanisms" of the world. 
+*   **The Latest Arc (The Asset Collection / Howler Company):** Following a successful heist of a mysterious **Lava Rock** from Rohan Kishibe’s villa, the gang (Jodio, Dragona, Paco, Usagi, and Charming Man) has moved on to a massive corporate-level scheme. They are currently attempting to use the Lava Rock’s wealth-attracting properties to seize the land deeds and assets of the **HOWLER Company**, a powerful infrastructure development firm.
+*   **Recent Developments:**
+    *   **Chapter 31 (December 2025):** The group faced intense pressure from the HOWLER Company’s legal and Stand-using defenses. The conflict has shifted from a simple heist to a high-stakes bureaucratic and physical battle.
+    *   **Chapter 32 (Upcoming):** Scheduled for release in Japan on **January 19, 2026**. It is expected to continue the "Dolphin Bank" confrontation and the team's attempt to finalize the asset seizure.
+*   **Key Characters & Stands:**
+    *   **Jodio Joestar:** Stand: *November Rain* (creates localized, heavy "weighted" rain).
+    *   **Dragona Joestar:** Stand: *Smooth Operators* (can slide and reposition objects/features).
+    *   **Usagi Alohaoe:** Stand: *The Matte Kudasai* (transforms into an object someone else desires).
+
+### **2. Steel Ball Run (Part 7) – Anime Adaptation**
+After years of speculation, the anime adaptation of the fan-favorite Part 7, *Steel Ball Run*, has been officially confirmed and detailed.
+
+*   **Release Date:** The "First Stage" of the anime is set to premiere globally on **March 19, 2026**, on Netflix.
+*   **Premiere Format:** The series will debut with a **47-minute special episode** covering the start of the cross-country horse race.
+*   **Production Staff:** **David Production** returns as the animation studio. The staff includes directors **Yasuhiro Kimura** and **Hideya Takahashi** (who previously directed *Golden Wind*), and series composer **Yasuko Kobayashi**.
+*   **Voice Cast:** 
+    *   **Johnny Joestar:** (Voice actor details are being finalized, though recent trailers have featured the main duo).
+    *   **Sandman:** Masaaki Mizunaka.
+    *   **Pocoloco:** Kenichirō Matsuda.
+
+### **3. Other Recent News & Media**
+*   **Video Games:** A new 3D strategy card mobile game titled ***JoJo’s Bizarre Adventure: Golden Anthem*** was announced in late 2025, with a planned release in **Q4 2026**. It features music by series veteran Yugo Kanno.
+*   **English Manga Releases:** Viz Media is currently publishing the physical English volumes of *Steel Ball Run*. Volume 1 was released in Summer 2025, and subsequent volumes are releasing quarterly.
+*   **Spin-offs:** The *Thus Spoke Kishibe Rohan* series continues to receive occasional new chapters and live-action adaptations in Japan, maintaining the character's relevance alongside his major role in *The JOJOLands*.
+
+### **Summary Table: Current Status**
+| Category | Latest Update |
+| :--- | :--- |
+| **Manga** | *The JOJOLands* Chapter 31 (Dec 2025); Ch. 32 due Jan 19, 2026. |
+| **Anime** | *Steel Ball Run* (Part 7) premieres **March 19, 2026**. |
+| **Protagonist** | Jodio Joestar (Hawaii-based, Part 9). |
+| **Major Antagonist** | The HOWLER Company (Current Part 9 threat). |
+| **New Game** | *Golden Anthem* (Mobile) – Releasing late 2026. |

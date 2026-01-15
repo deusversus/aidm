@@ -1,0 +1,81 @@
+id: trigun
+name: Trigun
+source_anime: Trigun
+media_type: anime
+status: completed
+generated_at: '2026-01-05T18:17:02.812308'
+confidence: 95
+research_method: bundled_parallel
+dna_scales:
+  introspection_vs_action: 6
+  comedy_vs_drama: 4
+  simple_vs_complex: 7
+  power_fantasy_vs_struggle: 6
+  explained_vs_mysterious: 5
+  fast_paced_vs_slow_burn: 4
+  episodic_vs_serialized: 7
+  grounded_vs_absurd: 7
+  tactical_vs_instinctive: 5
+  hopeful_vs_cynical: 3
+  ensemble_vs_solo: 7
+tropes:
+  tournament_arc: false
+  training_montage: false
+  power_of_friendship: false
+  mentor_death: true
+  chosen_one: true
+  tragic_backstory: true
+  redemption_arc: true
+  betrayal: true
+  sacrifice: true
+  transformation: true
+  forbidden_technique: true
+  time_loop: false
+  false_identity: true
+  ensemble_focus: true
+  slow_burn_romance: true
+combat_system: tactical
+power_system:
+  name: Plant-based Energy / Gate Mechanics
+  mechanics: Plants act as biological 'Gates' or conduits to a higher dimension, producing
+    energy by manipulating causality and matter at a quantum level. Sentient 'Independents'
+    can consciously tap into this Gate to manifest physical phenomena such as the
+    Angel Arm (energy cannon), spatial manipulation (Black Hole and Subspace Bullets),
+    matter creation (Angel Wings), and telepathic communication. Humans can bridge
+    this gap through 'Eye of Michael' modifications, using Plant-based cells and cybernetics
+    to gain superhuman strength and regeneration.
+  limitations: A Plant's energy is finite, represented by the 'Black Hair Phenomenon'
+    where hair turns black as life force is depleted; reaching the 'Final Run' results
+    in death. Human modifications cause accelerated aging and a dependency on specialized
+    regenerative drugs to heal fatal wounds.
+  tiers:
+  - Cosmic / Universal (Ark Knives, The Lost Plant)
+  - Planetary (Vash Full Power, Base Knives)
+  - City / Multi-City (Legato, Elendira, Livio)
+  - Town / Building (Gung-Ho Guns)
+  - Peak Human (Meryl, Milly, Bounty Hunters)
+tone:
+  comedy_level: 6
+  darkness_level: 7
+  optimism: 8
+director_personality: 'You are the director for a Trigun-style campaign. '
+pacing:
+  scene_length: moderate
+  arc_length_sessions: 4-6
+sources_consulted:
+- power_system
+- combat
+- tone
+- characters
+- factions
+- locations
+- arcs
+- sequels
+- adaptations
+- recent
+aliases:
+- toraigan
+- trigun
+- トライガン
+series_group: trigun
+series_position: 1

@@ -1,0 +1,85 @@
+id: tokyo_ghoul
+name: Tokyo Ghoul
+source_anime: Tokyo Ghoul
+media_type: anime
+status: completed
+generated_at: '2026-01-07T07:58:43.283195'
+confidence: 95
+research_method: bundled_parallel
+dna_scales:
+  introspection_vs_action: 4
+  comedy_vs_drama: 2
+  simple_vs_complex: 8
+  power_fantasy_vs_struggle: 8
+  explained_vs_mysterious: 4
+  fast_paced_vs_slow_burn: 7
+  episodic_vs_serialized: 10
+  grounded_vs_absurd: 4
+  tactical_vs_instinctive: 5
+  hopeful_vs_cynical: 7
+  ensemble_vs_solo: 4
+tropes:
+  tournament_arc: false
+  training_montage: true
+  power_of_friendship: false
+  mentor_death: true
+  chosen_one: true
+  tragic_backstory: true
+  redemption_arc: true
+  betrayal: true
+  sacrifice: true
+  transformation: true
+  forbidden_technique: true
+  time_loop: false
+  false_identity: true
+  ensemble_focus: true
+  slow_burn_romance: true
+combat_system: tactical
+power_system:
+  name: RC Cells (Kagune System)
+  mechanics: The system is based on Red Child (RC) cells which function like liquid
+    muscle. Ghouls store these cells in a kakuhou organ and release them to manifest
+    a kagune, a predatory organ shaped by the user's RC type (Ukaku, Koukaku, Rinkaku,
+    or Bikaku) and imagination. CCG investigators use Quinque, which are weapons forged
+    from harvested kakuhou that require electric pulses to activate.
+  limitations: Ghouls are biologically restricted to a diet of human or ghoul flesh,
+    as human food is indigestible. Powers can be neutralized by RC suppressants. Excessive
+    RC cell counts in humans lead to ROS disease (uncontrollable tumor growth). Cannibalism-induced
+    mutations (Kakuja) often result in mental instability or insanity during incomplete
+    transformations.
+  tiers:
+  - SSS (Global threats)
+  - SS (Highly dangerous)
+  - S (Dangerous/Special Class level)
+  - A to C (Lower-level threats)
+  - Quinx Frames (Levels 1-5)
+tone:
+  comedy_level: 3
+  darkness_level: 9
+  optimism: 4
+director_personality: You are the director for a Tokyo Ghoul-style campaign. You maintain
+  dramatic weight; comedy is rare and earned. The protagonist is powerful; challenges
+  come from elsewhere.
+pacing:
+  scene_length: moderate
+  arc_length_sessions: 4-6
+sources_consulted:
+- power_system
+- combat
+- tone
+- characters
+- factions
+- locations
+- arcs
+- sequels
+- adaptations
+- recent
+aliases:
+- tg
+- tokyo ghoul
+- tokyo ghul
+- tokyo goul
+- tokyoghoul
+- 東京喰種トーキョーグール
+series_group: tokyo_ghoul
+series_position: 1

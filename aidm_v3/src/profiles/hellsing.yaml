@@ -1,0 +1,84 @@
+id: hellsing
+name: Hellsing
+source_anime: Hellsing
+media_type: anime
+status: completed
+generated_at: '2026-01-05T17:50:01.634323'
+confidence: 95
+research_method: bundled_parallel
+dna_scales:
+  introspection_vs_action: 8
+  comedy_vs_drama: 2
+  simple_vs_complex: 5
+  power_fantasy_vs_struggle: 2
+  explained_vs_mysterious: 6
+  fast_paced_vs_slow_burn: 3
+  episodic_vs_serialized: 9
+  grounded_vs_absurd: 9
+  tactical_vs_instinctive: 7
+  hopeful_vs_cynical: 8
+  ensemble_vs_solo: 7
+tropes:
+  tournament_arc: false
+  training_montage: false
+  power_of_friendship: false
+  mentor_death: true
+  chosen_one: false
+  tragic_backstory: true
+  redemption_arc: false
+  betrayal: true
+  sacrifice: true
+  transformation: true
+  forbidden_technique: true
+  time_loop: false
+  false_identity: false
+  ensemble_focus: false
+  slow_burn_romance: false
+combat_system: spectacle
+power_system:
+  name: Hematophagy and the Cromwell Invocation
+  mechanics: Power is centered on the consumption of blood and the absorption of souls,
+    which function as a stockpile of extra lives and can be manifested as Familiars
+    with their original abilities. The Cromwell Invocation (Control Art Restriction
+    System) uses alchemical seals to regulate these powers through specific levels,
+    ranging from Level 6 to Level 0.
+  limitations: Users are vulnerable to silver, blessed weapons, and decapitation,
+    and cannot cross large bodies of water without external transport. Releasing Level
+    0 makes the user vulnerable by externalizing their soul stockpile. The system
+    is also bound by the philosophical 'Rule of Humanity,' stating only a human can
+    kill a monster.
+  tiers:
+  - 'God Tier: The No-Life King / Omnipresent'
+  - 'Top Tier: True Monsters / Trump Cards'
+  - 'High Tier: Real Vampires / Elite Humans'
+  - 'Mid Tier: Artificial Vampires / Freaks'
+  - 'Low Tier: Fledglings / Ghouls'
+tone:
+  comedy_level: 3
+  darkness_level: 9
+  optimism: 3
+director_personality: You are the director for a Hellsing-style campaign. You explore
+  character thoughts and feelings deeply. You maintain dramatic weight; comedy is
+  rare and earned. Battles are won by willpower and instinct, not chess moves. Embrace
+  the absurd. Reality is a suggestion. Every victory is hard-earned. Struggles are
+  real.
+pacing:
+  scene_length: moderate
+  arc_length_sessions: 4-6
+sources_consulted:
+- power_system
+- combat
+- tone
+- characters
+- factions
+- locations
+- arcs
+- sequels
+- adaptations
+- recent
+aliases:
+- hellsing
+- helsing
+- ヘルシング
+series_group: hellsing
+series_position: 1

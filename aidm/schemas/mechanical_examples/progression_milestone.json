@@ -1,0 +1,21 @@
+{
+  "description": "Milestone-based progression (Death Note strategic thinking)",
+  "type": "milestone_based",
+  "parameters": {
+    "milestone_events": [
+      "obtain_death_note",
+      "discover_L",
+      "yotsuba_arc",
+      "kira_investigation",
+      "final_confrontation"
+    ],
+    "power_grants": {
+      "obtain_death_note": ["death_note_rules", "shinigami_eyes_option"],
+      "discover_L": ["investigation_skills", "tactical_planning"],
+      "yotsuba_arc": ["memory_manipulation_awareness", "corporate_infiltration"],
+      "kira_investigation": ["counter_intelligence", "psychological_warfare"],
+      "final_confrontation": ["master_manipulator", "endgame_strategy"]
+    }
+  },
+  "use_case": "Progression tied to story beats only. No XP or levels. Powers/abilities unlock at specific plot moments. Perfect for narrative-driven anime without traditional power systems (Death Note, Monster, Steins;Gate)."
+}

@@ -1,0 +1,317 @@
+## Characters
+*Code Geass: Lelouch of the Rebellion* is centered on a complex web of characters whose conflicting ideologies and personal relationships drive the narrative. The story primarily follows **Lelouch Lamperouge**, an exiled prince who seeks to destroy the Holy Britannian Empire.
+
+### **Main Protagonist: Lelouch Lamperouge (Zero)**
+*   **Role:** The central protagonist and leader of the resistance group, the **Black Knights**. He is a former Britannian prince (Lelouch vi Britannia) living in hiding in Japan (Area 11).
+*   **Abilities:**
+    *   **Geass (Power of Absolute Obedience):** Granted by C.C., this allows him to plant a command in anyone’s mind through direct eye contact. The victim must obey, even if the order is suicidal. It can only be used on a person once.
+    *   **Intellect:** His greatest weapon is his genius-level tactical mind, often compared to a grandmaster chess player.
+    *   **Knightmare Piloting:** While not the best physical pilot, he operates the **Gawain** and later the **Shinkirō**, which are designed for command and high-output electronic warfare.
+*   **Relationships:** Motivated entirely by his love for his sister **Nunnally**, he shares a deep, tragic bond with his best friend **Suzaku** and a contract-bound partnership with **C.C.**
+
+### **Deuteragonist & Primary Rival: Suzaku Kururugi**
+*   **Role:** Lelouch’s childhood friend and the son of Japan’s last Prime Minister. He serves as the **deuteragonist** and often the primary **antagonist** to Lelouch’s "Zero" persona.
+*   **Abilities:**
+    *   **Physical Prowess:** Possesses near-superhuman reflexes and combat skills.
+    *   **Knightmare Piloting:** The "Ace of Britannia," he pilots the **Lancelot**, a high-performance experimental frame.
+    *   **Geass Command:** Lelouch accidentally placed a permanent Geass on him to "Live," which forces his body to survive at all costs, granting him a "berserker" edge in life-threatening situations.
+*   **Relationships:** He is Lelouch’s moral foil; while Lelouch believes the "ends justify the means," Suzaku believes that change must come from within the system through "right methods." He falls in love with **Princess Euphemia**, whose death fuels his hatred for Zero.
+
+### **Key Supporting Characters**
+#### **C.C. (The Immortal Witch)**
+*   **Role:** The main female protagonist and Lelouch’s "accomplice." She is an immortal being who granted Lelouch his Geass.
+*   **Abilities:**
+    *   **Code (Immortality):** She cannot die, heals instantly from any wound, and does not age.
+    *   **Geass Bestowal:** She can grant the power of Geass to others through a contract.
+    *   **Telepathy:** She can communicate with other Code-bearers and sense Geass users.
+*   **Relationships:** Her relationship with Lelouch evolves from a cold business contract to a deep, intimate bond where they are the only ones who truly understand each other’s burdens.
+
+#### **Kallen Stadtfeld (Kallen Kozuki)**
+*   **Role:** The ace pilot of the Black Knights and Lelouch’s most loyal soldier. She leads a double life as a frail Britannian student and a fierce Japanese resistance fighter.
+*   **Abilities:**
+    *   **Master Pilot:** One of the few pilots capable of matching Suzaku. She pilots the **Guren Mk-II** and its later iterations, which utilize a devastating "Radiation Wave" arm.
+*   **Relationships:** She is deeply devoted to Zero, eventually developing romantic feelings for him, though she struggles with the revelation of his true identity as the "arrogant" Lelouch.
+
+### **Primary Antagonists**
+*   **Charles zi Britannia (The Emperor):** Lelouch’s father and the 98th Emperor of Britannia. He represents the ultimate "Social Darwinist" ideology. His goal is the **Ragnarök Connection**, a plan to "kill God" and merge all human consciousness into one to eliminate lies.
+    *   **Ability:** He possesses a Geass that can rewrite memories.
+*   **Schneizel el Britannia:** Lelouch’s older half-brother and the Second Prince. He is the only person whose intellect rivals or exceeds Lelouch’s. Unlike the Emperor, he is a cold pragmatist who seeks to bring "peace" through the threat of total nuclear annihilation (via the **Damocles** fortress).
+
+### **Summary of Relationships & Roles**
+| Character | Role | Primary Ability | Relationship to Lelouch |
+| :--- | :--- | :--- | :--- |
+| **Lelouch** | Protagonist | Geass (Obedience) | N/A |
+| **Suzaku** | Rival/Antagonist | Lancelot Piloting | Best friend / Mortal enemy |
+| **C.C.** | Accomplice | Immortality | Partner / Contractor |
+| **Kallen** | Ally (Ace) | Guren Piloting | Loyal Soldier / Love interest |
+| **Nunnally** | Motivation | Diplomacy/Empathy | Beloved Sister |
+| **Charles** | Main Antagonist | Geass (Memory) | Estranged Father |
+| **Schneizel** | Final Antagonist | Strategy/Politics | Rival Brother |
+
+## Combat
+Combat in *Code Geass* is a multi-layered experience that blends high-speed mecha action with psychological warfare and grand-scale military strategy. The series is famous for treating war like a high-stakes chess match where a single tactical maneuver or a well-timed supernatural ability can topple an empire.
+
+### 1. Tactical Combat: The "Chess Match"
+The defining characteristic of *Code Geass* combat is its focus on **strategy over raw power**. Battles are rarely won by the strongest unit alone; instead, they are decided by the brilliance of the commanders.
+*   **The Commander’s Perspective:** Protagonist Lelouch Lamperouge (Zero) views the battlefield as a literal chess board. He often sacrifices "pawns" (minor units) to lure enemies into elaborate traps, such as triggering landslides (Battle of Narita) or collapsing city blocks to trap enemy forces.
+*   **Psychological Warfare:** Lelouch uses his **Geass (Power of Absolute Obedience)** to turn enemy soldiers into sleepers, sabotage equipment from within, or force high-ranking officials to commit tactical errors. 
+*   **Information Supremacy:** Battles often hinge on "Factspheres" (advanced sensors) and electronic warfare. Disrupting an enemy's communication or "Gefjun Disturbers" (which disable mecha power sources) are common tactical plays.
+
+### 2. Fighting Styles: The Ace Pilots
+While Lelouch handles the "macro" strategy, the "micro" combat is dominated by **Knightmare Frames (KMFs)**—humanoid mecha that evolved from ground-based tanks into high-mobility aerial fighters.
+*   **Suzaku Kururugi (The Lancelot):** His style is defined by **high-speed acrobatics and precision**. Using the Lancelot’s superior mobility and "Landspinners" (wheels on the heels), he performs spinning kicks and rapid-fire strikes. His "Live" Geass command enhances his reflexes to a superhuman level, allowing him to dodge point-blank fire.
+*   **Kallen Kozuki (The Guren):** Her style is **aggressive and devastating**. The Guren’s signature weapon, the **Radiant Wave Surger** (a glowing claw), allows her to melt enemy mecha instantly upon contact. She excels in close-quarters brawling and high-risk maneuvers.
+*   **Lelouch (The Shinkiro):** Unlike other aces, Lelouch pilots a tactical unit. His style is **defensive and calculated**, utilizing the "Absolute Defense System"—a complex hexagonal shield that requires high-level calculations to operate—while raining down wide-area beams.
+
+### 3. Emotional Stakes: The Human Cost
+Battles in *Code Geass* are rarely just about territory; they are deeply personal and philosophical.
+*   **Ideological Clashes:** The core rivalry between Lelouch (who wants to destroy the system from the outside) and Suzaku (who wants to change it from within) turns every duel into a debate about morality and justice.
+*   **The Weight of Sacrifice:** Combat is often punctuated by tragedy. Characters frequently have to choose between their personal feelings and their strategic goals. The accidental massacre at the Special Administrative Zone and the use of the **F.L.E.I.I.A. (nuclear-equivalent)** warhead are moments where the spectacle of war is stripped away to reveal its horrific emotional toll.
+
+### 4. Flashy Spectacle: Visual Evolution
+The series is known for its "spectacle" battles that escalate in visual intensity as the technology evolves.
+*   **Generational Leaps:** Combat starts with grounded, gritty urban skirmishes (5th Gen Knightmares) and evolves into "9th Generation" battles where mecha sprout **Energy Wings**, move fast enough to leave after-images, and fire city-leveling **Hadron Cannons**.
+*   **Iconic Weaponry:** The visual flair of the **MVS (Maser Vibration Swords)** clashing, the purple beams of the Gawain, and the golden shields of the Shinkiro create a distinct, vibrant aesthetic.
+*   **Choreography:** Despite being a mecha show, the fights often mirror martial arts or fencing, with the mecha moving with a fluidity and "lankiness" (designed by the manga group CLAMP) that sets them apart from the bulkier robots of other series.
+
+### Summary of Combat Elements
+| Element | Key Feature | Example |
+| :--- | :--- | :--- |
+| **Tactical** | Environmental manipulation & traps | Collapsing the Tokyo Settlement |
+| **Fighting Style** | High-mobility "Landspinners" & Ace duels | Suzaku vs. Kallen rivalries |
+| **Supernatural** | Geass-assisted maneuvers | Bismarck’s precognition Geass |
+| **Spectacle** | Energy Wings & Map-clearing beams | The Guren SEITEN’s "Flaming Halo" |
+| **Emotional** | Personal betrayals & moral dilemmas | The "Zero Requiem" finale |
+
+## Locations
+The world of *Code Geass* is set in an alternate history where three major superpowers dominate the globe. The geography is defined by the **Holy Empire of Britannia**, the **Chinese Federation**, and the **Europia United (E.U.)**.
+
+### **1. Major Global Superpowers**
+*   **Holy Empire of Britannia:** Based in the Americas (the "Homeland"), its capital is **Pendragon** (located in North America). It controls roughly one-third of the world, including the entire Western Hemisphere, New Zealand, and various "Areas" (conquered nations).
+*   **Chinese Federation:** A massive monarchy covering East Asia, South Asia, and Central Asia. Its capital is **Luoyang**, home to the **Vermillion Forbidden City**.
+*   **Europia United (E.U.):** A democratic federation of nations spanning Europe, Africa, and parts of Russia. Its capital is **Paris**.
+*   **United Federation of Nations (UFN):** Formed later in the series by Lelouch/Zero, this is a coalition of 47 nations (including the former Chinese Federation and Japan) intended to oppose Britannia. Its capital is the artificial **Penglai Island** (Horai Island).
+
+---
+
+### **2. Area 11 (Japan) – The Primary Setting**
+Japan was conquered by Britannia in 2010 a.t.b. for its **Sakuradite** (a rare room-temperature superconductor) and renamed Area 11.
+*   **Tokyo Settlement:** The primary administrative district for Britannians. It is a high-tech, fortified city built over the ruins of old Tokyo.
+*   **Shinjuku Ghetto:** A dilapidated area where "Elevens" (Japanese citizens) are forced to live in poverty. It is the site of the series' first major battle.
+*   **Ashford Academy:** A prestigious Britannian school in Tokyo where Lelouch and his friends live. It serves as the primary "slice of life" setting.
+*   **Mount Fuji:** The world’s largest Sakuradite mine. It is a site of immense strategic importance and the location of the final battle in *R2*.
+*   **Narita:** A mountainous region where the Black Knights successfully used a Guren Mk-II to trigger a massive landslide against the Britannian military.
+*   **Kamine Island (Kaminejima):** A mysterious, uninhabited island containing ancient ruins and a **Thought Elevator**. It is a crucial site for Geass-related plot developments.
+
+---
+
+### **3. Geass & Supernatural Locations**
+The "World of C" (the collective unconscious) is accessed through ancient structures known as **Thought Elevators**. There are eight primary gates worldwide:
+1.  **Kamine Island, Japan:** Used by Charles zi Britannia to attempt the Ragnarök Connection.
+2.  **The Geass Directorate (Xinjiang, Chinese Federation):** A secret underground city in the Taklamakan Desert where Geass users are trained.
+3.  **Pendragon, Britannia:** Located beneath the Imperial Palace.
+4.  **London, E.U.:** Secretly located beneath the city.
+5.  **Haut-Katanga, Congo (Africa):** Within E.U. territory.
+6.  **Semnan Province, Iran:** Located in the Middle Eastern Federation (Area 18).
+7.  **Krasnoyarsk, Russia:** In E.U./Euro-Britannian territory.
+8.  **Thurston Island, Antarctica:** An unclaimed gate.
+
+---
+
+### **4. Other Notable Locations**
+*   **Area 18 (Middle Eastern Federation):** Conquered by Princess Cornelia early in the series.
+*   **Damocles:** A massive, F.L.E.I.J.A.-equipped floating fortress built by Prince Schneizel. It serves as the "ultimate weapon" in the final conflict.
+*   **Babel Tower:** A massive skyscraper in Tokyo where Lelouch regains his memories at the start of the second season.
+*   **Shikine Island:** A Britannian military base near Kamine Island where the *Avalon* (Schneizel's flagship) first appears.
+*   **Zilkhstan:** A desert kingdom introduced in the *Lelouch of the Re;surrection* film, known for its mercenary culture and its own connection to the World of C.
+
+## Power System
+The power system in **Code Geass** is centered on **Geass**, a supernatural ability known as the "Power of the King," and the **Code**, the source of immortality that fuels it. The system is deeply tied to the "World of C" (the collective human unconsciousness) and manifests differently for every individual based on their inner desires.
+
+### 1. The Geass System: Mechanics & Rules
+Geass is a psychic ability granted to a mortal through a **contract** with a Code bearer (an immortal). 
+
+*   **Manifestation:** It typically appears as a red, bird-like sigil in one of the user's eyes when activated.
+*   **Nature of Power:** Every Geass is unique. It is a manifestation of the user's "wish" or deepest desire. For example, Lelouch’s desire to change the world led to "Absolute Obedience," while C.C.’s desire to be loved led to a Geass that forced others to love her.
+*   **General Rules:**
+    *   **Mind-Based:** Almost all Geass abilities affect the human mind, including perception, memory, and will.
+    *   **Human-Only:** It generally only works on humans, not animals or machines.
+    *   **Eye Contact/Range:** Most abilities require direct eye contact (Lelouch, Charles) or have a specific effective radius (Mao, Rolo).
+    *   **Verbal Commands:** Some, like Lelouch’s, require a verbal command to be issued.
+
+### 2. Progression & Tiers
+Geass is not a static power; it evolves as the user becomes more proficient or is consumed by their desires.
+
+*   **Tier 1: Initial Manifestation (One Eye):** The power manifests in one eye and can be toggled on and off at will.
+*   **Tier 2: Matured Geass (Two Eyes):** With frequent use, the sigil appears in both eyes. This represents the "peak" of a Geass user’s power and is a prerequisite for inheriting a Code.
+*   **Tier 3: Runaway Geass (Permanent Activation):** If a user lacks the willpower to control the power, it becomes "runaway," meaning it is permanently active. Users at this stage often need external aids (like special contact lenses or goggles) to avoid accidentally using their power.
+*   **Tier 4: The Code (Immortal Status):** A user with matured Geass in both eyes can "take" the Code from their contractor. Upon doing so, they lose their Geass but gain immortality.
+
+### 3. Limitations & Side Effects
+The "Power of the King" is famously described as a power that "will isolate you."
+
+*   **Specific Restrictions:** Each Geass has its own "hard" limit.
+    *   **Lelouch:** Can only use his power on a specific person **once**.
+    *   **Rolo:** His Geass stops the subjective time of others but also **stops his own heart** while active.
+    *   **Mao:** His mind-reading is always on and has a limited range; he cannot "shut out" the thoughts of others, leading to mental instability.
+*   **Resistance:** Individuals with extreme willpower (like Euphemia or Suzaku) can briefly resist a command, though they almost always succumb eventually.
+*   **Counters:** The **Geass Canceler** (used by Jeremiah Gottwald) can "reset" the nervous system, nullifying any active Geass effects and allowing a user like Lelouch to re-apply his power to a target.
+
+### 4. The Code System (Code Bearers)
+Code bearers (e.g., C.C., V.V.) are the "Givers" of the system. They are the source of the Geass and possess the following traits:
+*   **Immortality:** They cannot age and can regenerate from any wound, including decapitation or incineration.
+*   **Geass Immunity:** They are immune to the effects of all Geass abilities.
+*   **Contracting:** They can grant Geass to others but cannot use Geass themselves (unless they are a "Failed One" like Lelouch in the *Re;surrection* timeline).
+*   **World of C Connection:** They act as gateways to the collective unconscious, allowing them to communicate telepathically or enter the spiritual "Thought Elevators."
+
+### 5. Summary of Notable Abilities
+| User | Ability Name | Effect | Limitation |
+| :--- | :--- | :--- | :--- |
+| **Lelouch** | Absolute Obedience | Forces targets to follow any command. | Requires eye contact; works only once per person. |
+| **Charles** | Memory Alteration | Can rewrite or seal memories/senses. | Requires eye contact. |
+| **Rolo** | Absolute Suspension | Freezes the target's perception of time. | Stops the user's heart during use. |
+| **Mao** | Absolute Sound | Reads the surface thoughts of anyone nearby. | Always active; range limit of 500 meters. |
+| **Bismarck** | Future Sight | Sees several seconds into the future. | Limited to physical movements/intentions. |
+| **Marianne** | Soul Transfer | Transfers her spirit into another's body. | Only usable at the moment of her death. |
+| **Shamna** | Time Leap | Sends her consciousness 6 hours into the past. | Requires the user to die to trigger it. |
+
+## Factions
+The world of *Code Geass* is defined by a geopolitical landscape of three primary superpowers, which eventually shifts into a global conflict between the Holy Britannian Empire and the United Federation of Nations.
+
+### **1. Global Superpowers**
+At the start of the series, the world is divided among three major powers:
+
+*   **The Holy Britannian Empire:** An absolute monarchy that controls roughly one-third of the world, including the Americas and various "Areas" (conquered territories like Area 11, formerly Japan). It is governed by a strict social Darwinist philosophy ("survival of the fittest") championed by Emperor Charles zi Britannia.
+*   **The Chinese Federation:** A massive imperial monarchy covering most of Asia. While technically ruled by the **Empress (Tianzi)**, actual power is held by the corrupt **High Eunuchs**, who prioritize their own wealth over the people. It later transitions into the **United States of China** after a rebellion led by Li Xingke and Zero.
+*   **Europia United (E.U.):** Also known as the Euro Universe or United Republic of Europia, it is a democratic federation encompassing Europe, Africa, and Russia. Unlike the other two, it lacks a monarch and is governed by the **Council of Forty**. During the series, it suffers heavy territorial losses to Britannia.
+
+---
+
+### **2. The United Federation of Nations (UFN)**
+Formed in the second season (R2) by Zero (Lelouch), the UFN is a supranational coalition of 47 nations designed to oppose Britannian hegemony.
+*   **Structure:** Member nations must ratify the "United States Charter," which requires them to disband their independent militaries.
+*   **Military:** The **Order of the Black Knights** serves as the UFN's official, unified military force.
+*   **Key Leadership:** Kaguya Sumeragi serves as the first Chairwoman of the Supreme Council.
+
+---
+
+### **3. Major Factions & Organizations**
+
+#### **The Order of the Black Knights**
+Founded by Zero, they began as a small resistance cell in Area 11 and grew into a global military power. They define themselves as "allies of justice" who protect the weak. Key members include Kallen Kozuki (Ace Pilot), Kaname Ohgi (Executive), and Kyoshiro Tohdoh (Military Commander).
+
+#### **The Six Houses of Kyoto (Kyoto House)**
+A secret society of former Japanese elite and industrialists (led by the **Sumeragi House**) who secretly funded and supplied resistance groups like the Japan Liberation Front and the Black Knights. They operated publicly as the NAC (a collaborationist council) to hide their activities from Britannia.
+
+#### **The Geass Order (Geass Directorate)**
+A secretive, ancient organization dedicated to the study and cultivation of Geass. 
+*   **Leaders:** Historically led by C.C., then V.V., and eventually Charles zi Britannia.
+*   **Purpose:** They conduct human experimentation to create "artificial" Geass users (like Rolo Lamperouge) and seek to fulfill the "Ragnarök Connection"—a plan to rewrite reality.
+
+---
+
+### **4. Specialized Britannian Factions**
+*   **Knights of the Round:** An elite unit of 12 (later 13) knights who serve directly under the Emperor. They operate outside the standard military hierarchy and pilot experimental, high-performance Knightmare Frames (e.g., Bismarck Waldstein, Suzaku Kururugi, Anya Alstreim).
+*   **The Purist Faction (Purebloods):** A hardline political and military group within the Britannian army that opposes the "Honorary Britannian" system. They believe only "pure" Britannians should serve in the military. Notable members include Jeremiah Gottwald and Villetta Nu.
+*   **Glaston Knights:** An elite unit under Princess Cornelia li Britannia, known for their tactical coordination and loyalty.
+
+---
+
+### **5. Post-Series & Alternate Timeline Factions**
+The *Code Geass* universe expands through sequels like *Lelouch of the Re;surrection* and *Rozé of the Recapture*:
+
+*   **Kingdom of Zilkhstan:** Known as the "Land of Warriors," this nation’s economy relied on mercenary work. After the "Zero Requiem" brought world peace, they kidnapped Nunnally to use her connection to "C’s World" to restore their power. It is ruled by Queen Shamna and King Shalio.
+*   **Neo-Britannian Empire:** Featured in *Rozé of the Recapture*, this is a remnant of the old empire that seized the Hokkaido Block of Japan after Lelouch's death. They are led by the **100th Emperor, Callis al Britannia**, and protected by the **Knights of Einberg**.
+*   **Seven Shining Stars:** A Japanese resistance group in Hokkaido fighting to liberate the region from the Neo-Britannian Empire.
+
+## Tone
+*Code Geass: Lelouch of the Rebellion* is a high-octane, multi-genre anime known for its complex morality, theatrical flair, and sharp tonal shifts. It balances a grim political narrative with lighthearted high school antics, creating a unique atmosphere that fans often describe as "magnificent trash" or a "masterpiece of melodrama."
+
+### **1. Genre and Mood**
+*Code Geass* is a "genre-bender" that refuses to stay in one lane. Its primary identity is a **Mecha Political Thriller**, but it heavily incorporates elements of:
+*   **Alternate History:** Set in a world where the Holy Britannian Empire has conquered a third of the globe, including Japan (renamed "Area 11").
+*   **Psychological Drama:** Similar to *Death Note*, it focuses on a "mastermind" protagonist engaging in high-stakes mind games.
+*   **Supernatural Fantasy:** Centered on "Geass," a mysterious power that grants unique abilities, such as absolute obedience.
+*   **Mood:** The mood is **high-stakes and theatrical**. It is often categorized as *Chuunibyou* (middle-school syndrome) fiction because of its "hammy" dialogue, dramatic poses, and the protagonist’s grandiose alter-ego, Zero.
+
+### **2. Tone: The "Emotional Whiplash"**
+The show is famous for its **tonal dissonance**. It frequently jumps between two extremes:
+*   **The Grim Reality:** Scenes of war, systemic racism, massacres, and cold-blooded executions.
+*   **The School Hijinks:** Lighthearted "slice-of-life" episodes at Ashford Academy involving giant pizza festivals, chasing cats, and romantic misunderstandings.
+*   **Purpose of the Contrast:** This isn't accidental; the school scenes represent the "peaceful world" Lelouch is trying to create, while the war scenes show the "bloody price" he must pay to get there.
+
+### **3. Dark Comedy and Irony**
+While not a "comedy" in the traditional sense, *Code Geass* employs **dark irony** and **absurdism** that often functions as dark humor:
+*   **Absurd Situations:** The contrast between Lelouch being a revolutionary leader and a high schooler leads to hilarious, high-stress moments—such as when he must use his tactical genius to stop a cat from running away with his secret mask.
+*   **Dramatic Irony:** Much of the "humor" comes from the audience knowing Lelouch's secret while his friends remain oblivious.
+*   **The "Princess Massacre":** One of the show's most infamous moments involves a horrific accident caused by a poorly timed joke. While tragic, the sheer "diabolus ex machina" (contrived misfortune) of the scene is so extreme that it has become a point of dark, meme-worthy fascination for the fandom.
+
+### **4. Themes: Morality and Identity**
+*   **The Ends vs. The Means:** This is the central conflict. Lelouch believes "to defeat evil, I shall become an even greater evil," while his rival Suzaku believes change must come from within the system through "just" means.
+*   **The Mask (Identity):** Almost every character wears a literal or metaphorical mask. Lelouch is a student, a prince, and a terrorist leader; the show explores how these identities eventually fracture the person underneath.
+*   **Social Injustice:** The series tackles themes of colonialism, racism, and classism, portraying the Britannian Empire as a social-Darwinist state where "the weak are stepped upon."
+
+### **5. Optimism vs. Nihilism**
+Despite its high body count and tragic betrayals, *Code Geass* is fundamentally **optimistic**.
+*   **Rejection of Nihilism:** Characters like C.C. start the series with a nihilistic worldview (feeling that life is a meaningless cycle of pain), but through their bond with Lelouch, they find a reason to live.
+*   **The "Zero Requiem":** Without spoiling the specifics, the series finale is considered one of the greatest in anime history because it resolves the dark themes with a profound act of hope. It suggests that while the world is filled with hate, a "gentle world" is possible through sacrifice and the collective will to move toward the future.
+
+### **6. Atmosphere**
+The atmosphere is **electric and tense**. The soundtrack (a mix of orchestral marches and J-pop) and the "noodle-like" character designs by CLAMP give the show a stylish, avant-garde feel. It feels like a grand stage play where the fate of the world is decided in a game of chess, but the players are deeply flawed, emotional teenagers.
+
+## Arcs, Sequels, Adaptations, Recent
+The *Code Geass* franchise, created by Sunrise (now Bandai Namco Filmworks), has expanded from a standalone 2006 anime into a multi-timeline universe. Below is a detailed breakdown of its story arcs, continuity branches, adaptations, and current state.
+
+### 1. Major Story Arcs & Timeline
+The original series is divided into two seasons: *Lelouch of the Rebellion* (R1) and *R2*. While not officially titled by the studio, fans and guides generally recognize the following progression:
+
+**Season 1 (R1): The Rise of Zero**
+*   **Introduction Arc (Eps 1–4):** Exiled prince Lelouch Lamperouge acquires the "Geass" (Power of Kings) from C.C. and begins his first strikes against the Britannian Empire in Area 11 (Japan).
+*   **The Black Knights Arc (Eps 5–13):** Lelouch adopts the persona "Zero" and forms the Black Knights. He faces his childhood friend Suzaku Kururugi, who pilots the experimental Lancelot.
+*   **The Mao Arc (Eps 14–16):** A psychological battle against Mao, a previous Geass user who can read minds, which tests Lelouch’s resolve and endangers his sister, Nunnally.
+*   **The Black Rebellion (Eps 17–25):** Following a tragic accident involving Princess Euphemia, Lelouch launches a full-scale uprising in Tokyo. It ends in disaster when Lelouch abandons the front lines to save Nunnally, leading to the defeat of the Black Knights and Lelouch's capture.
+
+**Season 2 (R2): The Zero Requiem**
+*   **Reintroduction Arc (Eps 1–7):** One year later, Lelouch lives with false memories until C.C. restores them. He resumes his role as Zero while being monitored by his "brother" Rolo and the intelligence agency.
+*   **United Federation of Nations Arc (Eps 8–16):** Zero expands the rebellion globally, forming a coalition of nations to rival Britannia.
+*   **Ragnarok Connection Arc (Eps 17–21):** The truth of the Geass and the Emperor’s plan to "kill God" is revealed. Lelouch rejects his parents' vision and seizes the throne of Britannia.
+*   **The Zero Requiem (Eps 22–25):** Emperor Lelouch becomes a global tyrant to focus the world's hatred on himself. He orchestrates his own assassination by Suzaku (disguised as Zero) to break the cycle of war and usher in a peaceful era.
+
+---
+
+### 2. Sequels, Spinoffs, and Continuity
+The franchise is split into two distinct timelines. Understanding this is crucial for following the sequels.
+
+*   **Timeline A (Original TV Series):** Consists of *R1* and *R2*. It concludes with the Zero Requiem.
+*   **Timeline B (Movie Continuity):** Consists of the three compilation films (*Initiation, Transgression, Glorification*). These films make several changes—most notably, **Shirley Fenette survives**, and the Mao arc is largely removed.
+
+**Major Related Works:**
+*   **Code Geass: Akito the Exiled (OVA):** Set between R1 and R2. It follows a group of Japanese soldiers in the European front (E.U.) and features cameos from Lelouch (as Julius Kingsley) and Suzaku.
+*   **Code Geass: Lelouch of the Re;surrection (Movie):** A direct sequel to the **Movie Continuity**. It takes place one year after the Zero Requiem. C.C. succeeds in resurrecting Lelouch’s body and mind to face a new threat in the Kingdom of Zilkhstan.
+*   **Code Geass: Rozé of the Recapture (2024 Series):** Set five years after *Re;surrection*. It follows two mercenary brothers, Rozé and Ash, fighting the "Neo-Britannian Empire" in Hokkaido.
+
+---
+
+### 3. Manga vs. Anime: Key Differences
+The *Code Geass* manga are not the "source material" (as the anime is original), but rather adaptations that often diverge wildly.
+
+| Feature | Anime (Original) | Main Manga Adaptation |
+| :--- | :--- | :--- |
+| **Mecha** | Central to the plot (Knightmare Frames). | **No Knightmare Frames.** Battles are fought with conventional weapons or hand-to-hand. |
+| **Tone** | Political thriller, high-stakes drama. | More comedic, "shoujo-esque" art style, and shorter. |
+| **Shirley's Fate** | Dies in R2 (TV) / Lives in Movie Trilogy. | Lives (in the main manga adaptation). |
+
+**Other Notable Manga Adaptations:**
+*   **Nightmare of Nunnally:** An alternate universe where Nunnally is the protagonist. She makes a contract with a being named Nemo and pilots a specialized Knightmare.
+*   **Suzaku of the Counterattack:** Focuses on Suzaku’s perspective, where he wears a powered suit instead of piloting a mecha.
+*   **Renya of Darkness:** A prequel set in the Edo period, exploring the origins of Geass and C.C.'s past.
+
+---
+
+### 4. Current Events & Latest Updates (2024–2026)
+The franchise is currently in the middle of a "10-Year Plan" to expand the universe.
+
+*   **Rozé of the Recapture (Ongoing/Recent):** Released in 2024 as four theatrical "Acts" and a 12-episode streaming series (Disney+/Hulu). It concluded its first major run in late 2024.
+*   **New Anime: "Hoshi Oi no Aspar" (Aspal the Star Chaser):** Announced in December 2024 for the franchise's 20th anniversary (2026). It is described as a completely new work with new characters and mecha.
+*   **Gundam Crossover:** A special crossover manga between *Code Geass: Lelouch of the Rebellion* and *Mobile Suit Gundam Wing* was recently announced for 2025/2026.
+*   **Multiple Sequels:** Producer Kojiro Taniguchi confirmed in late 2024 that multiple new projects are currently in production to celebrate the 20th anniversary in 2026, indicating *Rozé* was only the beginning of a new era for the series.

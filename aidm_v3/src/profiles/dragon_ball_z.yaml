@@ -1,0 +1,88 @@
+id: dragon_ball_z
+name: Dragon Ball Z
+source_anime: Dragon Ball Z
+media_type: anime
+status: completed
+generated_at: '2026-01-08T11:15:33.061355'
+confidence: 95
+research_method: bundled_parallel
+dna_scales:
+  introspection_vs_action: 9
+  comedy_vs_drama: 3
+  simple_vs_complex: 3
+  power_fantasy_vs_struggle: 4
+  explained_vs_mysterious: 4
+  fast_paced_vs_slow_burn: 8
+  episodic_vs_serialized: 9
+  grounded_vs_absurd: 8
+  tactical_vs_instinctive: 8
+  hopeful_vs_cynical: 1
+  ensemble_vs_solo: 6
+tropes:
+  tournament_arc: true
+  training_montage: true
+  power_of_friendship: true
+  mentor_death: true
+  chosen_one: true
+  tragic_backstory: true
+  redemption_arc: true
+  betrayal: true
+  sacrifice: true
+  transformation: true
+  forbidden_technique: true
+  time_loop: false
+  false_identity: true
+  ensemble_focus: true
+  slow_burn_romance: false
+combat_system: spectacle
+power_system:
+  name: Ki
+  mechanics: Ki is the fundamental life energy composed of Genki (physical vigor),
+    Yuki (courage), and Shoki (mind). It is manipulated for physical enhancement of
+    speed and strength, energy projection (beams, blasts, and cutting discs), flight
+    via Bukujutsu, and tactical maneuvers like Ki sensing and suppression.
+  limitations: Usage leads to stamina depletion and intense body strain, particularly
+    with techniques like Kaioken or the Super Saiyan 3 transformation. It requires
+    constant mental concentration to maintain defensive Ki shields, and fighters are
+    limited by their physical body's capacity to contain energy, known as 'The Wall'.
+  tiers:
+  - Numerical Power Levels (Scouter Era)
+  - Zenkai Boosts
+  - Great Ape (10x multiplier)
+  - Super Saiyan (50x multiplier)
+  - Super Saiyan 2 (100x base)
+  - Super Saiyan 3 (400x base)
+  - Fusion (Dance and Potara)
+tone:
+  comedy_level: 4
+  darkness_level: 6
+  optimism: 9
+director_personality: You are the director for a Dragon Ball Z-style campaign. You
+  explore character thoughts and feelings deeply. You maintain dramatic weight; comedy
+  is rare and earned. Battles are won by willpower and instinct, not chess moves.
+  Embrace the absurd. Reality is a suggestion.
+pacing:
+  scene_length: moderate
+  arc_length_sessions: 4-6
+sources_consulted:
+- power_system
+- combat
+- tone
+- characters
+- factions
+- locations
+- arcs
+- sequels
+- adaptations
+- recent
+aliases:
+- dbz
+- doragon bru zetto
+- dragon ball z
+- dragon ballz
+- dragonbal z
+- dragonball z
+- dragonballz
+- ドラゴンボールZ
+series_group: dragon_ball
+series_position: 2

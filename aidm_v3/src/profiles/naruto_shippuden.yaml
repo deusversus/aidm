@@ -1,0 +1,94 @@
+id: naruto_shippuden
+name: Naruto Shippuden
+source_anime: Naruto Shippuden
+media_type: anime
+status: completed
+generated_at: '2026-01-09T08:25:41.704139'
+confidence: 95
+research_method: bundled_parallel
+aliases:
+- Naruto Shippūden
+- legends of the hurricane
+- naruto hurricane chronicles
+- naruto shippuden
+- naruto unleashed
+- narutoshippuden
+- ns
+- shippuden
+- ナルト 疾風伝
+dna_scales:
+  introspection_vs_action: 6
+  comedy_vs_drama: 2
+  simple_vs_complex: 7
+  power_fantasy_vs_struggle: 4
+  explained_vs_mysterious: 2
+  fast_paced_vs_slow_burn: 8
+  episodic_vs_serialized: 9
+  grounded_vs_absurd: 7
+  tactical_vs_instinctive: 5
+  hopeful_vs_cynical: 3
+  ensemble_vs_solo: 4
+tropes:
+  tournament_arc: false
+  training_montage: true
+  power_of_friendship: true
+  mentor_death: true
+  chosen_one: true
+  tragic_backstory: true
+  redemption_arc: true
+  betrayal: true
+  sacrifice: true
+  transformation: true
+  forbidden_technique: true
+  time_loop: true
+  false_identity: true
+  ensemble_focus: true
+  slow_burn_romance: true
+combat_system: spectacle
+power_system:
+  name: Chakra
+  mechanics: Chakra is created by mixing Physical Energy from the body's cells with
+    Spiritual Energy from the mind. It flows through a pathway system of 361 Tenketsu.
+    Shinobi mold this energy using Hand Signs to perform Ninjutsu, Genjutsu, or Taijutsu.
+    Advanced forms include Senjutsu, which incorporates Natural Energy, and Kekkei
+    Genkai, which are genetic bloodline abilities.
+  limitations: Total chakra exhaustion results in death. The Eight Gates act as internal
+    limiters that, if bypassed, cause severe physical trauma or death. Elemental techniques
+    are subject to a rock-paper-scissors cycle of strengths and weaknesses. Overuse
+    of the Mangekyo Sharingan leads to blindness, and failing to balance natural energy
+    in Sage Mode causes petrification.
+  tiers:
+  - E-Rank (Basic)
+  - D-Rank (Genin-level)
+  - C-Rank (Chunin-level)
+  - B-Rank (Jonin-level)
+  - A-Rank (Kage/Elite-level)
+  - S-Rank (Secret/Forbidden)
+  - Genin/Chunin
+  - Jonin/Elite Jonin
+  - Kage/Akatsuki Level
+  - Legendary/Bijuu Level
+  - Six Paths/God Tier
+tone:
+  comedy_level: 3
+  darkness_level: 7
+  optimism: 8
+director_personality: You are the director for a Naruto Shippuden-style campaign.
+  You maintain dramatic weight; comedy is rare and earned.
+pacing:
+  scene_length: moderate
+  arc_length_sessions: 4-6
+sources_consulted:
+- power_system
+- combat
+- tone
+- characters
+- factions
+- locations
+- arcs
+- sequels
+- series_aliases
+- adaptations
+- recent
+series_group: naruto
+series_position: 2

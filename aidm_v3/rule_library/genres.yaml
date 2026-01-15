@@ -1,0 +1,224 @@
+# Rule Library - Genre Tropes
+# Summaries for RAG retrieval, with pointers to full genre files
+# Full content in: rule_library/genres/*.md
+
+---
+# Shonen Genre
+- id: "genre_shonen"
+  category: "genre"
+  source_module: "module_13"
+  tags: ["genre", "shonen", "action", "training", "tournament", "rivalry"]
+  retrieve_conditions: ["campaign_type contains 'action'", "genre == 'shonen'"]
+  content: |
+    SHONEN (Battle Action): Action-focused, determination/growth/friendship, overcoming impossible odds.
+    
+    Core Elements:
+    - PROTAGONIST TYPES: Underdog (Deku, Asta), Prodigy (Gon, Luffy), Chosen One (Naruto), Hot-Blooded (Goku)
+    - TRAINING ARCS: Time-skip, Environmental, Mentor-Student, Survival
+    - TOURNAMENT ARCS: Single-elimination, Battle Royale, Tag Team, Promotion Exam
+    - POWER OF FRIENDSHIP: Emotional power-ups, Combo techniques, Trust/cover weaknesses
+    - RIVALS: The Equal (Vegeta, Sasuke), The Superior (Mihawk), Dark Mirror (Gaara)
+    - MENTOR SACRIFICE: Heroic death, Defeated by villain, Natural departure
+    
+    Combat Patterns:
+    - Declaring attack names (RASENGAN!)
+    - "Get back up" moments (Second Wind: restore 50% HP, permanent scar)
+    - Beam clashes (contested rolls, best of 3)
+    
+    Arc Templates: Rescue Mission, Invasion Defense, Hunt the Threat, Gauntlet, Exam Multi-Phase
+    
+    Examples: Naruto, Dragon Ball, One Piece, MHA, Demon Slayer
+    Full Reference: rule_library/genres/shonen_tropes.md
+
+---
+# Mystery/Thriller Genre
+- id: "genre_mystery_thriller"
+  category: "genre"
+  source_module: "module_13"
+  tags: ["genre", "mystery", "thriller", "detective", "investigation", "psychological"]
+  retrieve_conditions: ["campaign_type contains 'detective'", "genre == 'mystery'"]
+  content: |
+    MYSTERY/THRILLER: Investigation, deduction, psychological manipulation, revealing truth.
+    
+    Core Principles:
+    - CLUES MUST BE FAIR: Players can solve with available info (no ass-pulls)
+    - DEDUCTION > ACTION: Brains over brawn
+    - EVERY DETAIL MATTERS: Attention rewards players
+    - TRUST NO ONE: Suspects lie, witnesses unreliable
+    
+    Detective Archetypes:
+    - Genius Detective (L, Conan): Pattern recognition, high INT
+    - Intuitive Investigator (Satoru, Oreki): Empathy, high WIS
+    - Obsessive Pursuer (Lunge, Tenma): Never gives up, advantage on tracking
+    
+    Mystery Structures:
+    - WHODUNIT: Gather suspects, red herrings, critical clue, accusation
+    - HOWDUNIT: Impossible crime, theories, discover trick, reconstruct
+    - WHYDUNIT: Complex victim, multiple motives, psychological profiles
+    
+    Plot Twist Frameworks:
+    - Unreliable Narrator (Perfect Blue)
+    - Innocent Framed (Death Note)
+    - Victim is Villain (Monster)
+    - Double Bluff (Death Note)
+    
+    KNOX'S COMMANDMENTS: Culprit introduced early, no supernatural deus ex, clues available
+    
+    Examples: Death Note, Detective Conan, Monster, Erased, Psycho-Pass
+    Full Reference: rule_library/genres/mystery_thriller_tropes.md
+
+---
+# Seinen Genre
+- id: "genre_seinen"
+  category: "genre"
+  source_module: "module_13"
+  tags: ["genre", "seinen", "mature", "dark", "consequences", "moral_ambiguity"]
+  retrieve_conditions: ["tone == 'dark'", "genre == 'seinen'"]
+  content: |
+    SEINEN (Mature): Complex themes, moral ambiguity, realistic consequences, psychological depth.
+    
+    Core Elements:
+    - ACTIONS HAVE CONSEQUENCES: No reset button, trauma persists
+    - GREY MORALITY: Heroes flawed, villains sympathetic, no clear good/evil
+    - VIOLENCE MEANINGFUL: Not spectacle, shows cost and horror
+    - PSYCHOLOGICAL DEPTH: Internal struggles, PTSD, moral dilemmas
+    
+    Themes:
+    - War and its costs (AoT, Vinland Saga)
+    - Power and corruption (Monster, Death Note)
+    - Identity and purpose (Ghost in the Shell, Psycho-Pass)
+    - Trauma and recovery (Re:Zero, Berserk)
+    
+    Narrative Techniques:
+    - Pyrrhic victories (win but at terrible cost)
+    - Character deaths (permanent, meaningful)
+    - Time skips with consequences
+    - Unreliable protagonists
+    
+    Examples: Attack on Titan, Vinland Saga, Monster, Berserk, Psycho-Pass
+    Full Reference: rule_library/genres/seinen_tropes.md
+
+---
+# Isekai Genre
+- id: "genre_isekai"
+  category: "genre"
+  source_module: "module_13"
+  tags: ["genre", "isekai", "transported", "reincarnation", "power_fantasy", "game_mechanics"]
+  retrieve_conditions: ["campaign_type contains 'isekai'", "genre == 'isekai'"]
+  content: |
+    ISEKAI (Transported/Reincarnated): Other-world adventure, often with game mechanics.
+    
+    Core Elements:
+    - CHEAT ABILITIES: Unique skill from being otherworlder
+    - STATUS SCREENS: Game-like UI (HP, MP, skills, levels)
+    - CULTURE SHOCK: Earth knowledge as advantage
+    - POWER PROGRESSION: Often accelerated growth curves
+    
+    Isekai Types:
+    - POWER FANTASY (Overlord, Slime): Start OP, build empire
+    - SURVIVAL (Re:Zero, Shield Hero): Start weak, suffer, grow
+    - COMEDY (Konosuba): Parody tropes, dysfunctional party
+    - GAME WORLD (SAO, Log Horizon): Trapped in game rules
+    
+    Common Tropes:
+    - Guild registration scene
+    - Slave liberation/harem building
+    - Inventing modern tech (mayo, weapons)
+    - Underestimated at adventurer's guild
+    - Merchant/trade arcs
+    
+    Examples: Overlord, Re:Zero, Slime, Konosuba, Shield Hero, SAO
+    Full Reference: rule_library/genres/isekai_tropes.md
+
+---
+# Comedy Genre
+- id: "genre_comedy"
+  category: "genre"
+  source_module: "module_13"
+  tags: ["genre", "comedy", "humor", "gag", "parody"]
+  retrieve_conditions: ["tone == 'comedy'", "genre == 'comedy'"]
+  content: |
+    COMEDY: Humor-focused, rule of funny, tension undercut, failures celebrated.
+    
+    Core Elements:
+    - STAKES FEEL LOW: Even danger is comedy
+    - FAILURES ARE CONTENT: Messing up more entertaining than success
+    - UNDERCUT TENSION: Every serious moment gets deflated
+    - CHARACTER FLAWS: Comedy from personality clashes
+    
+    Comedy Types:
+    - GAG COMEDY (Gintama): Rapid jokes, breaking fourth wall
+    - PARODY (Konosuba, OPM): Deconstruct genre tropes
+    - SITUATIONAL (Kaguya-sama): Misunderstandings, social comedy
+    - SLAPSTICK (KonoSuba): Physical comedy, exaggerated reactions
+    
+    Techniques:
+    - Running gags (recurring jokes)
+    - Tsukkomi/boke dynamic (straight man/funny man)
+    - Reaction faces (exaggerated expressions)
+    - Anachronism (modern references in fantasy)
+    
+    Examples: Konosuba, Gintama, Saiki K, Kaguya-sama, Daily Lives of High School Boys
+    Full Reference: rule_library/genres/comedy_tropes.md
+
+---
+# Horror Genre
+- id: "genre_horror"
+  category: "genre"
+  source_module: "module_13"
+  tags: ["genre", "horror", "survival", "atmosphere", "dread", "unknown"]
+  retrieve_conditions: ["tone == 'horror'", "genre == 'horror'"]
+  content: |
+    HORROR: Fear, dread, the unknown, survival against overwhelming threats.
+    
+    Core Elements:
+    - ATMOSPHERE OVER ACTION: Building dread more important than fights
+    - UNKNOWN IS TERRIFYING: Less information = more scary
+    - VULNERABILITY: PCs should feel weak, resources scarce
+    - CONSEQUENCES PERMANENT: Death, madness, corruption
+    
+    Horror Types:
+    - SURVIVAL HORROR (Higurashi, Another): Can you survive until morning?
+    - PSYCHOLOGICAL (Perfect Blue, Paranoia Agent): Is it real? Are you sane?
+    - BODY HORROR (Parasyte): Transformation, loss of humanity
+    - COSMIC (Madoka Magica): Incomprehensible forces, insignificance
+    
+    Techniques:
+    - Information starvation (players don't know rules)
+    - Safe space violation (nowhere is truly safe)
+    - Creeping dread (slow escalation)
+    - Survival resource management
+    
+    Examples: Higurashi, Another, Parasyte, Perfect Blue, Made in Abyss
+    Full Reference: rule_library/genres/horror_tropes.md
+
+---
+# Slice of Life Genre
+- id: "genre_slice_of_life"
+  category: "genre"
+  source_module: "module_13"
+  tags: ["genre", "slice_of_life", "low_stakes", "character", "daily_life", "cozy"]
+  retrieve_conditions: ["tone == 'relaxed'", "genre == 'slice_of_life'"]
+  content: |
+    SLICE OF LIFE: Low stakes, character moments, daily routines, cozy atmosphere.
+    
+    Core Elements:
+    - STAKES ARE SMALL: Personal, relatable problems
+    - ATMOSPHERE MATTERS: Seasonal vibes, comfortable settings
+    - CHARACTER >> PLOT: Personality and relationships drive sessions
+    - NO VILLAIN NEEDED: Conflict from life, not antagonists
+    
+    Session Types:
+    - SEASONAL EVENTS: Festivals, beach episodes, holidays
+    - DAILY ROUTINES: School, work, hobbies
+    - RELATIONSHIPS: Friendships forming, romantic tension
+    - SMALL GOALS: Passing exam, making friends, perfecting recipe
+    
+    Techniques:
+    - Environmental focus (describe food, weather, sounds)
+    - Long conversations (let dialogue breathe)
+    - Found family dynamics
+    - Healing/iyashikei (comforting, healing)
+    
+    Examples: K-On!, Mushishi, Yuru Camp, Aria, Barakamon
+    Full Reference: rule_library/genres/slice_of_life_tropes.md

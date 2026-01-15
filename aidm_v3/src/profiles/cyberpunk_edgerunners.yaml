@@ -1,0 +1,84 @@
+id: cyberpunk_edgerunners
+name: Cyberpunk Edgerunners
+source_anime: Cyberpunk Edgerunners
+media_type: anime
+status: completed
+generated_at: '2026-01-07T09:57:31.293329'
+confidence: 95
+research_method: bundled_parallel
+dna_scales:
+  introspection_vs_action: 8
+  comedy_vs_drama: 2
+  simple_vs_complex: 6
+  power_fantasy_vs_struggle: 7
+  explained_vs_mysterious: 3
+  fast_paced_vs_slow_burn: 2
+  episodic_vs_serialized: 9
+  grounded_vs_absurd: 7
+  tactical_vs_instinctive: 8
+  hopeful_vs_cynical: 9
+  ensemble_vs_solo: 4
+tropes:
+  tournament_arc: false
+  training_montage: true
+  power_of_friendship: false
+  mentor_death: true
+  chosen_one: false
+  tragic_backstory: true
+  redemption_arc: false
+  betrayal: true
+  sacrifice: true
+  transformation: true
+  forbidden_technique: true
+  time_loop: false
+  false_identity: false
+  ensemble_focus: true
+  slow_burn_romance: false
+combat_system: spectacle
+power_system:
+  name: Cyberware & Netrunning
+  mechanics: The system relies on Cyberware, which are physical hardware implants
+    like the Sandevistan for time dilation or Gorilla Arms for strength, and Netrunning,
+    which involves using Cyberdecks to upload quickhacks into an enemy's Neuroport.
+  limitations: Users face Cyberpsychosis, a loss of humanity and sanity from excessive
+    implants, requiring immunosuppressants that eventually become ineffective, alongside
+    physical strain like nosebleeds and organ failure.
+  tiers:
+  - Street Level
+  - Edgerunner
+  - Night City Legend
+  - Force of Nature
+tone:
+  comedy_level: 3
+  darkness_level: 9
+  optimism: 1
+director_personality: You are the director for a Cyberpunk Edgerunners-style campaign.
+  You explore character thoughts and feelings deeply. You maintain dramatic weight;
+  comedy is rare and earned. Battles are won by willpower and instinct, not chess
+  moves.
+pacing:
+  scene_length: moderate
+  arc_length_sessions: 4-6
+sources_consulted:
+- power_system
+- combat
+- tone
+- characters
+- factions
+- locations
+- arcs
+- sequels
+- adaptations
+- recent
+aliases:
+- cyberpunk edge runners
+- cyberpunk edgerunner
+- cyberpunk edgerunners
+- cyberpunkedgerunners
+- edgerunners
+- saibpanku edjirannzu
+- サイバーパンク エッジランナーズ
+series_group: cyberpunk_edgerunners
+series_position: 1
+related_franchise: cyberpunk_2077
+relation_type: spinoff

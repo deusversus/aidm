@@ -1,0 +1,86 @@
+id: fateapocrypha
+name: Fate/Apocrypha
+source_anime: Fate/Apocrypha
+media_type: anime
+status: completed
+generated_at: '2026-01-10T16:44:46.863030'
+confidence: 95
+research_method: bundled_parallel
+aliases:
+- apo
+- fateapo
+- fateapocrypha
+- feitoapokurifa
+- フェイト/アポクリファ
+dna_scales:
+  introspection_vs_action: 8
+  comedy_vs_drama: 3
+  simple_vs_complex: 6
+  power_fantasy_vs_struggle: 4
+  explained_vs_mysterious: 3
+  fast_paced_vs_slow_burn: 3
+  episodic_vs_serialized: 10
+  grounded_vs_absurd: 7
+  tactical_vs_instinctive: 6
+  hopeful_vs_cynical: 3
+  ensemble_vs_solo: 2
+tropes:
+  tournament_arc: true
+  training_montage: false
+  power_of_friendship: true
+  mentor_death: true
+  chosen_one: true
+  tragic_backstory: true
+  redemption_arc: true
+  betrayal: true
+  sacrifice: true
+  transformation: true
+  forbidden_technique: true
+  time_loop: false
+  false_identity: true
+  ensemble_focus: true
+  slow_burn_romance: true
+combat_system: spectacle
+power_system:
+  name: Magic Circuits and Heroic Spirit Summoning (Great Holy Grail War)
+  mechanics: The system utilizes Heroic Spirits summoned as Servants across seven
+    classes, defined by parameters ranging from E to A (plus EX) and specialized Noble
+    Phantasms (Anti-Unit, Anti-Army, Anti-Fortress, Barrier). Mana is supplied through
+    Magic Circuits, often supplemented by homunculi batteries or the Greater Grail.
+    Power is further influenced by Class Skills, Personal Skills, and a Fame Bonus
+    based on the geographical location of the hero's legend.
+  limitations: Servants require constant mana supply to manifest and use Noble Phantasms;
+    exhaustion of mana leads to dissipation. The Ruler class can enforce rules using
+    God's Resolution Command Spells. Specific abilities like the Dead Count Shapeshifter
+    are restricted by strict time limits (3 minutes) and a finite number of uses (3
+    times).
+  tiers:
+  - 'Top Tier (World-Class: Karna, Achilles)'
+  - 'High Tier (Regional/Elite: Siegfried, Vlad III, Chiron, Mordred)'
+  - Special/Niche Tier (Avicebron, Jack the Ripper)
+tone:
+  comedy_level: 3
+  darkness_level: 7
+  optimism: 7
+director_personality: You are the director for a Fate/Apocrypha-style campaign. You
+  explore character thoughts and feelings deeply. You maintain dramatic weight; comedy
+  is rare and earned.
+pacing:
+  scene_length: moderate
+  arc_length_sessions: 4-6
+sources_consulted:
+- power_system
+- combat
+- tone
+- characters
+- factions
+- locations
+- arcs
+- sequels
+- adaptations
+- recent
+- series_aliases
+series_group: fate_apocrypha
+series_position: 1
+related_franchise: fate
+relation_type: alternate_timeline

@@ -1,0 +1,302 @@
+## Characters
+*Fate/Apocrypha* is set in a parallel world where the Greater Grail was stolen during the Third Holy Grail War, leading to a "Great Holy Grail War" between two factions: the **Black Faction** (Yggdmillennia clan) and the **Red Faction** (Mage's Association).
+
+### **The Protagonist: Sieg**
+Sieg is a homunculus created by the Yggdmillennia clan as a disposable mana battery. He defies his fate, eventually becoming the central figure of the story.
+
+*   **Role:** He begins as a "blank slate" seeking the meaning of life. After being saved by the sacrifice of Siegfried and the kindness of Astolfo, he joins the war to save his fellow homunculi and stop the antagonist's plan.
+*   **Abilities:**
+    *   **Dead Count Shapeshifter:** By using special Command Spells, he can temporarily transform into the Heroic Spirit **Siegfried**, gaining his strength and the Noble Phantasm *Balmung*.
+    *   **Blasted Tree:** After being revived by Frankenstein’s lightning, he gains the ability to discharge powerful electrical attacks.
+    *   **Dragon Transformation:** In the finale, he transforms into the dragon **Fafnir** to carry the Grail to the "Reverse Side of the World."
+*   **Relationships:**
+    *   **Astolfo (Rider of Black):** His first friend and most loyal ally.
+    *   **Jeanne d’Arc:** His mentor and romantic interest; she guides his moral development.
+    *   **Siegfried:** His "father figure" who gave his heart to Sieg so he could live.
+
+### **The Antagonist: Shirou Kotomine (Amakusa Shirou Tokisada)**
+The primary antagonist is not a traditional villain but a "saint" with a radical vision for humanity.
+
+*   **Role:** A Ruler-class Servant from the Third Holy Grail War who survived and spent 60 years preparing to hijack the Great Holy Grail War. His goal is to use the **Third Magic** to grant all of humanity "Salvation" by making them immortal, spiritual beings, thereby ending all suffering and conflict.
+*   **Abilities:**
+    *   **Twin Arms (Xanadu Matrix & Wickedness Predation):** His Noble Phantasms are his arms, which allow him to use any form of magecraft and grant him eternal youth and precognition.
+    *   **Baptism Sacrament:** A Church ritual used to "purify" spiritual entities (Servants).
+*   **Relationships:**
+    *   **Semiramis (Assassin of Red):** His most loyal partner and co-conspirator.
+    *   **Jeanne d’Arc:** His ideological rival. While both are "saints," Jeanne believes humanity must grow through struggle, whereas Shirou believes struggle must be eliminated.
+
+### **Key Supporting Characters**
+
+#### **Jeanne d’Arc (Ruler)**
+*   **Role:** Summoned by the Grail itself to act as an impartial mediator. She eventually breaks her neutrality to side with Sieg against Shirou’s plan.
+*   **Abilities:** *Luminosité Eternelle* (a flag that provides absolute defense) and *La Pucelle* (a suicide attack that manifests the flames of her execution).
+
+#### **The Black Faction (Yggdmillennia)**
+*   **Darnic Prestone Yggdmillennia:** The ruthless leader who stole the Grail.
+*   **Vlad III (Lancer of Black):** The "Lord" of the faction; he fights to reclaim his honor but is eventually forcibly turned into a vampire (Dracula) by Darnic.
+*   **Chiron (Archer of Black):** A wise mentor to the faction and former teacher of Achilles.
+*   **Astolfo (Rider of Black):** A whimsical, fiercely loyal knight who serves as Sieg's primary protector.
+
+#### **The Red Faction (Mage's Association)**
+*   **Kairi Shishigou:** A pragmatic necromancer who acts as a "third party" protagonist alongside his Servant.
+*   **Mordred (Saber of Red):** The rebellious "son" of King Arthur. She and Shishigou have one of the most balanced and healthy Master-Servant relationships in the series.
+*   **Karna (Lancer of Red):** An incredibly powerful, honorable warrior who serves as the ultimate rival to Sieg/Siegfried.
+*   **Achilles (Rider of Red):** A legendary hero whose speed and invulnerability make him nearly unstoppable until he faces his teacher, Chiron.
+
+### **Summary of Dynamics**
+| Feature | Protagonist Side (Sieg/Jeanne) | Antagonist Side (Shirou/Semiramis) |
+| :--- | :--- | :--- |
+| **Goal** | To protect human free will and the right to struggle/grow. | To force universal salvation and immortality on humanity. |
+| **Philosophy** | "Humanity is beautiful because it is flawed." | "Humanity must be saved from its own nature." |
+| **Key Servant** | Astolfo (Rider of Black) | Karna (Lancer of Red) |
+
+## Locations
+The setting of *Fate/Apocrypha* is a departure from the traditional Fuyuki City setting of the main *Fate/stay night* series. It takes place in a parallel world where the Greater Grail was stolen during the Third Holy Grail War, leading to a "Great Holy Grail War" in **Romania**.
+
+### **1. Primary Setting: Trifas, Romania**
+Trifas is the central hub of the series. It is a fictional city located on the outskirts of the **Transylvania** region. 
+*   **Geography:** The city is situated on a powerful leyline, which provides the massive amounts of magical energy required to summon 14 Servants simultaneously.
+*   **Real-Life Inspiration:** The architecture and atmosphere of Trifas are heavily inspired by the real-world city of **Sighisoara, Romania**, known for its well-preserved medieval citadel.
+*   **Political Status:** By the start of the series, the Yggdmillennia clan has effectively seized control of the city, turning it into their personal territory and a "Holy Land" for their faction.
+
+### **2. The Fortress of Millennia (Black Faction Base)**
+The **Fortress of Millennia** (also known as the Fortress of Yggdmillennia) is the headquarters for the Black Faction.
+*   **Scale:** It is a gargantuan medieval-style castle that occupies nearly half the area of Trifas.
+*   **Defense Systems:** The fortress is protected by thousands of **Homunculi** (who serve as both soldiers and mana batteries) and **Golems** created by Avicebron (Caster of Black). It is reinforced with layers of powerful bounded fields and mystic codes.
+*   **Key Areas:**
+    *   **Throne Room:** Where the clan leader, Darnic Prestone Yggdmillennia, and Vlad III (Lancer of Black) hold court.
+    *   **Homunculus Production Labs:** Underground facilities where the clan mass-produces homunculi.
+    *   **The Greater Grail Chamber:** Initially, the stolen Greater Grail is hidden deep within the fortress's basement.
+
+### **3. The Hanging Gardens of Babylon (Red Faction Base)**
+The **Hanging Gardens of Babylon** is the primary base for the Red Faction. It is not a stationary location but a **Massive Aerial Fortress** and the Noble Phantasm of Semiramis (Assassin of Red).
+*   **Manifestation:** It is a "Vanity" Noble Phantasm, meaning it does not exist naturally. It must be physically constructed using specific materials (soil, stone, and water) from the ruins of **Baghdad, Iraq**, and then manifested through a three-day ritual.
+*   **Features:**
+    *   **Flight:** It hovers high above Romania, allowing the Red Faction to launch aerial assaults on Trifas.
+    *   **Territory Advantage:** While inside the Gardens, all of Semiramis's stats are significantly boosted, and she can use powerful Caster-like magecraft.
+    *   **Central Tower:** Later in the series, the Red Faction successfully steals the Greater Grail from the Fortress of Millennia and installs it in the central tower of the Gardens.
+
+### **4. The Reverse Side of the World**
+This is a conceptual and metaphysical location in the *Fate* universe that plays a crucial role in the ending of *Apocrypha*.
+*   **Nature:** It is a dimension where the "Age of Gods" still exists. It is inhabited by Phantasmal Species (dragons, griffins, etc.) that fled the human world as mystery declined.
+*   **Significance:** At the end of the series, **Sieg** (transformed into the dragon Fafnir) carries the Greater Grail to the Reverse Side of the World. He does this to prevent the Grail from fulfilling Amakusa Shirou Tokisada’s wish for the "Salvation of Humanity," which would have stripped humans of their physical forms. By taking it here, the Grail is isolated from humanity forever.
+
+### **5. Secondary & Historical Locations**
+*   **Fuyuki City, Japan:** The original site of the Holy Grail Wars. In the *Apocrypha* timeline, the Greater Grail was stolen from the caverns beneath **Mount Enzou** (Ryuudou Temple) by Nazi forces and Darnic during the 1940s.
+*   **The Clock Tower (London):** The headquarters of the Mage's Association. Several Red Faction Masters are high-ranking members of the Clock Tower, and the series begins with their meeting to discuss the Yggdmillennia secession.
+*   **Sighisoara Safe House:** A smaller church/safe house in Romania used by **Ruler (Jeanne d'Arc)** and the freelance Master **Kairi Sisigou** (Master of Mordred) as they operate independently from the two main factions.
+
+## Combat
+Combat in *Fate/Apocrypha* is defined by its unique **Great Holy Grail War** format, which shifts the traditional seven-servant battle royale into a massive **7 vs. 7 team deathmatch** between the Red and Black factions. This scale allows for larger tactical maneuvers, faction-wide logistics, and high-octane spectacles that differ significantly from other *Fate* entries.
+
+### 1. Combat Structure: The Great Holy Grail War
+The war is split between the **Mage's Association (Red Faction)** and the **Yggdmillennia Clan (Black Faction)**.
+*   **Faction Tactics:** Unlike the individualistic combat of *Fate/Zero*, factions in *Apocrypha* utilize specialized roles. The Black Faction uses **Golems** (Caster of Black) and **Homunculi** as a vanguard and "living batteries" to provide near-infinite mana, allowing their Servants to spam Noble Phantasms without exhausting their Masters.
+*   **The Ruler Class:** Jeanne d’Arc is summoned as a mediator. Her combat style is defensive and authoritative, utilizing her flag, *Luminosité Eternelle*, for absolute protection. Tactically, she possesses **God’s Resolution**, granting her two Command Spells for every Servant in the war, allowing her to force compliance or stop battles.
+
+### 2. Tactical Fighting Styles
+The series highlights diverse tactical approaches based on the Servants' legends:
+*   **Chiron (Archer of Black):** A master of "Tactical Archery" and Pankration (ancient Greek MMA). He focuses on predicting enemy movements and exploiting weaknesses rather than raw power. His battle with Achilles is a highlight of tactical hand-to-hand combat.
+*   **Vlad III (Lancer of Black):** He gains a massive "fame boost" in Romania, allowing him to manifest thousands of stakes (*Kazikli Bay*) from the ground. His strategy is territorial control, turning the entire battlefield into a death trap.
+*   **Semiramis (Assassin of Red):** She operates from the *Hanging Gardens of Babylon*, a massive flying fortress. Her combat is tactical and indirect, using poison (*Sikera Usum*) and long-range magical bombardment.
+*   **Amakusa Shirou (Ruler of Red):** A master tactician who counters Jeanne by using his own hoard of Command Spells. He tactically "pre-loaded" the Red Servants with Command Spells to resist Jeanne’s authority, effectively neutralizing her role as a mediator.
+
+### 3. Emotional Weight & Sacrifices
+Combat in *Apocrypha* is often the medium for expressing clashing ideologies:
+*   **Self-Sacrifice:** The series begins with the emotional sacrifice of **Siegfried**, who gives his heart to the homunculus Sieg. This "heroic suicide" sets a theme of selflessness that contrasts with the cold pragmatism of the mages.
+*   **Ideological Clashes:** The final battle between **Sieg/Jeanne and Amakusa Shirou** is a physical manifestation of their views on humanity's salvation. Amakusa seeks to "save" humanity by removing free will and suffering, while Sieg fights for the right of humans (and homunculi) to struggle and find their own meaning.
+*   **Tragic Ends:** The death of **Frankenstein (Berserker of Black)** is a pivotal emotional moment; her suicide attack (*Blasted Tree*) is a desperate attempt to find connection, which later grants Sieg the power of "Galvanism" to fight on her behalf.
+
+### 4. Flashy Spectacle & Animation
+*Fate/Apocrypha* is famous for its "Sakuga" (high-quality animation) highlights, particularly in the second half of the series.
+*   **Episode 22 (Karna vs. Sieg):** This is widely considered one of the most spectacular battles in the *Fate* franchise. Directed by Hakuyu Go, it utilized a "webgen" style that prioritized fluid, explosive motion and massive scale over consistent character models. The terrain is constantly obliterated as Karna unleashes his sun-god powers against Sieg’s dragon-slayer strikes.
+*   **Noble Phantasm Spectacle:** The series leans into "flashy" finishes. **Karna’s *Vasavi Shakti*** (a spear of pure light) and **Achilles’ *Akhilleus Kosmos*** (a shield that manifests a miniature world) are depicted as world-shaking events, moving away from the "surgical strike" nature of Noble Phantasms in other series toward "nuclear-scale" devastation.
+
+### Summary of Key Battles
+| Battle | Style | Significance |
+| :--- | :--- | :--- |
+| **Achilles vs. Chiron** | Tactical / Emotional | A mentor-student duel focusing on martial arts and mutual respect. |
+| **Karna vs. Sieg** | Flashy Spectacle | The peak of the series' animation; a clash of "God-tier" powers. |
+| **Mordred vs. Semiramis** | Tactical / Spectacle | A siege battle involving a flying fortress and a "mutually fatal" conclusion. |
+| **Vlad III vs. Red Faction** | Territorial | Demonstrates the power of "Fame" in a Servant's home territory. |
+
+## Power System
+The power system in *Fate/Apocrypha* is an expansion of the classic *Fate/stay night* mechanics, adapted for a large-scale "Great Holy Grail War." It features 14 Servants split into two factions (Red and Black), plus a 15th "Ruler" class Servant to oversee the conflict.
+
+### 1. Core Mechanics & Power Scaling
+The system uses a standardized ranking system to measure the capabilities of Heroic Spirits (Servants).
+
+*   **Parameters (Stats):** Measured on a scale from **E to A**, with **EX** representing an unmeasurable or "off the charts" value.
+    *   **Numerical Values:** E = 10, D = 20, C = 30, B = 40, A = 50.
+    *   **Modifiers (+ and -):** A "+" indicates a temporary doubling of the value (e.g., B+ can momentarily reach 80, surpassing a base A-rank of 50). A "-" indicates an unstable or conditional rank.
+*   **Mana Supply System:** 
+    *   **The Homunculi Batteries:** Unlike standard wars where Masters provide mana, the **Black Faction** uses homunculi as living batteries. This allows their Servants to use high-cost Noble Phantasms frequently without exhausting their Masters.
+    *   **The Greater Grail:** The **Red Faction** (under Amakusa Shirou) eventually bypasses traditional Master-Servant contracts to draw mana directly from the Greater Grail itself.
+
+### 2. Abilities & Skills
+*   **Noble Phantasms (NP):** The "ultimate trump card" of a Heroic Spirit, classified by their area of effect:
+    *   **Anti-Unit:** Focused on a single target (e.g., Siegfried’s *Balmung* in close combat).
+    *   **Anti-Army:** Designed to wipe out large groups (e.g., Mordred’s *Clarent Blood Arthur*).
+    *   **Anti-Fortress:** Capable of destroying massive structures (e.g., Karna’s *Vasavi Shakti*).
+    *   **Barrier:** Defensive in nature (e.g., Jeanne d’Arc’s *Luminosité Eternelle*).
+*   **Class & Personal Skills:** 
+    *   **Class Skills:** Automatic abilities based on the Servant's class (e.g., Sabers have *Magic Resistance*, Archers have *Independent Action*).
+    *   **Personal Skills:** Unique abilities from the hero's legend (e.g., Vlad III’s *Protection of the Faith* or Chiron’s *Wisdom of Divine Gift*).
+
+### 3. Rules & Limitations
+*   **The Great Holy Grail War Rule:** Once one faction is completely defeated, the remaining seven Servants of the winning faction must transition into a traditional "Battle Royale" until only one pair remains.
+*   **Ruler’s Authority:** As the mediator, the Ruler (Jeanne d'Arc) possesses unique Class Skills:
+    *   **God’s Resolution:** Grants her **two Command Spells for every Servant** in the war (28 total), allowing her to force obedience or punish rule-breakers.
+    *   **True Name Discernment:** Automatically reveals the identity and stats of any Servant she encounters (unless hidden by specific Noble Phantasms like Mordred’s helmet).
+*   **Fame Bonus:** A Servant’s power increases when fighting in the region where their legend is most famous. In *Apocrypha*, **Vlad III** is nearly invincible within Romania, gaining the ability to manifest thousands of stakes (*Kazikli Bey*) throughout the territory.
+
+### 4. Power Tiers (Lore-Based)
+While "tiers" are subjective, the series establishes a clear hierarchy based on the scale of their legends:
+*   **Top Tier (World-Class):** **Karna** (Lancer of Red) and **Achilles** (Rider of Red). These are "demigod" level spirits whose raw power and Noble Phantasms can warp the battlefield.
+*   **High Tier (Regional/Elite):** **Siegfried** (Saber of Black), **Vlad III** (with Romania bonus), **Chiron** (Archer of Black), and **Mordred** (Saber of Red).
+*   **Special/Niche Tier:** **Avicebron** (Caster of Black), whose power depends on his Golems, and **Jack the Ripper** (Assassin of Black), who excels in stealth and "Anti-Female" specialized kills.
+
+### 5. Progression: The Case of Sieg
+The protagonist, Sieg, demonstrates a unique progression system within the war:
+1.  **Homunculus:** Starts with high-quality Magic Circuits but a fragile body and a 3-year lifespan.
+2.  **Siegfried’s Heart:** After receiving Siegfried’s heart, he gains the **"Dead Count Shapeshifter"** ability. Using a Command Spell, he can transform into Siegfried for **3 minutes**, gaining all his parameters and Noble Phantasms. He is limited to three such transformations.
+3.  **Galvanism:** By absorbing Frankenstein’s (Berserker of Black) lightning, he gains the *Galvanism* skill, allowing him to convert ambient mana and attacks into his own energy, effectively becoming a perpetual motion machine.
+4.  **Dragon Transformation:** At the series' climax, he uses the Grail to permanently transform into the dragon **Fafnir**, allowing him to carry the Greater Grail to the "Reverse Side of the World."
+
+## Tone
+*Fate/Apocrypha* is a unique entry in the *Fate* franchise, often described as the "summer blockbuster" of the series. It shifts away from the intimate, psychological horror of *Fate/Zero* and the character-driven deconstruction of *Fate/stay night* toward a high-stakes, action-oriented spectacle.
+
+### **1. Tone and Mood**
+The tone of *Fate/Apocrypha* is a complex blend of **grim wartime drama** and **high-octane heroism**. 
+*   **Action-Centric:** Unlike other *Fate* entries that focus on the "mystery" of the Grail War, *Apocrypha* is a "Great Holy Grail War" involving two teams of seven Servants. This creates a mood of constant, chaotic warfare.
+*   **Melancholic yet Grand:** The atmosphere is often heavy with the "weight of history," as legendary figures clash over unresolved regrets. However, this is balanced by a sense of grandiosity and "pulp" excitement.
+*   **Less Cynical:** While it features betrayal and death, it is notably less cynical than *Fate/Zero*. It allows for moments of genuine connection and camaraderie between Masters and Servants (e.g., Mordred and Sisigou).
+
+### **2. Themes**
+The narrative explores philosophical questions through its massive cast:
+*   **The Value of Life:** Central to the protagonist Sieg (a homunculus with a short lifespan), the story asks what makes a life "well-spent" and whether an artificial being can possess a soul.
+*   **Hope vs. Forced Salvation:** The climax centers on a clash between two "saints." **Amakusa Shirou** represents a desperate, cynical view of humanity that requires forced salvation (Gnosticism), while **Jeanne d’Arc** represents the optimistic belief that humans must be allowed to find their own path, even if it involves suffering.
+*   **Legacy and Succession:** Many characters, such as Mordred and the Yggdmillennia clan, struggle with the burden of their parents' expectations and the desire to forge their own identity.
+
+### **3. Dark Comedy**
+While not a "comedy" by genre, *Fate/Apocrypha* utilizes **dark comedy** to puncture its serious moments:
+*   **William Shakespeare (Caster of Red):** He is the primary source of dark humor. He views the entire war as a play and treats the trauma of other characters as "plot points" for his next tragedy. His meta-commentary and theatrical cruelty provide a macabre levity.
+*   **Astolfo (Rider of Black):** Astolfo serves as a "pure" comedic relief, often ignoring the "rules" of the war or the gravity of a situation with a carefree, chaotic energy that frustrates more serious characters.
+
+### **4. Optimism**
+Despite the high body count, the series is fundamentally **optimistic**. 
+*   **Sieg’s Journey:** Sieg begins as a literal "blank slate" (Cardboard-kun) and slowly learns to love the world. His final decision is an act of ultimate self-sacrifice born from a love for humanity’s potential.
+*   **Humanity’s Beauty:** The narrative repeatedly highlights that even in a world of "original sin" and cruelty, the small acts of kindness and the "miracle of life" make the struggle worthwhile.
+
+### **5. Genre and Atmosphere**
+*   **Genre:** Action, Supernatural, Fantasy, Drama. It is frequently categorized as a **"Battle Shonen"** take on the *Fate* universe due to its focus on power-ups, large-scale battles, and the "power of friendship/bonds."
+*   **Visual Atmosphere:** The art style (by A-1 Pictures) is distinct for its "rougher" and more stylized look compared to Ufotable’s sleekness. This is most apparent in the famous **Episode 22**, where the animation becomes incredibly fluid and abstract to convey the sheer intensity of the final battles.
+*   **Soundscape:** The music by **Masaru Yokoyama** is essential to the atmosphere, blending orchestral majesty with modern, electronic "explosive" themes that heighten the sense of a modern-day epic.
+
+## Factions
+*Fate/Apocrypha* takes place in a parallel timeline where the Greater Grail was stolen from Fuyuki City during the Third Holy Grail War (1940s). This event prevents the Fourth and Fifth Holy Grail Wars (seen in *Fate/Zero* and *Fate/stay night*) and leads to a global proliferation of "Subcategory Holy Grail Wars."
+
+The story centers on the **Great Holy Grail War**, a massive conflict in Trifas, Romania, involving two teams of seven Servants each, rather than the traditional seven-way battle royale.
+
+### **1. Primary Factions**
+
+#### **The Black Faction (Yggdmillennia Clan)**
+The Yggdmillennia are a conglomerate of magi families who seceded from the Mage's Association. They are led by **Darnic Prestone Yggdmillennia**, a magus who survived for nearly a century by stealing the Greater Grail with the help of Nazi Germany during WWII.
+*   **Goal:** To establish their own independent organization and use the Grail to reach the "Root" (Akasha).
+*   **Base of Operations:** Castle Yggdmillennia in Trifas, Romania.
+*   **Servants:**
+    *   **Lancer of Black:** Vlad III (The "Lord" of the faction)
+    *   **Saber of Black:** Siegfried
+    *   **Archer of Black:** Chiron
+    *   **Rider of Black:** Astolfo
+    *   **Caster of Black:** Avicebron
+    *   **Berserker of Black:** Frankenstein's Monster
+    *   **Assassin of Black:** Jack the Ripper (Operates independently)
+
+#### **The Red Faction (Mage's Association / Clock Tower)**
+The Mage's Association is the governing body of the magical world, headquartered at the **Clock Tower** in London. After Yggdmillennia declared secession and slaughtered 49 of the 50 "hunters" sent to retrieve the Grail, the Association activated the Grail’s reserve system to summon their own team.
+*   **Goal:** To reclaim the Greater Grail and destroy the "traitorous" Yggdmillennia clan.
+*   **Servants:**
+    *   **Saber of Red:** Mordred (Operates independently with Master Kairi Sisigou)
+    *   **Lancer of Red:** Karna
+    *   **Archer of Red:** Atalanta
+    *   **Rider of Red:** Achilles
+    *   **Caster of Red:** William Shakespeare
+    *   **Berserker of Red:** Spartacus
+    *   **Assassin of Red:** Semiramis
+
+---
+
+### **2. Key Organizations & World Powers**
+
+*   **The Clock Tower (Mage's Association):** The highest institute of magecraft. In this timeline, its power is slightly diluted due to the many "Subcategory Holy Grail Wars" that have occurred globally, which led to a decrease in the total number of magi.
+*   **The Holy Church:** Traditionally the mediator of the Grail Wars. In *Apocrypha*, they send **Shirou Kotomine** (Amakusa Shirou Tokisada) to act as an overseer and Master for the Red Faction. However, the Church's role is compromised by Shirou's personal agenda.
+*   **The Third Reich (Nazi Germany):** Historical world power that initially helped Darnic steal the Grail from Fuyuki. Darnic eventually betrayed them, causing the Grail to "vanish" from history for 60 years.
+*   **The Three Founding Families:** The **Einzberns**, **Tohsakas**, and **Matous** (Makiri). In this timeline, their influence is broken. The Matous are practically extinct, and the Tohsakas pivoted to combining magecraft with Chinese martial arts.
+
+---
+
+### **3. Neutral Parties & Mediators**
+
+*   **The Ruler Class (Jeanne d'Arc):** A special Servant class summoned by the Grail itself to act as an impartial judge. She possesses "Command Spells" for every Servant in the war to maintain order.
+*   **Sieg:** A homunculus created by Yggdmillennia as a "mana battery." He gains sentience, escapes, and eventually becomes a central figure who forms a third, neutral party to stop the war from destroying the world.
+
+---
+
+### **4. Alliances & Shifting Loyalties**
+
+The conflict is not a simple Red vs. Black war. As the story progresses, the factions fracture:
+*   **The Independent Duo:** **Kairi Sisigou** and **Saber of Red (Mordred)** refuse to join the main Red Faction camp, distrusting Shirou Kotomine. They eventually ally with the remnants of the Black Faction.
+*   **The Mastermind's Coup:** **Amakusa Shirou Tokisada** (Master of Red) eventually seizes control of almost all Red Servants and the Greater Grail itself, revealing his goal to "save humanity" by materializing all souls.
+*   **The Final Alliance:** To stop Amakusa, the surviving members of the Black Faction (led by **Caules** and **Fiore**), **Sieg**, **Ruler**, and the **Sisigou/Mordred** duo form a desperate alliance to launch an assault on Amakusa's flying fortress, the **Hanging Gardens of Babylon**.
+
+### **5. Enemies**
+*   **Jack the Ripper (Assassin of Black):** A "wild card" that kills her original Master and preys on both magi and civilians in Trifas, forcing both factions to briefly consider her a common threat.
+*   **Amakusa Shirou Tokisada:** While technically the leader of the Red Faction, he becomes the primary antagonist for both sides due to his plan to use the Grail to fundamentally alter human existence.
+
+## Arcs, Sequels, Adaptations, Recent, Series Aliases
+*Fate/Apocrypha* (Japanese: フェイト/アポクリファ, *Feito/Apokurifa*) is a light novel series written by Yuichiro Higashide and illustrated by Ototsugu Konoe. It serves as an alternate timeline spinoff to the original *Fate/stay night* visual novel.
+
+### **1. Major Story Arcs & Plot Progression**
+The story is centered on the **Great Holy Grail War**, a massive conflict involving 14 Servants divided into two factions: the **Faction of Black** (Yggdmillennia clan) and the **Faction of Red** (Mage's Association).
+
+*   **Arc 1: The Great Holy Grail War (Vols 1–2):** 
+    The Yggdmillennia clan in Romania declares independence from the Mage's Association, revealing they possess the Greater Grail stolen during the 3rd Holy Grail War. The Association sends 50 magi, who are slaughtered, triggering the Grail's reserve system to summon a second team of seven Servants. The protagonist, **Sieg**, a homunculus destined for mana fuel, escapes with the help of Astolfo (Rider of Black) and the sacrifice of Siegfried (Saber of Black).
+*   **Arc 2: The Saint’s Triumph (Vol 3):** 
+    The factions clash at the Fortress of Millennia. The true antagonist is revealed to be **Amakusa Shirō Tokisada** (Ruler of the 3rd War), who has spent 60 years infiltrating the Church to seize the Grail. He subdues the Red Faction's Masters and takes control of their Servants.
+*   **Arc 3: The Cup of Heaven & The Dragon and the Saint (Vols 4–5):** 
+    The conflict shifts to the **Hanging Gardens of Babylon**, a flying fortress. Sieg, now a Master, leads the remaining Black Servants and Jeanne d’Arc (Ruler) to stop Shirō’s plan for the "Salvation of Humanity" (Third Magic). The war ends with Sieg transforming into the dragon **Fafnir** to carry the Grail to the "Reverse Side of the World" to prevent its activation.
+
+### **2. Timeline & Continuity**
+*   **Point of Divergence:** During the **Third Holy Grail War** (1930s), the Einzbern family summoned a **Ruler** (Amakusa Shirō) instead of an **Avenger** (Angra Mainyu). This prevented the Grail's corruption and allowed Darnic Prestone Yggdmillennia to steal the Greater Grail with Nazi assistance.
+*   **Setting:** The main story takes place in **2004** in Trifas, Romania—concurrent with the time the 5th Holy Grail War would have occurred in the *Fate/stay night* timeline.
+*   **Canon Status:** It is considered a "parallel world" canon. While it doesn't happen in the same universe as *Fate/Zero* or *FSN*, its events are referenced in the wider "Nasuverse" multiverse.
+
+### **3. Sequels, Spinoffs, and Related Series**
+*   **Inheritance of Glory (FGO Event):** A direct story continuation. Set in the "Reverse Side of the World," it follows Sieg (as Fafnir) and the FGO protagonist. It serves as a bridge between the end of the war and the final epilogue scene of the anime/novel.
+*   **Short Stories:** 
+    *   *Fate/Apocrypha: Unbirth* – A prequel focusing on Jack the Ripper's summoning.
+    *   *Fate/Apocrypha: Zugzwang* – A side story about Jack the Ripper facing a mercenary group.
+    *   *Side of Survivor* – A short story following the war's survivors (Astolfo, Caules, etc.).
+*   **Character Crossovers:**
+    *   **Caules Forvedge:** Appears as a student in *Lord El-Melloi II's Case Files* (main timeline).
+    *   **Flat Escardos:** A student of El-Melloi II who appears in *Fate/strange Fake*.
+
+### **4. Adaptation Differences (Manga vs. Anime vs. LN)**
+| Feature | Light Novel (Source) | Manga (Akira Ishida) | Anime (A-1 Pictures) |
+| :--- | :--- | :--- | :--- |
+| **Length** | 5 Volumes (Complete) | 16 Volumes (Finished 2024) | 25 Episodes (Complete) |
+| **Pacing** | Detailed, heavy internal monologue. | Closer to LN; expands on fights. | Very fast; cuts many subplots. |
+| **Character** | Deep focus on Red Faction. | Best balance of character depth. | Red Faction (Atalante/Achilles) feels rushed. |
+| **Ending** | Philosophical and tragic. | 1:1 with LN. | More action-focused; adds a reunion scene. |
+
+### **5. Latest Updates (as of Early 2026)**
+*   **Manga Conclusion:** The manga adaptation by Akira Ishida officially concluded in **March 2024** with Volume 16, providing a more faithful rendition of the novel's ending than the anime.
+*   **Fate/strange Fake (Winter 2026):** The ongoing anime adaptation of *Fate/strange Fake* is the current focus of the franchise. It features **Flat Escardos** and references the Great Holy Grail War's mechanics, making *Apocrypha* essential viewing for context on "irregular" Grail Wars.
+*   **FGO Cameos:** Characters like Sieg and Jeanne continue to receive updates and story relevance in *Fate/Grand Order*'s latest "Ordeal Call" arcs.
+
+### **Series Aliases & Titles**
+*   **Full Title:** *Fate/Apocrypha*
+*   **Japanese:** フェイト/アポクリファ
+*   **Abbreviation:** *Apo*, *Fate/Apo*
+*   **Meaning:** "Apocrypha" refers to the "hidden" or "non-canonical" nature of this war compared to the standard Fuyuki ritual.

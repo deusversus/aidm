@@ -1,0 +1,18 @@
+{
+  "description": "Class-based progression (Traditional RPG/Sports positions)",
+  "type": "class_based",
+  "parameters": {
+    "available_classes": [
+      "Setter",
+      "Wing Spiker",
+      "Middle Blocker",
+      "Libero",
+      "Opposite Hitter",
+      "Pinch Server"
+    ],
+    "multiclass_allowed": false,
+    "max_level": 20,
+    "stat_growth": "choice"
+  },
+  "use_case": "Fixed classes with level-based progression. Each class has specific abilities and growth patterns. Works for sports anime (Haikyuu positions), game-world isekai (SAO), or traditional RPG-style worlds."
+}

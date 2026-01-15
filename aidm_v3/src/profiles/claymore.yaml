@@ -1,0 +1,84 @@
+id: claymore
+name: Claymore
+source_anime: Claymore
+media_type: anime
+status: completed
+generated_at: '2026-01-07T12:30:22.986565'
+confidence: 95
+research_method: bundled_parallel
+dna_scales:
+  introspection_vs_action: 7
+  comedy_vs_drama: 1
+  simple_vs_complex: 7
+  power_fantasy_vs_struggle: 8
+  explained_vs_mysterious: 4
+  fast_paced_vs_slow_burn: 6
+  episodic_vs_serialized: 9
+  grounded_vs_absurd: 3
+  tactical_vs_instinctive: 4
+  hopeful_vs_cynical: 4
+  ensemble_vs_solo: 4
+tropes:
+  tournament_arc: false
+  training_montage: true
+  power_of_friendship: true
+  mentor_death: true
+  chosen_one: false
+  tragic_backstory: true
+  redemption_arc: true
+  betrayal: true
+  sacrifice: true
+  transformation: true
+  forbidden_technique: true
+  time_loop: false
+  false_identity: true
+  ensemble_focus: true
+  slow_burn_romance: true
+combat_system: spectacle
+power_system:
+  name: Yoki
+  mechanics: Power is derived from Yoma flesh implanted in warriors, allowing them
+    to release demon energy in stages (10%, 30%, 50%, 80%) to enhance physical attributes.
+    Warriors are categorized as Offensive types, who focus on power, or Defensive
+    types, who possess superior regeneration. Advanced users can suppress Yoki entirely
+    or use Soul Links to manage the mental strain of transformation.
+  limitations: Releasing Yoki carries the risk of reaching the 'Point of No Return'
+    at 80%, where predatory instincts overwhelm the human mind. Reaching 100% results
+    in permanent 'Awakening' into a monster. Offensive types cannot regrow limbs to
+    their original strength, and using Yoki makes warriors detectable to others with
+    Yoki-sensing abilities.
+  tiers:
+  - Ranks 1-47
+  - Single-digit Elites (Ranks 1-9)
+  - Abyssal Ones
+  - Seven Ghosts
+  - Awakened Beings
+tone:
+  comedy_level: 1
+  darkness_level: 9
+  optimism: 7
+director_personality: You are the director for a Claymore-style campaign. You explore
+  character thoughts and feelings deeply. You maintain dramatic weight; comedy is
+  rare and earned. The protagonist is powerful; challenges come from elsewhere.
+pacing:
+  scene_length: moderate
+  arc_length_sessions: 4-6
+sources_consulted:
+- power_system
+- combat
+- tone
+- characters
+- factions
+- locations
+- arcs
+- sequels
+- adaptations
+- recent
+aliases:
+- claymoar
+- claymor
+- claymore
+- kureimoa
+- クレイモア
+series_group: claymore
+series_position: 1

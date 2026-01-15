@@ -1,0 +1,81 @@
+id: fire_force
+name: Fire Force
+source_anime: Fire Force
+media_type: anime
+status: completed
+generated_at: '2026-01-06T20:10:19.012649'
+confidence: 95
+research_method: bundled_parallel
+dna_scales:
+  introspection_vs_action: 8
+  comedy_vs_drama: 5
+  simple_vs_complex: 7
+  power_fantasy_vs_struggle: 6
+  explained_vs_mysterious: 4
+  fast_paced_vs_slow_burn: 3
+  episodic_vs_serialized: 9
+  grounded_vs_absurd: 8
+  tactical_vs_instinctive: 6
+  hopeful_vs_cynical: 4
+  ensemble_vs_solo: 3
+tropes:
+  tournament_arc: true
+  training_montage: true
+  power_of_friendship: true
+  mentor_death: true
+  chosen_one: true
+  tragic_backstory: true
+  redemption_arc: true
+  betrayal: true
+  sacrifice: true
+  transformation: true
+  forbidden_technique: true
+  time_loop: false
+  false_identity: true
+  ensemble_focus: true
+  slow_burn_romance: false
+combat_system: spectacle
+power_system:
+  name: Pyrokinetic Generations
+  mechanics: Humans adapted to Spontaneous Human Combustion through distinct generations.
+    Powers range from manipulating existing flames (2nd Gen) to generating fire from
+    specific body parts using internal oxygen (3rd Gen). Advanced users access the
+    Adolla Burst to defy physics through Adolla Grace, enabling light-speed travel
+    or time manipulation.
+  limitations: Users face Oxygen depletion and Overheating, which causes physical
+    exhaustion. Extreme overextension leads to Tephrosis, where the body chars and
+    turns to ash. Non-Pillars accessing the Adolla Link often suffer physical 'Stigmas'
+    like permanent scarring or loss of sight.
+  tiers:
+  - First Generation (Infernals)
+  - Second Generation
+  - Third Generation
+  - Fourth Generation (Pillars)
+  - Fifth Generation/Hybrids
+tone:
+  comedy_level: 6
+  darkness_level: 7
+  optimism: 7
+director_personality: You are the director for a Fire Force-style campaign. You explore
+  character thoughts and feelings deeply. Embrace the absurd. Reality is a suggestion.
+pacing:
+  scene_length: moderate
+  arc_length_sessions: 4-6
+sources_consulted:
+- power_system
+- combat
+- tone
+- characters
+- factions
+- locations
+- arcs
+- sequels
+- adaptations
+- recent
+aliases:
+- enen no shouboutai
+- fire force
+- fireforce
+- 炎炎ノ消防隊
+series_group: fire_force
+series_position: 1

@@ -1,0 +1,184 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "downtime_meta_schema.json",
+  "title": "Downtime Meta-Schema",
+  "description": "Parameterized meta-schema for downtime activities. Defines what characters can do between main story events.",
+  "version": "1.0.0",
+  "type": "object",
+  "required": ["enabled_modes"],
+  "properties": {
+    "enabled_modes": {
+      "type": "array",
+      "description": "Which downtime activities are available in this anime world",
+      "items": {
+        "type": "string",
+        "enum": ["training_arcs", "social_links", "investigation", "travel", "faction_building", "slice_of_life"]
+      },
+      "minItems": 0,
+      "uniqueItems": true
+    },
+    "default_mode": {
+      "type": "string",
+      "description": "Default activity if player doesn't specify (optional)",
+      "enum": ["training_arcs", "social_links", "investigation", "travel", "faction_building", "slice_of_life"]
+    },
+    "time_tracking": {
+      "type": "boolean",
+      "description": "Whether downtime consumes in-game time",
+      "default": true
+    }
+  },
+  "activity_definitions": {
+    "training_arcs": {
+      "description": "Structured training for skill improvement (anime training montages)",
+      "parameters": {
+        "training_types": {
+          "type": "array",
+          "description": "Available training categories",
+          "items": { "type": "string" },
+          "examples": [["combat", "magic", "physical"], ["Nen_mastery", "strategic_thinking"]]
+        },
+        "time_requirement": {
+          "type": "string",
+          "enum": ["days", "weeks", "months"],
+          "default": "weeks"
+        },
+        "mentor_required": {
+          "type": "boolean",
+          "default": false
+        },
+        "breakthrough_chance": {
+          "type": "boolean",
+          "description": "Whether training can trigger power awakenings",
+          "default": true
+        }
+      },
+      "mechanics": {
+        "activity": "extended_skill_training",
+        "rewards": "stat_increases_skill_unlocks",
+        "narrative_weight": "montage_or_detailed"
+      }
+    },
+    "social_links": {
+      "description": "Building relationships with NPCs (Persona-style social systems)",
+      "parameters": {
+        "link_types": {
+          "type": "array",
+          "items": { "type": "string" },
+          "examples": [["friendship", "romance", "rivalry"], ["mentor", "protege"]]
+        },
+        "benefits": {
+          "type": "array",
+          "description": "What relationships provide",
+          "items": { "type": "string" },
+          "examples": [["combat_bonuses", "story_unlocks"], ["power_ups", "information"]]
+        },
+        "time_slots": {
+          "type": "integer",
+          "description": "How many NPCs can be interacted with per downtime",
+          "default": 2,
+          "minimum": 1
+        }
+      },
+      "mechanics": {
+        "activity": "npc_interaction_scenes",
+        "rewards": "affinity_bonuses_story_unlocks",
+        "narrative_weight": "character_development"
+      }
+    },
+    "investigation": {
+      "description": "Research, clue-gathering, mystery-solving (Detective anime style)",
+      "parameters": {
+        "investigation_types": {
+          "type": "array",
+          "items": { "type": "string" },
+          "examples": [["research", "surveillance", "interrogation"], ["forensics", "hacking"]]
+        },
+        "clue_system": {
+          "type": "boolean",
+          "description": "Whether investigations reveal explicit clues",
+          "default": true
+        },
+        "time_pressure": {
+          "type": "boolean",
+          "description": "Whether delayed investigation has consequences",
+          "default": false
+        }
+      },
+      "mechanics": {
+        "activity": "skill_checks_for_information",
+        "rewards": "knowledge_clues_plot_advancement",
+        "narrative_weight": "detective_work"
+      }
+    },
+    "travel": {
+      "description": "Journeys between locations with potential encounters",
+      "parameters": {
+        "encounter_chance": {
+          "type": "number",
+          "description": "Probability of random encounters (0.0-1.0)",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0.3
+        },
+        "travel_mechanics": {
+          "type": "string",
+          "enum": ["abstract", "detailed", "montage"],
+          "description": "How travel is handled narratively",
+          "default": "abstract"
+        },
+        "resource_drain": {
+          "type": "boolean",
+          "description": "Whether travel consumes resources",
+          "default": true
+        }
+      },
+      "mechanics": {
+        "activity": "movement_with_events",
+        "rewards": "discovery_encounters",
+        "narrative_weight": "journey_focus"
+      }
+    },
+    "faction_building": {
+      "description": "Managing organizations, guilds, or nations (Kingdom management anime)",
+      "parameters": {
+        "management_focus": {
+          "type": "array",
+          "items": { "type": "string" },
+          "examples": [["military", "economy", "diplomacy"], ["research", "construction"]]
+        },
+        "automation_level": {
+          "type": "string",
+          "enum": ["manual", "semi_automated", "fully_automated"],
+          "description": "How much faction management is automated",
+          "default": "semi_automated"
+        }
+      },
+      "mechanics": {
+        "activity": "strategic_decisions",
+        "rewards": "faction_growth_resources",
+        "narrative_weight": "kingdom_management"
+      }
+    },
+    "slice_of_life": {
+      "description": "Daily mundane activities and character moments (SoL anime)",
+      "parameters": {
+        "activity_types": {
+          "type": "array",
+          "items": { "type": "string" },
+          "examples": [["cooking", "shopping", "hobbies"], ["school_life", "festivals"]]
+        },
+        "narrative_focus": {
+          "type": "boolean",
+          "description": "Whether these moments drive character development",
+          "default": true
+        }
+      },
+      "mechanics": {
+        "activity": "character_moments",
+        "rewards": "emotional_development",
+        "narrative_weight": "quiet_scenes"
+      }
+    }
+  }
+}

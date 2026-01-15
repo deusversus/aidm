@@ -1,0 +1,22 @@
+{
+  "description": "Reputation-based economy (Social credit system)",
+  "type": "reputation_based",
+  "parameters": {
+    "reputation_name": "Social Credit",
+    "gain_methods": [
+      "completing_missions",
+      "helping_citizens",
+      "defeating_villains",
+      "public_heroism",
+      "government_approval"
+    ],
+    "loss_methods": [
+      "breaking_laws",
+      "harming_innocents",
+      "failed_missions",
+      "public_disgrace",
+      "association_with_criminals"
+    ]
+  },
+  "use_case": "Currency is reputation/social standing. Characters spend reputation to access services. Common in dystopian or hero society anime (Psycho-Pass, parts of MHA)."
+}

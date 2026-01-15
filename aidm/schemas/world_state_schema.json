@@ -1,0 +1,367 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "AIDM World State Schema",
+  "description": "Complete world state data structure for AIDM v2 system",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "world_id",
+    "name",
+    "created_at",
+    "last_updated",
+    "temporal",
+    "environment",
+    "factions",
+    "npcs",
+    "locations",
+    "economy",
+    "narrative_state"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "description": "Schema version for migration compatibility tracking",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "default": "2.2.0"
+    },
+    "world_id": {
+      "type": "string",
+      "description": "Unique identifier for this world",
+      "pattern": "^world_[a-zA-Z0-9]{16}$"
+    },
+    "name": {
+      "type": "string",
+      "description": "World name",
+      "maxLength": 100
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "last_updated": {
+      "type": "string",
+      "format": "date-time"
+    },
+    
+    "anime_sources": {
+      "type": "array",
+      "description": "Anime that influenced this world",
+      "items": {
+        "type": "object",
+        "required": ["title", "integration_date"],
+        "properties": {
+          "title": {"type": "string"},
+          "genres": {"type": "array", "items": {"type": "string"}},
+          "power_system": {"type": "string"},
+          "integration_date": {"type": "string", "format": "date-time"},
+          "fusion_notes": {"type": "string", "description": "How this anime was harmonized with others"}
+        }
+      }
+    },
+    
+    "temporal": {
+      "type": "object",
+      "description": "Time tracking and calendar",
+      "required": ["current_date", "time_of_day", "season"],
+      "properties": {
+        "current_date": {
+          "type": "object",
+          "description": "In-world date",
+          "properties": {
+            "year": {"type": "integer"},
+            "month": {"type": "integer", "minimum": 1, "maximum": 12},
+            "day": {"type": "integer", "minimum": 1, "maximum": 31},
+            "calendar_system": {"type": "string"}
+          }
+        },
+        "time_of_day": {
+          "type": "string",
+          "enum": ["dawn", "morning", "midday", "afternoon", "dusk", "evening", "night", "midnight", "late_night"]
+        },
+        "season": {
+          "type": "string",
+          "enum": ["spring", "summer", "autumn", "winter"]
+        },
+        "moon_phase": {
+          "type": "string",
+          "enum": ["new", "waxing_crescent", "first_quarter", "waxing_gibbous", "full", "waning_gibbous", "last_quarter", "waning_crescent"]
+        },
+        "special_events": {
+          "type": "array",
+          "description": "Upcoming or active temporal events",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {"type": "string"},
+              "type": {"type": "string", "enum": ["festival", "astronomical", "political", "magical", "disaster"]},
+              "start_date": {"type": "object"},
+              "end_date": {"type": "object"},
+              "effects": {"type": "string"}
+            }
+          }
+        },
+        "total_in_game_days": {"type": "integer", "minimum": 0}
+      }
+    },
+    
+    "environment": {
+      "type": "object",
+      "description": "Current environmental conditions",
+      "properties": {
+        "weather": {
+          "type": "object",
+          "properties": {
+            "current": {
+              "type": "string",
+              "enum": ["clear", "cloudy", "overcast", "light_rain", "heavy_rain", "thunderstorm", "light_snow", "heavy_snow", "fog", "mist", "windstorm", "sandstorm", "magical_storm"]
+            },
+            "temperature": {"type": "string", "enum": ["freezing", "cold", "cool", "mild", "warm", "hot", "scorching"]},
+            "forecast": {
+              "type": "array",
+              "description": "Next 3 days",
+              "items": {"type": "string"}
+            }
+          }
+        },
+        "magical_phenomena": {
+          "type": "array",
+          "description": "Active magical effects on the environment",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {"type": "string"},
+              "description": {"type": "string"},
+              "location": {"type": "string"},
+              "duration": {"type": "string"},
+              "effects": {"type": "string"}
+            }
+          }
+        },
+        "natural_disasters": {
+          "type": "array",
+          "description": "Active or recent disasters",
+          "items": {
+            "type": "object",
+            "properties": {
+              "type": {"type": "string"},
+              "location": {"type": "string"},
+              "severity": {"type": "string", "enum": ["minor", "moderate", "major", "catastrophic"]},
+              "started_at": {"type": "string", "format": "date-time"}
+            }
+          }
+        }
+      }
+    },
+    
+    "factions": {
+      "type": "object",
+      "description": "Master registry of all factions in the world. The key is the faction_id.",
+      "additionalProperties": {
+        "$ref": "faction_schema.json"
+      }
+    },
+    
+    "npcs": {
+      "type": "object",
+      "description": "World NPC registry (references, not full data)",
+      "properties": {
+        "total_count": {"type": "integer", "minimum": 0},
+        "significant_npcs": {
+          "type": "array",
+          "description": "IDs of major NPCs",
+          "items": {"type": "string"}
+        },
+        "npc_locations": {
+          "type": "object",
+          "description": "Tracking where NPCs are",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "current_location": {"type": "string"},
+              "activity": {"type": "string"},
+              "last_updated": {"type": "string", "format": "date-time"}
+            }
+          }
+        }
+      }
+    },
+    
+    "locations": {
+      "type": "array",
+      "description": "Known locations in the world",
+      "items": {
+        "type": "object",
+        "required": ["location_id", "name", "type"],
+        "properties": {
+          "location_id": {"type": "string"},
+          "name": {"type": "string"},
+          "type": {
+            "type": "string",
+            "enum": ["city", "town", "village", "dungeon", "wilderness", "landmark", "building", "realm", "dimension"]
+          },
+          "description": {"type": "string", "maxLength": 2000},
+          "parent_location": {"type": "string", "description": "Location ID of containing area"},
+          "population": {"type": "integer", "minimum": 0},
+          "controlling_faction": {"type": "string", "description": "Faction ID"},
+          "discovered": {"type": "boolean", "default": false},
+          "danger_level": {"type": "integer", "minimum": 0, "maximum": 100},
+          "notable_features": {
+            "type": "array",
+            "items": {"type": "string"}
+          },
+          "available_services": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["inn", "shop", "blacksmith", "temple", "guild_hall", "market", "library", "training_ground", "teleport"]
+            }
+          },
+          "active_quests": {
+            "type": "array",
+            "description": "Quest IDs available here",
+            "items": {"type": "string"}
+          }
+        }
+      }
+    },
+    
+    "economy": {
+      "type": "object",
+      "description": "Economic conditions",
+      "properties": {
+        "primary_currency": {"type": "string"},
+        "exchange_rates": {
+          "type": "object",
+          "description": "Currency conversion rates",
+          "additionalProperties": {"type": "number"}
+        },
+        "market_conditions": {
+          "type": "object",
+          "description": "Supply and demand for resources",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "availability": {"type": "string", "enum": ["abundant", "common", "normal", "scarce", "rare"]},
+              "price_modifier": {"type": "number", "description": "Multiplier on base price"}
+            }
+          }
+        },
+        "trade_routes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "from": {"type": "string"},
+              "to": {"type": "string"},
+              "status": {"type": "string", "enum": ["active", "disrupted", "blocked", "dangerous"]},
+              "goods": {"type": "array", "items": {"type": "string"}}
+            }
+          }
+        }
+      }
+    },
+    
+    "narrative_state": {
+      "type": "object",
+      "description": "Story and world evolution tracking",
+      "properties": {
+        "quests": {
+          "type": "object",
+          "description": "World quest registry (full quest data stored here, character schema only tracks IDs)",
+          "additionalProperties": {
+            "$ref": "quest_schema.json"
+          },
+          "default": {}
+        },
+        "main_story_arc": {
+          "type": "object",
+          "properties": {
+            "title": {"type": "string"},
+            "current_chapter": {"type": "integer"},
+            "progress": {"type": "integer", "minimum": 0, "maximum": 100}
+          }
+        },
+        "active_plot_threads": {
+          "type": "array",
+          "description": "Ongoing storylines",
+          "items": {
+            "type": "object",
+            "properties": {
+              "thread_id": {"type": "string"},
+              "description": {"type": "string"},
+              "importance": {"type": "string", "enum": ["minor", "moderate", "major", "critical"]},
+              "status": {"type": "string", "enum": ["introduced", "developing", "escalating", "climax", "resolving", "resolved"]}
+            }
+          }
+        },
+        "world_changing_events": {
+          "type": "array",
+          "description": "Major events that altered the world permanently",
+          "items": {
+            "type": "object",
+            "properties": {
+              "event": {"type": "string"},
+              "timestamp": {"type": "string", "format": "date-time"},
+              "player_caused": {"type": "boolean"},
+              "consequences": {"type": "array", "items": {"type": "string"}}
+            }
+          }
+        },
+        "narrative_drift": {
+          "type": "object",
+          "description": "Autonomous world evolution metrics",
+          "properties": {
+            "local_pressure": {"type": "integer", "minimum": 0, "maximum": 100, "description": "Tension building in static areas"},
+            "world_balance": {"type": "integer", "minimum": -100, "maximum": 100, "description": "Equilibrium vs chaos"},
+            "chaos_affinity": {"type": "integer", "minimum": 0, "maximum": 100, "description": "World's tendency toward dramatic change"}
+          }
+        },
+        "prophecies": {
+          "type": "array",
+          "description": "Active prophecies and predictions",
+          "items": {
+            "type": "object",
+            "properties": {
+              "text": {"type": "string"},
+              "source": {"type": "string"},
+              "interpretation": {"type": "string"},
+              "fulfillment_progress": {"type": "integer", "minimum": 0, "maximum": 100}
+            }
+          }
+        }
+      }
+    },
+    
+    "power_systems": {
+      "type": "array",
+      "description": "Active power/magic systems in this world",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {"type": "string"},
+          "source_anime": {"type": "string"},
+          "description": {"type": "string"},
+          "rules": {"type": "array", "items": {"type": "string"}},
+          "harmony_notes": {"type": "string", "description": "How this system coexists with others"}
+        }
+      }
+    },
+
+    "mechanical_systems": {
+      "type": "object",
+      "description": "Configuration and state for game mechanics",
+      "properties": {
+        "economy": { "$ref": "economy_meta_schema.json" },
+        "crafting": { "$ref": "crafting_meta_schema.json" },
+        "progression": { "$ref": "progression_meta_schema.json" },
+        "downtime": { "$ref": "downtime_meta_schema.json" }
+      }
+    },
+    
+    "global_flags": {
+      "type": "array",
+      "description": "World state flags (events, conditions, unlocks)",
+      "items": {"type": "string"}
+    }
+  }
+}

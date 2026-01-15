@@ -1,0 +1,353 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "AIDM Character Schema",
+  "description": "Player character data",
+  "type": "object",
+  "required": ["schema_version", "character_id", "name", "created_at", "last_updated", "core_identity", "resources", "attributes", "skills", "progression", "inventory", "relationships", "quests", "world_context"],
+  "properties": {
+    "schema_version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$", "default": "2.4.0" },
+    "character_id": { "type": "string", "pattern": "^char_[a-zA-Z0-9]{16}$" },
+    "name": { "type": "string", "minLength": 1, "maxLength": 100 },
+    "created_at": { "type": "string", "format": "date-time" },
+    "last_updated": { "type": "string", "format": "date-time" },
+    
+    "core_identity": {
+      "type": "object",
+      "required": ["origin", "personality", "goals", "appearance"],
+      "properties": {
+        "origin": { "type": "string", "description": "Backstory", "maxLength": 2000 },
+        "personality": { "type": "array", "description": "Core traits", "items": { "type": "string", "maxLength": 50 }, "minItems": 3, "maxItems": 8 },
+        "goals": { "type": "array", "description": "Motivations", "items": { "type": "string", "maxLength": 200 }, "minItems": 1, "maxItems": 5 },
+        "appearance": { "type": "string", "maxLength": 1000 },
+        "unique_abilities": {
+          "type": "array",
+          "description": "Special powers",
+          "items": {
+            "type": "object",
+            "required": ["name", "description"],
+            "properties": {
+              "name": {"type": "string", "maxLength": 100},
+              "description": {"type": "string", "maxLength": 500},
+              "source": {"type": "string"},
+              "limitations": {"type": "string", "maxLength": 300}
+            }
+          }
+        }
+      }
+    },
+    
+    "resources": {
+      "type": "object",
+      "required": ["hp", "mp", "sp"],
+      "properties": {
+        "hp": { "type": "object", "required": ["current", "maximum"], "properties": { "current": {"type": "integer", "minimum": 0}, "maximum": {"type": "integer", "minimum": 1}, "temporary": {"type": "integer", "minimum": 0, "default": 0} } },
+        "mp": { "type": "object", "required": ["current", "maximum"], "properties": { "current": {"type": "integer", "minimum": 0}, "maximum": {"type": "integer", "minimum": 0}, "temporary": {"type": "integer", "minimum": 0, "default": 0} } },
+        "sp": { "type": "object", "required": ["current", "maximum"], "properties": { "current": {"type": "integer", "minimum": 0}, "maximum": {"type": "integer", "minimum": 1}, "temporary": {"type": "integer", "minimum": 0, "default": 0} } },
+        "death_saves": {
+          "type": "object",
+          "description": "Track death save progress when downed (0 HP)",
+          "properties": {
+            "successes": {"type": "integer", "minimum": 0, "maximum": 3, "default": 0},
+            "failures": {"type": "integer", "minimum": 0, "maximum": 3, "default": 0},
+            "is_stable": {"type": "boolean", "default": false, "description": "True if stabilized (3 successes)"}
+          }
+        },
+        "injuries": {
+          "type": "array",
+          "description": "Lasting injuries from failed death saves or major damage",
+          "items": {
+            "type": "object",
+            "required": ["name", "effect", "duration_remaining"],
+            "properties": {
+              "name": {"type": "string", "description": "e.g., Minor Wound, Broken Bone, Concussion"},
+              "effect": {"type": "string", "description": "Mechanical penalty (e.g., -2 all rolls, -5 movement)"},
+              "duration_remaining": {"type": "string", "description": "e.g., until long rest, 3 days, 1 week, permanent"},
+              "acquired_at": {"type": "string", "format": "date-time"},
+              "treated": {"type": "boolean", "default": false, "description": "True if medical care applied (reduces duration)"}
+            }
+          }
+        },
+        "conditions": {
+          "type": "array",
+          "description": "Buffs/debuffs",
+          "items": {
+            "type": "object",
+            "required": ["name", "type", "duration"],
+            "properties": {
+              "name": {"type": "string"},
+              "type": {"type": "string", "enum": ["buff", "debuff", "neutral"]},
+              "description": {"type": "string"},
+              "duration": {"type": "integer", "description": "Turns (-1=permanent)"},
+              "effects": { "type": "object", "properties": { "hp_modifier": {"type": "integer"}, "mp_modifier": {"type": "integer"}, "sp_modifier": {"type": "integer"}, "stat_modifiers": {"type": "object"} } }
+            }
+          }
+        }
+      }
+    },
+    
+    "attributes": {
+      "type": "object",
+      "properties": {
+        "strength": {"type": "integer", "minimum": 1, "maximum": 999},
+        "dexterity": {"type": "integer", "minimum": 1, "maximum": 999},
+        "constitution": {"type": "integer", "minimum": 1, "maximum": 999},
+        "intelligence": {"type": "integer", "minimum": 1, "maximum": 999},
+        "wisdom": {"type": "integer", "minimum": 1, "maximum": 999},
+        "charisma": {"type": "integer", "minimum": 1, "maximum": 999},
+        "custom_stats": { "type": "object", "description": "e.g., chakra, ki", "additionalProperties": {"type": "integer"} }
+      }
+    },
+    
+    "skills": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["skill_id", "name", "category", "level", "experience"],
+        "properties": {
+          "skill_id": {"type": "string"},
+          "name": {"type": "string"},
+          "category": { "type": "string", "enum": ["physical", "magical", "psionic", "hybrid", "unique"] },
+          "level": {"type": "integer", "minimum": 1, "maximum": 100},
+          "experience": {"type": "integer", "minimum": 0},
+          "description": {"type": "string", "maxLength": 500},
+          "cost": { "type": "object", "properties": { "hp": {"type": "integer", "minimum": 0}, "mp": {"type": "integer", "minimum": 0}, "sp": {"type": "integer", "minimum": 0} } },
+          "cooldown": {"type": "integer", "minimum": 0, "description": "Turns"},
+          "current_cooldown": {"type": "integer", "minimum": 0, "default": 0},
+          "mastery_bonuses": { "type": "array", "items": {"type": "string"} }
+        }
+      }
+    },
+    
+    "progression": {
+      "type": "object",
+      "required": ["level", "experience", "next_level_xp"],
+      "properties": {
+        "level": {"type": "integer", "minimum": 1, "maximum": 999},
+        "experience": {"type": "integer", "minimum": 0},
+        "next_level_xp": {"type": "integer", "minimum": 0},
+        "total_sessions": {"type": "integer", "minimum": 0},
+        "training_progress": {
+          "type": "array",
+          "description": "Track downtime training for skills",
+          "items": {
+            "type": "object",
+            "required": ["skill_name", "weeks_trained", "total_xp_gained"],
+            "properties": {
+              "skill_name": {"type": "string"},
+              "weeks_trained": {"type": "integer", "minimum": 0},
+              "total_xp_gained": {"type": "integer", "minimum": 0},
+              "trainer_name": {"type": "string", "description": "NPC trainer or self-study"},
+              "trainer_quality": {"type": "string", "enum": ["self-study", "competent", "expert", "master"]},
+              "started_at": {"type": "string", "format": "date-time"},
+              "notes": {"type": "string", "maxLength": 500}
+            }
+          }
+        },
+        "achievements": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "earned_at"],
+            "properties": {
+              "name": {"type": "string"},
+              "description": {"type": "string"},
+              "earned_at": {"type": "string", "format": "date-time"},
+              "rarity": {"type": "string", "enum": ["common", "uncommon", "rare", "epic", "legendary"]}
+            }
+          }
+        },
+        "skill_points_available": {"type": "integer", "minimum": 0, "default": 0},
+        "attribute_points_available": {"type": "integer", "minimum": 0, "default": 0}
+      }
+    },
+    
+    "inventory": {
+      "type": "object",
+      "required": ["items", "equipped", "currency"],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["item_id", "name", "quantity"],
+            "properties": {
+              "item_id": {"type": "string"},
+              "name": {"type": "string"},
+              "quantity": {"type": "integer", "minimum": 1},
+              "description": {"type": "string"},
+              "category": {"type": "string", "enum": ["weapon", "armor", "consumable", "quest", "material", "misc"]},
+              "rarity": {"type": "string", "enum": ["common", "uncommon", "rare", "epic", "legendary", "artifact"]},
+              "effects": {
+                "type": "object",
+                "description": "Item effects when used/equipped"
+              },
+              "weight": {"type": "number", "minimum": 0},
+              "value": {"type": "integer", "minimum": 0}
+            }
+          }
+        },
+        "equipped": {
+          "type": "object",
+          "properties": {
+            "weapon_main": {"type": "string"},
+            "weapon_off": {"type": "string"},
+            "armor_head": {"type": "string"},
+            "armor_chest": {"type": "string"},
+            "armor_hands": {"type": "string"},
+            "armor_legs": {"type": "string"},
+            "armor_feet": {"type": "string"},
+            "accessory_1": {"type": "string"},
+            "accessory_2": {"type": "string"},
+            "accessory_3": {"type": "string"}
+          }
+        },
+        "currency": { "type": "object", "additionalProperties": {"type": "integer", "minimum": 0} },
+        "max_weight": {"type": "number", "minimum": 0},
+        "current_weight": {"type": "number", "minimum": 0}
+      }
+    },
+    
+    "relationships": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["npc_id", "name", "affinity"],
+        "properties": {
+          "npc_id": {"type": "string"},
+          "name": {"type": "string"},
+          "affinity": {"type": "integer", "minimum": -100, "maximum": 100},
+          "relationship_type": {"type": "string", "enum": ["stranger", "acquaintance", "friend", "ally", "rival", "enemy", "romance", "family"]},
+          "flags": { "type": "array", "items": {"type": "string"} },
+          "shared_history": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "event": {"type": "string"},
+                "affinity_change": {"type": "integer"},
+                "timestamp": {"type": "string", "format": "date-time"}
+              }
+            }
+          }
+        }
+      }
+    },
+    
+    "quests": {
+      "type": "object",
+      "properties": {
+        "active": { "type": "array", "items": { "type": "string", "pattern": "^quest_[a-z0-9_]+$" }, "default": [] },
+        "available": { "type": "array", "items": { "type": "string", "pattern": "^quest_[a-z0-9_]+$" }, "default": [] },
+        "completed": { "type": "array", "items": { "type": "string", "pattern": "^quest_[a-z0-9_]+$" }, "default": [] },
+        "failed": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["quest_id", "reason"],
+            "properties": {
+              "quest_id": {
+                "type": "string",
+                "pattern": "^quest_[a-z0-9_]+$"
+              },
+              "reason": { "type": "string" },
+              "failed_at": {
+                "type": "string",
+                "format": "date-time"
+              }
+            }
+          },
+          "default": []
+        }
+      }
+    },
+    
+    "world_context": {
+      "type": "object",
+      "properties": {
+        "current_location": {"type": "string"},
+        "faction_reputations": { "type": "object", "additionalProperties": { "type": "integer" } },
+        "known_locations": { "type": "array", "items": {"type": "string"} },
+        "world_state_flags": { "type": "array", "items": {"type": "string"} }
+      }
+    },
+    
+    "narrative_context": {
+      "type": "object",
+      "description": "Narrative framing for this character",
+      "properties": {
+        "op_protagonist": {
+          "type": "boolean",
+          "default": false,
+          "description": "True if character is overpowered protagonist (Saitama/Mob/Overlord/etc archetype)"
+        },
+        "op_archetype": {
+          "type": "string",
+          "enum": [
+            "saitama_invincible",
+            "mob_restraint",
+            "overlord_roleplaying",
+            "saiki_oblivious",
+            "mashle_absurd",
+            "wang_ling_secret",
+            "vampire_d_legend",
+            "slime_builder",
+            "deus_disguised_god",
+            "custom",
+            null
+          ],
+          "description": "If OP, which archetype model to follow"
+        },
+        "power_tier": {
+          "type": "string",
+          "description": "VS Battles Wiki tier (e.g., '6-C', '5-B', '2-B') for power scaling reference"
+        },
+        "current_scale": {
+          "type": "string",
+          "enum": [
+            "tactical_survival",
+            "strategic_combat",
+            "ensemble_focus",
+            "reverse_ensemble",
+            "mythology_journey",
+            "faction_building",
+            "mythic_spectacle",
+            "conceptual_philosophy",
+            "metafictional"
+          ],
+          "description": "Current narrative scale being used (actively updated by Module 12)"
+        },
+        "progression_model": {
+          "type": "string",
+          "enum": ["modest", "accelerated", "instant_op"],
+          "description": "How fast character gains power: modest (slow grind), accelerated (isekai spikes), instant_op (already maxed)"
+        },
+        "scale_shift_history": {
+          "type": "array",
+          "description": "Record of narrative scale shifts (for pacing/continuity)",
+          "items": {
+            "type": "object",
+            "required": ["session", "old_scale", "new_scale", "trigger"],
+            "properties": {
+              "session": { "type": "integer" },
+              "old_scale": { "type": "string" },
+              "new_scale": { "type": "string" },
+              "trigger": { "type": "string", "description": "What caused shift (e.g., 'Tier 9→8 breakthrough', 'Epic quest complete')" },
+              "ceremony_used": { "type": "boolean", "description": "True if scale shift ceremony was narrated" }
+            }
+          }
+        },
+        "power_imbalance_context": {
+          "type": "object",
+          "description": "Context modifiers affecting effective power",
+          "properties": {
+            "environmental_constraint": { "type": "number", "description": "Multiplier (e.g., 0.1 = Frieza on planet)" },
+            "secret_identity": { "type": "boolean", "description": "True if hiding power (Deus F-rank, Wang Ling)" },
+            "self_imposed_limiter": { "type": "boolean", "description": "True if deliberately limiting (Saiki gear, sealed god)" },
+            "mentor_role": { "type": "boolean", "description": "True if protecting/teaching others (Gojo, All Might)" },
+            "political_constraints": { "type": "boolean", "description": "True if governing/managing (Overlord, Slime)" }
+          }
+        }
+      }
+    }
+  }
+}

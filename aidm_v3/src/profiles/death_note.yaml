@@ -1,0 +1,85 @@
+id: death_note
+name: Death Note
+source_anime: Death Note
+media_type: anime
+status: completed
+generated_at: '2026-01-06T21:20:34.644009'
+confidence: 95
+research_method: bundled_parallel
+dna_scales:
+  introspection_vs_action: 1
+  comedy_vs_drama: 1
+  simple_vs_complex: 9
+  power_fantasy_vs_struggle: 3
+  explained_vs_mysterious: 0
+  fast_paced_vs_slow_burn: 4
+  episodic_vs_serialized: 10
+  grounded_vs_absurd: 3
+  tactical_vs_instinctive: 0
+  hopeful_vs_cynical: 9
+  ensemble_vs_solo: 8
+tropes:
+  tournament_arc: false
+  training_montage: false
+  power_of_friendship: false
+  mentor_death: false
+  chosen_one: false
+  tragic_backstory: false
+  redemption_arc: false
+  betrayal: true
+  sacrifice: true
+  transformation: false
+  forbidden_technique: true
+  time_loop: false
+  false_identity: true
+  ensemble_focus: false
+  slow_burn_romance: false
+combat_system: tactical
+power_system:
+  name: How to Use Rules
+  mechanics: The system functions through the Death Note, where writing a human's
+    name while picturing their face causes death. The default cause is a heart attack
+    after 40 seconds, but users can specify causes and detailed actions within a 6-minute
+    and 40-second window. It allows for limited mind manipulation of the victim's
+    actions prior to death, provided the actions are physically and mentally possible
+    for that individual.
+  limitations: Restrictions include a 23-day scheduling limit for deaths, age boundaries
+    (780 days to 124 years), and a 12-minute natural life remaining rule. Misspelling
+    a name four times can grant immunity or kill the user depending on intent. Humans
+    must sacrifice half their remaining lifespan for Shinigami Eyes, and Shinigami
+    die instantly if they use the notebook to extend a human's life.
+  tiers:
+  - 'Tier 1: Shinigami King (The source of all rules and notebooks)'
+  - 'Tier 2: Shinigami (Ranked 1-13, immortal beings who steal human lifespans)'
+  - 'Tier 3: Human Users (Mortals who utilize found notebooks through strategy and
+    lifespan trades)'
+tone:
+  comedy_level: 2
+  darkness_level: 8
+  optimism: 2
+director_personality: You are the director for a Death Note-style campaign. You favor
+  action and momentum over lengthy contemplation. You maintain dramatic weight; comedy
+  is rare and earned. You explain strategies and tactics in detail.
+pacing:
+  scene_length: moderate
+  arc_length_sessions: 4-6
+sources_consulted:
+- power_system
+- combat
+- tone
+- characters
+- factions
+- locations
+- arcs
+- sequels
+- adaptations
+- recent
+aliases:
+- death note
+- deathnote
+- desu noto
+- desu nto
+- dn
+- デスノート
+series_group: death_note
+series_position: 1

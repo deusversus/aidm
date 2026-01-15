@@ -1,0 +1,86 @@
+id: re_zero
+name: Re:Zero
+source_anime: Re:Zero
+media_type: anime
+status: completed
+generated_at: '2026-01-07T08:01:32.399400'
+confidence: 95
+research_method: bundled_parallel
+dna_scales:
+  introspection_vs_action: 3
+  comedy_vs_drama: 2
+  simple_vs_complex: 9
+  power_fantasy_vs_struggle: 10
+  explained_vs_mysterious: 7
+  fast_paced_vs_slow_burn: 8
+  episodic_vs_serialized: 10
+  grounded_vs_absurd: 4
+  tactical_vs_instinctive: 2
+  hopeful_vs_cynical: 3
+  ensemble_vs_solo: 8
+tropes:
+  tournament_arc: false
+  training_montage: true
+  power_of_friendship: true
+  mentor_death: false
+  chosen_one: true
+  tragic_backstory: true
+  redemption_arc: true
+  betrayal: true
+  sacrifice: true
+  transformation: true
+  forbidden_technique: true
+  time_loop: true
+  false_identity: true
+  ensemble_focus: true
+  slow_burn_romance: true
+combat_system: tactical
+power_system:
+  name: Mana, Od, and Authorities
+  mechanics: The system relies on the interaction between Mana (atmospheric energy),
+    Od (internal life force/soul), and the Gate (a metaphysical organ for mana expulsion).
+    It includes six elemental affinities (Fire, Water, Wind, Earth, Yin, Yang) with
+    a four-stage spell progression (Base, El, Ul, Al). Beyond magic, 'Authorities'
+    rewrite reality via Witch Factors, 'Divine Protections' provide passive blessings
+    from Od Laguna, and the 'Flow Method' allows warriors to circulate mana internally
+    for superhuman physical enhancement.
+  limitations: Forcing a Gate can cause it to break, leading to fatal Mana Poisoning.
+    Using Od instead of atmospheric mana shortens the user's lifespan or causes loss
+    of self. Authorities often inflict madness or moral rot. A person cannot possess
+    a Witch Factor and a Divine Protection simultaneously. Magic is limited by innate
+    elemental affinity and the physical capacity of the user's Gate.
+  tiers:
+  - 'Tier 1: World-Class Entities (Satella, Reinhard van Astrea, Volcanica)'
+  - 'Tier 2: Witches & Archbishops (Holders of Witch Factors)'
+  - 'Tier 3: Royal Court Mages & Spirit Knights (Color-titled mages like Roswaal)'
+  - 'Tier 4: Spirit Arts Users (Contractors using atmospheric mana)'
+tone:
+  comedy_level: 4
+  darkness_level: 9
+  optimism: 8
+director_personality: You are the director for a Re:Zero-style campaign. You favor
+  action and momentum over lengthy contemplation. You maintain dramatic weight; comedy
+  is rare and earned. You explain strategies and tactics in detail. The protagonist
+  is powerful; challenges come from elsewhere.
+pacing:
+  scene_length: moderate
+  arc_length_sessions: 4-6
+sources_consulted:
+- power_system
+- combat
+- tone
+- characters
+- factions
+- locations
+- arcs
+- sequels
+- adaptations
+- recent
+aliases:
+- Re:ゼロから始める異世界生活
+- re zero
+- re:zero
+- rezero
+- rezero kara hajimeru isekai seikatsu
+series_group: re_zero
+series_position: 1

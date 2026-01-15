@@ -1,0 +1,115 @@
+## Tone, Characters
+*Princess Mononoke* (1997), directed by Hayao Miyazaki, is a landmark of animated cinema known for its moral complexity, visceral violence, and environmental depth. Unlike many traditional "good vs. evil" stories, it presents a world where every faction has valid motivations, leading to a tragic but ultimately hopeful conflict.
+
+### **Tone, Atmosphere, and Genre**
+*   **Genre:** An **Epic Historical Fantasy** and **Jidaigeki** (period drama). It is set in a heightened version of Japan’s Muromachi period (1336–1573), blending historical realism with Shinto-inspired mythology.
+*   **Tone & Mood:** The tone is **mature, serious, and visceral**. It is famously one of Studio Ghibli’s darkest films, featuring graphic violence (dismemberment and decapitation) to emphasize the brutality of war. The mood shifts between the **ethereal, haunting silence** of the ancient forest and the **industrial, chaotic energy** of Iron Town.
+*   **Dark Comedy:** While not a "dark comedy" by genre, the film utilizes **cynical humor** and sharp wit to provide relief. This is primarily seen through:
+    *   **Jigo:** A pragmatic, "shady" monk whose dry observations about the world's cruelty provide a dark, comedic edge.
+    *   **The Women of Iron Town:** Their bawdy, defiant banter (especially Toki’s) serves as a grounded, humorous contrast to the high-stakes spiritual war.
+*   **Optimism vs. Pessimism:** The film is often described as **"melancholic optimism."** It is pessimistic about humanity’s inherent greed and the inevitable destruction of nature, but optimistic about the power of individuals to choose compassion. The central mantra—*"Life is suffering... but still, you find reasons to keep living"*—encapsulates this balance.
+
+### **Main Characters & Roles**
+
+| Character | Role | Abilities & Traits | Relationships |
+| :--- | :--- | :--- | :--- |
+| **Ashitaka** | **Protagonist** | Expert archer; possesses **superhuman strength** and speed due to a demonic curse on his arm. | An outsider who loves San but respects Lady Eboshi’s humanity; acts as a mediator. |
+| **San (Princess Mononoke)** | **Heroine / Co-Protagonist** | High agility, expert knife-fighter, and can communicate with forest gods. | Raised by the wolf goddess **Moro**; she views herself as a wolf and hates all humans until meeting Ashitaka. |
+| **Lady Eboshi** | **Antagonist (Complex)** | Master tactician and leader; proficient with "hand cannons" (firearms). | Ruler of Iron Town; she is a savior to outcasts (lepers and former prostitutes) but a destroyer of the forest. |
+| **Moro** | **Supporting / Guardian** | A 300-year-old wolf goddess with massive size, strength, and high intelligence. | San’s adoptive mother; she is fiercely protective of the forest and seeks to kill Eboshi. |
+| **Jigo** | **Secondary Antagonist** | Cunning, surprisingly athletic, and a master of manipulation. | An agent of the Emperor; he views both the gods and Iron Town as tools for his own gain. |
+| **The Forest Spirit** | **Divine Force** | God of life and death; can heal wounds or take life with a touch; transforms into the Nightwalker. | Neutral and detached; it represents the uncaring, cyclical nature of the environment. |
+
+### **Key Themes**
+1.  **Environmentalism & Industrialization:** The film explores the "cost of progress." Iron Town is a place of social liberation for humans, but its existence requires the destruction of the forest.
+2.  **Relative Morality:** There is no true villain. Lady Eboshi is a philanthropist to her people, and the "heroic" forest gods can be vengeful and monstrous.
+3.  **The Cycle of Violence:** The "curse" in the film is a physical manifestation of **hate**. Ashitaka’s journey is to "see with eyes unclouded by hate" to break the cycle of revenge.
+4.  **Coexistence:** The ending does not result in a perfect peace, but in a "truce" where both sides must learn to live in a diminished world, acknowledging that nature and humanity are permanently changed.
+
+## Power System, Combat
+In *Princess Mononoke*, the "power system" is not a traditional shonen-style magic system with levels and named spells, but rather a **spiritual ecology** rooted in Shinto animism. Combat is visceral, blending historical realism with supernatural brutality.
+
+### **1. Power System: Spiritual Ecology & The Curse**
+The power system is defined by the relationship between the natural world (Kami) and the human world (Industry).
+
+#### **Mechanics & Rules**
+*   **The Curse (Tatari-gami):** Triggered when a God (Kami) is consumed by hatred and physical pain—usually caused by "unnatural" iron weapons. 
+    *   **Manifestation:** It appears as "demon worms" (Deadly Annelids), which are physical manifestations of a grudge. These worms act as a parasitic force that grants the host immense power while rotting their soul and body.
+    *   **Ashitaka’s Progression:** Because Ashitaka fought the demon boar (Nago) without hatred, he was cursed but not immediately demonized. His curse grants him **supernatural strength and speed** (e.g., drawing a heavy bow with one hand, decapitating enemies with a single arrow). However, the curse is a "living" entity; it spreads further across his body every time he uses it or feels anger, eventually leading to death.
+*   **Life & Death Manipulation:** The Great Forest Spirit (Shishigami) is the apex of the system. It does not "fight" in a traditional sense; it simply *is*. It can heal wounds with a touch or take life with a breath. Its power is neutral, reflecting the indifference of nature.
+
+#### **Tiers & Hierarchy**
+*   **Tier 1: The Great Forest Spirit (Shishigami):** The supreme deity. It has two forms: the Deer God (day) and the Nightwalker (night). It is the only entity capable of lifting the curse.
+*   **Tier 2: Ancient Clan Gods:** Massive, sentient beasts like **Moro** (Wolf Goddess) and **Okkoto/Nago** (Boar Gods). They possess high intelligence, speech, and immense physical power, but are vulnerable to human technology.
+*   **Tier 3: Lesser Spirits:** Entities like the **Kodama** (tree spirits). They have no combat ability but serve as indicators of the forest's health and can guide those they trust.
+
+---
+
+### **2. Combat & Fighting Styles**
+Combat in the film is designed to show the "weight" of violence. It is rarely "flashy" for the sake of spectacle; instead, it is fast, lethal, and emotionally heavy.
+
+#### **Character Fighting Styles**
+*   **Ashitaka (The Cursed Mediator):**
+    *   **Style:** Precision Archery and Swordsmanship.
+    *   **Tactics:** He fights defensively, aiming to disarm or incapacitate rather than kill, though the curse often overrides this, resulting in "overkill" (e.g., his arrows carrying enough force to tear off limbs).
+    *   **Spectacle:** His combat is characterized by fluid, horse-mounted (Yakul) maneuvers and sudden, explosive bursts of demonic strength.
+*   **San (The Feral Princess):**
+    *   **Style:** Primal/Guerilla. She fights like a wolf, utilizing high-speed dashes, leaps, and a bone dagger.
+    *   **Tactics:** Hit-and-run. She relies on her "brothers" (the wolves) for mobility and distractions. Her combat is frantic and desperate, reflecting her internal struggle between her human body and wolf spirit.
+*   **Lady Eboshi (The Industrialist):**
+    *   **Style:** Tactical Commander / Marksman.
+    *   **Tactics:** She uses **Ishibiya** (early hand cannons/firearms). She doesn't rely on physical strength but on the "equalizing" power of gunpowder. She is cold and efficient, willing to sacrifice her own troops to set traps for the forest gods.
+
+#### **Tactical & Emotional Spectacle**
+*   **The "Iron" Advantage:** Humans win battles not through superior spirit, but through **industrial tactics**. In the Great Battle, Eboshi uses explosive mines and concentrated "fire-lines" to annihilate the Boar Clan's charge.
+*   **Emotional Weight:** Battles are often framed as tragedies. When San and Eboshi duel in Irontown, the "spectacle" is interrupted by Ashitaka walking between them, physically stopping their blades with his cursed hand—a moment where the "power" of the curse is used to enforce peace, even as it causes him agony.
+*   **The Final Spectacle:** The climax features the Nightwalker's decapitation, which transforms the power system into a literal "God of Death" flood. This is the ultimate spectacle: a mindless, expanding ooze that drains the life from everything it touches, representing the total collapse of the natural order.
+
+## Factions, Locations, Arcs, Sequels, Adaptations, Recent, Series Aliases
+*Princess Mononoke* (Japanese: **もののけ姫**, *Mononoke-hime*) is a 1997 historical fantasy epic directed by Hayao Miyazaki and produced by Studio Ghibli. Set in the late Muromachi period (approx. 1336–1573), it explores the violent clash between industrializing humanity and the ancient gods of nature.
+
+### **1. Factions, Organizations, and World Powers**
+The world is divided into three primary conflicting powers, with a fourth opportunistic group acting as a catalyst for the climax.
+*   **The Emishi People:** An isolated, indigenous tribe in the East. Ashitaka is their last prince. They are a "hidden" people, having been driven out by the Emperor centuries prior.
+*   **Iron Town (Tatara-ba):** A fortified industrial settlement led by **Lady Eboshi**. It is a social refuge for outcasts, including former prostitutes and lepers. Their power comes from advanced firearms (hand cannons) and iron production, which requires clear-cutting the forest.
+*   **The Forest Gods (Mononoke):** Supernatural guardians of the Cedar Forest.
+    *   **The Wolf Clan:** Led by the 300-year-old goddess **Moro** and her human "daughter" **San**.
+    *   **The Boar Clan:** Led by the blind god **Okkoto** (and formerly Nago). They are aggressive and traditionalist.
+    *   **The Forest Spirit (Shishigami):** The god of life and death, appearing as a stag by day and the **Night-Walker** (*Daidarabotchi*) by night.
+*   **The Imperial Forces & Jigo’s Network:** **Jigo**, an opportunistic monk, leads a group of hunters and "jibashiri" (earth-runners). They work under an Imperial mandate to obtain the Forest Spirit’s head, which the Emperor believes will grant him immortality.
+
+### **2. Important Locations and Geography**
+*   **The Emishi Village:** Located in the remote eastern mountains; a peaceful, traditionalist enclave.
+*   **The Cedar Forest:** A mystical, ancient woodland home to the Forest Spirit and the **Kodama** (tree spirits). It is inspired by the real-world **Yakushima Island** and **Shirakami-Sanchi**.
+*   **Iron Town (Tatara-ba):** A massive, walled fortress built on the edge of a lake, designed to withstand both samurai sieges and attacks from forest gods.
+*   **The Sacred Pool:** A hidden clearing deep in the forest where the Forest Spirit resides and where its healing (and destructive) powers are most concentrated.
+
+### **3. Major Story Arcs and Plot Progression**
+*   **The Curse of the East:** Ashitaka kills a corrupted boar god (Nago) to save his village but is afflicted with a terminal, superhuman curse. He is exiled to the West to "see with eyes unclouded" and find a cure.
+*   **The Siege of Iron Town:** Ashitaka arrives at the center of the conflict. He saves San during her assassination attempt on Eboshi, revealing his role as a neutral mediator.
+*   **The Boar War:** The Boar Clan launches a massive, suicidal charge against Iron Town’s forces. Eboshi uses this distraction to lead an expedition to decapitate the Forest Spirit.
+*   **The Night-Walker’s Wrath:** Eboshi beheads the Forest Spirit. Its body becomes a toxic, life-draining ooze that destroys Iron Town and the forest. Ashitaka and San return the head, causing the Spirit to pass away peacefully, healing the land and lifting Ashitaka’s curse.
+
+### **4. Sequels, Spinoffs, and Related Series**
+*   **Official Sequels:** There are **no official animated sequels or prequels**. Miyazaki intended the film to be a standalone masterpiece.
+*   **Spiritual Predecessor:** ***Shuna’s Journey*** (1983), a graphic novel by Miyazaki, features a prince on a red elk (Yakul) traveling to a land of gods. It served as a prototype for *Princess Mononoke*.
+*   **Unrelated Series:** The 2007 anime series ***Mononoke*** (about a Medicine Seller) is **not related** to the Ghibli film. "Mononoke" is a general Japanese term for a vengeful spirit.
+
+### **5. Manga vs. Anime: Adaptations and Versions**
+*   **The "Manga":** There is no traditional serialized manga. However, ***Princess Mononoke: The First Story*** (1980) is a book of Miyazaki’s early image boards. In this version, the "Mononoke" was a giant cat-like creature, and the story was a "Beauty and the Beast" style fairy tale.
+*   **Film Comics:** A multi-volume "film comic" exists, which uses still frames from the movie with dialogue bubbles.
+*   **Translation Differences:** The English dub (scripted by **Neil Gaiman**) adds context for Western audiences. For example, the dub explicitly mentions the Emperor’s promise of gold to Jigo, whereas the Japanese version leaves Jigo’s political motivations more subtle.
+
+### **6. Recent Events and Ongoing Updates (2025–2026)**
+*   **4K Restoration:** A new **4K restoration** of the film was released in IMAX theaters in North America in **March 2025** to celebrate Studio Ghibli's 40th anniversary.
+*   **Super Kabuki Adaptation:** A major new adaptation titled ***Super Kabuki: Princess Mononoke*** is scheduled to run at the Shinbashi Enbujō Theatre in Tokyo from **July to August 2026**. It will feature traditional Kabuki staging mixed with modern effects and music by Joe Hisaishi.
+
+### **7. Series Details Summary**
+| Feature | Detail |
+| :--- | :--- |
+| **Japanese Title** | もののけ姫 (*Mononoke-hime*) |
+| **Romanized Title** | Mononoke-hime |
+| **Common Abbreviation** | PM / Mononoke |
+| **Canon Status** | Standalone Film (Original Story) |
+| **Main Relationship** | Ashitaka (Emishi Prince) & San (Wolf Girl) |
+| **Latest Project** | Super Kabuki Stage Play (Summer 2026) |

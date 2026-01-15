@@ -1,0 +1,48 @@
+# AIDM .gitignore
+# Based on backup_aidm.ps1 exclusions
+
+# === SENSITIVE FILES (NEVER COMMIT) ===
+apikeys_unencrypted
+.env
+settings.json
+
+# === Virtual Environments ===
+venv/
+venv313/
+Lib/
+Include/
+share/
+Scripts/
+pyvenv.cfg
+
+# === Dependencies ===
+node_modules/
+
+# === Python Artifacts ===
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+
+# === Data & Runtime ===
+chroma/
+test_chroma/
+data/
+*.db
+*.sqlite
+
+# === Logs & Backups ===
+*.log
+log/
+backup/
+*.zip
+
+# === IDE & System ===
+.git/
+.vscode/
+*.swp
+*.swo
+Thumbs.db
+.DS_Store

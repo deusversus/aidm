@@ -1,0 +1,83 @@
+id: frieren
+name: Frieren
+source_anime: Frieren
+media_type: anime
+status: completed
+generated_at: '2026-01-07T09:57:50.526546'
+confidence: 95
+research_method: bundled_parallel
+dna_scales:
+  introspection_vs_action: 2
+  comedy_vs_drama: 3
+  simple_vs_complex: 5
+  power_fantasy_vs_struggle: 3
+  explained_vs_mysterious: 4
+  fast_paced_vs_slow_burn: 9
+  episodic_vs_serialized: 6
+  grounded_vs_absurd: 2
+  tactical_vs_instinctive: 3
+  hopeful_vs_cynical: 2
+  ensemble_vs_solo: 3
+tropes:
+  tournament_arc: true
+  training_montage: true
+  power_of_friendship: true
+  mentor_death: true
+  chosen_one: false
+  tragic_backstory: true
+  redemption_arc: false
+  betrayal: false
+  sacrifice: true
+  transformation: false
+  forbidden_technique: true
+  time_loop: false
+  false_identity: true
+  ensemble_focus: true
+  slow_burn_romance: true
+combat_system: tactical
+power_system:
+  name: Magic (Visualization-based)
+  mechanics: 'Magic is powered by Mana and structured through mathematical or linguistic
+    formulas. Its ultimate law is Visualization: a mage can only manifest what they
+    can clearly imagine. It involves mana detection, suppression, and the use of specific
+    techniques like Human Magic, Curses, or Goddess Magic.'
+  limitations: Magic is rigid and limited by the caster's logic; if a mage cannot
+    visualize a result, the spell fails regardless of mana levels. Mages are physically
+    vulnerable 'glass cannons' who are easily defeated by warriors if they get within
+    a 5-meter range.
+  tiers:
+  - 9th Class (Apprentice)
+  - 1st Class (Elite)
+  - Great Mages
+  - Demons
+  - Priests
+tone:
+  comedy_level: 4
+  darkness_level: 4
+  optimism: 8
+director_personality: You are the director for a Frieren-style campaign. You favor
+  action and momentum over lengthy contemplation. You maintain dramatic weight; comedy
+  is rare and earned. You explain strategies and tactics in detail.
+pacing:
+  scene_length: moderate
+  arc_length_sessions: 4-6
+sources_consulted:
+- power_system
+- combat
+- tone
+- characters
+- factions
+- locations
+- arcs
+- sequels
+- adaptations
+- recent
+aliases:
+- frieran
+- frieren
+- frierin
+- sousou no freiren
+- sousou no frieren
+- 葬送のフリーレン
+series_group: frieren_beyond_journeys_end
+series_position: 1

@@ -1,0 +1,90 @@
+id: hunter_x_hunter_2
+name: Hunter x Hunter (2
+source_anime: Hunter x Hunter (2
+media_type: anime
+status: completed
+generated_at: '2026-01-11T12:46:03.940489'
+confidence: 95
+research_method: bundled_parallel
+aliases:
+- Hantā Hantā
+- hunter hunter
+- hunter x hunter 2
+- hunter x hunter 2011
+- hunterxhunter2
+- hxh
+- hxh 2011
+- ハンター×ハンター
+dna_scales:
+  introspection_vs_action: 4
+  comedy_vs_drama: 3
+  simple_vs_complex: 9
+  power_fantasy_vs_struggle: 8
+  explained_vs_mysterious: 1
+  fast_paced_vs_slow_burn: 7
+  episodic_vs_serialized: 9
+  grounded_vs_absurd: 6
+  tactical_vs_instinctive: 1
+  hopeful_vs_cynical: 6
+  ensemble_vs_solo: 3
+tropes:
+  tournament_arc: true
+  training_montage: true
+  power_of_friendship: true
+  mentor_death: true
+  chosen_one: false
+  tragic_backstory: true
+  redemption_arc: true
+  betrayal: true
+  sacrifice: true
+  transformation: true
+  forbidden_technique: true
+  time_loop: false
+  false_identity: true
+  ensemble_focus: true
+  slow_burn_romance: false
+combat_system: tactical
+power_system:
+  name: Nen
+  mechanics: 'Nen is the manipulation of Aura, the life energy flowing from all living
+    beings. It is built on the Four Major Principles: Ten (containing aura), Zetsu
+    (suppressing aura), Ren (producing large amounts), and Hatsu (personal expression).
+    Users have specific affinities—Enhancement, Transmutation, Emission, Conjuration,
+    Manipulation, or Specialization—and use advanced techniques like Gyo, En, and
+    Ryu for combat.'
+  limitations: Power is governed by Vows and Contracts where self-imposed restrictions
+    multiply strength; breaking these can result in death. Users face diminishing
+    efficiency when using types outside their natural affinity. Techniques like Zetsu
+    leave the user defenseless, and the 'Initiation' method of awakening can be fatal.
+  tiers:
+  - Beginner
+  - Intermediate
+  - Expert
+  - Master
+  - Ultimate/Transcendental
+tone:
+  comedy_level: 4
+  darkness_level: 8
+  optimism: 5
+director_personality: You are the director for a Hunter x Hunter (2-style campaign.
+  You maintain dramatic weight; comedy is rare and earned. You explain strategies
+  and tactics in detail. The protagonist is powerful; challenges come from elsewhere.
+pacing:
+  scene_length: moderate
+  arc_length_sessions: 4-6
+sources_consulted:
+- power_system
+- combat
+- tone
+- characters
+- factions
+- locations
+- arcs
+- sequels
+- series_aliases
+- adaptations
+- recent
+series_group: hunter_x_hunter_2011
+series_position: 1
+related_franchise: hunter_x_hunter
+relation_type: alternate_timeline

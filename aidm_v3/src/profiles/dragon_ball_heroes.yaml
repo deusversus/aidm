@@ -1,0 +1,90 @@
+id: dragon_ball_heroes
+name: Dragon Ball Heroes
+source_anime: Dragon Ball Heroes
+media_type: anime
+status: completed
+generated_at: '2026-01-08T16:09:54.213638'
+confidence: 95
+research_method: bundled_parallel
+aliases:
+- doragon bru hrzu
+- dragon ball heroes
+- dragonballheroes
+- ドラゴンボールヒーローズ
+dna_scales:
+  introspection_vs_action: 10
+  comedy_vs_drama: 3
+  simple_vs_complex: 2
+  power_fantasy_vs_struggle: 1
+  explained_vs_mysterious: 7
+  fast_paced_vs_slow_burn: 0
+  episodic_vs_serialized: 8
+  grounded_vs_absurd: 10
+  tactical_vs_instinctive: 9
+  hopeful_vs_cynical: 2
+  ensemble_vs_solo: 3
+tropes:
+  tournament_arc: true
+  training_montage: false
+  power_of_friendship: true
+  mentor_death: false
+  chosen_one: true
+  tragic_backstory: true
+  redemption_arc: true
+  betrayal: true
+  sacrifice: true
+  transformation: true
+  forbidden_technique: true
+  time_loop: true
+  false_identity: true
+  ensemble_focus: true
+  slow_burn_romance: false
+combat_system: tactical
+power_system:
+  name: Dragon Ball Heroes Card-Battle System & Multiversal Ki
+  mechanics: A hybrid system utilizing a 7-card deck and three Battle Types (Hero,
+    Elite, Berserker). Battle Power (BP) is generated in the Attack Area, where every
+    3,000 BP produces 1 Hero Energy (HE) for Super Attacks. Combat success relies
+    on the Charge Impact (CI) timing gauge. Advanced powers include Time Power for
+    temporal manipulation and Dark Ki for corruption and mind control.
+  limitations: High-tier forms like Universal Blue are temporary and dependent on
+    external energy sources. Time-based abilities can be resisted by significantly
+    higher raw power. Energy absorption from the Universe Tree can be blocked by divine
+    shields. Avatar progression involves 'Class Ups' that reset levels while retaining
+    a fraction of previous stats.
+  tiers:
+  - Base
+  - Super
+  - Ultimate
+  - God
+  - Super God
+  - Super Saiyan 4 Limit Breaker
+  - Universal Super Saiyan Blue
+  - Ultra Instinct
+tone:
+  comedy_level: 2
+  darkness_level: 4
+  optimism: 8
+director_personality: You are the director for a Dragon Ball Heroes-style campaign.
+  You explore character thoughts and feelings deeply. You maintain dramatic weight;
+  comedy is rare and earned. Battles are won by willpower and instinct, not chess
+  moves. Embrace the absurd. Reality is a suggestion. Every victory is hard-earned.
+  Struggles are real.
+pacing:
+  scene_length: moderate
+  arc_length_sessions: 4-6
+sources_consulted:
+- power_system
+- combat
+- tone
+- characters
+- factions
+- locations
+- arcs
+- sequels
+- adaptations
+- recent
+series_group: dragon_ball_heroes
+series_position: 1
+related_franchise: dragon_ball
+relation_type: spinoff

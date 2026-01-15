@@ -1,0 +1,10 @@
+{
+  "description": "Equivalent Exchange crafting (Fullmetal Alchemist style)",
+  "type": "equivalent_exchange",
+  "parameters": {
+    "craft_focus": "alchemy",
+    "exchange_law": "Humankind cannot gain anything without first giving something in return. To obtain, something of equal value must be lost.",
+    "forbidden_transmutations": ["human_life", "human_souls", "gold_from_lead"]
+  },
+  "use_case": "Sacrifice-based transmutation. Must give up equal value to create. Hard limits on what can be created. Defines the core mechanic of Fullmetal Alchemist-style worlds."
+}

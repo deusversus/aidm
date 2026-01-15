@@ -1,0 +1,86 @@
+id: boruto
+name: Boruto
+source_anime: Boruto
+media_type: anime
+status: completed
+generated_at: '2026-01-09T08:24:10.175682'
+confidence: 95
+research_method: bundled_parallel
+aliases:
+- BORUTO （ボルト）
+- bolt
+- boruto
+- boruto naruto next generations
+- boruto two blue vortex
+- nng
+- tbv
+dna_scales:
+  introspection_vs_action: 7
+  comedy_vs_drama: 2
+  simple_vs_complex: 8
+  power_fantasy_vs_struggle: 5
+  explained_vs_mysterious: 4
+  fast_paced_vs_slow_burn: 6
+  episodic_vs_serialized: 9
+  grounded_vs_absurd: 8
+  tactical_vs_instinctive: 3
+  hopeful_vs_cynical: 4
+  ensemble_vs_solo: 6
+tropes:
+  tournament_arc: true
+  training_montage: true
+  power_of_friendship: true
+  mentor_death: true
+  chosen_one: true
+  tragic_backstory: true
+  redemption_arc: true
+  betrayal: true
+  sacrifice: true
+  transformation: true
+  forbidden_technique: true
+  time_loop: false
+  false_identity: true
+  ensemble_focus: true
+  slow_burn_romance: false
+combat_system: tactical
+power_system:
+  name: Chakra, Karma, and Shinjutsu
+  mechanics: 'The system operates on three layers: traditional Chakra/Senjutsu molded
+    from physical and mental energy, Karma which acts as a biological DNA backup that
+    rewrites a host into an Otsutsuki, and Shinjutsu which are divine arts that manipulate
+    reality and biological laws without hand signs.'
+  limitations: Karma cannot absorb natural elements like real fire or water; using
+    Karma risks total possession by an Otsutsuki consciousness; most humans die if
+    they are not compatible vessels; some Shinjutsu are passive and cannot be consciously
+    controlled.
+  tiers:
+  - God Tier (Shibai Otsutsuki)
+  - Otsutsuki Tier (Isshiki, Baryon Mode Naruto, Boruto TBV, Daemon)
+  - Vessel Tier (Code, Kawaki)
+  - Elite Shinobi (Sasuke, Kashin Koji, Sarada)
+  - Standard Shinobi (Konohamaru, Mitsuki, Genin)
+tone:
+  comedy_level: 3
+  darkness_level: 7
+  optimism: 6
+director_personality: You are the director for a Boruto-style campaign. You explore
+  character thoughts and feelings deeply. You maintain dramatic weight; comedy is
+  rare and earned. You explain strategies and tactics in detail. Embrace the absurd.
+  Reality is a suggestion.
+pacing:
+  scene_length: moderate
+  arc_length_sessions: 4-6
+sources_consulted:
+- power_system
+- combat
+- tone
+- characters
+- factions
+- locations
+- arcs
+- sequels
+- series_aliases
+- adaptations
+- recent
+series_group: naruto
+series_position: 3

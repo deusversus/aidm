@@ -1,0 +1,71 @@
+{
+  "schema_id": "meta_progression",
+  "version": "1.0",
+  "types": {
+    "mastery_tiers": {
+      "description": "Skill-based mastery progression (Hunter x Hunter Nen)",
+      "parameters": {
+        "system_name": { "type": "string", "required": true, "example": "Nen" },
+        "mastery_levels": { "type": "array", "required": true, "example": ["Novice", "Initiate", "Practitioner", "Expert", "Master"] },
+        "categories": { "type": "array", "items": "string", "required": true },
+        "advancement_method": { "type": "enum", "values": ["practice_hours", "breakthrough", "training_arc"], "default": "practice_hours" }
+      },
+      "mechanics": {
+        "leveling": "tier_based_unlock",
+        "skills": "mastery_level_determines_access",
+        "power_curve": "exponential_with_conditions"
+      }
+    },
+    "class_based": {
+      "description": "Traditional class/level system (D&D style)",
+      "parameters": {
+        "available_classes": { "type": "array", "items": "string", "required": true },
+        "multiclass_allowed": { "type": "boolean", "default": false },
+        "max_level": { "type": "number", "default": 20 },
+        "stat_growth": { "type": "string", "enum": ["fixed", "random", "choice"], "default": "fixed" }
+      },
+      "mechanics": {
+        "leveling": "xp_threshold_system",
+        "skills": "class_skill_trees",
+        "power_curve": "linear_with_capstone_abilities"
+      }
+    },
+    "quirk_awakening": {
+      "description": "Single power that evolves (MHA style)",
+      "parameters": {
+        "power_name": { "type": "string", "required": true, "example": "Quirk" },
+        "awakening_stages": { "type": "array", "required": true, "example": ["Base", "Plus Ultra", "Awakened"] },
+        "evolution_triggers": { "type": "array", "items": "string", "required": true }
+      },
+      "mechanics": {
+        "leveling": "narrative_milestone_unlocks",
+        "skills": "power_evolution_tree",
+        "power_curve": "steep_at_awakening_moments"
+      }
+    },
+    "milestone_based": {
+      "description": "Story beats grant power (campaign-driven)",
+      "parameters": {
+        "milestone_events": { "type": "array", "items": "string", "required": true },
+        "power_grants": { "type": "object", "required": true }
+      },
+      "mechanics": {
+        "leveling": "narrative_only",
+        "skills": "story_unlocked",
+        "power_curve": "dm_controlled"
+      }
+    },
+    "static_op": {
+      "description": "No progression, already overpowered (Saitama)",
+      "parameters": {
+        "starting_power_tier": { "type": "number", "required": true, "min": 1, "max": 10 },
+        "growth_focus": { "type": "string", "enum": ["none", "technique_variety", "control"], "default": "none" }
+      },
+      "mechanics": {
+        "leveling": "disabled",
+        "skills": "all_unlocked_or_static",
+        "power_curve": "flat_maximum"
+      }
+    }
+  }
+}

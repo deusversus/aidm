@@ -1,0 +1,90 @@
+id: ghost_in_the_shell
+name: Ghost in the Shell
+source_anime: Ghost in the Shell
+media_type: anime
+status: completed
+generated_at: '2026-01-12T13:27:57.530285'
+confidence: 95
+research_method: bundled_parallel
+aliases:
+- Kōkaku Kidōtai
+- ghost in the shell
+- ghost in the shell arise
+- ghost in the shell sac2045
+- ghost in the shell stand alone complex
+- ghostintheshell
+- gits
+- mmi
+- mobile armored riot police
+- sac
+- sss
+- 攻殻機動隊
+dna_scales:
+  introspection_vs_action: 4
+  comedy_vs_drama: 2
+  simple_vs_complex: 9
+  power_fantasy_vs_struggle: 3
+  explained_vs_mysterious: 4
+  fast_paced_vs_slow_burn: 7
+  episodic_vs_serialized: 6
+  grounded_vs_absurd: 3
+  tactical_vs_instinctive: 1
+  hopeful_vs_cynical: 4
+  ensemble_vs_solo: 2
+tropes:
+  tournament_arc: false
+  training_montage: false
+  power_of_friendship: false
+  mentor_death: false
+  chosen_one: false
+  tragic_backstory: true
+  redemption_arc: false
+  betrayal: true
+  sacrifice: true
+  transformation: true
+  forbidden_technique: true
+  time_loop: false
+  false_identity: true
+  ensemble_focus: true
+  slow_burn_romance: false
+combat_system: tactical
+power_system:
+  name: Ghost-Shell Integration
+  mechanics: A hard-science framework where human consciousness (Ghost) is integrated
+    with technological interfaces (Shell) via a Cyberbrain. It utilizes micromachines
+    to bridge organic neurons with digital hardware, enabling abilities such as brain-diving,
+    remote hacking, sensory distortion, and the use of thermoptic camouflage.
+  limitations: Vulnerability to 'Attack Barriers' that can cause brain death and 'Labyrinth
+    Barriers' that trap consciousness; high maintenance costs and the need for regular
+    'tuning' of prosthetic bodies; legal constraints regarding unauthorized diving;
+    and the requirement of a 'Ghost' for specific types of hacking.
+  tiers:
+  - Natural/Minimal Cyberization
+  - Partial Cyborg
+  - Full-Body Prosthesis
+  - Class-A / Wizard Class Hacker
+  - Super-Wizard Class Hacker
+tone:
+  comedy_level: 3
+  darkness_level: 7
+  optimism: 6
+director_personality: You are the director for a Ghost in the Shell-style campaign.
+  You maintain dramatic weight; comedy is rare and earned. You explain strategies
+  and tactics in detail.
+pacing:
+  scene_length: moderate
+  arc_length_sessions: 4-6
+sources_consulted:
+- power_system
+- combat
+- tone
+- characters
+- factions
+- locations
+- arcs
+- sequels
+- adaptations
+- recent
+- series_aliases
+series_group: ghost_in_the_shell
+series_position: 1

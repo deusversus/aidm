@@ -1,0 +1,91 @@
+id: fatestay_night
+name: Fate/stay night
+source_anime: Fate/stay night
+media_type: anime
+status: completed
+generated_at: '2026-01-09T09:48:40.434260'
+confidence: 95
+research_method: bundled_parallel
+aliases:
+- fatestay night
+- fatestay night heavens feel
+- fatestay night realta nua
+- fatestay night unlimited blade works
+- fatestaynight
+- feitosutei naito
+- fsn
+- hf
+- ubw
+- フェイト/ステイナイト
+dna_scales:
+  introspection_vs_action: 2
+  comedy_vs_drama: 1
+  simple_vs_complex: 9
+  power_fantasy_vs_struggle: 9
+  explained_vs_mysterious: 2
+  fast_paced_vs_slow_burn: 8
+  episodic_vs_serialized: 10
+  grounded_vs_absurd: 4
+  tactical_vs_instinctive: 3
+  hopeful_vs_cynical: 3
+  ensemble_vs_solo: 8
+tropes:
+  tournament_arc: true
+  training_montage: true
+  power_of_friendship: true
+  mentor_death: false
+  chosen_one: false
+  tragic_backstory: false
+  redemption_arc: false
+  betrayal: false
+  sacrifice: false
+  transformation: false
+  forbidden_technique: false
+  time_loop: false
+  false_identity: false
+  ensemble_focus: false
+  slow_burn_romance: false
+combat_system: tactical
+power_system:
+  name: Magecraft (Thaumaturgy) and True Magic
+  mechanics: Magi utilize Magic Circuits to convert internal life force (Od) or environmental
+    energy (Mana) into Prana. This energy is used to fuel 'Foundations'—pre-established
+    systems like Runes or Alchemy—to reenact phenomena. A magus's abilities are further
+    defined by their innate Origin (fundamental nature) and Element (affinity).
+  limitations: The system is restricted by the Principle of Mystery, where power fades
+    as science explains phenomena, and Equivalent Exchange, which prevents creating
+    something from nothing. Magic Circuits are innate and cannot be increased through
+    training. Additionally, the World (Gaia) actively suppresses unnatural phenomena
+    like Reality Marbles, and the Counter Force (Alaya) eliminates threats to humanity.
+  tiers:
+  - Ultimate Ones (Types)
+  - Divine Spirits / True Ancestors
+  - Servants / Heroic Spirits
+  - Dead Apostles
+  - 'Magi (Ranks: Frame to Grand)'
+  - Ranking System (E to A, EX)
+tone:
+  comedy_level: 2
+  darkness_level: 8
+  optimism: 7
+director_personality: You are the director for a Fate/stay night-style campaign. You
+  favor action and momentum over lengthy contemplation. You maintain dramatic weight;
+  comedy is rare and earned. You explain strategies and tactics in detail. The protagonist
+  is powerful; challenges come from elsewhere.
+pacing:
+  scene_length: moderate
+  arc_length_sessions: 4-6
+sources_consulted:
+- power_system
+- combat
+- tone
+- characters
+- factions
+- locations
+- arcs
+- sequels
+- series_aliases
+- adaptations
+- recent
+series_group: fate_series
+series_position: 1

@@ -1,0 +1,132 @@
+## Power System, Combat
+*Cyberpunk: Edgerunners* features a power system rooted in the "High Tech, Low Life" ethos of the Cyberpunk 2077 universe. It is a system where power is literally bought and installed, but at the cost of one’s sanity and physical health.
+
+### **1. Power System: Cyberware & Netrunning**
+The power system is divided into two primary disciplines: **Cyberware** (physical/hardware) and **Netrunning** (digital/software).
+
+#### **Mechanics & Abilities**
+*   **Cyberware (Chrome):** Characters enhance their bodies with implants.
+    *   **Sandevistan (Sandy):** The most iconic ability in the series. It is a spinal implant that grants superhuman speed by dilating the user's perception of time. Visually, this is shown as the user moving while everyone else is frozen, often leaving a "green trail" of afterimages.
+    *   **Gorilla Arms / Monowire:** Physical combat enhancements. Gorilla Arms provide immense blunt force, while the Monowire (used by Lucy) is a molecular-thin whip used for both decapitation and remote hacking.
+    *   **Cyberskeleton:** An experimental, massive exoskeleton David uses in the finale. It grants gravity-manipulation powers, allowing him to crush tanks and deflect bullets, but it requires constant medicinal suppression to prevent instant death.
+*   **Quickhacking:** Netrunners like Lucy and Kiwi use "Cyberdecks" to upload viruses into an enemy's **Neuroport**.
+    *   **Abilities:** They can force enemies to commit suicide ("Synapse Burnout"), jam weapons ("Weapon Glitch"), or blind them ("Reboot Optics").
+    *   **Rules:** Hacking requires a "jack-in" (wireless or physical link). Higher-tier netrunners can "counter-hack" or trace the location of the attacker.
+
+#### **Limitations & Rules: The "Humanity" Cost**
+*   **Cyberpsychosis:** The ultimate limitation. Every piece of "chrome" chips away at a person's humanity. The brain struggles to process artificial sensory input, leading to a loss of empathy, hallucinations, and eventually a violent, psychotic break.
+*   **Immunosuppressants:** To delay cyberpsychosis, "chrome-jockeys" must take heavy doses of blockers. Over time, the body builds a tolerance, requiring higher doses until they no longer work.
+*   **Physical Strain:** High-tier cyberware like the Sandevistan causes nosebleeds, tremors, and organ failure if overused.
+
+#### **Tiers & Progression**
+*   **Tier 1: Street Level:** Basic internal upgrades, cheap pistols, and minimal chrome (e.g., David at the start).
+*   **Tier 2: Edgerunner:** Professional mercenaries with specialized gear (e.g., Maine’s crew). They have a balance of speed, hacking, and firepower.
+*   **Tier 3: Night City Legend:** Chromed to the limit, capable of taking on entire police platoons (e.g., David post-timeskip).
+*   **Tier 4: Force of Nature:** Characters like **Adam Smasher**, who is 96% machine. He represents the "ceiling" of the power system—someone who has replaced so much of himself that he is effectively a living weapon with no remaining humanity to lose.
+
+---
+
+### **2. Combat: Tactical Spectacle**
+Combat in *Edgerunners* is a blend of gritty tactical realism and the "flashy spectacle" of **Studio Trigger’s** signature animation style.
+
+#### **Fighting Styles**
+*   **David (The Speedster):** Relies almost entirely on the Sandevistan to end fights before they begin. His style is "hit and run," using speed to bypass defenses.
+*   **Maine (The Tank):** Uses overwhelming force, projectile launchers, and heavy machine guns. His style is "attrition," absorbing damage while dishing out more.
+*   **Lucy (The Assassin):** Combines stealth with the Monowire. She is a "glass cannon," avoiding direct confrontation by hacking enemies or slicing them from a distance.
+
+#### **Tactical vs. Flashy Spectacle**
+*   **Tactical Depth:** Battles often involve "prepping"—hacking cameras, scouting layouts, and using specialized roles (Driver, Techie, Netrunner). The show respects the "action economy" of the tabletop game; if a character is caught without their team or their meds, they die quickly.
+*   **Studio Trigger Spectacle:** The animation uses **"Kanada-style"** techniques—exaggerated poses, sharp timing, and vibrant color flares. Speed is conveyed through "rim lighting" (glowing outlines) and distorted backgrounds, making the high-speed combat feel kinetic and overwhelming.
+
+#### **Emotional Stakes**
+Combat is rarely just about winning; it is a narrative tool for the characters' descent.
+*   **The Weight of Chrome:** Every time David uses his Sandevistan to save a friend, the audience sees the physical toll (shaking hands, blurred vision). The "spectacle" of the fight is undercut by the "tragedy" of his looming insanity.
+*   **The Final Battle:** David vs. Adam Smasher is a clash of ideologies. David fights for Lucy’s dream (emotional), while Smasher fights because he is a machine designed for it (mechanical). The battle is a "spectacle" of gravity and speed, but the "emotional" core is David’s realization that he has reached the end of his path.
+
+## Tone, Characters
+*Cyberpunk: Edgerunners* is a 10-episode standalone anime series set in the world of the *Cyberpunk 2077* video game. Produced by Studio Trigger, it is known for its high-octane action, vibrant aesthetic, and deeply tragic narrative.
+
+### **Tone and Atmosphere**
+The series is a quintessential **Cyberpunk** story, defined by the "high tech, low life" mantra.
+
+*   **Genre & Mood:** It is an **Action-Tragedy**. While it begins with the energy of an underdog success story, it quickly shifts into a fatalistic "Shakespearean tragedy." The mood is oppressive and cynical, emphasizing that in Night City, there are no happy endings—only how you are remembered after you die.
+*   **Dark Comedy:** The show utilizes **dark comedy** to highlight the absurdity of its dystopian world. This is seen in the casualness of extreme violence, the eccentric and "over-the-top" personalities of the crew (particularly Rebecca), and the satirical nature of corporate advertisements that play even during life-or-death moments.
+*   **Optimism vs. Fatalism:** Optimism is rare and fragile, usually manifesting as "The Dream" (e.g., Lucy’s desire to go to the Moon). However, the show suggests that hope is a "trap" or a "delusion" that keeps people running on the corporate hamster wheel until they break.
+*   **Atmosphere:** The atmosphere is a sensory overload of neon colors, hyper-violence, and dehumanizing technology. It captures the feeling of "living on borrowed time," where every character is one bad day away from death or **Cyberpsychosis** (a mental break caused by excessive cybernetic implants).
+
+---
+
+### **Main Characters & Roles**
+
+#### **The Protagonist: David Martinez**
+*   **Role:** A talented but impoverished street kid who drops out of the prestigious Arasaka Academy after a personal tragedy. He becomes an "Edgerunner" (mercenary) to survive.
+*   **Abilities:** His signature cyberware is the **Sandevistan**, a military-grade spinal implant that allows him to move at superhuman speeds (effectively slowing down time). Later, he adopts heavy-duty implants, including the experimental **Cyber Skeleton**.
+*   **Relationships:** He views **Maine** as a father figure and inherits his "dreams." He is romantically involved with **Lucy**, whose safety becomes his primary motivation.
+
+#### **The Love Interest: Lucy (Lucyna Kushinada)**
+*   **Role:** A mysterious and highly skilled **Netrunner** who introduces David to the criminal underworld. 
+*   **Abilities:** She is an elite hacker capable of infiltrating high-security corporate servers. In combat, she uses **Monowire**—thin, glowing fiber-optic wires that can slice through enemies.
+*   **Relationships:** She is guarded due to a traumatic past as an Arasaka test subject. Her relationship with David is the emotional core of the show; she wants to save him from the city, while he wants to fulfill her dream of going to the Moon.
+
+#### **The Crew**
+*   **Maine (The Mentor):** The veteran leader of the crew. He uses **Gorilla Arms** and a **Projectile Launch System**. His descent into cyberpsychosis serves as a grim foreshadowing for David’s own path.
+*   **Rebecca (The Solo):** A trigger-happy, fiercely loyal gunner. She uses a variety of heavy firearms, including her signature shotgun, **Guts**. Despite her unrequited feelings for David, she remains his most steadfast ally until the end.
+*   **Kiwi (The Veteran Netrunner):** Lucy’s stoic mentor. She is pragmatic and cynical, famously living by the code: "Never trust a soul in Night City."
+*   **Falco (The Driver):** The crew's reliable getaway driver. He is one of the few characters who prioritizes survival and loyalty over "becoming a legend."
+
+---
+
+### **Antagonists**
+
+*   **Faraday (The Fixer):** A manipulative middleman who works for both Militech and Arasaka. He is the primary architect of the crew's downfall, viewing them as disposable tools for corporate espionage.
+*   **Adam Smasher:** A legendary corporate "boogeyman" and full-borg solo working for Arasaka. He serves as the **physical antagonist**, representing the pinnacle of dehumanization—a being who is more machine than man and possesses overwhelming, unstoppable power.
+*   **Night City (The Overarching Villain):** The show frequently frames the city itself as the true antagonist. It is a meat grinder that consumes the young and ambitious, ensuring that even those who "win" lose their humanity in the process.
+
+## Factions, Locations, Arcs, Sequels, Adaptations, Recent
+*Cyberpunk: Edgerunners* is a 10-episode standalone anime series produced by **Studio Trigger** in collaboration with **CD Projekt Red**. Set in the universe of the *Cyberpunk 2077* video game and the original tabletop RPG by Mike Pondsmith, it serves as a prequel to the game's main events.
+
+### **1. Organizations, Factions, and World Powers**
+The world of *Edgerunners* is defined by a "neofeudal" structure where corporations hold more power than governments.
+
+*   **Megacorporations:**
+    *   **Arasaka Corporation:** The primary antagonist. A Japanese security, banking, and manufacturing giant. They control Night City through economic might and the **Arasaka Academy**.
+    *   **Militech:** Arasaka’s American rival and a major military contractor. They are the "fist" of the **NUSA** (New United States of America).
+    *   **Trauma Team International:** A high-end paramedical insurance company that provides armed rescue services only to those who can afford the "Platinum" premiums.
+*   **Gangs of Night City:**
+    *   **Maelstrom:** Chrome-obsessed ghouls who replace most of their flesh with cyberware; they appear in early episodes during a heist.
+    *   **Tyger Claws:** A Japanese-influenced gang that controls Japantown and has unofficial ties to Arasaka.
+    *   **The Mox:** A gang formed to protect sex workers and outcasts; they operate out of **Lizzie’s Bar**.
+*   **The Edgerunners (Mercenaries):**
+    *   A "crew" of mercenaries (solos, netrunners, and techies) led initially by **Maine** and later by **David Martinez**. They operate in the "gray" market, taking illegal "gigs" from Fixers like **Faraday**.
+
+### **2. Important Locations and Geography**
+The series takes place in **Night City**, a fictional megalopolis on the coast of California (formerly the Free State of Northern California).
+
+*   **Santo Domingo (Arroyo):** The industrial, poverty-stricken district where David lives in **Megabuilding H4**.
+*   **Watson (Kabuki & Little China):** Home to the **Afterlife** bar (the legendary merc hangout) and various ripperdoc clinics.
+*   **Westbrook (Japantown):** A neon-soaked entertainment hub where Lucy lives and the crew often celebrates at **Turbo’s Diner**.
+*   **City Center (Corpo Plaza):** The heart of corporate power, dominated by the **Arasaka Tower**. This is the site of the series' climactic finale.
+*   **The Badlands:** The desert wasteland outside the city, used for training and smuggling runs.
+*   **The Moon:** A symbol of hope and escape for Lucy, representing a life away from the "cage" of Night City.
+
+### **3. Major Story Arcs and Timeline**
+The story takes place in **2076**, roughly one year before the start of *Cyberpunk 2077*.
+
+*   **The Origin Arc (Episodes 1–3):** David Martinez, a brilliant but poor student, loses his mother in a drive-by shooting. Desperate and angry, he implants a military-grade **Sandevistan** (speed-enhancing cyberware) and joins Maine’s crew after meeting the netrunner **Lucy**.
+*   **The Rise Arc (Episodes 4–6):** David integrates into the crew, learning the ropes of being an "Edgerunner." This arc culminates in a tragic mission where Maine succumbs to **cyberpsychosis**, leading to his death and David taking over the leadership.
+*   **The Fall Arc (Episodes 7–10):** A time skip shows a heavily "chromed-out" David leading a successful crew. However, he is manipulated by the Fixer Faraday into a trap involving the **Cyber Skeleton**—a massive, experimental Arasaka weapon. The series ends with a suicidal assault on Arasaka Tower to save Lucy from Arasaka’s netrunners.
+
+### **4. Sequels, Spinoffs, and Continuity**
+*   **Cyberpunk: Edgerunners II:** Announced in July 2025, this is a **standalone sequel series** currently in production by Studio Trigger. It will feature a new cast and a new story in Night City, rather than continuing David’s finished narrative.
+*   **Cyberpunk 2077 (Game):** The anime is canon to the game. Players can find David’s jacket, visit his apartment, and even order a "David Martinez" drink at the Afterlife bar.
+*   **Cyberpunk: Edgerunners Mission Kit:** A tabletop RPG expansion by R. Talsorian Games that provides lore and rules for playing in the 2076 "Edgerunners" era.
+
+### **5. Manga vs. Anime Differences**
+There is **no direct manga adaptation** of the anime's plot. Instead, the franchise has expanded through original manga stories:
+*   **Cyberpunk: Edgerunners MADNESS:** A prequel manga launched in December 2024. It focuses on the backstories of **Rebecca and Pilar** before they joined Maine’s crew.
+*   **Differences:** While the anime is a high-octane, tragic action-drama, the *Madness* manga leans more into the chaotic, "every man for himself" upbringing of the siblings in Night City.
+
+### **6. Latest Events and Ongoing Updates**
+*   **Anime:** *Cyberpunk: Edgerunners II* is the most significant upcoming project. Early teasers suggest a protagonist who is a young "media" (journalist/cameraman) with bright green eyes.
+*   **Manga:** *Edgerunners MADNESS* is currently being serialized. Volume 1 is scheduled for a physical English release by **Dark Horse Comics** in **February 2026**.
+*   **Gaming:** CD Projekt Red continues to reference the anime in *Cyberpunk 2077* updates (Patch 1.6 and 2.0+), maintaining the "Edgerunner" legacy through gear and lore shards.

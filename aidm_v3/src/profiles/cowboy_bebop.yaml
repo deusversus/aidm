@@ -1,0 +1,81 @@
+id: cowboy_bebop
+name: Cowboy Bebop
+source_anime: Cowboy Bebop
+media_type: anime
+status: completed
+generated_at: '2026-01-06T14:04:00.537662'
+confidence: 95
+research_method: bundled_parallel
+dna_scales:
+  introspection_vs_action: 5
+  comedy_vs_drama: 2
+  simple_vs_complex: 7
+  power_fantasy_vs_struggle: 8
+  explained_vs_mysterious: 6
+  fast_paced_vs_slow_burn: 7
+  episodic_vs_serialized: 3
+  grounded_vs_absurd: 3
+  tactical_vs_instinctive: 8
+  hopeful_vs_cynical: 8
+  ensemble_vs_solo: 3
+tropes:
+  tournament_arc: false
+  training_montage: false
+  power_of_friendship: false
+  mentor_death: false
+  chosen_one: false
+  tragic_backstory: true
+  redemption_arc: true
+  betrayal: true
+  sacrifice: true
+  transformation: false
+  forbidden_technique: false
+  time_loop: false
+  false_identity: true
+  ensemble_focus: true
+  slow_burn_romance: false
+combat_system: narrative
+power_system:
+  name: Grounded Sci-Fi Framework
+  mechanics: Abilities are derived from cybernetic enhancements, biological experimentation,
+    nanotechnology, and chemical stimulants like Red Eye. Rare phenomena like immortality
+    result from hyperspace energy exposure during the Astral Gate Disaster.
+  limitations: All enhancements have physical or scientific costs. Combat drugs cause
+    extreme strain and fatal withdrawal, while cybernetics are limited by hardware
+    durability and physical laws.
+  tiers:
+  - 'Tier 1 (Augmented): Mad Pierrot, Red Eye users'
+  - 'Tier 2 (Peak Human): Spike Spiegel, Vicious, Vincent Volaju'
+  - 'Tier 3 (Professional): Jet Black, Faye Valentine, ISSP officers'
+tone:
+  comedy_level: 3
+  darkness_level: 7
+  optimism: 3
+director_personality: You are the director for a Cowboy Bebop-style campaign. You
+  maintain dramatic weight; comedy is rare and earned. Battles are won by willpower
+  and instinct, not chess moves. The protagonist is powerful; challenges come from
+  elsewhere.
+pacing:
+  scene_length: moderate
+  arc_length_sessions: 4-6
+sources_consulted:
+- power_system
+- combat
+- tone
+- characters
+- factions
+- locations
+- arcs
+- sequels
+- adaptations
+- recent
+aliases:
+- cb
+- cowboy bebob
+- cowboy bebop
+- cowboy beebop
+- cowboybebop
+- kaubi bibappu
+- カウボーイビバップ
+series_group: cowboy_bebop
+series_position: 1

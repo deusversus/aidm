@@ -1,0 +1,94 @@
+id: hellsing_ultimate
+name: Hellsing Ultimate
+source_anime: Hellsing Ultimate
+media_type: anime
+status: completed
+generated_at: '2026-01-07T09:33:43.451511'
+confidence: 95
+research_method: bundled_parallel
+dna_scales:
+  introspection_vs_action: 8
+  comedy_vs_drama: 2
+  simple_vs_complex: 4
+  power_fantasy_vs_struggle: 1
+  explained_vs_mysterious: 4
+  fast_paced_vs_slow_burn: 2
+  episodic_vs_serialized: 10
+  grounded_vs_absurd: 9
+  tactical_vs_instinctive: 7
+  hopeful_vs_cynical: 8
+  ensemble_vs_solo: 7
+tropes:
+  tournament_arc: false
+  training_montage: false
+  power_of_friendship: false
+  mentor_death: true
+  chosen_one: false
+  tragic_backstory: true
+  redemption_arc: false
+  betrayal: true
+  sacrifice: true
+  transformation: true
+  forbidden_technique: true
+  time_loop: false
+  false_identity: true
+  ensemble_focus: false
+  slow_burn_romance: false
+combat_system: spectacle
+power_system:
+  name: Soul & Blood Absorption (Control Art Restriction System)
+  mechanics: The system is based on the principle that 'Blood is the coinage of the
+    soul.' When a vampire consumes blood, they absorb the victim's entire existence,
+    including memories and skills. These souls act as a stock of extra lives for instant
+    regeneration and can be manifested as familiars. Alucard specifically operates
+    under the Control Art Restriction System, which seals his power behind alchemical
+    levels.
+  limitations: To become a vampire, the victim must be a virgin; otherwise, they turn
+    into a mindless Ghoul. Vampires are weakened by sunlight, silver, and holy weapons,
+    and cannot enter private residences without an invitation. At Level 0, the user
+    is highly vulnerable because all stored souls are externalized, meaning a single
+    strike to the heart can cause permanent death.
+  tiers:
+  - Level 0 (Ultimate Release/Undead Army)
+  - Level 1 & 2 (Shadow Manifestation/Baskerville)
+  - Level 3 to 6 (Standard Combat/Restricted)
+  - True Vampires
+  - Werewolves
+  - Regenerators
+  - Artificial Vampires
+  - Fledglings
+  - Ghouls
+tone:
+  comedy_level: 3
+  darkness_level: 9
+  optimism: 3
+director_personality: You are the director for a Hellsing Ultimate-style campaign.
+  You explore character thoughts and feelings deeply. You maintain dramatic weight;
+  comedy is rare and earned. Battles are won by willpower and instinct, not chess
+  moves. Embrace the absurd. Reality is a suggestion. Every victory is hard-earned.
+  Struggles are real.
+pacing:
+  scene_length: moderate
+  arc_length_sessions: 4-6
+sources_consulted:
+- power_system
+- combat
+- tone
+- characters
+- factions
+- locations
+- arcs
+- sequels
+- adaptations
+- recent
+aliases:
+- hellsing ultimate
+- hellsingultimate
+- helsing
+- herushingu
+- hu
+- ヘルシング
+series_group: hellsing_ultimate
+series_position: 1
+related_franchise: hellsing
+relation_type: alternate_timeline

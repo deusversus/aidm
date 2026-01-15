@@ -1,0 +1,87 @@
+id: my_hero_academia_vigilantes
+name: 'My Hero Academia: Vigilantes'
+source_anime: 'My Hero Academia: Vigilantes'
+media_type: anime
+status: completed
+generated_at: '2026-01-11T10:58:22.679874'
+confidence: 95
+research_method: bundled_parallel
+aliases:
+- Vijirante -Boku no Hīrō Akademia Irīgarusu-
+- boku no hero academia illegals
+- mha vigilantes
+- my hero academia vigilantes
+- myheroacademiavigilantes
+- vigilantes
+- ヴィジランテ-僕のヒーローアカデミア ILLEGALS-
+dna_scales:
+  introspection_vs_action: 5
+  comedy_vs_drama: 5
+  simple_vs_complex: 6
+  power_fantasy_vs_struggle: 8
+  explained_vs_mysterious: 3
+  fast_paced_vs_slow_burn: 7
+  episodic_vs_serialized: 7
+  grounded_vs_absurd: 4
+  tactical_vs_instinctive: 5
+  hopeful_vs_cynical: 3
+  ensemble_vs_solo: 4
+tropes:
+  tournament_arc: false
+  training_montage: true
+  power_of_friendship: true
+  mentor_death: false
+  chosen_one: false
+  tragic_backstory: true
+  redemption_arc: true
+  betrayal: false
+  sacrifice: false
+  transformation: true
+  forbidden_technique: false
+  time_loop: false
+  false_identity: true
+  ensemble_focus: true
+  slow_burn_romance: false
+combat_system: tactical
+power_system:
+  name: Quirks
+  mechanics: Quirks are biological abilities that can undergo 'Evolution' through
+    a gradual realization of their true nature, often hindered by subconscious suppression
+    from psychological trauma. They can be artificially enhanced using the drug 'Trigger,'
+    which increases potency while decreasing rationality and causing physical markers
+    like a black tongue.
+  limitations: Quirks are limited by physical strain, specific 'fuel' sources, and
+    environmental requirements. For example, speed-based Quirks like Overclock are
+    limited by the user's ability to hold their breath and brain strain. Additionally,
+    legal restrictions like the Rhode Island Statute prohibit public Quirk usage without
+    a hero license.
+  tiers:
+  - S-Tier (Symbol Level)
+  - A-Tier (Top Pro Level)
+  - B-Tier (Street Level)
+  - C-Tier (Impromptu)
+tone:
+  comedy_level: 6
+  darkness_level: 6
+  optimism: 8
+director_personality: 'You are the director for a My Hero Academia: Vigilantes-style
+  campaign. The protagonist is powerful; challenges come from elsewhere.'
+pacing:
+  scene_length: moderate
+  arc_length_sessions: 4-6
+sources_consulted:
+- power_system
+- combat
+- tone
+- characters
+- factions
+- locations
+- arcs
+- sequels
+- adaptations
+- recent
+- series_aliases
+series_group: my_hero_academia_vigilantes
+series_position: 1
+related_franchise: my_hero_academia
+relation_type: spinoff

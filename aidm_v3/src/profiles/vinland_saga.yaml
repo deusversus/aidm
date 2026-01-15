@@ -1,0 +1,84 @@
+id: vinland_saga
+name: Vinland Saga
+source_anime: Vinland Saga
+media_type: anime
+status: completed
+generated_at: '2026-01-05T17:01:37.761681'
+confidence: 95
+research_method: bundled_parallel
+dna_scales:
+  introspection_vs_action: 4
+  comedy_vs_drama: 1
+  simple_vs_complex: 8
+  power_fantasy_vs_struggle: 9
+  explained_vs_mysterious: 1
+  fast_paced_vs_slow_burn: 8
+  episodic_vs_serialized: 10
+  grounded_vs_absurd: 2
+  tactical_vs_instinctive: 4
+  hopeful_vs_cynical: 4
+  ensemble_vs_solo: 4
+tropes:
+  tournament_arc: false
+  training_montage: false
+  power_of_friendship: false
+  mentor_death: true
+  chosen_one: false
+  tragic_backstory: true
+  redemption_arc: true
+  betrayal: true
+  sacrifice: true
+  transformation: false
+  forbidden_technique: false
+  time_loop: false
+  false_identity: true
+  ensemble_focus: true
+  slow_burn_romance: true
+combat_system: narrative
+power_system:
+  name: True Warrior Philosophy & Saga Logic
+  mechanics: A grounded system based on peak human physicality and technical mastery
+    where legendary warriors perform superhuman feats. It involves technical specialization
+    (speed vs. brute force), the use of Berserker mushrooms for increased strength,
+    and battle instincts that allow warriors to sense an opponent's intent.
+  limitations: Users are subject to realistic physical tolls including exhaustion,
+    blood loss, and permanent scarring. Combat is also limited by weapon durability
+    and the Jomsviking Code, which mandates a refusal to flee regardless of tactical
+    disadvantage.
+  tiers:
+  - God Tier (Thors Snorresson)
+  - Legendary (Thorkell the Tall, Garm)
+  - Elite (Askeladd, Snake, Adult Thorfinn)
+  - Veteran (Bjorn, Thorgil, Wulf)
+  - Standard (Jomsvikings, English Thegns)
+tone:
+  comedy_level: 2
+  darkness_level: 8
+  optimism: 7
+director_personality: You are the director for a Vinland Saga-style campaign. You
+  maintain dramatic weight; comedy is rare and earned. The protagonist is powerful;
+  challenges come from elsewhere.
+pacing:
+  scene_length: moderate
+  arc_length_sessions: 4-6
+sources_consulted:
+- power_system
+- combat
+- tone
+- characters
+- factions
+- locations
+- arcs
+- sequels
+- adaptations
+- recent
+aliases:
+- vineland saga
+- vinland saga
+- vinland sagg
+- vinland sagga
+- vinlandsaga
+- vs
+- ヴィンランド・サガ
+series_group: vinland_saga
+series_position: 1

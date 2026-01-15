@@ -1,0 +1,7 @@
+{
+  "description": "School/Slice of Life anime",
+  "enabled_modes": ["slice_of_life", "social_links", "training_arcs"],
+  "default_mode": "slice_of_life",
+  "time_tracking": true,
+  "use_case": "Haikyuu, K-On!, My Hero Academia (school portions). Focus on daily life, relationships, occasional training. Time tracking for school schedules and seasons."
+}

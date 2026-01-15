@@ -1,0 +1,83 @@
+id: vampire_hunter_d_bloodlust
+name: Vampire Hunter D Bloodlust
+source_anime: Vampire Hunter D Bloodlust
+media_type: anime
+status: completed
+generated_at: '2026-01-09T08:01:34.425351'
+confidence: 95
+research_method: bundled_parallel
+aliases:
+- 'Banpaia Hantā Dī: Buraddorasuto'
+- bloodlust
+- demon deathchase
+- vampire hunter d bloodlust
+- vampirehunterdbloodlust
+- vhd bloodlust
+- 吸血鬼ハンターD ブラッドラスト
+dna_scales:
+  introspection_vs_action: 7
+  comedy_vs_drama: 1
+  simple_vs_complex: 4
+  power_fantasy_vs_struggle: 3
+  explained_vs_mysterious: 6
+  fast_paced_vs_slow_burn: 3
+  episodic_vs_serialized: 10
+  grounded_vs_absurd: 7
+  tactical_vs_instinctive: 4
+  hopeful_vs_cynical: 7
+  ensemble_vs_solo: 7
+tropes:
+  tournament_arc: false
+  training_montage: false
+  power_of_friendship: false
+  mentor_death: false
+  chosen_one: true
+  tragic_backstory: true
+  redemption_arc: true
+  betrayal: true
+  sacrifice: true
+  transformation: true
+  forbidden_technique: false
+  time_loop: false
+  false_identity: true
+  ensemble_focus: false
+  slow_burn_romance: false
+combat_system: spectacle
+power_system:
+  name: Nobility Hierarchy and Noble Arts
+  mechanics: A system based on biological and technological superiority where ancient
+    vampires (Nobility) use sorcery and regeneration, while hybrids and mutants utilize
+    elemental absorption, shadow manipulation, and genetic engineering.
+  limitations: Susceptibility to Heat Syndrome (sun-sickness), constant psychological
+    bloodlust, exhaustion of symbiotic entities like the Left Hand, and vulnerability
+    to holy symbols or running water.
+  tiers:
+  - The Sacred Ancestor
+  - The Nobility
+  - Dhampirs
+  - The Barbarois
+  - Enhanced Humans
+tone:
+  comedy_level: 2
+  darkness_level: 8
+  optimism: 4
+director_personality: You are the director for a Vampire Hunter D Bloodlust-style
+  campaign. You explore character thoughts and feelings deeply. You maintain dramatic
+  weight; comedy is rare and earned.
+pacing:
+  scene_length: moderate
+  arc_length_sessions: 4-6
+sources_consulted:
+- power_system
+- combat
+- tone
+- characters
+- factions
+- locations
+- arcs
+- sequels
+- adaptations
+- recent
+- series_aliases
+series_group: vampire_hunter_d
+series_position: 2

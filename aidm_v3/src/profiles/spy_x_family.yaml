@@ -1,0 +1,80 @@
+id: spy_x_family
+name: Spy x Family
+source_anime: Spy x Family
+media_type: anime
+status: completed
+generated_at: '2026-01-05T18:35:17.972203'
+confidence: 95
+research_method: bundled_parallel
+dna_scales:
+  introspection_vs_action: 5
+  comedy_vs_drama: 7
+  simple_vs_complex: 6
+  power_fantasy_vs_struggle: 3
+  explained_vs_mysterious: 4
+  fast_paced_vs_slow_burn: 7
+  episodic_vs_serialized: 5
+  grounded_vs_absurd: 6
+  tactical_vs_instinctive: 3
+  hopeful_vs_cynical: 2
+  ensemble_vs_solo: 2
+tropes:
+  tournament_arc: true
+  training_montage: true
+  power_of_friendship: false
+  mentor_death: false
+  chosen_one: false
+  tragic_backstory: true
+  redemption_arc: false
+  betrayal: false
+  sacrifice: false
+  transformation: false
+  forbidden_technique: false
+  time_loop: false
+  false_identity: true
+  ensemble_focus: true
+  slow_burn_romance: true
+combat_system: tactical
+power_system:
+  name: Project Apple & Peak Human Conditioning
+  mechanics: A soft system combining experimental supernatural abilities like telepathy
+    and precognition with extreme physical training. Telepathy manifests as perceiving
+    thoughts through voices or images, while precognition provides glimpses of likely
+    futures. Physical abilities include 'Hysterical Strength' and high resistance
+    to toxins.
+  limitations: Telepathy is lost during the new moon (Eclipsis) and causes mental
+    overload in crowds. Precognition is not absolute and can be altered by intervention.
+    Physical combatants are still susceptible to injury and rely on tactical equipment.
+  tiers:
+  - 'Tier 0: The Outlier (Yor Forger)'
+  - 'Tier 1: Elite Professionals (Loid, Fiona, Shopkeeper)'
+  - 'Tier 2: Specialized/Supernatural (Yuri, Matthew, Anya, Bond)'
+tone:
+  comedy_level: 8
+  darkness_level: 4
+  optimism: 8
+director_personality: You are the director for a Spy x Family-style campaign. You
+  inject humor even in tense moments. You explain strategies and tactics in detail.
+pacing:
+  scene_length: moderate
+  arc_length_sessions: 4-6
+sources_consulted:
+- power_system
+- combat
+- tone
+- characters
+- factions
+- locations
+- arcs
+- sequels
+- adaptations
+- recent
+aliases:
+- SPY×FAMILY
+- spy family
+- spy x family
+- spyxfamily
+- supai famiri
+- sxf
+series_group: spy_x_family
+series_position: 1

@@ -1,0 +1,89 @@
+id: rising_of_the_shield_hero
+name: Rising of the Shield Hero
+source_anime: Rising of the Shield Hero
+media_type: anime
+status: completed
+generated_at: '2026-01-07T12:44:58.926638'
+confidence: 95
+research_method: bundled_parallel
+dna_scales:
+  introspection_vs_action: 6
+  comedy_vs_drama: 2
+  simple_vs_complex: 6
+  power_fantasy_vs_struggle: 8
+  explained_vs_mysterious: 3
+  fast_paced_vs_slow_burn: 7
+  episodic_vs_serialized: 9
+  grounded_vs_absurd: 4
+  tactical_vs_instinctive: 3
+  hopeful_vs_cynical: 7
+  ensemble_vs_solo: 7
+tropes:
+  tournament_arc: false
+  training_montage: true
+  power_of_friendship: true
+  mentor_death: false
+  chosen_one: true
+  tragic_backstory: true
+  redemption_arc: false
+  betrayal: true
+  sacrifice: false
+  transformation: true
+  forbidden_technique: true
+  time_loop: false
+  false_identity: false
+  ensemble_focus: false
+  slow_burn_romance: true
+combat_system: tactical
+power_system:
+  name: Status Magic System (SMS)
+  mechanics: 'A game-like progression system centered on Legendary and Vassal Weapons
+    that absorb materials to unlock new forms and permanent stat bonuses. It utilizes
+    three energy sources: SP (Soul Power) for weapon skills, MP (Magic Power) for
+    elemental spells, and Ki for life-force manipulation. Heroes can share unique
+    strengthening methods like Smelting and Mastery, provided they believe in the
+    method''s efficacy.'
+  limitations: The Proximity Rule prevents Legendary Heroes from gaining XP when within
+    1km of each other. The Weapon Lockout causes an electrical shock if a hero attempts
+    to use a non-assigned weapon type. Curse Series abilities provide massive power
+    but inflict severe permanent stat reductions or psychological trauma.
+  tiers:
+  - Fast
+  - Zweite
+  - Drifter
+  - Liberation
+  - Class Up (Level 40/100)
+  - Legendary/Vassal Grade
+tone:
+  comedy_level: 3
+  darkness_level: 7
+  optimism: 6
+director_personality: You are the director for a Rising of the Shield Hero-style campaign.
+  You maintain dramatic weight; comedy is rare and earned. You explain strategies
+  and tactics in detail. The protagonist is powerful; challenges come from elsewhere.
+pacing:
+  scene_length: moderate
+  arc_length_sessions: 4-6
+sources_consulted:
+- power_system
+- combat
+- tone
+- characters
+- factions
+- locations
+- arcs
+- sequels
+- adaptations
+- recent
+aliases:
+- rising of the shield hero
+- rising of the shieldhero
+- risingoftheshieldhero
+- shield hero
+- tate no yusha
+- tate no yuusa
+- tate no yuusha
+- tate no yuusha no nariagari
+- 盾の勇者の成り上がり
+series_group: rising_of_the_shield_hero
+series_position: 1

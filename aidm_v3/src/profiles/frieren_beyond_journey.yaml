@@ -1,0 +1,87 @@
+id: frieren_beyond_journey
+name: 'Frieren: Beyond Journey'
+source_anime: 'Frieren: Beyond Journey'
+media_type: anime
+status: completed
+generated_at: '2026-01-12T14:28:11.294333'
+confidence: 95
+research_method: bundled_parallel
+aliases:
+- Sōsō no Furīren
+- frieren
+- frieren at the funeral
+- frieren beyond journey
+- frieren beyond journeys end
+- frieren the slayer
+- frierenbeyondjourney
+- snf
+- 葬送のフリーレン
+dna_scales:
+  introspection_vs_action: 5
+  comedy_vs_drama: 5
+  simple_vs_complex: 5
+  power_fantasy_vs_struggle: 5
+  explained_vs_mysterious: 5
+  fast_paced_vs_slow_burn: 5
+  episodic_vs_serialized: 5
+  grounded_vs_absurd: 5
+  tactical_vs_instinctive: 5
+  hopeful_vs_cynical: 5
+  ensemble_vs_solo: 5
+tropes:
+  tournament_arc: false
+  training_montage: false
+  power_of_friendship: false
+  mentor_death: false
+  chosen_one: false
+  tragic_backstory: false
+  redemption_arc: false
+  betrayal: false
+  sacrifice: false
+  transformation: false
+  forbidden_technique: false
+  time_loop: false
+  false_identity: false
+  ensemble_focus: false
+  slow_burn_romance: false
+combat_system: tactical
+power_system:
+  name: Magic
+  mechanics: 'The system relies on three pillars: Mana, which serves as the energy
+    source and can be concealed or detected; Visualization, the absolute law where
+    a mage can only materialize what they can clearly imagine; and Technique, which
+    involves the study of spells through Grimoires and the application of logic or
+    imagination.'
+  limitations: Magic is strictly limited by the user's mental state; if a mage cannot
+    visualize a spell's success, it fails. Additionally, mages are vulnerable to physical
+    attacks within a five-meter range and are generally unable to perceive or block
+    'Curses' without the specific use of Goddess's Magic.
+  tiers:
+  - Third Class Mage
+  - Second Class Mage
+  - First Class Mage
+  - Demons (Specialized Magic Users)
+  - Elves (High Mana/Longevity)
+  - Humans (Innovative/Efficient)
+tone:
+  comedy_level: 5
+  darkness_level: 5
+  optimism: 5
+director_personality: 'You are the director for a Frieren: Beyond Journey-style campaign. '
+pacing:
+  scene_length: moderate
+  arc_length_sessions: 4-6
+sources_consulted:
+- power_system
+- combat
+- tone
+- characters
+- factions
+- locations
+- arcs
+- sequels
+- adaptations
+- recent
+- series_aliases
+series_group: frieren_beyond_journeys_end
+series_position: 1

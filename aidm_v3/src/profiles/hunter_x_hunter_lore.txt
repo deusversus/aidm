@@ -1,0 +1,326 @@
+## Power System
+The Nen power system in *Hunter x Hunter* is widely considered one of the most complex and balanced in anime. It is based on the manipulation of **Aura** (life energy) and is governed by strict mathematical and psychological rules.
+
+### 1. The Four Major Principles
+Every Nen user must master these four foundational techniques before developing specific abilities:
+*   **Ten (Envelop):** Keeping aura from leaking away, creating a shroud around the body. It provides basic defense and slows aging.
+*   **Zetsu (Suppress):** Closing all aura nodes to stop the flow of energy. This hides the user's presence but leaves them completely vulnerable to Nen attacks.
+*   **Ren (Refine):** Producing a high output of aura for offensive power and physical enhancement.
+*   **Hatsu (Release):** The personal expression of Nen. This is where a user’s unique "superpower" (their *Hatsu* ability) is formed based on their Nen type.
+
+### 2. The Six Nen Types
+A user's affinity is determined at birth and can be tested via **Water Divination** (placing a leaf on a glass of water and applying aura).
+*   **Enhancement:** Boosting the natural qualities of an object or the body (e.g., Gon’s super-strength).
+*   **Transmutation:** Changing the *properties* of aura to mimic something else (e.g., Killua’s aura becoming electricity).
+*   **Emission:** Detaching aura from the body and maintaining it at a distance (e.g., Leorio’s remote punches).
+*   **Conjuration:** Creating physical, independent objects out of aura (e.g., Kurapika’s chains).
+*   **Manipulation:** Controlling living or non-living things (e.g., Illumi’s needles).
+*   **Specialization:** Anything that doesn't fit the other five. This is the only type that cannot be learned unless you are born with it or acquire it later through extreme circumstances (e.g., Chrollo’s ability to steal others' powers).
+
+### 3. Advanced Techniques
+Mastery involves combining the basic principles:
+*   **Gyo:** Focusing aura into the eyes to see hidden Nen.
+*   **In:** Making aura nearly invisible.
+*   **En:** Extending aura in a sphere to sense everything within its radius.
+*   **Ko:** Concentrating 100% of aura into one body part (extremely powerful but leaves the rest of the body in *Zetsu*).
+*   **Ken:** A sustained, high-level *Ten* used for total body defense.
+*   **Ryu:** The real-time adjustment of aura distribution (e.g., 70% to a fist for a punch, 30% to the body for defense).
+
+### 4. Rules and Limitations: Vows & Restrictions
+The most unique aspect of Nen is that **limitations increase power.** By setting "Vows" (rules) and "Restrictions" (penalties), a user can multiply their aura output exponentially.
+*   **Conditions:** Steps required to activate an ability (e.g., Chrollo must touch his target).
+*   **Restrictions:** Hard limits on what an ability *cannot* do.
+*   **Vows (Covenants):** Self-imposed rules with a penalty for breaking them. The greater the risk, the greater the power. 
+    *   *Example:* Kurapika’s "Chain Jail" can only be used on the Phantom Troupe; if he uses it on anyone else, he will die. This "Vow" makes the chain virtually unbreakable for Troupe members.
+
+### 5. Progression and Power Tiers
+Unlike systems with "power levels," Nen is tactical. A weaker user can defeat a stronger one through better strategy or specific "counter" abilities.
+
+**Official Proficiency Tiers (from Togashi’s 2022 Exhibition):**
+Author Yoshihiro Togashi revealed four levels of Nen mastery: **Great, Excellent, Genius, and Ultimate.**
+*   **Ultimate Level:** Only 7 characters have been officially confirmed to reach the "Ultimate" peak of their respective types:
+    1.  **Meruem** (Emitter)
+    2.  **Isaac Netero** (Enhancer)
+    3.  **Zeno Zoldyck** (Emitter)
+    4.  **Adult Gon** (Enhancer - reached momentarily via Vow)
+    5.  **Bisky Krueger** (Transmuter)
+    6.  **Abengane** (Conjurer - a Nen Exorcist)
+    7.  **Alluka/Nanika** (Specialist)
+
+### 6. Post-Mortem Nen
+Nen is fueled by the user's will. If a user dies with intense emotions (hatred, love, or a strong goal), their Nen can become "Post-Mortem Nen." This aura remains active after death and is often significantly more powerful and difficult to remove than standard Nen. This was famously seen when Hisoka used his aura to restart his heart after dying.
+
+## Combat
+Hunter x Hunter (HxH) is widely regarded as having one of the most sophisticated and consistent combat systems in anime history. Its battles are rarely decided by who has the "highest power level," but rather by strategy, psychological state, and the creative application of a complex energy system called **Nen**.
+
+### 1. The Foundation: The Nen System
+Nen is the ability to manipulate one's life energy (Aura). It is divided into four basic principles and several advanced techniques that form the "rules" of every fight.
+
+*   **The Four Basic Principles:**
+    *   **Ten (Envelop):** Keeping aura within the body to provide basic defense and slow aging.
+    *   **Zetsu (Suppress):** Completely shutting off aura flow to become undetectable or recover from fatigue.
+    *   **Ren (Refine):** Producing a high output of aura for offensive power.
+    *   **Hatsu (Release):** The personal expression of Nen, leading to unique "superpowers."
+*   **Advanced Techniques:**
+    *   **Gyo:** Focusing aura into the eyes to see hidden Nen (In).
+    *   **Ko:** Concentrating all aura into one body part for a devastating strike, leaving the rest of the body defenseless.
+    *   **Ken:** A high-level defensive state maintaining Ren over the whole body.
+    *   **Ryu:** The real-time adjustment of aura distribution (e.g., 70% to a fist for a punch, 30% to the body for defense).
+
+### 2. Fighting Styles: The Six Nen Categories
+Every character falls into one of six categories based on their personality and aura type, which dictates their combat style:
+*   **Enhancers:** (e.g., Gon) Simple and direct. They strengthen their bodies or objects.
+*   **Transmuters:** (e.g., Killua, Hisoka) Fickle and deceptive. They change the *properties* of their aura (e.g., making it mimic electricity or sticky gum).
+*   **Emitters:** (e.g., Leorio, Razor) Impatient. They project aura away from their bodies as projectiles or constructs.
+*   **Conjurers:** (e.g., Kurapika) High-strung and analytical. They create physical objects out of aura.
+*   **Manipulators:** (e.g., Illumi) Logical. They control living or non-living things, often requiring a "medium" like needles or antennas.
+*   **Specialists:** (e.g., Chrollo) Charismatic and independent. They possess unique abilities that don't fit other categories (e.g., stealing others' powers).
+
+### 3. Tactical Depth: "Mind Games" over "Power Levels"
+Combat in HxH is often described as a high-stakes chess match. 
+*   **Conditions and Oaths (Vows):** A fighter can exponentially increase their power by setting a "Condition" (a rule) and a "Penalty" (a consequence for breaking it). For example, Kurapika’s "Chain Jail" is nearly unbreakable, but he made a vow that if he uses it on anyone other than a member of the Phantom Troupe, he will die.
+*   **Information Warfare:** Battles often revolve around discovering the opponent's "Hatsu." Once an ability's rules are understood, a weaker fighter can often find a tactical loophole to win.
+*   **Example:** The **Chrollo vs. Hisoka** fight in the manga is a masterclass in tactics, involving complex ability combinations, crowd manipulation, and psychological traps.
+
+### 4. Emotional Weight and Character Growth
+Battles in HxH are rarely just about the win; they are pivotal moments of character transformation.
+*   **Gon vs. Neferpitou:** This is the emotional peak of the series. It isn't a "heroic" power-up; it is a tragic, terrifying transformation fueled by grief and self-destruction. The "spectacle" is intentionally chilling rather than triumphant.
+*   **Netero vs. Meruem:** A philosophical clash between human evolution (Netero) and natural superiority (Meruem). The fight explores the "malice" of humanity and the weight of being the strongest.
+
+### 5. Flashy Spectacle: Animation and Choreography
+While tactical, the 2011 Madhouse adaptation ensures battles are visual spectacles.
+*   **Fluid Choreography:** Fights like **Gon vs. Hisoka** (Heaven's Arena) feature incredible hand-to-hand choreography where every movement has weight and purpose.
+*   **The "Zero Hand":** Netero’s 100-Type Guanyin Bodhisattva is one of the most visually stunning abilities in anime, featuring a golden multi-armed deity that strikes with blinding speed.
+*   **Creative Set-Pieces:** The **Greed Island Dodgeball Game** turns a simple sport into a lethal, aura-infused spectacle that requires teamwork and high-level Nen control.
+
+### Summary Table of Iconic Battles
+| Battle | Primary Theme | Key Tactical Element |
+| :--- | :--- | :--- |
+| **Kurapika vs. Uvogin** | Revenge / Strategy | Vows and Limitations (Chain Jail) |
+| **Gon vs. Hisoka** | Growth / Rivalry | Using the environment (Stone tiles) |
+| **Netero vs. Meruem** | Philosophy / Sacrifice | Pattern recognition and the "Poor Man's Rose" |
+| **Chrollo vs. Zeno & Silva** | Professionalism / Skill | High-level aura reading and resourcefulness |
+| **Morel vs. Cheetu** | Experience vs. Ego | Breaking down the logic of an opponent's ability |
+
+## Tone
+*Hunter x Hunter*, created by Yoshihiro Togashi, is widely regarded as a masterpiece of the shonen genre due to its complex subversion of tropes and its extreme tonal range. It is often described as a "deconstruction" of the typical battle manga, moving from a whimsical adventure to a deeply psychological and often horrific exploration of human nature.
+
+### **1. Tone and Tonal Shifts**
+The series is famous for its **masterful tonal shifts**. It begins as a bright, "happy-go-lucky" adventure but gradually descends into darker territory.
+*   **The "Bait and Switch":** The early episodes (Hunter Exam arc) present a colorful world with a young, optimistic protagonist. However, the series quickly introduces high stakes and graphic violence, signaling that this is not a standard children's story.
+*   **Consistency in Contrast:** Despite these shifts, the series maintains a sense of "tonal consistency" by ensuring that the darker elements are always rooted in the world’s established rules (Nen) and character motivations.
+
+### **2. Themes**
+*   **Human Nature (Malice vs. Kindness):** A central theme, especially in the *Chimera Ant* arc, is the duality of humanity. It explores how humans can be more monstrous than actual monsters, yet also capable of profound self-sacrifice and love.
+*   **Morality and Gray Areas:** Characters are rarely purely "good" or "evil." Even the protagonists exhibit frightening ruthlessness (e.g., Gon’s descent into revenge), while villains like the Phantom Troupe show deep loyalty and grief for their comrades.
+*   **Evolution and Potential:** The series examines what happens when individuals or species reach their peak potential and the ethical responsibilities that come with power.
+
+### **3. Dark Comedy**
+*Hunter x Hunter* utilizes a specific brand of **dark comedy** that stems from the juxtaposition of its youthful leads and their grim reality.
+*   **Irony:** A classic example is Killua Zoldyck, a world-class assassin who can rip a heart out without blinking but is comically disgusted by the "gross" task of baiting a fishing hook.
+*   **Absurdity:** Characters like Hisoka embody a dark, eccentric humor. His flamboyant, almost clownish persona masks a predatory nature, creating a "creepy-funny" vibe that keeps the audience off-balance.
+
+### **4. Optimism vs. Cynicism**
+While the series explores dark themes, it is rarely nihilistic.
+*   **The Power of Connection:** Optimism is maintained through the bond between Gon and Killua. Their friendship is the emotional anchor that prevents the story from becoming a "depressing slog."
+*   **Humanity's Merit:** Even in the darkest arcs, the story argues for the value of life. In the *Chimera Ant* arc, the "monsters" eventually develop human emotions like compassion and love, suggesting that humanity’s best traits are infectious and worth preserving.
+
+### **5. Atmosphere and Mood**
+The atmosphere varies significantly depending on the arc and the version of the anime:
+*   **1999 Anime:** Known for a more **somber, grounded, and noir-like** atmosphere. It uses lighting and music to create a sense of constant underlying dread.
+*   **2011 Anime:** Initially appears **vibrant and energetic**, which makes the eventual shift into "biological horror" and "psychological thriller" in later arcs feel even more jarring and impactful.
+*   **Mood Evolution:** The mood transitions from **wonder and discovery** (Hunter Exam) to **tension and revenge** (Yorknew City) to **existential dread and tragedy** (Chimera Ant).
+
+### **6. Genre Fluidity**
+One of the series' most unique traits is how it **changes genres** with every new story arc:
+*   **Hunter Exam:** Adventure / Fantasy
+*   **Heavens Arena:** Martial Arts / Tournament
+*   **Yorknew City:** Mafia Thriller / Crime Drama
+*   **Greed Island:** Isekai / RPG / Training
+*   **Chimera Ant:** Biological Horror / War Epic / Philosophical Drama
+*   **Election Arc:** Political Satire / Family Drama
+*   **Succession Contest (Manga):** Psychological Thriller / Battle Royale / High-Stakes Strategy
+
+## Characters
+*Hunter x Hunter*, created by Yoshihiro Togashi, is renowned for its complex power system (Nen), deep character development, and shifting narrative focus. The story follows a core group of four friends, though the role of "protagonist" often shifts depending on the story arc.
+
+### **The Main Protagonists**
+
+The series features four central characters who meet during the 287th Hunter Exam. While **Gon Freecss** is the primary protagonist for most of the series, **Kurapika** takes the lead in the *Yorknew City* and *Succession Contest* arcs, and **Killua** serves as the primary deuteragonist.
+
+| Character | Role | Nen Type | Signature Abilities |
+| :--- | :--- | :--- | :--- |
+| **Gon Freecss** | Primary Protagonist | **Enhancer** | **Jajanken:** A three-part attack based on Rock-Paper-Scissors. "Rock" is a devastating enhanced punch; "Paper" is an emitted aura blast; "Scissors" is a transmuted blade of aura. |
+| **Killua Zoldyck** | Deuteragonist / Best Friend | **Transmuter** | **Godspeed (Kanmuru):** Transmutes aura into electricity to bypass the nervous system, allowing for superhuman reaction speed (**Shippu Jinrai**) and movement (**Raiko Sekka**). |
+| **Kurapika** | Protagonist (Specific Arcs) | **Conjurer / Specialist** | **Conjured Chains:** Five chains with unique powers. **Chain Jail** (restrains Spiders), **Judgment Chain** (imposes lethal rules), and **Emperor Time** (Specialist mode allowing 100% mastery of all Nen types). |
+| **Leorio Paradinight** | Supporting Protagonist | **Emitter** | **Remote Punch:** Punches a surface to warp his fist through a portal, striking a target from a distance. He also uses Nen for medical diagnosis (ultrasound-like pulses). |
+
+#### **Relationships & Dynamics**
+*   **Gon & Killua:** The heart of the series. Their bond is one of mutual growth; Gon provides Killua with the emotional warmth he lacked in his assassin upbringing, while Killua provides the strategic grounding for Gon’s impulsive nature.
+*   **The Four Friends:** They view each other as family. Leorio often acts as the "big brother," while Kurapika is the intellectual anchor. Despite long periods of separation, they remain fiercely loyal to one another.
+
+---
+
+### **Key Antagonists**
+
+Antagonists in *Hunter x Hunter* are rarely "evil for evil's sake." They often have complex motivations, and some even act as temporary allies.
+
+#### **1. Hisoka Morow (The Magician)**
+*   **Role:** Recurring Antagonist / Chaotic Wildcard.
+*   **Motivation:** He is a battle-hungry sociopath who seeks out strong opponents. He protects Gon and Killua only so they can "ripen" into worthy prey.
+*   **Abilities:** **Bungee Gum** (gives his aura the properties of both rubber and gum) and **Texture Surprise** (allows him to alter the appearance of flat surfaces to create illusions).
+
+#### **2. Chrollo Lucilfer (Leader of the Phantom Troupe)**
+*   **Role:** Main Antagonist of the *Yorknew City* arc.
+*   **Motivation:** He leads a band of world-class thieves (the Spiders). He is a nihilistic but charismatic leader who values the survival of the "Spider" (the group) over his own life.
+*   **Abilities:** **Skill Hunter:** A Specialist ability that allows him to steal the Nen abilities of others and store them in a conjured book (*Bandit's Secret*).
+
+#### **3. Meruem (The Chimera Ant King)**
+*   **Role:** Main Antagonist of the *Chimera Ant* arc.
+*   **Motivation:** Initially born to conquer the world and treat humans as livestock, his character undergoes a profound transformation through his relationship with a blind Gungi player, Komugi, leading him to question the nature of power and humanity.
+*   **Abilities:** **Aura Synthesis:** He grows stronger by consuming other Nen users. He possesses near-limitless physical strength, speed, and intelligence, eventually developing wings and photon-based detection.
+
+#### **4. Illumi Zoldyck**
+*   **Role:** Antagonist / Killua’s Brother.
+*   **Motivation:** A cold, controlling assassin who wants to keep Killua within the family business. He uses fear and manipulation to "protect" his brother in a twisted, obsessive way.
+*   **Abilities:** **Needle Manipulation:** Uses Nen-infused needles to reshape his own face, control others as "Needle People," or implant mental suggestions (as he did with a needle in Killua’s brain).
+
+---
+
+### **Summary of Roles & Relationships**
+*   **Protagonist Focus:** The series is unique because the "main character" changes. While Gon starts the journey, **Kurapika** is the current lead in the manga's *Succession Contest* arc, as Gon has lost his ability to use Nen and remains at home.
+*   **Antagonist Complexity:** Most villains are mirrors of the heroes. **Meruem** represents the peak of evolution, **Chrollo** represents the dark side of found family, and **Hisoka** represents the ultimate "Hunter" who hunts for the thrill of the kill.
+
+## Factions
+The world of *Hunter x Hunter* is governed by a complex web of political entities, criminal organizations, and legendary families. Power is divided between the public "Light" world (governments and the Hunter Association) and the "Dark" underworld (mafia and assassins), with the mysterious **Dark Continent** serving as the ultimate external threat.
+
+### **1. Major World Powers (The V6)**
+The **V5** was originally a coalition of the five most powerful nations that governed global affairs and prohibited travel to the Dark Continent. It became the **V6** when the Kakin Empire was admitted to the group.
+*   **United States of Saherta:** A dominant superpower modeled after the U.S.
+*   **Kukan'yu Kingdom:** A powerful nation that funded Beyond Netero’s first (failed) expedition.
+*   **Mimbo Republic:** A major nation involved in global policy.
+*   **Begerossé Union:** A large union of states.
+*   **Federation of Ochima:** A key member of the global council.
+*   **Kakin Empire:** A rapidly rising monarchy led by **King Nasubi Hui Guo Rou**. Kakin disrupted the global status quo by publicly announcing a new expedition to the Dark Continent, forcing the V5 to accept them as the sixth member to maintain control.
+
+### **2. The Hunter Association**
+The primary organization for licensed "Hunters." It operates as a semi-autonomous NGO with immense political and legal privileges.
+*   **The Zodiacs:** An elite group of 12 Hunters chosen by the late Chairman Netero to act as his inner circle and advisors. Following Netero's death, **Cheadle Yorkshire** (Dog) became the 14th Chairman.
+*   **Factions:** The association is currently divided between **Netero Loyalists** (led by Cheadle) and **Subversives** (formerly led by Pariston Hill, who seeks to cause chaos).
+*   **Current Mission:** They are currently tasked by the V5 to escort the Kakin Empire to the Dark Continent while keeping the prisoner **Beyond Netero** (Isaac Netero's son) under guard.
+
+### **3. Criminal & Underworld Organizations**
+*   **The Phantom Troupe (The Spiders):** A world-renowned gang of 13 thieves from **Meteor City**. Led by **Chrollo Lucilfer**, they prioritize the survival of the "Spider" over any individual member. They are currently aboard the Kakin expedition ship to steal the royal treasures and hunt their former member, **Hisoka Morow**.
+*   **The Zoldyck Family:** The world’s most famous family of assassins, residing on Kukuroo Mountain. They are not a "faction" in the traditional sense but act as a neutral, high-tier power for hire.
+*   **The Mafia Community:**
+    *   **The Ten Godfathers:** Formerly the leaders of the global mafia, they were assassinated by the Zoldycks on behalf of the Phantom Troupe.
+    *   **Shadow Beasts (Inju):** The elite Nen-using enforcers of the Godfathers, almost entirely wiped out by the Phantom Troupe.
+    *   **Kakin Mafia:** Three families currently fighting for control on the expedition ship: **Xi-Yu** (backed by 3rd Prince Zhang Lei), **Cha-R** (backed by 7th Prince Luzurus), and **Heil-Ly** (led by Morena Prudo, backed by 4th Prince Tserriednich).
+
+### **4. The Succession Contest Factions**
+The current arc centers on a "Battle Royale" between the **14 Princes of Kakin** to determine the next King.
+*   **The Princes:** Each prince is protected by a **Guardian Spirit Beast** (a parasitic Nen beast) and a private army of bodyguards.
+*   **Key Contenders:**
+    *   **Benjamin (1st Prince):** Commands the Kakin military; a ruthless traditionalist.
+    *   **Tserriednich (4th Prince):** A sadistic genius and the primary antagonist of the arc; possesses terrifying Nen potential.
+    *   **Halkenburg (9th Prince):** A reformer who initially opposed the war but awakened a powerful collective Nen ability.
+    *   **Woble (14th Prince):** An infant protected by **Kurapika**, who has formed a fragile alliance with other lower-ranked princes.
+
+### **5. The Dark Continent & The Five Threats**
+The Dark Continent is the origin of all "Magical Beasts" and represents a level of danger that dwarfs the known world.
+*   **Beyond Netero’s Expedition Team:** A group of specialists (including **Ging Freecss** and **Pariston Hill**) who intend to ditch the V6 and explore the true Dark Continent.
+*   **The Five Threats (Calamities):** Humanity has brought back five "punishments" from previous failed expeditions:
+    1.  **Brion:** A botanical weapon (a sphere-headed humanoid) guarding ancient ruins.
+    2.  **Ai:** A gaseous lifeform (codependence of desire); **Nanika** (inside Alluka Zoldyck) is confirmed to be an Ai.
+    3.  **Hellbell:** A two-tailed snake that infects victims with homicidal rage.
+    4.  **Pap:** The "Human-Keeping Beast" that drains humans while keeping them in a state of perpetual pleasure.
+    5.  **Zobae Disease:** The "Immortality Malady" that makes a person immortal but mindless, forced to consume their own regenerating flesh.
+
+### **6. Major Enemies & Antagonists**
+*   **The Chimera Ants:** An invasive species from the Dark Continent. While the King (**Meruem**) and his Royal Guard were defeated, **Pariston Hill** currently possesses 5,000 Chimera Ant hybrids in cocoons, a potential "army" he could unleash.
+*   **Gyro:** The former leader of the NGL (Neo-Green Life). Though he has not yet reappeared, he is a "wild card" villain who left the Chimera Ant colony to rebuild his empire and spread hatred globally.
+*   **Hisoka Morow:** A chaotic agent who is currently the "Enemy #1" of the Phantom Troupe, engaging in a guerrilla war to kill every member of the Spiders.
+
+## Locations
+The world of *Hunter x Hunter* is far more vast and complex than it initially appears. The setting is divided into the **Known World**—where almost all of the story takes place—and the **Dark Continent**, a massive, deadly wilderness that surrounds it.
+
+### **1. Global Geography: The World Map**
+The world map of *Hunter x Hunter* is a "jumbled" version of Earth’s continents. However, the most significant revelation in the series is that the entire "Known World" is actually just a small archipelago of islands located in the center of a gargantuan lake called **Lake Mobius**.
+
+*   **The Known World:** Composed of six main continents and over 250 countries.
+*   **The Dark Continent:** The true "outside world" that surrounds Lake Mobius. It is hundreds of times larger than the Known World and is the origin of magical beasts, the Chimera Ants, and the "Five Threats" (calamities that can end humanity).
+*   **The V6 (formerly V5):** The six most powerful nations that govern the Known World and restrict travel to the Dark Continent. They include:
+    *   **United States of Saherta** (Yorbian Continent)
+    *   **Kukan'yu Kingdom** (Unnamed Continent resembling South America)
+    *   **Mimbo Republic** (Unnamed Continent resembling Africa)
+    *   **Begerossé Union** (Unnamed Continent resembling Australia)
+    *   **Federation of Ochima** (Azian Continent)
+    *   **Kakin Empire** (The newest member, a rising superpower)
+
+---
+
+### **2. Important Continents & Regions**
+*   **Yorbian Continent:** Resembles North America tilted 90 degrees.
+    *   **Yorknew City:** A massive metropolis based on New York City. It is the world's financial hub and the site of the prestigious Southernpiece Auction.
+    *   **Lukso Province:** The secluded homeland of the Kurta Clan (Kurapika’s people).
+*   **Azian Continent:** Resembles Eurasia.
+    *   **Kakin Empire:** A monarchical superpower led by King Nasubi Hui Guo Rou. It is the primary sponsor of the current voyage to the Dark Continent.
+    *   **Jappon:** An island nation based on Japan; the homeland of the Hunter Exam candidate Hanzo.
+*   **Mitene Union:** A small archipelago of islands where the Chimera Ant arc takes place.
+    *   **NGL (Neo-Green Life):** A neo-Luddite autonomous region that rejects all modern technology. It became the first breeding ground for the Chimera Ants.
+    *   **Republic of East Gorteau:** A totalitarian state (resembling North Korea) where the Chimera Ant King, Meruem, established his palace.
+
+---
+
+### **3. Key Landmarks & Cities**
+*   **Whale Island:** A small, rural island where Gon Freecss was raised. It is shaped like a whale and is known for its unique wildlife, like the Foxbear.
+*   **Kukuroo Mountain:** Located in the **Republic of Padokea**, this dormant volcano is the site of the **Zoldyck Family Estate**. The estate is a massive private territory protected by the "Testing Gate" (a multi-ton door).
+*   **Heavens Arena:** A 251-story skyscraper where fighters from around the world compete for money and fame. It is the world's most popular combat site.
+*   **Meteor City:** A lawless, "non-existent" junkyard city where the world dumps its trash. It is the birthplace of the **Phantom Troupe**. Because its citizens are not officially recorded in any government database, they are often used for off-the-books operations.
+*   **Greed Island:** Not a virtual world, but a real island in the eastern ocean. It was "conjured" and maintained by Ging Freecss and his friends using Nen.
+*   **Swardani City:** A major metropolis that serves as the location for the **Hunter Association Headquarters**.
+*   **The World Tree:** A massive tree that grows to the height of the atmosphere. The one Gon climbs is actually a "sapling" that failed to grow; true World Trees in the Dark Continent are said to grow tall enough to pierce the stratosphere.
+
+---
+
+### **4. The Dark Continent Voyage Locations**
+*   **The Black Whale No. 1:** A colossal, city-sized ship carrying 200,000 people, including the Kakin Royal Family and the Hunter Association, toward the Dark Continent.
+*   **The New Continent:** An uninhabited island within Lake Mobius that the V5 intends to use as a "fake" Dark Continent to satisfy the public, while the actual Hunters and Princes continue to the true mainland.
+*   **The Gate:** The only known "safe" entrance to the Dark Continent, guarded by a race of magical beasts known as **Gatekeepers**.
+
+## Arcs, Sequels, Adaptations, Recent
+*Hunter x Hunter*, created by Yoshihiro Togashi, is one of the most critically acclaimed battle shonen series, known for its complex power systems, high-stakes psychological battles, and frequent hiatuses. Below is a detailed breakdown of its arcs, adaptations, and current status as of **January 2026**.
+
+### **1. Major Story Arcs & Timeline**
+The story follows **Gon Freecss** as he seeks to become a "Hunter" to find his father, Ging. The narrative is divided into several distinct arcs:
+
+*   **Hunter Exam Arc:** Gon meets his core friends—Killua, Kurapika, and Leorio. They undergo a series of lethal tests to earn their Hunter licenses.
+*   **Zoldyck Family Arc:** A short transition where Gon, Kurapika, and Leorio travel to Kukuroo Mountain to "rescue" Killua from his family of elite assassins.
+*   **Heavens Arena Arc:** Gon and Killua travel to a combat tower to train. They are introduced to **Nen**, the series' intricate energy system, and Gon finally lands a punch on his rival, Hisoka.
+*   **Yorknew City Arc:** The story shifts focus to Kurapika and his quest for revenge against the **Phantom Troupe** (the Spiders), who massacred his clan. This arc is noted for its dark, noir-inspired tone.
+*   **Greed Island Arc:** Gon and Killua enter a "real-life" video game designed by Ging. They undergo intense training under Biscuit Krueger and eventually "clear" the game to find a clue to Ging's location.
+*   **Chimera Ant Arc:** Often cited as the series' masterpiece, it follows the emergence of man-eating ants. The arc explores themes of humanity, evolution, and morality, culminating in a devastating war between the Hunter Association and the Ant King, Meruem.
+*   **13th Hunter Chairman Election Arc:** Following the death of Chairman Netero, the Association holds an election. Simultaneously, Killua seeks to save a hospitalized Gon using the reality-warping powers of his sibling, Alluka.
+*   **Succession Contest Arc (Ongoing):** The current manga arc. It takes place on a massive ship (Black Whale 1) heading toward the **Dark Continent**. 14 princes of the Kakin Empire engage in a lethal battle royale for the throne, while Kurapika serves as a bodyguard and the Phantom Troupe hunts for Hisoka.
+
+### **2. Sequels, Spinoffs, and Continuity**
+There is no official "sequel" series like *Boruto* or *Dragon Ball Super*. However, there are several related works:
+*   **Kurapika’s Reminiscence (Volume 0):** A two-part canon prequel manga written by Togashi. it details Kurapika’s childhood and the events leading to the Kurta Clan massacre.
+*   **Hisoka’s Origin Story:** A one-shot manga written and illustrated by **Sui Ishida** (*Tokyo Ghoul*). While not strictly written by Togashi, he has acknowledged it and expressed interest in connecting it to the main story, making it "semi-canon" in the eyes of many fans.
+*   **Movies:** Two non-canon films exist: *Phantom Rouge* (2013) and *The Last Mission* (2013). They are generally considered separate from the main timeline.
+*   **Light Novels:** Several niche light novels exist, mostly adapting the movies or providing side-stories about the main cast's early days.
+
+### **3. Manga vs. Anime: Adaptations & Differences**
+There are two primary anime adaptations, each with a distinct identity:
+*   **1999 Version (Nippon Animation):** Covers up to the end of Yorknew (with OVAs for Greed Island). It is praised for its dark, atmospheric art style and slower pacing that fleshes out character interactions. It includes some "filler" content that fans often enjoy.
+*   **2011 Version (Madhouse):** A complete reboot that covers from the beginning through the Election Arc (148 episodes). It is more vibrant, has fluid modern animation, and follows the manga almost panel-for-panel.
+*   **Key Differences:**
+    *   **Kite’s Introduction:** In the manga and 1999 anime, Kite appears in Chapter 1/Episode 1. The 2011 anime omits him until the Chimera Ant arc, which lessens the emotional impact of his return for some viewers.
+    *   **Censorship:** The 1999 version is generally grittier, while the 2011 version (initially) censored some of the more graphic violence before becoming much darker during the Chimera Ant arc.
+
+### **4. Latest Updates & Current Events (January 2026)**
+*   **Manga Status:** The manga is currently serialized in a non-weekly format due to Togashi's health. 
+*   **Latest Chapters:** The most recent release block occurred in late 2024, covering **Chapters 401–410**. These chapters focused on the Phantom Troupe’s past in Meteor City and the escalating tension between the Kakin Princes.
+*   **Newest Milestone:** **Volume 38** (English) was officially released by Viz Media on **January 6, 2026**. 
+*   **Future Outlook:** Togashi confirmed via social media in December 2025 that the manuscript for **Chapter 411** is complete. He has also stated that storyboards are finished up to **Chapter 424**, with a goal of completing a 50-chapter block. Fans expect the manga to resume serialization in **Spring 2026**.
+*   **Anime News:** There are currently no official plans for a new anime season, as there is not yet enough manga material to adapt a full arc (the Succession Contest is still ongoing).

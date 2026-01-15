@@ -1,0 +1,84 @@
+id: one_piece
+name: One Piece
+source_anime: One Piece
+media_type: anime
+status: completed
+generated_at: '2026-01-06T20:39:54.679024'
+confidence: 95
+research_method: bundled_parallel
+dna_scales:
+  introspection_vs_action: 7
+  comedy_vs_drama: 5
+  simple_vs_complex: 9
+  power_fantasy_vs_struggle: 6
+  explained_vs_mysterious: 7
+  fast_paced_vs_slow_burn: 9
+  episodic_vs_serialized: 10
+  grounded_vs_absurd: 9
+  tactical_vs_instinctive: 8
+  hopeful_vs_cynical: 1
+  ensemble_vs_solo: 2
+tropes:
+  tournament_arc: true
+  training_montage: true
+  power_of_friendship: true
+  mentor_death: true
+  chosen_one: true
+  tragic_backstory: true
+  redemption_arc: true
+  betrayal: true
+  sacrifice: true
+  transformation: true
+  forbidden_technique: true
+  time_loop: false
+  false_identity: true
+  ensemble_focus: true
+  slow_burn_romance: false
+combat_system: spirit
+power_system:
+  name: Devil Fruits and Haki
+  mechanics: A dual-layered system where Devil Fruits grant supernatural abilities
+    (Paramecia, Zoan, or Logia) through consumption, and Haki harnesses latent spiritual
+    energy (willpower) for sensory, defensive, and offensive techniques. Advanced
+    progression includes Devil Fruit Awakening and specialized Haki forms like Future
+    Sight and Conqueror's Coating.
+  limitations: Devil Fruit users lose all energy and cannot use active powers when
+    submerged in standing water or in contact with Sea Prism Stone (Kairoseki). Consuming
+    a second fruit typically results in death. Haki is limited by the user's willpower
+    and must be developed through intense combat.
+  tiers:
+  - Top Tier (Legends/Yonko)
+  - High Tier (Admirals/Commanders)
+  - Mid Tier (Warlords/Officers)
+  - Low Tier (Paradise/Blue Sea)
+tone:
+  comedy_level: 8
+  darkness_level: 6
+  optimism: 9
+director_personality: You are the director for a One Piece-style campaign. You explore
+  character thoughts and feelings deeply. Battles are won by willpower and instinct,
+  not chess moves. Embrace the absurd. Reality is a suggestion.
+pacing:
+  scene_length: moderate
+  arc_length_sessions: 4-6
+sources_consulted:
+- power_system
+- combat
+- tone
+- characters
+- factions
+- locations
+- arcs
+- sequels
+- adaptations
+- recent
+aliases:
+- 1 piece
+- one piece
+- onepeice
+- onepiece
+- op
+- wan psu
+- ワンピース
+series_group: one_piece
+series_position: 1
