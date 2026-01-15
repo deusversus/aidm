@@ -47,7 +47,7 @@ Mix providers! Use Gemini Flash for structured calls and Claude Opus for narrati
 |----------|------------|----------------|
 | **Google** | gemini-3-flash-preview | gemini-3-pro-preview |
 | **Anthropic** | claude-haiku-4-5 | claude-sonnet-4-5 / opus-4-5 |
-| **OpenAI** | gpt-5.2-chat-latest | gpt-5.2-pro |
+| **OpenAI** | gpt-5.2-mini | gpt-5.2 / gpt-5.2-pro |
 
 ## Architecture
 
