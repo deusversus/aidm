@@ -86,5 +86,39 @@ aliases:
 - honzuki no gekokujou shisho ni naru tame ni wa shudan wo erandeiraremasen
 - honzuki no gekokujyo
 - 本好きの下剋上 ～司書になるためには手段を選んでいられません～
+detected_genres:
+  - isekai
+  - slice_of_life
+  - shoujo_romance
+
+voice_cards:
+  myne:
+    speech_patterns: book obsession rants, modern knowledge application, "I NEED books!"
+    humor_type: priority disorder (books > everything), sickly scheming
+    dialogue_rhythm: excited invention proposals with sudden collapse
+    emotional_expression: pure bibliophile passion, growing family love
+  ferdinand:
+    speech_patterns: cold intellectual superiority, hidden care, "It cannot be helped"
+    humor_type: deadpan exasperation at Myne's chaos, reluctant mentorship
+    dialogue_rhythm: dismissive orders softening to protective concern
+    emotional_expression: hidden loneliness, growing genuine care for Myne
+  lutz:
+    speech_patterns: loyal childhood friend, merchant ambition, Myne protection
+    humor_type: straight-man to Myne's inventions, practical concerns
+    dialogue_rhythm: common-sense grounding for fantasy schemes
+    emotional_expression: unwavering loyalty, growing into capable partner
+  benno:
+    speech_patterns: merchant cunning, profit calculations, grudging appreciation
+    humor_type: greedy schemes undermined by ethics
+    dialogue_rhythm: business-first speech hiding genuine mentorship
+    emotional_expression: seeing potential, protective investment
+
+author_voice:
+  sentence_patterns: book creation process detail, noble politics exposition, Devouring illness
+  structural_motifs: knowledge as power, class system navigation, family bonds transcending blood
+  dialogue_quirks: printing terminology, noble hierarchy, "The Devouring" references
+  emotional_rhythm: cozy crafting joy punctuated by political danger and illness
+  example_voice: "In my past life, I was surrounded by books. In this one, I was dying without them. So I'll make them myself. Chapter by chapter. Page by page. Until this world has a library."
+
 series_group: ascendance_of_a_bookworm
 series_position: 1

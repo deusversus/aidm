@@ -86,6 +86,45 @@ sources_consulted:
 - adaptations
 - recent
 - series_aliases
+detected_genres:
+  - shonen
+  - supernatural
+  - mystery_thriller
+
+voice_cards:
+  edward_elric:
+    speech_patterns: short rant explosions, "DON'T CALL ME SMALL!", alchemist prodigy
+    humor_type: height complex comedy, automail complaints, Al banter
+    dialogue_rhythm: hot-headed youth with mature philosophical weight
+    emotional_expression: guilt-driven determination, brotherly devotion, earned wisdom
+  alphonse_elric:
+    speech_patterns: gentle armored soul, "Brother!", philosophical questioning
+    humor_type: cat hiding, armor confusion, being mistaken for Fullmetal
+    dialogue_rhythm: kind soul in steel with assertive moral strength
+    emotional_expression: identity without body, unwavering faith, gentle strength
+  roy_mustang:
+    speech_patterns: smug Flame Alchemist, ambitious declarations, Hughes grief
+    humor_type: useless in rain gags, subordinate harassment, Riza management
+    dialogue_rhythm: confident command hiding deep subordinate care
+    emotional_expression: Ishval guilt, Hughes rage, Fuhrer ambition
+  ling_yao:
+    speech_patterns: cheerful prince, "I'll become Emperor!", surprising depth
+    humor_type: mooching food, con man antics, bodyguard exasperation
+    dialogue_rhythm: carefree facade hiding genuine wisdom and responsibility
+    emotional_expression: genuine care for people, Greed friendship
+  father:
+    speech_patterns: emotionless philosophy, god complex, homunculi contempt
+    humor_type: none - pure cold ambition
+    dialogue_rhythm: detached creator statements with philosophical weight
+    emotional_expression: god ambition, human contempt, final desperate rage
+
+author_voice:
+  sentence_patterns: equivalent exchange philosophy, transmutation descriptions, conspiracy revelation
+  structural_motifs: brother bond, sins as children, sacrifice for what matters
+  dialogue_quirks: alchemy terminology, homunculi names as sins, "Philosopher's Stone"
+  emotional_rhythm: adventure comedy building to devastating brotherhood sacrifice
+  example_voice: "A lesson without pain is meaningless. For you cannot gain something without sacrificing something else in return. But once you have overcome it... you will gain an irreplaceable fullmetal heart."
+
 series_group: fullmetal_alchemist_brotherhood
 series_position: 1
 related_franchise: fullmetal_alchemist

@@ -83,5 +83,34 @@ sources_consulted:
 - adaptations
 - recent
 - series_aliases
+detected_genres:
+  - isekai
+  - comedy
+  - shonen
+
+voice_cards:
+  noor:
+    speech_patterns: humble farmer earnestness, "I only know how to parry", oblivious modesty
+    humor_type: genuine confusion at praise, claiming weakness while godlike
+    dialogue_rhythm: simple honest speech while casually parrying concepts
+    emotional_expression: genuine desire to help, confused by reverence
+  lynneburg:
+    speech_patterns: royal knight formality, growing awe, Noor worship
+    humor_type: straight-man reactions to Noor's absurdity
+    dialogue_rhythm: professional speech crumbling to fanboying
+    emotional_expression: genuine admiration, sworn loyalty, protective
+  ines:
+    speech_patterns: assassin efficiency, growing respect, deadpan observations
+    humor_type: professional killer being confused by parry mastery
+    dialogue_rhythm: terse operative speech softening with party bond
+    emotional_expression: professional becoming personal loyalty
+
+author_voice:
+  sentence_patterns: Level 1 skill mastery exposition, parry mechanics, humble misunderstanding
+  structural_motifs: hard work over talent, misunderstanding-based comedy, OP protagonist denial
+  dialogue_quirks: "Parry" as solution to everything, stat system, skill level discussions
+  emotional_rhythm: light comedy building to surprisingly earnest moments
+  example_voice: "I trained to parry 10,000 times a day for 15 years. It's nothing special... I can only parry. *casually deflects the concept of death*"
+
 series_group: i_parry_everything
 series_position: 1

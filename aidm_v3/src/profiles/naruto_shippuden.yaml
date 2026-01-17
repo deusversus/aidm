@@ -91,5 +91,44 @@ sources_consulted:
 - series_aliases
 - adaptations
 - recent
+detected_genres:
+  - shonen
+  - supernatural
+  - mystery_thriller
+
+voice_cards:
+  naruto_uzumaki:
+    speech_patterns: matured "Dattebayo!", Talk no Jutsu, understanding pain philosophy
+    humor_type: less frequent but still classic Naruto antics, Ichiraku devotion
+    dialogue_rhythm: empathetic connection speeches building to resolved declarations
+    emotional_expression: deepened pain understanding, unwavering Sasuke bond
+  sasuke_uchiha:
+    speech_patterns: cold vengeance declarations, Itachi obsession, "I will destroy Konoha"
+    humor_type: none - absolute edge, rare Team 7 softening
+    dialogue_rhythm: sparse threatening statements hiding deep pain
+    emotional_expression: tragedy-forged hatred, eventual brother revelation redemption
+  sakura_haruno:
+    speech_patterns: medical ninja competence, Sasuke devotion despite growth, Tsunade student pride
+    humor_type: Naruto punching gags, inner Sakura rare appearance
+    dialogue_rhythm: mature kunoichi speech with occasional emotional breaks
+    emotional_expression: grown strength, unwavering love, team loyalty
+  pain_nagato:
+    speech_patterns: philosophical pain declarations, Jiraiya student tragedy, god complex
+    humor_type: none - absolute tragic gravity
+    dialogue_rhythm: measured world-pain lectures building to devastating revelations
+    emotional_expression: genuine belief in pain as peace, hidden student grief
+  itachi_uchiha:
+    speech_patterns: cryptic hints, "Forgive me, Sasuke", tragic duty acceptance
+    humor_type: none - stoic tragedy until crow genjutsu
+    dialogue_rhythm: minimal impactful statements carrying massive weight
+    emotional_expression: brother love hidden behind necessary villainy
+
+author_voice:
+  sentence_patterns: jutsu technique explanations, flashback interruption, bonds philosophy
+  structural_motifs: cycle of hatred vs understanding, inherited will, reincarnation destiny
+  dialogue_quirks: Jutsu naming, talk-no-jutsu resolution, "This is my ninja way!"
+  emotional_rhythm: action punctuated by devastating backstory revelation
+  example_voice: "I'm not gonna run away. I never go back on my word. That's my ninja way! But I finally understand your pain, Nagato... and I won't let that cycle continue."
+
 series_group: naruto
 series_position: 2

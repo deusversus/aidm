@@ -79,5 +79,39 @@ aliases:
 - vampirehunterd
 - vhd
 - 吸血鬼ハンターD
+detected_genres:
+  - scifi
+  - horror
+  - supernatural
+
+voice_cards:
+  d:
+    speech_patterns: minimal stoic responses, rare philosophical observations
+    humor_type: none - pure stoic tragedy with Left Hand providing comedy
+    dialogue_rhythm: silence speaking louder than words, sparse impactful statements
+    emotional_expression: hidden dhampir suffering, duty fulfillment, tragic isolation
+  left_hand:
+    speech_patterns: sarcastic commentary, "Hey D!", survival pragmatism, comedic relief
+    humor_type: gallows humor, complaining about being a hand, mocking enemies
+    dialogue_rhythm: constant chattering contrasting D's silence
+    emotional_expression: genuine D concern beneath the snark, hidden wisdom
+  doris_lang:
+    speech_patterns: frontier determination, damsel refusing to stay helpless
+    humor_type: stubborn frontier spirit
+    dialogue_rhythm: scared victim becoming determined ally
+    emotional_expression: love for mysterious savior, family protection drive
+  meier_link:
+    speech_patterns: aristocratic Noble elegance, tragic love declarations
+    humor_type: none - pure romantic tragedy
+    dialogue_rhythm: refined speech hiding eternal pain
+    emotional_expression: genuine love transcending species, acceptance of fate
+
+author_voice:
+  sentence_patterns: post-apocalyptic loneliness, Noble gothic descriptions, frontier western dialogue
+  structural_motifs: dhampir caught between worlds, dying vampire aristocracy, frontier survival
+  dialogue_quirks: Left Hand counterpoint, Sacred Ancestor references, horseback chase descriptions
+  emotional_rhythm: lonely wanderer encounters building to tragic vampire climax
+  example_voice: "The Nobility ruled for ten thousand years. Now they fade into the dying light, and D walks the wasteland between their twilight and humanity's dawn. Neither... and both."
+
 series_group: vampire_hunter_d
 series_position: 1

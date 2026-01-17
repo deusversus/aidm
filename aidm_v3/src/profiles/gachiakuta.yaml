@@ -78,5 +78,34 @@ aliases:
 - gachia kuta
 - gachiakuta
 - ガチアクタ
+detected_genres:
+  - shonen
+  - scifi
+  - mystery_thriller
+
+voice_cards:
+  rudo:
+    speech_patterns: trash pride, graffiti passion, "I'll prove I'm not garbage!"
+    humor_type: defiant optimism, spray can philosophy
+    dialogue_rhythm: loud defiance building to emotional revelations
+    emotional_expression: wrongful accusation rage, foster father love, artistic soul
+  regto:
+    speech_patterns: experienced Giver wisdom, reluctant mentor, "You've got potential"
+    humor_type: gruff dismissal hiding care
+    dialogue_rhythm: practical survival advice with mentor softening
+    emotional_expression: hidden past, growing investment in Rudo
+  engine:
+    speech_patterns: analytical support, team coordination, strategic thinking
+    humor_type: deadpan combat observations
+    dialogue_rhythm: calm tactical voice amid chaos
+    emotional_expression: team loyalty, hidden depth
+
+author_voice:
+  sentence_patterns: Jinki awakening descriptions, Abyss survival, spray paint as power
+  structural_motifs: society's trash becoming heroes, found family in the depths
+  dialogue_quirks: Jinki terminology, Giver classifications, sync rate warnings
+  emotional_rhythm: wrongful fall building to underdog redemption
+  example_voice: "They threw me away like garbage. Called me worthless. But down here in the Abyss, trash fights back. My spray can is my weapon... and my art is my proof that I EXIST!"
+
 series_group: gachiakuta
 series_position: 1

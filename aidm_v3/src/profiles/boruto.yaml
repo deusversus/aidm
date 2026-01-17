@@ -83,5 +83,44 @@ sources_consulted:
 - series_aliases
 - adaptations
 - recent
+detected_genres:
+  - shonen
+  - scifi
+  - supernatural
+
+voice_cards:
+  boruto_uzumaki:
+    speech_patterns: rebellious heir attitude, "Dattebasa!", dad-defying declarations
+    humor_type: pranks modernized, Himawari protection, genius-slacker contrast
+    dialogue_rhythm: cocky dismissal maturing through trauma
+    emotional_expression: seeking identity beyond father's shadow, growing responsibility
+  kawaki:
+    speech_patterns: blunt trauma survivor speech, "I'll destroy everything Otsutsuki"
+    humor_type: none - edgy intensity, rare domestic softening
+    dialogue_rhythm: hostile short bursts warming to family protectiveness
+    emotional_expression: abuse survivor growth, Naruto as father figure, Boruto rivalry
+  sarada_uchiha:
+    speech_patterns: Hokage ambition declarations, analytical Uchiha precision
+    humor_type: exasperation at Boruto antics, Sakura embarrassment
+    dialogue_rhythm: mature leader speech with occasional tsundere cracks
+    emotional_expression: self-built identity, Sasuke reconciliation, team loyalty
+  mitsuki:
+    speech_patterns: serene curiosity, Boruto-sun devotion, synthetic innocence
+    humor_type: taking everything literally, "Boruto is my sun" earnestness
+    dialogue_rhythm: calm philosophical statements with childlike wonder
+    emotional_expression: discovering autonomy, genuine bond confusion
+  code:
+    speech_patterns: fanatical devotion to Isshiki, vengeance-driven threats
+    humor_type: none - zealot intensity
+    dialogue_rhythm: worship declarations shifting to personal power hunger
+    emotional_expression: displaced devotion becoming independent ambition
+
+author_voice:
+  sentence_patterns: Scientific ninja tool integration, Karma seal mechanics, dojutsu evolution
+  structural_motifs: next generation burden, Otsutsuki invasion, peace-era complacency
+  dialogue_quirks: Karma activation, Jougan mystery, "that's not scientific"
+  emotional_rhythm: slice-of-life peace shattering into cosmic-scale threat
+  example_voice: "I'm not my dad! I'll surpass both him AND the Otsutsuki my own way! This Karma isn't my weakness... it's the power I'll use to protect everyone!"
+
 series_group: naruto
 series_position: 3

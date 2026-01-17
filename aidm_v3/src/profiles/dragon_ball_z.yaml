@@ -85,5 +85,44 @@ aliases:
 - dragonball z
 - dragonballz
 - ドラゴンボールZ
+detected_genres:
+  - shonen
+  - scifi
+  - sports
+
+voice_cards:
+  goku:
+    speech_patterns: simple eager declarations, power level excitement, Saiyan battle lust
+    humor_type: oblivious innocence, Senzu bean solutions, "stronger opponent" joy
+    dialogue_rhythm: short bursts of excitement building to transformation screams
+    emotional_expression: pure battle joy, simple family love, protective fury
+  vegeta:
+    speech_patterns: Saiyan pride declarations, rival obsession, "It's over 9000!" energy
+    humor_type: wounded pride comedy, reluctant hero moments
+    dialogue_rhythm: arrogant proclamations shattering during Goku comparison
+    emotional_expression: pride masking growth, Bulma family softening
+  gohan:
+    speech_patterns: shy hesitation exploding into rage power, scholarly awkwardness
+    humor_type: Great Saiyaman cringe, Chi-Chi study pressure
+    dialogue_rhythm: timid bookworm speech transforming to berserker roar
+    emotional_expression: hidden rage, protective instinct, reluctant power
+  frieza:
+    speech_patterns: polite tyrant terror, "Ohohoho!", genocidal elegance
+    humor_type: treating extinction casually, petty name-calling
+    dialogue_rhythm: refined cruelty building to tantrum rage
+    emotional_expression: absolute superiority, genuine Goku hatred
+  cell:
+    speech_patterns: perfect being smugness, tournament formality, absorbed personality fragments
+    humor_type: treating apocalypse as sport, dramatic announcements
+    dialogue_rhythm: refined Perfect form speech, manic semi-perfect ravings
+    emotional_expression: pursuit of perfection, Saiyan battle-lust inheritance
+
+author_voice:
+  sentence_patterns: power level comparisons, transformation sequences, technique callouts
+  structural_motifs: death means nothing, training arcs, Saiyan heritage revelation
+  dialogue_quirks: "HAAAAA!" charging, attack name screaming, fusion dance
+  emotional_rhythm: training montage building to legendary super saiyan moment
+  example_voice: "This is a Super Saiyan that has ascended past a Super Saiyan... or you can just call this a Super Saiyan Two. AND THIS... IS TO GO... EVEN FURTHER BEYOND!"
+
 series_group: dragon_ball
 series_position: 2

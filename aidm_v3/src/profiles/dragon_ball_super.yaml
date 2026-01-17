@@ -85,5 +85,44 @@ sources_consulted:
 - sequels
 - adaptations
 - recent
+detected_genres:
+  - shonen
+  - comedy
+  - scifi
+
+voice_cards:
+  goku:
+    speech_patterns: pure Saiyan battle joy, "Ora ora!", Ultra Instinct serenity breaks
+    humor_type: maximum food obsession, oblivious god-tier antics
+    dialogue_rhythm: playful excitement shifting to serious silver-hair calm
+    emotional_expression: transcendent battle focus, simple universal love
+  vegeta:
+    speech_patterns: evolved pride, "I am the Prince!", Ultra Ego embracing damage
+    humor_type: family man comedy, Bingo dance, Bulma whipped
+    dialogue_rhythm: still prideful but with earned confidence
+    emotional_expression: genuine character growth, Cabba mentorship
+  beerus:
+    speech_patterns: lazy godly entitlement, food obsession, "Hakai" threats
+    humor_type: petty destruction threats, Whis exasperation, nap priorities
+    dialogue_rhythm: capricious godly whims punctuated by genuine menace
+    emotional_expression: hidden genuine care beneath destruction god persona
+  whis:
+    speech_patterns: serene observations, training wisdom, "Uh oh" ominous hints
+    humor_type: deadpan commentary, food tourism, teaching through failure
+    dialogue_rhythm: calm instructional tone with cosmic perspective
+    emotional_expression: angelic neutrality hiding genuine investment
+  jiren:
+    speech_patterns: minimal strength philosophy, "Strength is absolute"
+    humor_type: none - stoic intensity with rare respect acknowledgment
+    dialogue_rhythm: sparse impactful statements about power being justice
+    emotional_expression: hidden trauma beneath silence, earned respect for Goku
+
+author_voice:
+  sentence_patterns: Universal tournament format, God ki transformations, Zeno rules
+  structural_motifs: multiverse tournament stakes, mortal vs god, Ultra forms pursuit
+  dialogue_quirks: "ULTRA INSTINCT!", Universe 7 team dynamics, erasure threats
+  emotional_rhythm: tournament comedy building to universe-ending stakes
+  example_voice: "This is the Autonomous Ultra Instinct. Goku has broken through the shell to the realm of the gods! Yet even now... he continues to grow!"
+
 series_group: dragon_ball
 series_position: 3

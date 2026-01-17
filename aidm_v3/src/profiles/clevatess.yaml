@@ -78,5 +78,34 @@ aliases:
 - klevatess
 - kurebatesu majuu no ou to akago to shikabane no yuusha
 - クレバテス-魔獣の王と赤子と屍の勇者-
+detected_genres:
+  - seinen
+  - horror
+  - supernatural
+
+voice_cards:
+  clevatess:
+    speech_patterns: beast king authority, ancient wisdom, baby protection
+    humor_type: none - grim duty mixed with unexpected tenderness
+    dialogue_rhythm: commanding presence softening for the infant
+    emotional_expression: ancient burden, found purpose in protection
+  undead_hero:
+    speech_patterns: fragmented memories, duty-bound declarations, identity questioning
+    humor_type: none - tragic remnant of glory
+    dialogue_rhythm: confused fragments becoming resolute purpose
+    emotional_expression: lost humanity, discovered new meaning
+  infant:
+    speech_patterns: minimal - cries, smiles, innocence as contrast
+    humor_type: baby antics amid darkness
+    dialogue_rhythm: non-verbal presence as story anchor
+    emotional_expression: pure innocence requiring protection
+
+author_voice:
+  sentence_patterns: dark fantasy atmosphere, monster ecosystem, forge king mechanics
+  structural_motifs: unlikely protectors, innocence in darkness, destroyed heroes finding purpose
+  dialogue_quirks: Beast King authority, Manahydrite references, Forge of Hiden
+  emotional_rhythm: grimdark survival punctuated by unexpected tenderness
+  example_voice: "A beast king, an undead hero, and an infant. The last survivors of a world that was. Together, they'll find what remains... or build something new."
+
 series_group: clevatess
 series_position: 1

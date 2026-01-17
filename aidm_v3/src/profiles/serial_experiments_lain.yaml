@@ -81,5 +81,39 @@ sources_consulted:
 - adaptations
 - recent
 - series_aliases
+detected_genres:
+  - scifi
+  - horror
+  - mystery_thriller
+
+voice_cards:
+  lain_iwakura:
+    speech_patterns: fragmented questioning, "Who am I?", split personality divergence
+    humor_type: none - existential dread played completely straight
+    dialogue_rhythm: hesitant whispers fracturing into confident Wired Lain statements
+    emotional_expression: identity dissolution, desperate connection seeking, godhood burden
+  arisu_mizuki:
+    speech_patterns: concerned friend warmth, grounding reality anchor, "Lain, are you okay?"
+    humor_type: rare normal teenage moments, slice-of-life contrast
+    dialogue_rhythm: worried friend speech providing human anchor
+    emotional_expression: genuine friendship despite horror, sanity lifeline for viewer
+  masami_eiri:
+    speech_patterns: god complex declarations, Protocol 7 exposition, digital transcendence philosophy
+    humor_type: none - messiah delusion sincerity
+    dialogue_rhythm: measured tech-prophet sermons building to rejected godhood
+    emotional_expression: genuine belief in his own divinity, human frailty denial
+  the_knights:
+    speech_patterns: collective cult voice, secret society jargon, Wired supremacy
+    humor_type: none - ominous cultist presence
+    dialogue_rhythm: threatening whispers, digital intrusion
+    emotional_expression: fanatical devotion to boundary dissolution
+
+author_voice:
+  sentence_patterns: hypnotic repetition, reality-questioning narration, Wired static overlays
+  structural_motifs: identity as construct, memory defining reality, observation creating existence
+  dialogue_quirks: "Present day. Present time. Hahaha!", humming static, layer terminology
+  emotional_rhythm: ambient dread building to complete reality dissolution
+  example_voice: "If you're not remembered, then you never existed. In the Wired... no one ever has to be alone. But does that mean you're truly connected... or truly lost?"
+
 series_group: serial_experiments_lain
 series_position: 1

@@ -82,5 +82,44 @@ sources_consulted:
 - adaptations
 - recent
 - series_aliases
+detected_genres:
+  - seinen
+  - horror
+  - historical
+
+voice_cards:
+  gabimaru:
+    speech_patterns: emotionless assassin denial, hidden wife thoughts, efficient killing talk
+    humor_type: claiming no emotions while clearly having them, straight-faced absurdity
+    dialogue_rhythm: flat killer efficiency cracking for wife-related matters
+    emotional_expression: suppressed humanity reawakening, wife as anchor, hollow emptiness filling
+  sagiri:
+    speech_patterns: samurai formality, self-doubt questioning, growing conviction
+    humor_type: sheltered noble confusion, earnest misunderstanding
+    dialogue_rhythm: hesitant proper speech strengthening to decisive declarations
+    emotional_expression: inherited duty burden, growing personal resolve, compassion through blade
+  chobe:
+    speech_patterns: bandit king arrogance, brutal pragmatism, Tao obsession
+    humor_type: none - absolute survival focus with rare darkly comedic observations
+    dialogue_rhythm: commanding bandit authority, increasing monster philosophy
+    emotional_expression: brother bond beneath brutality, power hunger, survival above all
+  yuzuriha:
+    speech_patterns: flirtatious manipulation, kunoichi double-speak, survival pragmatism
+    humor_type: seduction as distraction, playing dumb, ruthless beneath smiles
+    dialogue_rhythm: playful surface hiding calculated lethality
+    emotional_expression: genuine loneliness beneath manipulation, grudging attachments
+  lord_tensen:
+    speech_patterns: serene immortal wisdom, flower/life metaphors, existential ennui
+    humor_type: treating death casually, bored immortality, plant-human confusion
+    dialogue_rhythm: ethereal calm with sudden monstrous intensity
+    emotional_expression: ancient emptiness, seeking sensation, inhuman serenity
+
+author_voice:
+  sentence_patterns: Tao flow descriptions, Edo-era formality, grotesque beauty of violence
+  structural_motifs: hollow killer finding meaning, Shinsenkoku as liminal death-garden
+  dialogue_quirks: Tao terminology, flower-death imagery, Edo period speech patterns
+  emotional_rhythm: brutal survival horror punctuated by unexpected human connection
+  example_voice: "I am Gabimaru the Hollow. I feel nothing. I want nothing. ...Except to return to her. For her, I will survive even this Hell."
+
 series_group: hells_paradise
 series_position: 1

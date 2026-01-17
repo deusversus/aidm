@@ -87,5 +87,34 @@ aliases:
 - seventh prince
 - tensei shitara dai nana ouji dattanode kimanini magutsu o kiwamemasu
 - 転生したら第七王子だったので、気ままに魔術を極めます
+detected_genres:
+  - isekai
+  - comedy
+  - shonen
+
+voice_cards:
+  lloyd:
+    speech_patterns: magic nerd enthusiasm, cute prince politeness, adult soul wisdom
+    humor_type: shota prince casually breaking reality, magic obsession
+    dialogue_rhythm: excited magic lectures while effortlessly OP
+    emotional_expression: pure magic research joy, reincarnated appreciation
+  tao:
+    speech_patterns: loyal martial artist, "Young Master!", straight-man exasperation
+    humor_type: reacting to Lloyd's casual godhood, protective overdrive
+    dialogue_rhythm: respectful service crumbling to bewildered awe
+    emotional_expression: fierce loyalty, martial pride, comedic suffering
+  sylpha:
+    speech_patterns: demon contract formality, hidden softening, tsundere demon
+    humor_type: powerful demon becoming de facto servant, dignity loss
+    dialogue_rhythm: threatening demon speech becoming awkward devotion
+    emotional_expression: contract obligation becoming genuine care
+
+author_voice:
+  sentence_patterns: magic circle programming, rune algorithm descriptions, power level comparisons
+  structural_motifs: reincarnation advantage, cute OP protagonist, collecting loyal followers
+  dialogue_quirks: magic circle terminology, adventurer ranks, "Algorithmancy" references
+  emotional_rhythm: comedy power fantasy with rare touching moments
+  example_voice: "In my past life, I died before mastering magic. This time, as a prince with infinite resources and time... I'll become the greatest mage ever! *casts city-destroying spell casually*"
+
 series_group: tensei_shitara_dai_nana_ouji
 series_position: 1

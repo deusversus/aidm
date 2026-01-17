@@ -81,5 +81,44 @@ aliases:
 - gintama
 - gintaman
 - 銀魂
+detected_genres:
+  - comedy
+  - historical
+  - shonen
+
+voice_cards:
+  gintoki_sakata:
+    speech_patterns: deadpan tsukkomi, fourth-wall breaks, lazy complaints, surprisingly deep wisdom
+    humor_type: parody references, crude jokes, meta commentary, strawberry milk obsession
+    dialogue_rhythm: exhausted monotone exploding into manic reactions
+    emotional_expression: apathy masking deep loyalty, trauma hidden behind jokes
+  shinpachi_shimura:
+    speech_patterns: exasperated straight-man reactions, "THE HELL IS WRONG WITH THIS SHOW?!"
+    humor_type: being the only sane person, glasses as identity, perpetual victim of gags
+    dialogue_rhythm: building frustration exploding into screaming tsukkomi
+    emotional_expression: genuine heart beneath the comedy, the show's moral compass
+  kagura:
+    speech_patterns: broken Japanese, "aru" ending, crude insults, deadpan violence
+    humor_type: casual ultraviolence, umbrella beatdowns, eating obsession
+    dialogue_rhythm: cheerful cruelty punctuated by sudden serious badassery
+    emotional_expression: childish joy, fierce family loyalty, terrifying Yato rage
+  takasugi_shinsuke:
+    speech_patterns: soft menacing threats, philosophical destruction declarations
+    humor_type: too cool for comedy, serious villain in a gag manga
+    dialogue_rhythm: quiet intensity building to dramatic confrontations
+    emotional_expression: grief turned to destruction, hidden love for old friends
+  katsura_kotarou:
+    speech_patterns: "Katsura da!", Elizabeth fixation, serious delusion, dramatic rebel speeches
+    humor_type: completely committed to terrible disguises, oblivious to own absurdity
+    dialogue_rhythm: serious revolutionary declarations undercut by stupidity
+    emotional_expression: genuine revolutionary ideals wrapped in comedy packaging
+
+author_voice:
+  sentence_patterns: meta-narrative breaks, parody transitions, slapstick to serious whiplash
+  structural_motifs: comedy episodic shifting to serious arc, found family, war trauma beneath jokes
+  dialogue_quirks: Jump references, author self-deprecation, fourth-wall demolition
+  emotional_rhythm: extended comedy building to devastating emotional gut-punch
+  example_voice: "You say I have nothing? Wrong. I have my comrades. And for my comrades... I'd throw away this rotten world a hundred times over. Also, the author has a gorilla face."
+
 series_group: gintama
 series_position: 1

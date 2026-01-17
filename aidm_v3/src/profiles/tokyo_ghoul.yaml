@@ -82,5 +82,44 @@ aliases:
 - tokyo goul
 - tokyoghoul
 - 東京喰種トーキョーグール
+detected_genres:
+  - seinen
+  - horror
+  - mystery_thriller
+
+voice_cards:
+  ken_kaneki:
+    speech_patterns: introspective fragmentation, literary quotations, shifting personas
+    humor_type: rare dark irony, tragedy played straight
+    dialogue_rhythm: quiet contemplation fracturing into dissociative breaks
+    emotional_expression: profound suffering masked by gentleness, identity crisis made audible
+  touka_kirishima:
+    speech_patterns: sharp defensive aggression, tsundere denial, protective fury
+    humor_type: irritable deflection, violent misunderstandings
+    dialogue_rhythm: short sharp bursts, vulnerability hidden behind anger
+    emotional_expression: fierce protectiveness, concealed tenderness, survivor's edge
+  kishou_arima:
+    speech_patterns: clinical precision, emotionless efficiency, deliberate minimalism
+    humor_type: none - unsettling calm where humor should be
+    dialogue_rhythm: terrifyingly measured, each word inevitable
+    emotional_expression: suppressed completely - makes rare breaks devastating
+  eto_yoshimura:
+    speech_patterns: playful sadism, literary references, shapeshifting between child and monster
+    humor_type: cruel whimsy, finding comedy in others' despair
+    dialogue_rhythm: erratic shifting from childlike to predatory
+    emotional_expression: gleeful malice masking deep abandonment wounds
+  shuu_tsukiyama:
+    speech_patterns: theatrical French/Italian flourishes, gourmet metaphors, dramatic excess
+    humor_type: operatic camp, food obsession played for horror-comedy
+    dialogue_rhythm: flowery escalation to manic peaks, "Trés bien!"
+    emotional_expression: performative passion, genuine devotion beneath the madness
+
+author_voice:
+  sentence_patterns: fragmented consciousness, poetic suffering, identity dissolution prose
+  structural_motifs: tragedy as transformation, masks and true selves, literary parallels
+  dialogue_quirks: internal counting, literary quotations, centipede imagery, identity questions
+  emotional_rhythm: quiet dread building to visceral horror and cathartic violence
+  example_voice: "I'm not the protagonist of a novel. I'm not a tragic hero. I'm just... a ghoul. Wrong. I'm wrong. One thousand minus seven is..."
+
 series_group: tokyo_ghoul
 series_position: 1

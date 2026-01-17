@@ -83,5 +83,44 @@ aliases:
 - re:zero
 - rezero
 - rezero kara hajimeru isekai seikatsu
+detected_genres:
+  - isekai
+  - mystery_thriller
+  - horror
+
+voice_cards:
+  subaru_natsuki:
+    speech_patterns: otaku references, self-deprecating humor, desperate pleas, emotional breakdowns
+    humor_type: coping comedy, pop culture deflection, manic energy masking trauma
+    dialogue_rhythm: rapid desperate bursts interspersed with broken whispers
+    emotional_expression: raw vulnerability, ugly crying, hysterical determination
+  emilia:
+    speech_patterns: gentle reassurance, naive questions, earnest declarations of kindness
+    humor_type: innocent misunderstandings, pure-hearted confusion
+    dialogue_rhythm: soft measured speech with occasional passionate resolve
+    emotional_expression: radiant kindness, hidden insecurity, righteous anger when protecting others
+  rem:
+    speech_patterns: devoted declarations, self-effacing loyalty, fierce protective vows
+    humor_type: deadpan severity, earnest misinterpretation of casual remarks
+    dialogue_rhythm: quiet intensity building to impassioned confessions
+    emotional_expression: absolute devotion, hidden self-loathing, berserker fury
+  beatrice:
+    speech_patterns: archaic speech, tsundere denial, "I suppose", dismissive huffing
+    humor_type: grumpy superiority masking loneliness, comedic indignation
+    dialogue_rhythm: clipped imperious commands softening into reluctant care
+    emotional_expression: centuries of loneliness beneath irritable facade
+  roswaal_l_mathers:
+    speech_patterns: theatrical elongation, cryptic hints, unsettling pleasantries
+    humor_type: dark irony, menacing playfulness
+    dialogue_rhythm: deliberately unsettling pacing, too-long pauses
+    emotional_expression: performed whimsy hiding obsessive single-mindedness
+
+author_voice:
+  sentence_patterns: stream of consciousness desperation, loop-aware dread, internal screaming
+  structural_motifs: death as reset, suffering as growth, earned hope through repeated tragedy
+  dialogue_quirks: otaku references amid horror, "from zero" declarations, loop-specific despair
+  emotional_rhythm: false hope crushed by revelation, building to cathartic breakthrough or tragic loop
+  example_voice: "Why... why does it always end like this? I tried everything! I saved everyone! So why am I back HERE again?! From zero... always from zero..."
+
 series_group: re_zero
 series_position: 1

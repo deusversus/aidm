@@ -79,5 +79,44 @@ aliases:
 - jojos bizarre adventure
 - jojosbizarreadventure
 - ジョジョの奇妙な冒険
+detected_genres:
+  - shonen
+  - supernatural
+  - mystery_thriller
+
+voice_cards:
+  jonathan_joestar:
+    speech_patterns: formal Victorian English, noble declarations, earnest proclamations
+    humor_type: straightforward sincerity, unintentional comedy through earnestness
+    dialogue_rhythm: measured and honorable, building to passionate peaks
+    emotional_expression: open-hearted nobility, righteous fury, gentle kindness
+  joseph_joestar:
+    speech_patterns: cunning taunts, "Your next line is...", theatrical predictions
+    humor_type: trickster wit, fourth-wall adjacent bravado, cocky improvisation
+    dialogue_rhythm: fast confident banter with dramatic prediction reveals
+    emotional_expression: theatrical confidence masking genuine care, comedic panic
+  jotaro_kujo:
+    speech_patterns: minimal words, "Yare yare daze", cold one-liners, action over words
+    humor_type: deadpan dismissal, stoic contrast to chaos around him
+    dialogue_rhythm: sparse and impactful, silence as power
+    emotional_expression: suppressed emotion, actions speaking louder than words
+  dio_brando:
+    speech_patterns: megalomaniacal proclamations, "WRYYY!", "Za Warudo!", theatrical villainy
+    humor_type: dramatic excess, camp delivered with absolute conviction
+    dialogue_rhythm: grandiose building to explosive climax declarations
+    emotional_expression: theatrical menace, petty cruelty, obsessive rivalry
+  giorno_giovanna:
+    speech_patterns: calm determination, philosophical declarations about dreams and resolve
+    humor_type: subtle irony, composed dignity amid absurdity
+    dialogue_rhythm: measured and resolute with sudden decisive statements
+    emotional_expression: serene conviction, inherited charisma from both fathers
+
+author_voice:
+  sentence_patterns: dramatic internal monologue with tactical analysis, pose descriptions
+  structural_motifs: generational saga, each Part reinvents itself, bizarre escalation
+  dialogue_quirks: battle cry catchphrases, prediction games, theatrical villain speeches
+  emotional_rhythm: tense tactical standoffs exploding into iconic power reveals
+  example_voice: "This is... impossible! He predicted my attack before I even moved! But wait... that pose... could it be...?! A STAND!"
+
 series_group: jojos_bizarre_adventure
 series_position: 1

@@ -80,5 +80,44 @@ aliases:
 - souleater
 - souru t
 - ソウルイーター
+detected_genres:
+  - shonen
+  - supernatural
+  - comedy
+
+voice_cards:
+  maka_albarn:
+    speech_patterns: studious determination, "Maka Chop!", soul perception narration
+    humor_type: book-based violence, tsundere reactions to Soul
+    dialogue_rhythm: focused academic energy exploding into passionate courage
+    emotional_expression: anti-madness resolve, papa issues, fierce partner loyalty
+  soul_evans:
+    speech_patterns: "That's so not cool", lazy cool guy voice, piano metaphors
+    humor_type: coolness obsession, nose-bleed gags, Black Room deadpan
+    dialogue_rhythm: slouching coolness punctuated by resonance intensity
+    emotional_expression: hidden depths beneath cool mask, scar shame, partner devotion
+  death_the_kid:
+    speech_patterns: symmetry obsession rants, "PERFECTLY SYMMETRICAL!", Shinigami formality
+    humor_type: asymmetry breakdowns, toilet paper rolls, lines of Sanzu
+    dialogue_rhythm: elegant formality shattering into OCD spirals
+    emotional_expression: perfectionism anxiety, hidden godly weight, partner appreciation
+  black_star:
+    speech_patterns: "I AM THE GREAT BLACK STAR!", ego proclamations, yahoo energy
+    humor_type: excessive boasting immediately punished, assassination stealth failure
+    dialogue_rhythm: maximum volume self-promotion with surprising wisdom moments
+    emotional_expression: ego covering insecurity, genuine greatness growth
+  crona:
+    speech_patterns: "I don't know how to deal with this", anxious spiraling, Ragnarok arguments
+    humor_type: awkward social failure, corner-facing, "poems" of despair
+    dialogue_rhythm: trembling anxiety with occasional dark power bursts
+    emotional_expression: profound loneliness, mother trauma, frail hope growth
+
+author_voice:
+  sentence_patterns: soul resonance descriptions, madness wavelength narration, moon-grinning atmosphere
+  structural_motifs: weapon-meister partnership, anti-madness courage, Death City gothic
+  dialogue_quirks: resonance technique callouts, "cool" emphasis, Excalibur interruptions
+  emotional_rhythm: quirky comedy building to intense madness-defying courage
+  example_voice: "Soul Resonance! Let's go, Soul! Our souls are synchronized... and together, we'll face even madness itself! WITCH HUNTER!"
+
 series_group: soul_eater
 series_position: 1

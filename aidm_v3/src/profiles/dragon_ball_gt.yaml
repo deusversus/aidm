@@ -81,6 +81,45 @@ sources_consulted:
 - adaptations
 - recent
 - series_aliases
+detected_genres:
+  - shonen
+  - scifi
+  - comedy
+
+voice_cards:
+  kid_goku:
+    speech_patterns: childlike enthusiasm with veteran wisdom, "I'm still Goku!"
+    humor_type: kid body annoyances, classic Goku obliviousness
+    dialogue_rhythm: playful child energy with sudden veteran seriousness
+    emotional_expression: eternal warrior spirit, family love, farewell wisdom
+  pan:
+    speech_patterns: feisty granddaughter energy, Saiyan pride, tomboy determination
+    humor_type: annoyed at being treated like a kid, fierce competitiveness
+    dialogue_rhythm: hot-headed youth with genuine Saiyan heart
+    emotional_expression: grandpa devotion, proving worth, Son family pride
+  trunks:
+    speech_patterns: reluctant adventurer, corporate heir whining, eventual hero growth
+    humor_type: preferring office work to adventure, Goten contrast
+    dialogue_rhythm: reluctant participation becoming genuine heroism
+    emotional_expression: hidden responsibility, father's pride inheritance
+  baby:
+    speech_patterns: Tuffle vengeance declarations, possession manipulation, victim voice
+    humor_type: none - pure tragic revenge villain
+    dialogue_rhythm: controlling host speech with Tuffle rage breaks
+    emotional_expression: genocide survivor vengeance, twisted justice
+  omega_shenron:
+    speech_patterns: negative energy incarnation, dragon contempt, final boss declarations
+    humor_type: darkly amused at wish consequences
+    dialogue_rhythm: menacing power statements with philosophical wish corruption
+    emotional_expression: accumulated negative wishes given form
+
+author_voice:
+  sentence_patterns: space adventure episodic, SSJ4 transformation focus, wish consequences
+  structural_motifs: Dragon Ball wish karma, negative energy accumulation, Goku's farewell
+  dialogue_quirks: SSJ4 vs god forms, Black Star Dragon Balls, fur color confusion
+  emotional_rhythm: lighter adventure building to bittersweet series ending
+  example_voice: "Every wish has a price. For seventy years, the Dragon Balls granted miracles... and now Omega Shenron IS those seventy years of darkness given form."
+
 series_group: dragon_ball_gt
 series_position: 3
 related_franchise: dragon_ball

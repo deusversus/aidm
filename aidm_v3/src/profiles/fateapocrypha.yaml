@@ -81,6 +81,45 @@ sources_consulted:
 - adaptations
 - recent
 - series_aliases
+detected_genres:
+  - seinen
+  - supernatural
+  - shonen
+
+voice_cards:
+  sieg:
+    speech_patterns: homunculus self-discovery, borrowed Siegfried heart, "I want to LIVE"
+    humor_type: none - existential earnestness
+    dialogue_rhythm: blank slate awakening to passionate declarations
+    emotional_expression: artificial life finding meaning, Jeanne devotion, Fafnir sacrifice
+  jeanne_darc:
+    speech_patterns: saintly arbitration, "As the Ruler of this war", hidden heart conflict
+    humor_type: rare moments of Laeticia influence
+    dialogue_rhythm: divine duty declarations cracking for Sieg
+    emotional_expression: impartial judge becoming partial, forbidden love burden
+  mordred:
+    speech_patterns: violent father-complex rage, "DON'T CALL ME A WOMAN!", rebel knight
+    humor_type: aggressive denial of femininity, tube-top pride
+    dialogue_rhythm: angry outbursts hiding desperate approval seeking
+    emotional_expression: Artoria obsession, Sisigou found-family, hidden vulnerability
+  karna:
+    speech_patterns: quiet conviction, charitable even in battle, "Hero of Charity" duty
+    humor_type: none - serene acceptance of every situation
+    dialogue_rhythm: minimal impactful statements of absolute loyalty
+    emotional_expression: unwavering duty, genuine respect for opponents
+  achilles:
+    speech_patterns: cocky invincible swagger, chariot racing enthusiasm, warrior respect
+    humor_type: overconfident bravado, heel weakness awareness
+    dialogue_rhythm: playful combat banter with sudden seriousness
+    emotional_expression: genuine warrior respect, Atalante concern, heel fate acceptance
+
+author_voice:
+  sentence_patterns: faction war commentary, Noble Phantasm TRUE NAME declarations, homunculus philosophy
+  structural_motifs: Red vs Black factional war, artificial life's worth, heroic spirit ensemble
+  dialogue_quirks: Great Holy Grail War terminology, faction allegiance, Master-Servant bonds
+  emotional_rhythm: massive battle spectacle punctuated by individual character tragedy
+  example_voice: "What does it mean to truly be alive? I was created as nothing... but I choose to become something. Even if I only have three years... I will LIVE!"
+
 series_group: fate_apocrypha
 series_position: 1
 related_franchise: fate

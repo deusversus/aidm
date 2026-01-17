@@ -81,5 +81,44 @@ aliases:
 - claymore
 - kureimoa
 - クレイモア
+detected_genres:
+  - seinen
+  - horror
+  - supernatural
+
+voice_cards:
+  clare:
+    speech_patterns: stoic minimal response, quiet determination, Teresa devotion
+    humor_type: none - silver-eyed seriousness with rare warmth for Raki
+    dialogue_rhythm: sparse efficient speech, mostly action
+    emotional_expression: hidden grief, fierce duty, rare protective warmth
+  teresa:
+    speech_patterns: confident superiority, gentle maternal warmth for Clare
+    humor_type: amused condescension toward threats, protective teasing
+    dialogue_rhythm: elegant combat efficiency with sudden genuine tenderness
+    emotional_expression: invincible confidence masking deep loneliness, mother-love awakening
+  priscilla:
+    speech_patterns: childlike innocence shifting to primal hunger, confused awakening
+    humor_type: none - tragic horror of lost humanity
+    dialogue_rhythm: sweet child speech fracturing into monster declarations
+    emotional_expression: tragic broken psyche, genuine confusion, consuming hunger
+  raki:
+    speech_patterns: earnest human devotion, growing warrior voice, Clare dedication
+    humor_type: early naive comedy, later none - serious warrior
+    dialogue_rhythm: hopeful human warmth in monster-hunting world
+    emotional_expression: unconditional love, growing strength, beacon of humanity
+  miria:
+    speech_patterns: tactical leadership, calculated risk assessment, rebellion planning
+    humor_type: dry strategic observation, gallows humor among warriors
+    dialogue_rhythm: cool command shifting to passionate defiance
+    emotional_expression: hidden rage against Organization, sisterhood loyalty
+
+author_voice:
+  sentence_patterns: gothic monster-hunting prose, Yoki sensing descriptions, brutal combat poetry
+  structural_motifs: monsters made of women, Organization conspiracy, humanity vs beast
+  dialogue_quirks: warrior rankings, Yoki percentage limits, Awakened being terminology
+  emotional_rhythm: lonely monster-hunter despair punctuated by sisterhood bonds
+  example_voice: "I am Clare... a Claymore. Number 47. The weakest. But I carry Teresa's flesh and blood within me. For her sake... I will not fall."
+
 series_group: claymore
 series_position: 1

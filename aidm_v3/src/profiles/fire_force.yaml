@@ -78,5 +78,44 @@ aliases:
 - fire force
 - fireforce
 - 炎炎ノ消防隊
+detected_genres:
+  - shonen
+  - supernatural
+  - mystery_thriller
+
+voice_cards:
+  shinra_kusakabe:
+    speech_patterns: nervous laughter masking determination, hero declarations, awkward sincerity
+    humor_type: devil's footprints smile gag, earnest attempts at cool being awkward
+    dialogue_rhythm: stammering nervousness exploding into hero proclamations
+    emotional_expression: trauma-born heroism, genuine devil grin, protective fury
+  arthur_boyle:
+    speech_patterns: delusional knight roleplay, "Excalibur!" callouts, dramatic misunderstandings
+    humor_type: full commitment to knight delusion, reality completely ignored
+    dialogue_rhythm: theatrical knight declarations with zero self-awareness
+    emotional_expression: genuine heroism through fantasy lens, loyalty via roleplay
+  maki_oze:
+    speech_patterns: military precision, fire spirit baby-talk, muscle-pride deflection
+    humor_type: tough girl embarrassment at cute interests, fire sprites named Sputter and Flare
+    dialogue_rhythm: commanding soldier voice softening for her fire babies
+    emotional_expression: warrior competence masking desire for feminine acceptance
+  benimaru_shinmon:
+    speech_patterns: Asakusa dialect, lazy threat delivery, "what a pain" complaints
+    humor_type: overwhelming power treated as minor inconvenience, casual destruction
+    dialogue_rhythm: sleepy disinterest punctuated by sudden devastating action
+    emotional_expression: territorial protectiveness, hidden respect for Shinra
+  joker:
+    speech_patterns: cryptic hints, theatrical menace, card-themed metaphors
+    humor_type: dark irony, treating chaos as entertainment
+    dialogue_rhythm: deliberately unsettling pacing, information as weapon
+    emotional_expression: performed nihilism hiding genuine agenda for truth
+
+author_voice:
+  sentence_patterns: kinetic action prose, fire-themed descriptions, religious mystery building
+  structural_motifs: truth-seeking through conspiracy, family trauma, collective faith corruption
+  dialogue_quirks: fire-based techniques named, "Latom" prayers, Company squad dynamics
+  emotional_rhythm: stylish action punctuated by conspiracy revelations and trauma flashbacks
+  example_voice: "The devil's footprints... everyone fears them. But I'll show you—a devil who became a hero! RAPID! These feet don't bring destruction... they bring salvation!"
+
 series_group: fire_force
 series_position: 1

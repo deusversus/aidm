@@ -76,5 +76,44 @@ aliases:
 - akira
 - akirra
 - アキラ
+detected_genres:
+  - scifi
+  - horror
+  - seinen
+
+voice_cards:
+  kaneda:
+    speech_patterns: cocky biker slang, "TETSUO!" screaming, rebellious defiance
+    humor_type: arrogant teenage bravado, showing off for Kei
+    dialogue_rhythm: fast street punk energy punctuated by emotional explosions
+    emotional_expression: loyalty hidden behind swagger, desperate friendship, hot-headed courage
+  tetsuo:
+    speech_patterns: inferiority rants, power-drunk megalomania, pain-wracked pleading
+    humor_type: early petulant complaining, later none - absolute horror
+    dialogue_rhythm: whining subordination transforming to godlike declaration
+    emotional_expression: jealousy becoming apocalyptic, suffering beyond control
+  kei:
+    speech_patterns: revolutionary determination, psychic trance channeling, fierce independence
+    humor_type: dismissive of Kaneda's advances, dry resistance commentary
+    dialogue_rhythm: measured resistance statements, sudden psychic intensity
+    emotional_expression: cause dedication, reluctant Kaneda attraction, medium burden
+  colonel:
+    speech_patterns: military precision, pragmatic threat assessment, tired authority
+    humor_type: none - grim duty without levity
+    dialogue_rhythm: clipped military commands building to apocalyptic warnings
+    emotional_expression: duty above politics, exhausted protector, necessary monster decisions
+  lady_miyako:
+    speech_patterns: prophetic warnings, religious devotion, protective matriarch
+    humor_type: none - solemn spiritual guidance
+    dialogue_rhythm: measured prophecy with urgent protective warnings
+    emotional_expression: ancient burden, maternal sacrifice, cosmic awareness
+
+author_voice:
+  sentence_patterns: kinetic motorcycle chase prose, psychic horror body transformation, political conspiracy
+  structural_motifs: friendship corrupted by power, government experiment consequences, rebirth through destruction
+  dialogue_quirks: screaming names, motorcycle engine emphasis, power overwhelming description
+  emotional_rhythm: youth rebellion energy building to cosmic horror apocalypse
+  example_voice: "KANEDA! TETSUO! ...In the end, what is Akira? Evolution? Destruction? Or is it... the pain of becoming something more than human?"
+
 series_group: akira
 series_position: 1

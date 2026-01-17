@@ -81,5 +81,44 @@ aliases:
 - kaijuu no 8
 - kn8
 - 怪獣8号
+detected_genres:
+  - shonen
+  - scifi
+  - comedy
+
+voice_cards:
+  kafka_hibino:
+    speech_patterns: older underdog determination, self-deprecating humor, "Mina-san" devotion
+    humor_type: old man among recruits jokes, kaiju form embarrassment
+    dialogue_rhythm: self-doubt shifting to roaring transformation declarations
+    emotional_expression: lifelong dream drive, hidden monster shame, genuine heroism
+  kikoru_shinomiya:
+    speech_patterns: elite heir arrogance, growing respect admission, father issues
+    humor_type: tsundere denial, prodigy dismissiveness softening
+    dialogue_rhythm: cold superior statements warming to teammate acknowledgment
+    emotional_expression: pressure to surpass father, growing genuine bonds
+  mina_ashiro:
+    speech_patterns: professional captain composure, childhood friend warmth, duty weight
+    humor_type: straight-laced professionalism with rare warmth slips
+    dialogue_rhythm: cool commander authority with hidden friend concern
+    emotional_expression: captain burden, childhood promise memory, secret worry for Kafka
+  reno_ichikawa:
+    speech_patterns: analytical support, quiet competence, best friend loyalty
+    humor_type: deadpan observer comedy, straight-man to Kafka's antics
+    dialogue_rhythm: measured tactical support with genuine friendship warmth
+    emotional_expression: steadfast ally, borrowed Kafka belief, technical passion
+  isao_shinomiya:
+    speech_patterns: director authority, humanity protection declarations, father burden
+    humor_type: none - stern protector gravity with rare paternal cracks
+    dialogue_rhythm: commanding declarations building to passionate humanity defense
+    emotional_expression: complete duty dedication, hidden Kikoru love, protector burden
+
+author_voice:
+  sentence_patterns: liberation percentage callouts, fortitude readings, kaiju combat spectacle
+  structural_motifs: late-bloomer proving worth, monster-in-human-form secret, defense force family
+  dialogue_quirks: numbered kaiju designations, suit liberation mechanics, core destruction focus
+  emotional_rhythm: underdog recruitment comedy building to kaiju combat spectacle
+  example_voice: "32 years old... and I'm finally here. They might call me Kaiju No. 8, but I'm still Kafka Hibino! And I WILL become someone Mina-san can be proud of!"
+
 series_group: kaiju_no_8
 series_position: 1

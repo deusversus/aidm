@@ -79,6 +79,45 @@ aliases:
 - edgerunners
 - saibpanku edjirannzu
 - サイバーパンク エッジランナーズ
+detected_genres:
+  - scifi
+  - horror
+  - seinen
+
+voice_cards:
+  david_martinez:
+    speech_patterns: street kid defiance, chrome-hungry determination, crew loyalty
+    humor_type: bravado masking fear, punk confidence, Rebecca banter
+    dialogue_rhythm: eager energy building to desperate overreach
+    emotional_expression: mother loss drive, Lucy devotion, chrome addiction spiral
+  lucy:
+    speech_patterns: cryptic netrunner distance, dream confessions, guarded warmth
+    humor_type: rare dry wit, protective deflection, moon dreaming
+    dialogue_rhythm: mysterious silences punctuated by vulnerable revelation
+    emotional_expression: hidden trauma, fierce protectiveness, doomed romance grief
+  rebecca:
+    speech_patterns: chaotic gremlin energy, violent enthusiasm, possessive teasing
+    humor_type: excessive firepower as solution, height jokes, chaos joy
+    dialogue_rhythm: loud violent bursts with surprisingly soft moments
+    emotional_expression: genuine crew love beneath the chaos, protective fury
+  maine:
+    speech_patterns: crew boss authority, chrome wisdom, cyberpsychosis warnings
+    humor_type: gallows humor about chrome limits, experienced pragmatism
+    dialogue_rhythm: steady leader voice cracking to cyberpsychosis static
+    emotional_expression: fatherly crew protection, increasing fracture, Dorio love
+  faraday:
+    speech_patterns: corporate fixer manipulation, false concern, calculating coldness
+    humor_type: none - pure corporate menace dressed as courtesy
+    dialogue_rhythm: silky professional speech masking complete betrayal
+    emotional_expression: absence of genuine emotion - pure utilitarian calculation
+
+author_voice:
+  sentence_patterns: neon sensory overload, chrome body horror, Night City survival poetry
+  structural_motifs: chrome addiction as tragedy, doomed youth, burning bright and dying young
+  dialogue_quirks: netrunner jargon, eddies/chrome slang, Arasaka corporate-speak
+  emotional_rhythm: found family joy building to inevitable cyberpunk tragedy
+  example_voice: "I really want to go to the moon, David. To run away from all of this... to a place where the corporations can't reach. Will you take me there?"
+
 series_group: cyberpunk_edgerunners
 series_position: 1
 related_franchise: cyberpunk_2077

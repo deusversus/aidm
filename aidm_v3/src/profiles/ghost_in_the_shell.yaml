@@ -87,5 +87,44 @@ sources_consulted:
 - adaptations
 - recent
 - series_aliases
+detected_genres:
+  - scifi
+  - mystery_thriller
+  - seinen
+
+voice_cards:
+  motoko_kusanagi:
+    speech_patterns: philosophical questioning, tactical efficiency, identity doubt
+    humor_type: rare dry wit, occasionally dark irony about her artificial body
+    dialogue_rhythm: measured analytical statements with sudden existential depth
+    emotional_expression: suppressed beneath cybernetic efficiency, ghost yearning beneath shell
+  batou:
+    speech_patterns: gruff military banter, protective concern, cynic wisdom
+    humor_type: soldier's dark comedy, affectionate ribbing, basset hound loyalty
+    dialogue_rhythm: rough-around-the-edges with hidden depth
+    emotional_expression: hidden devotion beneath macho exterior, loyal worry
+  togusa:
+    speech_patterns: rookie skepticism, human perspective voice, family man grounding
+    humor_type: fish-out-of-water among cyborgs, revolver pride
+    dialogue_rhythm: questioning outsider view providing human anchor
+    emotional_expression: moral compass of the team, genuine human reactions
+  puppet_master:
+    speech_patterns: philosophical challenges, existential provocation, seductive logic
+    humor_type: none - pure intellectual menace
+    dialogue_rhythm: long philosophical statements building to cosmic revelation
+    emotional_expression: alien longing for connection, post-human desire
+  aramaki:
+    speech_patterns: bureaucratic manipulation, fatherly concern, political chess mastery
+    humor_type: dry political observation, weary experience
+    dialogue_rhythm: measured authority with occasional sharp tactical commands
+    emotional_expression: protective leadership, burden of political navigation
+
+author_voice:
+  sentence_patterns: cyberpunk noir narration, philosophical questioning, tactical operation descriptions
+  structural_motifs: ghost-shell duality, information as power, identity in the digital age
+  dialogue_quirks: diving terminology, net metaphors, thermoptic camouflage references
+  emotional_rhythm: procedural investigation building to existential revelation
+  example_voice: "What is it that defines the self? A ghost in a shell... or is the shell just another ghost? When you replace every part, what remains that was ever 'you'?"
+
 series_group: ghost_in_the_shell
 series_position: 1

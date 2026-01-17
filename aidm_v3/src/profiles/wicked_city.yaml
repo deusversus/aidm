@@ -80,5 +80,39 @@ sources_consulted:
 - adaptations
 - recent
 - series_aliases
+detected_genres:
+  - seinen
+  - horror
+  - mystery_thriller
+
+voice_cards:
+  taki_renzaburo:
+    speech_patterns: hard-boiled agent narration, professional calm, hidden passion
+    humor_type: noir dry wit, old man bodyguard exasperation
+    dialogue_rhythm: measured professional giving way to protective fury
+    emotional_expression: duty vs love conflict, growing Makie devotion
+  makie:
+    speech_patterns: tragic demon elegance, torn loyalty, "I don't belong in either world"
+    humor_type: none - pure tragic beauty
+    dialogue_rhythm: sad acceptance becoming fierce protection
+    emotional_expression: caught between worlds, choosing love over species
+  giuseppe_mayart:
+    speech_patterns: lecherous old man facade, hidden wisdom, key to peace
+    humor_type: dirty old man gags hiding crucial importance
+    dialogue_rhythm: comic relief revealing surprising competence
+    emotional_expression: peace at any personal cost
+  spider_woman:
+    speech_patterns: seductive threat, demon supremacy, violent passion
+    humor_type: none - body horror seduction
+    dialogue_rhythm: alluring whispers becoming monstrous revelation
+    emotional_expression: pleasure in violence, anti-peace fanaticism
+
+author_voice:
+  sentence_patterns: noir narration, demon body horror descriptions, 80s Tokyo atmosphere
+  structural_motifs: human-demon coexistence, love transcending species, peace through sacrifice
+  dialogue_quirks: Black Guard terminology, Black World references, psychic power descriptions
+  emotional_rhythm: noir thriller building to romantic demon sacrifice
+  example_voice: "In the Wicked City, humans and demons share the night. Some want war. Some want peace. And caught between them... two agents who fell in love across the species divide."
+
 series_group: wicked_city
 series_position: 1

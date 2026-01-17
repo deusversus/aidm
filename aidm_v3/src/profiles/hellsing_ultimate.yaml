@@ -89,6 +89,45 @@ aliases:
 - herushingu
 - hu
 - ヘルシング
+detected_genres:
+  - seinen
+  - horror
+  - supernatural
+
+voice_cards:
+  alucard:
+    speech_patterns: theatrical monster wisdom, Level release declarations, worthy opponent seeking
+    humor_type: sadistic dark comedy, mocking weak prey, Integra reverence contrast
+    dialogue_rhythm: languid aristocratic patience exploding into berserker joy
+    emotional_expression: ancient ennui, master devotion, respect for human resolve
+  integra_fairbrook_wingates_hellsing:
+    speech_patterns: ice-cold command, Protestant authority, "Search and Destroy" orders
+    humor_type: none - impeccable poise with rare cigar-punctuated remarks
+    dialogue_rhythm: clipped aristocratic orders with passionate duty declarations
+    emotional_expression: iron will hiding burden, genuine care for Seras, master's duty
+  seras_victoria:
+    speech_patterns: "Yes, Master!", reluctant draculina protests, police officer instincts
+    humor_type: humanity-preservation comedy, vampire denial, blush reactions
+    dialogue_rhythm: frightened uncertainty maturing into true vampire embrace
+    emotional_expression: Pip's sacrifice breaking her, becoming true nosferatu
+  walter_c_dornez:
+    speech_patterns: butler courtesy masking deadly intent, "Angel of Death" history
+    humor_type: polite menace, gentlemanly combat narration
+    dialogue_rhythm: refined service speech with sudden wire violence
+    emotional_expression: hidden resentment becoming revealed betrayal
+  pip_bernadotte:
+    speech_patterns: French mercenary charm, romantic pursuit, Wild Geese leadership
+    humor_type: rakish flirtation, mercenary pragmatism, death-bed confession
+    dialogue_rhythm: roguish banter becoming sincere devotion
+    emotional_expression: playboy facade hiding genuine Seras love, willing sacrifice
+
+author_voice:
+  sentence_patterns: gothic carnage description, vampire philosophy, Protestant vs Catholic rivalry
+  structural_motifs: only humans kill monsters, Millennium Nazi vampires, London siege
+  dialogue_quirks: Control Art levels, familiar summoning, "Amen" battle cries
+  emotional_rhythm: ultraviolent spectacle punctuated by profound monster philosophy
+  example_voice: "I am a monster. The world needs monsters like me... to kill monsters like them. But in the end, only a man can kill a monster. Remember that, Police Girl."
+
 series_group: hellsing_ultimate
 series_position: 1
 related_franchise: hellsing

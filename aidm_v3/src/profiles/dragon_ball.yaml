@@ -86,5 +86,44 @@ aliases:
 - dragonbal
 - dragonball
 - ドラゴンボール
+detected_genres:
+  - shonen
+  - comedy
+  - sports
+
+voice_cards:
+  goku:
+    speech_patterns: simple excited declarations, "I'm Son Goku!", naive food/fighting focus
+    humor_type: oblivious innocence, taking everything literally, childlike enthusiasm
+    dialogue_rhythm: short energetic bursts, simple profound statements about fighting
+    emotional_expression: pure joy in battle, simple genuine caring, cheerful determination
+  vegeta:
+    speech_patterns: proud Saiyan declarations, "I am the Prince of all Saiyans!", arrogant taunts
+    humor_type: wounded pride comedy, tsundere denial of caring, frustrated superiority
+    dialogue_rhythm: dramatic proclamations building to explosive outbursts
+    emotional_expression: pride masking insecurity, grudging respect earned through fists
+  piccolo:
+    speech_patterns: tactical observations, gruff mentorship, "What are you doing, Gohan?!"
+    humor_type: straight-man exasperation, baffled by Goku's antics
+    dialogue_rhythm: terse tactical commands with occasional passionate outbursts
+    emotional_expression: hidden paternal care, stoic warrior masking deep bonds
+  frieza:
+    speech_patterns: polite sadism, "Ohohoho!", elegant cruelty, condescending pet names
+    humor_type: darkly comedic politeness while committing atrocities
+    dialogue_rhythm: silky calm escalating to petulant rage when challenged
+    emotional_expression: theatrical villainy, genuine hatred beneath the smiles
+  gohan:
+    speech_patterns: nervous scholarly hesitation exploding into rage-fueled power
+    humor_type: academic awkwardness, reluctant hero embarrassment
+    dialogue_rhythm: quiet timid speech transforming in battle
+    emotional_expression: hidden rage, scholarly gentleness, protective fury for loved ones
+
+author_voice:
+  sentence_patterns: action-focused minimal prose, technique callouts, transformation descriptions
+  structural_motifs: training to surpass limits, tournament brackets, death meaning nothing
+  dialogue_quirks: technique names shouted, power level references, "Kamehameha!" callouts
+  emotional_rhythm: simple stakes building to explosive confrontation and power-up breakthrough
+  example_voice: "His power... it's incredible! But I won't give up! If I push past my limits... one more time... HAAAAAAAAA!"
+
 series_group: dragon_ball
 series_position: 1

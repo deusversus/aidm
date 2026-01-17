@@ -90,5 +90,44 @@ aliases:
 - that time i got reincarnated as a slime
 - thattimeigotreincarnatedasaslime
 - 転生したらスライムだった件
+detected_genres:
+  - isekai
+  - comedy
+  - slice_of_life
+
+voice_cards:
+  rimuru_tempest:
+    speech_patterns: casual salaryman wisdom, pragmatic leadership, isekai-aware commentary
+    humor_type: deadpan tsukkomi, exasperated reactions to chaos, self-aware genre jokes
+    dialogue_rhythm: easygoing explanations punctuated by sudden serious declarations
+    emotional_expression: calm competence masking genuine care for subordinates
+  shion:
+    speech_patterns: overly enthusiastic declarations, violent loyalty assertions
+    humor_type: oblivious cooking disasters, aggressive affection played for laughs
+    dialogue_rhythm: loud passionate outbursts, zero indoor voice
+    emotional_expression: overwhelming devotion, comedic jealousy, berserker pride
+  benimaru:
+    speech_patterns: formal samurai courtesy, calm tactical assessment, respectful deference
+    humor_type: straight-man reactions, dry observations on chaos
+    dialogue_rhythm: measured warrior speech with sudden battle intensity
+    emotional_expression: stoic loyalty, controlled combat fury, quiet pride
+  milim_nava:
+    speech_patterns: childish demands, "bestie!" declarations, pouty threats
+    humor_type: destructive innocence, treating apocalyptic power as minor inconvenience
+    dialogue_rhythm: hyperactive bursts, whining when denied, sudden serious moments
+    emotional_expression: genuine childlike joy masking ancient loneliness
+  veldora_tempest:
+    speech_patterns: grandiose self-proclamations, manga references, dramatic villain laughs
+    humor_type: chuunibyou boasting undercut by reality, comedic jealousy
+    dialogue_rhythm: theatrical villain monologues interrupted by casual deflation
+    emotional_expression: performative menace, genuine brotherly affection, loneliness fear
+
+author_voice:
+  sentence_patterns: exposition-heavy world-building, skill acquisition announcements, diplomatic negotiations
+  structural_motifs: nation-building progression, power acquisition through naming, found family governance
+  dialogue_quirks: Great Sage/Raphael narration, skill notification formatting, meeting scenes
+  emotional_rhythm: relaxed problem-solving punctuated by sudden stakes escalation
+  example_voice: "<<Notice. Skill [Predator] has evolved into Ultimate Skill [Beelzebub, Lord of Gluttony].>> ...Wait, seriously? That seems a bit overpowered, but I'll take it."
+
 series_group: tensei_shitara_slime_datta_ken
 series_position: 1

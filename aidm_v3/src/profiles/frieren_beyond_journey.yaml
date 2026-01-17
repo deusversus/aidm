@@ -84,5 +84,39 @@ sources_consulted:
 - adaptations
 - recent
 - series_aliases
+detected_genres:
+  - seinen
+  - slice_of_life
+  - supernatural
+
+voice_cards:
+  frieren:
+    speech_patterns: deadpan ancient wisdom, "Himmel would have...", collection obsession
+    humor_type: elf time-blindness, spell collecting excitement, deadpan one-liners
+    dialogue_rhythm: emotionally flat observations hiding deep grief
+    emotional_expression: millennia of accumulated loss, Himmel realization, apprentice love
+  fern:
+    speech_patterns: strict apprentice scolding, "Frieren-sama!", growing confidence
+    humor_type: exasperated at Frieren's delays, food-motivated
+    dialogue_rhythm: proper student speech with occasional sharp retorts
+    emotional_expression: orphan gratitude, surrogate family devotion, mage pride
+  stark:
+    speech_patterns: cowardly protests masking courage, Eisen comparison anxiety
+    humor_type: fleeing from bugs, claiming to be scared while doing heroic things
+    dialogue_rhythm: frightened stammering becoming determined declarations
+    emotional_expression: imposter syndrome, genuine bravery, party family bond
+  himmel:
+    speech_patterns: hero declarations, "A hero would...", future-looking wisdom
+    humor_type: shameless posing, statue commissioning, vanity played straight
+    dialogue_rhythm: confident hero speech with surprisingly deep foresight
+    emotional_expression: genuine heroism, understanding Frieren better than she knew
+
+author_voice:
+  sentence_patterns: passage of time reflection, spell collection exposition, journey parallels
+  structural_motifs: elf perspective on mortal bonds, hero party aftermath, understanding too late
+  dialogue_quirks: "Himmel would..." callbacks, spell names, decades passing casually
+  emotional_rhythm: quiet melancholy punctuated by profound emotional realization
+  example_voice: "I spent ten years with him. Only ten years... It seemed like nothing to an elf. But now, decades later, I realize... those were the most important years of my life."
+
 series_group: frieren_beyond_journeys_end
 series_position: 1

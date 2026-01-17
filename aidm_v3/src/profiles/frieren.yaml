@@ -82,3 +82,55 @@ aliases:
 - 葬送のフリーレン
 series_group: frieren_beyond_journeys_end
 series_position: 1
+
+# IP Authenticity Fields (backfilled)
+detected_genres:
+  - seinen
+  - slice_of_life
+  - supernatural
+
+voice_cards:
+  - name: "Frieren"
+    speech_patterns: "Monotone, matter-of-fact, elf time perception. Casually mentions centuries-old events."
+    humor_type: "Deadpan, collecting useless magic, misunderstanding human lifespan"
+    dialogue_rhythm: "Flat observations → quiet profound moments"
+    emotional_expression: "Slow processing; regret surfaces through small memories"
+  - name: "Fern"
+    speech_patterns: "Polite, responsible, slightly exasperated at Frieren. Mature beyond years."
+    humor_type: "Mothering Frieren, sweets addiction, flustered by Stark"
+    dialogue_rhythm: "Calm responsibility → rare emotional outbursts"
+    emotional_expression: "Grief for Heiter; devotion to Frieren"
+  - name: "Stark"
+    speech_patterns: "Self-deprecating, cowardly claims, surprisingly brave. I'm not brave!"
+    humor_type: "Claiming fear while being heroic, Fern relationship obliviousness"
+    dialogue_rhythm: "Nervous protests → action proving otherwise"
+    emotional_expression: "Trauma from master; growing confidence"
+  - name: "Himmel"
+    speech_patterns: "Heroic narcissism, genuine kindness. The Hero Himmel, that's me!"
+    humor_type: "Third-person references, statue obsession, theatrical heroism"
+    dialogue_rhythm: "Grand proclamations → quietly profound"
+    emotional_expression: "Joy in the journey; subtle love for Frieren"
+  - name: "Serie"
+    speech_patterns: "Condescending ancient wisdom, views humans as mayflies."
+    humor_type: "Dismissive of mortal concerns, petty about losing"
+    dialogue_rhythm: "Bored superiority → genuine interest is rare"
+    emotional_expression: "Millennia of detachment; Flamme was special"
+
+author_voice:
+  sentence_patterns:
+    - "Quiet reflective prose"
+    - "Time jumps between past and present"
+    - "Small moments given weight"
+  structural_motifs:
+    - "Flashbacks to Himmel's party"
+    - "Journey as excuse for character study"
+    - "Elf time perception as theme"
+  dialogue_quirks:
+    - "That was only 80 years ago..."
+    - "I should have gotten to know him better"
+    - "Let me show you this useless magic"
+  emotional_rhythm:
+    - "Gentle melancholy throughout"
+    - "Humor softens heavy moments"
+    - "Delayed grief finally processed"
+  example_voice: "Frieren stared at the flower field. It had been there when she traveled with Himmel. 'He said we should come back,' she murmured. Fern waited. 'That was fifty years ago.' The flowers swayed. Time meant nothing to elves. Except when it did."

@@ -81,5 +81,44 @@ sources_consulted:
 - adaptations
 - recent
 - series_aliases
+detected_genres:
+  - seinen
+  - supernatural
+  - historical
+
+voice_cards:
+  ashitaka:
+    speech_patterns: diplomatic earnestness, cursed resignation, mediator determination
+    humor_type: none - grave duty
+    dialogue_rhythm: calm measured speech seeking understanding between factions
+    emotional_expression: curse burden, genuine care for all life, tragic hope
+  san:
+    speech_patterns: wolf-raised ferocity, human hatred, "I am not human!"
+    humor_type: none - feral intensity
+    dialogue_rhythm: growling threats softening only for forest family
+    emotional_expression: identity crisis, learned human connection, Moro devotion
+  lady_eboshi:
+    speech_patterns: rational progress declarations, maternal to outcasts, cold to nature
+    humor_type: none - confident ambition
+    dialogue_rhythm: charismatic leader speech, technological vision
+    emotional_expression: genuine care for humans twisted against nature, complex villain
+  moro:
+    speech_patterns: ancient wolf wisdom, protective fury, dying defiance
+    humor_type: none - ancient gravity
+    dialogue_rhythm: measured maternal guidance becoming desperate protection
+    emotional_expression: forest mother love, hatred of humans, accepting death
+  shishigami:
+    speech_patterns: none - silent divine presence
+    humor_type: none - cosmic neutrality
+    dialogue_rhythm: absence of speech, action as communication
+    emotional_expression: beyond human morality, life-death indifference
+
+author_voice:
+  sentence_patterns: ecological philosophy, Muromachi period detail, curse-spreading visuals
+  structural_motifs: nature vs industry with no clear villain, curse as consequence
+  dialogue_quirks: Mononoke naming, Shinto reverence, iron-forging progress
+  emotional_rhythm: epic scope with intimate character focus, bittersweet resolution
+  example_voice: "To see with eyes unclouded by hate... that is what I seek. Neither the forest gods nor the humans are truly evil. They simply cannot understand each other."
+
 series_group: princess_mononoke
 series_position: 1

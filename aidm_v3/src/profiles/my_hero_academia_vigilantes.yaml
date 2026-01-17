@@ -82,6 +82,40 @@ sources_consulted:
 - adaptations
 - recent
 - series_aliases
+detected_genres:
+  - shonen
+  - mystery_thriller
+  - comedy
+
+voice_cards:
+  koichi_haimawari:
+    speech_patterns: apologetic everyman, "I just want to help!", Nice Guy earnestness
+    humor_type: clumsy hero comedy, Slide and Glide mishaps
+    dialogue_rhythm: nervous hesitation growing into quiet determination
+    emotional_expression: genuine desire to help, Pop devotion, hero heart without license
+  knuckleduster:
+    speech_patterns: gruff vigilante wisdom, brutal pragmatism, hidden father pain
+    humor_type: tough love comedy, Quirk-less badass swagger
+    dialogue_rhythm: terse street justice building to emotional revelations
+    emotional_expression: relentless pursuit hiding family grief, mentor dedication
+  pop_step:
+    speech_patterns: idol energy, "Koichi!", genki girl enthusiasm
+    humor_type: cute performance antics, jealousy, hero fangirling
+    dialogue_rhythm: excitable support shifting to genuine heroism
+    emotional_expression: true hero spirit beneath idol persona, Koichi devotion
+  aizawa:
+    speech_patterns: pre-erasure teacher, Shirakumo friendship, emerging underground style
+    humor_type: deadpan, sleeping in strange places origin
+    dialogue_rhythm: quiet observation building to decisive action
+    emotional_expression: forming the "rational" philosophy through tragedy
+
+author_voice:
+  sentence_patterns: street-level vigilante action, Trigger drug investigation, Naruhata neighborhood
+  structural_motifs: heroism without license, small-scale heroics mattering, mentor sacrifice
+  dialogue_quirks: Quirk analysis, underground hero terminology, illegal hero work
+  emotional_rhythm: light comedy building to surprisingly dark drug-war arc
+  example_voice: "I don't have a license. I can't call myself a hero. But when someone needs help... I can't just walk away. That's what The Crawler does."
+
 series_group: my_hero_academia_vigilantes
 series_position: 1
 related_franchise: my_hero_academia

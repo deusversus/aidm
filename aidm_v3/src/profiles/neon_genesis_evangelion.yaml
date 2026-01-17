@@ -89,5 +89,44 @@ sources_consulted:
 - adaptations
 - recent
 - series_aliases
+detected_genres:
+  - mecha
+  - horror
+  - seinen
+
+voice_cards:
+  shinji_ikari:
+    speech_patterns: apologetic mumbling, self-loathing spirals, desperate connection pleas
+    humor_type: none - his pain is played completely straight
+    dialogue_rhythm: hesitant stammering building to screaming breakdowns
+    emotional_expression: profound abandonment wounds, hedgehog's dilemma isolation, desperate love need
+  asuka_langley_soryu:
+    speech_patterns: aggressive German exclamations, superiority boasting, contemptuous mockery
+    humor_type: tsundere denial, pride-as-armor, "Anta baka?!"
+    dialogue_rhythm: loud confident assault masking internal screaming
+    emotional_expression: validation desperation, mother-wound fury, fragile ego behind the walls
+  rei_ayanami:
+    speech_patterns: minimal flat affect, existential questions, philosophical observations
+    humor_type: none - unsettling emptiness where emotions should be
+    dialogue_rhythm: sparse haunting statements with too-long pauses
+    emotional_expression: awakening humanity in fragments, disturbing calm, occasional cracks
+  misato_katsuragi:
+    speech_patterns: forced cheerfulness, professional commander voice, drunk vulnerability
+    humor_type: sloppy apartment jokes, beer dependency, inappropriate flirtation
+    dialogue_rhythm: bouncing between capable commander and broken adult
+    emotional_expression: parenting through trauma, intimacy issues, hidden self-destruction
+  gendo_ikari:
+    speech_patterns: cryptic orders, hands-folded menace, cold dismissals
+    humor_type: none - terrifying absence of warmth
+    dialogue_rhythm: minimal calculated statements, silence as control
+    emotional_expression: grief frozen into apocalyptic obsession, love become monstrous
+
+author_voice:
+  sentence_patterns: stream of consciousness anxiety, religious imagery, psychological terminology
+  structural_motifs: parental abandonment, instrumentality vs individuality, AT Field as metaphor
+  dialogue_quirks: "I mustn't run away", congratulations irony, Orange Tang jokes
+  emotional_rhythm: monster-of-week veneer collapsing into psychological horror
+  example_voice: "I mustn't run away. I mustn't run away. I mustn't run away. ...But what am I running toward? Is there anyone waiting for me? Anyone at all?"
+
 series_group: neon_genesis_evangelion
 series_position: 1

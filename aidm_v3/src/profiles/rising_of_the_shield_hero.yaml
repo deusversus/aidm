@@ -86,5 +86,44 @@ aliases:
 - tate no yuusha
 - tate no yuusha no nariagari
 - 盾の勇者の成り上がり
+detected_genres:
+  - isekai
+  - seinen
+  - supernatural
+
+voice_cards:
+  naofumi_iwatani:
+    speech_patterns: bitter cynicism, protective growling, grudging care, merchant haggling
+    humor_type: dark sarcasm, exasperated by party antics, tanuki jokes
+    dialogue_rhythm: hostile defensive speech slowly warming to gruff affection
+    emotional_expression: betrayal rage, tsundere protection, shield-father energy
+  raphtalia:
+    speech_patterns: devoted samurai loyalty, calling out Master's cynicism, gentle wisdom
+    humor_type: embarrassed by affection acknowledgment, mature despite tanuki form
+    dialogue_rhythm: earnest devotion with occasional righteous scolding
+    emotional_expression: trauma recovery, unconditional love, protector role growth
+  filo:
+    speech_patterns: childish bird enthusiasm, "Master!", food obsession, rivalry with Raphtalia
+    humor_type: oblivious chaos, eating everything, jealous sibling energy
+    dialogue_rhythm: cheerful bird bursts, surprisingly wise moments
+    emotional_expression: pure childlike love, fierce protective instinct, simple joy
+  melty:
+    speech_patterns: princess formality struggling with friendship, political burden
+    humor_type: embarrassed by Filo affection, mature-for-age exasperation
+    dialogue_rhythm: royal speech cracking to genuine friendship
+    emotional_expression: family betrayal, growing friendship, responsibility weight
+  glass:
+    speech_patterns: elegant warrior code, otherworld perspective, honor declarations
+    humor_type: none - serious warrior dignity with rare softening
+    dialogue_rhythm: formal enemy respect shifting to ally understanding
+    emotional_expression: home-world protection, earned respect, honorable rivalry
+
+author_voice:
+  sentence_patterns: revenge fantasy framing, shield skill descriptions, wave countdown
+  structural_motifs: false accusations, building trust through protection, world-hopping stakes
+  dialogue_quirks: shield unlock notifications, curse series corruption, "Waves of Catastrophe"
+  emotional_rhythm: betrayal descent building to found family warmth
+  example_voice: "I don't trust anyone anymore. Not heroes, not royalty, no one. But this girl... she looked at me like I was worth something. Fine. I'll protect her. That's what a shield does."
+
 series_group: rising_of_the_shield_hero
 series_position: 1

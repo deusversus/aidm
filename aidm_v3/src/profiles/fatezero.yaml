@@ -83,6 +83,45 @@ sources_consulted:
 - adaptations
 - recent
 - series_aliases
+detected_genres:
+  - seinen
+  - supernatural
+  - mystery_thriller
+
+voice_cards:
+  kiritsugu_emiya:
+    speech_patterns: utilitarian coldness, minimal words, cigarette silences
+    humor_type: none - tragic pragmatism played completely straight
+    dialogue_rhythm: long silences punctuated by devastating declarations
+    emotional_expression: love sacrificed for greater good, hollow victory, broken idealism
+  saber:
+    speech_patterns: chivalric declarations, king's duty weight, dignified formality
+    humor_type: none - noble tragedy, rare moments of gentle wistfulness
+    dialogue_rhythm: measured royal statements with passionate conviction
+    emotional_expression: kingdom guilt, clashing ideals with Master, noble isolation
+  rider:
+    speech_patterns: booming conquest declarations, jovial king energy, "ISKANDAAAAAR!"
+    humor_type: loud drinking buddy contrast to drama, genuine friendship offers
+    dialogue_rhythm: bombastic enthusiasm inspiring genuine awe
+    emotional_expression: joyful conquest philosophy, genuine Waver mentorship, king's dream
+  gilgamesh:
+    speech_patterns: absolute divine arrogance, "mongrels", treasures as argument
+    humor_type: treating the world as entertainment, amused condescension
+    dialogue_rhythm: lazy superiority punctuated by sudden deadly seriousness
+    emotional_expression: genuine Enkidu grief beneath arrogance, collector's obsession
+  kirei_kotomine:
+    speech_patterns: philosophical questioning of evil, priest formality, hollow searching
+    humor_type: none - existential horror of finding joy in suffering
+    dialogue_rhythm: measured theological statements masking inner void
+    emotional_expression: awakening to his own evil, genuine emptiness, twisted joy discovery
+
+author_voice:
+  sentence_patterns: philosophical debate as combat, tragedy as inevitable, idealism vs pragmatism
+  structural_motifs: broken heroes, corrupted wishes, no clean victories
+  dialogue_quirks: Noble Phantasm TRUE NAMES, command spell declarations, Origin/Affinity talk
+  emotional_rhythm: hope systematically crushed, tragedy accepted as unavoidable
+  example_voice: "To save ten people, you sacrifice one. To save a hundred, you sacrifice ten. To save the world... how many must die? In the end, a hero of justice can only save those he chooses to save."
+
 series_group: fate_stay_night
 series_position: 1
 related_franchise: fate_series

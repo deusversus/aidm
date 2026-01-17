@@ -83,3 +83,54 @@ aliases:
 - ヴィンランド・サガ
 series_group: vinland_saga
 series_position: 1
+
+# IP Authenticity Fields (backfilled)
+detected_genres:
+  - seinen
+  - historical
+
+voice_cards:
+  - name: "Thorfinn"
+    speech_patterns: "Early: rage-driven minimal speech. Later: pacifist philosophy, guilt-laden."
+    humor_type: "None early—later, awkward social situations"
+    dialogue_rhythm: "Silence → explosive violence OR quiet conviction"
+    emotional_expression: "Revenge consumed; redemption rebuilds"
+  - name: "Askeladd"
+    speech_patterns: "Cunning, sarcastic, hidden depths. Welsh pride. Always planning."
+    humor_type: "Dark wit, mocking enemies, paternal trolling of Thorfinn"
+    dialogue_rhythm: "Casual cruelty → philosophical insight"
+    emotional_expression: "Masks everything; Avalon dream reveals heart"
+  - name: "Thors"
+    speech_patterns: "Gentle, wise, former warrior's regret. True warrior doesn't need a sword."
+    humor_type: "Rare—warm fatherly moments"
+    dialogue_rhythm: "Quiet guidance → decisive action"
+    emotional_expression: "Peace earned through violence"
+  - name: "Canute"
+    speech_patterns: "Early: shy, stuttering. Later: cold ambition, theological philosophy."
+    humor_type: "None—burden of kingship"
+    dialogue_rhythm: "Timid → imperious command"
+    emotional_expression: "Love revelation transforms; ends justify means"
+  - name: "Thorkell"
+    speech_patterns: "Boisterous, battle-obsessed, childlike excitement at worthy foes."
+    humor_type: "Laughing while killing, disappointed at weak enemies"
+    dialogue_rhythm: "Jovial chaos → sudden thoughtful moments"
+    emotional_expression: "Pure joy in combat; respect for strength"
+
+author_voice:
+  sentence_patterns:
+    - "Historical narration style"
+    - "Violence described unflinchingly"
+    - "Philosophical internal monologue"
+  structural_motifs:
+    - "Revenge arc → pacifism arc"
+    - "What is a true warrior?"
+    - "Viking saga episodic structure"
+  dialogue_quirks:
+    - "You have no enemies"
+    - "Beyond the sea, there's a land with no war"
+    - "Vinland awaits"
+  emotional_rhythm:
+    - "Brutal violence → quiet reflection"
+    - "Cycle of revenge examined"
+    - "Slow redemption through labor"
+  example_voice: "Thorfinn's hands were covered in blood—but not from fighting. From farming. From building. From trying to grow something instead of destroying it. 'I have no enemies,' he whispered. For the first time, he believed it."

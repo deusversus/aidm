@@ -85,6 +85,40 @@ sources_consulted:
 - sequels
 - adaptations
 - recent
+detected_genres:
+  - shonen
+  - scifi
+  - sports
+
+voice_cards:
+  xeno_goku:
+    speech_patterns: veteran Time Patrol wisdom, SSJ4 pride, multiverse experience
+    humor_type: classic Goku obliviousness with time travel confusion
+    dialogue_rhythm: calm experience punctuated by excited new opponent discovery
+    emotional_expression: endless adventure joy, timeline protection duty
+  xeno_vegeta:
+    speech_patterns: Patrol pride, SSJ4 mastery declarations, Xeno rivalry
+    humor_type: time patrol complaints, Goku rivalry across timelines
+    dialogue_rhythm: authoritative statements with rare timeline appreciation
+    emotional_expression: evolved pride, timeline duty acceptance
+  fu:
+    speech_patterns: mad scientist enthusiasm, "This is so interesting!", chaos creation
+    humor_type: treating multiversal chaos as experiments, childlike curiosity
+    dialogue_rhythm: excited scientific observations about destruction
+    emotional_expression: genuine curiosity divorced from morality, creator's pride
+  hearts:
+    speech_patterns: anti-god philosophy, human liberation declarations
+    humor_type: none - pure ideological villain
+    dialogue_rhythm: grandiose liberation speeches building to Universe Seed power
+    emotional_expression: genuine belief in freeing mortals from gods
+
+author_voice:
+  sentence_patterns: promotional anime pacing, multiverse crossover logic, card game integration
+  structural_motifs: what-if scenarios, alternate timeline mashups, promotional spectacle
+  dialogue_quirks: SSJ4 Limit Breaker, Universe Mission, Super Dragon Ball Heroes terminology
+  emotional_rhythm: rapid escalation fanservice building to ultimate crossover
+  example_voice: "Across infinite timelines, every Goku, every Vegeta, every hero unites! This is the SUPER Dragon Ball Heroes... and no enemy can stand against eternity!"
+
 series_group: dragon_ball_heroes
 series_position: 1
 related_franchise: dragon_ball

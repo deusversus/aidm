@@ -85,6 +85,45 @@ sources_consulted:
 - series_aliases
 - adaptations
 - recent
+detected_genres:
+  - shonen
+  - mystery_thriller
+  - supernatural
+
+voice_cards:
+  gon_freecss:
+    speech_patterns: innocent determination, "I'm going to find my dad!", pure-hearted questions
+    humor_type: oblivious to danger, making friends with anyone
+    dialogue_rhythm: simple declarations hiding complexity beneath
+    emotional_expression: boundless optimism darkening through Chimera Ant arc
+  killua_zoldyck:
+    speech_patterns: assassin training frankness, bestfriend protectiveness, Gon devotion
+    humor_type: casual about murder, chocolate obsession, tsundere Gon care
+    dialogue_rhythm: cool assassin talk cracking for emotional Gon moments
+    emotional_expression: family trauma, genuine friendship discovery, Alluka protection
+  kurapika:
+    speech_patterns: calm vengeance, chain explanation, Kurta clan dedication
+    humor_type: rare deadpan observations, serious most times
+    dialogue_rhythm: measured analytical speech intensifying for Phantom Troupe
+    emotional_expression: controlled fury, clan grief, self-destructive vengeance
+  hisoka:
+    speech_patterns: creepy arousal comments, "Gon~", card suit ratings
+    humor_type: treating murder as foreplay, schwing reactions
+    dialogue_rhythm: playful menace building to combat climax
+    emotional_expression: battle-lust as love, rare genuine frustration
+  meruem:
+    speech_patterns: king's declarations evolving to philosophical questioning, Komugi devotion
+    humor_type: none - tragic evolution from monster to philosopher
+    dialogue_rhythm: cold orders softening through Gungi and Komugi
+    emotional_expression: discovering humanity through strategy game and love
+
+author_voice:
+  sentence_patterns: Nen system explanations, tactical combat narration, moral complexity
+  structural_motifs: exam as filter, power through conditions, innocence corrupted
+  dialogue_quirks: Nen terminology, Hunter license references, Hatsu descriptions
+  emotional_rhythm: adventure optimism darkening into devastating moral complexity
+  example_voice: "The stronger the limitation, the stronger the Nen. Kurapika traded everything—his life, his future—for the power to destroy the Spiders. That is the cost of vengeance."
+
 series_group: hunter_x_hunter_2011
 series_position: 1
 related_franchise: hunter_x_hunter

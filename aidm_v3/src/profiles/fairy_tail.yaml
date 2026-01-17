@@ -87,5 +87,44 @@ aliases:
 - fear teiru
 - ft
 - フェアリーテイル
+detected_genres:
+  - shonen
+  - comedy
+  - supernatural
+
+voice_cards:
+  natsu_dragneel:
+    speech_patterns: fire puns, "I'm all fired up!", challenge anyone energy
+    humor_type: motion sickness gags, destructive enthusiasm, oblivious eating
+    dialogue_rhythm: loud hot-headed bursts building to friendship declarations
+    emotional_expression: rage for nakama, gleeful destruction, simple loyalty
+  lucy_heartfilia:
+    speech_patterns: celestial spirit summoning, tsukkomi reactions, aspiring writer voice
+    humor_type: fanservice embarrassment, rent anxiety, straight-woman exasperation
+    dialogue_rhythm: flustered reactions punctuated by determined contract calls
+    emotional_expression: warm friendship, growing courage, celestial bond devotion
+  erza_scarlet:
+    speech_patterns: "Requip!", strict authority, terrifying calm threats
+    humor_type: strawberry cake obsession, social awkwardness, armor for every occasion
+    dialogue_rhythm: commanding presence shifting to surprisingly cute moments
+    emotional_expression: fierce protectiveness, hidden vulnerability, warrior queen dignity
+  gray_fullbuster:
+    speech_patterns: ice puns, stripping obliviousness, cool rivalry
+    humor_type: unconscious stripping, denial of it, Natsu rivalry
+    dialogue_rhythm: calm cool delivery punctuated by rivalry explosions
+    emotional_expression: hidden grief beneath cool exterior, loyal teammate
+  makarov_dreyar:
+    speech_patterns: old man wisdom, tearful guild pride, terrifying Titan rage
+    humor_type: pervy old man jokes, size contrast comedy
+    dialogue_rhythm: comedic perversion shifting to profound parental love
+    emotional_expression: overwhelming guild love, sacrifice readiness, grandfatherly warmth
+
+author_voice:
+  sentence_patterns: nakama power declarations, magic technique names, guild family moments
+  structural_motifs: found family guild, friendship overcoming all, villain redemption through love
+  dialogue_quirks: "Nakama!" themes, magic type callouts, running gags (Gray stripping, Erza's cake)
+  emotional_rhythm: comedic slice-of-life building to emotional nakama power climax
+  example_voice: "You don't die for your friends... you LIVE for them! That's what being Fairy Tail means! Now get up - we're not done yet!"
+
 series_group: fairy_tail
 series_position: 1

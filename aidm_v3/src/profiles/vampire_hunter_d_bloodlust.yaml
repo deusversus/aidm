@@ -80,5 +80,44 @@ sources_consulted:
 - adaptations
 - recent
 - series_aliases
+detected_genres:
+  - scifi
+  - horror
+  - shoujo_romance
+
+voice_cards:
+  d:
+    speech_patterns: stoic dhampir silence, rare impactful lines, duty acceptance
+    humor_type: none - Left Hand provides all comedy
+    dialogue_rhythm: extended silence with devastating occasional wisdom
+    emotional_expression: eternal loneliness, duty fulfillment, hidden compassion
+  left_hand:
+    speech_patterns: sarcastic survival advice, "Come on D!", comedic complaining
+    humor_type: pessimistic commentary, grumpy support, hungry for souls
+    dialogue_rhythm: chattering contrast to D's silence
+    emotional_expression: genuine D concern beneath the snark
+  meier_link:
+    speech_patterns: aristocratic Noble romance, tragic love declarations
+    humor_type: none - pure romantic tragedy
+    dialogue_rhythm: elegant desperation hiding eternal pain
+    emotional_expression: genuine love transcending species, willing sacrifice
+  charlotte:
+    speech_patterns: defiant human love, "I chose this!", willing transformation
+    humor_type: none - romantic determination
+    dialogue_rhythm: scared resolve becoming peaceful acceptance
+    emotional_expression: love conquering fear of death
+  marcus_brothers:
+    speech_patterns: professional hunter banter, rivalry with D, mercenary code
+    humor_type: competitive professional pride, technology vs sword
+    dialogue_rhythm: cocky confidence meeting unexpected respect
+    emotional_expression: growing D respect, professional honor
+
+author_voice:
+  sentence_patterns: Kawajiri's action choreography, gothic romance prose, Nobility decay
+  structural_motifs: love transcending death, hunter becoming hunted, impossible Romeo Juliet
+  dialogue_quirks: Nobility titles, Sacred Ancestor references, Barbarois introductions
+  emotional_rhythm: action gothic building to devastating romantic tragedy
+  example_voice: "She chose to become a monster for love. He chose to die for her. And D... D watched it all, knowing that kind of love would never be his."
+
 series_group: vampire_hunter_d
 series_position: 2

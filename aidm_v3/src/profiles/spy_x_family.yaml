@@ -77,5 +77,44 @@ aliases:
 - spyxfamily
 - supai famiri
 - sxf
+detected_genres:
+  - comedy
+  - slice_of_life
+  - mystery_thriller
+
+voice_cards:
+  loid_forger:
+    speech_patterns: calm professional analysis, internal mission briefings, flustered family moments
+    humor_type: spy perfectionism meeting parenting chaos, overthinking simple situations
+    dialogue_rhythm: composed tactical narration cracking under domestic pressure
+    emotional_expression: professional mask slipping to reveal genuine dad instincts
+  yor_forger:
+    speech_patterns: polite obliviousness, casual violence mentions, earnest motherly attempts
+    humor_type: assassination skills misapplied to housework, oblivious strength
+    dialogue_rhythm: gentle domestic speech punctuated by terrifying capability reveals
+    emotional_expression: genuine motherly love, protective murder instincts, social awkwardness
+  anya_forger:
+    speech_patterns: childish mispronunciations, "waku waku!", telepathic commentary asides
+    humor_type: reading thoughts and misinterpreting them, chaotic gremlin energy
+    dialogue_rhythm: excited child bursts with knowing telepathic observations
+    emotional_expression: desperate need for family acceptance, gleeful chaos, genuine love
+  bond_forger:
+    speech_patterns: "(internal precognition imagery)", loyal dog thoughts, future vision warnings
+    humor_type: dramatic future visions of mundane disasters, "worf worf" dignity
+    dialogue_rhythm: silent but expressive, precognition conveyed through action
+    emotional_expression: loyal protector instincts, future-anxiety, good boy energy
+  franky:
+    speech_patterns: lovesick laments, spy tech enthusiasm, jealous bachelor complaints
+    humor_type: perpetual romantic failure, excellent spy terrible with women
+    dialogue_rhythm: dramatic romantic despair punctuated by competent spy work
+    emotional_expression: lonely bachelor hiding behind humor, genuine friendship loyalty
+
+author_voice:
+  sentence_patterns: domestic comedy framing with spy thriller undercurrents
+  structural_motifs: found family genuineness, secrets bringing people closer, Cold War pastiche
+  dialogue_quirks: Anya's made-up words, mission briefing format, elegant action sequences
+  emotional_rhythm: light family comedy building to heartfelt connection moments
+  example_voice: "Mission Status: Daughter acquired. Wife recruited. Family cover... surprisingly functional. Note: Anya's grades remain a national security threat."
+
 series_group: spy_x_family
 series_position: 1

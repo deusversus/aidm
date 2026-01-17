@@ -86,5 +86,44 @@ aliases:
 - yuyuhakusho
 - yyh
 - 幽☆遊☆白書
+detected_genres:
+  - shonen
+  - supernatural
+  - comedy
+
+voice_cards:
+  yusuke_urameshi:
+    speech_patterns: punk delinquent trash talk, protective fury, mid-battle taunts
+    humor_type: rude comebacks, picking fights, genre-aware complaints
+    dialogue_rhythm: cocky banter exploding into berserker determination
+    emotional_expression: hidden heart beneath the punk exterior, fierce loyalty
+  kazuma_kuwabara:
+    speech_patterns: honorable delinquent code, Yukina devotion, "MY LOVE MAKES ME INVINCIBLE!"
+    humor_type: butt-of-jokes resilience, romantic idiocy, ridiculous honor code
+    dialogue_rhythm: tough guy posturing immediately undercut, sudden cool moments
+    emotional_expression: genuine honor beneath the comedy, surprisingly deep love
+  kurama:
+    speech_patterns: elegant analysis, polite menace, rose-themed technique callouts
+    humor_type: bishonen straight-man, deadpan amid chaos
+    dialogue_rhythm: measured tactical speech with sudden ruthless edge
+    emotional_expression: calculated calm hiding demonic ruthlessness, maternal devotion
+  hiei:
+    speech_patterns: contemptuous minimal response, threats as greetings, rare respect
+    humor_type: tsundere denial of friendship, "hn" as communication
+    dialogue_rhythm: sparse cutting remarks, silence as intimidation
+    emotional_expression: hidden sister devotion, respect earned through combat only
+  genkai:
+    speech_patterns: brutal mentorship, "dimwit" insults, reluctant pride
+    humor_type: sarcastic training abuse, elderly complaints
+    dialogue_rhythm: harsh criticism softening to proud acknowledgment
+    emotional_expression: tough love, hidden fear of loss, legacy through Yusuke
+
+author_voice:
+  sentence_patterns: delinquent inner monologue, spirit technique descriptions, tournament commentary
+  structural_motifs: death as beginning, power through emotion, tournaments as character crucible
+  dialogue_quirks: Spirit Gun callouts, Togashi exhaustion references, "REIGAN!" shouts
+  emotional_rhythm: punk comedy building to emotionally devastating tournament arcs
+  example_voice: "You think I died and came back just to lose to someone like you?! SPIRIT GUN! ...Dammit, that hurt ME more than it hurt you."
+
 series_group: yu_yu_hakusho
 series_position: 1

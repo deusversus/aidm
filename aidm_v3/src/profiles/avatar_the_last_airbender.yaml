@@ -79,5 +79,44 @@ aliases:
 - avatar the last airbender
 - avatarthelastairbender
 - avater
+detected_genres:
+  - shonen
+  - comedy
+  - supernatural
+
+voice_cards:
+  aang:
+    speech_patterns: playful monk wisdom, childlike wonder, Avatar responsibility weight
+    humor_type: air-headed goofiness, pranks and games, penguin sledding enthusiasm
+    dialogue_rhythm: bouncy child energy shifting to profound spiritual insight
+    emotional_expression: genocide survivor grief, pacifist conviction, pure joyful love
+  zuko:
+    speech_patterns: angry prince demands shifting to redemption humility, "Honor!" obsession
+    humor_type: awkward teatime attempts, "That's rough buddy", socially inept growth
+    dialogue_rhythm: initial rage softening through painful character development
+    emotional_expression: father wound rage, redemption struggle, earned honor finding
+  katara:
+    speech_patterns: motherly concern, righteous fury, hope declarations
+    humor_type: exasperated straight-woman, protective scolding
+    dialogue_rhythm: caring warmth punctuated by fierce waterbending determination
+    emotional_expression: mother loss, fierce protectiveness, hope anchor for the group
+  toph:
+    speech_patterns: blind jokes, trash talk mastery, "I am the greatest earthbender ever!"
+    humor_type: self-deprecating blind humor, tough love, feet jokes
+    dialogue_rhythm: brash confidence with rare vulnerable admissions
+    emotional_expression: hidden isolation, genuine friend love, proud independence
+  iroh:
+    speech_patterns: tea wisdom, proverbs, and unexpected depth, "Leaves from the vine..."
+    humor_type: goofy uncle antics masking profound wisdom
+    dialogue_rhythm: seemingly silly wandering to devastating emotional truth
+    emotional_expression: son grief transformed to universal love, patient guidance
+
+author_voice:
+  sentence_patterns: martial arts as elemental philosophy, four nations worldbuilding
+  structural_motifs: chosen one avoiding destiny, redemption through choice, balance restoration
+  dialogue_quirks: element-specific metaphors, Avatar State warnings, honor discussions
+  emotional_rhythm: adventure comedy building to profound emotional growth and sacrifice
+  example_voice: "Fire. Earth. Water. Air. Long ago, the four nations lived together in harmony. Then everything changed when the Fire Nation attacked."
+
 series_group: avatar_the_last_airbender
 series_position: 1

@@ -85,5 +85,39 @@ aliases:
 - xian wang de richang shenghuo
 - xwrcsh
 - 仙王的日常生活
+detected_genres:
+  - comedy
+  - shonen
+  - supernatural
+
+voice_cards:
+  wang_ling:
+    speech_patterns: minimal words, deadpan stoicism, internal monologue contrast
+    humor_type: casually omnipotent reactions, trying desperately to be normal
+    dialogue_rhythm: almost silent exterior hiding frantic internal planning
+    emotional_expression: genuine desire to live normally, hidden care beneath god-tier apathy
+  sun_rong:
+    speech_patterns: cute girlfriend energy, oblivious to power levels, genuine love
+    humor_type: treating god-tier boyfriend normally, sweet misunderstandings
+    dialogue_rhythm: earnest affection causing Wang Ling panic
+    emotional_expression: pure love unconcerned with cultivation status
+  chen_chao:
+    speech_patterns: best friend loyalty, "Wang Ling is totally normal!", comic relief
+    humor_type: failing to notice anything supernatural, pure friendship
+    dialogue_rhythm: enthusiastic buddy speech oblivious to reality-warping chaos
+    emotional_expression: genuine friendship, comedic suffering
+  wang_ling_father:
+    speech_patterns: gag inventor, silly dad energy, "Look at my new invention!"
+    humor_type: useless inventions, embarrassing parent comedy
+    dialogue_rhythm: excited inventor enthusiasm, family warmth
+    emotional_expression: genuine parental love hiding talisman sacrifice
+
+author_voice:
+  sentence_patterns: cultivation realm terminology, modern school life fusion, casually omnipotent descriptions
+  structural_motifs: hiding godhood to live normally, school life with world-ending stakes
+  dialogue_quirks: Dao terminology, talisman seal references, cultivation ranks
+  emotional_rhythm: absurdist comedy punctuated by surprisingly touching family moments
+  example_voice: "Wang Ling's power could destroy universes. But today, his biggest challenge was convincing his classmates he's completely ordinary... while accidentally erasing a demon king from existence."
+
 series_group: the_daily_life_of_the_immortal_king
 series_position: 1

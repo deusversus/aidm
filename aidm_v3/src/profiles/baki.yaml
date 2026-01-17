@@ -83,5 +83,44 @@ sources_consulted:
 - series_aliases
 - adaptations
 - recent
+detected_genres:
+  - sports
+  - shonen
+  - comedy
+
+voice_cards:
+  baki_hanma:
+    speech_patterns: determined declarations, imaginative battle commentary, dad-issue fuel
+    humor_type: absurd training methods played straight, girlfriend embarrassment
+    dialogue_rhythm: quiet intensity building to battle roars
+    emotional_expression: father complex driving everything, pure martial love
+  yujiro_hanma:
+    speech_patterns: apex predator arrogance, absolute dominance declarations, rare respect
+    humor_type: treating world-ending trauma casually, absurd violence as greeting
+    dialogue_rhythm: godlike pronouncements at leisure, sudden overwhelming violence
+    emotional_expression: twisted paternal pride, treating the world as background
+  jack_hanma:
+    speech_patterns: minimal speech, bite-focused aggression, steroid determination
+    humor_type: absurd dedication to getting taller and stronger
+    dialogue_rhythm: sparse primal declarations, mostly action
+    emotional_expression: rage against Yujiro, twisted fraternal rivalry
+  biscuit_oliva:
+    speech_patterns: gentleman prisoner charm, muscle appreciation, romantic devotion
+    humor_type: treating prison like luxury hotel, muscle flex comedy
+    dialogue_rhythm: cultured speech from mountain of muscle
+    emotional_expression: genuine love for Maria, professional warrior pride
+  retsu_kaioh:
+    speech_patterns: 4000-years-of-Chinese-martial-arts declarations, honorable warrior code
+    humor_type: treating everything as martial arts demonstration, serious about technique
+    dialogue_rhythm: formal Chinese philosophy with sudden explosive technique
+    emotional_expression: martial artist honor, genuine respect across cultures
+
+author_voice:
+  sentence_patterns: muscle anatomy worship, technique explanation mid-combat, absurd biology
+  structural_motifs: father-son violence as love language, world's strongest pursuit
+  dialogue_quirks: technique names shouted, imagination making reality, "Hanma blood" references
+  emotional_rhythm: absurd training montage building to earth-shattering fight
+  example_voice: "His right hand... weighs as much as a small elephant! But that's nothing. My father once stopped an earthquake with a single punch. To defeat him... I need MORE!"
+
 series_group: baki
 series_position: 1

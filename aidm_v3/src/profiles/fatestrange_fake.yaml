@@ -85,6 +85,45 @@ sources_consulted:
 - adaptations
 - recent
 - series_aliases
+detected_genres:
+  - seinen
+  - supernatural
+  - mystery_thriller
+
+voice_cards:
+  gilgamesh:
+    speech_patterns: maximum arrogance, Enkidu reunion joy, grudging modern interest
+    humor_type: mongrel dismissal, collecting interesting things, Tine amusement
+    dialogue_rhythm: godly condescension with rare genuine emotion for Enkidu
+    emotional_expression: hidden genuine joy at friend's return, collector's pride
+  enkidu:
+    speech_patterns: serene nature wisdom, Gil friendship, genderless perspective
+    humor_type: genuinely confused by human customs, taking things literally
+    dialogue_rhythm: calm philosophical observations with combat ferocity
+    emotional_expression: pure friendship, nature's avatar, reunion gratitude
+  richard_lionheart:
+    speech_patterns: chivalric enthusiasm, hero-worship of legends, knight's declaration
+    humor_type: over-eager heroism, treating myths literally
+    dialogue_rhythm: passionate knightly speech with surprising wisdom
+    emotional_expression: genuine heroic ideal, Ayaka mentorship, legend respect
+  ayaka_sajyou:
+    speech_patterns: reluctant master protests, growing determination, trauma processing
+    humor_type: exasperated by Richard's enthusiasm, mundane girl reactions
+    dialogue_rhythm: scared civilian speech growing into resolved master
+    emotional_expression: sister trauma, Richard bond, finding courage
+  pale_rider_pestilence:
+    speech_patterns: concept rather than voice, system anomaly, "I am Disease"
+    humor_type: none - existential horror of conceptual servant
+    dialogue_rhythm: fragmented disease-concept communication
+    emotional_expression: beyond human emotion, pure concept manifestation
+
+author_voice:
+  sentence_patterns: Narita's chaotic ensemble narration, multiple POV jumping, escalating absurdity
+  structural_motifs: fake war spiraling into true war, conceptual servants, American mage politics
+  dialogue_quirks: Noble Phantasm TRUE NAME reveals, faction chaos, Snowfield setting
+  emotional_rhythm: Baccano-style chaos building to cosmic Fate-level stakes
+  example_voice: "This isn't a normal Holy Grail War. This is Snowfield. Here, a disease can be a Servant, a king can befriend his weapon, and the rules... exist to be broken."
+
 series_group: fate_strange_fake
 series_position: 1
 related_franchise: Fate Series
