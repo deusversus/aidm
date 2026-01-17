@@ -88,7 +88,7 @@ class DirectorAgent(BaseAgent):
         
         # 2. Build Context
         context = self._build_review_context(
-            session, bible, world_state, op_preset, op_tension_source, op_mode_guidance
+            session, bible, world_state, profile, op_preset, op_tension_source, op_mode_guidance
         )
         
         # 3. Call LLM with dynamic system prompt override
@@ -101,6 +101,7 @@ class DirectorAgent(BaseAgent):
         session: Session, 
         bible: CampaignBible,
         world_state: Optional[WorldState],
+        profile: Optional[NarrativeProfile] = None,
         op_preset: Optional[str] = None,
         op_tension_source: Optional[str] = None,
         op_mode_guidance: Optional[str] = None
@@ -108,6 +109,60 @@ class DirectorAgent(BaseAgent):
         """Construct the context prompt for the Director."""
         
         lines = ["# Campaign Status Review"]
+        
+        # =====================================================================
+        # Narrative DNA (Calibrate Arc Pacing)
+        # =====================================================================
+        if profile and profile.dna:
+            lines.append("\n## 🎭 Narrative DNA (Guide Your Arc Decisions)")
+            dna = profile.dna
+            
+            # Key scales for Director decisions
+            comedy_drama = dna.get('comedy_vs_drama', 5)
+            fast_slow = dna.get('fast_paced_vs_slow_burn', 5)
+            hopeful_cynical = dna.get('hopeful_vs_cynical', 5)
+            ensemble = dna.get('ensemble_vs_solo', 5)
+            
+            lines.append(f"- Comedy/Drama: {comedy_drama}/10 {'(serious, minimal humor)' if comedy_drama <= 3 else '(comedic, lighthearted)' if comedy_drama >= 7 else ''}")
+            lines.append(f"- Pacing: {fast_slow}/10 {'(FAST - short arcs, rapid escalation)' if fast_slow <= 3 else '(SLOW - long arcs, gradual build)' if fast_slow >= 7 else ''}")
+            lines.append(f"- Hopeful/Cynical: {hopeful_cynical}/10 {'(optimistic resolutions)' if hopeful_cynical <= 3 else '(pyrrhic victories, dark endings)' if hopeful_cynical >= 7 else ''}")
+            lines.append(f"- Ensemble/Solo: {ensemble}/10 {'(team-focused, share spotlight)' if ensemble <= 3 else '(single protagonist focus)' if ensemble >= 7 else ''}")
+            
+            # Interpretation guidance
+            if fast_slow >= 7:
+                lines.append("\n*PACING: This IP uses SLOW BURN. Plan 4-6 session arcs. Plant seeds early. Payoffs should feel earned.*")
+            elif fast_slow <= 3:
+                lines.append("\n*PACING: This IP is FAST. Plan 2-3 session arcs. Escalate quickly. Don't linger.*")
+        
+        # =====================================================================
+        # Active Tropes (Arc Planning Hooks)
+        # =====================================================================
+        if profile and profile.tropes:
+            active = [k for k, v in profile.tropes.items() if v]
+            inactive = [k for k, v in profile.tropes.items() if not v]
+            
+            if active:
+                lines.append("\n## 📖 Active Tropes (Plan These Into Arcs)")
+                for trope in active:
+                    trope_name = trope.replace('_', ' ').title()
+                    # Add guidance for key tropes
+                    if trope == 'mentor_death':
+                        lines.append(f"- **{trope_name}**: The mentor WILL die. Foreshadow this. Make their wisdom meaningful.")
+                    elif trope == 'betrayal':
+                        lines.append(f"- **{trope_name}**: An ally will betray. Plant seeds of doubt. Make it hurt.")
+                    elif trope == 'tournament_arc':
+                        lines.append(f"- **{trope_name}**: Consider a tournament arc. Great for introducing rivals.")
+                    elif trope == 'redemption_arc':
+                        lines.append(f"- **{trope_name}**: Keep one villain redeemable. Give them sympathetic moments.")
+                    elif trope == 'tragic_backstory':
+                        lines.append(f"- **{trope_name}**: NPCs hint at dark pasts. Reveal slowly for emotional impact.")
+                    elif trope == 'sacrifice':
+                        lines.append(f"- **{trope_name}**: Someone may sacrifice themselves. Build relationships first.")
+                    else:
+                        lines.append(f"- {trope_name}")
+                
+            if inactive and 'power_of_friendship' in inactive:
+                lines.append("\n*NOTE: `power_of_friendship` is OFF. Victories come from skill, not bonds. Teamwork is tactical, not magical.*")
         
         # OP Mode context (if active)
         if op_preset and op_mode_guidance:

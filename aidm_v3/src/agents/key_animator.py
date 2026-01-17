@@ -380,6 +380,16 @@ the SAME narrative voice, the SAME style. Do NOT restart or re-describe the scen
             if retrieved_context.get("faction_guidance"):
                 faction_text = f"\n\n{retrieved_context['faction_guidance']}"
         
+        # Inject lore from profile research (canon reference)
+        lore_text = ""
+        if retrieved_context and retrieved_context.get("lore"):
+            lore_text = f"""## 📚 Canon Reference (From Source Material)
+
+{retrieved_context['lore']}
+
+**Use this to ground your narrative:** correct terminology, power system rules, known locations."""
+        prompt = prompt.replace("{{LORE_INJECTION}}", lore_text or "")
+        
         prompt = prompt.replace("{{MEMORIES_INJECTION}}", memories_text or "(No relevant memories)")
         prompt = prompt.replace("{{RETRIEVED_CHUNKS_INJECTION}}", chunks_text + archetype_text + tension_text + npc_text + faction_text or "(No additional guidance)")
         

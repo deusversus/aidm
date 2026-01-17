@@ -4,6 +4,7 @@ import time
 
 from ..context.memory import MemoryStore
 from ..context.rule_library import RuleLibrary
+from ..context.profile_library import get_profile_library
 from .memory_ranker import MemoryRanker
 from .intent_classifier import IntentOutput
 from ..db.state_manager import GameContext
@@ -115,13 +116,25 @@ class ContextSelector:
         rule_query = f"{player_input} {state_context.situation}"
         relevant_rules = self.rules.get_relevant_rules(rule_query, limit=3)
         
+        # 3. Search Profile Lore (for canon grounding)
+        # Query lore for relevant intents: COMBAT, ABILITY, LORE_QUESTION, SOCIAL
+        lore_chunks = []
+        if intent and intent.intent in ["COMBAT", "ABILITY", "LORE_QUESTION", "SOCIAL"]:
+            profile_lib = get_profile_library()
+            lore_query = f"{intent.action} {intent.target or ''} {state_context.situation}"
+            lore_chunks = profile_lib.search_lore(profile_id, lore_query, limit=2)
+            if lore_chunks:
+                print(f"[ContextSelector] Retrieved {len(lore_chunks)} lore chunks for {profile_id}")
+        
         return {
             "raw_memories": raw_memories,
             "rules": relevant_rules,
+            "lore": "\n\n".join(lore_chunks) if lore_chunks else "",
             "short_term": str(state_context),
             "stats": {
                 "base_retrieval_ms": int((time.time() - start_time) * 1000),
-                "raw_memory_count": len(raw_memories)
+                "raw_memory_count": len(raw_memories),
+                "lore_chunk_count": len(lore_chunks)
             }
         }
     
