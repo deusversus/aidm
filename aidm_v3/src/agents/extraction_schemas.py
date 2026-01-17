@@ -235,16 +235,24 @@ def get_extraction_prompt(topics: List[str], anime_name: str) -> str:
   - darkness_level: How dark/grim is the content? (0=lighthearted like K-On, 10=grimdark like Berserk)
   - optimism: How hopeful is the worldview? (0=cynical/nihilistic, 10=idealistic/uplifting)
 
-- **world_tier**: The typical power tier for MOST characters in this anime world:
-  - world_tier: Use VS Battles tiering (T10=human, T9=street, T8=building, T7=city block, T6=city, T5=island, T4=planet, T3=universe, T2=multiverse)
-  - tier_reasoning: Brief explanation based on character feats (e.g., "JJK sorcerers can level buildings, top-tiers threaten cities")
+- **world_tier**: The BASELINE power tier for this anime world.
+  
+  CRITICAL: Rate the power of a TYPICAL MID-ARC VILLAIN or COMPETENT ALLY.
+  Think: "What tier is an Episode 10-15 opponent?" NOT the final boss or protagonist peak.
+  
+  EXCLUDE: Protagonist's final form, main antagonist at full power, god-tier beings, endgame power levels.
+  INCLUDE: Mid-arc villains, starting protagonist power, allies, average soldiers.
+  
+  VS Battles tiers: T10=human, T9=street, T8=building, T7=city block, T6=city, T5=island, T4=planet, T3=stellar, T2=universal
   
   Examples:
-  - Death Note: T10 (normal humans, no supernatural combat)
-  - Demon Slayer: T8-T9 (wall-level to building-level combat)
-  - Jujutsu Kaisen: T7-T6 (city block to city level for top sorcerers)
-  - Dragon Ball Z: T4-T3 (planet to universe level)
-  - Record of Ragnarok: T2-T1 (gods vs multiversal threats)
+  - Death Note: T10 (normal humans)
+  - Akira: T8 (espers, military) - NOT T2 (Tetsuo is an outlier)
+  - Demon Slayer: T8 (mid-tier demon slayers)
+  - JoJo: T8 (most Stand users) - NOT T2 (GER is an outlier)
+  - Jujutsu Kaisen: T7 (Grade 1 sorcerers)
+  - Naruto: T6 (Jonin-level) - NOT T4 (Six Paths endgame)
+  - Dragon Ball Z: T4 (Saiyan Saga) - NOT T2 (Buu Saga peaks)
 
 - **dna_scales**: Rate each narrative dimension 0-10 based on the research:
   - introspection_vs_action: 0=internal monologue focus, 10=pure action sequences
