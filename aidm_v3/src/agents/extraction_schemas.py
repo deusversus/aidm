@@ -71,6 +71,39 @@ class CharactersExtract(BaseModel):
     key_characters: List[str] = Field(default_factory=list, description="Other important characters")
 
 
+class CharacterVoiceCard(BaseModel):
+    """Voice differentiation data for a single character."""
+    name: str = Field(description="Character name")
+    speech_patterns: str = Field(
+        default="", 
+        description="How they speak: formal/casual, archaic/modern, verbose/terse, accent notes"
+    )
+    humor_type: str = Field(
+        default="", 
+        description="How they express humor: sardonic, earnest, deadpan, none, slapstick"
+    )
+    signature_phrases: List[str] = Field(
+        default_factory=list,
+        description="Iconic lines or catchphrases they use"
+    )
+    dialogue_rhythm: str = Field(
+        default="",
+        description="Sentence structure: short questions, long monologues, fragments, commands"
+    )
+    emotional_expression: str = Field(
+        default="",
+        description="How they show emotion: restrained, explosive, deflecting, direct"
+    )
+
+
+class CharacterVoiceCardsExtract(BaseModel):
+    """Extracted voice cards for main cast (5-7 characters max)."""
+    voice_cards: List[CharacterVoiceCard] = Field(
+        default_factory=list,
+        description="Voice differentiation data for main cast characters"
+    )
+
+
 class FactionsExtract(BaseModel):
     """Extracted faction/organization data."""
     factions: List[Dict[str, str]] = Field(
@@ -168,6 +201,37 @@ class GenreDetectionExtract(BaseModel):
     )
 
 
+class AuthorVoiceExtract(BaseModel):
+    """Extracted author's distinctive writing voice for IP authenticity.
+    
+    This captures the unique stylistic fingerprint of the original creator:
+    - Sentence patterns: How they structure prose (punchy vs flowing, etc.)
+    - Structural motifs: Narrative techniques they repeatedly use
+    - Dialogue quirks: Distinctive ways characters speak
+    - Emotional rhythm: How they pace emotional beats
+    """
+    sentence_patterns: List[str] = Field(
+        default_factory=list,
+        description="Characteristic sentence structures: 'Short declaratives during action', 'Compound sentences during introspection'"
+    )
+    structural_motifs: List[str] = Field(
+        default_factory=list,
+        description="Narrative techniques: 'Cold open before title', 'Parallel callbacks', 'In media res'"
+    )
+    dialogue_quirks: List[str] = Field(
+        default_factory=list,
+        description="How characters speak: 'Finish each other's sentences', 'Dramatic irony', 'Midsentence interruptions'"
+    )
+    emotional_rhythm: List[str] = Field(
+        default_factory=list,
+        description="How emotions are paced: 'Slow build to catharsis', 'Joy undercut by tragedy', 'Silence before violence'"
+    )
+    example_voice: str = Field(
+        default="",
+        description="A brief sample sentence that exemplifies this author's voice"
+    )
+
+
 # =============================================================================
 # TOPIC-TO-SCHEMA MAPPING
 # =============================================================================
@@ -186,11 +250,13 @@ TOPIC_SCHEMAS: Dict[str, Type[BaseModel]] = {
     "series_aliases": SeriesAliasesExtract,
 }
 
-# DNA scales and tropes are extracted from tone research
+# DNA scales, tropes, genres, and voice are extracted from research
 DERIVED_SCHEMAS = {
     "dna_scales": DNAScalesExtract,
     "tropes": StorytellingTropesExtract,
     "genres": GenreDetectionExtract,
+    "voice_cards": CharacterVoiceCardsExtract,
+    "author_voice": AuthorVoiceExtract,
 }
 
 

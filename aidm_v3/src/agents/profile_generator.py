@@ -144,6 +144,14 @@ def generate_compact_profile(research: AnimeResearchOutput) -> Dict[str, Any]:
         "sources_consulted": research.sources_consulted,
     }
     
+    # Add voice cards for NPC differentiation (if extracted)
+    if research.voice_cards:
+        profile["voice_cards"] = research.voice_cards
+    
+    # Add author voice for IP authenticity (if extracted)
+    if research.author_voice:
+        profile["author_voice"] = research.author_voice
+    
     # Add series detection fields
     profile["series_group"] = research.series_group or profile_id
     profile["series_position"] = research.series_position or 1

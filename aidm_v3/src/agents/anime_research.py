@@ -67,6 +67,18 @@ class AnimeResearchOutput(BaseModel):
         description="Detected genres (primary + secondary): shonen, seinen, shoujo_romance, isekai, supernatural, etc."
     )
     
+    # Character voice cards (for NPC differentiation)
+    voice_cards: List[Dict[str, Any]] = Field(
+        default_factory=list,
+        description="Voice cards for main cast: [{name, speech_patterns, humor_type, signature_phrases, dialogue_rhythm}]"
+    )
+    
+    # Author's voice (for IP authentic writing style)
+    author_voice: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Author's distinctive style: sentence_patterns, structural_motifs, dialogue_quirks, emotional_rhythm"
+    )
+    
     # Combat style
     combat_style: str = Field(default="spectacle", description="tactical, spectacle, comedy, spirit, narrative")
     
