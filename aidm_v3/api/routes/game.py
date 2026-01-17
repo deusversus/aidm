@@ -1037,12 +1037,20 @@ I found several entries in the **{media_ref}** franchise:
 
                 
                 # 1. Update Character
+                # Infer power tier from OP mode - OP protagonists are NOT T10 peasants
+                if draft.op_protagonist_enabled:
+                    # OP mode = high tier by default (T3 = City level threats)
+                    # Can be customized later based on narrative_focus
+                    default_tier = "T3"
+                else:
+                    default_tier = "T10"
+                
                 orchestrator.state.update_character(
                     name=draft.name or "Unnamed Protagonist",
                     level=1, # Default start
                     hp_current=draft.resources.get("HP", 100),
                     hp_max=draft.resources.get("HP", 100),
-                    power_tier=draft.attributes.get("power_tier", "T10"),
+                    power_tier=draft.attributes.get("power_tier", default_tier),
                     abilities=draft.skills
                 )
                 
