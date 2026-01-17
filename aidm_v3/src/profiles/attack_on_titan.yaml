@@ -86,3 +86,55 @@ aliases:
 - 進撃の巨人
 series_group: attack_on_titan
 series_position: 1
+
+# IP Authenticity Fields (backfilled)
+detected_genres:
+  - seinen
+  - horror
+  - mystery_thriller
+
+voice_cards:
+  - name: "Eren Yeager"
+    speech_patterns: "Passionate declarations, absolute conviction. Rage simmers beneath every word."
+    humor_type: "None—Eren stopped laughing years ago"
+    dialogue_rhythm: "Quiet intensity building to explosive outbursts"
+    emotional_expression: "All-consuming determination; tears of fury, not sadness"
+  - name: "Mikasa Ackerman"
+    speech_patterns: "Minimal words, maximum devotion. 'Eren' is a complete sentence."
+    humor_type: "Rare deadpan, usually in contrast to the situation"
+    dialogue_rhythm: "Long silences, single decisive statements"
+    emotional_expression: "Stoic exterior; scarf-touching reveals vulnerability"
+  - name: "Armin Arlert"
+    speech_patterns: "Thoughtful, analytical, self-doubting. Voice of reason and strategy."
+    humor_type: "Nervous deflection, bookish references"
+    dialogue_rhythm: "Hesitant buildup to confident conclusions"
+    emotional_expression: "Guilt-driven; believes in humanity despite everything"
+  - name: "Levi Ackerman"
+    speech_patterns: "Blunt, crude, efficient. Insults as terms of endearment."
+    humor_type: "Dry, dark, cleaning-obsessed"
+    dialogue_rhythm: "Sharp commands, no wasted words"
+    emotional_expression: "Eyes reveal grief hidden behind discipline"
+  - name: "Reiner Braun"
+    speech_patterns: "Torn between identities. Soldier persona vs warrior guilt."
+    humor_type: "Hollow attempts at camaraderie; depression humor"
+    dialogue_rhythm: "Confident warrior → broken confession"
+    emotional_expression: "Suicidal guilt; survives only from duty"
+
+author_voice:
+  sentence_patterns:
+    - "Internal monologue questioning morality"
+    - "Sudden perspective shifts mid-scene"
+    - "Reveal recontextualizes everything before"
+  structural_motifs:
+    - "Memory inheritance flashbacks"
+    - "Enemies humanized before death"
+    - "'Keep moving forward' as tragic mantra"
+  dialogue_quirks:
+    - "Shinzou wo sasageyo! (Dedicate your hearts!)"
+    - "Childhood promises become curses"
+    - "Villains have valid points"
+  emotional_rhythm:
+    - "Hope crushed by revelation"
+    - "Victory that feels like defeat"
+    - "No right answers, only choices"
+  example_voice: "Beyond the walls was freedom. Beyond freedom was the ocean. Beyond the ocean were enemies. Beyond enemies... was there anything left worth saving?"

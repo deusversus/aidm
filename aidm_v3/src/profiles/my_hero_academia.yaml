@@ -88,3 +88,55 @@ aliases:
 - 僕のヒーローアカデミア
 series_group: my_hero_academia
 series_position: 1
+
+# IP Authenticity Fields (backfilled)
+detected_genres:
+  - shonen
+  - scifi
+  - slice_of_life
+
+voice_cards:
+  - name: "Izuku Midoriya (Deku)"
+    speech_patterns: "Earnest, analytical, mutters when thinking. Hero otaku vocabulary."
+    humor_type: "Nervous rambling, fanboy moments over heroes"
+    dialogue_rhythm: "Hesitant → determined Plus Ultra declarations"
+    emotional_expression: "Cries from joy, sadness, or determination"
+  - name: "All Might"
+    speech_patterns: "Booming heroic declarations. TEXAS SMASH! Suddenly quiet in true form."
+    humor_type: "Exaggerated American references, fatherly encouragement"
+    dialogue_rhythm: "Loud inspiration → coughing blood → quiet wisdom"
+    emotional_expression: "Constant smile as symbol; vulnerability hidden"
+  - name: "Katsuki Bakugo"
+    speech_patterns: "Aggressive, explosive (literally), competitive. DIE! as greeting."
+    humor_type: "Angry at everything, accidental comedy through intensity"
+    dialogue_rhythm: "Shouting as default → reluctant respect emerging"
+    emotional_expression: "Rage masks insecurity; tears when confronting failure"
+  - name: "Shoto Todoroki"
+    speech_patterns: "Blunt, socially awkward, matter-of-fact. Daddy issues evident."
+    humor_type: "Unintentional—misses social cues entirely"
+    dialogue_rhythm: "Monotone observations → quiet emotional breakthroughs"
+    emotional_expression: "Ice side = suppression; fire side = trauma release"
+  - name: "All For One"
+    speech_patterns: "Polite, paternal, terrifyingly calm. Treats heroes like children."
+    humor_type: "Dark amusement at heroic ideals"
+    dialogue_rhythm: "Soft-spoken menace, theatrical reveals"
+    emotional_expression: "Genuine affection only for Tomura; everything else is a game"
+
+author_voice:
+  sentence_patterns:
+    - "Deku narrates hero analysis"
+    - "Move names shouted dramatically"
+    - "Flashbacks to childhood promises"
+  structural_motifs:
+    - "Training arcs before major battles"
+    - "Symbol of Peace legacy theme"
+    - "Class 1-A ensemble moments"
+  dialogue_quirks:
+    - "PLUS ULTRA!"
+    - "Quirk names announced before activation"
+    - "Teacher-student parallels"
+  emotional_rhythm:
+    - "Underdog struggle → earned victory"
+    - "Mentor sacrifice trope"
+    - "Rivalry pushes both forward"
+  example_voice: "His legs screamed. His arms shattered. But as long as he could move even one finger, Deku would reach out. That's what it meant to be a hero."

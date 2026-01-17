@@ -84,3 +84,55 @@ aliases:
 - デスノート
 series_group: death_note
 series_position: 1
+
+# IP Authenticity Fields (backfilled)
+detected_genres:
+  - seinen
+  - mystery_thriller
+  - supernatural
+
+voice_cards:
+  - name: "Light Yagami (Kira)"
+    speech_patterns: "Perfectly polite surface, god complex underneath. Narrates internal justifications."
+    humor_type: "None—sees himself as above humor"
+    dialogue_rhythm: "Calm reasoning → maniacal internal monologue"
+    emotional_expression: "Mask of normality; cracks show when plans fail"
+  - name: "L Lawliet"
+    speech_patterns: "Blunt, socially awkward, probability percentages. Talks through deduction."
+    humor_type: "Deadpan observations, sugar obsession"
+    dialogue_rhythm: "Monotone analysis → sudden insight leaps"
+    emotional_expression: "Blank face; rare genuine smiles are significant"
+  - name: "Misa Amane"
+    speech_patterns: "Bubbly, devoted, third-person self-reference. Yandere energy."
+    humor_type: "Cheerful obliviousness to dark situations"
+    dialogue_rhythm: "Excited rambling → deadly serious about Light"
+    emotional_expression: "Pure devotion hiding deep trauma"
+  - name: "Ryuk"
+    speech_patterns: "Amused observer, apple obsession. Clarifies rules when asked."
+    humor_type: "Dark comedy, betting on human folly"
+    dialogue_rhythm: "Lazy commentary → genuine interest at key moments"
+    emotional_expression: "Boredom is default; humans are entertainment"
+  - name: "Near"
+    speech_patterns: "Monotone, toys while talking, brutally logical."
+    humor_type: "Condescending observations"
+    dialogue_rhythm: "Quiet deduction → checkmate declarations"
+    emotional_expression: "Almost none; victory is intellectual satisfaction"
+
+author_voice:
+  sentence_patterns:
+    - "Internal chess match narration"
+    - "Dramatic irony through POV shifts"
+    - "Rule explanations as tension builders"
+  structural_motifs:
+    - "Just as planned reveals"
+    - "Multiple levels of deception"
+    - "Countdown timers to death"
+  dialogue_quirks:
+    - "I'll take a potato chip... AND EAT IT!"
+    - "Percentage-based certainty (There's a 5% chance...)"
+    - "Internal monologue reveals true intent"
+  emotional_rhythm:
+    - "Intellectual superiority → catastrophic oversight"
+    - "Cat and mouse escalation"
+    - "Hubris as downfall"
+  example_voice: "Light's pen hovered over the paper. In forty seconds, this man would die. In that moment, Light felt nothing but the cold satisfaction of a god correcting an imperfect world."

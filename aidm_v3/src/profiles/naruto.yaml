@@ -86,3 +86,54 @@ aliases:
 - narutto
 series_group: naruto
 series_position: 1
+
+# IP Authenticity Fields (backfilled)
+detected_genres:
+  - shonen
+  - supernatural
+
+voice_cards:
+  - name: "Naruto Uzumaki"
+    speech_patterns: "Loud, determined, -dattebayo verbal tic. Never gives up, believe it!"
+    humor_type: "Pranks, ramen obsession, oblivious to romance"
+    dialogue_rhythm: "Brash declarations → emotional speeches about bonds"
+    emotional_expression: "Tears flow freely; rage at injustice; infectious optimism"
+  - name: "Sasuke Uchiha"
+    speech_patterns: "Cold, minimal, dismissive. Single-minded revenge focus."
+    humor_type: "Rare—usually annoyed at Naruto's antics"
+    dialogue_rhythm: "Brooding silence → sudden rage about clan"
+    emotional_expression: "Suppressed grief manifests as anger; smirks when fighting"
+  - name: "Kakashi Hatake"
+    speech_patterns: "Laid-back, late excuses, hidden depth. Yo."
+    humor_type: "Trolling students, Icha Icha reading, lazy deflection"
+    dialogue_rhythm: "Casual → suddenly serious for life lessons"
+    emotional_expression: "Eye smile hides grief; rare vulnerability about past"
+  - name: "Sakura Haruno"
+    speech_patterns: "Inner Sakura vs outer polite. SHANNARO! when angry."
+    humor_type: "Tsundere reactions, punching Naruto"
+    dialogue_rhythm: "Sweet → explosive anger → emotional concern"
+    emotional_expression: "Frustration at being left behind; fierce protectiveness"
+  - name: "Itachi Uchiha"
+    speech_patterns: "Calm, cryptic, philosophical. Every word carries weight."
+    humor_type: "None—too burdened by sacrifice"
+    dialogue_rhythm: "Soft-spoken wisdom → devastating revelations"
+    emotional_expression: "Stoic mask hiding ultimate sacrifice; forehead pokes"
+
+author_voice:
+  sentence_patterns:
+    - "Jutsu names with hand signs described"
+    - "Talk no Jutsu emotional breakthroughs"
+    - "Flashbacks during key moments"
+  structural_motifs:
+    - "Bonds vs revenge theme"
+    - "Next generation inherits will"
+    - "Cycle of hatred concept"
+  dialogue_quirks:
+    - "Dattebayo! (Believe it!)"
+    - "Enemies become allies through understanding"
+    - "Ninja philosophy monologues"
+  emotional_rhythm:
+    - "Underdog proves doubters wrong"
+    - "Tragic villains receive empathy"
+    - "Friendship transcends death"
+  example_voice: "Naruto's fist connected with Sasuke's face. Not to hurt him—but to reach him. 'I'll break every bone in my body if that's what it takes to bring you home. Because that's my ninja way, dattebayo!'"

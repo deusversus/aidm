@@ -88,3 +88,54 @@ aliases:
 - ブリーチ
 series_group: bleach
 series_position: 1
+
+# IP Authenticity Fields (backfilled)
+detected_genres:
+  - shonen
+  - supernatural
+
+voice_cards:
+  - name: "Ichigo Kurosaki"
+    speech_patterns: "Gruff, protective, reluctant hero. Scowls while saving everyone."
+    humor_type: "Deadpan reactions to supernatural chaos"
+    dialogue_rhythm: "Irritated grumbling → determined declarations"
+    emotional_expression: "Protective fury; hides worry behind scowls"
+  - name: "Rukia Kuchiki"
+    speech_patterns: "Formal noble speech with modern slang confusion. Bad drawings for explanations."
+    humor_type: "Terrible art skills, human world misunderstandings"
+    dialogue_rhythm: "Proud → flustered → wise in combat"
+    emotional_expression: "Stoic exterior; grief about Kaien, love for nakama"
+  - name: "Byakuya Kuchiki"
+    speech_patterns: "Cold, aristocratic, minimal words. Pride above all."
+    humor_type: "None intentional—accidental comedy through rigidity"
+    dialogue_rhythm: "Dismissive → rare acknowledgment means everything"
+    emotional_expression: "Mask of duty; protecting Rukia breaks the ice"
+  - name: "Sosuke Aizen"
+    speech_patterns: "Polite, paternal, infinitely calm. Always according to plan."
+    humor_type: "None—finds mortals beneath amusement"
+    dialogue_rhythm: "Soft explanations → condescending reveals"
+    emotional_expression: "Eternal superiority; genuine surprise is rare"
+  - name: "Kenpachi Zaraki"
+    speech_patterns: "Battle-hungry, straightforward, respects strength only."
+    humor_type: "Getting lost constantly (Yachiru's fault), fight excitement"
+    dialogue_rhythm: "Bored → manic joy when challenged"
+    emotional_expression: "Pure combat euphoria; genuine respect for strong opponents"
+
+author_voice:
+  sentence_patterns:
+    - "Zanpakuto release commands with flair"
+    - "Reiatsu pressure as physical force"
+    - "Mid-battle power reveals"
+  structural_motifs:
+    - "Soul Society procedural drama"
+    - "Bankai as arc climax power-up"
+    - "Ichigo arrives to save the day"
+  dialogue_quirks:
+    - "Bankai names announced dramatically"
+    - "Aizen was behind everything"
+    - "Power levels through spiritual pressure"
+  emotional_rhythm:
+    - "Seemingly unbeatable enemy → power-up → victory"
+    - "Rescue mission structure"
+    - "Bonds formed through combat"
+  example_voice: "His Reiatsu crashed down like an ocean. Ichigo's blade trembled—but his resolve didn't. 'I don't care how strong you are. I'll keep standing up until you stay down.'"

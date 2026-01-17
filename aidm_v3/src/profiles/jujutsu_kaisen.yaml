@@ -86,3 +86,55 @@ aliases:
 - 呪術廻戦
 series_group: jujutsu_kaisen
 series_position: 2
+
+# IP Authenticity Fields (backfilled)
+detected_genres:
+  - shonen
+  - supernatural
+  - horror
+
+voice_cards:
+  - name: "Gojo Satoru"
+    speech_patterns: "Playful and teasing, even in danger. Uses casual speech with hidden depth. Drops bombshells casually."
+    humor_type: "Trolling, theatrical confidence, dramatic reveals"
+    dialogue_rhythm: "Light banter followed by suddenly serious one-liners"
+    emotional_expression: "Masks everything behind smiles; intensity only in eyes"
+  - name: "Itadori Yuji"
+    speech_patterns: "Earnest and straightforward. Speaks from the heart. Gets louder when emotional."
+    humor_type: "Innocent reactions, friendship enthusiasm, pop culture references"
+    dialogue_rhythm: "Quick emotional shifts - cheerful to determined to grief"
+    emotional_expression: "Wears heart on sleeve; tears flow freely"
+  - name: "Fushiguro Megumi"
+    speech_patterns: "Reserved, practical, occasionally sharp. Minimal words, maximum meaning."
+    humor_type: "Deadpan reactions to chaos, reluctant participation"
+    dialogue_rhythm: "Long silences, then precise observations"
+    emotional_expression: "Stoic exterior, protective fury when friends threatened"
+  - name: "Kugisaki Nobara"
+    speech_patterns: "Brash, confident, unapologetically herself. Tokyo dialect pride."
+    humor_type: "Aggressive confidence, fashion commentary, calling out nonsense"
+    dialogue_rhythm: "Quick retorts, dramatic declarations of self-worth"
+    emotional_expression: "Fierce loyalty disguised as annoyance"
+  - name: "Sukuna"
+    speech_patterns: "Archaic arrogance. Speaks down to everyone. Finds mortals amusing."
+    humor_type: "Dark amusement at suffering, mockery of effort"
+    dialogue_rhythm: "Languid threats, sudden violence in tone"
+    emotional_expression: "Contempt as default; genuine interest is terrifying"
+
+author_voice:
+  sentence_patterns:
+    - "Short punchy sentences during combat"
+    - "Internal monologue reveals tactical thinking"
+    - "Technique names announced dramatically"
+  structural_motifs:
+    - "Flashbacks at moment of death/defeat"
+    - "Binding Vow revelations as twist"
+    - "Domain Expansion as arc climax"
+  dialogue_quirks:
+    - "Characters explain techniques mid-battle"
+    - "Enemies acknowledge each other's strength"
+    - "Dark humor undercuts tragedy"
+  emotional_rhythm:
+    - "Build tension through tactical chess"
+    - "Sudden devastating losses"
+    - "Brief comedy relief before next tragedy"
+  example_voice: "Gojo smiled behind the blindfold. 'You know, I really hate explaining myself. But since you're about to die anyway—let me show you what infinity really means.'"

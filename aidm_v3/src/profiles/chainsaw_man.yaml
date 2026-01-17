@@ -83,3 +83,55 @@ aliases:
 - チェンソーマン
 series_group: chainsaw_man
 series_position: 1
+
+# IP Authenticity Fields (backfilled)
+detected_genres:
+  - seinen
+  - horror
+  - comedy
+
+voice_cards:
+  - name: "Denji"
+    speech_patterns: "Simple, crude, horny teenager. Dreams of touching boobs and eating good food."
+    humor_type: "Perverted innocence, low-bar dreams, dog-brain logic"
+    dialogue_rhythm: "Simple desires → surprising emotional depth"
+    emotional_expression: "Cries openly; rage when friends hurt; genuine confusion at complex emotions"
+  - name: "Power"
+    speech_patterns: "Arrogant, lies constantly, claims credit. Nobel Prize for Power!"
+    humor_type: "Shameless lying, cowardice, blood fiend chaos"
+    dialogue_rhythm: "Boasting → immediate retreat → accidental heroism"
+    emotional_expression: "Hides care behind selfishness; attachment issues"
+  - name: "Aki Hayakawa"
+    speech_patterns: "Serious, professional, quietly devoted. Desk jobs are for quitters."
+    humor_type: "Straight man to Denji/Power chaos; forced cohabitation frustration"
+    dialogue_rhythm: "Cold professionalism → buried warmth"
+    emotional_expression: "Revenge-driven → found family; tearjerking last arc"
+  - name: "Makima"
+    speech_patterns: "Soft, maternal, controlling. Precise orders disguised as requests."
+    humor_type: "Disturbingly pleasant about violence"
+    dialogue_rhythm: "Gentle guidance → chilling reveals"
+    emotional_expression: "Everything is control; genuine interest only in Chainsaw Man"
+  - name: "Pochita"
+    speech_patterns: "Cannot speak human—communicates through chainsaw sounds and dreams."
+    humor_type: "Adorable chainsaw dog contrast"
+    dialogue_rhythm: "Silent devotion → dream sequence revelations"
+    emotional_expression: "Pure love; became Denji's heart literally"
+
+author_voice:
+  sentence_patterns:
+    - "Action without explanation—show don't tell"
+    - "Sudden brutality mid-comedy"
+    - "Simple prose for complex emotions"
+  structural_motifs:
+    - "Movie homages in battle cinematography"
+    - "Found family assembled then destroyed"
+    - "Low-bar dreams as thematic core"
+  dialogue_quirks:
+    - "CHAINSAW! (transformation sound)"
+    - "Anti-climactic villain deaths"
+    - "Mundane conversations before horror"
+  emotional_rhythm:
+    - "Comedy → sudden gut-punch death"
+    - "Simple goals mask deep trauma"
+    - "Everything you love will be taken"
+  example_voice: "Power was annoying, selfish, and a liar. She ate his food and blamed him. She was the worst. She was his best friend. Denji held her horns and screamed."
