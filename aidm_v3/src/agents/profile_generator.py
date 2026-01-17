@@ -118,6 +118,9 @@ def generate_compact_profile(research: AnimeResearchOutput) -> Dict[str, Any]:
         # 11 DNA Scales
         "dna_scales": research.dna_scales,
         
+        # World Tier (inferred from DNA scales and tone)
+        "world_tier": _infer_world_tier(research),
+        
         # 15 Tropes
         "tropes": research.storytelling_tropes,
         
@@ -213,6 +216,46 @@ def _infer_pacing(research: AnimeResearchOutput) -> Dict[str, Any]:
         "scene_length": scene_length,
         "arc_length_sessions": arc_sessions
     }
+
+
+def _infer_world_tier(research: AnimeResearchOutput) -> str:
+    """
+    Infer the typical power tier for characters in this anime world.
+    
+    Uses DNA scales and tone to estimate:
+    - T10: Slice of life, grounded human stories (Death Note, March Comes In Like a Lion)
+    - T8-9: Street level action (Early MHA, Demon Slayer rookies)
+    - T6-7: City/Building level (Jujutsu Kaisen, mid-tier shonen)
+    - T4-5: Planetary/Stellar (Dragon Ball Z, late Naruto)
+    - T2-3: Universal+ (Dragon Ball Super, Record of Ragnarok)
+    
+    Returns tier as string like "T8".
+    """
+    dna = research.dna_scales
+    tone = research.tone if isinstance(research.tone, dict) else {}
+    
+    # Key indicators
+    power_fantasy = dna.get("power_fantasy_vs_struggle", 5)  # 0=underdog, 10=OP
+    grounded_vs_absurd = dna.get("grounded_vs_absurd", 5)    # 0=realistic, 10=ridiculous
+    
+    # Combine indicators (weighted towards grounded_vs_absurd for tier estimation)
+    power_score = (power_fantasy * 0.4) + (grounded_vs_absurd * 0.6)
+    
+    # Map to tier
+    if power_score <= 2:
+        return "T10"  # Very grounded (Death Note, realistic drama)
+    elif power_score <= 4:
+        return "T9"   # Street level (early shonen, semi-grounded action)
+    elif power_score <= 5.5:
+        return "T8"   # Building level (mid-tier action)
+    elif power_score <= 7:
+        return "T7"   # Town/City level (standard shonen peak)
+    elif power_score <= 8.5:
+        return "T6"   # Island/Country level (high-tier shonen)
+    elif power_score <= 9.5:
+        return "T5"   # Planetary level (DBZ territory)
+    else:
+        return "T4"   # Stellar+ (cosmic level series)
 
 
 async def _validate_and_update_series_positions(series_group: str, profiles_dir: Path) -> None:

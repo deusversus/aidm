@@ -27,6 +27,7 @@ dna_scales:
   tactical_vs_instinctive: 1
   hopeful_vs_cynical: 7
   ensemble_vs_solo: 3
+world_tier: T7
 tropes:
   tournament_arc: true
   training_montage: true
