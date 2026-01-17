@@ -322,8 +322,9 @@ When generating OP configurations, you have THREE independent axes. Each axis ca
 | Value | Meaning |
 |-------|---------|
 | `internal` | Character's psychology, meaning, personal growth |
-| `ensemble` | Party dynamics, team spotlight rotation |
-| `reverse_ensemble` | Others react to the legend, POV shifts |
+| `ensemble` | Party/ally spotlight rotation, shared development |
+| `reverse_ensemble` | POV shifts to observers—dramatic irony, legend framing |
+| `adversary_ensemble` | Enemies get full arcs, we see the peril from their side |
 | `episodic` | Vignette structure, anthology feel |
 | `faction` | Politics, management, kingdom-building |
 | `mundane` | Slice-of-life despite cosmic power |
