@@ -212,6 +212,88 @@ def derive_composition_from_dna(dna: Dict[str, int], tropes: Dict[str, bool] = N
     return composition
 
 
+def get_effective_composition(
+    profile_composition: Dict[str, str],
+    world_tier: str = "T8",
+    character_tier: str = "T10",
+    character_op_enabled: bool = False,
+    character_op_tension: str = None,
+    character_op_expression: str = None,
+    character_op_focus: str = None,
+    current_threat_tier: str = None
+) -> Dict[str, Any]:
+    """
+    Calculate effective narrative composition based on power differential.
+    
+    This is the core of the Unified Power Differential System:
+    - Standard (0-1 tier gap): Profile composition only
+    - Blended (2-3 tier gap): Profile + character OP flavor
+    - OP Dominant (4+ tier gap): Character OP axes lead
+    
+    Args:
+        profile_composition: The profile's baseline composition from DNA
+        world_tier: The world's baseline power tier (from profile)
+        character_tier: The character's current power tier
+        character_op_enabled: Whether OP mode is enabled for character
+        character_op_tension: Character's chosen tension source
+        character_op_expression: Character's chosen power expression
+        character_op_focus: Character's chosen narrative focus
+        current_threat_tier: Current threat tier (overrides world baseline)
+        
+    Returns:
+        Effective composition dict with mode and differential info
+    """
+    from ..utils.power_utils import calculate_power_differential, get_narrative_mode
+    
+    # Calculate differential
+    differential = calculate_power_differential(
+        world_tier=world_tier,
+        character_tier=character_tier,
+        threat_tier=current_threat_tier
+    )
+    
+    mode = get_narrative_mode(differential)
+    
+    # Base composition from profile
+    base_tension = profile_composition.get("tension_source", "existential")
+    base_expression = profile_composition.get("power_expression", "flashy")
+    base_focus = profile_composition.get("narrative_focus", "party")
+    
+    # Determine effective values based on mode and OP settings
+    if mode == "op_dominant" and character_op_enabled:
+        # OP DOMINANT: Character axes override profile (if set)
+        effective = {
+            "tension_source": character_op_tension or base_tension,
+            "power_expression": character_op_expression or base_expression,
+            "narrative_focus": character_op_focus or base_focus,
+            "mode": "op_dominant",
+            "differential": differential,
+            "mode_description": "Combat is trivial. Story shifts to meaning, relationships, consequences."
+        }
+    elif mode == "blended" and character_op_enabled:
+        # BLENDED: Character tension/expression, but keep profile's narrative focus
+        effective = {
+            "tension_source": character_op_tension or base_tension,
+            "power_expression": character_op_expression or base_expression,
+            "narrative_focus": base_focus,  # Keep IP's story structure
+            "mode": "blended",
+            "differential": differential,
+            "mode_description": "Powerful but not untouchable. Traditional stakes with OP flavor."
+        }
+    else:
+        # STANDARD: Profile composition only
+        effective = {
+            "tension_source": base_tension,
+            "power_expression": base_expression,
+            "narrative_focus": base_focus,
+            "mode": "standard",
+            "differential": differential,
+            "mode_description": "Traditional storytelling. Combat has real stakes."
+        }
+    
+    return effective
+
+
 def load_profile(profile_id: str, fallback: bool = True) -> NarrativeProfile:
     """Load a narrative profile by ID.
     

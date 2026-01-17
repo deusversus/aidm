@@ -168,11 +168,31 @@ Write vivid, anime-appropriate prose. End at a clear decision point if one exist
             if 'optimism' in tone:
                 lines.append(f"- Optimism: {tone['optimism']}/10")
         
-        # === NARRATIVE COMPOSITION (Always-On 3-Axis Direction) ===
+        # === NARRATIVE COMPOSITION (Power Differential System) ===
         composition = getattr(self.profile, 'composition', None)
         if composition and isinstance(composition, dict):
             lines.append("")
-            lines.append("### 🎬 Narrative Composition (DIRECTION LAYER)")
+            
+            # Display mode if using effective composition (from power differential)
+            mode = composition.get("mode", "standard")
+            differential = composition.get("differential", 0)
+            mode_desc = composition.get("mode_description", "")
+            
+            mode_labels = {
+                "standard": "🎯 STANDARD",
+                "blended": "⚡ BLENDED",
+                "op_dominant": "💀 OP DOMINANT"
+            }
+            mode_label = mode_labels.get(mode, "STANDARD")
+            
+            if mode != "standard" or differential != 0:
+                lines.append(f"### 🎬 Narrative Composition ({mode_label})")
+                if differential:
+                    lines.append(f"*Power Differential: {differential} tiers above baseline*")
+                if mode_desc:
+                    lines.append(f"*{mode_desc}*")
+            else:
+                lines.append("### 🎬 Narrative Composition (DIRECTION LAYER)")
             
             # Tension Source descriptions
             tension_desc = {

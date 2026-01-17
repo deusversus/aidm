@@ -1,0 +1,62 @@
+IP Authenticity Roadmap - Task Checklist
+Gap 1: Scene Length Enforcement ✅
+ Add scene length guidance to vibe_keeper.md DNA interpretation section
+ Define paragraph counts by pacing scale (0-3, 4-6, 7-10)
+ Define sentence style guidance per pacing tier
+ Test: Verify prompt renders correctly with JJK profile
+Gap 2: Narrative Direction Layer (Composition System) ✅
+2A: Refactor OP Mode → Composition System
+ Create derivation rules: DNA scales → composition axes (derive_composition_from_dna())
+ Auto-derive composition from DNA during profile loading
+ Store composition in NarrativeProfile
+2B: Composition in KeyAnimator
+ KeyAnimator receives composition axes via profile
+ Add interpretation guide for each axis combination
+ Verified: JJK profile derives consequence/overwhelming/ensemble
+Gap 3: Genre Trope Integration
+3A: Complete Genre Library (15 total) ✅
+ Ported from v2: historical, magical_girl, mecha, music, scifi, shoujo_romance, sports, supernatural
+ Copied GENRE_TROPES_INDEX.md
+3B: Genre Detection in Research ✅
+ Add detected_genres field to extraction schema (GenreDetectionExtract)
+ Add detected_genres to AnimeResearchOutput
+ Wire genre into profile_generator.py
+3C: Genre in Director
+ Director loads active genre trope files
+ Uses arc templates from genre files
+ Genre-aware pacing guidance
+3D: Genre in KeyAnimator
+ Query genre tropes via RAG (like lore)
+ Genre-specific mechanics injection (isekai status screens, etc.)
+3E: Genre Auto-Load Triggers
+ Implement keyword-based auto-detection
+ Compatible genre blending logic
+ Warn on incompatible combinations
+Gap 4: Character Voice Cards
+4A: Schema Design ✅
+ Define CharacterVoiceCard/CharacterVoiceCardsExtract schemas
+ Fields: name, speech_patterns, humor_type, signature_phrases, dialogue_rhythm, emotional_expression
+ Wired into DERIVED_SCHEMAS and AnimeResearchOutput
+4B: Research Extraction ✅
+ Added voice_cards to AnimeResearchOutput
+4C: Runtime Injection
+ Track present NPCs in scene
+ Inject voice cards when NPC speaks
+ Director can request specific NPC voice emphasis
+Gap 5: Author's Voice Extraction
+5A: Schema Design ✅
+ Define AuthorVoiceExtract schema
+ Fields: sentence_patterns, structural_motifs, dialogue_quirks, emotional_rhythm, example_voice
+ Wired into DERIVED_SCHEMAS and AnimeResearchOutput
+5B: Research Extraction ✅
+ Added author_voice to AnimeResearchOutput
+5C: Integration
+ Director includes author_voice in voice_patterns
+ KeyAnimator sees structural guidance in DNA section
+ Test with distinctive authors (Hirano, Takaya)
+Final Verification
+ Full test: Hellsing profile (dark, action, spectacle)
+ Full test: Fruits Basket profile (slow, emotional, ensemble)
+ Full test: JJK profile (tactical, seralized, party)
+ Commit all changes with comprehensive message
+ Update walkthrough documentation
