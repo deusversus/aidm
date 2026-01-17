@@ -292,91 +292,129 @@ How do major canon events factor into your story?
 - "npcs only", "background", "cameos" → `canon_cast_mode: "npcs_only"`
 
 
+### Understanding the 3-Axis OP System
+
+When generating OP configurations, you have THREE independent axes. Each axis can have MULTIPLE values (e.g., `relational + legacy`). All combinations are valid — generate what fits the anime.
+
+**AXIS 1: Tension Source** (where dramatic stakes come from)
+| Value | Meaning |
+|-------|---------|
+| `existential` | What's the point of power? Finding meaning, purpose |
+| `relational` | Bonds, friendships, protecting loved ones |
+| `moral` | Right vs wrong, ends vs means, ethical weight |
+| `burden` | Power as curse, isolation, outliving everyone |
+| `information` | Mysteries, secrets, hidden truths to uncover |
+| `consequence` | Actions have weight despite power |
+| `control` | Maintaining composure, managing seals/limits |
+
+**AXIS 2: Power Expression** (how power manifests in the story)
+| Value | Meaning |
+|-------|---------|
+| `instantaneous` | One-shot victories, combat is trivial |
+| `overwhelming` | Waves of destruction, army-breaking scale |
+| `sealed` | Power deliberately locked away, released rarely |
+| `hidden` | Nobody knows how strong you are |
+| `conditional` | Works only under specific rules/circumstances |
+| `derivative` | Power through minions, proxies, delegation |
+| `passive` | Accumulated mastery over centuries, not flashy |
+
+**AXIS 3: Narrative Focus** (what the story becomes "about")
+| Value | Meaning |
+|-------|---------|
+| `internal` | Character's psychology, meaning, personal growth |
+| `ensemble` | Party dynamics, team spotlight rotation |
+| `reverse_ensemble` | Others react to the legend, POV shifts |
+| `episodic` | Vignette structure, anthology feel |
+| `faction` | Politics, management, kingdom-building |
+| `mundane` | Slice-of-life despite cosmic power |
+| `competition` | Structured challenges, tournaments, ranking |
+| `legacy` | Impact on future generations, mentorship |
+
+---
+
 ### OP_MODE_DETECTION (Phase 0.6)
-**Goal**: Determine if player wants an overpowered protagonist, and select composition.
+**Goal**: Determine if player wants an overpowered protagonist, then GENERATE anime-specific configurations.
 
 **Initial Question:**
 ```
 One more calibration question - **Power Level**:
 
 1. **OP Protagonist** — Overwhelmingly powerful from the start
-   > Tension comes from existential meaning, emotional restraint, consequences, or relationships
+   > Tension comes from meaning, relationships, consequences, or burden—not combat
 
 2. **Traditional Progression** — Start relatively grounded, grow through earned victories
    > Classic hero's journey with meaningful power growth
 
 ---
 
-**Which one would you like to explore?** Just tell me the number or name!
+**Which resonates with your vision?**
 ```
 
-**If player says YES to OP, present preset options:**
+**If player says YES to OP, GENERATE custom configurations:**
+
+Based on your knowledge of [anime] from the profile and research, propose 2-3 OP configurations that fit how THIS WORLD handles power fantasy. Do NOT use pre-made templates. Analyze the anime's actual storytelling patterns.
+
+**Format each configuration as:**
 ```
-## ⚡ OP Protagonist Presets
+## ⚡ OP Configurations for [Anime]
 
-Choose a style that resonates with you (or describe your own):
+Based on how [Anime] handles overpowered protagonists...
 
-**Internal Focus:**
-1. **Bored God** — Victory is instant and empty. Real struggle is finding meaning.
-   > *One Punch Man*: Combat assumed, grocery sales matter more than world-ending threats.
+**1. "[Creative Name]"**
+- **Tension:** `[values]` — [why this fits the anime's themes]
+- **Expression:** `[values]` — [how the anime portrays power]
+- **Focus:** `[values]` — [what stories the anime tells]
 
-2. **Time Looper** — Death is reset. Tension comes from learning what matters.
-   > *Re:Zero*: Knowledge through iteration, every loop reveals more.
-
-3. **Immortal** — Can't die, but life isn't easy. Eternity is a burden.
-   > *Ajin, Highlander*: The horror of watching everything mortal fade.
-
-**Ensemble Focus:**
-4. **Restrainer** — Godlike power deliberately suppressed. Emotional growth over combat.
-   > *Mob Psycho 100*: ???% mode = crisis only, focus on human connections.
-
-5. **Wandering Legend** — Mythical drifter. Each arc is a new chapter in your legend.
-   > *Vampire Hunter D*: Poetic melancholy, gradual reveals, swift elegant combat.
-
-**Faction/Management Focus:**
-6. **Hidden Ruler** — Command through subordinates. Maintain the mastermind facade.
-   > *Overlord*: Everyone thinks you're a genius, you improvise. Comedic gap.
-
-7. **Nation Builder** — Power enables building. Combat quick, management deep.
-   > *Reincarnated as a Slime*: Collect allies, solve problems through delegation.
-
-**Mundane Focus:**
-8. **Burden Bearer** — Power is a curse. Protecting normalcy is the real goal.
-   > *Saiki K*: Just wants normal life, but psychic nonsense keeps happening.
-
-9. **Sealed Apocalypse** — World-ending power locked away for school life.
-   > *Daily Life of the Immortal King*: Cosmic stakes hidden, focus on daily life.
-
-10. **Disguised God** — Cosmic power at F-rank. Coffee dates and secret identity.
-    > *Awaken the God*: Dramatic irony, everyone underestimates you.
-
-**Competition Focus:**
-11. **Muscle Wizard** — Absurd physical power. Punch solves everything earnestly.
-    > *Mashle*: Doesn't realize he's OP, earnest reactions to absurd situations.
+**2. "[Creative Name]"**
+- **Tension:** `[values]` — [explanation]
+- **Expression:** `[values]` — [explanation]
+- **Focus:** `[values]` — [explanation]
 
 ---
 
-**Which preset appeals to you?** Or describe your own OP style!
+Which resonates with you? Or describe your own configuration!
 ```
 
-**Preset Detection Keywords:**
-- "bored", "one punch", "saitama", "too strong" → `bored_god`
-- "restraint", "mob", "emotional", "???%", "hold back" → `restrainer`
-- "overlord", "ainz", "villain", "mastermind", "ruler" → `hidden_ruler`
-- "burden", "saiki", "curse", "normal life" → `burden_bearer`
-- "mashle", "muscles", "punch", "absurd" → `muscle_wizard`
-- "sealed", "school", "wang ling", "apocalypse" → `sealed_apocalypse`
-- "wanderer", "legend", "vampire", "episodic" → `wandering_legend`
-- "slime", "rimuru", "nation", "build", "collect" → `nation_builder`
-- "god", "disguised", "coffee", "f-rank", "deus" → `disguised_god`
-- "time loop", "restart", "death", "re:zero" → `time_looper`
-- "immortal", "can't die", "eternal", "ajin" → `immortal`
+**Example for Frieren:**
+```
+## ⚡ OP Configurations for Frieren
 
-**Store in**: 
-- `character_draft.op_preset` (preset name)
-- `character_draft.op_tension_source` (axis value from preset)
-- `character_draft.op_power_expression` (axis value from preset)
-- `character_draft.op_narrative_focus` (axis value from preset)
+Based on how Frieren handles overpowered protagonists...
+
+**1. "The Thousand-Year Perspective"**
+- **Tension:** `legacy + burden` — Outliving everyone you love, carrying Himmel's memory
+- **Expression:** `passive + hidden` — Centuries of accumulated mastery, understated
+- **Focus:** `ensemble + episodic` — Fern/Stark growth arcs, vignette structure
+
+**2. "The Foregone Conclusion"**
+- **Tension:** `relational` — Party bonds across eras, found family
+- **Expression:** `hidden` — Frieren casually downplays her power level
+- **Focus:** `reverse_ensemble` — Others react to her legend, dramatic irony
+
+---
+
+Which resonates with you? Or describe your own configuration!
+```
+
+**After player selects or describes their preference:**
+
+Store in detected_info:
+```json
+{
+  "op_mode": true,
+  "op_tension_source": "legacy + burden",
+  "op_power_expression": "passive + hidden",
+  "op_narrative_focus": "ensemble + episodic",
+  "op_config_name": "The Thousand-Year Perspective"
+}
+```
+
+**Store in character_draft:**
+- `character_draft.op_mode` = true
+- `character_draft.op_tension_source` = axis values (comma-separated if multiple)
+- `character_draft.op_power_expression` = axis values
+- `character_draft.op_narrative_focus` = axis values
+- `character_draft.op_config_name` = the creative name (optional)
 
 ### CONCEPT (Phase 1)
 **Goal**: Get the "big idea" for the character.
