@@ -258,7 +258,9 @@ Write vivid, anime-appropriate prose. End at a clear decision point if one exist
                 "magical_girl": "**Transformation sequences.** Power of hope/love. Cute aesthetics. Dark undertones beneath brightness. Friendship bonds.",
                 "historical": "**Period-appropriate language.** Cultural details. Honor codes. Class dynamics. Historical context weaves into narrative.",
                 "music": "**Synesthesia in descriptions.** Performance as climax. Practice struggles. Band/group dynamics. Music as emotional expression.",
-                "scifi": "**Tech jargon that feels natural.** Worldbuilding through details. Scientific concepts. Future society commentary."
+                "scifi": "**Tech jargon that feels natural.** Worldbuilding through details. Scientific concepts. Future society commentary.",
+                "josei": "**Emotional complexity.** Career vs love tension. Realistic relationships. No easy answers. Bittersweet growth.",
+                "ecchi": "**Comedic fan service.** Accidental situations. Harem dynamics. Status quo preservation. Dense protagonist moments."
             }
             
             lines.append("")

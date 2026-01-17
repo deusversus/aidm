@@ -224,6 +224,41 @@ class DirectorAgent(BaseAgent):
                     "**First Sortie**: Reluctant pilot→Emergency→Awakening→Victory",
                     "**Upgrade Arc**: Defeat→New unit development→Training→Revenge match",
                     "**Final Defense**: Overwhelming odds→Sacrifices→Last stand→Decisive blow"
+                ],
+                "comedy": [
+                    "**Misunderstanding Spiral**: Small confusion→Escalates→Chaos peak→Anticlimax resolution",
+                    "**Competition Gone Wrong**: Simple contest→Ridiculous stakes→Cheating→Everyone loses",
+                    "**Fish Out of Water**: New environment→Culture clash→Hilarious failures→Adaptation"
+                ],
+                "magical_girl": [
+                    "**Awakening Arc**: Normal life→Mascot appears→First transformation→Defeat monster→Accept destiny",
+                    "**Team Assembly**: Solo→Meet second→Rivalry→Friendship→Full team",
+                    "**Dark Magical Girl**: Enemy magical girl→Tragic backstory→Redemption or sacrifice"
+                ],
+                "historical": [
+                    "**Political Intrigue**: Stable court→Conspiracy hints→Factions form→Climactic confrontation",
+                    "**War Campaign**: March to war→Skirmishes→Major battle→Aftermath",
+                    "**Honor Duel**: Insult→Challenge→Training/preparation→Duel→Consequences"
+                ],
+                "music": [
+                    "**First Performance**: Form group→Practice struggles→Stage fright→Breakthrough performance",
+                    "**Competition Arc**: Rivals introduced→Preparation→Preliminaries→Finals→Growth over victory",
+                    "**Creative Block**: Success→Pressure→Block→Inspiration→Comeback"
+                ],
+                "scifi": [
+                    "**First Contact**: Discovery→Communication attempts→Misunderstanding→Understanding or conflict",
+                    "**AI Dilemma**: AI introduced→Grows→Questions humanity→Crisis→Resolution",
+                    "**Colony Crisis**: Isolated→Systems fail→Survival→Rescue or self-sufficiency"
+                ],
+                "josei": [
+                    "**Workplace Drama**: New job→Culture shock→Mentor→Challenge→Success or growth",
+                    "**Reunion Romance**: Meet again→Reignite feelings→Address past→Decide→Move forward",
+                    "**Quarter-Life Crisis**: Routine→Disruption→Question everything→Experiment→New direction"
+                ],
+                "ecchi": [
+                    "**New Suitor Arc**: Mysterious stranger→Reveal interest→Rivalry→Integration into group",
+                    "**Vacation Episode**: Group trip→Compromising situations→Bonding moments→Return closer",
+                    "**Confession Dodge**: Building feelings→Confession attempt→Interruption→Progress anyway"
                 ]
             }
             
