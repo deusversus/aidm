@@ -329,6 +329,11 @@ class StateManager:
             if not director_notes:
                  # Fallback to generic notes
                  director_notes = bible.planning_data.get("notes", "")
+            
+            # Append voice patterns if available (for KeyAnimator voice consistency)
+            voice_patterns = bible.planning_data.get("voice_patterns", "")
+            if voice_patterns:
+                director_notes += f"\n\n### Voice Consistency\n{voice_patterns}"
         
         # Get character
         character = (

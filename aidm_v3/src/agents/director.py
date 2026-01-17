@@ -29,6 +29,11 @@ class DirectorOutput(BaseModel):
         description="High-level guidance for the Key Animator for the next session/segment"
     )
     
+    voice_patterns: str = Field(
+        default="",
+        description="Key voice traits to maintain: humor style (sarcastic/earnest), sentence rhythm (punchy/flowing), narrator distance (intimate/cinematic)"
+    )
+    
     analysis: str = Field(description="Reasoning behind these decisions")
 
 
