@@ -68,6 +68,15 @@ class NarrativeProfile:
     # Detected genres (for arc templates)
     detected_genres: Optional[List[str]] = None
     
+    # IP Authenticity: Voice Cards for NPC dialogue differentiation
+    voice_cards: Optional[List[Dict[str, Any]]] = None
+    
+    # IP Authenticity: Author's distinctive writing style
+    author_voice: Optional[Dict[str, Any]] = None
+    
+    # Power tier baseline for world (for Power Differential System)
+    world_tier: str = "T8"
+    
     @property
     def combat_style(self) -> str:
         """Alias for combat_system (some code uses combat_style)."""
@@ -369,7 +378,10 @@ def load_profile(profile_id: str, fallback: bool = True) -> NarrativeProfile:
         series_parent=data.get('series_parent'),
         full_profile_path=str(profile_path),
         composition=composition,
-        detected_genres=data.get('detected_genres', [])
+        detected_genres=data.get('detected_genres', []),
+        voice_cards=data.get('voice_cards'),
+        author_voice=data.get('author_voice'),
+        world_tier=data.get('world_tier', 'T8')
     )
 
 
