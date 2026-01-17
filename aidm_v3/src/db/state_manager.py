@@ -43,6 +43,11 @@ class GameContext:
     op_narrative_focus: Optional[str] = None     # internal, ensemble, reverse_ensemble, episodic, faction, mundane, competition, legacy
     op_preset: Optional[str] = None              # Optional preset name
     
+    # Power Differential System (unifies profile composition + character OP mode)
+    power_tier: str = "T10"                       # Character's current power tier
+    world_tier: str = "T8"                        # World's baseline power tier (from profile)
+    effective_composition: Optional[Dict[str, Any]] = None  # Calculated from differential
+    
     # Progressive OP Mode tracking
     high_imbalance_count: int = 0  # Encounters where imbalance > 10
     op_suggestion_dismissed: bool = False  # Player dismissed suggestion
@@ -424,6 +429,9 @@ class StateManager:
             op_power_expression=character.op_power_expression if character else None,
             op_narrative_focus=character.op_narrative_focus if character else None,
             op_preset=character.op_preset if character else None,
+            # Power Differential System
+            power_tier=character.power_tier if character else "T10",
+            world_tier="T8",  # TODO: Load from profile when available in context
             narrative_scale=getattr(world_state, 'narrative_scale', None) or "strategic",
             has_party=has_party,
             party_tier_delta=party_tier_delta,

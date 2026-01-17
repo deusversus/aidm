@@ -591,6 +591,23 @@ class Orchestrator:
             use_sakuga = True
         
         # Single narrative path - KeyAnimator handles both normal and sakuga modes
+        
+        # === UNIFIED POWER DIFFERENTIAL: Calculate effective composition ===
+        # Blends profile composition with character OP settings based on power tier gap
+        from ..profiles.loader import get_effective_composition
+        effective_comp = get_effective_composition(
+            profile_composition=self.profile.composition or {},
+            world_tier=self.profile.world_tier or "T8",
+            character_tier=db_context.power_tier or "T10",
+            character_op_enabled=db_context.op_protagonist_enabled,
+            character_op_tension=db_context.op_tension_source,
+            character_op_expression=db_context.op_power_expression,
+            character_op_focus=db_context.op_narrative_focus
+        )
+        # Inject effective composition into profile for KeyAnimator
+        self.profile.composition = effective_comp
+        print(f"[Orchestrator] Power Differential: {effective_comp.get('differential', 0)} tiers, mode={effective_comp.get('mode', 'standard')}")
+        
         narrative = await self.key_animator.generate(
             player_input=player_input,
             intent=intent,
