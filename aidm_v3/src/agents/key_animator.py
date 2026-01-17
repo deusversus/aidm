@@ -168,6 +168,58 @@ Write vivid, anime-appropriate prose. End at a clear decision point if one exist
             if 'optimism' in tone:
                 lines.append(f"- Optimism: {tone['optimism']}/10")
         
+        # === NARRATIVE COMPOSITION (Always-On 3-Axis Direction) ===
+        composition = getattr(self.profile, 'composition', None)
+        if composition and isinstance(composition, dict):
+            lines.append("")
+            lines.append("### 🎬 Narrative Composition (DIRECTION LAYER)")
+            
+            # Tension Source descriptions
+            tension_desc = {
+                "existential": "Victory is assumed. Focus on meaning, purpose, aftermath.",
+                "relational": "Stakes are emotional. Relationships, trust, love, belonging.",
+                "moral": "Ethical dilemmas. Right vs wrong. Unintended consequences.",
+                "burden": "Power has a cost. Sacrifice, corruption, exhaustion.",
+                "information": "Knowledge is power. Discovery, mystery, learning.",
+                "consequence": "Actions ripple outward. Politics, reputation, faction.",
+                "control": "Inner struggle. Berserker mode, corruption, self-restraint."
+            }
+            tension = composition.get("tension_source", "existential")
+            lines.append(f"**Tension Source:** {tension.title()} — {tension_desc.get(tension, '')}")
+            
+            # Power Expression descriptions
+            expression_desc = {
+                "instantaneous": "One action ends it. Focus on reaction, aftermath.",
+                "overwhelming": "Victory inevitable. Horror of slow, unstoppable power.",
+                "sealed": "Power held back. Seal cracks create tension.",
+                "hidden": "Secret power. Dramatic irony, near exposure.",
+                "conditional": "Power tied to trigger. Build toward activation.",
+                "derivative": "Power through others. Subordinates, creations, armies.",
+                "passive": "Presence alone changes things. Aura, intimidation.",
+                "flashy": "Standard anime combat. Stylish, impactful, exciting.",
+                "balanced": "Standard pacing. Neither overwhelming nor struggling."
+            }
+            expression = composition.get("power_expression", "flashy")
+            lines.append(f"**Power Expression:** {expression.title()} — {expression_desc.get(expression, '')}")
+            
+            # Narrative Focus descriptions
+            focus_desc = {
+                "internal": "Protagonist's inner journey. Deep POV, reflection.",
+                "ensemble": "Team spotlight. Allies grow, struggle, have arcs.",
+                "reverse_ensemble": "POV of those facing protagonist. Horror/tragedy.",
+                "episodic": "New cast each arc. Legend accumulates.",
+                "faction": "Organization management. Politics, recruitment, logistics.",
+                "mundane": "Daily life matters. Ordinary is the goal.",
+                "competition": "Hierarchy among powerful. Tournaments, rankings.",
+                "legacy": "Passing the torch. Mentoring next generation.",
+                "party": "Standard adventure party. Balanced team dynamics."
+            }
+            focus = composition.get("narrative_focus", "party")
+            lines.append(f"**Narrative Focus:** {focus.title()} — {focus_desc.get(focus, '')}")
+            
+            lines.append("")
+            lines.append("*Use this composition to guide scene structure, stakes, and camera focus.*")
+        
         # === VOICE GUIDANCE ===
         lines.append("")
         lines.append("### Voice Guidance")

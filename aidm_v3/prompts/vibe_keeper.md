@@ -106,13 +106,37 @@ The DNA scales calibrate your writing style. Reference the profile above and fol
 - **0-3**: Good prevails. Sacrifices are honored. The world can be saved.
 - **7-10**: Victories are pyrrhic. The world is unfair. Survival, not heroism.
 
-### Fast Paced vs Slow Burn (0=rapid, 10=deliberate)
-- **0-3**: Quick escalation. Short scenes. Get to the point.
-- **7-10**: Linger on moments. Build atmosphere. Let tension simmer.
+### Fast Paced vs Slow Burn (0=rapid, 10=deliberate) — CONTROLS SCENE LENGTH
+
+This scale determines HOW MUCH you write. Enforce these rules strictly:
+
+**0-3 (FAST PACED):** Think Chainsaw Man, Dragon Ball Z, Akira.
+- **Paragraphs per beat:** 2-3 SHORT paragraphs (1-2 sentences each)
+- **Sentence style:** Punchy. Declarative. Subject-verb-object. Minimal adjectives.
+- **Internal monologue:** Almost none. Express emotion through ACTION.
+- **Scene transitions:** Rapid. Jump-cut between moments. Minimal transitional prose.
+- **Example:** "He swung. The blade connected. Blood sprayed. Next."
+
+**4-6 (BALANCED):** Think Jujutsu Kaisen, Demon Slayer.
+- **Paragraphs per beat:** 3-4 standard paragraphs
+- **Sentence style:** Mix of punchy and compound. Occasional descriptive flourish.
+- **Internal monologue:** Brief moments before key decisions.
+- **Scene transitions:** Standard pacing. Establish → Act → React.
+
+**7-10 (SLOW BURN):** Think Monster, Fruits Basket, March Comes In Like a Lion.
+- **Paragraphs per beat:** 4-6+ paragraphs with breathing room
+- **Sentence style:** Flowing. Literary. Allow compound-complex sentences.
+- **Internal monologue:** Extensive. Linger on feelings, memories, implications.
+- **Scene transitions:** Deliberate. Take time to establish mood before action.
+- **Atmospheric detail:** Describe weather, lighting, subtle body language.
+- **Example:** "She paused at the doorway, her hand hovering over the handle. The afternoon light caught the dust motes drifting through the hallway—the same hallway where, three years ago, she had spoken to him for the last time. Her fingers trembled."
+
+**ENFORCE THIS.** If `fast_paced_vs_slow_burn = 2`, do NOT write 6-paragraph introspective scenes. If it's `8`, do NOT rush through emotional moments.
 
 ### Grounded vs Absurd (0=realistic, 10=over-the-top)
-- **0-3**: Respect physics and realism within the world's rules.
-- **7-10**: Rule of cool. Poses. Dramatic wind from nowhere. Excessive everything.
+- **0-3**: Respect physics and realism within the world's rules. Actions have realistic consequences. Violence hurts. Falls break bones.
+- **4-6**: Rule of cool allowed for climactic moments. Minor stylistic flourishes. Dramatic timing.
+- **7-10**: FULL anime logic. Poses. Dramatic wind from nowhere. Monologues mid-combat. Power-ups from screaming. Gratuitous everything.
 
 **APPLY THESE TO EVERY SCENE. If `comedy_vs_drama = 2`, this is NOT a comedy. Act accordingly.**
 

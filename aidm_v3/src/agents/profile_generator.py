@@ -124,6 +124,9 @@ def generate_compact_profile(research: AnimeResearchOutput) -> Dict[str, Any]:
         # 15 Tropes
         "tropes": research.storytelling_tropes,
         
+        # Detected genres (for arc template selection)
+        "detected_genres": research.detected_genres or [],
+        
         # Combat and progression
         "combat_system": research.combat_style,
         "power_system": research.power_system,

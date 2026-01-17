@@ -61,6 +61,12 @@ class AnimeResearchOutput(BaseModel):
         description="15 storytelling tropes (enabled/disabled)"
     )
     
+    # Genre detection (for arc templates)
+    detected_genres: List[str] = Field(
+        default_factory=list,
+        description="Detected genres (primary + secondary): shonen, seinen, shoujo_romance, isekai, supernatural, etc."
+    )
+    
     # Combat style
     combat_style: str = Field(default="spectacle", description="tactical, spectacle, comedy, spirit, narrative")
     

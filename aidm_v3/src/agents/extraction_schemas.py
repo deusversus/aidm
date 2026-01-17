@@ -145,6 +145,29 @@ class SeriesAliasesExtract(BaseModel):
     alternate_titles: List[str] = Field(default_factory=list, description="Other known titles")
 
 
+class GenreDetectionExtract(BaseModel):
+    """Extracted genre classification for arc templates and narrative conventions.
+    
+    Valid genres (match rule_library/genres/ files):
+    - shonen, seinen, shoujo_romance, slice_of_life
+    - isekai, supernatural, mystery_thriller, horror
+    - mecha, scifi, sports, music, historical
+    - comedy, magical_girl
+    """
+    primary_genre: str = Field(
+        default="shonen", 
+        description="Main genre: shonen, seinen, shoujo_romance, isekai, supernatural, mystery_thriller, horror, mecha, scifi, sports, music, historical, comedy, magical_girl, slice_of_life"
+    )
+    secondary_genres: List[str] = Field(
+        default_factory=list,
+        description="1-2 secondary genres that blend with primary (e.g., supernatural + mystery_thriller)"
+    )
+    genre_reasoning: str = Field(
+        default="",
+        description="Brief explanation of genre classification"
+    )
+
+
 # =============================================================================
 # TOPIC-TO-SCHEMA MAPPING
 # =============================================================================
@@ -167,6 +190,7 @@ TOPIC_SCHEMAS: Dict[str, Type[BaseModel]] = {
 DERIVED_SCHEMAS = {
     "dna_scales": DNAScalesExtract,
     "tropes": StorytellingTropesExtract,
+    "genres": GenreDetectionExtract,
 }
 
 

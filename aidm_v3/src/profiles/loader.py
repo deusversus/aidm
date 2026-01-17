@@ -56,10 +56,160 @@ class NarrativeProfile:
     # Full profile path for deep lookup
     full_profile_path: Optional[str] = None
     
+    # Narrative Composition Layer (always-on 3-axis system)
+    # Derived from DNA scales if not explicitly set
+    composition: Optional[Dict[str, str]] = None
+    # composition = {
+    #   "tension_source": existential/relational/moral/burden/information/consequence/control
+    #   "power_expression": instantaneous/overwhelming/sealed/hidden/conditional/derivative/passive
+    #   "narrative_focus": internal/ensemble/reverse_ensemble/episodic/faction/mundane/competition/legacy
+    # }
+    
+    # Detected genres (for arc templates)
+    detected_genres: Optional[List[str]] = None
+    
     @property
     def combat_style(self) -> str:
         """Alias for combat_system (some code uses combat_style)."""
         return self.combat_system
+
+
+def derive_composition_from_dna(dna: Dict[str, int], tropes: Dict[str, bool] = None) -> Dict[str, str]:
+    """
+    Derive Narrative Composition (3-axis system) from DNA scales.
+    
+    This enables always-on narrative direction for ALL profiles, not just OP mode.
+    The derived composition guides both Director (arc planning) and KeyAnimator (scene framing).
+    
+    Args:
+        dna: Dictionary of DNA scales (0-10 each)
+        tropes: Optional dictionary of active tropes
+        
+    Returns:
+        Dictionary with tension_source, power_expression, narrative_focus
+    """
+    tropes = tropes or {}
+    
+    # Default composition
+    composition = {
+        "tension_source": "existential",  # Default fallback
+        "power_expression": "balanced",   # Neutral default
+        "narrative_focus": "party"        # Standard adventure party
+    }
+    
+    # =========================================================================
+    # TENSION SOURCE - What creates meaningful stakes?
+    # =========================================================================
+    hopeful_cynical = dna.get("hopeful_vs_cynical", 5)
+    comedy_drama = dna.get("comedy_vs_drama", 5)
+    power_fantasy = dna.get("power_fantasy_vs_struggle", 5)
+    introspection = dna.get("introspection_vs_action", 5)
+    
+    # Emotional tension: High introspection + drama-focused + hopeful
+    if introspection <= 4 and comedy_drama <= 4:
+        composition["tension_source"] = "relational"  # Fruits Basket, romance
+    
+    # Moral tension: Very cynical, focuses on right/wrong
+    elif hopeful_cynical >= 7 and power_fantasy <= 4:
+        composition["tension_source"] = "moral"  # Berserk, seinen moral grey
+    
+    # Existential tension: Low struggle, high cynical (nothing challenges)
+    elif power_fantasy <= 3:
+        composition["tension_source"] = "existential"  # One Punch Man
+    
+    # Consequence tension: Politics/faction tropes active
+    elif tropes.get("betrayal") or tropes.get("faction_politics"):
+        composition["tension_source"] = "consequence"  # Overlord, political
+    
+    # Control tension: Internal struggle tropes
+    elif tropes.get("berserker_mode") or tropes.get("corruption"):
+        composition["tension_source"] = "control"  # Mob Psycho, Naruto
+    
+    # Information tension: Mystery-focused
+    elif tropes.get("mystery") or comedy_drama >= 7:
+        composition["tension_source"] = "information"  # Death Note
+    
+    # Burden tension: Tragic backstory + high darkness
+    elif tropes.get("tragic_backstory") and hopeful_cynical >= 6:
+        composition["tension_source"] = "burden"  # Tokyo Ghoul
+    
+    # Default for standard adventure: existential (what does victory mean?)
+    # Already set
+    
+    # =========================================================================
+    # POWER EXPRESSION - How does power manifest?
+    # =========================================================================
+    grounded_absurd = dna.get("grounded_vs_absurd", 5)
+    tactical = dna.get("tactical_vs_instinctive", 5)
+    fast_slow = dna.get("fast_paced_vs_slow_burn", 5)
+    
+    # Instantaneous: Fast-paced + very absurd
+    if fast_slow <= 3 and grounded_absurd >= 7:
+        composition["power_expression"] = "instantaneous"  # One Punch Man
+    
+    # Sealed: Grounded + slow (holding back is emphasized)
+    elif grounded_absurd <= 3 and fast_slow >= 7:
+        composition["power_expression"] = "sealed"  # Mob Psycho
+    
+    # Hidden: Grounded + tactical (concealment is strategy)
+    elif grounded_absurd <= 4 and tactical <= 3:
+        composition["power_expression"] = "hidden"  # Solo Leveling early
+    
+    # Overwhelming: Absurd + serial (power grows over time)
+    elif grounded_absurd >= 6 and dna.get("episodic_vs_serialized", 5) >= 7:
+        composition["power_expression"] = "overwhelming"  # Slime, progression
+    
+    # Derivative: Faction/ensemble focused
+    elif dna.get("ensemble_vs_solo", 5) <= 3:
+        composition["power_expression"] = "derivative"  # Overlord (subordinates)
+    
+    # Conditional: Tactical + moderate grounding
+    elif tactical <= 4 and 4 <= grounded_absurd <= 7:
+        composition["power_expression"] = "conditional"  # JJK (technique rules)
+    
+    # Balanced: Default for most shonen/action
+    else:
+        composition["power_expression"] = "flashy"  # Standard anime action
+    
+    # =========================================================================
+    # NARRATIVE FOCUS - Whose story gets screen time?
+    # =========================================================================
+    ensemble_solo = dna.get("ensemble_vs_solo", 5)
+    episodic = dna.get("episodic_vs_serialized", 5)
+    
+    # Ensemble: Low solo score (team-focused)
+    if ensemble_solo <= 3:
+        composition["narrative_focus"] = "ensemble"  # One Piece, Fruits Basket
+    
+    # Solo/Internal: High solo + high introspection
+    elif ensemble_solo >= 7 and introspection <= 3:
+        composition["narrative_focus"] = "internal"  # Solo Leveling, internal journey
+    
+    # Episodic: High episodic score
+    elif episodic <= 3:
+        composition["narrative_focus"] = "episodic"  # Cowboy Bebop, Mushi-shi
+    
+    # Faction: Politics tropes + ensemble leaning
+    elif tropes.get("faction_politics") or tropes.get("nation_building"):
+        composition["narrative_focus"] = "faction"  # Overlord, Rimuru
+    
+    # Mundane: Slice of life tropes
+    elif tropes.get("slice_of_life") or (comedy_drama >= 7 and introspection <= 3):
+        composition["narrative_focus"] = "mundane"  # Saiki K, daily life
+    
+    # Competition: Tournament tropes
+    elif tropes.get("tournament_arc"):
+        composition["narrative_focus"] = "competition"  # Early DBZ, sports
+    
+    # Legacy: Mentor death + ensemble
+    elif tropes.get("mentor_death") and ensemble_solo <= 5:
+        composition["narrative_focus"] = "legacy"  # MHA, passing the torch
+    
+    # Party: Default for balanced ensemble/solo (standard adventure party)
+    else:
+        composition["narrative_focus"] = "party"  # Standard JRPG-style party
+    
+    return composition
 
 
 def load_profile(profile_id: str, fallback: bool = True) -> NarrativeProfile:
@@ -109,12 +259,23 @@ def load_profile(profile_id: str, fallback: bool = True) -> NarrativeProfile:
     if not data:
         raise ValueError(f"Empty profile: {profile_path}")
     
+    # Extract core data
+    dna = data.get('dna') or data.get('dna_scales', {})
+    tropes = data.get('tropes', {})
+    
+    # Get composition: use explicit if provided, otherwise derive from DNA
+    explicit_composition = data.get('composition')
+    if explicit_composition:
+        composition = explicit_composition
+    else:
+        composition = derive_composition_from_dna(dna, tropes)
+    
     return NarrativeProfile(
         id=data.get('id', profile_id),
         name=data.get('name', profile_id.title()),
         source=data.get('source', 'Unknown'),
-        dna=data.get('dna') or data.get('dna_scales', {}),
-        tropes=data.get('tropes', {}),
+        dna=dna,
+        tropes=tropes,
         combat_system=data.get('combat_system') or data.get('combat', {}).get('system', 'tactical'),
         power_system=data.get('power_system'),
         progression=data.get('progression'),
@@ -124,7 +285,9 @@ def load_profile(profile_id: str, fallback: bool = True) -> NarrativeProfile:
         series_group=data.get('series_group'),
         series_position=data.get('series_position'),
         series_parent=data.get('series_parent'),
-        full_profile_path=str(profile_path)
+        full_profile_path=str(profile_path),
+        composition=composition,
+        detected_genres=data.get('detected_genres', [])
     )
 
 
