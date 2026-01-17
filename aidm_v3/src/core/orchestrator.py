@@ -12,10 +12,8 @@ from ..profiles.loader import load_profile, NarrativeProfile
 from ..agents.director import DirectorAgent
 from .turn import TurnResult
 
-# Phase 2: Context Layer
 from ..context.memory import MemoryStore
 from ..context.rule_library import RuleLibrary
-from ..agents.sakuga import SakugaAgent
 from ..agents.validator import ValidatorAgent
 from ..agents.context_selector import ContextSelector
 from ..agents.combat import CombatAgent
@@ -74,7 +72,6 @@ class Orchestrator:
         self.intent_classifier = IntentClassifier()
         self.outcome_judge = OutcomeJudge()
         self.key_animator = KeyAnimator(self.profile)
-        self.sakuga = SakugaAgent()
         self.validator = ValidatorAgent()
         
         # Phase 4: Director
@@ -585,33 +582,24 @@ class Orchestrator:
             )
             current_turn.outcome = outcome
 
-        # 4. Generate narrative (Router: Sakuga vs Key Animator)
-        # Narrative Router Logic
+        # 4. Generate narrative (KeyAnimator with optional Sakuga Mode)
+        # Determine if this is a sakuga moment (climactic, high intensity)
         use_sakuga = False
         if outcome.narrative_weight == "climactic":
             use_sakuga = True
         elif intent.intent == "COMBAT" or outcome.calculated_roll >= 20: # Natural 20 or high
             use_sakuga = True
-            
-        if use_sakuga:
-            narrative = await self.sakuga.generate_scene(
-                turn=current_turn,
-                context={
-                    "profile_name": self.profile.name,
-                    "character_name": db_context.character_name,
-                    "location": db_context.location,
-                    "status": db_context.situation
-                }
-            )
-        else:
-            narrative = await self.key_animator.generate(
-                player_input=player_input,
-                intent=intent,
-                outcome=outcome,
-                context=db_context,
-                retrieved_context=rag_context,
-                handoff_transcript=handoff_transcript
-            )
+        
+        # Single narrative path - KeyAnimator handles both normal and sakuga modes
+        narrative = await self.key_animator.generate(
+            player_input=player_input,
+            intent=intent,
+            outcome=outcome,
+            context=db_context,
+            retrieved_context=rag_context,
+            handoff_transcript=handoff_transcript,
+            sakuga_mode=use_sakuga
+        )
         
         # DEBUG: Log narrative generation
         print(f"[Orchestrator] Narrative generated:")

@@ -238,6 +238,39 @@ Write vivid, anime-appropriate prose. End at a clear decision point if one exist
         
         return "\n".join(lines)
     
+    def _build_sakuga_injection(self) -> str:
+        """Build the sakuga mode injection for high-intensity climactic scenes."""
+        return """
+## 🎬 SAKUGA MODE ACTIVE
+
+This is a CLIMACTIC moment. Unleash the full animation budget:
+
+### Choreography Over Action
+- Don't just say "He punched him"
+- Describe the shift in weight, the blur of motion, the shockwave of impact
+- Treat the text like a storyboard for an animation
+
+### Sensory Overload
+- **Visuals:** Lighting changes, color shifts (auras), speed lines
+- **Audio:** The sound of breaking bone, the high-pitch whine of energy charging
+- **Physical:** The heat, the wind pressure, the vibration
+
+### Pacing Control
+- Use short, punchy sentences for speed
+- Use long, flowing sentences for buildup
+- Use `---` dividers for "impact frame" frozen moments of extreme detail
+
+### No Mechanical Talk
+- Never mention HP, damage numbers, or dice
+- "Critical Hit" → "A devastating blow that shatters defenses"
+- "Miss" → "A hair's breadth dodge, the wind of the attack cutting the cheek"
+
+### Profile Adherence
+- Match the power system and visual language of this anime
+- Use the DNA scales to calibrate the intensity
+
+"""
+    
     async def generate(
         self,
         player_input: str,
@@ -245,7 +278,8 @@ Write vivid, anime-appropriate prose. End at a clear decision point if one exist
         outcome: OutcomeOutput,
         context: GameContext,
         retrieved_context: Optional[dict] = None,
-        handoff_transcript: list = None
+        handoff_transcript: list = None,
+        sakuga_mode: bool = False
     ) -> str:
         """Generate narrative prose for this turn.
         
@@ -257,6 +291,7 @@ Write vivid, anime-appropriate prose. End at a clear decision point if one exist
             retrieved_context: RAG context (memories, rules)
             handoff_transcript: Full Session Zero dialogue for voice/tone continuity (first turn only)
                                Contains Phase 5 opening scene as the last assistant message.
+            sakuga_mode: If True, inject high-intensity sakuga guidance for climactic moments
             
         Returns:
             Generated narrative prose
@@ -303,6 +338,14 @@ the SAME narrative voice, the SAME style. Do NOT restart or re-describe the scen
         director_notes = getattr(context, "director_notes", None) or "(No specific guidance this turn)"
         prompt = prompt.replace("{{DIRECTOR_NOTES_INJECTION}}", director_notes)
         
+        # SAKUGA MODE: Inject high-intensity guidance for climactic moments
+        if sakuga_mode:
+            sakuga_injection = self._build_sakuga_injection()
+            prompt = prompt.replace("{{SAKUGA_MODE_INJECTION}}", sakuga_injection)
+            print("[KeyAnimator] SAKUGA MODE ACTIVE - injecting high-intensity guidance")
+        else:
+            prompt = prompt.replace("{{SAKUGA_MODE_INJECTION}}", "")
+        
         # Inject RAG context (granular)
         memories_text = ""
         chunks_text = ""
@@ -341,12 +384,15 @@ the SAME narrative voice, the SAME style. Do NOT restart or re-describe the scen
         settings = get_settings_store().load()
         use_extended_thinking = settings.extended_thinking
         
+        # Adjust temperature for sakuga mode (higher for more creative flair)
+        temperature = 0.85 if sakuga_mode else 0.7
+        
         response = await self.provider.complete(
             messages=messages,
             system=prompt,
             model=self.model,
             max_tokens=8192,  # High limit for full narrative; anthropic_provider adds more if extended_thinking
-            temperature=0.7,
+            temperature=temperature,
             extended_thinking=use_extended_thinking
         )
         

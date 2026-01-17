@@ -86,6 +86,8 @@ Your responses MUST be beautifully formatted. Create visual hierarchy and breath
 
 {{DIRECTOR_NOTES_INJECTION}}
 
+{{SAKUGA_MODE_INJECTION}}
+
 {{RETRIEVED_CHUNKS_INJECTION}}
 
 {{MEMORIES_INJECTION}}

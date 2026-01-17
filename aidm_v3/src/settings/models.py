@@ -26,7 +26,7 @@ class AgentSettings(BaseModel):
     
     Agent Tiers:
     - FAST: intent_classifier, outcome_judge, validator, memory_ranker, 
-      context_selector, sakuga, combat, progression, scale_selector, 
+      context_selector, combat, progression, scale_selector, 
       npc_reaction, relationship_analyzer, session_zero
     - THINKING: director, research
     - CREATIVE: key_animator, calibration (prose generation)
@@ -93,10 +93,6 @@ class AgentSettings(BaseModel):
     npc_reaction: Optional[ModelConfig] = Field(
         default=None,
         description="Model for NPC disposition changes (balanced model preferred)"
-    )
-    sakuga: Optional[ModelConfig] = Field(
-        default=None,
-        description="Model for epic moment detection (fast model preferred)"
     )
     calibration: Optional[ModelConfig] = Field(
         default=None,
