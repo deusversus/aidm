@@ -28,6 +28,18 @@ class ToneExtract(BaseModel):
     optimism: int = Field(default=5, ge=0, le=10, description="0=cynical, 10=hopeful")
 
 
+class WorldTierExtract(BaseModel):
+    """Extracted world power tier data."""
+    world_tier: str = Field(
+        default="T8", 
+        description="Typical power tier for characters in this anime (T10=human, T8=street, T6=city, T4=planet, T2=multiverse)"
+    )
+    tier_reasoning: str = Field(
+        default="", 
+        description="Brief explanation of why this tier was chosen based on character feats"
+    )
+
+
 class DNAScalesExtract(BaseModel):
     """Extracted narrative DNA scales (0-10)."""
     introspection_vs_action: int = Field(default=5, ge=0, le=10, description="0=internal/thoughtful, 10=external/action")
@@ -187,10 +199,11 @@ def build_bundle_schema(topics: List[str]) -> Type[BaseModel]:
         else:
             print(f"[ExtractionSchemas] Warning: Unknown topic '{topic}'")
     
-    # Also include DNA scales and tropes when tone is in the bundle
+    # Also include DNA scales, tropes, and world_tier when tone is in the bundle
     if "tone" in topics:
         fields["dna_scales"] = (DNAScalesExtract, Field(default_factory=DNAScalesExtract))
         fields["tropes"] = (StorytellingTropesExtract, Field(default_factory=StorytellingTropesExtract))
+        fields["world_tier"] = (WorldTierExtract, Field(default_factory=WorldTierExtract))
     
     return create_model("BundleExtract", **fields)
 
@@ -221,6 +234,17 @@ def get_extraction_prompt(topics: List[str], anime_name: str) -> str:
   - comedy_level: How comedic is the series? (0=dead serious like Monster, 10=pure comedy like Gintama)
   - darkness_level: How dark/grim is the content? (0=lighthearted like K-On, 10=grimdark like Berserk)
   - optimism: How hopeful is the worldview? (0=cynical/nihilistic, 10=idealistic/uplifting)
+
+- **world_tier**: The typical power tier for MOST characters in this anime world:
+  - world_tier: Use VS Battles tiering (T10=human, T9=street, T8=building, T7=city block, T6=city, T5=island, T4=planet, T3=universe, T2=multiverse)
+  - tier_reasoning: Brief explanation based on character feats (e.g., "JJK sorcerers can level buildings, top-tiers threaten cities")
+  
+  Examples:
+  - Death Note: T10 (normal humans, no supernatural combat)
+  - Demon Slayer: T8-T9 (wall-level to building-level combat)
+  - Jujutsu Kaisen: T7-T6 (city block to city level for top sorcerers)
+  - Dragon Ball Z: T4-T3 (planet to universe level)
+  - Record of Ragnarok: T2-T1 (gods vs multiversal threats)
 
 - **dna_scales**: Rate each narrative dimension 0-10 based on the research:
   - introspection_vs_action: 0=internal monologue focus, 10=pure action sequences

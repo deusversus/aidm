@@ -70,6 +70,9 @@ class AnimeResearchOutput(BaseModel):
         description="comedy_level, darkness_level, optimism"
     )
     
+    # World Tier (typical power level for characters in this anime)
+    world_tier: str = Field(default="T8", description="Typical power tier (T10=human, T8=street, T6=city, T4=planet, T2=multiverse)")
+    
     # Raw Content (for RAG)
     raw_content: Optional[str] = Field(default=None, description="The full research text from Pass 1")
     
@@ -582,6 +585,11 @@ Return ONLY the title.'''
                     "darkness_level": getattr(t, 'darkness_level', 5),
                     "optimism": getattr(t, 'optimism', 5)
                 }
+            
+            # World Tier (LLM-researched based on character feats)
+            if hasattr(extracted, 'world_tier') and extracted.world_tier:
+                wt = extracted.world_tier
+                output.world_tier = getattr(wt, 'world_tier', 'T8')
             
             # DNA Scales
             if hasattr(extracted, 'dna_scales') and extracted.dna_scales:

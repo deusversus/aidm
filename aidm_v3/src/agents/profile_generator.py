@@ -118,8 +118,8 @@ def generate_compact_profile(research: AnimeResearchOutput) -> Dict[str, Any]:
         # 11 DNA Scales
         "dna_scales": research.dna_scales,
         
-        # World Tier (inferred from DNA scales and tone)
-        "world_tier": _infer_world_tier(research),
+        # World Tier (LLM-researched, or inferred as fallback)
+        "world_tier": research.world_tier if research.world_tier != "T8" else _infer_world_tier(research),
         
         # 15 Tropes
         "tropes": research.storytelling_tropes,
