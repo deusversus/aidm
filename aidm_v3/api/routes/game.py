@@ -20,6 +20,7 @@ from src.agents.progress import ProgressTracker, ProgressPhase
 from src.settings import get_settings_store
 from src.db.session import init_db
 from src.db.session_store import get_session_store
+from src.db.models import Character, NPC, Faction, WorldState
 
 router = APIRouter()
 
@@ -345,6 +346,147 @@ async def delete_session(session_id: str):
         "custom_folder_deleted": folder_deleted,
         "memory_deleted": memory_deleted
     }
+
+
+# === SIDEBAR API ENDPOINTS ===
+
+@router.get("/character-status", response_model=CharacterStatusResponse)
+async def get_character_status():
+    """Get current character status for sidebar."""
+    try:
+        orchestrator = get_orchestrator()
+    except HTTPException:
+        raise HTTPException(status_code=404, detail="No active campaign")
+    
+    campaign_id = orchestrator.campaign_id
+    db = orchestrator.db
+    
+    character = db.query(Character).filter_by(campaign_id=campaign_id).first()
+    
+    if not character:
+        raise HTTPException(status_code=404, detail="No character found")
+    
+    return CharacterStatusResponse(
+        name=character.name,
+        level=character.level,
+        xp_current=character.xp_current,
+        xp_to_next=character.xp_to_next_level,
+        hp_current=character.hp_current,
+        hp_max=character.hp_max,
+        mp_current=character.mp_current,
+        mp_max=character.mp_max,
+        sp_current=character.sp_current,
+        sp_max=character.sp_max,
+        stats=character.stats or {},
+        power_tier=character.power_tier or "T10",
+        abilities=character.abilities or [],
+        character_class=character.character_class
+    )
+
+
+@router.get("/npcs", response_model=NPCListResponse)
+async def get_npcs():
+    """Get NPC list for relationship tracker."""
+    try:
+        orchestrator = get_orchestrator()
+    except HTTPException:
+        raise HTTPException(status_code=404, detail="No active campaign")
+    
+    campaign_id = orchestrator.campaign_id
+    db = orchestrator.db
+    
+    npcs = db.query(NPC).filter_by(campaign_id=campaign_id).all()
+    
+    return NPCListResponse(
+        npcs=[
+            NPCInfo(
+                id=npc.id,
+                name=npc.name,
+                role=npc.role,
+                affinity=npc.affinity,
+                disposition=npc.disposition,
+                faction=npc.faction,
+                last_appeared=npc.last_appeared
+            )
+            for npc in npcs
+        ]
+    )
+
+
+@router.get("/factions", response_model=FactionListResponse)
+async def get_factions():
+    """Get faction list for reputation tracker."""
+    try:
+        orchestrator = get_orchestrator()
+    except HTTPException:
+        raise HTTPException(status_code=404, detail="No active campaign")
+    
+    campaign_id = orchestrator.campaign_id
+    db = orchestrator.db
+    
+    factions = db.query(Faction).filter_by(campaign_id=campaign_id).all()
+    
+    def get_relationship(f):
+        if f.pc_reputation >= 500: return "allied"
+        if f.pc_reputation >= 200: return "friendly"
+        if f.pc_reputation >= -200: return "neutral"
+        if f.pc_reputation >= -500: return "unfriendly"
+        return "enemy"
+    
+    return FactionListResponse(
+        factions=[
+            FactionInfo(
+                id=f.id,
+                name=f.name,
+                pc_reputation=f.pc_reputation,
+                pc_rank=f.pc_rank,
+                pc_is_member=f.pc_is_member,
+                relationship_to_pc=get_relationship(f)
+            )
+            for f in factions
+        ]
+    )
+
+
+@router.get("/quests", response_model=QuestListResponse)
+async def get_quests():
+    """Get active quests for objective tracker."""
+    try:
+        orchestrator = get_orchestrator()
+    except HTTPException:
+        raise HTTPException(status_code=404, detail="No active campaign")
+    
+    campaign_id = orchestrator.campaign_id
+    db = orchestrator.db
+    
+    character = db.query(Character).filter_by(campaign_id=campaign_id).first()
+    world_state = db.query(WorldState).filter_by(campaign_id=campaign_id).first()
+    
+    quests = []
+    if character:
+        if character.short_term_goal:
+            quests.append(QuestInfo(
+                name="Current Objective",
+                description=character.short_term_goal,
+                status="active"
+            ))
+        if character.long_term_goal:
+            quests.append(QuestInfo(
+                name="Ultimate Goal",
+                description=character.long_term_goal,
+                status="active"
+            ))
+        for goal in (character.narrative_goals or []):
+            quests.append(QuestInfo(
+                name=goal.get("name", "Quest") if isinstance(goal, dict) else "Quest",
+                description=goal.get("description", str(goal)) if isinstance(goal, dict) else str(goal),
+                status=goal.get("status", "active") if isinstance(goal, dict) else "active"
+            ))
+    
+    return QuestListResponse(
+        quests=quests,
+        current_arc=world_state.arc_name if world_state else None
+    )
 
 
 @router.post("/session/{session_id}/turn", response_model=SessionZeroResponse)
