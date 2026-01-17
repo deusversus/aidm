@@ -81,3 +81,55 @@ aliases:
 - モブサイコ100
 series_group: mob_psycho_100
 series_position: 1
+
+# IP Authenticity Fields (backfilled)
+detected_genres:
+  - shonen
+  - comedy
+  - supernatural
+
+voice_cards:
+  - name: "Shigeo Kageyama (Mob)"
+    speech_patterns: "Monotone, simple, earnest. Says exactly what he means with no flair."
+    humor_type: "Deadpan reactions to absurdity, social awkwardness"
+    dialogue_rhythm: "Flat delivery → genuine emotional outburst at 100%"
+    emotional_expression: "Repressed emotions build to explosive release"
+  - name: "Reigen Arataka"
+    speech_patterns: "Confident BS, self-help platitudes, surprisingly wise. Greatest psychic of the 21st century!"
+    humor_type: "Con man confidence, accidental success, life advice that's actually good"
+    dialogue_rhythm: "Exaggerated claims → genuine care slipping through"
+    emotional_expression: "Fake everything except love for Mob"
+  - name: "Dimple"
+    speech_patterns: "Scheming, possessive, grudging friendship. World domination dreams."
+    humor_type: "Evil spirit doing mundane things, ghost possession comedy"
+    dialogue_rhythm: "Plotting → reluctant heroism"
+    emotional_expression: "Denial of friendship → sacrificial devotion"
+  - name: "Ritsu Kageyama"
+    speech_patterns: "Polite, perfectionist, hidden inferiority complex about brother."
+    humor_type: "Straight-laced contrast to chaos, faking normality"
+    dialogue_rhythm: "Perfect student → dark side emerges"
+    emotional_expression: "Jealousy transforms to admiration"
+  - name: "Teruki Hanazawa"
+    speech_patterns: "Arrogant early, humbled later. Still dramatic but self-aware now."
+    humor_type: "Wig jokes, redemption arc comedy"
+    dialogue_rhythm: "Grandiose → embarrassed when reminded of past"
+    emotional_expression: "Ego shattered into genuine growth"
+
+author_voice:
+  sentence_patterns:
+    - "Emotion percentage counters build tension"
+    - "Psychic battles as emotional metaphors"
+    - "ONE's simple profound observations"
+  structural_motifs:
+    - "100% as emotional climax"
+    - "Self-improvement over raw power"
+    - "Adults can be wrong and grow too"
+  dialogue_quirks:
+    - "Mob: 100% (Emotion)"
+    - "Reigen's life advice being accidentally wise"
+    - "???% as ominous mystery"
+  emotional_rhythm:
+    - "Comedy builds to devastating emotional peak"
+    - "OP protagonist whose real weakness is social"
+    - "Everyone deserves to grow, even villains"
+  example_voice: "'Being strong doesn't mean you can do whatever you want.' Mob's power surged, but his voice stayed quiet. 'It means protecting the people who can't.'"

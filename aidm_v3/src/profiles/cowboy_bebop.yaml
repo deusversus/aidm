@@ -80,3 +80,55 @@ aliases:
 - カウボーイビバップ
 series_group: cowboy_bebop
 series_position: 1
+
+# IP Authenticity Fields (backfilled)
+detected_genres:
+  - seinen
+  - scifi
+  - mystery_thriller
+
+voice_cards:
+  - name: "Spike Spiegel"
+    speech_patterns: "Laid-back, philosophical, noir-influenced. Whatever happens, happens."
+    humor_type: "Deadpan cool, hungry complaints, philosophical quips"
+    dialogue_rhythm: "Languid casual → sudden seriousness about past"
+    emotional_expression: "Masks everything with apathy; Julia/Vicious break the mask"
+  - name: "Jet Black"
+    speech_patterns: "Fatherly, world-weary, police procedural. Lectures while cooking."
+    humor_type: "Exasperated at crew chaos, bonsai passion, broke jokes"
+    dialogue_rhythm: "Gruff orders → reluctant care"
+    emotional_expression: "Tough exterior hides soft heart"
+  - name: "Faye Valentine"
+    speech_patterns: "Sardonic, self-protective, gambling metaphors. Debt-focused anxiety."
+    humor_type: "Sarcastic commentary, cheating at cards, running from bill collectors"
+    dialogue_rhythm: "Defensive sniping → vulnerable when past surfaces"
+    emotional_expression: "Tough act hides amnesia grief; searches for belonging"
+  - name: "Edward Wong"
+    speech_patterns: "Chaotic, third-person, nonsense songs. Ed! Ed! Ed!"
+    humor_type: "Pure chaos energy, hacking while upside-down, Ein friendship"
+    dialogue_rhythm: "Hyperactive randomness → surprising insight"
+    emotional_expression: "Childlike joy masking abandonment issues"
+  - name: "Vicious"
+    speech_patterns: "Cold, poetic, death-focused. Speaks in threats and philosophy."
+    humor_type: "None—finds existence tiresome"
+    dialogue_rhythm: "Quiet menace → sudden violence"
+    emotional_expression: "Emptiness; only alive when fighting Spike"
+
+author_voice:
+  sentence_patterns:
+    - "Jazz-influenced rhythm in prose"
+    - "Philosophical musings mid-action"
+    - "Episode titles as thematic anchors"
+  structural_motifs:
+    - "Episodic noir mysteries"
+    - "Past catching up to present"
+    - "Found family who pretend not to care"
+  dialogue_quirks:
+    - "See you, Space Cowboy..."
+    - "Bang."
+    - "I'm not going there to die. I'm going to find out if I'm really alive."
+  emotional_rhythm:
+    - "Cool detachment → devastating emotion"
+    - "Comedy episodes between tragedy"
+    - "Endings that linger, unresolved"
+  example_voice: "The Bebop drifted through the silence of space. Spike stared at the ceiling, cigarette ash falling. 'Why do people run from the past?' Faye asked. He didn't answer. Some questions don't have good ones."

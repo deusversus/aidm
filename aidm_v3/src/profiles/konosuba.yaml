@@ -83,3 +83,55 @@ aliases:
 - この素晴らしい世界に祝福を！
 series_group: konosuba
 series_position: 1
+
+# IP Authenticity Fields (backfilled)
+detected_genres:
+  - isekai
+  - comedy
+  - ecchi
+
+voice_cards:
+  - name: "Kazuma Satou"
+    speech_patterns: "Cynical, pervy, gender equality advocate. Tsukkomi to everyone's boke."
+    humor_type: "Straight man reactions, shameless opportunism, steal!"
+    dialogue_rhythm: "Exasperated yelling → reluctant heroism"
+    emotional_expression: "Cares deeply, pretends not to"
+  - name: "Aqua"
+    speech_patterns: "Arrogant, whiny, party tricks goddess. I'm a goddess!"
+    humor_type: "Crying dramatically, useless despite power, debt spiral"
+    dialogue_rhythm: "Haughty → pathetic sobbing instantly"
+    emotional_expression: "Peak comedy; genuinely powerful when it matters"
+  - name: "Megumin"
+    speech_patterns: "Chuunibyou dramatic, explosion obsessed. My name is Megumin!"
+    humor_type: "Explosion addiction, falling over after one spell, naming conventions"
+    dialogue_rhythm: "Dramatic chuuni speech → exhausted collapse"
+    emotional_expression: "Pride in uselessness; caring buried under explosions"
+  - name: "Darkness (Lalatina)"
+    speech_patterns: "Noble facade, secretly masochistic. Inappropriate excitement in danger."
+    humor_type: "Getting turned on at wrong times, horrible aim"
+    dialogue_rhythm: "Elegant → blushing excitement at punishment"
+    emotional_expression: "Tank who wants to be hit; genuine nobility underneath"
+  - name: "Wiz"
+    speech_patterns: "Soft-spoken, business failure, apologetic lich."
+    humor_type: "Store never profits, accidentally overpowered, kind undead"
+    dialogue_rhythm: "Gentle explanations → accidentally terrifying"
+    emotional_expression: "Sweetest lich ever; cries when yelled at"
+
+author_voice:
+  sentence_patterns:
+    - "Tsukkomi reactions as punctuation"
+    - "Failed attacks described dramatically then undermined"
+    - "RPG mechanics played for comedy"
+  structural_motifs:
+    - "Quest goes wrong in stupid ways"
+    - "Useless goddess usefully useless"
+    - "Dysfunctional party somehow wins"
+  dialogue_quirks:
+    - "EXPLOSION!"
+    - "Hai, Kazuma desu."
+    - "Eris pads her chest!"
+  emotional_rhythm:
+    - "Setup → punchline every scene"
+    - "Genuine moments buried in comedy"
+    - "Found family of idiots"
+  example_voice: "'EXPLOOOOSION!' The castle crumbled. Megumin collapsed. 'Beautiful,' she whispered, smoke rising from the crater. Kazuma looked at the quest failure notice. 'We were supposed to PROTECT that castle.'"

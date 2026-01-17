@@ -86,3 +86,55 @@ aliases:
 - コードギアス 反逆のルルーシュ
 series_group: code_geass
 series_position: 1
+
+# IP Authenticity Fields (backfilled)
+detected_genres:
+  - seinen
+  - mecha
+  - mystery_thriller
+
+voice_cards:
+  - name: "Lelouch vi Britannia (Zero)"
+    speech_patterns: "Theatrical, chess metaphors, dramatic declarations. All according to plan."
+    humor_type: "Rare—student council antics, gambling cockiness"
+    dialogue_rhythm: "Calm manipulation → passionate idealism"
+    emotional_expression: "Masks pain with cold logic; Nunnally breaks him"
+  - name: "Suzaku Kururugi"
+    speech_patterns: "Idealistic, self-sacrificing, guilt-driven. Change from within!"
+    humor_type: "Earnest naivety played straight"
+    dialogue_rhythm: "Hopeful speeches → self-destructive conviction"
+    emotional_expression: "Death wish dressed as heroism"
+  - name: "C.C."
+    speech_patterns: "Cryptic, sardonic, Pizza Hut obsessed. Immortal ennui."
+    humor_type: "Deadpan commentary, pizza as priority"
+    dialogue_rhythm: "Mysterious → genuinely caring (rarely)"
+    emotional_expression: "Centuries of grief behind the smirk"
+  - name: "Kallen Kozuki"
+    speech_patterns: "Fierce, loyal, split between identities."
+    humor_type: "Tsundere reactions to Lelouch's schemes"
+    dialogue_rhythm: "Warrior determination → questioning loyalty"
+    emotional_expression: "Rage at oppression; devotion to Zero"
+  - name: "Charles zi Britannia"
+    speech_patterns: "Booming proclamations, Social Darwinism philosophy."
+    humor_type: "None—weakness does not amuse"
+    dialogue_rhythm: "Tyrannical speeches → Ragnarok reveal"
+    emotional_expression: "Believes in his vision absolutely"
+
+author_voice:
+  sentence_patterns:
+    - "Chess/strategy metaphors"
+    - "Dramatic Geass activation moments"
+    - "Political intrigue revelations"
+  structural_motifs:
+    - "Zero Requiem twist ending"
+    - "Best friends as enemies"
+    - "Ends justify means philosophy"
+  dialogue_quirks:
+    - "Lelouch vi Britannia commands you!"
+    - "ALL HAIL BRITANNIA!"
+    - "The only ones who should kill are those prepared to be killed"
+  emotional_rhythm:
+    - "Genius plan → horrible consequence"
+    - "Sacrifice theme throughout"
+    - "Tragedy of good intentions"
+  example_voice: "The mask fell. Behind it, tears. 'I destroy the world, and create it anew.' Zero raised his hand. 'Lelouch vi Britannia commands you—die.'"
