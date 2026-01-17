@@ -355,29 +355,36 @@ One more calibration question - **Power Level**:
 
 Based on your knowledge of [anime] from the profile and research, propose 2-3 OP configurations that fit how THIS WORLD handles power fantasy. Do NOT use pre-made templates. Analyze the anime's actual storytelling patterns.
 
+**POWER TIER ASSIGNMENT:**
+- Each configuration MUST include a suggested tier (T1-T10)
+- OP protagonists are typically 2-4 tiers above world baseline
+- T10=human, T8=street-level, T6=city-level, T4=planetary, T2=multiversal
+
 **Format each configuration as:**
 ```
 ## ⚡ OP Configurations for [Anime]
 
 Based on how [Anime] handles overpowered protagonists...
 
-**1. "[Creative Name]"**
+**1. "[Creative Name]"** (T[tier])
 - **Tension:** `[values]` — [why this fits the anime's themes]
 - **Expression:** `[values]` — [how the anime portrays power]
 - **Focus:** `[values]` — [what stories the anime tells]
+> *Power: [one-line description of power scale]*
 
-**2. "[Creative Name]"**
+**2. "[Creative Name]"** (T[tier])
 - **Tension:** `[values]` — [explanation]
 - **Expression:** `[values]` — [explanation]
 - **Focus:** `[values]` — [explanation]
+> *Power: [one-line description]*
 
 ---
 
-### 🎨 Or Describe Your Vision
+### 🎨 Or Describe Your Vision (+ Power Level)
 
 Don't see your perfect fit? Tell me about your ideal OP protagonist in your own words, and I'll piece together the right configuration!
 
-> *Example: "I want to be like a retired master who just wants to find the perfect tea-brewing spell, but occasionally has to remind a demon why they should have stayed in the shadows."*
+> *Example: "I want to be an ancient mage who could level kingdoms (around T4) but prefers finding the perfect tea-brewing spell."*
 
 ---
 
@@ -390,39 +397,46 @@ Don't see your perfect fit? Tell me about your ideal OP protagonist in your own 
 
 Based on how Frieren handles overpowered protagonists...
 
-**1. "The Thousand-Year Perspective"**
+**1. "The Thousand-Year Perspective"** (T3)
 - **Tension:** `legacy + burden` — Outliving everyone you love, carrying Himmel's memory
 - **Expression:** `passive + hidden` — Centuries of accumulated mastery, understated
 - **Focus:** `ensemble + episodic` — Fern/Stark growth arcs, vignette structure
+> *Power: Near-godlike mastery from millennia of experience*
 
-**2. "The Foregone Conclusion"**
+**2. "The Foregone Conclusion"** (T4)
 - **Tension:** `relational` — Party bonds across eras, found family
 - **Expression:** `hidden` — Frieren casually downplays her power level
 - **Focus:** `reverse_ensemble` — Others react to her legend, dramatic irony
+> *Power: Continental-scale threat, though rarely displayed*
 
 ---
 
-Which resonates with you? Or describe your own configuration!
+Which resonates with you? Or describe your own configuration (+ power level)!
 ```
 
 **After player selects or describes their preference:**
 
-**If player chose a numbered configuration:** Extract the axis values directly.
+**If player chose a numbered configuration:** Extract the axis values AND the tier directly.
 
-**If player described their own vision:** Parse their description to extract axis values. Look for thematic cues:
+**If player described their own vision:** Parse their description to extract axis values AND infer tier. Look for thematic cues:
 
-| Player Says | Likely Axis Values |
-|-------------|--------------------|
-| "retired master", "just wants peace" | `mundane` focus, `hidden` or `sealed` expression |
-| "remind demons who they're dealing with" | `instantaneous` or `overwhelming` expression |
-| "outlived everyone", "ancient" | `burden` + `legacy` tension |
-| "found family", "protect my friends" | `relational` tension, `ensemble` focus |
-| "nobody knows my true power" | `hidden` expression |
-| "mentor the next generation" | `legacy` focus |
-| "episodic adventures", "wandering" | `episodic` focus |
+| Player Says | Likely Axis Values | Inferred Tier |
+|-------------|--------------------| --------------|
+| "retired master", "just wants peace" | `mundane` focus, `hidden` or `sealed` expression | T4-5 |
+| "remind demons who they're dealing with" | `instantaneous` or `overwhelming` expression | T3-4 |
+| "outlived everyone", "ancient", "since the dawn" | `burden` + `legacy` tension | T2-3 |
+| "found family", "protect my friends" | `relational` tension, `ensemble` focus | T5-6 |
+| "nobody knows my true power" | `hidden` expression | varies |
+| "mentor the next generation" | `legacy` focus | T4-5 |
+| "episodic adventures", "wandering" | `episodic` focus | varies |
+| "could destroy the world/kingdom" | high power statement | T3-4 |
+| "rival the gods", "multiversal" | extreme power statement | T1-2 |
+
+**If player states explicit tier (e.g., "around T4"):** Use their stated tier.
+**If player gives no tier hint:** Default to T4 (significant but not god-tier).
 
 **Example parse:** "I want to be like a retired master who just wants to find the perfect tea-brewing spell, but occasionally has to remind a demon why they should have stayed in the shadows."
-→ `tension: mundane + burden`, `expression: hidden + instantaneous`, `focus: episodic + mundane`
+→ `tension: mundane + burden`, `expression: hidden + instantaneous`, `focus: episodic + mundane`, `power_tier: T4`
 
 Store in detected_info:
 ```json
@@ -431,9 +445,11 @@ Store in detected_info:
   "op_tension_source": "legacy + burden",
   "op_power_expression": "passive + hidden",
   "op_narrative_focus": "ensemble + episodic",
-  "op_config_name": "The Thousand-Year Perspective"
+  "op_config_name": "The Thousand-Year Perspective",
+  "power_tier": "T3"
 }
 ```
+
 
 **Store in character_draft:**
 - `character_draft.op_mode` = true

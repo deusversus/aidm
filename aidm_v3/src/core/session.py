@@ -156,6 +156,9 @@ class CharacterDraft:
     op_narrative_focus: Optional[str] = None     # internal, ensemble, reverse_ensemble, episodic, faction, mundane, competition, legacy
     op_preset: Optional[str] = None              # Optional preset name (bored_god, hidden_ruler, etc.)
     
+    # Power Tier (from OP mode or profile)
+    power_tier: Optional[str] = None             # e.g., "T3", "T6" - defaults based on OP mode/world
+    
     # Phase 1: Concept
     concept: Optional[str] = None  # The "big idea" tagline
     
@@ -198,6 +201,7 @@ class CharacterDraft:
             "op_power_expression": self.op_power_expression,
             "op_narrative_focus": self.op_narrative_focus,
             "op_preset": self.op_preset,
+            "power_tier": self.power_tier,
             "concept": self.concept,
             "name": self.name,
             "age": self.age,
@@ -235,6 +239,7 @@ class CharacterDraft:
             op_power_expression=data.get("op_power_expression"),
             op_narrative_focus=data.get("op_narrative_focus"),
             op_preset=data.get("op_preset") or data.get("op_archetype"),  # Migration: use archetype as preset
+            power_tier=data.get("power_tier"),
             concept=data.get("concept"),
             name=data.get("name"),
             age=data.get("age"),

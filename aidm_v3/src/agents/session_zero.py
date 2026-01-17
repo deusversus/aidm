@@ -203,6 +203,8 @@ def apply_detected_info(session: Session, detected: Dict[str, Any]) -> None:
         "backstory": "backstory",
         "starting_location": "starting_location",
         "location": "starting_location",
+        # Power Tier
+        "power_tier": "power_tier",
     }
     
     for key, value in detected.items():

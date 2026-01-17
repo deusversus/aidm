@@ -1037,14 +1037,27 @@ I found several entries in the **{media_ref}** franchise:
 
                 
                 # 1. Update Character
+                # Determine power tier from Session Zero
+                # Priority: explicit power_tier > OP inference > world_tier > T10
+                if draft.power_tier:
+                    final_tier = draft.power_tier
+                elif draft.op_protagonist_enabled:
+                    # OP mode but no explicit tier - use world tier - 4 (significant above baseline)
+                    world_tier = session.phase_state.get("profile_data", {}).get("world_tier", "T10")
+                    tier_num = int(world_tier.replace("T", ""))
+                    final_tier = f"T{max(1, tier_num - 4)}"
+                else:
+                    final_tier = session.phase_state.get("profile_data", {}).get("world_tier", "T10")
+                
                 orchestrator.state.update_character(
                     name=draft.name or "Unnamed Protagonist",
                     level=1, # Default start
                     hp_current=draft.resources.get("HP", 100),
                     hp_max=draft.resources.get("HP", 100),
-                    power_tier=draft.attributes.get("power_tier", "T10"),
+                    power_tier=final_tier,
                     abilities=draft.skills
                 )
+                print(f"[Handoff] Power tier set to: {final_tier}")
                 
                 # 2. Update World State (Location)
                 if draft.starting_location:

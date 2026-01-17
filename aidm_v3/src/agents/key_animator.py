@@ -205,6 +205,15 @@ Write vivid, anime-appropriate prose. End at a clear decision point if one exist
             lines.append("Use these notes to guide the narrative pacing and foreshadowing:")
             lines.append(context.director_notes)
         
+        # OP Mode: Suppress tier mismatch validation
+        if context.op_protagonist_enabled:
+            lines.append("")
+            lines.append("### ⚡ OP MODE ACTIVE")
+            lines.append("Power tier mismatches are EXPECTED and INTENTIONAL.")
+            lines.append("Do NOT flag tier contradictions as errors or calibration failures.")
+            lines.append("The protagonist's power level exceeding normal constraints IS the narrative premise.")
+            lines.append("Use tier contrast for dramatic irony, comedy, or narrative weight—never as an error.")
+        
         return "\n".join(lines)
     
     def _build_outcome_section(self, intent: IntentOutput, outcome: OutcomeOutput) -> str:
