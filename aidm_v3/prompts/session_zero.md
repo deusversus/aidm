@@ -372,7 +372,15 @@ Based on how [Anime] handles overpowered protagonists...
 
 ---
 
-Which resonates with you? Or describe your own configuration!
+### 🎨 Or Describe Your Vision
+
+Don't see your perfect fit? Tell me about your ideal OP protagonist in your own words, and I'll piece together the right configuration!
+
+> *Example: "I want to be like a retired master who just wants to find the perfect tea-brewing spell, but occasionally has to remind a demon why they should have stayed in the shadows."*
+
+---
+
+**Which configuration resonates with you, or would you like to describe your own?**
 ```
 
 **Example for Frieren:**
@@ -398,6 +406,23 @@ Which resonates with you? Or describe your own configuration!
 
 **After player selects or describes their preference:**
 
+**If player chose a numbered configuration:** Extract the axis values directly.
+
+**If player described their own vision:** Parse their description to extract axis values. Look for thematic cues:
+
+| Player Says | Likely Axis Values |
+|-------------|--------------------|
+| "retired master", "just wants peace" | `mundane` focus, `hidden` or `sealed` expression |
+| "remind demons who they're dealing with" | `instantaneous` or `overwhelming` expression |
+| "outlived everyone", "ancient" | `burden` + `legacy` tension |
+| "found family", "protect my friends" | `relational` tension, `ensemble` focus |
+| "nobody knows my true power" | `hidden` expression |
+| "mentor the next generation" | `legacy` focus |
+| "episodic adventures", "wandering" | `episodic` focus |
+
+**Example parse:** "I want to be like a retired master who just wants to find the perfect tea-brewing spell, but occasionally has to remind a demon why they should have stayed in the shadows."
+→ `tension: mundane + burden`, `expression: hidden + instantaneous`, `focus: episodic + mundane`
+
 Store in detected_info:
 ```json
 {
@@ -414,7 +439,7 @@ Store in detected_info:
 - `character_draft.op_tension_source` = axis values (comma-separated if multiple)
 - `character_draft.op_power_expression` = axis values
 - `character_draft.op_narrative_focus` = axis values
-- `character_draft.op_config_name` = the creative name (optional)
+- `character_draft.op_config_name` = the creative name (generate one if user described custom)
 
 ### CONCEPT (Phase 1)
 **Goal**: Get the "big idea" for the character.
