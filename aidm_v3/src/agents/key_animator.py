@@ -240,10 +240,64 @@ Write vivid, anime-appropriate prose. End at a clear decision point if one exist
             lines.append("")
             lines.append("*Use this composition to guide scene structure, stakes, and camera focus.*")
         
+        # === GENRE-SPECIFIC SCENE GUIDANCE (IP Authenticity) ===
+        detected_genres = getattr(self.profile, 'detected_genres', None)
+        if detected_genres and isinstance(detected_genres, list):
+            genre_scene_guidance = {
+                "shonen": "**Declare attack names loudly.** Training breakthroughs are emotional. Rivals deserve respect. Friendship powers up abilities.",
+                "seinen": "**Moral ambiguity.** No clean heroes or villains. Violence has weight. Consequences linger. Victories feel pyrrhic.",
+                "isekai": "**Status screens/notifications.** Level-up chimes. Skill acquisition pop-ups. System messages. World comparison moments.",
+                "shoujo_romance": "**Internal monologue for feelings.** Blush descriptions. Significant glances. Misunderstandings that hurt. Confession tension.",
+                "supernatural": "**Urban fantasy atmosphere.** Hidden world beneath mundane. Occult terminology. Monster lore reveals. Barrier between worlds.",
+                "mystery_thriller": "**Clue placement in descriptions.** Red herrings feel valid. Logical deduction. Tension ratchets. Revelations recontextualize.",
+                "horror": "**Dread over gore.** Isolation emphasized. Sensory details (sounds, smells). Safety is illusion. Something is always watching.",
+                "slice_of_life": "**Small moments matter.** Seasonal awareness. Food descriptions. Comfortable silences. Bittersweet nostalgia.",
+                "sports": "**Technical terminology.** Training montages. Rivalries with respect. Team dynamics. Crowd reactions. Victory/defeat emotions.",
+                "mecha": "**Cockpit POV.** Status readouts. Damage reports. G-force strain. Pilot-machine connection. Scale descriptions.",
+                "comedy": "**Timing is everything.** Comedic beats with pauses. Reaction faces. Tsukkomi/boke dynamics. Exaggeration for effect.",
+                "magical_girl": "**Transformation sequences.** Power of hope/love. Cute aesthetics. Dark undertones beneath brightness. Friendship bonds.",
+                "historical": "**Period-appropriate language.** Cultural details. Honor codes. Class dynamics. Historical context weaves into narrative.",
+                "music": "**Synesthesia in descriptions.** Performance as climax. Practice struggles. Band/group dynamics. Music as emotional expression.",
+                "scifi": "**Tech jargon that feels natural.** Worldbuilding through details. Scientific concepts. Future society commentary."
+            }
+            
+            lines.append("")
+            lines.append("### 🎬 Genre Scene Guidance")
+            for genre in detected_genres[:2]:  # Primary + 1 secondary
+                genre_key = genre.lower().replace(" ", "_").replace("-", "_")
+                if genre_key in genre_scene_guidance:
+                    lines.append(f"**{genre.title()}:** {genre_scene_guidance[genre_key]}")
+        
         # === VOICE GUIDANCE ===
         lines.append("")
         lines.append("### Voice Guidance")
         lines.append(self.profile.voice or "Write in an engaging anime style appropriate to the profile.")
+        
+        # === AUTHOR'S VOICE (IP Authenticity Gap 5C) ===
+        author_voice = getattr(self.profile, 'author_voice', None)
+        if author_voice and isinstance(author_voice, dict):
+            lines.append("")
+            lines.append("### ✍️ Author's Voice (Distinctive Writing Style)")
+            
+            sentence_patterns = author_voice.get('sentence_patterns', [])
+            if sentence_patterns:
+                lines.append(f"**Sentence Patterns:** {', '.join(sentence_patterns[:3])}")
+            
+            structural_motifs = author_voice.get('structural_motifs', [])
+            if structural_motifs:
+                lines.append(f"**Structural Motifs:** {', '.join(structural_motifs[:3])}")
+            
+            dialogue_quirks = author_voice.get('dialogue_quirks', [])
+            if dialogue_quirks:
+                lines.append(f"**Dialogue Quirks:** {', '.join(dialogue_quirks[:3])}")
+            
+            emotional_rhythm = author_voice.get('emotional_rhythm', [])
+            if emotional_rhythm:
+                lines.append(f"**Emotional Rhythm:** {', '.join(emotional_rhythm[:3])}")
+            
+            example_voice = author_voice.get('example_voice', '')
+            if example_voice:
+                lines.append(f"*Example:* \"{example_voice}\"")
         
         return "\n".join(lines)
     
@@ -269,6 +323,33 @@ Write vivid, anime-appropriate prose. End at a clear decision point if one exist
         if context.present_npcs:
             lines.append("")
             lines.append(f"**Present NPCs:** {', '.join(context.present_npcs)}")
+            
+            # === VOICE CARD INJECTION (IP Authenticity Gap 4C) ===
+            # If profile has voice_cards, inject speaking styles for present NPCs
+            voice_cards = getattr(self.profile, 'voice_cards', None)
+            if voice_cards and isinstance(voice_cards, list):
+                matching_cards = []
+                for npc_name in context.present_npcs:
+                    for card in voice_cards:
+                        if isinstance(card, dict):
+                            card_name = card.get('name', '').lower()
+                            if card_name and card_name in npc_name.lower():
+                                matching_cards.append(card)
+                                break
+                
+                if matching_cards:
+                    lines.append("")
+                    lines.append("### 🎭 Voice Cards (Write Each NPC Distinctly)")
+                    for card in matching_cards[:3]:  # Limit to 3 NPCs
+                        name = card.get('name', 'Unknown')
+                        patterns = card.get('speech_patterns', '')
+                        humor = card.get('humor_type', '')
+                        rhythm = card.get('dialogue_rhythm', '')
+                        lines.append(f"**{name}:** {patterns}")
+                        if humor:
+                            lines.append(f"  *Humor:* {humor}")
+                        if rhythm:
+                            lines.append(f"  *Rhythm:* {rhythm}")
         
         # Inject Director's Guidance (Phase 4)
         if hasattr(context, "director_notes") and context.director_notes:

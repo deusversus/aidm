@@ -169,6 +169,73 @@ class DirectorAgent(BaseAgent):
             if inactive and 'power_of_friendship' in inactive:
                 lines.append("\n*NOTE: `power_of_friendship` is OFF. Victories come from skill, not bonds. Teamwork is tactical, not magical.*")
         
+        # =====================================================================
+        # Genre-Specific Arc Templates (IP Authenticity)
+        # =====================================================================
+        if profile and hasattr(profile, 'detected_genres') and profile.detected_genres:
+            lines.append("\n## 🎬 Genre Arc Templates")
+            genre_arc_templates = {
+                "shonen": [
+                    "**Training Arc**: Intro→Struggle→Breakthrough→Demonstrate in combat",
+                    "**Tournament Arc**: R1 fodder→R2 rival→R3 unexpected→Finals antagonist",
+                    "**Rescue Mission**: Assemble team→Infiltrate→Fight minions→Boss→Escape"
+                ],
+                "seinen": [
+                    "**Moral Dilemma Arc**: Present impossible choice→Show consequences→No clean answer",
+                    "**Conspiracy Unravel**: Clues→Paranoia→Betrayal reveal→Systemic corruption",
+                    "**Survival Horror**: Isolation→Mounting dread→Deaths→Narrow escape"
+                ],
+                "isekai": [
+                    "**Power Discovery**: Weakness→System awakens→Experiment→First victory",
+                    "**Kingdom Building**: Gain territory→Recruit NPCs→Defend→Expand influence",
+                    "**World Comparison**: Fish out of water→Culture clash→Adapt→Homesickness"
+                ],
+                "shoujo_romance": [
+                    "**Love Triangle**: Meet both→Compare→Crisis→Choice",
+                    "**Slow Burn**: Meet cute→Misunderstandings→Confession fake-out→True confession",
+                    "**Rivals to Lovers**: Antagonism→Forced proximity→Vulnerability→Feelings"
+                ],
+                "supernatural": [
+                    "**Monster of Week**: Investigation→Hunt→Battle→Lore reveal",
+                    "**Occult Mystery**: Strange events→Research→Summoning/ritual→Confrontation",
+                    "**Possession Arc**: Subtle changes→Discovery→Fight for control→Exorcism"
+                ],
+                "mystery_thriller": [
+                    "**Whodunit**: Crime→Suspects→Red herrings→Revelation→Confrontation",
+                    "**Cat and Mouse**: Establish genius antagonist→Close calls→Trap→Reversal",
+                    "**Conspiracy**: Small clue→Bigger picture→Everyone involved→Trust no one"
+                ],
+                "horror": [
+                    "**Survival Horror**: Isolation→First death→Dwindling resources→Escape attempt",
+                    "**Psychological**: Reality questions→Paranoia→Reveal→Ambiguous ending",
+                    "**Monster Hunt**: Learn weakness→Prepare→Confront→Pyrrhic victory"
+                ],
+                "slice_of_life": [
+                    "**Festival Arc**: Preparation→Event→Bonding→Bittersweet ending",
+                    "**New Member**: Introduction→Friction→Understanding→Acceptance",
+                    "**Seasonal Change**: Summer vacation→School trip→Cultural festival→Graduation"
+                ],
+                "sports": [
+                    "**Tournament**: Qualifiers→Group stage→Semifinals→Finals",
+                    "**Rivalry Match**: Train for specific opponent→Analyze→Close game→Growth",
+                    "**Team Building**: Recruit→Train together→First loss→Comeback"
+                ],
+                "mecha": [
+                    "**First Sortie**: Reluctant pilot→Emergency→Awakening→Victory",
+                    "**Upgrade Arc**: Defeat→New unit development→Training→Revenge match",
+                    "**Final Defense**: Overwhelming odds→Sacrifices→Last stand→Decisive blow"
+                ]
+            }
+            
+            for genre in profile.detected_genres[:2]:  # Primary + 1 secondary
+                genre_key = genre.lower().replace(" ", "_").replace("-", "_")
+                if genre_key in genre_arc_templates:
+                    lines.append(f"\n**{genre.title()} Templates:**")
+                    for template in genre_arc_templates[genre_key]:
+                        lines.append(f"  {template}")
+            
+            lines.append("\n*Use these templates as arc structure guides. Adapt to current story.*")
+        
         # OP Mode context (if active)
         if op_preset and op_mode_guidance:
             lines.append("\n## ⚡ OP Protagonist Mode Active")
