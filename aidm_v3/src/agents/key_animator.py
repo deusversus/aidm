@@ -328,14 +328,31 @@ Write vivid, anime-appropriate prose. End at a clear decision point if one exist
             
             # === VOICE CARD INJECTION (IP Authenticity Gap 4C) ===
             # If profile has voice_cards, inject speaking styles for present NPCs
+            # Supports both list format [{name: "Gojo", ...}] and dict format {gojo: {...}}
             voice_cards = getattr(self.profile, 'voice_cards', None)
-            if voice_cards and isinstance(voice_cards, list):
+            if voice_cards:
+                # Normalize voice_cards to list format for processing
+                normalized_cards = []
+                if isinstance(voice_cards, list):
+                    # List format: [{name: "Gojo", speech_patterns: ...}, ...]
+                    normalized_cards = voice_cards
+                elif isinstance(voice_cards, dict):
+                    # Dict format: {gojo: {speech_patterns: ...}, ...}
+                    for char_key, card_data in voice_cards.items():
+                        if isinstance(card_data, dict):
+                            # Convert key to display name (gojo_satoru -> Gojo Satoru)
+                            display_name = char_key.replace('_', ' ').title()
+                            normalized_cards.append({
+                                'name': display_name,
+                                **card_data
+                            })
+                
                 matching_cards = []
                 for npc_name in context.present_npcs:
-                    for card in voice_cards:
+                    for card in normalized_cards:
                         if isinstance(card, dict):
                             card_name = card.get('name', '').lower()
-                            if card_name and card_name in npc_name.lower():
+                            if card_name and (card_name in npc_name.lower() or npc_name.lower() in card_name):
                                 matching_cards.append(card)
                                 break
                 
