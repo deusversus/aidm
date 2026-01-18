@@ -347,6 +347,9 @@ async def process_session_zero_state(
     if "npcs" in detected_info:
         npcs = detected_info["npcs"]
         if isinstance(npcs, list):
+            # Initialize StateManager for DB writes
+            state = StateManager(game_id=session_id)
+            
             for npc in npcs:
                 if isinstance(npc, dict) and "name" in npc:
                     # Create relationship memory
@@ -355,6 +358,18 @@ async def process_session_zero_state(
                     disposition = npc.get("disposition", "neutral")
                     background = npc.get("background", "")
                     
+                    # 1. Create NPC in SQLite database
+                    try:
+                        state.create_npc(
+                            name=npc_name,
+                            role=role,
+                            relationship_notes=f"{disposition}. {background}"
+                        )
+                        print(f"[SessionZero→State] Created NPC in DB: {npc_name}")
+                    except Exception as e:
+                        print(f"[SessionZero→State] NPC DB creation failed: {e}")
+                    
+                    # 2. Create NPC memory in ChromaDB
                     memory.add_memory(
                         content=f"NPC: {npc_name} - Role: {role}, Disposition: {disposition}. {background}",
                         memory_type="relationship",
