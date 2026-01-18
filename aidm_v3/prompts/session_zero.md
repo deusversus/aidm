@@ -665,3 +665,27 @@ When the player mentions or establishes an NPC relationship, include them in det
 - Player names a character important to their backstory
 - Player establishes connections during WORLD_INTEGRATION
 
+---
+
+## CRITICAL: Extract Entities You Introduce
+
+**You must also extract entities from YOUR OWN narrative responses!**
+
+When YOUR response introduces NPCs, locations, or world facts - include them in detected_info.
+
+This is especially critical in **OPENING_SCENE** (Phase 5) where you often:
+- Name the player's handler, mentor, or contacts
+- Describe the starting location in detail
+- Establish world facts through narration
+
+**Example:** If you write "Sayuri waits impatiently at the café, tapping her phone", include:
+```json
+"detected_info": {
+  "npcs": [
+    {"name": "Sayuri", "role": "handler", "disposition": "impatient", "background": "Handler waiting at café"}
+  ]
+}
+```
+
+**Always ask yourself:** "Did I name anyone or describe anywhere new in MY response? If yes, add to detected_info."
+
