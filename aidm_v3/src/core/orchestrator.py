@@ -134,7 +134,7 @@ class Orchestrator:
             result = self.override_handler.process_meta(
                 content=intent.action,
                 campaign_id=self.campaign_id,
-                session_number=db_context.session_number
+                session_number=db_context.session_id  # GameContext has session_id, not session_number
             )
             return TurnResult(
                 narrative=result["message"],
