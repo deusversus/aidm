@@ -39,13 +39,15 @@ class Orchestrator:
     4. State updates (persist changes)
     """
     
-    def __init__(self, profile_id: str):
+    def __init__(self, profile_id: str, session_id: str = None):
         """Initialize the orchestrator.
         
         Args:
             profile_id: The narrative profile ID (e.g., "hunterxhunter", "demon_slayer")
+            session_id: The unique session ID for memory isolation. If None, falls back to profile_id.
         """
         self.profile_id = profile_id
+        self.session_id = session_id or profile_id  # Fallback for backward compatibility
         
         # Load profile first to get display name
         self.profile: NarrativeProfile = load_profile(profile_id)
@@ -63,8 +65,8 @@ class Orchestrator:
             profile_id=profile_id
         )
         
-        # Initialize Context Layer
-        self.memory = MemoryStore(str(self.campaign_id))
+        # Initialize Context Layer - use session_id for memory isolation
+        self.memory = MemoryStore(self.session_id)
         self.rules = RuleLibrary()
         self.context_selector = ContextSelector(self.memory, self.rules)
         

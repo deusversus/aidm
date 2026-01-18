@@ -56,7 +56,9 @@ def get_orchestrator() -> Orchestrator:
             )
         
         # Orchestrator now resolves profile_id -> campaign_id internally
-        _orchestrator = Orchestrator(profile_id=profile_id)
+        # Pass session_id for memory collection isolation
+        session_id = settings.active_session_id or profile_id  # Fallback to profile_id for backward compatibility
+        _orchestrator = Orchestrator(profile_id=profile_id, session_id=session_id)
     
     return _orchestrator
 
@@ -318,24 +320,28 @@ async def delete_session(session_id: str):
     folder_deleted = delete_custom_profile(session_id)
     
     # Clear campaign memory (ChromaDB collection)
-    # Uses profile_id as campaign_id per current design
+    # Now uses session_id for proper isolation
     memory_deleted = False
     try:
         import chromadb
         from src.settings import get_settings_store
         settings_store = get_settings_store()
         settings = settings_store.load()
-        profile_id = settings.active_profile_id
         
-        client = chromadb.PersistentClient(path="./data/chroma")
-        collection_name = f"campaign_{profile_id}"
+        # Use active_session_id for session-based memory isolation
+        # Fallback to active_profile_id for backward compatibility
+        session_collection_id = settings.active_session_id or settings.active_profile_id
         
-        # Check if collection exists before deleting
-        existing = [c.name for c in client.list_collections()]
-        if collection_name in existing:
-            client.delete_collection(collection_name)
-            memory_deleted = True
-            print(f"[Session Reset] Deleted memory collection: {collection_name}")
+        if session_collection_id:
+            client = chromadb.PersistentClient(path="./data/chroma")
+            collection_name = f"campaign_{session_collection_id}"
+            
+            # Check if collection exists before deleting
+            existing = [c.name for c in client.list_collections()]
+            if collection_name in existing:
+                client.delete_collection(collection_name)
+                memory_deleted = True
+                print(f"[Session Reset] Deleted memory collection: {collection_name}")
     except Exception as e:
         print(f"[Session Reset] Memory cleanup error: {e}")
     
@@ -557,12 +563,12 @@ async def session_zero_turn(session_id: str, request: TurnRequest):
             
             # FLUID STATE INTEGRATION: Process detected_info for memory/NPC updates
             # This calls add_memory() for character facts, creates NPCs, stores canonicality
-            campaign_id = session.character_draft.narrative_profile or session.session_id[:8]
+            # Use session_id for memory isolation (not profile_id)
             try:
                 state_stats = await process_session_zero_state(
                     session=session,
                     detected_info=result.detected_info,
-                    campaign_id=campaign_id
+                    session_id=session.session_id
                 )
                 if state_stats.get("memories_added", 0) > 0:
                     print(f"[SessionZero] Fluid state: {state_stats['memories_added']} memories, {state_stats.get('npcs_created', 0)} NPCs")
@@ -1055,6 +1061,7 @@ I found several entries in the **{media_ref}** franchise:
                 print(f"[Handoff] Syncing settings: {current_settings.active_profile_id} -> {profile_to_use}", flush=True)
                 current_settings.active_profile_id = profile_to_use
                 current_settings.active_campaign_id = profile_to_use
+                current_settings.active_session_id = session.session_id  # Session-based memory isolation
                 settings_store.save(current_settings)
                 
                 # VERIFY file was written correctly

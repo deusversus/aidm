@@ -181,6 +181,11 @@ class UserSettings(BaseModel):
         description="Currently active narrative profile. Null means not set - triggers Session Zero recovery."
     )
     
+    active_session_id: Optional[str] = Field(
+        default=None,
+        description="Currently active session ID for memory isolation. Set at Session Zero handoff."
+    )
+    
     # Extended thinking mode
     extended_thinking: bool = Field(
         default=False,

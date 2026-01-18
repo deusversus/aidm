@@ -232,7 +232,7 @@ def apply_detected_info(session: Session, detected: Dict[str, Any]) -> None:
 async def process_session_zero_state(
     session: Session,
     detected_info: Dict[str, Any],
-    campaign_id: str
+    session_id: str
 ) -> Dict[str, int]:
     """
     Process Session Zero detected_info using the same systems as gameplay.
@@ -245,7 +245,7 @@ async def process_session_zero_state(
     Args:
         session: The current session
         detected_info: Info extracted by the Session Zero agent
-        campaign_id: The campaign/profile ID for the memory store
+        session_id: The unique session ID for memory isolation
         
     Returns:
         Dict with counts: {"memories_added": N, "npcs_created": N}
@@ -259,8 +259,8 @@ async def process_session_zero_state(
     if not detected_info:
         return stats
     
-    # Initialize stores
-    memory = MemoryStore(campaign_id=campaign_id)
+    # Initialize stores - use session_id for memory isolation
+    memory = MemoryStore(campaign_id=session_id)
     
     # === CHARACTER IDENTITY MEMORIES ===
     
@@ -1357,13 +1357,13 @@ async def index_session_zero_to_memory(session: Session) -> int:
     """
     from ..context.memory import MemoryStore
     
-    # Get campaign ID from session
-    profile_id = session.character_draft.narrative_profile or session.session_id[:8]
+    # Use session_id for memory isolation (not profile_id)
+    session_id = session.session_id
     
-    print(f"[SessionZero→Memory] Indexing character creation to memory for campaign: {profile_id}")
+    print(f"[SessionZero→Memory] Indexing character creation to memory for session: {session_id}")
     
-    # Create memory store for this campaign
-    memory = MemoryStore(campaign_id=profile_id)
+    # Create memory store for this session
+    memory = MemoryStore(campaign_id=session_id)
     
     # Get all Session Zero messages
     messages = session.messages
