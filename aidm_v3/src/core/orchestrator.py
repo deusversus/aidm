@@ -1105,7 +1105,19 @@ class Orchestrator:
             print(f"[WorldBuilding] Indexed location: {entity.name}")
         
         elif entity.entity_type == "faction":
-            # Factions are indexed as memories
+            # 1. Create faction in SQLite database
+            try:
+                self.state.create_faction(
+                    name=entity.name,
+                    description=entity.details.get('description', entity.implied_backstory or ''),
+                    reputation=0,
+                    pc_controls=False
+                )
+                print(f"[WorldBuilding] Created faction in DB: {entity.name}")
+            except Exception as e:
+                print(f"[WorldBuilding] Faction DB creation failed: {e}")
+            
+            # 2. Index faction to ChromaDB memory
             self.memory.add_memory(
                 content=f"Faction: {entity.name} - {entity.details.get('description', '')} {entity.implied_backstory or ''}",
                 memory_type="fact",
