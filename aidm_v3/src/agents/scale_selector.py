@@ -707,7 +707,7 @@ Based on observed behavior, suggest the most appropriate OP Protagonist preset:
 6. **sealed_apocalypse** - Seals power, school/life focus, secret identity (Wang Ling)
 7. **wandering_legend** - Mysterious, wandering, episodic encounters (Vampire D)
 8. **nation_builder** - Building/recruiting focus, nation management, collecting allies (Rimuru)
-9. **disguised_god** - Disguised god, romance/coffee focus, comedic contrast (Deus)
+9. **disguised_god** - Disguised god, romance/coffee focus, comedic contrast
 10. **time_looper** - Iteration, learning, death as reset (Re:Zero, Steins;Gate)
 11. **immortal** - Can't die, burden of eternity (Ajin, Highlander)
 

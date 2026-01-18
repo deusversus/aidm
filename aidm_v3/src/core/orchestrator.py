@@ -212,7 +212,7 @@ class Orchestrator:
                     "wang_ling": ("control", "sealed", "mundane"),
                     "vampire_d": ("relational", "passive", "episodic"),
                     "rimuru": ("consequence", "derivative", "faction"),
-                    "deus": ("relational", "hidden", "mundane"),
+                    "disguised_god": ("relational", "hidden", "mundane"),
                 }
                 
                 if preset and preset.lower() in preset_mapping:

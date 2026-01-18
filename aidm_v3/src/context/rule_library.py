@@ -413,7 +413,7 @@ class RuleLibrary:
             "overlord": "social",
             "saiki_k": "social",
             "wang_ling": "social",
-            "deus": "social",
+            "disguised_god": "social",
             "vampire_d": "existential",
             "rimuru": "ensemble",
             "mashle": "structural"

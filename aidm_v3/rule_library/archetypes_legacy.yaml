@@ -188,14 +188,14 @@
     Combat = appetizer. Building = the meal.
 
 ---
-# Archetype 9: Deus (Disguised God)
-- id: "archetype_deus"
+# Archetype 9: Disguised God
+- id: "archetype_disguised_god"
   category: "archetype"
   source_module: "module_12"
-  tags: ["op_mode", "deus", "disguised", "god", "romance", "comedy"]
-  retrieve_conditions: ["op_archetype == 'deus'"]
+  tags: ["op_mode", "disguised_god", "disguised", "god", "romance", "comedy"]
+  retrieve_conditions: ["op_archetype == 'disguised_god'"]
   content: |
-    DEUS (Disguised God): T2-B god at F-rank, coffee/romance/recruitment.
+    DISGUISED GOD: T2-B god at low-rank, coffee/romance/recruitment.
     Scales: Concept + Faction + Reverse-Ensemble
     
     Techniques:
