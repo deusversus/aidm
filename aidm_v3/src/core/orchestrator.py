@@ -631,8 +631,9 @@ class Orchestrator:
         # =====================================================================
         # ENTITY EXTRACTION: Mine DM narrative for NPCs, locations, items
         # Uses WorldBuilder in extract_only mode (no validation, just extraction)
+        # Always runs - WorldBuilder returns empty list if no entities found
         # =====================================================================
-        if narrative and len(narrative) > 100:  # Skip trivial responses
+        if narrative:
             try:
                 from ..agents.world_builder import WorldBuilderAgent
                 extractor = WorldBuilderAgent()
