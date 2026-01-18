@@ -101,12 +101,12 @@ class Orchestrator:
         db = create_session()
         self.override_handler = OverrideHandler(db=db, memory_store=self.memory)
     
-    async def process_turn(self, player_input: str, handoff_transcript: list = None) -> TurnResult:
+    async def process_turn(self, player_input: str, recent_messages: list = None) -> TurnResult:
         """Process a single turn.
         
         Args:
             player_input: The player's action/input
-            handoff_transcript: Full Session Zero transcript for voice continuity (first turn only)
+            recent_messages: Last N messages from session for working memory (every turn)
             
         Returns:
             TurnResult with narrative and agent decisions
@@ -616,7 +616,7 @@ class Orchestrator:
             outcome=outcome,
             context=db_context,
             retrieved_context=rag_context,
-            handoff_transcript=handoff_transcript,
+            recent_messages=recent_messages,
             sakuga_mode=use_sakuga
         )
         
@@ -982,6 +982,23 @@ class Orchestrator:
         
         # DEBUG: Log final narrative before return
         print(f"[Orchestrator] FINAL narrative length: {len(narrative) if narrative else 0}")
+        
+        # EPISODIC MEMORY: Write condensed turn summary for long-term recall
+        # This bridges the gap when working memory window slides past this turn
+        try:
+            turn_number = db_context.turn_number if hasattr(db_context, 'turn_number') else 0
+            location = db_context.location if hasattr(db_context, 'location') else "Unknown"
+            # Simple summary: action + outcome (no LLM call)
+            action_summary = player_input[:80].strip()
+            outcome_summary = narrative[:120].strip().replace('\n', ' ') if narrative else "No outcome"
+            self.memory.add_episode(
+                turn=turn_number,
+                location=location,
+                summary=f"Player: {action_summary}. Outcome: {outcome_summary}"
+            )
+            print(f"[Orchestrator] Episodic memory written for turn {turn_number}")
+        except Exception as e:
+            print(f"[Orchestrator] Episode write failed: {e}")
         
         return TurnResult(
             narrative=narrative,

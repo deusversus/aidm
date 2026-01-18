@@ -1402,13 +1402,11 @@ async def process_turn(request: TurnRequest):
     if session:
         session.add_message("user", request.player_input)
     
-    # Check for handoff transcript (first gameplay turn after Session Zero)
-    handoff_transcript = None
-    if session and hasattr(session, 'phase_state'):
-        if session.phase_state.get("handoff_transcript"):
-            handoff_transcript = session.phase_state.pop("handoff_transcript")  # One-time use
-            print(f"[GameAPI] First gameplay turn - handoff transcript found ({len(handoff_transcript)} messages)")
-            store.save(session)  # Save session with handoff data removed
+    # Working Memory: Get last 15 messages from session (includes Session Zero + gameplay)
+    # This replaces the one-time handoff_transcript mechanism
+    recent_messages = session.messages[-15:] if session and hasattr(session, 'messages') else []
+    if recent_messages:
+        print(f"[GameAPI] Working memory: {len(recent_messages)} recent messages")
     
     orchestrator = get_orchestrator()
     
@@ -1418,7 +1416,7 @@ async def process_turn(request: TurnRequest):
             print(f"[GameAPI] Processing turn: '{safe_input}...'")
         except Exception:
             print(f"[GameAPI] Processing turn: (encoding failed)")
-        result = await orchestrator.process_turn(request.player_input, handoff_transcript=handoff_transcript)
+        result = await orchestrator.process_turn(request.player_input, recent_messages=recent_messages)
         
         # DEBUG: Log the actual narrative value
         print(f"[GameAPI] Result received:")

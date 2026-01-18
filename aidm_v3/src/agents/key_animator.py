@@ -459,7 +459,7 @@ This is a CLIMACTIC moment. Unleash the full animation budget:
         outcome: OutcomeOutput,
         context: GameContext,
         retrieved_context: Optional[dict] = None,
-        handoff_transcript: list = None,
+        recent_messages: list = None,
         sakuga_mode: bool = False
     ) -> str:
         """Generate narrative prose for this turn.
@@ -470,8 +470,7 @@ This is a CLIMACTIC moment. Unleash the full animation budget:
             outcome: The outcome judgment
             context: Current game context
             retrieved_context: RAG context (memories, rules)
-            handoff_transcript: Full Session Zero dialogue for voice/tone continuity (first turn only)
-                               Contains Phase 5 opening scene as the last assistant message.
+            recent_messages: Working memory - last N messages from session (every turn)
             sakuga_mode: If True, inject high-intensity sakuga guidance for climactic moments
             
         Returns:
@@ -480,32 +479,26 @@ This is a CLIMACTIC moment. Unleash the full animation budget:
         # Build the full prompt
         prompt = self.vibe_keeper_template
         
-        # FIRST-TURN TRANSCRIPT INJECTION: Inject full Session Zero dialogue for voice continuity
-        # This includes Phase 5 (opening scene) as the last assistant message
-        if handoff_transcript:
+        # WORKING MEMORY INJECTION: Recent messages from session (includes Session Zero + gameplay)
+        if recent_messages:
             transcript_lines = []
-            for msg in handoff_transcript:
-                role = "PLAYER" if msg.get("role") == "user" else "SESSION_ZERO"
+            for msg in recent_messages:
+                role = "PLAYER" if msg.get("role") == "user" else "DM"
                 content = msg.get("content", "")
                 transcript_lines.append(f"[{role}]: {content}")
             
             transcript_text = "\n\n".join(transcript_lines)
-            transcript_injection = f"""
-=== SESSION ZERO TRANSCRIPT (Character Creation Dialogue) ===
-This is how the player built their character and calibrated the tone.
-MATCH THIS VOICE. MATCH THIS HUMOR. MATCH THIS ENERGY.
-Pay attention to the comedic patterns, the irony, the back-and-forth style.
-The FINAL assistant message below is the opening scene - CONTINUE FROM THERE.
+            working_memory_injection = f"""
+=== RECENT CONVERSATION (Working Memory) ===
+This is the recent dialogue. Use this for immediate context and continuity.
+MATCH the established voice, humor, and style from these exchanges.
 
 {transcript_text}
 
 === CONTINUE THE STORY ===
-The player's first gameplay action follows. Continue with the SAME comedic irony,
-the SAME narrative voice, the SAME style. Do NOT restart or re-describe the scene.
-
 """
-            print(f"[KeyAnimator] Injecting Session Zero transcript ({len(handoff_transcript)} messages, {len(transcript_text)} chars)")
-            prompt = transcript_injection + prompt
+            print(f"[KeyAnimator] Injecting working memory ({len(recent_messages)} messages, {len(transcript_text)} chars)")
+            prompt = working_memory_injection + prompt
         
         # Inject Profile DNA
         prompt = prompt.replace("{{PROFILE_DNA_INJECTION}}", self._build_profile_dna())

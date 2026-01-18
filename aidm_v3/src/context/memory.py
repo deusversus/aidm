@@ -19,6 +19,7 @@ DECAY_CURVES = {
     "slow": 0.95,     # Relationships: 5% decay per turn
     "normal": 0.90,   # Events: 10% decay per turn
     "fast": 0.80,     # Transient details: 20% decay per turn
+    "very_fast": 0.70, # Episodes: 30% decay per turn (fades in ~6 turns)
 }
 
 # Default decay rates by memory category
@@ -33,6 +34,9 @@ CATEGORY_DECAY = {
     "fact": "slow",            # Persistent facts
     "npc_state": "normal",     # NPC status
     "location": "slow",        # Visited places
+    "episode": "very_fast",    # Per-turn summaries (working memory overflow)
+    "session_zero": "none",    # Session Zero memories (never decay)
+    "session_zero_voice": "none", # Tonal/voice memories (never decay)
 }
 
 
@@ -130,6 +134,37 @@ class MemoryStore:
         
         return memory_id
     
+    def add_episode(
+        self, 
+        turn: int, 
+        location: str, 
+        summary: str,
+        flags: list = None
+    ) -> str:
+        """
+        Write episodic memory for a turn (condensed summary).
+        
+        Episodes use very_fast decay (30% per turn), fading in ~6 turns.
+        This bridges the gap between working memory and long-term.
+        
+        Args:
+            turn: Turn number
+            location: Current location
+            summary: Condensed summary of what happened
+            flags: Optional flags
+            
+        Returns:
+            Memory ID
+        """
+        content = f"[Turn {turn}] {location}: {summary}"
+        return self.add_memory(
+            content=content,
+            memory_type="episode",
+            turn_number=turn,
+            decay_rate="very_fast",
+            flags=flags or ["recent_event"]
+        )
+    
     def search(
         self, 
         query: str, 
@@ -172,6 +207,26 @@ class MemoryStore:
                 # Filter by minimum heat
                 if heat < min_heat:
                     continue
+                
+                # Base score from semantic similarity
+                base_score = 1.0 - distances[i]
+                
+                # RETRIEVAL BOOST: Session Zero and recent memories get priority
+                boost = 0.0
+                flags_str = metadatas[i].get("flags", "")
+                
+                # Session Zero memories: +0.3 boost (always relevant)
+                if "session_zero" in flags_str or "plot_critical" in flags_str:
+                    boost += 0.3
+                
+                # Recent memories: +0.2 boost (last 10 turns)
+                mem_turn = int(metadatas[i].get("turn", 0))
+                current_turn = int(metadatas[i].get("current_turn", 0))  # May not be set
+                # Fallback: look at memory type - episodes are recent by design
+                if metadatas[i].get("type") == "episode":
+                    boost += 0.15  # Episodes get slight boost
+                
+                boosted_score = min(1.0, base_score + boost)
                     
                 memories.append({
                     "id": mem_id,
@@ -179,7 +234,9 @@ class MemoryStore:
                     "metadata": metadatas[i],
                     "heat": heat,
                     "distance": distances[i],
-                    "score": 1.0 - distances[i]
+                    "score": boosted_score,
+                    "base_score": base_score,
+                    "boost": boost
                 })
                 
                 # Boost heat on access
@@ -188,6 +245,9 @@ class MemoryStore:
                 
                 if len(memories) >= limit:
                     break
+        
+        # Re-sort by boosted score (descending)
+        memories.sort(key=lambda m: m["score"], reverse=True)
                     
         return memories
     
