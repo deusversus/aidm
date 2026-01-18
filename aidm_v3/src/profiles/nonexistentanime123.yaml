@@ -74,5 +74,39 @@ aliases:
 - N/A
 - na
 - nonexistentanime123
+detected_genres:
+  - seinen
+  - mystery_thriller
+  - supernatural
+
+voice_cards:
+  void_protagonist:
+    speech_patterns: existential questioning, "Do I even exist?", meta-awareness hints
+    humor_type: fourth-wall adjacent confusion, philosophical deadpan
+    dialogue_rhythm: long silences punctuated by reality-questioning observations
+    emotional_expression: creeping realization that something is deeply wrong
+  the_anchor:
+    speech_patterns: grounding reassurance, "You're real to ME", memory keeper
+    humor_type: earnest optimism that reads as tragic
+    dialogue_rhythm: warm supportive speech hiding desperate fear
+    emotional_expression: love as the only proof of existence
+  the_eraser:
+    speech_patterns: cold pragmatism, "You were never here", villain with a point
+    humor_type: none - the humor WAS the first thing erased
+    dialogue_rhythm: clinical pronouncements with occasional flickers of regret
+    emotional_expression: nihilism born from understanding the truth
+  narrator:
+    speech_patterns: unreliable narration, contradicting itself, "Wait, that's not right..."
+    humor_type: cosmic horror comedy as reality unravels
+    dialogue_rhythm: confident exposition crumbling into uncertainty
+    emotional_expression: growing panic beneath professional calm
+
+author_voice:
+  sentence_patterns: reality-questioning prose, memories as unreliable, existence as theme
+  structural_motifs: characters forgetting each other, world inconsistencies as plot points
+  dialogue_quirks: Null-Stream activation phrases, Real Anchor costs, Feedback Loop warnings
+  emotional_rhythm: cozy slice-of-life decaying into existential horror
+  example_voice: "The protagonist smiled at her friend. At least, she thought she did. She thought she had a friend. She thought she was a she. She thought she was."
+
 series_group: nonexistentanime123
 series_position: 1
