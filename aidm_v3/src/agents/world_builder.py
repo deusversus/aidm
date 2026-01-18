@@ -160,20 +160,48 @@ If rejecting/clarifying, provide a natural in-character response, not a robotic 
         canonicality: Dict[str, str] = None,
         power_tier: str = "T10",
         established_facts: str = "",
+        mode: Literal["validate", "extract_only"] = "validate",
         **kwargs
     ) -> WorldBuildingOutput:
         """Call the world builder with context.
         
         Args:
-            player_input: The player's action text
+            player_input: The player's action text (or DM narrative for extract_only mode)
             character_context: Summary of the character
             canonicality: Dict with timeline_mode, canon_cast_mode, event_fidelity
             power_tier: Character's power tier (T1-T10)
             established_facts: Summary of established world facts
+            mode: "validate" for player input, "extract_only" for DM narratives
         """
         canonicality = canonicality or {}
         
-        context_message = f"""## Player Action
+        if mode == "extract_only":
+            # EXTRACT ONLY: DM narrative mining, no validation needed
+            context_message = f"""## DM NARRATIVE (Extract Only)
+
+{player_input}
+
+---
+
+## EXTRACTION MODE INSTRUCTIONS
+
+This is a DM-generated narrative. The DM is authoritative - DO NOT validate or reject.
+
+Your ONLY job is to EXTRACT named entities introduced in this narrative:
+- Named NPCs (proper nouns that refer to people/characters)
+- Named locations (specific places mentioned)
+- Named items (specific objects with names)
+- Named factions/organizations
+
+**CRITICAL**: Only extract entities with ACTUAL NAMES (proper nouns).
+Do NOT extract generic references like "the guard" or "a merchant".
+
+Always return validation_status="accepted" in extract_only mode.
+
+If no named entities are found, return an empty entities list."""
+        else:
+            # VALIDATE MODE: Standard player input validation
+            context_message = f"""## Player Action
 {player_input}
 
 ## Character Context
@@ -195,3 +223,4 @@ If rejecting/clarifying, provide a natural in-character response, not a robotic 
 Extract and validate any world-building assertions in this player action."""
         
         return await super().call(context_message)
+

@@ -628,6 +628,27 @@ class Orchestrator:
         
         current_turn.narrative = narrative
         
+        # =====================================================================
+        # ENTITY EXTRACTION: Mine DM narrative for NPCs, locations, items
+        # Uses WorldBuilder in extract_only mode (no validation, just extraction)
+        # =====================================================================
+        if narrative and len(narrative) > 100:  # Skip trivial responses
+            try:
+                from ..agents.world_builder import WorldBuilderAgent
+                extractor = WorldBuilderAgent()
+                dm_entities = await extractor.call(
+                    player_input=narrative[:800],  # First 800 chars
+                    mode="extract_only"
+                )
+                for entity in dm_entities.entities:
+                    if entity.is_new:
+                        await self._apply_world_building_entity(entity, db_context.turn_number)
+                if dm_entities.entities:
+                    print(f"[Orchestrator] Extracted {len(dm_entities.entities)} entities from DM narrative")
+            except Exception as e:
+                print(f"[Orchestrator] Entity extraction failed: {e}")
+        
+
         # 5. Combat Resolution (if applicable)
         combat_occurred = False
         combat_result = None
