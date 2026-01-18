@@ -38,16 +38,8 @@ tropes:
 combat_system: tactical
 power_system:
   name: Geass
-  mechanics: A supernatural psychic ability granted through a contract with a Code
-    bearer, manifesting as a red bird-like sigil in the eye. It is a manifestation
-    of the user's deepest desires and primarily affects the human mind, perception,
-    and will. Most variations require direct eye contact or operate within a specific
-    radius, and some require verbal commands.
-  limitations: Each Geass has unique restrictions, such as Lelouch's one-time-per-person
-    limit or Rolo's heart stopping during use. Overuse leads to Runaway Geass where
-    the power becomes permanently active and uncontrollable. It generally only works
-    on humans, and Code bearers are immune to its effects. Additionally, a Geass Canceler
-    can nullify active effects.
+  mechanics: A supernatural psychic ability granted through a contract with a Code bearer, manifesting as a red bird-like sigil in the eye. It is a manifestation of the user's deepest desires and primarily affects the human mind, perception, and will. Most variations require direct eye contact or operate within a specific radius, and some require verbal commands.
+  limitations: Each Geass has unique restrictions, such as Lelouch's one-time-per-person limit or Rolo's heart stopping during use. Overuse leads to Runaway Geass where the power becomes permanently active and uncontrollable. It generally only works on humans, and Code bearers are immune to its effects. Additionally, a Geass Canceler can nullify active effects.
   tiers:
   - Initial Manifestation (One Eye)
   - Matured Geass (Two Eyes)
@@ -57,9 +49,7 @@ tone:
   comedy_level: 3
   darkness_level: 8
   optimism: 7
-director_personality: You are the director for a Code Geass-style campaign. You maintain
-  dramatic weight; comedy is rare and earned. You explain strategies and tactics in
-  detail. Embrace the absurd. Reality is a suggestion.
+director_personality: You are the director for a Code Geass-style campaign. You maintain dramatic weight; comedy is rare and earned. You explain strategies and tactics in detail. Embrace the absurd. Reality is a suggestion.
 pacing:
   scene_length: moderate
   arc_length_sessions: 4-6
@@ -86,55 +76,51 @@ aliases:
 - コードギアス 反逆のルルーシュ
 series_group: code_geass
 series_position: 1
-
-# IP Authenticity Fields (backfilled)
 detected_genres:
-  - seinen
-  - mecha
-  - mystery_thriller
-
+- seinen
+- mecha
+- mystery_thriller
 voice_cards:
-  - name: "Lelouch vi Britannia (Zero)"
-    speech_patterns: "Theatrical, chess metaphors, dramatic declarations. All according to plan."
-    humor_type: "Rare—student council antics, gambling cockiness"
-    dialogue_rhythm: "Calm manipulation → passionate idealism"
-    emotional_expression: "Masks pain with cold logic; Nunnally breaks him"
-  - name: "Suzaku Kururugi"
-    speech_patterns: "Idealistic, self-sacrificing, guilt-driven. Change from within!"
-    humor_type: "Earnest naivety played straight"
-    dialogue_rhythm: "Hopeful speeches → self-destructive conviction"
-    emotional_expression: "Death wish dressed as heroism"
-  - name: "C.C."
-    speech_patterns: "Cryptic, sardonic, Pizza Hut obsessed. Immortal ennui."
-    humor_type: "Deadpan commentary, pizza as priority"
-    dialogue_rhythm: "Mysterious → genuinely caring (rarely)"
-    emotional_expression: "Centuries of grief behind the smirk"
-  - name: "Kallen Kozuki"
-    speech_patterns: "Fierce, loyal, split between identities."
-    humor_type: "Tsundere reactions to Lelouch's schemes"
-    dialogue_rhythm: "Warrior determination → questioning loyalty"
-    emotional_expression: "Rage at oppression; devotion to Zero"
-  - name: "Charles zi Britannia"
-    speech_patterns: "Booming proclamations, Social Darwinism philosophy."
-    humor_type: "None—weakness does not amuse"
-    dialogue_rhythm: "Tyrannical speeches → Ragnarok reveal"
-    emotional_expression: "Believes in his vision absolutely"
-
+  lelouch_vi_britannia_zero:
+    speech_patterns: Theatrical, chess metaphors, dramatic declarations. All according to plan.
+    humor_type: Rare—student council antics, gambling cockiness
+    dialogue_rhythm: Calm manipulation → passionate idealism
+    emotional_expression: Masks pain with cold logic; Nunnally breaks him
+  suzaku_kururugi:
+    speech_patterns: Idealistic, self-sacrificing, guilt-driven. Change from within!
+    humor_type: Earnest naivety played straight
+    dialogue_rhythm: Hopeful speeches → self-destructive conviction
+    emotional_expression: Death wish dressed as heroism
+  c.c.:
+    speech_patterns: Cryptic, sardonic, Pizza Hut obsessed. Immortal ennui.
+    humor_type: Deadpan commentary, pizza as priority
+    dialogue_rhythm: Mysterious → genuinely caring (rarely)
+    emotional_expression: Centuries of grief behind the smirk
+  kallen_kozuki:
+    speech_patterns: Fierce, loyal, split between identities.
+    humor_type: Tsundere reactions to Lelouch's schemes
+    dialogue_rhythm: Warrior determination → questioning loyalty
+    emotional_expression: Rage at oppression; devotion to Zero
+  charles_zi_britannia:
+    speech_patterns: Booming proclamations, Social Darwinism philosophy.
+    humor_type: None—weakness does not amuse
+    dialogue_rhythm: Tyrannical speeches → Ragnarok reveal
+    emotional_expression: Believes in his vision absolutely
 author_voice:
   sentence_patterns:
-    - "Chess/strategy metaphors"
-    - "Dramatic Geass activation moments"
-    - "Political intrigue revelations"
+  - Chess/strategy metaphors
+  - Dramatic Geass activation moments
+  - Political intrigue revelations
   structural_motifs:
-    - "Zero Requiem twist ending"
-    - "Best friends as enemies"
-    - "Ends justify means philosophy"
+  - Zero Requiem twist ending
+  - Best friends as enemies
+  - Ends justify means philosophy
   dialogue_quirks:
-    - "Lelouch vi Britannia commands you!"
-    - "ALL HAIL BRITANNIA!"
-    - "The only ones who should kill are those prepared to be killed"
+  - Lelouch vi Britannia commands you!
+  - ALL HAIL BRITANNIA!
+  - The only ones who should kill are those prepared to be killed
   emotional_rhythm:
-    - "Genius plan → horrible consequence"
-    - "Sacrifice theme throughout"
-    - "Tragedy of good intentions"
-  example_voice: "The mask fell. Behind it, tears. 'I destroy the world, and create it anew.' Zero raised his hand. 'Lelouch vi Britannia commands you—die.'"
+  - Genius plan → horrible consequence
+  - Sacrifice theme throughout
+  - Tragedy of good intentions
+  example_voice: The mask fell. Behind it, tears. 'I destroy the world, and create it anew.' Zero raised his hand. 'Lelouch vi Britannia commands you—die.'

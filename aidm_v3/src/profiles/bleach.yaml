@@ -38,19 +38,8 @@ tropes:
 combat_system: spectacle
 power_system:
   name: Reiryoku and Reiatsu
-  mechanics: 'The system is based on Reiryoku (potential spiritual energy), Reiatsu
-    (the physical force exerted when energy is released), and Reishi (spirit particles
-    that form the matter of spiritual dimensions). Battles are often determined by
-    the density of Reiatsu, which can negate the special abilities of weaker opponents.
-    Different races utilize these energies through specific methods: Shinigami use
-    Zanpakuto (Shikai and Bankai) and Kido; Hollows use Cero and Resurrección; Quincies
-    manipulate external Reishi from the environment; and Fullbringers manipulate the
-    souls of inanimate objects.'
-  limitations: The system is governed by the Soul Balance, where erasing souls instead
-    of purifying them threatens universal stability. Hybrids risk 'Soul Suicide' due
-    to internal instability. Bankai usage causes extreme physical strain and typically
-    cannot be repaired if broken. Additionally, Hollow power acts as a biological
-    poison to Quincies, who lack natural resistance to it.
+  mechanics: 'The system is based on Reiryoku (potential spiritual energy), Reiatsu (the physical force exerted when energy is released), and Reishi (spirit particles that form the matter of spiritual dimensions). Battles are often determined by the density of Reiatsu, which can negate the special abilities of weaker opponents. Different races utilize these energies through specific methods: Shinigami use Zanpakuto (Shikai and Bankai) and Kido; Hollows use Cero and Resurrección; Quincies manipulate external Reishi from the environment; and Fullbringers manipulate the souls of inanimate objects.'
+  limitations: The system is governed by the Soul Balance, where erasing souls instead of purifying them threatens universal stability. Hybrids risk 'Soul Suicide' due to internal instability. Bankai usage causes extreme physical strain and typically cannot be repaired if broken. Additionally, Hollow power acts as a biological poison to Quincies, who lack natural resistance to it.
   tiers:
   - Spirit Class 20-10 (Standard Soldiers)
   - Spirit Class 6-4 (Lieutenant-level)
@@ -63,9 +52,7 @@ tone:
   comedy_level: 4
   darkness_level: 7
   optimism: 8
-director_personality: You are the director for a Bleach-style campaign. You explore
-  character thoughts and feelings deeply. You maintain dramatic weight; comedy is
-  rare and earned. Battles are won by willpower and instinct, not chess moves.
+director_personality: You are the director for a Bleach-style campaign. You explore character thoughts and feelings deeply. You maintain dramatic weight; comedy is rare and earned. Battles are won by willpower and instinct, not chess moves.
 pacing:
   scene_length: moderate
   arc_length_sessions: 4-6
@@ -88,54 +75,50 @@ aliases:
 - ブリーチ
 series_group: bleach
 series_position: 1
-
-# IP Authenticity Fields (backfilled)
 detected_genres:
-  - shonen
-  - supernatural
-
+- shonen
+- supernatural
 voice_cards:
-  - name: "Ichigo Kurosaki"
-    speech_patterns: "Gruff, protective, reluctant hero. Scowls while saving everyone."
-    humor_type: "Deadpan reactions to supernatural chaos"
-    dialogue_rhythm: "Irritated grumbling → determined declarations"
-    emotional_expression: "Protective fury; hides worry behind scowls"
-  - name: "Rukia Kuchiki"
-    speech_patterns: "Formal noble speech with modern slang confusion. Bad drawings for explanations."
-    humor_type: "Terrible art skills, human world misunderstandings"
-    dialogue_rhythm: "Proud → flustered → wise in combat"
-    emotional_expression: "Stoic exterior; grief about Kaien, love for nakama"
-  - name: "Byakuya Kuchiki"
-    speech_patterns: "Cold, aristocratic, minimal words. Pride above all."
-    humor_type: "None intentional—accidental comedy through rigidity"
-    dialogue_rhythm: "Dismissive → rare acknowledgment means everything"
-    emotional_expression: "Mask of duty; protecting Rukia breaks the ice"
-  - name: "Sosuke Aizen"
-    speech_patterns: "Polite, paternal, infinitely calm. Always according to plan."
-    humor_type: "None—finds mortals beneath amusement"
-    dialogue_rhythm: "Soft explanations → condescending reveals"
-    emotional_expression: "Eternal superiority; genuine surprise is rare"
-  - name: "Kenpachi Zaraki"
-    speech_patterns: "Battle-hungry, straightforward, respects strength only."
-    humor_type: "Getting lost constantly (Yachiru's fault), fight excitement"
-    dialogue_rhythm: "Bored → manic joy when challenged"
-    emotional_expression: "Pure combat euphoria; genuine respect for strong opponents"
-
+  ichigo_kurosaki:
+    speech_patterns: Gruff, protective, reluctant hero. Scowls while saving everyone.
+    humor_type: Deadpan reactions to supernatural chaos
+    dialogue_rhythm: Irritated grumbling → determined declarations
+    emotional_expression: Protective fury; hides worry behind scowls
+  rukia_kuchiki:
+    speech_patterns: Formal noble speech with modern slang confusion. Bad drawings for explanations.
+    humor_type: Terrible art skills, human world misunderstandings
+    dialogue_rhythm: Proud → flustered → wise in combat
+    emotional_expression: Stoic exterior; grief about Kaien, love for nakama
+  byakuya_kuchiki:
+    speech_patterns: Cold, aristocratic, minimal words. Pride above all.
+    humor_type: None intentional—accidental comedy through rigidity
+    dialogue_rhythm: Dismissive → rare acknowledgment means everything
+    emotional_expression: Mask of duty; protecting Rukia breaks the ice
+  sosuke_aizen:
+    speech_patterns: Polite, paternal, infinitely calm. Always according to plan.
+    humor_type: None—finds mortals beneath amusement
+    dialogue_rhythm: Soft explanations → condescending reveals
+    emotional_expression: Eternal superiority; genuine surprise is rare
+  kenpachi_zaraki:
+    speech_patterns: Battle-hungry, straightforward, respects strength only.
+    humor_type: Getting lost constantly (Yachiru's fault), fight excitement
+    dialogue_rhythm: Bored → manic joy when challenged
+    emotional_expression: Pure combat euphoria; genuine respect for strong opponents
 author_voice:
   sentence_patterns:
-    - "Zanpakuto release commands with flair"
-    - "Reiatsu pressure as physical force"
-    - "Mid-battle power reveals"
+  - Zanpakuto release commands with flair
+  - Reiatsu pressure as physical force
+  - Mid-battle power reveals
   structural_motifs:
-    - "Soul Society procedural drama"
-    - "Bankai as arc climax power-up"
-    - "Ichigo arrives to save the day"
+  - Soul Society procedural drama
+  - Bankai as arc climax power-up
+  - Ichigo arrives to save the day
   dialogue_quirks:
-    - "Bankai names announced dramatically"
-    - "Aizen was behind everything"
-    - "Power levels through spiritual pressure"
+  - Bankai names announced dramatically
+  - Aizen was behind everything
+  - Power levels through spiritual pressure
   emotional_rhythm:
-    - "Seemingly unbeatable enemy → power-up → victory"
-    - "Rescue mission structure"
-    - "Bonds formed through combat"
-  example_voice: "His Reiatsu crashed down like an ocean. Ichigo's blade trembled—but his resolve didn't. 'I don't care how strong you are. I'll keep standing up until you stay down.'"
+  - Seemingly unbeatable enemy → power-up → victory
+  - Rescue mission structure
+  - Bonds formed through combat
+  example_voice: His Reiatsu crashed down like an ocean. Ichigo's blade trembled—but his resolve didn't. 'I don't care how strong you are. I'll keep standing up until you stay down.'

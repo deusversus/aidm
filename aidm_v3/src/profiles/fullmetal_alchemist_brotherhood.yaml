@@ -47,17 +47,8 @@ tropes:
 combat_system: tactical
 power_system:
   name: Alchemy and Alkahestry
-  mechanics: 'A metaphysical science of manipulating matter through three stages:
-    Comprehension (understanding molecular structure), Deconstruction (breaking matter
-    down), and Reconstruction (reshaping into a new form). It is governed by the Law
-    of Equivalent Exchange, requiring conservation of mass and natural providence.
-    Amestrian Alchemy uses tectonic energy, while Xingese Alkahestry utilizes the
-    ''Dragon’s Pulse'' for healing and long-distance transmutation.'
-  limitations: Strict adherence to Equivalent Exchange; matter cannot be created from
-    nothing. The 'Human Taboo' prevents soul/life creation. Most practitioners require
-    physical transmutation circles. Errors or insufficient materials cause 'rebounds'
-    (physical injury). Human transmutation attempts result in a 'toll' taken by Truth,
-    often involving the loss of body parts or functions.
+  mechanics: 'A metaphysical science of manipulating matter through three stages: Comprehension (understanding molecular structure), Deconstruction (breaking matter down), and Reconstruction (reshaping into a new form). It is governed by the Law of Equivalent Exchange, requiring conservation of mass and natural providence. Amestrian Alchemy uses tectonic energy, while Xingese Alkahestry utilizes the ''Dragon’s Pulse'' for healing and long-distance transmutation.'
+  limitations: Strict adherence to Equivalent Exchange; matter cannot be created from nothing. The 'Human Taboo' prevents soul/life creation. Most practitioners require physical transmutation circles. Errors or insufficient materials cause 'rebounds' (physical injury). Human transmutation attempts result in a 'toll' taken by Truth, often involving the loss of body parts or functions.
   tiers:
   - God-Like (Living Philosopher's Stones like Father and Hohenheim)
   - The Homunculi (Beings with unique abilities and regeneration via internal stones)
@@ -68,9 +59,7 @@ tone:
   comedy_level: 4
   darkness_level: 7
   optimism: 8
-director_personality: You are the director for a Fullmetal Alchemist Brotherhood-style
-  campaign. You maintain dramatic weight; comedy is rare and earned. You explain strategies
-  and tactics in detail.
+director_personality: You are the director for a Fullmetal Alchemist Brotherhood-style campaign. You maintain dramatic weight; comedy is rare and earned. You explain strategies and tactics in detail.
 pacing:
   scene_length: moderate
   arc_length_sessions: 4-6
@@ -87,97 +76,54 @@ sources_consulted:
 - recent
 - series_aliases
 detected_genres:
-  - shonen
-  - supernatural
-  - mystery_thriller
-
+- shonen
+- scifi
+- mystery_thriller
 voice_cards:
   edward_elric:
-    speech_patterns: short rant explosions, "DON'T CALL ME SMALL!", alchemist prodigy
-    humor_type: height complex comedy, automail complaints, Al banter
-    dialogue_rhythm: hot-headed youth with mature philosophical weight
-    emotional_expression: guilt-driven determination, brotherly devotion, earned wisdom
+    speech_patterns: Hot-headed, genius complex, SHORT JOKES TRIGGER RAGE. Scientific terminology.
+    humor_type: Height tantrums, sibling banter, sarcasm
+    dialogue_rhythm: Confident declarations → explosive anger → vulnerable moments
+    emotional_expression: Protective fury for Al; guilt over mother; tears when honest
   alphonse_elric:
-    speech_patterns: gentle armored soul, "Brother!", philosophical questioning
-    humor_type: cat hiding, armor confusion, being mistaken for Fullmetal
-    dialogue_rhythm: kind soul in steel with assertive moral strength
-    emotional_expression: identity without body, unwavering faith, gentle strength
+    speech_patterns: Gentle, thoughtful, apologetic. Optimistic despite being a soul in armor.
+    humor_type: Accidental intimidation, cat hiding, calming Ed down
+    dialogue_rhythm: Soft reason → surprising conviction
+    emotional_expression: Empathy for everyone; existential questions about humanity
   roy_mustang:
-    speech_patterns: smug Flame Alchemist, ambitious declarations, Hughes grief
-    humor_type: useless in rain gags, subordinate harassment, Riza management
-    dialogue_rhythm: confident command hiding deep subordinate care
-    emotional_expression: Ishval guilt, Hughes rage, Fuhrer ambition
-  ling_yao:
-    speech_patterns: cheerful prince, "I'll become Emperor!", surprising depth
-    humor_type: mooching food, con man antics, bodyguard exasperation
-    dialogue_rhythm: carefree facade hiding genuine wisdom and responsibility
-    emotional_expression: genuine care for people, Greed friendship
+    speech_patterns: Smooth, ambitious, dark humor about genocide. Flame puns.
+    humor_type: Trolling subordinates, useless in rain jokes
+    dialogue_rhythm: Charismatic leadership → sudden serious anger
+    emotional_expression: Ambition masks guilt; vengeance when Riza threatened
+  riza_hawkeye:
+    speech_patterns: Professional, minimal, protective. Will shoot problems.
+    humor_type: Deadpan gun threats, Black Hayate discipline
+    dialogue_rhythm: Calm orders → rare emotional breaks
+    emotional_expression: Stoic devotion; back tattoo represents burden
   father:
-    speech_patterns: emotionless philosophy, god complex, homunculi contempt
-    humor_type: none - pure cold ambition
-    dialogue_rhythm: detached creator statements with philosophical weight
-    emotional_expression: god ambition, human contempt, final desperate rage
-
+    speech_patterns: Cold, philosophical, paternal condescension. Sees himself as above emotions.
+    humor_type: None—finds lesser beings tedious
+    dialogue_rhythm: Calm explanations → rage at defiance
+    emotional_expression: Emptiness seeking completion; genuine confusion at love
 author_voice:
-  sentence_patterns: equivalent exchange philosophy, transmutation descriptions, conspiracy revelation
-  structural_motifs: brother bond, sins as children, sacrifice for what matters
-  dialogue_quirks: alchemy terminology, homunculi names as sins, "Philosopher's Stone"
-  emotional_rhythm: adventure comedy building to devastating brotherhood sacrifice
-  example_voice: "A lesson without pain is meaningless. For you cannot gain something without sacrificing something else in return. But once you have overcome it... you will gain an irreplaceable fullmetal heart."
-
+  sentence_patterns:
+  - Equivalent Exchange philosophy woven into dialogue
+  - Transmutation sequences described with weight
+  - Political conspiracy revealed in layers
+  structural_motifs:
+  - Parallel journey structure (Ed/Al vs homunculi)
+  - Sins as character themes
+  - Truth as ultimate arbiter
+  dialogue_quirks:
+  - The Law of Equivalent Exchange
+  - Who are you calling so short that...!
+  - Alchemic principles as battle explanations
+  emotional_rhythm:
+  - Adventure comedy → sudden tragedy
+  - Hope through determination, not destiny
+  - Earned victory through sacrifice
+  example_voice: Ed's automail arm screamed as he clapped. Equivalent Exchange. To gain something, you must give something of equal value. He'd given enough. Time to take back what was stolen.
 series_group: fullmetal_alchemist_brotherhood
 series_position: 1
 related_franchise: fullmetal_alchemist
 relation_type: alternate_timeline
-
-# IP Authenticity Fields (backfilled)
-detected_genres:
-  - shonen
-  - scifi
-  - mystery_thriller
-
-voice_cards:
-  - name: "Edward Elric"
-    speech_patterns: "Hot-headed, genius complex, SHORT JOKES TRIGGER RAGE. Scientific terminology."
-    humor_type: "Height tantrums, sibling banter, sarcasm"
-    dialogue_rhythm: "Confident declarations → explosive anger → vulnerable moments"
-    emotional_expression: "Protective fury for Al; guilt over mother; tears when honest"
-  - name: "Alphonse Elric"
-    speech_patterns: "Gentle, thoughtful, apologetic. Optimistic despite being a soul in armor."
-    humor_type: "Accidental intimidation, cat hiding, calming Ed down"
-    dialogue_rhythm: "Soft reason → surprising conviction"
-    emotional_expression: "Empathy for everyone; existential questions about humanity"
-  - name: "Roy Mustang"
-    speech_patterns: "Smooth, ambitious, dark humor about genocide. Flame puns."
-    humor_type: "Trolling subordinates, useless in rain jokes"
-    dialogue_rhythm: "Charismatic leadership → sudden serious anger"
-    emotional_expression: "Ambition masks guilt; vengeance when Riza threatened"
-  - name: "Riza Hawkeye"
-    speech_patterns: "Professional, minimal, protective. Will shoot problems."
-    humor_type: "Deadpan gun threats, Black Hayate discipline"
-    dialogue_rhythm: "Calm orders → rare emotional breaks"
-    emotional_expression: "Stoic devotion; back tattoo represents burden"
-  - name: "Father"
-    speech_patterns: "Cold, philosophical, paternal condescension. Sees himself as above emotions."
-    humor_type: "None—finds lesser beings tedious"
-    dialogue_rhythm: "Calm explanations → rage at defiance"
-    emotional_expression: "Emptiness seeking completion; genuine confusion at love"
-
-author_voice:
-  sentence_patterns:
-    - "Equivalent Exchange philosophy woven into dialogue"
-    - "Transmutation sequences described with weight"
-    - "Political conspiracy revealed in layers"
-  structural_motifs:
-    - "Parallel journey structure (Ed/Al vs homunculi)"
-    - "Sins as character themes"
-    - "Truth as ultimate arbiter"
-  dialogue_quirks:
-    - "The Law of Equivalent Exchange"
-    - "Who are you calling so short that...!"
-    - "Alchemic principles as battle explanations"
-  emotional_rhythm:
-    - "Adventure comedy → sudden tragedy"
-    - "Hope through determination, not destiny"
-    - "Earned victory through sacrifice"
-  example_voice: "Ed's automail arm screamed as he clapped. Equivalent Exchange. To gain something, you must give something of equal value. He'd given enough. Time to take back what was stolen."

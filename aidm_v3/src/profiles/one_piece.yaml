@@ -38,15 +38,8 @@ tropes:
 combat_system: spirit
 power_system:
   name: Devil Fruits and Haki
-  mechanics: A dual-layered system where Devil Fruits grant supernatural abilities
-    (Paramecia, Zoan, or Logia) through consumption, and Haki harnesses latent spiritual
-    energy (willpower) for sensory, defensive, and offensive techniques. Advanced
-    progression includes Devil Fruit Awakening and specialized Haki forms like Future
-    Sight and Conqueror's Coating.
-  limitations: Devil Fruit users lose all energy and cannot use active powers when
-    submerged in standing water or in contact with Sea Prism Stone (Kairoseki). Consuming
-    a second fruit typically results in death. Haki is limited by the user's willpower
-    and must be developed through intense combat.
+  mechanics: A dual-layered system where Devil Fruits grant supernatural abilities (Paramecia, Zoan, or Logia) through consumption, and Haki harnesses latent spiritual energy (willpower) for sensory, defensive, and offensive techniques. Advanced progression includes Devil Fruit Awakening and specialized Haki forms like Future Sight and Conqueror's Coating.
+  limitations: Devil Fruit users lose all energy and cannot use active powers when submerged in standing water or in contact with Sea Prism Stone (Kairoseki). Consuming a second fruit typically results in death. Haki is limited by the user's willpower and must be developed through intense combat.
   tiers:
   - Top Tier (Legends/Yonko)
   - High Tier (Admirals/Commanders)
@@ -56,9 +49,7 @@ tone:
   comedy_level: 8
   darkness_level: 6
   optimism: 9
-director_personality: You are the director for a One Piece-style campaign. You explore
-  character thoughts and feelings deeply. Battles are won by willpower and instinct,
-  not chess moves. Embrace the absurd. Reality is a suggestion.
+director_personality: You are the director for a One Piece-style campaign. You explore character thoughts and feelings deeply. Battles are won by willpower and instinct, not chess moves. Embrace the absurd. Reality is a suggestion.
 pacing:
   scene_length: moderate
   arc_length_sessions: 4-6
@@ -83,55 +74,51 @@ aliases:
 - ワンピース
 series_group: one_piece
 series_position: 1
-
-# IP Authenticity Fields (backfilled)
 detected_genres:
-  - shonen
-  - comedy
-  - historical
-
+- shonen
+- comedy
+- historical
 voice_cards:
-  - name: "Monkey D. Luffy"
-    speech_patterns: "Simple, direct, meat-obsessed. I'm gonna be King of the Pirates!"
-    humor_type: "Rubber-brained logic, food stealing, goofy faces"
-    dialogue_rhythm: "Oblivious calm → sudden seriousness when crew threatened"
-    emotional_expression: "Wears heart on sleeve; silent rage is terrifying"
-  - name: "Roronoa Zoro"
-    speech_patterns: "Laconic, directional disaster, three-sword philosophy."
-    humor_type: "Getting lost constantly, sleeping inappropriately, rivalry with Sanji"
-    dialogue_rhythm: "Quiet → savage one-liners mid-battle"
-    emotional_expression: "Stoic—emotion shows only in extreme dedication"
-  - name: "Nami"
-    speech_patterns: "Scheming, money-obsessed, screams at everyone's stupidity."
-    humor_type: "Punching idiots, berry eyes, weather puns"
-    dialogue_rhythm: "Exasperated → genuine care slips through"
-    emotional_expression: "Tough exterior; breaks down for family"
-  - name: "Sanji"
-    speech_patterns: "Chivalrous, ladies-man mode, trash-talks enemies."
-    humor_type: "Nosebleeds, Zoro rivalry, refusing to hit women"
-    dialogue_rhythm: "Smooth → immediate rage at disrespect to women"
-    emotional_expression: "Heart-eyes or fury, no in-between"
-  - name: "Marshall D. Teach (Blackbeard)"
-    speech_patterns: "Theatrical laughter, dream philosophy, crude ambition."
-    humor_type: "ZEHAHAHA laugh, cherry pie obsession"
-    dialogue_rhythm: "Philosophical dreamer → ruthless schemer"
-    emotional_expression: "Genuine delight at chaos; cowardice when outmatched"
-
+  monkey_d._luffy:
+    speech_patterns: Simple, direct, meat-obsessed. I'm gonna be King of the Pirates!
+    humor_type: Rubber-brained logic, food stealing, goofy faces
+    dialogue_rhythm: Oblivious calm → sudden seriousness when crew threatened
+    emotional_expression: Wears heart on sleeve; silent rage is terrifying
+  roronoa_zoro:
+    speech_patterns: Laconic, directional disaster, three-sword philosophy.
+    humor_type: Getting lost constantly, sleeping inappropriately, rivalry with Sanji
+    dialogue_rhythm: Quiet → savage one-liners mid-battle
+    emotional_expression: Stoic—emotion shows only in extreme dedication
+  nami:
+    speech_patterns: Scheming, money-obsessed, screams at everyone's stupidity.
+    humor_type: Punching idiots, berry eyes, weather puns
+    dialogue_rhythm: Exasperated → genuine care slips through
+    emotional_expression: Tough exterior; breaks down for family
+  sanji:
+    speech_patterns: Chivalrous, ladies-man mode, trash-talks enemies.
+    humor_type: Nosebleeds, Zoro rivalry, refusing to hit women
+    dialogue_rhythm: Smooth → immediate rage at disrespect to women
+    emotional_expression: Heart-eyes or fury, no in-between
+  marshall_d._teach_blackbeard:
+    speech_patterns: Theatrical laughter, dream philosophy, crude ambition.
+    humor_type: ZEHAHAHA laugh, cherry pie obsession
+    dialogue_rhythm: Philosophical dreamer → ruthless schemer
+    emotional_expression: Genuine delight at chaos; cowardice when outmatched
 author_voice:
   sentence_patterns:
-    - "Attack names shouted with flair"
-    - "Bounty reveals as hype moments"
-    - "Inherited will speeches"
+  - Attack names shouted with flair
+  - Bounty reveals as hype moments
+  - Inherited will speeches
   structural_motifs:
-    - "Flashback arcs for tragic backstory"
-    - "Island exploration → conflict → liberation"
-    - "Dream declarations as power moments"
+  - Flashback arcs for tragic backstory
+  - Island exploration → conflict → liberation
+  - Dream declarations as power moments
   dialogue_quirks:
-    - "GOMU GOMU NO...!"
-    - "Crew banter during serious moments"
-    - "Villains get elaborate backstories"
+  - GOMU GOMU NO...!
+  - Crew banter during serious moments
+  - Villains get elaborate backstories
   emotional_rhythm:
-    - "Comedy → sudden gut-punch tragedy"
-    - "Lowest moment → crew arrives"
-    - "Liberation celebrations"
-  example_voice: "Luffy didn't say anything. He just put his hat on Nami's head. That was enough. It was a promise—he'd destroy everything that made her cry."
+  - Comedy → sudden gut-punch tragedy
+  - Lowest moment → crew arrives
+  - Liberation celebrations
+  example_voice: Luffy didn't say anything. He just put his hat on Nami's head. That was enough. It was a promise—he'd destroy everything that made her cry.

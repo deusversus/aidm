@@ -38,15 +38,8 @@ tropes:
 combat_system: tactical
 power_system:
   name: Titan Powers (The Nine Titans)
-  mechanics: A biological and metaphysical network rooted in 'The Paths,' a transcendental
-    dimension connecting all Subjects of Ymir. This network allows for the instantaneous
-    transfer of mass to form Titan bodies, memories of past and future inheritors,
-    and commands from the Founding Titan. Transformation is triggered by physical
-    injury (blood loss) combined with a specific mental goal.
-  limitations: The Curse of Ymir restricts Shifters to a 13-year lifespan after inheriting
-    their power. The Founding Titan's full power is generally restricted to those
-    of royal blood. If a Shifter dies without being eaten, their power is randomly
-    transferred to a newborn Eldian baby via the Paths.
+  mechanics: A biological and metaphysical network rooted in 'The Paths,' a transcendental dimension connecting all Subjects of Ymir. This network allows for the instantaneous transfer of mass to form Titan bodies, memories of past and future inheritors, and commands from the Founding Titan. Transformation is triggered by physical injury (blood loss) combined with a specific mental goal.
+  limitations: The Curse of Ymir restricts Shifters to a 13-year lifespan after inheriting their power. The Founding Titan's full power is generally restricted to those of royal blood. If a Shifter dies without being eaten, their power is randomly transferred to a newborn Eldian baby via the Paths.
   tiers:
   - 'Tier 0: The Founding Titan (Full Power / The Rumbling)'
   - 'Tier 1: High-Tier Shifters (Colossal, War Hammer, Evolved Attack Titan)'
@@ -57,9 +50,7 @@ tone:
   comedy_level: 2
   darkness_level: 9
   optimism: 3
-director_personality: You are the director for a Attack on Titan-style campaign. You
-  maintain dramatic weight; comedy is rare and earned. You explain strategies and
-  tactics in detail. The protagonist is powerful; challenges come from elsewhere.
+director_personality: You are the director for a Attack on Titan-style campaign. You maintain dramatic weight; comedy is rare and earned. You explain strategies and tactics in detail. The protagonist is powerful; challenges come from elsewhere.
 pacing:
   scene_length: moderate
   arc_length_sessions: 4-6
@@ -86,55 +77,51 @@ aliases:
 - 進撃の巨人
 series_group: attack_on_titan
 series_position: 1
-
-# IP Authenticity Fields (backfilled)
 detected_genres:
-  - seinen
-  - horror
-  - mystery_thriller
-
+- seinen
+- horror
+- mystery_thriller
 voice_cards:
-  - name: "Eren Yeager"
-    speech_patterns: "Passionate declarations, absolute conviction. Rage simmers beneath every word."
-    humor_type: "None—Eren stopped laughing years ago"
-    dialogue_rhythm: "Quiet intensity building to explosive outbursts"
-    emotional_expression: "All-consuming determination; tears of fury, not sadness"
-  - name: "Mikasa Ackerman"
-    speech_patterns: "Minimal words, maximum devotion. 'Eren' is a complete sentence."
-    humor_type: "Rare deadpan, usually in contrast to the situation"
-    dialogue_rhythm: "Long silences, single decisive statements"
-    emotional_expression: "Stoic exterior; scarf-touching reveals vulnerability"
-  - name: "Armin Arlert"
-    speech_patterns: "Thoughtful, analytical, self-doubting. Voice of reason and strategy."
-    humor_type: "Nervous deflection, bookish references"
-    dialogue_rhythm: "Hesitant buildup to confident conclusions"
-    emotional_expression: "Guilt-driven; believes in humanity despite everything"
-  - name: "Levi Ackerman"
-    speech_patterns: "Blunt, crude, efficient. Insults as terms of endearment."
-    humor_type: "Dry, dark, cleaning-obsessed"
-    dialogue_rhythm: "Sharp commands, no wasted words"
-    emotional_expression: "Eyes reveal grief hidden behind discipline"
-  - name: "Reiner Braun"
-    speech_patterns: "Torn between identities. Soldier persona vs warrior guilt."
-    humor_type: "Hollow attempts at camaraderie; depression humor"
-    dialogue_rhythm: "Confident warrior → broken confession"
-    emotional_expression: "Suicidal guilt; survives only from duty"
-
+  eren_yeager:
+    speech_patterns: Passionate declarations, absolute conviction. Rage simmers beneath every word.
+    humor_type: None—Eren stopped laughing years ago
+    dialogue_rhythm: Quiet intensity building to explosive outbursts
+    emotional_expression: All-consuming determination; tears of fury, not sadness
+  mikasa_ackerman:
+    speech_patterns: Minimal words, maximum devotion. 'Eren' is a complete sentence.
+    humor_type: Rare deadpan, usually in contrast to the situation
+    dialogue_rhythm: Long silences, single decisive statements
+    emotional_expression: Stoic exterior; scarf-touching reveals vulnerability
+  armin_arlert:
+    speech_patterns: Thoughtful, analytical, self-doubting. Voice of reason and strategy.
+    humor_type: Nervous deflection, bookish references
+    dialogue_rhythm: Hesitant buildup to confident conclusions
+    emotional_expression: Guilt-driven; believes in humanity despite everything
+  levi_ackerman:
+    speech_patterns: Blunt, crude, efficient. Insults as terms of endearment.
+    humor_type: Dry, dark, cleaning-obsessed
+    dialogue_rhythm: Sharp commands, no wasted words
+    emotional_expression: Eyes reveal grief hidden behind discipline
+  reiner_braun:
+    speech_patterns: Torn between identities. Soldier persona vs warrior guilt.
+    humor_type: Hollow attempts at camaraderie; depression humor
+    dialogue_rhythm: Confident warrior → broken confession
+    emotional_expression: Suicidal guilt; survives only from duty
 author_voice:
   sentence_patterns:
-    - "Internal monologue questioning morality"
-    - "Sudden perspective shifts mid-scene"
-    - "Reveal recontextualizes everything before"
+  - Internal monologue questioning morality
+  - Sudden perspective shifts mid-scene
+  - Reveal recontextualizes everything before
   structural_motifs:
-    - "Memory inheritance flashbacks"
-    - "Enemies humanized before death"
-    - "'Keep moving forward' as tragic mantra"
+  - Memory inheritance flashbacks
+  - Enemies humanized before death
+  - '''Keep moving forward'' as tragic mantra'
   dialogue_quirks:
-    - "Shinzou wo sasageyo! (Dedicate your hearts!)"
-    - "Childhood promises become curses"
-    - "Villains have valid points"
+  - Shinzou wo sasageyo! (Dedicate your hearts!)
+  - Childhood promises become curses
+  - Villains have valid points
   emotional_rhythm:
-    - "Hope crushed by revelation"
-    - "Victory that feels like defeat"
-    - "No right answers, only choices"
-  example_voice: "Beyond the walls was freedom. Beyond freedom was the ocean. Beyond the ocean were enemies. Beyond enemies... was there anything left worth saving?"
+  - Hope crushed by revelation
+  - Victory that feels like defeat
+  - No right answers, only choices
+  example_voice: Beyond the walls was freedom. Beyond freedom was the ocean. Beyond the ocean were enemies. Beyond enemies... was there anything left worth saving?
