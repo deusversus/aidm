@@ -591,23 +591,46 @@ async def session_zero_turn(session_id: str, request: TurnRequest):
                 
                 # ======== DISAMBIGUATION CHECK ========
                 # Before loading/generating, check if this anime needs disambiguation
+                # FIX: Check multiple conditions to prevent re-triggering
                 is_disambiguation_response = result.detected_info.get("disambiguation_selection", False)
                 
-                # If user just made a disambiguation selection, mark it complete to prevent re-runs
+                # If user just made a disambiguation selection, mark it complete
                 if is_disambiguation_response:
                     session.phase_state['disambiguation_complete'] = True
                     print(f"[SessionZero] DEBUG: Disambiguation selection made - marking complete")
                 
-                # Check if disambiguation already completed for this session
+                # Check if disambiguation already completed OR was shown this session
                 disambiguation_already_done = session.phase_state.get('disambiguation_complete', False)
+                disambiguation_shown = session.phase_state.get('disambiguation_shown', False)
                 
-                # Only run single-title disambiguation if NOT a hybrid (hybrids have their own disambiguation)
-                # AND disambiguation hasn't already been completed for this session
-                if not is_disambiguation_response and not is_hybrid and not disambiguation_already_done:
+                # Also skip if user gave a SPECIFIC title that matches an existing profile
+                # (e.g., "Naruto Shippuden" instead of just "Naruto")
+                from src.agents.profile_generator import load_existing_profile
+                specific_profile_exists = load_existing_profile(media_ref) is not None
+                
+                print(f"[Disambiguation] Flags: done={disambiguation_already_done}, shown={disambiguation_shown}, specific_exists={specific_profile_exists}")
+                
+                # Only run single-title disambiguation if:
+                # - NOT a hybrid (hybrids have their own disambiguation)
+                # - NOT already completed or shown
+                # - NOT a specific profile that already exists
+                should_disambiguate = (
+                    not is_disambiguation_response and 
+                    not is_hybrid and 
+                    not disambiguation_already_done and 
+                    not disambiguation_shown and
+                    not specific_profile_exists
+                )
+                
+                if should_disambiguate:
                     # This is NOT a disambiguation selection - check if we need to offer options
                     disambiguation = await get_disambiguation_options(media_ref)
                     
                     if disambiguation.get('needs_disambiguation'):
+                        # Mark that we SHOWED disambiguation (prevents re-trigger)
+                        session.phase_state['disambiguation_shown'] = True
+                        session.phase_state['disambiguation_for'] = media_ref
+                        
                         # Return disambiguation options to user
                         print(f"[SessionZero] Disambiguation needed for '{media_ref}' - returning {len(disambiguation['options'])} options")
                         
@@ -670,8 +693,21 @@ I found several entries in the **{media_ref}** franchise:
                     # ======== HYBRID DISAMBIGUATION ========
                     # Check if either title needs disambiguation before proceeding
                     # Skip if preferences already confirmed OR this is a disambiguation selection
-                    # OR disambiguation has already been completed
-                    if not is_disambiguation_response and not hybrid_confirmed and not disambiguation_already_done:
+                    # OR disambiguation has already been completed/shown
+                    # OR both specific profiles already exist
+                    prof_a_exists = load_existing_profile(media_ref) is not None
+                    prof_b_exists = load_existing_profile(secondary_ref) is not None
+                    both_specific = prof_a_exists and prof_b_exists
+                    
+                    should_hybrid_disambiguate = (
+                        not is_disambiguation_response and 
+                        not hybrid_confirmed and 
+                        not disambiguation_already_done and
+                        not disambiguation_shown and
+                        not both_specific
+                    )
+                    
+                    if should_hybrid_disambiguate:
                         import asyncio  # Local import to avoid scope conflicts
                         disambig_a, disambig_b = await asyncio.gather(
                             get_disambiguation_options(media_ref),
@@ -681,6 +717,10 @@ I found several entries in the **{media_ref}** franchise:
                         needs_any = disambig_a.get('needs_disambiguation') or disambig_b.get('needs_disambiguation')
                         
                         if needs_any:
+                            # Mark that we SHOWED disambiguation (prevents re-trigger)
+                            session.phase_state['disambiguation_shown'] = True
+                            session.phase_state['disambiguation_for'] = f"{media_ref} × {secondary_ref}"
+                            
                             # DEBUG: Log actual option counts
                             print(f"[Hybrid Debug] disambig_a options: {len(disambig_a.get('options', []))}")
                             print(f"[Hybrid Debug] disambig_b options: {len(disambig_b.get('options', []))}")
