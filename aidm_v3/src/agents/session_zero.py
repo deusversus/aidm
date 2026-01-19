@@ -672,6 +672,21 @@ async def research_and_apply_profile(
         "sources_consulted": profile.get("sources_consulted", [])
     }
     
+    # EARLY SETTINGS SYNC: Update settings immediately after research completes
+    # Prevents wrong profile loading if server restarts before handoff
+    try:
+        from src.settings import get_settings_store
+        settings_store = get_settings_store()
+        current_settings = settings_store.load()
+        profile_id = profile.get("id")
+        if current_settings.active_profile_id != profile_id:
+            print(f"[SessionZero] Early sync after research: {current_settings.active_profile_id} -> {profile_id}")
+            current_settings.active_profile_id = profile_id
+            current_settings.active_session_id = session.session_id
+            settings_store.save(current_settings)
+    except Exception as sync_err:
+        print(f"[SessionZero] Early sync failed (non-fatal): {sync_err}")
+    
     return {
         "status": "researched",
         "profile_id": profile.get("id"),

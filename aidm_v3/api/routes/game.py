@@ -229,6 +229,17 @@ async def start_session(request: StartSessionRequest = None):
     # Generate or use provided session ID
     session_id = (request.session_id if request else None) or str(uuid.uuid4())
     
+    # FIX #4: Validate settings on new session - clear stale data
+    # If there's a stale session_id that doesn't match, reset settings
+    settings_store = get_settings_store()
+    current_settings = settings_store.load()
+    if current_settings.active_session_id and current_settings.active_session_id != session_id:
+        print(f"[StartSession] Clearing stale settings: session_id was '{current_settings.active_session_id}'")
+        current_settings.active_profile_id = ""
+        current_settings.active_session_id = ""
+        current_settings.active_campaign_id = None
+        settings_store.save(current_settings)
+    
     # Create new session
     session = manager.create_session(session_id)
     
@@ -292,6 +303,32 @@ async def resume_session(session_id: str):
         character_draft=draft_dict
     )
 
+
+@router.get("/session/latest")
+async def get_latest_session():
+    """Get the most recently active session.
+    
+    Used for frontend recovery after server restart.
+    If the current session_id returns 404, frontend can use this
+    to recover to the last active session.
+    """
+    store = get_session_store()
+    session_id = store.get_latest_session_id()
+    
+    if not session_id:
+        raise HTTPException(status_code=404, detail="No sessions found")
+    
+    # Load and return session info
+    session = store.load(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session data corrupted")
+    
+    return {
+        "session_id": session_id,
+        "phase": session.phase.value,
+        "is_session_zero": session.is_session_zero(),
+        "profile": session.character_draft.narrative_profile if session.character_draft else None
+    }
 
 @router.delete("/session/{session_id}")
 async def delete_session(session_id: str):
@@ -918,6 +955,16 @@ I found several entries in the **{media_ref}** franchise:
                         result.detected_info["profile_type"] = "canonical"
                         result.detected_info["profile_id"] = profile_id
                         result.detected_info["confidence"] = existing.get("confidence", 100)
+                        
+                        # EARLY SETTINGS SYNC: Update settings immediately on profile selection
+                        # This prevents wrong profile loading if server restarts before handoff
+                        settings_store = get_settings_store()
+                        current_settings = settings_store.load()
+                        if current_settings.active_profile_id != profile_id:
+                            print(f"[SessionZero] Early sync: {current_settings.active_profile_id} -> {profile_id}")
+                            current_settings.active_profile_id = profile_id
+                            current_settings.active_session_id = session.session_id
+                            settings_store.save(current_settings)
                     else:
                         print(f"[SessionZero] DEBUG: Entering Single Profile Logic for '{media_ref}'")
                         # No existing profile - run research as BACKGROUND TASK
