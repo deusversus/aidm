@@ -284,7 +284,8 @@ class Orchestrator:
                     "event_fidelity": db_context.event_fidelity,
                 },
                 power_tier=db_context.character_summary.split(",")[1].strip() if "," in (db_context.character_summary or "") else "T10",
-                established_facts=established_facts
+                established_facts=established_facts,
+                profile_id=self.profile_id
             )
             
             print(f"[Orchestrator] WORLD_BUILDING: {len(wb_result.entities)} entities, status={wb_result.validation_status}")

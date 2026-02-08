@@ -117,14 +117,29 @@ class ContextSelector:
         relevant_rules = self.rules.get_relevant_rules(rule_query, limit=3)
         
         # 3. Search Profile Lore (for canon grounding)
-        # Query lore for relevant intents: COMBAT, ABILITY, LORE_QUESTION, SOCIAL
+        # Intent → preferred page_type for filtered retrieval
+        INTENT_LORE_CONFIG = {
+            "COMBAT":        {"page_type": None,         "limit": 3},  # broad — techniques, characters, etc.
+            "ABILITY":       {"page_type": "techniques",  "limit": 3},
+            "LORE_QUESTION": {"page_type": None,         "limit": 3},  # broad search for any lore
+            "SOCIAL":        {"page_type": "characters",  "limit": 2},
+            "EXPLORATION":   {"page_type": "locations",   "limit": 2},
+            "DIALOGUE":      {"page_type": "characters",  "limit": 2},
+        }
+        
         lore_chunks = []
-        if intent and intent.intent in ["COMBAT", "ABILITY", "LORE_QUESTION", "SOCIAL"]:
+        lore_config = INTENT_LORE_CONFIG.get(intent.intent if intent else None)
+        if lore_config:
             profile_lib = get_profile_library()
             lore_query = f"{intent.action} {intent.target or ''} {state_context.situation}"
-            lore_chunks = profile_lib.search_lore(profile_id, lore_query, limit=2)
+            lore_chunks = profile_lib.search_lore(
+                profile_id, 
+                lore_query, 
+                limit=lore_config["limit"],
+                page_type=lore_config.get("page_type"),
+            )
             if lore_chunks:
-                print(f"[ContextSelector] Retrieved {len(lore_chunks)} lore chunks for {profile_id}")
+                print(f"[ContextSelector] Retrieved {len(lore_chunks)} lore chunks for {profile_id} (type={lore_config.get('page_type', 'any')})")
         
         return {
             "raw_memories": raw_memories,

@@ -161,6 +161,7 @@ If rejecting/clarifying, provide a natural in-character response, not a robotic 
         power_tier: str = "T10",
         established_facts: str = "",
         mode: Literal["validate", "extract_only"] = "validate",
+        profile_id: Optional[str] = None,
         **kwargs
     ) -> WorldBuildingOutput:
         """Call the world builder with context.
@@ -172,6 +173,7 @@ If rejecting/clarifying, provide a natural in-character response, not a robotic 
             power_tier: Character's power tier (T1-T10)
             established_facts: Summary of established world facts
             mode: "validate" for player input, "extract_only" for DM narratives
+            profile_id: Optional profile ID for wiki-grounded canon lookup
         """
         canonicality = canonicality or {}
         
@@ -201,6 +203,11 @@ Always return validation_status="accepted" in extract_only mode.
 If no named entities are found, return an empty entities list."""
         else:
             # VALIDATE MODE: Standard player input validation
+            # Wiki-grounded canon lookup (Phase 3 enhancement)
+            canon_reference = ""
+            if profile_id:
+                canon_reference = self._query_wiki_canon(profile_id, player_input)
+            
             context_message = f"""## Player Action
 {player_input}
 
@@ -217,10 +224,40 @@ If no named entities are found, return an empty entities list."""
 
 ## Established World Facts
 {established_facts or 'No specific facts established yet.'}
-
+{canon_reference}
 ---
 
 Extract and validate any world-building assertions in this player action."""
         
         return await super().call(context_message)
+    
+    def _query_wiki_canon(self, profile_id: str, player_input: str) -> str:
+        """Query ProfileLibrary for wiki content relevant to the player's assertion.
+        
+        Searches across multiple page types to find canon evidence for validation.
+        Returns formatted text to inject into the LLM context, or empty string.
+        """
+        from ..context.profile_library import get_profile_library
+        
+        try:
+            lib = get_profile_library()
+            
+            # Broad search for anything matching the player's input
+            results = lib.search_lore(profile_id, player_input, limit=3)
+            
+            if not results:
+                return ""
+            
+            # Format as canon reference block
+            chunks_text = "\n\n".join(f"- {chunk}" for chunk in results)
+            return f"""
+## Canon Reference (from wiki)
+The following canon information was retrieved from the series wiki.
+Use this to validate whether the player's assertions are consistent with established lore.
+
+{chunks_text}
+"""
+        except Exception as e:
+            print(f"[WorldBuilder] Wiki canon lookup failed: {e}")
+            return ""
 

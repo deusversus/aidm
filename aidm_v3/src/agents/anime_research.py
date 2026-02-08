@@ -88,6 +88,18 @@ class AnimeResearchOutput(BaseModel):
         description="comedy_level, darkness_level, optimism"
     )
     
+    # Director personality (LLM-synthesized narrative directing prompt)
+    director_personality: str = Field(
+        default="",
+        description="3-5 sentence directing style prompt, IP-specific"
+    )
+    
+    # Pacing style (LLM-synthesized)
+    pacing_style: str = Field(
+        default="moderate",
+        description="Scene pacing: rapid, moderate, or deliberate"
+    )
+    
     # World Tier (typical power level for characters in this anime)
     world_tier: str = Field(default="T8", description="Typical power tier (T10=human, T8=street, T6=city, T4=planet, T2=multiverse)")
     
@@ -1016,23 +1028,592 @@ Supplemental knowledge: {response.content}
         
         result.confidence = max(20, min(100, base_confidence - penalties + boosts))
         return result
+    
+    # ====================================================================
+    # API-First Research Pipeline (Phase 2)
+    # ====================================================================
+    
+    @staticmethod
+    def _determine_scope_from_count(article_count: int) -> str:
+        """Deterministic scope from Fandom article count. No LLM needed."""
+        if article_count == 0:
+            return "MICRO"
+        elif article_count <= 50:
+            return "STANDARD"
+        elif article_count <= 300:
+            return "COMPLEX"
+        else:
+            return "EPIC"
+    
+    async def research_anime_api(
+        self,
+        anime_name: str,
+        progress_tracker: Optional[ProgressTracker] = None
+    ) -> AnimeResearchOutput:
+        """
+        API-first research pipeline: AniList + Fandom + 2-3 LLM calls.
+        
+        Flow:
+        1. AniList GraphQL → structured metadata (titles, genres, tags, characters)
+        2. Fandom MediaWiki → wiki pages (techniques, characters, locations)
+        3. LLM interpretation → DNA scales, power system synthesis, voice cards
+        
+        Falls back to web-search pipeline if APIs fail.
+        """
+        from ..scrapers.anilist import AniListClient
+        from ..scrapers.fandom import FandomClient, guess_wiki_url
+        from ..scrapers.cache import ScraperCache
+        from ..llm import get_llm_manager
+        
+        manager = get_llm_manager()
+        provider, model = manager.get_provider_for_agent(self.agent_name)
+        cache = ScraperCache()
+        
+        # ========== STEP 1: AniList Metadata ==========
+        if progress_tracker:
+            await progress_tracker.emit(
+                ProgressPhase.SCOPE,
+                "Fetching AniList metadata...",
+                5
+            )
+        
+        anilist_client = AniListClient()
+        anilist = await anilist_client.search_with_fallback(anime_name)
+        
+        if not anilist:
+            print(f"[AnimeResearch/API] AniList returned nothing for '{anime_name}', falling back to web search")
+            return await self.research_anime(anime_name, progress_tracker=progress_tracker)
+        
+        # Use the official title from AniList
+        official_title = anilist.title_english or anilist.title_romaji
+        print(f"[AnimeResearch/API] AniList: {official_title} ({anilist.status}, {anilist.format})")
+        
+        if progress_tracker:
+            await progress_tracker.emit(
+                ProgressPhase.SCOPE,
+                f"Found: {official_title} ({anilist.status})",
+                10,
+                {"source": "anilist", "title": official_title}
+            )
+        
+        # ========== STEP 2: Fandom Wiki Content ==========
+        if progress_tracker:
+            await progress_tracker.emit(
+                ProgressPhase.RESEARCH,
+                "Searching for Fandom wiki...",
+                15
+            )
+        
+        fandom_client = FandomClient()
+        # Pass both English and romaji titles so wiki discovery can try all variants
+        # (mirrors profile aliasing system that indexes multiple title forms)
+        alt_titles = []
+        if anilist.title_english and anilist.title_english != official_title:
+            alt_titles.append(anilist.title_english)
+        if anilist.title_romaji and anilist.title_romaji != official_title:
+            alt_titles.append(anilist.title_romaji)
+        wiki_url = await fandom_client.find_wiki_url(official_title, alt_titles=alt_titles or None)
+        
+        fandom_result = None
+        if wiki_url:
+            scope = self._determine_scope_from_count(0)  # Will update after stats
+            
+            if progress_tracker:
+                await progress_tracker.emit(
+                    ProgressPhase.RESEARCH,
+                    f"Scraping wiki: {wiki_url}...",
+                    20
+                )
+            
+            fandom_result = await fandom_client.scrape_wiki(
+                wiki_url,
+                max_pages_per_type=25,
+                character_limit=15,
+            )
+            
+            scope = self._determine_scope_from_count(fandom_result.article_count)
+            print(f"[AnimeResearch/API] Fandom: {fandom_result.article_count} articles, scope={scope}")
+            print(f"[AnimeResearch/API] Scraped: {fandom_result.get_total_page_count()} pages")
+            
+            if progress_tracker:
+                await progress_tracker.emit(
+                    ProgressPhase.RESEARCH,
+                    f"Wiki scraped: {fandom_result.get_total_page_count()} pages ({scope})",
+                    50,
+                    {"wiki": wiki_url, "pages": fandom_result.get_total_page_count(), "scope": scope}
+                )
+        else:
+            scope = "MICRO"
+            print(f"[AnimeResearch/API] No Fandom wiki found, proceeding with AniList-only")
+            
+            if progress_tracker:
+                await progress_tracker.emit(
+                    ProgressPhase.RESEARCH,
+                    "No wiki found, using AniList data only",
+                    50
+                )
+        
+        # ========== STEP 3: Build Output from API Data (No LLM) ==========
+        if progress_tracker:
+            await progress_tracker.emit(
+                ProgressPhase.PARSING,
+                "Mapping API data to profile...",
+                55
+            )
+        
+        output = AnimeResearchOutput(
+            title=official_title,
+            alternate_titles=anilist.get_all_titles(),
+            media_type=self._map_format(anilist.format),
+            status=anilist.status.lower() if anilist.status else "completed",
+            detected_genres=anilist.genres,
+            sources_consulted=["anilist.co"],
+            research_method="api_first",
+            confidence=85,
+        )
+        
+        # Map AniList relations to series fields
+        self._map_relations(output, anilist)
+        
+        # Map characters from AniList
+        if anilist.characters:
+            main_chars = anilist.get_main_characters()
+            output.world_setting["protagonist"] = main_chars[0].name if main_chars else ""
+            output.world_setting["key_characters"] = [c.name for c in anilist.characters[:15]]
+        
+        # Add description to raw content
+        raw_sections = []
+        if anilist.description:
+            raw_sections.append(f"## Synopsis\n{anilist.description}")
+        
+        # Add Fandom content
+        if fandom_result and fandom_result.all_content:
+            raw_sections.append(fandom_result.all_content)
+            output.sources_consulted.append(wiki_url)
+            
+            # Map fandom pages to world_setting
+            if fandom_result.pages.get("locations"):
+                output.world_setting["locations"] = [p.title for p in fandom_result.pages["locations"]]
+            if fandom_result.pages.get("factions"):
+                output.world_setting["factions"] = [
+                    {"name": p.title, "description": p.clean_text[:200]} 
+                    for p in fandom_result.pages["factions"][:10]
+                ]
+            if fandom_result.pages.get("arcs"):
+                output.recent_updates = ", ".join([p.title for p in fandom_result.pages["arcs"][:10]])
+        
+        output.raw_content = "\n\n".join(raw_sections) if raw_sections else None
+        
+        # ========== STEP 4: LLM Interpretation (2-3 calls) ==========
+        if progress_tracker:
+            await progress_tracker.emit(
+                ProgressPhase.PARSING,
+                "LLM: Deriving DNA scales and power system...",
+                60
+            )
+        
+        # Build context string for LLM interpretation
+        tag_context = "\n".join(
+            f"- {t.name}: {t.rank}%" 
+            for t in anilist.get_non_spoiler_tags(20)
+        )
+        genre_context = ", ".join(anilist.genres)
+        synopsis = anilist.description or "No synopsis available."
+        
+        # Power system and technique context from wiki
+        power_context = ""
+        if fandom_result:
+            tech_pages = fandom_result.get_pages_by_type("techniques")
+            if tech_pages:
+                power_context = "\n\n".join(
+                    f"### {p.title}\n{p.clean_text[:1000]}" for p in tech_pages[:5]
+                )
+        
+        # --- LLM Call 1: DNA Scales + Tone + Combat + World Tier ---
+        interpretation_prompt = f"""# Interpret Anime Profile: {official_title}
+
+## AniList Data
+- Genres: {genre_context}
+- Format: {anilist.format}, Episodes: {anilist.episodes or 'N/A'}
+- Score: {anilist.average_score}/100
+- Synopsis: {synopsis[:500]}
+
+## AniList Tags (community-voted relevance):
+{tag_context}
+
+## Task
+Based on the above data, provide:
+
+1. **dna_scales** (all 11 scales, 0-10):
+   - introspection_vs_action, comedy_vs_drama, simple_vs_complex
+   - power_fantasy_vs_struggle, explained_vs_mysterious, fast_paced_vs_slow_burn
+   - episodic_vs_serialized, grounded_vs_absurd, tactical_vs_instinctive
+   - hopeful_vs_cynical, ensemble_vs_solo
+
+2. **tone**: comedy_level (0-10), darkness_level (0-10), optimism (0-10)
+
+3. **combat_style**: exactly one of: tactical, spectacle, comedy, spirit, narrative
+
+4. **world_tier**: T10=human, T8=street, T6=city, T4=planet, T2=multiverse
+
+5. **storytelling_tropes** (true/false for each):
+   tournament_arc, training_montage, power_of_friendship, mentor_death, chosen_one,
+   tragic_backstory, redemption_arc, betrayal, sacrifice, transformation,
+   forbidden_technique, time_loop, false_identity, ensemble_focus, slow_burn_romance
+
+Respond with ONLY valid JSON, no markdown or explanation."""
+        
+        try:
+            from .extraction_schemas import DNAScalesExtract, ToneExtract, CombatExtract
+            
+            # Use a combined schema for efficiency
+            from pydantic import create_model
+            InterpretationSchema = create_model(
+                "InterpretationSchema",
+                dna_scales=(DNAScalesExtract, ...),
+                tone=(ToneExtract, ...),
+                combat=(CombatExtract, ...),
+                world_tier=(str, "T8"),
+                storytelling_tropes=(Dict[str, bool], {}),
+            )
+            
+            interp = await provider.complete_with_schema(
+                messages=[{"role": "user", "content": interpretation_prompt}],
+                schema=InterpretationSchema,
+                system="You are interpreting anime metadata into profile scales. Use the AniList tags as primary signal — they are community-voted relevance scores.",
+                model=model,
+                max_tokens=2048,
+            )
+            
+            # Apply interpretation results
+            ds = interp.dna_scales
+            output.dna_scales = {
+                "introspection_vs_action": getattr(ds, 'introspection_vs_action', 5),
+                "comedy_vs_drama": getattr(ds, 'comedy_vs_drama', 5),
+                "simple_vs_complex": getattr(ds, 'simple_vs_complex', 5),
+                "power_fantasy_vs_struggle": getattr(ds, 'power_fantasy_vs_struggle', 5),
+                "explained_vs_mysterious": getattr(ds, 'explained_vs_mysterious', 5),
+                "fast_paced_vs_slow_burn": getattr(ds, 'fast_paced_vs_slow_burn', 5),
+                "episodic_vs_serialized": getattr(ds, 'episodic_vs_serialized', 5),
+                "grounded_vs_absurd": getattr(ds, 'grounded_vs_absurd', 5),
+                "tactical_vs_instinctive": getattr(ds, 'tactical_vs_instinctive', 5),
+                "hopeful_vs_cynical": getattr(ds, 'hopeful_vs_cynical', 5),
+                "ensemble_vs_solo": getattr(ds, 'ensemble_vs_solo', 5),
+            }
+            
+            t = interp.tone
+            output.tone = {
+                "comedy_level": getattr(t, 'comedy_level', 5),
+                "darkness_level": getattr(t, 'darkness_level', 5),
+                "optimism": getattr(t, 'optimism', 5),
+            }
+            
+            output.combat_style = getattr(interp.combat, 'style', 'spectacle')
+            output.world_tier = interp.world_tier or "T8"
+            output.storytelling_tropes = interp.storytelling_tropes or {}
+            
+            print(f"[AnimeResearch/API] LLM interpretation: DNA={len(output.dna_scales)} scales, combat={output.combat_style}, tier={output.world_tier}")
+            
+        except Exception as e:
+            import traceback
+            print(f"[AnimeResearch/API] LLM interpretation failed: {e}")
+            traceback.print_exc()
+            output.confidence -= 20
+        
+        # --- LLM Call 2: Power System Synthesis (only if wiki has content) ---
+        if power_context:
+            if progress_tracker:
+                await progress_tracker.emit(
+                    ProgressPhase.PARSING,
+                    "LLM: Synthesizing power system from wiki...",
+                    75
+                )
+            
+            power_prompt = f"""# Synthesize Power System: {official_title}
+
+## Wiki Technique/Ability Pages:
+{power_context}
+
+## Task
+From the wiki pages above, extract the power system:
+- name: The name of the power system (e.g., "Nen", "Cursed Energy", "Quirks")
+- mechanics: How it works (2-3 sentences)
+- limitations: Costs, restrictions, drawbacks
+- tiers: Power levels/ranks if applicable (list of strings)
+
+Respond with ONLY valid JSON."""
+            
+            try:
+                from .extraction_schemas import PowerSystemExtract
+                
+                ps_result = await provider.complete_with_schema(
+                    messages=[{"role": "user", "content": power_prompt}],
+                    schema=PowerSystemExtract,
+                    system="Extract the power system from wiki page content. Be specific and use canon terminology.",
+                    model=model,
+                    max_tokens=1024,
+                )
+                
+                output.power_system = {
+                    "name": ps_result.name,
+                    "mechanics": ps_result.mechanics,
+                    "limitations": ps_result.limitations,
+                    "tiers": ps_result.tiers,
+                }
+                print(f"[AnimeResearch/API] Power system: {ps_result.name}")
+                
+            except Exception as e:
+                import traceback
+                print(f"[AnimeResearch/API] Power system synthesis failed: {e}")
+                traceback.print_exc()
+        
+        # --- LLM Call 3: Voice Cards (only if character pages with quotes exist) ---
+        char_pages_with_quotes = []
+        if fandom_result:
+            for p in fandom_result.get_pages_by_type("characters"):
+                if p.quotes:
+                    char_pages_with_quotes.append(p)
+        
+        if char_pages_with_quotes:
+            if progress_tracker:
+                await progress_tracker.emit(
+                    ProgressPhase.PARSING,
+                    "LLM: Extracting voice patterns...",
+                    85
+                )
+            
+            quote_context = ""
+            for page in char_pages_with_quotes[:5]:
+                quotes_str = "\n".join(f'  "{q}"' for q in page.quotes[:5])
+                quote_context += f"\n### {page.title}\n{quotes_str}\n"
+            
+            voice_prompt = f"""# Extract Character Voice Patterns: {official_title}
+
+## Character Quotes from Wiki:
+{quote_context}
+
+## Task
+For each character, create a voice card with:
+- name: Character name
+- speech_patterns: How they talk (formal, casual, rough, etc.)
+- humor_type: Their comedy style if any
+- signature_phrases: Catchphrases or common expressions
+- dialogue_rhythm: Sentence structure patterns
+
+Return as a JSON object with key "voice_cards" containing a list of voice card objects."""
+            
+            try:
+                from .extraction_schemas import CharacterVoiceCardsExtract
+                
+                vc_result = await provider.complete_with_schema(
+                    messages=[{"role": "user", "content": voice_prompt}],
+                    schema=CharacterVoiceCardsExtract,
+                    system="Extract speech patterns from character dialogue quotes. Be specific about HOW they speak.",
+                    model=model,
+                    max_tokens=2048,
+                )
+                
+                output.voice_cards = [
+                    {
+                        "name": vc.name,
+                        "speech_patterns": vc.speech_patterns,
+                        "humor_type": getattr(vc, 'humor_type', ''),
+                        "signature_phrases": getattr(vc, 'signature_phrases', ''),
+                        "dialogue_rhythm": getattr(vc, 'dialogue_rhythm', ''),
+                    }
+                    for vc in vc_result.voice_cards
+                ]
+                print(f"[AnimeResearch/API] Voice cards: {len(output.voice_cards)} characters")
+                
+            except Exception as e:
+                import traceback
+                print(f"[AnimeResearch/API] Voice card extraction failed: {e}")
+                traceback.print_exc()
+        
+        # --- LLM Call 4: Narrative Synthesis (director personality + author voice) ---
+        # This runs LAST because it needs the full assembled profile context
+        if progress_tracker:
+            await progress_tracker.emit(
+                ProgressPhase.PARSING,
+                "LLM: Synthesizing narrative direction...",
+                90
+            )
+        
+        # Build full context from all previously computed fields
+        dna_summary = ", ".join(f"{k}: {v}/10" for k, v in output.dna_scales.items()) if output.dna_scales else "Not computed"
+        tone_summary = ", ".join(f"{k}: {v}" for k, v in (output.tone or {}).items()) if output.tone else "Not computed"
+        tropes_on = [k.replace('_', ' ') for k, v in output.storytelling_tropes.items() if v]
+        tropes_off = [k.replace('_', ' ') for k, v in output.storytelling_tropes.items() if not v]
+        ps = output.power_system or {}
+        power_summary = f"{ps.get('name', 'None')} — {ps.get('mechanics', 'N/A')}" if ps.get('name') else "No power system"
+        genre_list = ", ".join(output.detected_genres) if output.detected_genres else "Unknown"
+        
+        synthesis_prompt = f"""# Narrative Synthesis: {official_title}
+
+You are creating the narrative DNA for a tabletop RPG campaign set in this anime's world. 
+Your output will directly steer the AI Director that plans story arcs and the AI Writer that generates prose.
+
+## Full Profile Context
+
+**Title:** {official_title}
+**Genres:** {genre_list}
+**Synopsis:** {synopsis[:600]}
+**Format:** {anilist.format if anilist else 'Unknown'}, Episodes: {anilist.episodes if anilist else 'N/A'}
+
+**DNA Scales:** {dna_summary}
+**Tone:** {tone_summary}
+**Combat Style:** {output.combat_style}
+**World Tier:** {output.world_tier}
+**Power System:** {power_summary}
+
+**Active Tropes:** {', '.join(tropes_on) if tropes_on else 'None'}
+**Inactive Tropes:** {', '.join(tropes_off) if tropes_off else 'None'}
+
+## Task: Generate Three Things
+
+### 1. director_personality (CRITICAL — Steers the Entire Campaign)
+Write a 3-5 sentence directing style prompt in second person ("You...").
+
+This must capture:
+- The IP's **emotional core** (what makes this anime FEEL like THIS anime, not just any anime)
+- **Pacing philosophy** (how scenes should breathe, when to linger vs cut)
+- **What matters** in this world (what the camera focuses on, what's worth a scene)
+- **How to frame conflict** (is it tactical chess or emotional catharsis?)
+
+BAD example (generic): "You favor action and momentum. You maintain dramatic weight."
+GOOD example (IP-specific): "You are patient — you let moments breathe and find meaning in what others overlook. Time is your most powerful narrative tool; show how decades compress into memories. Combat reveals character, never just power levels."
+
+### 2. author_voice (Writing Style Fingerprint)
+Capture the distinctive stylistic patterns of this IP:
+- sentence_patterns: How prose is structured (short vs flowing, etc.)
+- structural_motifs: Narrative techniques (flashbacks, parallel timelines, cold opens, etc.)
+- dialogue_quirks: How characters speak in this world
+- emotional_rhythm: How emotional beats are paced
+- example_voice: One sample sentence that exemplifies this IP's voice
+
+### 3. pacing_style
+Choose exactly one: "rapid" (action-driven, short scenes), "moderate" (balanced), or "deliberate" (slow-burn, scenes breathe, emotional weight)
+
+Respond with ONLY valid JSON."""
+
+        try:
+            from .extraction_schemas import NarrativeSynthesisExtract
+            
+            synth_result = await provider.complete_with_schema(
+                messages=[{"role": "user", "content": synthesis_prompt}],
+                schema=NarrativeSynthesisExtract,
+                system="You are synthesizing narrative direction for a tabletop RPG. Be specific to this IP — generic output is useless. Every sentence should be something that could NOT apply to a different anime.",
+                model=model,
+                max_tokens=2048,
+            )
+            
+            output.director_personality = synth_result.director_personality
+            output.pacing_style = synth_result.pacing_style
+            
+            # Author voice
+            av = synth_result.author_voice
+            output.author_voice = {
+                "sentence_patterns": av.sentence_patterns,
+                "structural_motifs": av.structural_motifs,
+                "dialogue_quirks": av.dialogue_quirks,
+                "emotional_rhythm": av.emotional_rhythm,
+                "example_voice": av.example_voice,
+            }
+            
+            print(f"[AnimeResearch/API] Narrative synthesis: pacing={output.pacing_style}, director={output.director_personality[:80]}...")
+            print(f"[AnimeResearch/API] Author voice: {len(av.sentence_patterns)} patterns, {len(av.structural_motifs)} motifs")
+            
+        except Exception as e:
+            import traceback
+            print(f"[AnimeResearch/API] Narrative synthesis failed (non-fatal): {e}")
+            traceback.print_exc()
+        
+        # ========== STEP 5: Confidence Assessment ==========
+        output = self._assess_and_adjust_confidence(output)
+        
+        # Boost confidence for API-sourced data
+        if anilist:
+            output.confidence = min(100, output.confidence + 5)
+        if fandom_result and fandom_result.get_total_page_count() > 0:
+            output.confidence = min(100, output.confidence + 5)
+        
+        if progress_tracker:
+            await progress_tracker.emit(
+                ProgressPhase.COMPLETE,
+                f"Research complete! Confidence: {output.confidence}%",
+                100,
+                {"confidence": output.confidence, "title": output.title, "method": "api_first"}
+            )
+        
+        print(f"[AnimeResearch/API] Complete: {output.title}, confidence={output.confidence}%, method=api_first")
+        return output
+    
+    @staticmethod
+    def _map_format(anilist_format: Optional[str]) -> str:
+        """Map AniList format to our media_type field."""
+        mapping = {
+            "TV": "anime", "TV_SHORT": "anime", "MOVIE": "anime",
+            "SPECIAL": "anime", "OVA": "anime", "ONA": "anime",
+            "MANGA": "manga", "ONE_SHOT": "manga",
+            "NOVEL": "light_novel",
+        }
+        return mapping.get(anilist_format or "", "anime")
+    
+    @staticmethod
+    def _map_relations(output: AnimeResearchOutput, anilist) -> None:
+        """Map AniList relations to series_group/related_franchise fields."""
+        if not anilist.relations:
+            return
+        
+        # Check for prequels/sequels to determine franchise
+        for rel in anilist.relations:
+            if rel.relation_type in ("PREQUEL", "SEQUEL"):
+                # Part of a franchise
+                base_title = anilist.title_romaji.lower()
+                # Simplify to snake_case for series_group
+                import re
+                output.series_group = re.sub(r'[^a-z0-9]+', '_', base_title).strip('_')
+                break
+        
+        # Check for parent/side stories
+        for rel in anilist.relations:
+            if rel.relation_type == "PARENT":
+                output.related_franchise = rel.title_romaji
+                output.relation_type = "spinoff"
+                break
+            elif rel.relation_type == "ALTERNATIVE":
+                output.related_franchise = rel.title_romaji
+                output.relation_type = "alternate_timeline"
+                break
 
 
 async def research_anime_with_search(
     anime_name: str,
-    progress_tracker: Optional["ProgressTracker"] = None
+    progress_tracker: Optional["ProgressTracker"] = None,
+    use_api: bool = True
 ) -> AnimeResearchOutput:
     """
     Convenience function for anime research.
     
     Creates an AnimeResearchAgent and runs research.
+    Uses the API-first pipeline by default, falls back to web search.
     
     Args:
         anime_name: Name of anime to research
         progress_tracker: Optional tracker for streaming progress updates
+        use_api: If True, use API-first pipeline (default). If False, use web search.
         
     Returns:
         AnimeResearchOutput with research results
     """
     agent = AnimeResearchAgent()
-    return await agent.research_anime(anime_name, progress_tracker=progress_tracker)
+    
+    if use_api:
+        try:
+            return await agent.research_anime_api(anime_name, progress_tracker=progress_tracker)
+        except Exception as e:
+            print(f"[AnimeResearch] API pipeline failed: {e}, falling back to web search")
+            return await agent.research_anime(anime_name, progress_tracker=progress_tracker)
+    else:
+        return await agent.research_anime(anime_name, progress_tracker=progress_tracker)
+

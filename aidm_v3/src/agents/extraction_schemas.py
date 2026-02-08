@@ -232,6 +232,32 @@ class AuthorVoiceExtract(BaseModel):
     )
 
 
+class NarrativeSynthesisExtract(BaseModel):
+    """Synthesized narrative direction from full profile context.
+    
+    This is the final synthesis step — after DNA scales, tone, tropes,
+    power system, and voice cards are all computed, this call produces
+    the high-level narrative prompts that steer the Director agent
+    and define the IP's writing fingerprint.
+    """
+    director_personality: str = Field(
+        default="",
+        description=(
+            "3-5 sentence directing style prompt. Capture this IP's emotional core, "
+            "pacing philosophy, what matters most in this world, and how to frame scenes. "
+            "Write in second person ('You...'). Be specific to this anime — generic prompts are useless."
+        )
+    )
+    author_voice: AuthorVoiceExtract = Field(
+        default_factory=AuthorVoiceExtract,
+        description="The distinctive writing voice and stylistic fingerprint of this IP"
+    )
+    pacing_style: str = Field(
+        default="moderate",
+        description="Scene pacing: 'rapid' (action-heavy, short scenes), 'moderate' (balanced), or 'deliberate' (slow-burn, scenes breathe)"
+    )
+
+
 # =============================================================================
 # TOPIC-TO-SCHEMA MAPPING
 # =============================================================================

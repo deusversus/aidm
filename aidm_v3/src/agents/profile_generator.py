@@ -134,11 +134,11 @@ def generate_compact_profile(research: AnimeResearchOutput) -> Dict[str, Any]:
         # Tone
         "tone": research.tone,
         
-        # Director personality (generated from DNA)
-        "director_personality": _generate_director_personality(research),
+        # Director personality (LLM-synthesized, with deterministic fallback)
+        "director_personality": research.director_personality or _generate_director_personality(research),
         
-        # Pacing
-        "pacing": _infer_pacing(research),
+        # Pacing (LLM-synthesized, with deterministic fallback)
+        "pacing": _build_pacing(research),
         
         # Sources for transparency
         "sources_consulted": research.sources_consulted,
@@ -169,64 +169,76 @@ def generate_compact_profile(research: AnimeResearchOutput) -> Dict[str, Any]:
 
 
 def _generate_director_personality(research: AnimeResearchOutput) -> str:
-    """Generate a director personality prompt from research."""
-    dna = research.dna_scales
+    """Fallback: generate a basic director personality from DNA scales.
     
-    # Build personality based on DNA
+    Only used when LLM synthesis (Call 4) fails. The LLM-generated version
+    is always preferred because it captures IP-specific thematic nuance.
+    """
+    dna = research.dna_scales
     traits = []
     
-    # Action vs introspection
-    if dna.get("introspection_vs_action", 5) < 4:
-        traits.append("You favor action and momentum over lengthy contemplation.")
-    elif dna.get("introspection_vs_action", 5) > 6:
+    # Introspection (low value = introspective, high = action)
+    if dna.get("introspection_vs_action", 5) <= 3:
         traits.append("You explore character thoughts and feelings deeply.")
+    elif dna.get("introspection_vs_action", 5) >= 7:
+        traits.append("You favor action and momentum over lengthy contemplation.")
     
     # Comedy vs drama
-    if dna.get("comedy_vs_drama", 5) > 6:
+    if dna.get("comedy_vs_drama", 5) >= 7:
         traits.append("You inject humor even in tense moments.")
-    elif dna.get("comedy_vs_drama", 5) < 4:
+    elif dna.get("comedy_vs_drama", 5) <= 3:
         traits.append("You maintain dramatic weight; comedy is rare and earned.")
     
+    # Pacing
+    if dna.get("fast_paced_vs_slow_burn", 5) >= 7:
+        traits.append("You let scenes breathe. Patience is a virtue; payoffs are earned.")
+    elif dna.get("fast_paced_vs_slow_burn", 5) <= 3:
+        traits.append("You keep the pace relentless. Every scene escalates.")
+    
+    # Hopeful vs cynical
+    if dna.get("hopeful_vs_cynical", 5) >= 7:
+        traits.append("Victories are pyrrhic. The world is harsh.")
+    elif dna.get("hopeful_vs_cynical", 5) <= 3:
+        traits.append("Hope is real in this world. Earned optimism, not naivety.")
+    
     # Tactical vs instinctive
-    if dna.get("tactical_vs_instinctive", 5) < 4:
+    if dna.get("tactical_vs_instinctive", 5) <= 3:
         traits.append("You explain strategies and tactics in detail.")
-    elif dna.get("tactical_vs_instinctive", 5) > 6:
+    elif dna.get("tactical_vs_instinctive", 5) >= 7:
         traits.append("Battles are won by willpower and instinct, not chess moves.")
-    
-    # Grounded vs absurd
-    if dna.get("grounded_vs_absurd", 5) > 7:
-        traits.append("Embrace the absurd. Reality is a suggestion.")
-    
-    # Power fantasy
-    if dna.get("power_fantasy_vs_struggle", 5) > 7:
-        traits.append("The protagonist is powerful; challenges come from elsewhere.")
-    elif dna.get("power_fantasy_vs_struggle", 5) < 3:
-        traits.append("Every victory is hard-earned. Struggles are real.")
     
     base = f"You are the director for a {research.title}-style campaign. "
     return base + " ".join(traits)
 
 
-def _infer_pacing(research: AnimeResearchOutput) -> Dict[str, Any]:
-    """Infer pacing parameters from DNA."""
-    dna = research.dna_scales
+def _build_pacing(research: AnimeResearchOutput) -> Dict[str, Any]:
+    """Build pacing dict from LLM pacing_style with deterministic fallback."""
+    # Use LLM-synthesized pacing if available
+    style = research.pacing_style or _infer_pacing_style(research)
     
-    fast_score = dna.get("fast_vs_slow", 5)
-    
-    if fast_score > 7:
-        scene_length = "rapid"
-        arc_sessions = "2-4"
-    elif fast_score > 4:
-        scene_length = "moderate"
-        arc_sessions = "4-6"
-    else:
-        scene_length = "deliberate"
-        arc_sessions = "6-10"
+    arc_map = {
+        "rapid": "2-4",
+        "moderate": "4-6",
+        "deliberate": "6-10",
+    }
     
     return {
-        "scene_length": scene_length,
-        "arc_length_sessions": arc_sessions
+        "scene_length": style,
+        "arc_length_sessions": arc_map.get(style, "4-6")
     }
+
+
+def _infer_pacing_style(research: AnimeResearchOutput) -> str:
+    """Fallback: infer pacing from DNA scales."""
+    dna = research.dna_scales
+    fast_score = dna.get("fast_paced_vs_slow_burn", 5)  # Fixed: was "fast_vs_slow"
+    
+    if fast_score >= 7:
+        return "deliberate"  # High = slow burn
+    elif fast_score <= 3:
+        return "rapid"       # Low = fast paced
+    else:
+        return "moderate"
 
 
 def _infer_world_tier(research: AnimeResearchOutput) -> str:
@@ -362,18 +374,34 @@ async def generate_and_save_profile(
             print(f"[ProfileGenerator] DEBUG: research.raw_content is {'PRESENT' if research.raw_content else 'MISSING'}")
             
             if research.raw_content:
-                # Validate lore before saving (detect corruption)
-                from .validator import ValidatorAgent
-                print(f"[ProfileGenerator] Validating research (len={len(research.raw_content)})...", flush=True)
-                validator = ValidatorAgent()
-                validation = await validator.validate_research(research.raw_content)
-                print(f"[ProfileGenerator] Validation complete. Is Valid: {validation.is_valid}", flush=True)
-                
-                if validation.has_corruption:
-                    raise ValueError(f"Profile lore corrupted: {validation.corruption_type}. Retry needed.")
-                
-                if not validation.is_valid:
-                    print(f"[ProfileGenerator] Warning: Lore validation issues: {validation.issues}")
+                # For large content (API-sourced wiki scrape), skip repetition-based
+                # corruption checks — they were designed for LLM output where looping
+                # is a failure mode, not for multi-page wiki dumps where repetition
+                # is natural. Still validate small/medium content (old web-search pipeline).
+                content_len = len(research.raw_content)
+                if content_len < 10000:
+                    # Small content: run full validation (corruption + completeness)
+                    from .validator import ValidatorAgent
+                    print(f"[ProfileGenerator] Validating research (len={content_len})...", flush=True)
+                    validator = ValidatorAgent()
+                    validation = await validator.validate_research(research.raw_content)
+                    print(f"[ProfileGenerator] Validation complete. Is Valid: {validation.is_valid}", flush=True)
+                    
+                    if validation.has_corruption:
+                        raise ValueError(f"Profile lore corrupted: {validation.corruption_type}. Retry needed.")
+                    
+                    if not validation.is_valid:
+                        print(f"[ProfileGenerator] Warning: Lore validation issues: {validation.issues}")
+                else:
+                    # Large content (wiki scrape): skip repetition checks, only check
+                    # for leaked reasoning markers which are always invalid
+                    from .validator import ValidatorAgent
+                    print(f"[ProfileGenerator] Large content ({content_len} chars) — skipping repetition checks, checking for leaked reasoning only...", flush=True)
+                    validator = ValidatorAgent()
+                    _, corruption_type, _ = validator._detect_corruption(research.raw_content[:2000])
+                    if corruption_type == "leaked_reasoning":
+                        raise ValueError(f"Profile lore corrupted: {corruption_type}. Retry needed.")
+                    print(f"[ProfileGenerator] Large content validation passed.", flush=True)
             else:
                 raise ValueError("Research returned no raw_content. Retry needed.")
             

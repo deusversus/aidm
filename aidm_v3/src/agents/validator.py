@@ -902,12 +902,15 @@ Status: {status}"""
             max_repeats = max(line_counts.values()) if line_counts else 0
             
             # Find what line repeats most (for debugging)
-            if max_repeats >= 5:
+            # Threshold scales with content size: 5 repeats in a 50-line doc is
+            # suspicious, but 5 repeats in a 5000-line wiki dump is normal
+            repeat_threshold = max(10, len(content_lines) // 20)
+            if max_repeats >= repeat_threshold:
                 most_repeated = line_counts.most_common(1)[0][0]
                 # Only flag as corrupt if the repeated line is substantial content
                 # (not just a common phrase like "**Role:**" or similar)
                 if len(most_repeated) > 20:
-                    print(f"[Validator] High repetition detected: '{most_repeated[:50]}...' appears {max_repeats} times")
+                    print(f"[Validator] High repetition detected: '{most_repeated[:50]}...' appears {max_repeats} times (threshold={repeat_threshold})")
                     return True, "repetition", min(1.0, max_repeats / 10.0)
             
             # Calculate repetition score (ratio of repeated to unique lines)
@@ -915,8 +918,19 @@ Status: {status}"""
             total_lines = len(content_lines)
             repetition_score = 1.0 - (unique_lines / total_lines) if total_lines > 0 else 0.0
             
-            # Only flag if more than 60% repeated content (raised from 50% to reduce false positives)
-            if repetition_score > 0.6:
+            # Threshold scales with content size: small docs (< 200 lines) use 0.6,
+            # large multi-page wiki content naturally has more repetition (common phrases,
+            # structural elements) so we raise the threshold proportionally
+            if total_lines < 200:
+                ratio_threshold = 0.6
+            elif total_lines < 1000:
+                ratio_threshold = 0.7
+            else:
+                ratio_threshold = 0.85  # Very permissive for large wiki dumps
+            
+            print(f"[Validator] Repetition analysis: {unique_lines}/{total_lines} unique lines, score={repetition_score:.2f}, threshold={ratio_threshold}")
+            
+            if repetition_score > ratio_threshold:
                 return True, "repetition", repetition_score
         else:
             repetition_score = 0.0
