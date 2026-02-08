@@ -1,0 +1,142 @@
+id: frieren_beyond_journeys_end
+name: 'Frieren: Beyond Journey’s End'
+source_anime: 'Frieren: Beyond Journey’s End'
+media_type: anime
+status: finished
+generated_at: '2026-02-07T21:53:50.805615'
+confidence: 100
+research_method: api_first
+aliases:
+- Frieren - Pháp sư tiễn táng
+- Frieren e a Jornada para o Além
+- Frieren – Nach dem Ende der Reise
+- 'Frieren: Beyond Journey’s End'
+- 'Frieren: Más allá del final del viaje'
+- Sōsō no Furīren
+- frieren at the funeral
+- frieren beyond journeys end
+- frieren en el funeral
+- frieren oltre la fine del viaggio
+- frieren tras finalizar el viaje
+- frieren u kresu drogi
+- frierenbeyondjourneysend
+- sousou no frieren
+- Фрирен, провожающая в последний путь
+- 'فريرن: ما وراء نهاية الرحلة'
+- คำอธิษฐานในวันที่จากลา Frieren
+- 葬送のフリーレン
+- 葬送的芙莉蓮
+- 장송의 프리렌
+dna_scales:
+  introspection_vs_action: 3
+  comedy_vs_drama: 4
+  simple_vs_complex: 6
+  power_fantasy_vs_struggle: 3
+  explained_vs_mysterious: 4
+  fast_paced_vs_slow_burn: 9
+  episodic_vs_serialized: 5
+  grounded_vs_absurd: 2
+  tactical_vs_instinctive: 2
+  hopeful_vs_cynical: 3
+  ensemble_vs_solo: 4
+world_tier: T6
+tropes:
+  tournament_arc: true
+  training_montage: true
+  power_of_friendship: false
+  mentor_death: true
+  chosen_one: false
+  tragic_backstory: true
+  redemption_arc: false
+  betrayal: false
+  sacrifice: true
+  transformation: false
+  forbidden_technique: false
+  time_loop: false
+  false_identity: false
+  ensemble_focus: true
+  slow_burn_romance: false
+detected_genres:
+- Adventure
+- Drama
+- Fantasy
+combat_system: tactical
+power_system:
+  name: Magic
+  mechanics: Magic is a system powered by mana that allows users to cast specialized
+    spells for combat, utility, and support. It encompasses diverse techniques such
+    as Golem Magic for creating autonomous constructs and offensive spells like Zoltraak,
+    which utilizes piercing mana to devastate targets.
+  limitations: Spells can be countered through research and the development of specific
+    defensive magic or magic-resistant equipment. Additionally, magical creations
+    like golems emit a distinct mana signature that makes them detectable and distinguishable
+    from natural monsters.
+  tiers:
+  - Ordinary Offensive Magic
+  - Killing Magic
+  - Demon-killing Magic
+tone:
+  comedy_level: 3
+  darkness_level: 3
+  optimism: 8
+director_personality: You are a patient observer of the passage of time, lingering
+  on the quiet moments of travel and the mundane beauty of everyday spells like cleaning
+  clothes or finding flowers. You must frame every scene through the lens of memory,
+  frequently juxtaposing the present journey with echoes of the Hero Party’s past
+  to show how small gestures carry the weight of decades. Combat should be treated
+  with a cold, tactical efficiency where mana management and visualization are key,
+  yet the ultimate victory must always serve as a bridge to understanding human emotion.
+pacing:
+  scene_length: deliberate
+  arc_length_sessions: 6-10
+sources_consulted:
+- anilist.co
+- https://frieren.fandom.com
+voice_cards:
+- name: Aura
+  speech_patterns: Formal, cold, and authoritative. She speaks with the detached confidence
+    of a powerful ancient being, emphasizing her status.
+  humor_type: None
+  signature_phrases:
+  - Aura the Guillotine
+  dialogue_rhythm: Short, declarative sentences and commands that brook no argument.
+- name: Demon King
+  speech_patterns: Academic, detached, and highly philosophical. He speaks like a
+    researcher or a scholar obsessed with the study of humanity and biology.
+  humor_type: None
+  signature_phrases:
+  - Coexistence
+  dialogue_rhythm: Long, complex monologues and theoretical explanations regarding
+    biological life.
+- name: Denken
+  speech_patterns: Formal, articulate, and seasoned. He speaks with the weight of
+    political experience and the wisdom of an elderly mage.
+  humor_type: Sardonic
+  signature_phrases:
+  - Magic is a world of visualization
+  dialogue_rhythm: Balanced and instructional, often using rhetorical questions to
+    guide younger mages.
+author_voice:
+  sentence_patterns:
+  - Flowing, descriptive prose for landscapes and the passage of seasons
+  - Short, matter-of-fact declarations regarding magical theory and combat
+  - Sentences that begin with time markers like 'It was twenty years after...'
+  structural_motifs:
+  - Flashbacks triggered by specific physical landmarks or mundane objects
+  - Parallel framing between the original Hero Party and the current companions
+  - Episodic vignettes that conclude with a quiet realization about human nature
+  dialogue_quirks:
+  - Stoic and understated delivery of profound emotional truths
+  - Dry, deadpan humor during moments of minor inconvenience
+  - Technical, clinical discussions of magic as a craft rather than a miracle
+  emotional_rhythm:
+  - Slow builds toward quiet catharsis
+  - Long periods of comfortable silence between characters
+  - Emotional weight delivered through symbolic actions rather than grand speeches
+  example_voice: It was a simple spell for turning red apples into green ones, a trivial
+    thing Himmel once praised, yet as the decades slipped away, it became the only
+    way she could still see the color of his eyes.
+series_group: sousou_no_frieren
+series_position: 1
+recent_updates: Episode 1, Episode 2, Episode 3, Episode 4, Episode 5, Episode 6,
+  Episode 7, Episode 8, Episode 9, Episode 10

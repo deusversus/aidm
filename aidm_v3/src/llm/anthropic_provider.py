@@ -11,10 +11,11 @@ from .provider import LLMProvider, LLMResponse
 class AnthropicProvider(LLMProvider):
     """Anthropic Claude provider implementation.
     
-    Supports Claude 4.5 model family:
+    Supports Claude model family:
     - Haiku 4.5: Fast, affordable for structured tasks
     - Sonnet 4.5: Balanced quality/speed for creative work
-    - Opus 4.5: Highest quality, now nearly Sonnet pricing
+    - Opus 4.6: Latest Opus — highest quality, nearly Sonnet pricing
+    - Opus 4.5: Previous-gen Opus, still excellent
     
     Also supports web search via the Anthropic API (May 2025+).
     """
@@ -33,12 +34,12 @@ class AnthropicProvider(LLMProvider):
         """Get creative model - defaults to Sonnet, can be set to Opus via env var."""
         preference = os.getenv("ANTHROPIC_CREATIVE_MODEL", "sonnet").lower()
         if preference == "opus":
-            return "claude-opus-4-5"
+            return "claude-opus-4-6"
         return "claude-sonnet-4-5"
     
     def get_opus_model(self) -> str:
         """Get Opus model explicitly."""
-        return "claude-opus-4-5"
+        return "claude-opus-4-6"
     
     def get_research_model(self) -> str:
         """Model optimized for research with web search."""

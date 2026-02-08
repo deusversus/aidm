@@ -207,7 +207,7 @@ class UserSettings(BaseModel):
                     },
                     "key_animator": {
                         "provider": "anthropic",
-                        "model": "claude-opus-4-5"
+                        "model": "claude-opus-4-6"
                     },
                     "director": {
                         "provider": "google",
