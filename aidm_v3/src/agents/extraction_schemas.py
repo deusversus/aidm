@@ -28,15 +28,34 @@ class ToneExtract(BaseModel):
     optimism: int = Field(default=5, ge=0, le=10, description="0=cynical, 10=hopeful")
 
 
-class WorldTierExtract(BaseModel):
-    """Extracted world power tier data."""
-    world_tier: str = Field(
-        default="T8", 
-        description="Typical power tier for characters in this anime (T10=human, T8=street, T6=city, T4=planet, T2=multiverse)"
+class PowerDistributionExtract(BaseModel):
+    """Extracted power distribution across the anime's world.
+    
+    Instead of a single tier, captures the full gradient:
+    - peak_tier: The strongest characters (outliers)
+    - typical_tier: Where most encounters and mid-arc opponents sit
+    - floor_tier: The weakest relevant actors
+    - gradient: How power is distributed (spike, top_heavy, flat, compressed)
+    """
+    peak_tier: str = Field(
+        default="T6",
+        description="Power tier of the strongest characters (T10=human, T8=building, T6=city, T4=planet, T2=universal)"
     )
-    tier_reasoning: str = Field(
+    typical_tier: str = Field(
+        default="T8", 
+        description="Power tier where most encounters happen — mid-arc opponents, average combatants"
+    )
+    floor_tier: str = Field(
+        default="T9",
+        description="Power tier of the weakest relevant actors (civilians, untrained characters)"
+    )
+    gradient: str = Field(
+        default="flat",
+        description="How power is distributed: 'spike' (one outlier), 'top_heavy' (handful of gods), 'flat' (many tiers populated), 'compressed' (narrow range)"
+    )
+    gradient_reasoning: str = Field(
         default="", 
-        description="Brief explanation of why this tier was chosen based on character feats"
+        description="Brief explanation of power distribution"
     )
 
 
@@ -315,11 +334,11 @@ def build_bundle_schema(topics: List[str]) -> Type[BaseModel]:
         else:
             print(f"[ExtractionSchemas] Warning: Unknown topic '{topic}'")
     
-    # Also include DNA scales, tropes, and world_tier when tone is in the bundle
+    # Also include DNA scales, tropes, and power_distribution when tone is in the bundle
     if "tone" in topics:
         fields["dna_scales"] = (DNAScalesExtract, Field(default_factory=DNAScalesExtract))
         fields["tropes"] = (StorytellingTropesExtract, Field(default_factory=StorytellingTropesExtract))
-        fields["world_tier"] = (WorldTierExtract, Field(default_factory=WorldTierExtract))
+        fields["power_distribution"] = (PowerDistributionExtract, Field(default_factory=PowerDistributionExtract))
     
     return create_model("BundleExtract", **fields)
 
@@ -351,24 +370,25 @@ def get_extraction_prompt(topics: List[str], anime_name: str) -> str:
   - darkness_level: How dark/grim is the content? (0=lighthearted like K-On, 10=grimdark like Berserk)
   - optimism: How hopeful is the worldview? (0=cynical/nihilistic, 10=idealistic/uplifting)
 
-- **world_tier**: The BASELINE power tier for this anime world.
+- **power_distribution**: Power gradient across the anime's world.
   
-  CRITICAL: Rate the power of a TYPICAL MID-ARC VILLAIN or COMPETENT ALLY.
-  Think: "What tier is an Episode 10-15 opponent?" NOT the final boss or protagonist peak.
+  VS Battles tier scale: T10=human, T9=street, T8=building, T7=city block, T6=city, T5=island, T4=planet, T3=stellar, T2=universal
   
-  EXCLUDE: Protagonist's final form, main antagonist at full power, god-tier beings, endgame power levels.
-  INCLUDE: Mid-arc villains, starting protagonist power, allies, average soldiers.
-  
-  VS Battles tiers: T10=human, T9=street, T8=building, T7=city block, T6=city, T5=island, T4=planet, T3=stellar, T2=universal
+  Provide:
+  - **peak_tier**: Strongest characters (outliers, final bosses, god-tier beings)
+  - **typical_tier**: Where MOST encounters happen — mid-arc opponents, average combatants
+  - **floor_tier**: Weakest relevant actors (civilians, untrained characters)
+  - **gradient**: How power is distributed:
+    - "spike": One massive outlier (e.g., Saitama in One Punch Man)
+    - "top_heavy": A handful of god-tier, most characters much weaker (e.g., Frieren)
+    - "flat": Many populated tiers with characters at every level (e.g., JJK, Naruto)
+    - "compressed": Narrow range, most characters near the same level (e.g., Death Note)
   
   Examples:
-  - Death Note: T10 (normal humans)
-  - Akira: T8 (espers, military) - NOT T2 (Tetsuo is an outlier)
-  - Demon Slayer: T8 (mid-tier demon slayers)
-  - JoJo: T8 (most Stand users) - NOT T2 (GER is an outlier)
-  - Jujutsu Kaisen: T7 (Grade 1 sorcerers)
-  - Naruto: T6 (Jonin-level) - NOT T4 (Six Paths endgame)
-  - Dragon Ball Z: T4 (Saiyan Saga) - NOT T2 (Buu Saga peaks)
+  - Frieren: peak=T4, typical=T8, floor=T9, gradient=top_heavy
+  - JJK: peak=T4, typical=T7, floor=T9, gradient=flat
+  - One Punch Man: peak=T2, typical=T7, floor=T9, gradient=spike
+  - Death Note: peak=T10, typical=T10, floor=T10, gradient=compressed
 
 - **dna_scales**: Rate each narrative dimension 0-10 based on the research:
   - introspection_vs_action: 0=internal monologue focus, 10=pure action sequences
@@ -398,7 +418,7 @@ def get_extraction_prompt(topics: List[str], anime_name: str) -> str:
   - time_loop: Time manipulation plot
   - false_identity: Hidden identity reveals
   - ensemble_focus: Large cast shares spotlight
-  - slow_burn_romance: Gradual romantic development""")
+  - slow_burn_romance: Gradual romantic development (including implicit/unspoken romance — e.g. deep emotional bonds, partners who don't confess, or relationships that develop across years/decades)""")
         
         elif topic == "combat":
             topic_instructions.append("""- **combat**: Identify the primary combat style:

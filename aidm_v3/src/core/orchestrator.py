@@ -372,6 +372,12 @@ class Orchestrator:
             ranked_memories = "No relevant past memories found."
         else:
             # Normal path: parallel OutcomeJudge and MemoryRanker
+            # Build power context for the Outcome Judge
+            power_context = f"Character Power Tier: {db_context.power_tier or 'T10'}. "
+            if db_context.op_protagonist_enabled:
+                power_context += "OP MODE IS ACTIVE — this character is intentionally overpowered. Routine power use should be trivial (DC 5, no cost, no consequence). "
+            power_context += f"World Tier: {self.profile.world_tier or 'T8'}."
+            
             outcome_task = asyncio.create_task(
                 self.outcome_judge.call(
                     f"Action: {intent.action}\nTarget: {intent.target or 'N/A'}",
@@ -379,7 +385,8 @@ class Orchestrator:
                     profile_tropes=str(self.profile.tropes),
                     arc_phase=db_context.arc_phase,
                     recent_events=db_context.recent_summary,
-                    difficulty_context=f"Situation: {db_context.situation}. Location: {db_context.location}"
+                    difficulty_context=f"Situation: {db_context.situation}. Location: {db_context.location}",
+                    power_context=power_context
                 )
             )
             
@@ -581,7 +588,8 @@ class Orchestrator:
                 profile_tropes=str(self.profile.tropes),
                 arc_phase=db_context.arc_phase,
                 recent_events=db_context.recent_summary,
-                correction_feedback=validation.correction
+                correction_feedback=validation.correction,
+                power_context=power_context
             )
             current_turn.outcome = outcome
 

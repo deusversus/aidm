@@ -203,6 +203,74 @@ query ($search: String, $type: MediaType) {
 """
 
 
+# Fetch a single media entry by AniList ID (for season merging)
+FETCH_BY_ID_QUERY = """
+query ($id: Int) {
+  Media(id: $id) {
+    id
+    title {
+      romaji
+      english
+      native
+    }
+    synonyms
+    format
+    status
+    episodes
+    chapters
+    description(asHtml: false)
+    genres
+    tags {
+      name
+      rank
+      isMediaSpoiler
+    }
+    averageScore
+    popularity
+    characters(sort: FAVOURITES_DESC, page: 1, perPage: 25) {
+      edges {
+        role
+        node {
+          name {
+            full
+            native
+          }
+        }
+        voiceActors(language: JAPANESE) {
+          name {
+            full
+          }
+        }
+      }
+    }
+    relations {
+      edges {
+        relationType
+        node {
+          id
+          title {
+            romaji
+            english
+          }
+          format
+          status
+          type
+        }
+      }
+    }
+    startDate {
+      year
+      month
+      day
+    }
+    source
+    countryOfOrigin
+    isAdult
+  }
+}
+"""
+
+
 # ─── Data Classes ────────────────────────────────────────────────────────────
 
 @dataclass
@@ -432,6 +500,134 @@ class AniListClient:
             logger.info(f"AniList: No anime result, falling back to MANGA search")
             result = await self.search(title, "MANGA")
         return result
+    
+    async def fetch_full_series(self, primary: AniListResult) -> AniListResult:
+        """
+        Walk the relations graph (BFS) to merge ALL seasons of the same series.
+        
+        Uses breadth-first traversal to follow SEQUEL/PREQUEL chains to any
+        depth (e.g. S1→S2→S3→...→S7), not just direct relations.
+        
+        Merges into the primary result:
+        - Tags: union (highest rank wins for duplicates)
+        - Characters: union (deduplicated by name)
+        - Genres: union
+        - Episodes: sum
+        - Status: latest season's status wins
+        - Synonyms: union
+        
+        Returns:
+            Enriched AniListResult with all seasons merged
+        """
+        MAX_DEPTH = 10  # Safety cap to prevent infinite traversal
+        
+        loop = asyncio.get_event_loop()
+        visited: set[int] = {primary.id}
+        queue: list[int] = []
+        related_results: list[AniListResult] = []
+        
+        # Seed queue from primary's direct relations
+        for rel in primary.relations:
+            if rel.relation_type in ("SEQUEL", "PREQUEL") and rel.format == primary.format:
+                if rel.id not in visited:
+                    queue.append(rel.id)
+                    visited.add(rel.id)
+        
+        if not queue:
+            print(f"[AniList] No related seasons found for merging")
+            return primary
+        
+        depth = 0
+        print(f"[AniList] Walking relations graph (BFS) for season merging...")
+        
+        # BFS: fetch each season, then check ITS relations for more seasons
+        while queue and depth < MAX_DEPTH:
+            depth += 1
+            current_batch = list(queue)
+            queue.clear()
+            
+            for rel_id in current_batch:
+                data = await loop.run_in_executor(
+                    None, self._execute_query, FETCH_BY_ID_QUERY, {"id": rel_id}
+                )
+                media = data.get("Media")
+                if not media:
+                    continue
+                
+                entry = self._parse_media(media)
+                related_results.append(entry)
+                
+                # Discover new seasons from this entry's relations
+                for rel in entry.relations:
+                    if (rel.relation_type in ("SEQUEL", "PREQUEL")
+                            and rel.format == primary.format
+                            and rel.id not in visited):
+                        queue.append(rel.id)
+                        visited.add(rel.id)
+        
+        if not related_results:
+            return primary
+        
+        # Merge into primary
+        all_entries = [primary] + related_results
+        
+        # Tags: union, keep highest rank for duplicates
+        tag_map: dict[str, AniListTag] = {}
+        for entry in all_entries:
+            for tag in entry.tags:
+                if tag.name not in tag_map or tag.rank > tag_map[tag.name].rank:
+                    tag_map[tag.name] = tag
+        primary.tags = list(tag_map.values())
+        
+        # Characters: union, deduplicate by name
+        seen_chars: set[str] = set()
+        merged_chars: list[AniListCharacter] = []
+        for entry in all_entries:
+            for char in entry.characters:
+                if char.name not in seen_chars:
+                    seen_chars.add(char.name)
+                    merged_chars.append(char)
+        primary.characters = merged_chars
+        
+        # Genres: union
+        all_genres = set()
+        for entry in all_entries:
+            all_genres.update(entry.genres)
+        primary.genres = sorted(all_genres)
+        
+        # Episodes: sum across seasons
+        total_eps = sum(e.episodes or 0 for e in all_entries)
+        if total_eps > 0:
+            primary.episodes = total_eps
+        
+        # Synonyms: union 
+        all_synonyms = set(primary.synonyms)
+        for entry in related_results:
+            all_synonyms.update(entry.synonyms)
+        primary.synonyms = list(all_synonyms)
+        
+        # Status: use latest season's status (prefer RELEASING > NOT_YET_RELEASED > FINISHED)
+        STATUS_PRIORITY = {"RELEASING": 0, "NOT_YET_RELEASED": 1, "HIATUS": 2, "FINISHED": 3, "CANCELLED": 4}
+        latest_status = min(
+            all_entries,
+            key=lambda e: STATUS_PRIORITY.get(e.status, 5)
+        ).status
+        primary.status = latest_status
+        
+        # Relations: union from all entries (for downstream franchise detection)
+        seen_rel_ids = {r.id for r in primary.relations}
+        for entry in related_results:
+            for rel in entry.relations:
+                if rel.id not in seen_rel_ids and rel.id != primary.id:
+                    seen_rel_ids.add(rel.id)
+                    primary.relations.append(rel)
+        
+        seasons = len(all_entries)
+        print(f"[AniList] Merged {seasons} seasons (depth={depth}): {total_eps} episodes, "
+              f"{len(primary.characters)} characters, {len(primary.tags)} tags, "
+              f"status={primary.status}")
+        
+        return primary
     
     def _parse_media(self, media: dict) -> AniListResult:
         """Parse raw AniList media JSON into an AniListResult."""

@@ -100,8 +100,11 @@ class AnimeResearchOutput(BaseModel):
         description="Scene pacing: rapid, moderate, or deliberate"
     )
     
-    # World Tier (typical power level for characters in this anime)
-    world_tier: str = Field(default="T8", description="Typical power tier (T10=human, T8=street, T6=city, T4=planet, T2=multiverse)")
+    # Power Distribution (replaces single world_tier)
+    power_distribution: Dict[str, str] = Field(
+        default_factory=lambda: {"peak_tier": "T6", "typical_tier": "T8", "floor_tier": "T9", "gradient": "flat"},
+        description="Power distribution: peak_tier, typical_tier, floor_tier, gradient (spike/top_heavy/flat/compressed)"
+    )
     
     # Raw Content (for RAG)
     raw_content: Optional[str] = Field(default=None, description="The full research text from Pass 1")
@@ -616,10 +619,15 @@ Return ONLY the title.'''
                     "optimism": getattr(t, 'optimism', 5)
                 }
             
-            # World Tier (LLM-researched based on character feats)
-            if hasattr(extracted, 'world_tier') and extracted.world_tier:
-                wt = extracted.world_tier
-                output.world_tier = getattr(wt, 'world_tier', 'T8')
+            # Power Distribution (LLM-researched)
+            if hasattr(extracted, 'power_distribution') and extracted.power_distribution:
+                pd = extracted.power_distribution
+                output.power_distribution = {
+                    "peak_tier": getattr(pd, 'peak_tier', 'T6'),
+                    "typical_tier": getattr(pd, 'typical_tier', 'T8'),
+                    "floor_tier": getattr(pd, 'floor_tier', 'T9'),
+                    "gradient": getattr(pd, 'gradient', 'flat'),
+                }
             
             # DNA Scales
             if hasattr(extracted, 'dna_scales') and extracted.dna_scales:
@@ -1084,6 +1092,9 @@ Supplemental knowledge: {response.content}
             print(f"[AnimeResearch/API] AniList returned nothing for '{anime_name}', falling back to web search")
             return await self.research_anime(anime_name, progress_tracker=progress_tracker)
         
+        # Merge all seasons of the same series (walks SEQUEL/PREQUEL relations)
+        anilist = await anilist_client.fetch_full_series(anilist)
+        
         # Use the official title from AniList
         official_title = anilist.title_english or anilist.title_romaji
         print(f"[AnimeResearch/API] AniList: {official_title} ({anilist.status}, {anilist.format})")
@@ -1200,7 +1211,11 @@ Supplemental knowledge: {response.content}
                     for p in fandom_result.pages["factions"][:10]
                 ]
             if fandom_result.pages.get("arcs"):
-                output.recent_updates = ", ".join([p.title for p in fandom_result.pages["arcs"][:10]])
+                arc_titles = [p.title for p in fandom_result.pages["arcs"][:10]]
+                # Filter out episode-style titles ("Episode 1", "Episode 2", etc.)
+                real_arcs = [t for t in arc_titles if not t.lower().startswith("episode")]
+                if real_arcs:
+                    output.recent_updates = ", ".join(real_arcs)
         
         output.raw_content = "\n\n".join(raw_sections) if raw_sections else None
         
@@ -1254,7 +1269,9 @@ Based on the above data, provide:
 
 3. **combat_style**: exactly one of: tactical, spectacle, comedy, spirit, narrative
 
-4. **world_tier**: T10=human, T8=street, T6=city, T4=planet, T2=multiverse
+4. **power_distribution**: Power gradient for the anime world.
+   VS Battles tiers: T10=human, T9=street, T8=building, T7=city block, T6=city, T5=island, T4=planet, T3=stellar, T2=universal
+   Provide: peak_tier (strongest), typical_tier (most encounters), floor_tier (weakest relevant), gradient (spike/top_heavy/flat/compressed)
 
 5. **storytelling_tropes** (true/false for each):
    tournament_arc, training_montage, power_of_friendship, mentor_death, chosen_one,
@@ -1264,7 +1281,7 @@ Based on the above data, provide:
 Respond with ONLY valid JSON, no markdown or explanation."""
         
         try:
-            from .extraction_schemas import DNAScalesExtract, ToneExtract, CombatExtract
+            from .extraction_schemas import DNAScalesExtract, ToneExtract, CombatExtract, PowerDistributionExtract
             
             # Use a combined schema for efficiency
             from pydantic import create_model
@@ -1273,7 +1290,7 @@ Respond with ONLY valid JSON, no markdown or explanation."""
                 dna_scales=(DNAScalesExtract, ...),
                 tone=(ToneExtract, ...),
                 combat=(CombatExtract, ...),
-                world_tier=(str, "T8"),
+                power_distribution=(PowerDistributionExtract, ...),
                 storytelling_tropes=(Dict[str, bool], {}),
             )
             
@@ -1309,10 +1326,16 @@ Respond with ONLY valid JSON, no markdown or explanation."""
             }
             
             output.combat_style = getattr(interp.combat, 'style', 'spectacle')
-            output.world_tier = interp.world_tier or "T8"
+            pd = interp.power_distribution
+            output.power_distribution = {
+                "peak_tier": getattr(pd, 'peak_tier', 'T6'),
+                "typical_tier": getattr(pd, 'typical_tier', 'T8'),
+                "floor_tier": getattr(pd, 'floor_tier', 'T9'),
+                "gradient": getattr(pd, 'gradient', 'flat'),
+            }
             output.storytelling_tropes = interp.storytelling_tropes or {}
             
-            print(f"[AnimeResearch/API] LLM interpretation: DNA={len(output.dna_scales)} scales, combat={output.combat_style}, tier={output.world_tier}")
+            print(f"[AnimeResearch/API] LLM interpretation: DNA={len(output.dna_scales)} scales, combat={output.combat_style}, power={output.power_distribution}")
             
         except Exception as e:
             import traceback
@@ -1374,7 +1397,18 @@ Respond with ONLY valid JSON."""
                 if p.quotes:
                     char_pages_with_quotes.append(p)
         
-        if char_pages_with_quotes:
+        # Build main character list from AniList for gap-filling
+        main_char_names = []
+        if anilist:
+            for char in anilist.characters:
+                if char.role == "MAIN":
+                    main_char_names.append(char.name)
+        
+        # Identify which main characters are NOT covered by wiki voice cards
+        wiki_covered_names = {p.title.lower() for p in char_pages_with_quotes}
+        missing_main_chars = [n for n in main_char_names if n.lower() not in wiki_covered_names]
+        
+        if char_pages_with_quotes or missing_main_chars:
             if progress_tracker:
                 await progress_tracker.emit(
                     ProgressPhase.PARSING,
@@ -1387,13 +1421,24 @@ Respond with ONLY valid JSON."""
                 quotes_str = "\n".join(f'  "{q}"' for q in page.quotes[:5])
                 quote_context += f"\n### {page.title}\n{quotes_str}\n"
             
+            # Build gap-filling instruction for main characters without wiki quotes
+            gap_instruction = ""
+            if missing_main_chars:
+                gap_instruction = f"""
+
+## Missing Main Characters (NO wiki quotes available)
+The following main characters have no quotes on the wiki. Using your knowledge of {official_title}, 
+generate voice cards for them based on how they speak in the series:
+{', '.join(missing_main_chars)}
+"""
+            
             voice_prompt = f"""# Extract Character Voice Patterns: {official_title}
 
 ## Character Quotes from Wiki:
-{quote_context}
-
+{quote_context if quote_context else '(No wiki quotes found)'}
+{gap_instruction}
 ## Task
-For each character, create a voice card with:
+For each character (both wiki-quoted AND missing main characters listed above), create a voice card with:
 - name: Character name
 - speech_patterns: How they talk (formal, casual, rough, etc.)
 - humor_type: Their comedy style if any
@@ -1463,7 +1508,7 @@ Your output will directly steer the AI Director that plans story arcs and the AI
 **DNA Scales:** {dna_summary}
 **Tone:** {tone_summary}
 **Combat Style:** {output.combat_style}
-**World Tier:** {output.world_tier}
+**Power Distribution:** peak={output.power_distribution.get('peak_tier', 'T6')}, typical={output.power_distribution.get('typical_tier', 'T8')}, floor={output.power_distribution.get('floor_tier', 'T9')}, gradient={output.power_distribution.get('gradient', 'flat')}
 **Power System:** {power_summary}
 
 **Active Tropes:** {', '.join(tropes_on) if tropes_on else 'None'}

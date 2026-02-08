@@ -28,11 +28,11 @@ class OutcomeOutput(BaseModel):
     )
     cost: Optional[str] = Field(
         default=None,
-        description="What does success cost? (resource, consequence, complication)"
+        description="ONLY set for dramatic/risky actions — null for routine power use or actions within character capability. Most actions should have no cost."
     )
     consequence: Optional[str] = Field(
         default=None,
-        description="What happens as a result? (physical, emotional, plot)"
+        description="ONLY set for significant narrative turning points — null for routine actions. An OP character casting a basic spell has NO consequence."
     )
     reasoning: str = Field(
         description="Brief explanation including the math (Roll vs DC)"

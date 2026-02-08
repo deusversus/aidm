@@ -118,8 +118,10 @@ def generate_compact_profile(research: AnimeResearchOutput) -> Dict[str, Any]:
         # 11 DNA Scales
         "dna_scales": research.dna_scales,
         
-        # World Tier (LLM-researched, or inferred as fallback)
-        "world_tier": research.world_tier if research.world_tier != "T8" else _infer_world_tier(research),
+        # Power Distribution (LLM-researched, or inferred as fallback)
+        "power_distribution": research.power_distribution if research.power_distribution.get("gradient") != "flat" or research.power_distribution.get("typical_tier") != "T8" else _infer_power_distribution(research),
+        # Backward compat: world_tier for any consumers that still read it
+        "world_tier": (research.power_distribution or {}).get("typical_tier", "T8"),
         
         # 15 Tropes
         "tropes": research.storytelling_tropes,
@@ -161,8 +163,8 @@ def generate_compact_profile(research: AnimeResearchOutput) -> Dict[str, Any]:
         profile["related_franchise"] = research.related_franchise
         profile["relation_type"] = research.relation_type or "spinoff"
     
-    # Add recent updates if ongoing
-    if research.recent_updates:
+    # Add recent updates if ongoing (not for finished series)
+    if research.recent_updates and research.status and research.status.lower() in ("releasing", "not_yet_released"):
         profile["recent_updates"] = research.recent_updates
     
     return profile
@@ -241,18 +243,16 @@ def _infer_pacing_style(research: AnimeResearchOutput) -> str:
         return "moderate"
 
 
-def _infer_world_tier(research: AnimeResearchOutput) -> str:
+def _infer_power_distribution(research: AnimeResearchOutput) -> Dict[str, str]:
     """
-    Infer the typical power tier for characters in this anime world.
+    Infer the power distribution for characters in this anime world.
     
     Uses DNA scales and tone to estimate:
-    - T10: Slice of life, grounded human stories (Death Note, March Comes In Like a Lion)
-    - T8-9: Street level action (Early MHA, Demon Slayer rookies)
-    - T6-7: City/Building level (Jujutsu Kaisen, mid-tier shonen)
-    - T4-5: Planetary/Stellar (Dragon Ball Z, late Naruto)
-    - T2-3: Universal+ (Dragon Ball Super, Record of Ragnarok)
-    
-    Returns tier as string like "T8".
+    - T10: Slice of life, grounded human stories (Death Note)
+    - T8-9: Street level action (Demon Slayer rookies)
+    - T6-7: City/Building level (JJK, mid-tier shonen)
+    - T4-5: Planetary/Stellar (Dragon Ball Z)
+    - T2-3: Universal+ (Dragon Ball Super)
     """
     dna = research.dna_scales
     tone = research.tone if isinstance(research.tone, dict) else {}
@@ -264,21 +264,34 @@ def _infer_world_tier(research: AnimeResearchOutput) -> str:
     # Combine indicators (weighted towards grounded_vs_absurd for tier estimation)
     power_score = (power_fantasy * 0.4) + (grounded_vs_absurd * 0.6)
     
-    # Map to tier
+    # Map to typical tier
     if power_score <= 2:
-        return "T10"  # Very grounded (Death Note, realistic drama)
+        typical = "T10"
     elif power_score <= 4:
-        return "T9"   # Street level (early shonen, semi-grounded action)
+        typical = "T9"
     elif power_score <= 5.5:
-        return "T8"   # Building level (mid-tier action)
+        typical = "T8"
     elif power_score <= 7:
-        return "T7"   # Town/City level (standard shonen peak)
+        typical = "T7"
     elif power_score <= 8.5:
-        return "T6"   # Island/Country level (high-tier shonen)
+        typical = "T6"
     elif power_score <= 9.5:
-        return "T5"   # Planetary level (DBZ territory)
+        typical = "T5"
     else:
-        return "T4"   # Stellar+ (cosmic level series)
+        typical = "T4"
+    
+    # Estimate peak (2 tiers above typical) and floor (1 below or T10)
+    tier_order = ["T2", "T3", "T4", "T5", "T6", "T7", "T8", "T9", "T10"]
+    typical_idx = tier_order.index(typical) if typical in tier_order else 6
+    peak_idx = max(0, typical_idx - 2)
+    floor_idx = min(len(tier_order) - 1, typical_idx + 1)
+    
+    return {
+        "peak_tier": tier_order[peak_idx],
+        "typical_tier": typical,
+        "floor_tier": tier_order[floor_idx],
+        "gradient": "flat",  # Fallback can't determine gradient reliably
+    }
 
 
 async def _validate_and_update_series_positions(series_group: str, profiles_dir: Path) -> None:

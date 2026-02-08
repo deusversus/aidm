@@ -408,11 +408,17 @@ Write vivid, anime-appropriate prose. End at a clear decision point if one exist
         lines.append(f"**Result:** {outcome.success_level.upper()}")
         lines.append(f"**Narrative Weight:** {outcome.narrative_weight}")
         
+        # Only inject cost/consequence if they exist AND are meaningful
         if outcome.cost:
             lines.append(f"**Cost:** {outcome.cost}")
         
         if outcome.consequence:
             lines.append(f"**Consequence:** {outcome.consequence}")
+        
+        # If no cost and no consequence, reinforce confidence
+        if not outcome.cost and not outcome.consequence and outcome.success_level in ("success", "critical"):
+            lines.append("")
+            lines.append("*No cost or consequence — narrate this with confidence and mastery. The character handles this within their capability.*")
         
         lines.append("")
         lines.append(f"**Judge's Reasoning:** {outcome.reasoning}")
