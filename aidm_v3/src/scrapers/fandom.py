@@ -36,6 +36,14 @@ REQUEST_DELAY = 0.2  # seconds between requests (rate limiting courtesy)
 REQUEST_TIMEOUT = 15  # seconds
 MAX_RETRIES = 3
 
+# MediaWiki namespaces that are NOT real articles — skip these when scraping
+NON_ARTICLE_PREFIXES = (
+    "Template:", "User:", "Category:", "File:", "MediaWiki:",
+    "Module:", "Draft:", "Help:", "Talk:", "User talk:",
+    "Template talk:", "Forum:", "Thread:", "Message Wall:",
+    "Board:", "Blog:",
+)
+
 
 # ─── Data Classes ────────────────────────────────────────────────────────────
 
@@ -301,12 +309,64 @@ def strip_html_to_text(html_content: str) -> str:
     # Decode HTML entities
     text = html_module.unescape(text)
     
+    # Second pass: catch <br> tags that were HTML-encoded entities decoded by unescape
+    text = re.sub(r'<br\s*/?>',  '\n', text, flags=re.IGNORECASE)
+    text = re.sub(r'<[^>]+>', '', text)  # catch any other decoded tags
+    
     # Clean up whitespace
     text = re.sub(r'\n{3,}', '\n\n', text)
     text = re.sub(r' +', ' ', text)
     text = text.strip()
     
     return text
+
+
+# ─── Noise Section Filtering ─────────────────────────────────────────────────
+
+# Sections that add no narrative value and pollute RAG retrieval
+SECTIONS_TO_STRIP = {
+    "manga appearance", "anime appearance",
+    "references", "notes", "site navigation",
+    "navigation", "gallery", "image gallery",
+    "external links",
+}
+
+
+def _strip_noise_sections(text: str) -> str:
+    """
+    Remove wiki-structural sections that add no narrative value.
+    
+    Strips entire sections like 'Manga Appearance' (chapter tracking lists),
+    'Anime Appearance' (episode lists), 'References', 'Site Navigation', etc.
+    Sections are identified by heading markers (## Heading]) and stripped
+    until the next heading at the same or higher level.
+    """
+    lines = text.split('\n')
+    output = []
+    skipping = False
+    skip_depth = 0
+    
+    for line in lines:
+        # Check if this line is a markdown heading
+        stripped = line.lstrip()
+        if stripped.startswith('#'):
+            # Count heading depth
+            depth = len(stripped) - len(stripped.lstrip('#'))
+            # Extract heading text, strip trailing ] and whitespace
+            heading_text = stripped.lstrip('#').strip().rstrip(']').strip().lower()
+            
+            if any(noise in heading_text for noise in SECTIONS_TO_STRIP):
+                skipping = True
+                skip_depth = depth
+                continue
+            elif skipping and depth <= skip_depth:
+                # New section at same or higher level — stop skipping
+                skipping = False
+        
+        if not skipping:
+            output.append(line)
+    
+    return '\n'.join(output)
 
 
 def extract_quotes(text: str) -> list[str]:
@@ -423,6 +483,7 @@ class FandomClient:
             return None
         
         clean_text = strip_html_to_text(raw_html)
+        clean_text = _strip_noise_sections(clean_text)
         
         # Skip very short pages (likely stubs or disambig)
         if len(clean_text) < 50:
@@ -528,6 +589,9 @@ class FandomClient:
                 f"[Fandom] Scraping {len(members)} '{canonical_type}' pages "
                 f"(from category '{primary_cat}')..."
             )
+            
+            # Filter out non-article namespace pages (Template:, User:, etc.)
+            members = [t for t in members if not t.startswith(NON_ARTICLE_PREFIXES)]
             
             # Scrape each page
             type_pages = []
