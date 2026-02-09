@@ -108,9 +108,13 @@ Write vivid, anime-appropriate prose. End at a clear decision point if one exist
 
 {{DIRECTOR_NOTES_INJECTION}}
 
+{{LORE_INJECTION}}
+
 {{RETRIEVED_CHUNKS_INJECTION}}
 
-{{MEMORIES_INJECTION}}"""
+{{MEMORIES_INJECTION}}
+
+{{SAKUGA_MODE_INJECTION}}"""
     
     def _build_profile_dna(self) -> str:
         """Build the profile DNA section."""

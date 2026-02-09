@@ -57,6 +57,10 @@ Structure your responses with:
 
 {{DIRECTOR_NOTES_INJECTION}}
 
+## Canon Reference
+
+{{LORE_INJECTION}}
+
 ## Narration Guidance
 
 {{RETRIEVED_CHUNKS_INJECTION}}
@@ -64,3 +68,5 @@ Structure your responses with:
 ## Relevant Memories
 
 {{MEMORIES_INJECTION}}
+
+{{SAKUGA_MODE_INJECTION}}
