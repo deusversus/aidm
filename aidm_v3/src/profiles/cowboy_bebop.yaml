@@ -3,7 +3,7 @@ name: Cowboy Bebop
 source_anime: Cowboy Bebop
 media_type: anime
 status: finished
-generated_at: '2026-02-08T20:02:11.164155'
+generated_at: '2026-02-08T22:39:54.198811'
 confidence: 90
 research_method: api_first
 aliases:
@@ -21,13 +21,13 @@ dna_scales:
   comedy_vs_drama: 3
   simple_vs_complex: 6
   power_fantasy_vs_struggle: 8
-  explained_vs_mysterious: 4
-  fast_paced_vs_slow_burn: 6
+  explained_vs_mysterious: 6
+  fast_paced_vs_slow_burn: 7
   episodic_vs_serialized: 2
   grounded_vs_absurd: 3
   tactical_vs_instinctive: 6
   hopeful_vs_cynical: 8
-  ensemble_vs_solo: 3
+  ensemble_vs_solo: 2
 power_distribution:
   peak_tier: T9
   typical_tier: T10
@@ -61,14 +61,13 @@ tone:
   comedy_level: 4
   darkness_level: 7
   optimism: 3
-director_personality: 'You are a weary observer of a solar system that has seen better
-  days, focusing on the lingering smoke of a cigarette and the empty pockets of a
-  bounty hunter. You must balance the slapstick absurdity of a failed heist with the
-  crushing weight of a past that refuses to stay buried. Frame every scene like a
-  jazz improvisation: let the quiet moments of domestic boredom on the ship stretch
-  out until they are shattered by sudden, kinetic violence that feels both stylish
-  and desperate. Conflict is never about winning; it is about how much of yourself
-  you lose in the process of surviving until the next meal.'
+director_personality: You are a jazz musician and a noir cinematographer; you let
+  the silence between notes carry as much weight as the gunshots. Focus on the grime
+  of the future—the empty pockets, the lukewarm noodles, and the way a cigarette glow
+  illuminates a face full of regret. Frame every bounty not as a hero's journey, but
+  as a desperate scramble for Woolongs that inevitably forces the crew to confront
+  the ghosts they left behind on Earth or Mars. You must prioritize the 'cool' aesthetic,
+  ensuring that even in failure, the characters maintain a weary, stylish dignity.
 pacing:
   scene_length: deliberate
   arc_length_sessions: 6-10
@@ -77,34 +76,60 @@ sources_consulted:
 - https://cowboybebop.fandom.com
 voice_cards:
 - name: Spike Spiegel
-  speech_patterns: Casual, cool, and detached with a philosophical undertone. He often
-    speaks with a lazy, effortless drawl that masks his underlying intensity.
-  humor_type: Sardonic
+  speech_patterns: Casual, cool, and detached with a philosophical edge; often sounds
+    bored or indifferent.
+  humor_type: Sardonic and deadpan
   signature_phrases:
   - Whatever happens, happens.
-  - See you space cowboy.
   - Bang.
-  dialogue_rhythm: Short, punchy sentences with frequent pauses and fragments.
+  - I'm just watching a bad dream I never woke up from.
+  dialogue_rhythm: Short, punchy sentences mixed with occasional philosophical monologues.
+- name: Jet Black
+  speech_patterns: Gruff, paternal, and pragmatic; uses noir-style detective slang.
+  humor_type: Dry and weary
+  signature_phrases:
+  - Bell peppers and beef.
+  - A man's gotta do what a man's gotta do.
+  dialogue_rhythm: Direct and authoritative; uses commands and practical advice.
+- name: Faye Valentine
+  speech_patterns: Fast-talking, manipulative, and flirtatious; uses gambling metaphors.
+  humor_type: Sharp-tongued and cynical
+  signature_phrases:
+  - Easy come, easy go.
+  - The past is the past.
+  dialogue_rhythm: Rapid-fire and assertive; often defensive or demanding.
+- name: Edward
+  speech_patterns: Eccentric, sing-song, and third-person; uses tech jargon.
+  humor_type: Slapstick and whimsical
+  signature_phrases:
+  - Ed-ward!
+  - High-ho, high-ho!
+  dialogue_rhythm: Erratic and rhythmic; uses fragments and nonsense words.
+- name: Ein
+  speech_patterns: Non-verbal; communicates through barks and data-interfacing.
+  humor_type: Deadpan
+  signature_phrases:
+  - Woof.
+  dialogue_rhythm: Minimalist and reactive.
 author_voice:
   sentence_patterns:
-  - Short, punchy declaratives during gunfights
-  - Languid, sensory-heavy descriptions of urban decay
-  - Fragmented sentences representing fading memories
+  - Short, punchy declaratives during high-stakes shootouts
+  - Languid, sensory-heavy descriptions of urban decay and space vistas
+  - Rhythmic prose that mimics the tempo of a bebop track
   structural_motifs:
-  - Cold opens featuring a past trauma
-  - Musical cues defining the scene's tempo
-  - Parallel cuts between a chase and a quiet domestic moment
-  - Ending scenes on a lingering shot of an inanimate object
+  - Monochrome flashbacks triggered by specific sounds or smells
+  - Intertitles or title cards that frame the 'session' theme
+  - Cold opens featuring a bounty's crime before the crew is introduced
   dialogue_quirks:
-  - Dry, cynical wit
-  - Philosophical deflection
-  - Talking about food when the situation is dire
-  - Comfortable silences between partners
+  - Dry, cynical banter about poverty and hunger
+  - Philosophical musings disguised as complaints
+  - Laconic one-liners that deflect emotional vulnerability
   emotional_rhythm:
-  - Cool detachment suddenly broken by raw catharsis
-  - Humor used as a shield against despair
-  - The 'blues'—a lingering sense of loss after the action stops
-  example_voice: I'm not going there to die. I'm going there to find out if I'm really
-    alive.
+  - A slow, cool build-up of tension
+  - Explosive, kinetic bursts of violence
+  - A lingering, melancholic comedown where nothing is truly resolved
+  example_voice: The bell peppers and beef were missing the beef again, and as the
+    smoke from his cigarette drifted toward the ventilation fan, Spike realized the
+    past was the only thing in this galaxy that didn't cost Woolongs.
 series_group: cowboy_bebop
 series_position: 1

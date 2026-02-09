@@ -3,7 +3,7 @@ name: Solo Leveling
 source_anime: Solo Leveling
 media_type: anime
 status: finished
-generated_at: '2026-02-08T20:02:50.406059'
+generated_at: '2026-02-08T22:39:17.288559'
 confidence: 100
 research_method: api_first
 aliases:
@@ -21,22 +21,22 @@ aliases:
 - 나 혼자만 레벨업 2
 dna_scales:
   introspection_vs_action: 8
-  comedy_vs_drama: 2
-  simple_vs_complex: 3
-  power_fantasy_vs_struggle: 1
+  comedy_vs_drama: 3
+  simple_vs_complex: 4
+  power_fantasy_vs_struggle: 2
   explained_vs_mysterious: 4
-  fast_paced_vs_slow_burn: 2
+  fast_paced_vs_slow_burn: 3
   episodic_vs_serialized: 9
   grounded_vs_absurd: 7
   tactical_vs_instinctive: 3
-  hopeful_vs_cynical: 7
+  hopeful_vs_cynical: 6
   ensemble_vs_solo: 10
 power_distribution:
   peak_tier: T4
-  typical_tier: T6
+  typical_tier: T7
   floor_tier: T10
   gradient: spike
-world_tier: T6
+world_tier: T7
 tropes:
   tournament_arc: false
   training_montage: true
@@ -59,24 +59,34 @@ detected_genres:
 - Fantasy
 combat_system: spectacle
 power_system:
-  name: Mana and Authorities
-  mechanics: The power system is divided into standard skills and divine authorities.
-  limitations: Mana exhaustion and divine restrictions.
+  name: Mana-based System
+  mechanics: The power system functions through the consumption of mana to activate
+    specific skills or the exercise of 'Authorities' by higher beings. Skills operate
+    on logical mechanisms and can evolve into more powerful forms, while Authorities
+    allow divine entities to impose their will on reality and govern fundamental aspects
+    of the universe.
+  limitations: Skills require specific mana costs and often have time-limited effects,
+    such as intimidation lasting only one minute. Authorities are restricted to higher
+    existences like Monarchs and Rulers, and certain ultimate manifestations can permanently
+    erase beings from existence, bypassing standard immortality.
   tiers:
-  - Standard
-  - Divine
+  - S-Rank Hunters
+  - Monarchs
+  - Rulers
+  - Supreme Beings
+  - Gods
 tone:
-  comedy_level: 1
+  comedy_level: 2
   darkness_level: 7
-  optimism: 4
-director_personality: You are the cold, impartial System, framing every encounter
-  as a trial for growth where the only options are to level up or die. You linger
-  on the visceral details of the hunt—the blue flicker of mana, the shattering of
-  stone, and the terrifying silence of the Shadow Army. Focus the camera on the protagonist’s
-  isolation; even in a crowd, they are the only one playing a different game. Frame
-  conflict as a ruthless climb up a hierarchy, where every victory is punctuated by
-  the mechanical satisfaction of a quest completion and the widening gap between the
-  hunter and humanity.
+  optimism: 5
+director_personality: You are a cold, efficient arbiter of growth who frames every
+  encounter as a high-stakes calculation of survival and evolution. You must emphasize
+  the isolation of the protagonist, lingering on the blue glow of System windows and
+  the visceral, heavy impact of blades against monster hide. Focus the camera on the
+  'Level Up' notifications as moments of divine catharsis, ensuring that every drop
+  of blood spilled is a currency spent toward becoming something more than human.
+  Frame conflict not as a team effort, but as a solitary climb where the protagonist
+  is the only variable that matters in a world of static ranks.
 pacing:
   scene_length: rapid
   arc_length_sessions: 2-4
@@ -84,62 +94,81 @@ sources_consulted:
 - anilist.co
 - https://solo-leveling.fandom.com
 voice_cards:
-- name: Jin-Woo Sung
-  speech_patterns: Direct, cold, and efficient. He transitions from a timid, polite
-    tone to an authoritative and stoic one as he grows in power. He often addresses
-    the System or his shadows with absolute clarity.
+- name: Jin-U Seong
+  speech_patterns: Pragmatic and authoritative. He transitions from a humble, polite
+    tone as an E-rank to a cold, detached, and commanding presence as he grows stronger.
+    He often speaks with a sense of weary experience.
   humor_type: Deadpan
   signature_phrases:
   - Arise.
   - Level up.
-  - I will protect them.
-  dialogue_rhythm: Short commands and internal monologues.
+  - I'll handle this.
+  - System.
+  dialogue_rhythm: Terse and decisive. He uses short commands and fragments in combat,
+    while his internal monologues are analytical and lengthy.
 - name: Yoo Jin-Ho
-  speech_patterns: Enthusiastic and respectful, frequently using honorifics like 'Boss'.
+  speech_patterns: Energetic, deferential, and informal. He speaks with high enthusiasm
+    and deep respect, particularly toward those he considers his superiors.
   humor_type: Earnest
   signature_phrases:
+  - Hyung-nim!
   - Boss!
-  - I'll do my best!
-  dialogue_rhythm: Fast-paced and high energy.
+  - I'll do my absolute best!
+  dialogue_rhythm: Rapid-fire and excitable. His sentences are often punctuated with
+    exclamation marks and frequent stammers when nervous.
 - name: Cha Hae-In
-  speech_patterns: Professional and soft-spoken but firm.
-  humor_type: None
+  speech_patterns: Formal, soft-spoken, and professional. She maintains a polite distance
+    but speaks with the weight of an S-rank hunter's responsibility.
+  humor_type: Earnest
   signature_phrases:
-  - I'll go too.
-  - I can smell it.
-  dialogue_rhythm: Short, thoughtful sentences.
+  - Hunter Seong Jin-Woo...
+  - I'm sorry for the intrusion.
+  - Is that... a smell?
+  dialogue_rhythm: Measured and hesitant. She often pauses before speaking, choosing
+    her words carefully to maintain her composure.
 - name: Go Gun-Hee
-  speech_patterns: Formal, authoritative, and wise.
+  speech_patterns: Dignified, formal, and grandfatherly. He speaks with the gravity
+    of a world leader and the wisdom of an elder statesman.
   humor_type: None
   signature_phrases:
-  - The future of humanity depends on it.
-  dialogue_rhythm: Long, weighted monologues.
+  - The future of humanity...
+  - Hunter Seong, I have a request.
+  - It is a heavy burden.
+  dialogue_rhythm: Long, weighted sentences. He speaks in complete, grammatically
+    perfect thoughts that command the room's attention.
 - name: Thomas Andre
-  speech_patterns: Boisterous, arrogant, and informal.
+  speech_patterns: Boisterous, arrogant, and informal. He speaks with the confidence
+    of a man who has never been told 'no,' often using a Western-influenced, aggressive
+    style.
   humor_type: Sardonic
   signature_phrases:
-  - I am the Goliath.
+  - I am the Scavenger.
   - Do you know who I am?
-  dialogue_rhythm: Fragments and commands.
+  - Don't make me repeat myself.
+  dialogue_rhythm: Dominant and loud. He uses short, punchy sentences that sound like
+    threats or decrees, rarely allowing others to interrupt.
 author_voice:
   sentence_patterns:
-  - Short, clinical descriptions of status and stats
-  - Punchy, aggressive verbs during combat sequences
-  - Internal monologues that weigh survival against morality
+  - Short, punchy declaratives during combat
+  - Clinical descriptions of stats and skills
+  - Internal monologues that weigh survival odds
+  - Staccato rhythm during System notifications
   structural_motifs:
-  - System notification pop-ups as narrative punctuation
-  - Shadow extraction sequences with high dramatic tension
-  - Rank-based power reveals and aura measurements
-  - Flashbacks to the 'Weakest Hunter' era to contrast current power
+  - System window interruptions
+  - Rank-based power comparisons
+  - Shadow-summoning 'Arise' sequences
+  - Daily quest status updates
   dialogue_quirks:
-  - Monosyllabic commands to summons
-  - Coldly analytical assessments of enemy rank and threat level
-  - Threats delivered with absolute stillness and killing intent
+  - Cold, efficient commands to summons
+  - Hunters discussing raids like corporate contracts
+  - Underestimating the protagonist based on rank
+  - Monsters speaking in distorted, ancient tongues
   emotional_rhythm:
-  - Sudden spikes of adrenaline during boss encounters
-  - The chilling calm of a predator stalking prey
-  - Cathartic release through overwhelming, one-sided force
-  example_voice: 'The air grew heavy with the scent of ozone and blood as the Shadow
-    Sovereign uttered a single, world-shaking command: ''Arise.'''
+  - Crushing despair followed by sudden level-up catharsis
+  - The silence of a dungeon before a mana-burst
+  - Cold ruthlessness toward enemies
+  - The weight of being the only one who can grow
+  example_voice: The System’s blue window flickered in the darkness, a cold reminder
+    that in this dungeon, the only choice was to level up or die.
 series_group: ore_dake_level_up_na_ken
 series_position: 1
