@@ -455,8 +455,11 @@ async def get_disambiguation_options(anime_name: str) -> Dict[str, Any]:
     """
     Check if an anime name needs disambiguation before loading/generating.
     
-    Always uses web search to get the FULL franchise list, ensuring consistent
-    UX regardless of what profiles we have cached.
+    Uses AniList's relation graph to find distinct franchise entries,
+    correctly collapsing seasons (SEQUEL/PREQUEL) and surfacing only
+    genuinely distinct series (SPIN_OFF, SIDE_STORY, ALTERNATIVE, etc).
+    
+    Falls back to LLM web search for titles not found on AniList.
     
     Args:
         anime_name: What the user typed (e.g., "dbz", "naruto")
@@ -464,8 +467,8 @@ async def get_disambiguation_options(anime_name: str) -> Dict[str, Any]:
     Returns:
         Dict with:
         - 'needs_disambiguation': bool
-        - 'options': List[Dict] with name for each option
-        - 'source': 'web_search'
+        - 'options': List[Dict] with name, id, relation_type for each option
+        - 'source': 'anilist' or 'web_search'
     """
     result = {
         'needs_disambiguation': False,
@@ -473,9 +476,47 @@ async def get_disambiguation_options(anime_name: str) -> Dict[str, Any]:
         'source': None
     }
     
-    # Always use web search for full franchise discovery
-    print(f"[Disambiguation] Searching for '{anime_name}' franchise...")
+    # Step 1: Try AniList relation graph (fast, deterministic, season-aware)
+    print(f"[Disambiguation] Checking AniList for '{anime_name}' franchise...")
+    try:
+        from ..scrapers.anilist import AniListClient
+        client = AniListClient()
+        franchise = await client.get_franchise_entries(anime_name)
+        
+        if franchise:
+            # Collapse season variants (e.g., "Side Story Part 2/3" → deduplicated)
+            titles = [e['title'] for e in franchise]
+            collapsed = _collapse_season_variants(titles)
+            
+            # Filter franchise to only keep entries whose titles survived collapse
+            collapsed_set = set(collapsed)
+            franchise = [e for e in franchise if e['title'] in collapsed_set]
+            
+            if len(franchise) > 1:
+                result['needs_disambiguation'] = True
+                result['options'] = [
+                    {'name': entry['title'], 'id': entry['id'], 'relation_type': entry['relation']}
+                    for entry in franchise
+                ]
+                result['source'] = 'anilist'
+                titles = [e['title'] for e in franchise]
+                print(f"[Disambiguation] AniList found {len(franchise)} distinct entries: {titles}")
+                return result
+            else:
+                print(f"[Disambiguation] AniList entries collapsed to 1, no disambiguation needed")
+                return result
+        else:
+            print(f"[Disambiguation] AniList: single continuity or not found, no disambiguation needed")
+            return result
+    except Exception as e:
+        print(f"[Disambiguation] AniList franchise check failed: {e}")
+    
+    # Step 2: Fallback to LLM web search (for obscure titles not on AniList)
+    print(f"[Disambiguation] Falling back to web search for '{anime_name}'...")
     franchise_entries = await _search_franchise_entries(anime_name)
+    
+    # Apply season dedup to LLM results
+    franchise_entries = _collapse_season_variants(franchise_entries)
     
     if franchise_entries and len(franchise_entries) > 1:
         result['needs_disambiguation'] = True
@@ -484,10 +525,68 @@ async def get_disambiguation_options(anime_name: str) -> Dict[str, Any]:
             for entry in franchise_entries
         ]
         result['source'] = 'web_search'
-        print(f"[Disambiguation] Found {len(franchise_entries)} entries: {franchise_entries[:5]}...")
+        print(f"[Disambiguation] Web search found {len(franchise_entries)} entries: {franchise_entries[:5]}")
         return result
     else:
         print(f"[Disambiguation] Single entry or standalone series, no disambiguation needed")
+    
+    return result
+
+
+def _collapse_season_variants(entries: List[str]) -> List[str]:
+    """
+    Post-processing filter to collapse season variants into their parent title.
+    
+    Catches patterns like:
+      "Solo Leveling Season 2: Arise from Shadow" → collapsed into "Solo Leveling"
+      "Mushoku Tensei Part 2" → collapsed into "Mushoku Tensei"
+      "Vinland Saga 2nd Season" → collapsed into "Vinland Saga"
+    
+    Keeps genuinely distinct entries like:
+      "Naruto: Shippuden" (different name, not "Naruto Season 2")
+      "Boruto: Naruto Next Generations" (different continuity)
+    """
+    import re
+    
+    if not entries or len(entries) <= 1:
+        return entries
+    
+    # Season markers: patterns that indicate "same show, different season"
+    SEASON_PATTERNS = re.compile(
+        r'\s*(?:'
+        r'Season\s+\d+'           # "Season 2", "Season 3"
+        r'|S\d+'                  # "S2", "S3"
+        r'|\d+(?:st|nd|rd|th)\s+Season'  # "2nd Season", "3rd Season"
+        r'|Part\s+\d+'            # "Part 2", "Part 3"
+        r'|Cour\s+\d+'            # "Cour 2"
+        r'|(?:Part|Season)\s+(?:One|Two|Three|Four|Five)'  # "Part Two"
+        r')'
+        r'(?:\s*[:：\-–—]\s*.+)?$',   # Optional subtitle after season marker
+        re.IGNORECASE
+    )
+    
+    # For each entry, check if removing a season marker makes it a substring of another entry
+    # Group entries by their "base title" (title with season marker stripped)
+    base_titles: Dict[str, str] = {}  # normalized base → original entry
+    
+    for entry in entries:
+        # Try stripping season patterns
+        base = SEASON_PATTERNS.sub('', entry).strip()
+        base_norm = base.lower().strip(' :：-–—')
+        
+        if base_norm not in base_titles:
+            base_titles[base_norm] = entry
+        else:
+            # Keep the shorter/simpler title (the parent)
+            existing = base_titles[base_norm]
+            if len(entry) < len(existing):
+                base_titles[base_norm] = entry
+    
+    result = list(dict.fromkeys(base_titles.values()))  # Deduplicate while preserving order
+    
+    if len(result) < len(entries):
+        removed = set(entries) - set(result)
+        print(f"[Disambiguation] Collapsed season variants: removed {removed}")
     
     return result
 
@@ -496,6 +595,7 @@ async def _search_franchise_entries(anime_name: str) -> List[str]:
     """
     Use web search to find all entries in an anime franchise.
     
+    This is the FALLBACK path — only used when AniList doesn't find the title.
     Works across all 3 providers that support search (Google, OpenAI, Anthropic).
     
     Args:

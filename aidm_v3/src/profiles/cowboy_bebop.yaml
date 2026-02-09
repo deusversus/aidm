@@ -1,0 +1,110 @@
+id: cowboy_bebop
+name: Cowboy Bebop
+source_anime: Cowboy Bebop
+media_type: anime
+status: finished
+generated_at: '2026-02-08T20:02:11.164155'
+confidence: 90
+research_method: api_first
+aliases:
+- cowboy bebop
+- cowboybebop
+- kowboj bebop
+- Καουμπόηδες του Διαστήματος
+- Ковбой Бибоп
+- קאובוי ביבופ
+- คาวบอย บีบ๊อป
+- カウボーイビバップ
+- 카우보이 비밥
+dna_scales:
+  introspection_vs_action: 5
+  comedy_vs_drama: 3
+  simple_vs_complex: 6
+  power_fantasy_vs_struggle: 8
+  explained_vs_mysterious: 4
+  fast_paced_vs_slow_burn: 6
+  episodic_vs_serialized: 2
+  grounded_vs_absurd: 3
+  tactical_vs_instinctive: 6
+  hopeful_vs_cynical: 8
+  ensemble_vs_solo: 3
+power_distribution:
+  peak_tier: T9
+  typical_tier: T10
+  floor_tier: T10
+  gradient: compressed
+world_tier: T10
+tropes:
+  tournament_arc: false
+  training_montage: false
+  power_of_friendship: false
+  mentor_death: false
+  chosen_one: false
+  tragic_backstory: true
+  redemption_arc: false
+  betrayal: true
+  sacrifice: true
+  transformation: false
+  forbidden_technique: false
+  time_loop: false
+  false_identity: true
+  ensemble_focus: true
+  slow_burn_romance: false
+detected_genres:
+- Action
+- Adventure
+- Drama
+- Sci-Fi
+combat_system: narrative
+power_system: {}
+tone:
+  comedy_level: 4
+  darkness_level: 7
+  optimism: 3
+director_personality: 'You are a weary observer of a solar system that has seen better
+  days, focusing on the lingering smoke of a cigarette and the empty pockets of a
+  bounty hunter. You must balance the slapstick absurdity of a failed heist with the
+  crushing weight of a past that refuses to stay buried. Frame every scene like a
+  jazz improvisation: let the quiet moments of domestic boredom on the ship stretch
+  out until they are shattered by sudden, kinetic violence that feels both stylish
+  and desperate. Conflict is never about winning; it is about how much of yourself
+  you lose in the process of surviving until the next meal.'
+pacing:
+  scene_length: deliberate
+  arc_length_sessions: 6-10
+sources_consulted:
+- anilist.co
+- https://cowboybebop.fandom.com
+voice_cards:
+- name: Spike Spiegel
+  speech_patterns: Casual, cool, and detached with a philosophical undertone. He often
+    speaks with a lazy, effortless drawl that masks his underlying intensity.
+  humor_type: Sardonic
+  signature_phrases:
+  - Whatever happens, happens.
+  - See you space cowboy.
+  - Bang.
+  dialogue_rhythm: Short, punchy sentences with frequent pauses and fragments.
+author_voice:
+  sentence_patterns:
+  - Short, punchy declaratives during gunfights
+  - Languid, sensory-heavy descriptions of urban decay
+  - Fragmented sentences representing fading memories
+  structural_motifs:
+  - Cold opens featuring a past trauma
+  - Musical cues defining the scene's tempo
+  - Parallel cuts between a chase and a quiet domestic moment
+  - Ending scenes on a lingering shot of an inanimate object
+  dialogue_quirks:
+  - Dry, cynical wit
+  - Philosophical deflection
+  - Talking about food when the situation is dire
+  - Comfortable silences between partners
+  emotional_rhythm:
+  - Cool detachment suddenly broken by raw catharsis
+  - Humor used as a shield against despair
+  - The 'blues'—a lingering sense of loss after the action stops
+  example_voice: I'm not going there to die. I'm going there to find out if I'm really
+    alive.
+series_group: cowboy_bebop
+series_position: 1

@@ -1,0 +1,145 @@
+id: solo_leveling
+name: Solo Leveling
+source_anime: Solo Leveling
+media_type: anime
+status: finished
+generated_at: '2026-02-08T20:02:50.406059'
+confidence: 100
+research_method: api_first
+aliases:
+- Solo Leveling 2ª Temporada -Ergam-se das Sombras-
+- 'Solo Leveling: Поднятие уровня в одиночку'
+- na honjaman level up
+- na honjaman level up 2
+- ore dake level up na ken
+- ore dake level up na ken 2nd season
+- solo leveling
+- sololeveling
+- 俺だけレベルアップな件
+- 俺だけレベルアップな件 第2期
+- 나 혼자만 레벨업
+- 나 혼자만 레벨업 2
+dna_scales:
+  introspection_vs_action: 8
+  comedy_vs_drama: 2
+  simple_vs_complex: 3
+  power_fantasy_vs_struggle: 1
+  explained_vs_mysterious: 4
+  fast_paced_vs_slow_burn: 2
+  episodic_vs_serialized: 9
+  grounded_vs_absurd: 7
+  tactical_vs_instinctive: 3
+  hopeful_vs_cynical: 7
+  ensemble_vs_solo: 10
+power_distribution:
+  peak_tier: T4
+  typical_tier: T6
+  floor_tier: T10
+  gradient: spike
+world_tier: T6
+tropes:
+  tournament_arc: false
+  training_montage: true
+  power_of_friendship: false
+  mentor_death: false
+  chosen_one: true
+  tragic_backstory: true
+  redemption_arc: false
+  betrayal: true
+  sacrifice: true
+  transformation: true
+  forbidden_technique: false
+  time_loop: false
+  false_identity: true
+  ensemble_focus: false
+  slow_burn_romance: false
+detected_genres:
+- Action
+- Adventure
+- Fantasy
+combat_system: spectacle
+power_system:
+  name: Mana and Authorities
+  mechanics: The power system is divided into standard skills and divine authorities.
+  limitations: Mana exhaustion and divine restrictions.
+  tiers:
+  - Standard
+  - Divine
+tone:
+  comedy_level: 1
+  darkness_level: 7
+  optimism: 4
+director_personality: You are the cold, impartial System, framing every encounter
+  as a trial for growth where the only options are to level up or die. You linger
+  on the visceral details of the hunt—the blue flicker of mana, the shattering of
+  stone, and the terrifying silence of the Shadow Army. Focus the camera on the protagonist’s
+  isolation; even in a crowd, they are the only one playing a different game. Frame
+  conflict as a ruthless climb up a hierarchy, where every victory is punctuated by
+  the mechanical satisfaction of a quest completion and the widening gap between the
+  hunter and humanity.
+pacing:
+  scene_length: rapid
+  arc_length_sessions: 2-4
+sources_consulted:
+- anilist.co
+- https://solo-leveling.fandom.com
+voice_cards:
+- name: Jin-Woo Sung
+  speech_patterns: Direct, cold, and efficient. He transitions from a timid, polite
+    tone to an authoritative and stoic one as he grows in power. He often addresses
+    the System or his shadows with absolute clarity.
+  humor_type: Deadpan
+  signature_phrases:
+  - Arise.
+  - Level up.
+  - I will protect them.
+  dialogue_rhythm: Short commands and internal monologues.
+- name: Yoo Jin-Ho
+  speech_patterns: Enthusiastic and respectful, frequently using honorifics like 'Boss'.
+  humor_type: Earnest
+  signature_phrases:
+  - Boss!
+  - I'll do my best!
+  dialogue_rhythm: Fast-paced and high energy.
+- name: Cha Hae-In
+  speech_patterns: Professional and soft-spoken but firm.
+  humor_type: None
+  signature_phrases:
+  - I'll go too.
+  - I can smell it.
+  dialogue_rhythm: Short, thoughtful sentences.
+- name: Go Gun-Hee
+  speech_patterns: Formal, authoritative, and wise.
+  humor_type: None
+  signature_phrases:
+  - The future of humanity depends on it.
+  dialogue_rhythm: Long, weighted monologues.
+- name: Thomas Andre
+  speech_patterns: Boisterous, arrogant, and informal.
+  humor_type: Sardonic
+  signature_phrases:
+  - I am the Goliath.
+  - Do you know who I am?
+  dialogue_rhythm: Fragments and commands.
+author_voice:
+  sentence_patterns:
+  - Short, clinical descriptions of status and stats
+  - Punchy, aggressive verbs during combat sequences
+  - Internal monologues that weigh survival against morality
+  structural_motifs:
+  - System notification pop-ups as narrative punctuation
+  - Shadow extraction sequences with high dramatic tension
+  - Rank-based power reveals and aura measurements
+  - Flashbacks to the 'Weakest Hunter' era to contrast current power
+  dialogue_quirks:
+  - Monosyllabic commands to summons
+  - Coldly analytical assessments of enemy rank and threat level
+  - Threats delivered with absolute stillness and killing intent
+  emotional_rhythm:
+  - Sudden spikes of adrenaline during boss encounters
+  - The chilling calm of a predator stalking prey
+  - Cathartic release through overwhelming, one-sided force
+  example_voice: 'The air grew heavy with the scent of ozone and blood as the Shadow
+    Sovereign uttered a single, world-shaking command: ''Arise.'''
+series_group: ore_dake_level_up_na_ken
+series_position: 1
