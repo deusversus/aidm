@@ -420,12 +420,45 @@ async def generate_and_save_profile(
             
             # --- ALL VALIDATION PASSED - NOW SAVE ATOMICALLY ---
             
-            # 1. Save lore text first (for inspection/backup)
-            lore_path = profiles_dir / f"{profile['id']}_lore.txt"
-            with open(lore_path, 'w', encoding='utf-8') as f:
-                f.write(research.raw_content)
+            # 1. Store structured lore in SQL (replaces .txt dump)
+            from ..scrapers.lore_store import get_lore_store
+            lore_store = get_lore_store()
             
-            # 2. Ingest into ProfileLibrary (ChromaDB)
+            if hasattr(research, 'fandom_pages') and research.fandom_pages:
+                # Structured pages from API pipeline — store individually
+                lore_store.store_pages(
+                    profile['id'],
+                    research.fandom_pages,
+                    source_wiki=getattr(research, 'fandom_wiki_url', ''),
+                )
+                print(f"[ProfileGenerator] Stored {len(research.fandom_pages)} pages in LoreStore for {profile['id']}")
+            elif research.raw_content:
+                # Fallback: parse raw_content into pages by section headers
+                import re
+                header_re = re.compile(r'^##\s*\[(\w+)\]\s*(.+)$', re.MULTILINE)
+                headers = list(header_re.finditer(research.raw_content))
+                
+                if headers:
+                    pages = []
+                    for i, match in enumerate(headers):
+                        end = headers[i + 1].start() if i + 1 < len(headers) else len(research.raw_content)
+                        pages.append({
+                            "title": match.group(2).strip(),
+                            "page_type": match.group(1).lower(),
+                            "content": research.raw_content[match.end():end].strip(),
+                        })
+                    lore_store.store_pages(profile['id'], pages)
+                    print(f"[ProfileGenerator] Parsed and stored {len(pages)} sections in LoreStore for {profile['id']}")
+                else:
+                    # No section headers — store as single page
+                    lore_store.store_pages(profile['id'], [{
+                        "title": profile.get('name', profile['id']),
+                        "page_type": "general",
+                        "content": research.raw_content,
+                    }])
+                    print(f"[ProfileGenerator] Stored raw content as single page in LoreStore for {profile['id']}")
+            
+            # 2. Ingest into ProfileLibrary (ChromaDB) — still uses raw_content for chunking
             from ..context.profile_library import get_profile_library
             library = get_profile_library()
             library.add_profile_lore(profile['id'], research.raw_content, source="auto_research")

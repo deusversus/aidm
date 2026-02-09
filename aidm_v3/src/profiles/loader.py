@@ -778,15 +778,16 @@ def load_profile_with_inheritance(profile_id: str) -> NarrativeProfile:
 
 def get_related_lore(profile_id: str) -> List[str]:
     """
-    Get lore file paths for related profiles in the same series.
+    Get lore content for related profiles in the same series.
     
+    Reads from LoreStore (SQL) first, with fallback to legacy .txt files.
     Also includes lore from related_franchise (for spinoffs/alternates).
     
     Args:
         profile_id: Profile ID to find related lore for
         
     Returns:
-        List of lore file paths for profiles in the same series/franchise
+        List of lore content strings for profiles in the same series/franchise
     """
     profiles_dir = Path(__file__).parent
     profile_path = profiles_dir / f"{profile_id}.yaml"
@@ -801,28 +802,45 @@ def get_related_lore(profile_id: str) -> List[str]:
         if not data:
             return []
         
-        lore_paths = set()  # Use set to avoid duplicates
+        related_ids = set()
         
-        # 1. Find lore from same series_group
+        # 1. Find profiles from same series_group
         series_group = data.get('series_group')
         if series_group:
             related = find_profiles_by_series_group(series_group)
             for r in related:
-                lore_path = profiles_dir / f"{r['id']}_lore.txt"
-                if lore_path.exists():
-                    lore_paths.add(str(lore_path))
+                related_ids.add(r['id'])
         
-        # 2. Also include lore from related_franchise (for spinoffs)
+        # 2. Also include profiles from related_franchise (for spinoffs)
         related_franchise = data.get('related_franchise')
         if related_franchise:
-            # Get lore from parent franchise
             parent_related = find_profiles_by_series_group(related_franchise)
             for r in parent_related:
-                lore_path = profiles_dir / f"{r['id']}_lore.txt"
-                if lore_path.exists():
-                    lore_paths.add(str(lore_path))
+                related_ids.add(r['id'])
         
-        return list(lore_paths)
+        # Collect lore content
+        lore_contents = []
+        
+        # Try LoreStore (SQL) first
+        try:
+            from ..scrapers.lore_store import get_lore_store
+            lore_store = get_lore_store()
+            
+            for rid in related_ids:
+                content = lore_store.get_combined_content(rid)
+                if content:
+                    lore_contents.append(content)
+        except Exception:
+            pass  # LoreStore not available, fall through to .txt
+        
+        # Fallback: check .txt files for profiles not found in SQL
+        if not lore_contents:
+            for rid in related_ids:
+                lore_path = profiles_dir / f"{rid}_lore.txt"
+                if lore_path.exists():
+                    lore_contents.append(str(lore_path))
+        
+        return lore_contents
         
     except Exception:
         return []

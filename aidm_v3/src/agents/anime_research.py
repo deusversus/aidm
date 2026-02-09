@@ -109,6 +109,11 @@ class AnimeResearchOutput(BaseModel):
     # Raw Content (for RAG)
     raw_content: Optional[str] = Field(default=None, description="The full research text from Pass 1")
     
+    # Structured Fandom pages (for SQL lore storage)
+    # List of dicts with keys: title, page_type, content
+    fandom_pages: List[Dict[str, Any]] = Field(default_factory=list, description="Individual wiki pages for structured storage")
+    fandom_wiki_url: str = Field(default="", description="Source wiki URL for provenance")
+    
     # Recent updates (for ongoing series)
     recent_updates: Optional[str] = Field(default=None, description="Latest arc/chapter info if ongoing")
     
@@ -1218,6 +1223,17 @@ Supplemental knowledge: {response.content}
                     output.recent_updates = ", ".join(real_arcs)
         
         output.raw_content = "\n\n".join(raw_sections) if raw_sections else None
+        
+        # Pass structured pages for SQL lore storage
+        if fandom_result:
+            output.fandom_wiki_url = wiki_url or ""
+            for page_type, page_list in fandom_result.pages.items():
+                for page in page_list:
+                    output.fandom_pages.append({
+                        "title": page.title,
+                        "page_type": page_type,
+                        "content": page.clean_text,
+                    })
         
         # ========== STEP 4: LLM Interpretation (2-3 calls) ==========
         if progress_tracker:

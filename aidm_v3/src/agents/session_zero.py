@@ -990,6 +990,16 @@ This is a hybrid world blending {primary_anime} ({blend_ratio*100:.0f}%) with {s
     # Save to disk
     save_custom_profile(session_id, profile_data, lore_content)
     
+    # Store in LoreStore SQL
+    from ..scrapers.lore_store import get_lore_store
+    lore_store = get_lore_store()
+    hybrid_profile_id = f"hybrid_{session_id[:12]}"
+    lore_store.store_pages(hybrid_profile_id, [{
+        "title": merged.title or f"{primary_anime} × {secondary_anime}",
+        "page_type": "hybrid",
+        "content": lore_content,
+    }])
+    
     # Index into RAG
     custom_lib = get_custom_profile_library()
     chunks_indexed = custom_lib.add_custom_lore(session_id, lore_content, source="hybrid_research")
@@ -1217,6 +1227,16 @@ Power system preference: {user_preferences.get('power_system', 'coexist')}
     
     # Save to session storage
     save_custom_profile(session_id, profile_data, lore_content)
+    
+    # Store in LoreStore SQL
+    from ..scrapers.lore_store import get_lore_store
+    lore_store = get_lore_store()
+    hybrid_profile_id = f"hybrid_{session_id[:12]}"
+    lore_store.store_pages(hybrid_profile_id, [{
+        "title": merged.title or f"{primary_anime} × {secondary_anime}",
+        "page_type": "hybrid",
+        "content": lore_content,
+    }])
     
     # Index into RAG
     custom_lib = get_custom_profile_library()
