@@ -26,6 +26,7 @@ from typing import Optional
 import requests
 
 from .wiki_normalize import CategoryMapping, discover_categories
+from .wiki_scout import WikiScrapePlan, plan_wiki_scrape
 
 logger = logging.getLogger(__name__)
 
@@ -512,27 +513,46 @@ class FandomClient:
         wiki_url: str,
         max_pages_per_type: int = 25,
         character_limit: int = 15,
+        anime_title: str = "",
     ) -> FandomResult:
         """
         Scrape a Fandom wiki: discover categories, fetch pages, extract text.
         
+        Uses WikiScout (LLM) to classify categories, with legacy fallback.
         Runs blocking HTTP in a thread pool to stay async-compatible.
         
         Args:
             wiki_url: Base URL of the Fandom wiki (e.g., "https://naruto.fandom.com")
             max_pages_per_type: Max pages to scrape per canonical type
             character_limit: Max character pages to scrape (usually fewer needed)
+            anime_title: The anime/manga title (used by WikiScout for context)
             
         Returns:
             FandomResult with all scraped content
         """
+        # Step 1: Get categories (sync HTTP, run in executor)
         loop = asyncio.get_event_loop()
+        all_cats = await loop.run_in_executor(
+            None, self._get_all_categories, wiki_url
+        )
+        
+        # Step 2: WikiScout classification (async LLM call)
+        scrape_plan = None
+        if anime_title and all_cats:
+            scrape_plan = await plan_wiki_scrape(wiki_url, anime_title, all_cats)
+            if not scrape_plan.categories:
+                logger.warning("[Fandom] WikiScout returned empty plan, falling back to legacy")
+                scrape_plan = None
+        
+        # Step 3: Execute scraping (sync HTTP, run in executor)
         return await loop.run_in_executor(
             None,
             self._scrape_wiki_sync,
             wiki_url,
             max_pages_per_type,
             character_limit,
+            all_cats,
+            scrape_plan,
         )
     
     def _scrape_wiki_sync(
@@ -540,8 +560,18 @@ class FandomClient:
         wiki_url: str,
         max_pages_per_type: int,
         character_limit: int,
+        all_cats: list[str] | None = None,
+        scrape_plan: WikiScrapePlan | None = None,
     ) -> FandomResult:
-        """Synchronous wiki scraping implementation."""
+        """Synchronous wiki scraping implementation.
+        
+        Args:
+            wiki_url: Base URL of the Fandom wiki
+            max_pages_per_type: Max pages to scrape per canonical type
+            character_limit: Max character pages to scrape
+            all_cats: Pre-fetched category list (from async wrapper)
+            scrape_plan: WikiScout LLM plan (None = use legacy normalizer)
+        """
         
         # Extract wiki name from URL
         wiki_name = wiki_url.replace("https://", "").replace("http://", "").split(".")[0]
@@ -563,16 +593,97 @@ class FandomClient:
         logger.info(f"[Fandom] {wiki_name}: {result.article_count} articles")
         
         # Step 2: Category discovery
-        logger.info(f"[Fandom] Discovering categories...")
-        all_cats = self._get_all_categories(wiki_url)
+        if all_cats is None:
+            all_cats = self._get_all_categories(wiki_url)
         result.total_categories = len(all_cats)
         
-        mapping = discover_categories(all_cats, wiki_url)
-        result.category_mapping = mapping
+        # Use WikiScout plan if available, otherwise fall back to legacy
+        if scrape_plan and scrape_plan.categories:
+            logger.info(f"[Fandom] Using WikiScout plan ({len(scrape_plan.categories)} categories)")
+            return self._execute_scout_plan(wiki_url, result, scrape_plan, max_pages_per_type, character_limit)
+        else:
+            logger.info(f"[Fandom] Using legacy category discovery")
+            mapping = discover_categories(all_cats, wiki_url)
+            result.category_mapping = mapping
+            logger.info(f"[Fandom] Category discovery: {mapping.discovery_rate}")
+            return self._execute_legacy_scrape(wiki_url, result, mapping, max_pages_per_type, character_limit)
+    
+    def _execute_scout_plan(
+        self,
+        wiki_url: str,
+        result: FandomResult,
+        plan: WikiScrapePlan,
+        max_pages_per_type: int,
+        character_limit: int,
+    ) -> FandomResult:
+        """Execute a WikiScout scraping plan."""
+        all_text_sections = []
         
-        logger.info(f"[Fandom] Category discovery: {mapping.discovery_rate}")
+        # Group categories by canonical type, sorted by priority
+        type_categories: dict[str, list] = {}
+        for sel in sorted(plan.categories, key=lambda s: s.priority):
+            if sel.priority > 2:  # Skip "nice-to-have" in default mode
+                continue
+            if sel.canonical_type not in type_categories:
+                type_categories[sel.canonical_type] = []
+            type_categories[sel.canonical_type].append(sel)
         
-        # Step 3: Scrape pages by type
+        for canonical_type, selections in type_categories.items():
+            # Determine page limit for this type
+            page_limit = character_limit if canonical_type == "characters" else max_pages_per_type
+            
+            type_pages = []
+            pages_remaining = page_limit
+            
+            for sel in selections:
+                if pages_remaining <= 0:
+                    break
+                
+                members = self._get_category_members(wiki_url, sel.wiki_category, limit=pages_remaining)
+                logger.info(
+                    f"[Fandom] Scraping {len(members)} '{canonical_type}' pages "
+                    f"(from '{sel.wiki_category}', priority={sel.priority})..."
+                )
+                
+                # Filter non-article namespace pages
+                members = [t for t in members if not t.startswith(NON_ARTICLE_PREFIXES)]
+                
+                for title in members:
+                    if pages_remaining <= 0:
+                        break
+                    page = self._parse_page(wiki_url, title, page_type=canonical_type)
+                    if page:
+                        type_pages.append(page)
+                        all_text_sections.append(
+                            f"\n## [{canonical_type.upper()}] {page.title}\n{page.clean_text}"
+                        )
+                        pages_remaining -= 1
+            
+            if type_pages:
+                result.pages[canonical_type] = type_pages
+                logger.info(f"[Fandom]   → {len(type_pages)} '{canonical_type}' pages extracted")
+        
+        # Combine all text for RAG
+        result.all_content = "\n\n".join(all_text_sections)
+        
+        total_pages = result.get_total_page_count()
+        total_chars = len(result.all_content)
+        logger.info(
+            f"[Fandom] Scrape complete: {total_pages} pages, "
+            f"{total_chars:,} chars total content"
+        )
+        
+        return result
+    
+    def _execute_legacy_scrape(
+        self,
+        wiki_url: str,
+        result: FandomResult,
+        mapping: CategoryMapping,
+        max_pages_per_type: int,
+        character_limit: int,
+    ) -> FandomResult:
+        """Execute scraping using legacy discover_categories mapping."""
         all_text_sections = []
         
         for canonical_type in mapping.types_found:
@@ -607,7 +718,7 @@ class FandomClient:
             result.pages[canonical_type] = type_pages
             logger.info(f"[Fandom]   → {len(type_pages)} pages extracted")
         
-        # Step 4: Combine all text for RAG
+        # Combine all text for RAG
         result.all_content = "\n\n".join(all_text_sections)
         
         total_pages = result.get_total_page_count()

@@ -129,6 +129,12 @@ class AgentSettings(BaseModel):
         description="Model for validating player world-building assertions (thinking model preferred)"
     )
 
+    # === WIKI SCRAPING ===
+    wiki_scout: Optional[ModelConfig] = Field(
+        default=None,
+        description="Model for wiki category classification (fast model preferred)"
+    )
+
 
 class APIKeySettings(BaseModel):
     """API key configuration for LLM providers.

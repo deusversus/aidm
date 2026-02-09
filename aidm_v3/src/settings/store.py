@@ -167,7 +167,8 @@ class SettingsStore:
         fast_tier_agents = {
             "intent_classifier", "outcome_judge", "validator", "memory_ranker",
             "context_selector", "combat", "progression", "scale_selector",
-            "npc_reaction", "relationship_analyzer", "session_zero", "world_builder"
+            "npc_reaction", "relationship_analyzer", "session_zero", "world_builder",
+            "wiki_scout",
         }
         creative_tier_agents = {"key_animator", "calibration"}  # Prose generation
         thinking_tier_agents = {"director", "research"}  # Reasoning/planning

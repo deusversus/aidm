@@ -1145,6 +1145,7 @@ Supplemental knowledge: {response.content}
                 wiki_url,
                 max_pages_per_type=25,
                 character_limit=15,
+                anime_title=official_title,
             )
             
             scope = self._determine_scope_from_count(fandom_result.article_count)

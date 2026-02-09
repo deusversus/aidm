@@ -600,6 +600,9 @@ async function loadSettings() {
         // World Building
         populateAgentSetting('world_builder', agentModels.world_builder);
 
+        // Wiki Scraping
+        populateAgentSetting('wiki_scout', agentModels.wiki_scout);
+
         // Extended thinking toggle
         const extendedThinkingToggle = document.getElementById('extended-thinking-toggle');
         if (extendedThinkingToggle) {
@@ -896,6 +899,10 @@ async function saveAdvancedSettings() {
                 relationship_analyzer: getAgentConfig('relationship_analyzer'),
                 // Session Zero
                 session_zero: getAgentConfig('session_zero'),
+                // World Building
+                world_builder: getAgentConfig('world_builder'),
+                // Wiki Scraping
+                wiki_scout: getAgentConfig('wiki_scout'),
             },
             debug_mode: true,
             active_profile_id: 'hunterxhunter',
