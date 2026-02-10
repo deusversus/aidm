@@ -1,0 +1,10 @@
+﻿venv313\Scripts\python.exe :   File "<string>", line 7
+At line:1 char:1
++ venv313\Scripts\python.exe -c "
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (  File "<string>", line 7:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+    tables = cur.execute(" SELECT name FROM sqlite_master WHERE type=table\).fetchall()
+                         ^
+SyntaxError: unterminated string literal (detected at line 7)
