@@ -374,6 +374,14 @@ Write vivid, anime-appropriate prose. End at a clear decision point if one exist
                         if rhythm:
                             lines.append(f"  *Rhythm:* {rhythm}")
         
+        # === NPC RELATIONSHIP CARDS (Module 04) ===
+        # Inject structured relationship data so narration reflects actual NPC disposition
+        if hasattr(self, '_npc_context') and self._npc_context:
+            lines.append("")
+            lines.append("### 🧠 NPC Relationship Context (Write Disposition-Aware Dialogue)")
+            lines.append("Use these relationship states to color NPC behavior and dialogue:")
+            lines.append(self._npc_context)
+        
         # Inject Director's Guidance (Phase 4)
         if hasattr(context, "director_notes") and context.director_notes:
             lines.append("")
@@ -470,7 +478,8 @@ This is a CLIMACTIC moment. Unleash the full animation budget:
         context: GameContext,
         retrieved_context: Optional[dict] = None,
         recent_messages: list = None,
-        sakuga_mode: bool = False
+        sakuga_mode: bool = False,
+        npc_context: Optional[str] = None
     ) -> str:
         """Generate narrative prose for this turn.
         
@@ -513,7 +522,10 @@ MATCH the established voice, humor, and style from these exchanges.
         # Inject Profile DNA
         prompt = prompt.replace("{{PROFILE_DNA_INJECTION}}", self._build_profile_dna())
         
-        # Inject Scene Context (includes outcome)
+        # Inject NPC relationship context (set before building scene context)
+        self._npc_context = npc_context
+        
+        # Inject Scene Context (includes outcome + NPC cards)
         scene_context = self._build_scene_context(context)
         scene_context += "\n\n" + self._build_outcome_section(intent, outcome)
         prompt = prompt.replace("{{SCENE_CONTEXT_INJECTION}}", scene_context)

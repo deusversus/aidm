@@ -679,13 +679,16 @@ class StateManager:
             name=name,
             role=role,
             relationship_notes=relationship_notes or "",
-            disposition=kwargs.get("disposition", 0.6),  # Default friendly
+            affinity=kwargs.get("affinity", 0),
+            disposition=kwargs.get("disposition", 0),
             power_tier=kwargs.get("power_tier", "T10"),
-            current_hp=kwargs.get("hp", 100),
-            max_hp=kwargs.get("hp", 100),
-            abilities=kwargs.get("abilities", []),
             personality=kwargs.get("personality", ""),
             goals=kwargs.get("goals", []),
+            ensemble_archetype=kwargs.get("ensemble_archetype"),
+            growth_stage="introduction",
+            intelligence_stage="reactive",
+            scene_count=0,
+            interaction_count=0,
         )
         db.add(npc)
         db.commit()
@@ -957,6 +960,144 @@ class StateManager:
         """Get all NPCs in the campaign."""
         db = self._get_db()
         return db.query(NPC).filter(NPC.campaign_id == self.campaign_id).all()
+    
+    def update_npc_relationship(
+        self,
+        npc_name: str,
+        affinity_delta: int,
+        turn_number: int,
+        emotional_milestone: Optional[str] = None,
+        milestone_context: Optional[str] = None
+    ) -> Optional[NPC]:
+        """Apply a relationship update to an NPC.
+        
+        Updates affinity, tracks emotional milestones, increments counters,
+        recalculates disposition, and evolves intelligence stage.
+        
+        Args:
+            npc_name: Name of the NPC
+            affinity_delta: Change in affinity (-10 to +10)
+            turn_number: Current turn number
+            emotional_milestone: Optional milestone key (e.g., 'first_humor')
+            milestone_context: Reasoning for milestone
+            
+        Returns:
+            Updated NPC or None if not found
+        """
+        npc = self.get_npc_by_name(npc_name)
+        if not npc:
+            return None
+        
+        db = self._get_db()
+        
+        # Update affinity (clamp to -100/+100)
+        npc.affinity = max(-100, min(100, (npc.affinity or 0) + affinity_delta))
+        npc.interaction_count = (npc.interaction_count or 0) + 1
+        npc.last_appeared = turn_number
+        
+        # Track emotional milestone (only firsts count)
+        if emotional_milestone:
+            milestones = npc.emotional_milestones or {}
+            if emotional_milestone not in milestones:
+                milestones[emotional_milestone] = {
+                    "turn": turn_number,
+                    "context": milestone_context or ""
+                }
+                npc.emotional_milestones = milestones
+                print(f"[NPC] {npc.name}: Emotional milestone '{emotional_milestone}' at turn {turn_number}")
+        
+        # Recalculate disposition
+        npc.disposition = self.get_npc_disposition(npc.id)
+        
+        # Evolve intelligence stage based on interaction count
+        self.evolve_npc_intelligence(npc)
+        
+        db.commit()
+        
+        if affinity_delta != 0:
+            print(f"[NPC] {npc.name}: affinity {affinity_delta:+d} → {npc.affinity} (disposition: {npc.disposition})")
+        
+        return npc
+    
+    def evolve_npc_intelligence(self, npc: NPC) -> str:
+        """Advance NPC intelligence stage based on interaction count.
+        
+        Stages:
+            reactive (0-4): NPC responds to direct prompts only
+            contextual (5-9): NPC references past interactions
+            anticipatory (10-19): NPC anticipates PC behavior
+            autonomous (20+): NPC acts independently
+            
+        Returns:
+            Current intelligence stage after evaluation
+        """
+        count = npc.interaction_count or 0
+        old_stage = npc.intelligence_stage or "reactive"
+        
+        if count >= 20:
+            new_stage = "autonomous"
+        elif count >= 10:
+            new_stage = "anticipatory"
+        elif count >= 5:
+            new_stage = "contextual"
+        else:
+            new_stage = "reactive"
+        
+        if new_stage != old_stage:
+            npc.intelligence_stage = new_stage
+            print(f"[NPC] {npc.name}: Intelligence evolved: {old_stage} → {new_stage} ({count} interactions)")
+        
+        return new_stage
+    
+    def get_present_npc_cards(self, npc_names: List[str]) -> str:
+        """Build formatted NPC context cards for narrative agents.
+        
+        Provides relationship-aware context so KeyAnimator can write
+        disposition-appropriate dialogue (hostile NPCs sound hostile, etc.).
+        
+        Args:
+            npc_names: List of NPC names present in the scene
+            
+        Returns:
+            Formatted string of NPC cards, or empty string
+        """
+        cards = []
+        for name in npc_names:
+            npc = self.get_npc_by_name(name)
+            if not npc:
+                continue
+            
+            # Determine disposition label
+            disp = npc.disposition or 0
+            if disp >= 90:
+                disp_label = "devoted"
+            elif disp >= 60:
+                disp_label = "trusted"
+            elif disp >= 30:
+                disp_label = "friendly"
+            elif disp >= -20:
+                disp_label = "neutral"
+            elif disp >= -60:
+                disp_label = "unfriendly"
+            else:
+                disp_label = "hostile"
+            
+            # Build milestone summary
+            milestones = npc.emotional_milestones or {}
+            milestone_str = ", ".join(milestones.keys()) if milestones else "none yet"
+            
+            # Intelligence stage hint
+            intel = npc.intelligence_stage or "reactive"
+            
+            card = (
+                f"**{npc.name}** ({npc.role or 'unknown'}, {disp_label})\n"
+                f"  Affinity: {npc.affinity or 0}/100 | Scenes: {npc.scene_count or 0} | Intelligence: {intel}\n"
+                f"  Personality: {npc.personality or 'Unknown'}\n"
+                f"  Milestones: {milestone_str}"
+            )
+            cards.append(card)
+        
+        return "\n\n".join(cards)
     
     def get_npc_disposition(self, npc_id: int) -> int:
         """

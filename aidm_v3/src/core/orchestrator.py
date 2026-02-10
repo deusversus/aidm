@@ -619,6 +619,22 @@ class Orchestrator:
         self.profile.composition = effective_comp
         print(f"[Orchestrator] Power Differential: {effective_comp.get('differential', 0)} tiers, mode={effective_comp.get('mode', 'standard')}")
         
+        # === NPC CONTEXT CARDS (Module 04) ===
+        # Build structured NPC relationship data for disposition-aware narration
+        npc_context = ""
+        pre_narr_npcs = self.state.detect_npcs_in_text(
+            player_input + " " + (db_context.situation or "")
+        )
+        if pre_narr_npcs:
+            npc_context = self.state.get_present_npc_cards(pre_narr_npcs)
+            # Add spotlight debt hints for narrative balancing
+            spotlight = self.state.compute_spotlight_debt()
+            if spotlight:
+                underserved = [f"{name} (+{debt})" for name, debt in spotlight.items() if debt > 0]
+                if underserved:
+                    npc_context += f"\n\n[Spotlight Hint] These NPCs need more screen time: {', '.join(underserved)}"
+            print(f"[Orchestrator] NPC context: {len(pre_narr_npcs)} NPCs present")
+        
         narrative = await self.key_animator.generate(
             player_input=player_input,
             intent=intent,
@@ -626,7 +642,8 @@ class Orchestrator:
             context=db_context,
             retrieved_context=rag_context,
             recent_messages=recent_messages,
-            sakuga_mode=use_sakuga
+            sakuga_mode=use_sakuga,
+            npc_context=npc_context or None
         )
         
         # DEBUG: Log narrative generation
@@ -657,6 +674,34 @@ class Orchestrator:
                     print(f"[Orchestrator] Extracted {len(dm_entities.entities)} entities from DM narrative")
             except Exception as e:
                 print(f"[Orchestrator] Entity extraction failed: {e}")
+        
+        # =====================================================================
+        # PHASE 4b: NPC RELATIONSHIP ANALYSIS (Module 04)
+        # Detect affinity changes and emotional milestones for present NPCs
+        # =====================================================================
+        if narrative:
+            try:
+                # Detect all NPCs mentioned in the full narrative
+                post_narr_npcs = self.state.detect_npcs_in_text(narrative)
+                if post_narr_npcs:
+                    rel_results = await self.relationship_analyzer.analyze_batch(
+                        npc_names=post_narr_npcs,
+                        action=player_input,
+                        outcome=str(outcome.narrative_weight) if outcome else "neutral",
+                        narrative_excerpt=narrative[:600]
+                    )
+                    for rel in rel_results:
+                        self.state.update_npc_relationship(
+                            npc_name=rel.npc_name,
+                            affinity_delta=rel.affinity_delta,
+                            turn_number=db_context.turn_number,
+                            emotional_milestone=rel.emotional_milestone,
+                            milestone_context=rel.reasoning
+                        )
+                    if rel_results:
+                        print(f"[Orchestrator] Relationship analysis: {len(rel_results)} NPCs updated")
+            except Exception as e:
+                print(f"[Orchestrator] Relationship analysis failed (non-fatal): {e}")
         
 
         # 5. Combat Resolution (if applicable)
@@ -1119,7 +1164,6 @@ class Orchestrator:
                 self.state.create_faction(
                     name=entity.name,
                     description=entity.details.get('description', entity.implied_backstory or ''),
-                    reputation=0,
                     pc_controls=False
                 )
                 print(f"[WorldBuilding] Created faction in DB: {entity.name}")
