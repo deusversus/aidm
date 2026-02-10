@@ -126,6 +126,39 @@ class LLMProvider(ABC):
         """
         pass
     
+    async def complete_with_tools(
+        self,
+        messages: List[Dict[str, str]],
+        tools: Any,  # ToolRegistry — imported lazily to avoid circular deps
+        system: Optional[str] = None,
+        model: Optional[str] = None,
+        max_tokens: int = 4096,
+        max_tool_rounds: int = 5,
+    ) -> 'LLMResponse':
+        """Run a tool-calling loop until the model produces a final text response.
+        
+        The loop:
+        1. Call the model with tool definitions
+        2. If the model returns tool calls → execute them via ToolRegistry
+        3. Append function responses to the conversation
+        4. Repeat until the model returns text or max_tool_rounds reached
+        
+        Args:
+            messages: Initial conversation messages
+            tools: ToolRegistry with available tools
+            system: System prompt
+            model: Model to use
+            max_tokens: Maximum tokens per response
+            max_tool_rounds: Safety limit on tool-call loop iterations
+            
+        Returns:
+            LLMResponse with final text content and tool_calls log
+        """
+        raise NotImplementedError(
+            f"{self.name} provider does not support tool-calling yet. "
+            f"Implement complete_with_tools() in the provider subclass."
+        )
+    
     def _ensure_client(self):
         """Ensure the client is initialized (lazy loading)."""
         if self._client is None:

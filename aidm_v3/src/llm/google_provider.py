@@ -356,6 +356,184 @@ Respond ONLY with the JSON object, no markdown formatting or explanation.
         except json.JSONDecodeError as e:
             raise ValueError(f"Failed to parse JSON response: {e}\nResponse: {content}")
     
+    async def complete_with_tools(
+        self,
+        messages: List[Dict[str, str]],
+        tools: Any,  # ToolRegistry
+        system: Optional[str] = None,
+        model: Optional[str] = None,
+        max_tokens: int = 4096,
+        max_tool_rounds: int = 5,
+    ) -> LLMResponse:
+        """Run a tool-calling loop with Google Gemini function calling.
+        
+        Uses non-streaming generate_content for multi-turn tool interactions.
+        The loop continues until the model produces a text response (no more
+        function calls) or max_tool_rounds is reached.
+        """
+        self._ensure_client()
+        from google.genai import types
+        import asyncio
+        
+        model_name = model or self.get_fast_model()
+        
+        # Convert ToolRegistry to Google format
+        google_tools = tools.to_google_format()
+        
+        # Build initial contents as proper Content objects for multi-turn
+        contents = []
+        for msg in messages:
+            role = msg.get("role", "user")
+            content_text = msg.get("content", "")
+            # Google uses "user" and "model" roles
+            genai_role = "model" if role == "assistant" else "user"
+            contents.append(types.Content(
+                role=genai_role,
+                parts=[types.Part.from_text(text=content_text)]
+            ))
+        
+        # Build config
+        config = {
+            "max_output_tokens": max_tokens,
+            "temperature": 0.3,  # Low temperature for tool-calling reasoning
+            "tools": google_tools,
+            # Disable automatic function calling — we handle the loop manually
+            "automatic_function_calling": types.AutomaticFunctionCallingConfig(
+                disable=True
+            ),
+        }
+        if system:
+            config["system_instruction"] = system
+        
+        all_tool_calls = []
+        total_usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+        
+        loop = asyncio.get_running_loop()
+        
+        for round_num in range(max_tool_rounds):
+            # Make the API call (non-streaming for tool calling)
+            def _generate(contents=contents, config=config):
+                return self._client.models.generate_content(
+                    model=model_name,
+                    contents=contents,
+                    config=config
+                )
+            
+            response = await loop.run_in_executor(None, _generate)
+            
+            # Accumulate usage
+            if hasattr(response, 'usage_metadata') and response.usage_metadata:
+                total_usage["prompt_tokens"] += getattr(response.usage_metadata, 'prompt_token_count', 0) or 0
+                total_usage["completion_tokens"] += getattr(response.usage_metadata, 'candidates_token_count', 0) or 0
+                total_usage["total_tokens"] += getattr(response.usage_metadata, 'total_token_count', 0) or 0
+            
+            # Check if the model returned function calls
+            candidate = response.candidates[0] if response.candidates else None
+            if not candidate or not candidate.content or not candidate.content.parts:
+                # No content — return empty
+                print(f"[ToolLoop] Round {round_num+1}: No content returned, ending loop")
+                break
+            
+            # Separate text parts and function call parts
+            text_parts = []
+            function_calls = []
+            for part in candidate.content.parts:
+                if hasattr(part, 'function_call') and part.function_call:
+                    function_calls.append(part.function_call)
+                elif hasattr(part, 'text') and part.text:
+                    text_parts.append(part.text)
+            
+            if not function_calls:
+                # Model is done — returned text without function calls
+                final_text = "".join(text_parts)
+                print(f"[ToolLoop] Round {round_num+1}: Model returned final text ({len(final_text)} chars)")
+                return LLMResponse(
+                    content=final_text,
+                    tool_calls=all_tool_calls,
+                    model=model_name,
+                    usage=total_usage,
+                    raw_response=response,
+                    metadata={"tool_rounds": round_num + 1}
+                )
+            
+            # Execute each function call
+            print(f"[ToolLoop] Round {round_num+1}: {len(function_calls)} tool call(s)")
+            
+            # Add the model's response (with function calls) to contents
+            contents.append(candidate.content)
+            
+            # Execute tools and build function response parts
+            function_response_parts = []
+            for fc in function_calls:
+                tool_name = fc.name
+                tool_args = dict(fc.args) if fc.args else {}
+                
+                print(f"  [Tool] {tool_name}({tool_args})")
+                
+                # Execute via ToolRegistry
+                result = tools.execute(tool_name, tool_args, round_number=round_num)
+                result_str = result.to_string()
+                
+                # Log for return value
+                all_tool_calls.append({
+                    "name": tool_name,
+                    "arguments": tool_args,
+                    "result_preview": result_str[:200],
+                    "round": round_num + 1
+                })
+                
+                # Build function response part
+                function_response_parts.append(types.Part.from_function_response(
+                    name=tool_name,
+                    response={"result": result_str}
+                ))
+            
+            # Add function responses as a user turn
+            contents.append(types.Content(
+                role="user",
+                parts=function_response_parts
+            ))
+        
+        # Hit max_tool_rounds — force a final text generation without tools
+        print(f"[ToolLoop] Hit max rounds ({max_tool_rounds}), forcing final response")
+        config_no_tools = {
+            "max_output_tokens": max_tokens,
+            "temperature": 0.3,
+        }
+        if system:
+            config_no_tools["system_instruction"] = system
+        
+        # Add instruction to produce final answer
+        contents.append(types.Content(
+            role="user",
+            parts=[types.Part.from_text(
+                text="You've completed your research. Now produce your final response based on everything you've found."
+            )]
+        ))
+        
+        def _final_generate(contents=contents, config=config_no_tools):
+            return self._client.models.generate_content(
+                model=model_name,
+                contents=contents,
+                config=config_no_tools
+            )
+        
+        final_response = await loop.run_in_executor(None, _final_generate)
+        final_text = ""
+        if final_response.candidates and final_response.candidates[0].content:
+            for part in final_response.candidates[0].content.parts:
+                if hasattr(part, 'text') and part.text:
+                    final_text += part.text
+        
+        return LLMResponse(
+            content=final_text,
+            tool_calls=all_tool_calls,
+            model=model_name,
+            usage=total_usage,
+            raw_response=final_response,
+            metadata={"tool_rounds": max_tool_rounds, "forced_finish": True}
+        )
+    
     def _build_contents(self, messages: List[Dict[str, str]]) -> str:
         """Build contents string from messages for the new SDK."""
         # For simple cases, just concatenate user messages

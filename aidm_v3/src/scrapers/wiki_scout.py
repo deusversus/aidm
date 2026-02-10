@@ -190,3 +190,136 @@ async def plan_wiki_scrape(
             categories=[],
             ip_notes=f"WikiScout failed: {e}. Falling back to legacy discovery.",
         )
+
+
+# ---------------------------------------------------------------------------
+# Agentic WikiScout (with exploration tools)
+# ---------------------------------------------------------------------------
+
+async def plan_wiki_scrape_with_tools(
+    wiki_url: str,
+    anime_title: str,
+    all_categories: List[str],
+    fandom_client: "FandomClient" = None,
+) -> WikiScrapePlan:
+    """Agentic wiki scraping plan using tool-calling exploration.
+    
+    Phase 1 (EXPLORE): Uses tools to investigate category sizes, preview
+    pages, and assess content quality before committing.
+    
+    Phase 2 (PLAN): Produces the structured WikiScrapePlan using the
+    exploration findings + category list.
+    
+    Falls back to standard plan_wiki_scrape() if tools fail.
+    
+    Args:
+        wiki_url: The Fandom wiki base URL
+        anime_title: The anime/manga title
+        all_categories: All category names from the wiki
+        fandom_client: FandomClient instance (required for tool-based exploration)
+        
+    Returns:
+        WikiScrapePlan with categorized selections
+    """
+    # If no client provided, fall back to non-agentic version
+    if not fandom_client:
+        return await plan_wiki_scrape(wiki_url, anime_title, all_categories)
+    
+    from ..llm import get_llm_manager
+    from .wiki_scout_tools import build_wiki_scout_tools
+    
+    logger.info(f"[WikiScout] Agentic exploration of {wiki_url} ({len(all_categories)} categories)...")
+    
+    # Build exploration tools
+    tools = build_wiki_scout_tools(
+        fandom_client=fandom_client,
+        wiki_url=wiki_url,
+        all_categories=all_categories,
+    )
+    
+    # Exploration prompt
+    explore_prompt = f"""You are exploring a Fandom wiki to plan a scraping strategy for an anime RPG.
+
+Anime: {anime_title}
+Wiki: {wiki_url}
+Total categories: {len(all_categories)}
+
+Your goal: Investigate this wiki's structure to identify the BEST categories for RPG lore.
+
+Steps:
+1. List categories (try filtering for "Character", "Technique", "Location" etc.)
+2. For promising categories, check their SIZE (get_category_size)
+3. For the top 2-3 candidates, PREVIEW a sample page to verify content quality
+4. Note any IP-specific patterns (e.g., this IP uses "Quirks" instead of "Techniques")
+
+After exploring, provide a CONCISE summary of:
+- Which categories are the best targets and why
+- Any IP-specific naming conventions
+- Estimated total pages to scrape"""
+
+    try:
+        manager = get_llm_manager()
+        fast_provider = manager.fast_provider
+        fast_model = manager.get_fast_model()
+        
+        response = await fast_provider.complete_with_tools(
+            messages=[{"role": "user", "content": explore_prompt}],
+            tools=tools,
+            system="You are a wiki analyst. Use tools to investigate wiki structure, then summarize findings.",
+            model=fast_model,
+            max_tokens=2048,
+            max_tool_rounds=5,
+        )
+        
+        exploration_findings = response.content.strip()
+        call_log = tools.call_log
+        tool_names = [c.tool_name for c in call_log]
+        logger.info(
+            f"[WikiScout] Exploration: {len(call_log)} tool calls "
+            f"({', '.join(tool_names)}), {len(exploration_findings)} chars"
+        )
+        
+        # Now run the structured planning with exploration context
+        provider, model = manager.get_provider_for_agent("wiki_scout")
+        
+        category_list = "\n".join(f"{i+1}. {cat}" for i, cat in enumerate(all_categories))
+        
+        enhanced_prompt = f"""Anime/Manga: {anime_title}
+Wiki URL: {wiki_url}
+
+## Exploration Findings
+(From tool-based investigation of this wiki)
+
+{exploration_findings}
+
+## All {len(all_categories)} Categories
+{category_list}
+
+Based on your exploration findings AND the full category list, produce your final scraping plan."""
+        
+        plan = await provider.complete_with_schema(
+            messages=[{"role": "user", "content": enhanced_prompt}],
+            schema=WikiScrapePlan,
+            system=WIKI_SCOUT_SYSTEM,
+            model=model,
+            max_tokens=2048,
+        )
+        
+        # Validate canonical types
+        valid = [sel for sel in plan.categories if sel.canonical_type in CANONICAL_TYPES]
+        plan.categories = valid
+        
+        type_counts = {}
+        for sel in plan.categories:
+            type_counts[sel.canonical_type] = type_counts.get(sel.canonical_type, 0) + 1
+        
+        logger.info(
+            f"[WikiScout] Agentic plan: {len(plan.categories)} categories "
+            f"across {len(type_counts)} types: {type_counts}"
+        )
+        
+        return plan
+        
+    except Exception as e:
+        logger.warning(f"[WikiScout] Agentic exploration failed, falling back: {e}")
+        return await plan_wiki_scrape(wiki_url, anime_title, all_categories)

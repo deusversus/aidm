@@ -2,6 +2,10 @@
 
 from .provider import LLMProvider, LLMResponse
 from .manager import LLMManager, get_llm_manager, reset_llm_manager
+from .tools import ToolDefinition, ToolParam, ToolResult, ToolRegistry
 
-__all__ = ["LLMProvider", "LLMResponse", "LLMManager", "get_llm_manager", "reset_llm_manager"]
+__all__ = [
+    "LLMProvider", "LLMResponse", "LLMManager", "get_llm_manager", "reset_llm_manager",
+    "ToolDefinition", "ToolParam", "ToolResult", "ToolRegistry",
+]
 

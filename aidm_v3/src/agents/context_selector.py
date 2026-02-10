@@ -1,4 +1,4 @@
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Set
 from pydantic import BaseModel
 import time
 
@@ -104,11 +104,15 @@ class ContextSelector:
         # 1. Determine memory tier based on intent complexity
         memory_limit = self.determine_memory_tier(intent)
         
-        # 2. Search Memories (fast ChromaDB query)
+        # 2. Search Memories (multi-query for better recall)
         # Skip for Tier 0 trivial actions (memory_limit == 0)
-        search_query = f"{player_input} {state_context.situation}"
         if memory_limit > 0:
-            raw_memories = self.memory.search(search_query, limit=memory_limit)
+            queries = self._decompose_queries(player_input, state_context, intent)
+            raw_memories = self._multi_query_search(queries, memory_limit)
+            
+            # Guaranteed plot-critical injection
+            critical = self._get_plot_critical_memories()
+            raw_memories = self._merge_and_dedup(raw_memories, critical)
         else:
             raw_memories = []  # Tier 0: no memory retrieval
         
@@ -211,6 +215,154 @@ class ContextSelector:
             memories_text = "No relevant past memories found."
         
         return memories_text
+    
+    def _decompose_queries(
+        self, 
+        player_input: str, 
+        state_context: GameContext,
+        intent: Optional[IntentOutput] = None
+    ) -> List[str]:
+        """Decompose a single action into 2-3 targeted search queries.
+        
+        Instead of a single concatenated query, generates focused queries:
+        1. Action-focused: what the player is doing
+        2. Situation-focused: current scene context  
+        3. Entity-focused: NPCs/locations mentioned (when present)
+        
+        Returns:
+            List of 2-3 search query strings
+        """
+        queries = []
+        
+        # Query 1: Action-focused (what the player is doing)
+        if intent and intent.action:
+            queries.append(f"{intent.action} {intent.target or ''}")
+        else:
+            queries.append(player_input)
+        
+        # Query 2: Situation-focused (where they are, what's happening)
+        if state_context.situation:
+            queries.append(state_context.situation)
+        
+        # Query 3: Entity-focused (NPCs or locations mentioned) 
+        if intent and intent.target:
+            # Target-specific query for NPC or location recall
+            queries.append(f"{intent.target} relationship history")
+        elif state_context.location:
+            queries.append(f"{state_context.location} events")
+        
+        # Ensure at least 2 queries — fallback to combined
+        if len(queries) < 2:
+            queries.append(f"{player_input} {state_context.situation or ''}")
+        
+        # Cap at 3 queries to limit ChromaDB calls
+        return queries[:3]
+    
+    def _multi_query_search(
+        self, 
+        queries: List[str], 
+        total_limit: int
+    ) -> List[Dict[str, Any]]:
+        """Run multiple queries against memory and deduplicate results.
+        
+        Distributes the total limit across queries, then merges and
+        deduplicates by content. Higher-scoring duplicates win.
+        
+        Args:
+            queries: List of search query strings
+            total_limit: Total number of memories to return
+            
+        Returns:
+            Deduplicated list of memory dicts, sorted by score
+        """
+        per_query_limit = max(3, total_limit // len(queries) + 1)
+        all_results = []
+        
+        for query in queries:
+            query = query.strip()
+            if not query:
+                continue
+            results = self.memory.search(query, limit=per_query_limit)
+            all_results.extend(results)
+        
+        # Deduplicate by content (keep highest score)
+        seen: Dict[str, Dict[str, Any]] = {}
+        for mem in all_results:
+            content = mem.get("content", "")
+            content_key = content[:100]  # First 100 chars as key
+            existing = seen.get(content_key)
+            if not existing or mem.get("score", 0) > existing.get("score", 0):
+                seen[content_key] = mem
+        
+        # Sort by score descending
+        deduped = sorted(seen.values(), key=lambda m: m.get("score", 0), reverse=True)
+        
+        if len(deduped) != len(all_results):
+            print(f"[ContextSelector] Multi-query: {len(all_results)} raw → {len(deduped)} unique (from {len(queries)} queries)")
+        
+        return deduped[:total_limit]
+    
+    def _get_plot_critical_memories(self) -> List[Dict[str, Any]]:
+        """Get guaranteed-include plot-critical and session-zero memories.
+        
+        These memories are ALWAYS included regardless of query similarity,
+        ensuring important established facts are never missed.
+        
+        Returns:
+            List of critical memory dicts (empty if none found)
+        """
+        try:
+            collection = self.memory.collection
+            # Query for plot-critical memories
+            results = collection.get(
+                where={"flags": {"$contains": "plot_critical"}},
+                limit=3,
+            )
+            
+            critical = []
+            if results and results.get("documents"):
+                for i, doc in enumerate(results["documents"]):
+                    meta = results["metadatas"][i] if results.get("metadatas") else {}
+                    critical.append({
+                        "content": doc,
+                        "metadata": meta,
+                        "score": 1.0,  # Max score — always relevant
+                        "source": "plot_critical",
+                    })
+            
+            return critical
+            
+        except Exception:
+            # ChromaDB filter may not match — not all collections have this flag
+            return []
+    
+    def _merge_and_dedup(
+        self, 
+        primary: List[Dict[str, Any]], 
+        additional: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
+        """Merge two memory lists, deduplicating by content.
+        
+        Additional memories are prepended (highest priority) but
+        duplicates from primary are removed.
+        """
+        if not additional:
+            return primary
+        
+        # Build set of content keys from additional
+        additional_keys: Set[str] = set()
+        for mem in additional:
+            additional_keys.add(mem.get("content", "")[:100])
+        
+        # Filter primary to remove duplicates
+        filtered_primary = [
+            m for m in primary
+            if m.get("content", "")[:100] not in additional_keys
+        ]
+        
+        # Prepend critical memories
+        merged = additional + filtered_primary
+        return merged
     
     async def get_context(self, 
                          game_id: str,

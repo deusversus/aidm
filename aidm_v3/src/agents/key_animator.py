@@ -1,9 +1,16 @@
-"""Key Animator Agent - Generate narrative prose."""
+"""Key Animator Agent - Generate narrative prose.
+
+Supports an optional agentic RESEARCH phase before the narrative WRITE phase.
+When tools are provided, the research phase uses tool-calling (on the fast model)
+to gather targeted context from memory, NPCs, and world state. The findings are
+injected into the Vibe Keeper template alongside the existing RAG context.
+"""
 
 from typing import Optional, Tuple
 from pathlib import Path
 
 from ..llm import get_llm_manager, LLMProvider
+from ..llm.tools import ToolRegistry
 from ..settings import get_settings_store
 from .intent_classifier import IntentOutput
 from .outcome_judge import OutcomeOutput
@@ -470,6 +477,68 @@ This is a CLIMACTIC moment. Unleash the full animation budget:
 
 """
     
+    async def _research_phase(
+        self,
+        player_input: str,
+        intent: IntentOutput,
+        context: GameContext,
+        tools: ToolRegistry,
+    ) -> str:
+        """Run targeted research using tool-calling before narrative generation.
+        
+        Delegates to AgenticAgent.research_with_tools() for the fast-model
+        tool-calling loop, keeping the same two-model pattern:
+        fast model for research, creative model for writing.
+        
+        Args:
+            player_input: The player's action
+            intent: Classified intent (for knowing what to research)
+            context: Current game context
+            tools: The ToolRegistry with gameplay tools
+            
+        Returns:
+            Research findings as formatted text, or empty string on failure
+        """
+        from .base import AgenticAgent
+        
+        # Build a focused research prompt
+        research_prompt = f"""You are a narrative researcher for an anime RPG. 
+Your job is to gather relevant context BEFORE the story is written.
+
+The player just did: "{player_input}"
+Intent: {intent.intent} (sub-intent: {intent.sub_intent or 'none'})
+Location: {context.location or 'Unknown'}
+Situation: {context.situation or 'Unknown'}
+
+Using the tools available to you, investigate:
+1. Search for memories related to this action or situation
+2. If any NPCs are mentioned or present, get their relationship details
+3. If this follows from a recent event, check recent episodes for continuity
+4. Get the character sheet if the action involves abilities or stats
+
+After investigating, provide a CONCISE summary of your findings structured as:
+- RELEVANT HISTORY: What established facts are relevant?
+- PRESENT NPCS: Who is here and what's their disposition?
+- CONTINUITY NOTES: What just happened that this scene should follow from?
+- PLAYER IDENTITY: Key character traits/abilities relevant to this action
+
+Be selective — only include what actually matters for THIS specific scene.
+Do NOT repeat information that's obvious from the player's action."""
+        
+        # Use a lightweight AgenticAgent for the research phase
+        # This avoids duplicating provider/model/error logic
+        researcher = AgenticAgent.__new__(AgenticAgent)
+        researcher.agent_name = "key_animator"
+        researcher._model_override = None
+        researcher._tools = tools
+        
+        return await researcher.research_with_tools(
+            research_prompt=research_prompt,
+            system="You are a concise narrative researcher. Use tools to gather facts, then summarize.",
+            max_tool_rounds=3,
+        )
+
+    
     async def generate(
         self,
         player_input: str,
@@ -479,7 +548,8 @@ This is a CLIMACTIC moment. Unleash the full animation budget:
         retrieved_context: Optional[dict] = None,
         recent_messages: list = None,
         sakuga_mode: bool = False,
-        npc_context: Optional[str] = None
+        npc_context: Optional[str] = None,
+        tools: Optional[ToolRegistry] = None
     ) -> str:
         """Generate narrative prose for this turn.
         
@@ -495,6 +565,17 @@ This is a CLIMACTIC moment. Unleash the full animation budget:
         Returns:
             Generated narrative prose
         """
+        # === AGENTIC RESEARCH PHASE (optional) ===
+        # When tools are provided, run a research loop before writing
+        research_findings = ""
+        if tools:
+            research_findings = await self._research_phase(
+                player_input=player_input,
+                intent=intent,
+                context=context,
+                tools=tools,
+            )
+        
         # Build the full prompt
         prompt = self.vibe_keeper_template
         
@@ -576,6 +657,10 @@ MATCH the established voice, humor, and style from these exchanges.
 
 **Use this to ground your narrative:** correct terminology, power system rules, known locations."""
         prompt = prompt.replace("{{LORE_INJECTION}}", lore_text or "")
+        
+        # Inject research findings from agentic research phase
+        if research_findings:
+            memories_text = f"## Agentic Research Findings\n\n{research_findings}\n\n" + (memories_text or "")
         
         prompt = prompt.replace("{{MEMORIES_INJECTION}}", memories_text or "(No relevant memories)")
         prompt = prompt.replace("{{RETRIEVED_CHUNKS_INJECTION}}", chunks_text + archetype_text + tension_text + npc_text + faction_text or "(No additional guidance)")

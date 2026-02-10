@@ -454,4 +454,178 @@ Respond ONLY with the JSON object, no markdown formatting.
             raise ValueError(f"Failed to parse JSON response: {e}\nResponse: {content}")
         except Exception as e:
             raise RuntimeError(f"OpenAI web search with schema failed: {e}")
-
+    
+    async def complete_with_tools(
+        self,
+        messages: List[Dict[str, str]],
+        tools: Any,  # ToolRegistry
+        system: Optional[str] = None,
+        model: Optional[str] = None,
+        max_tokens: int = 4096,
+        max_tool_rounds: int = 5,
+    ) -> LLMResponse:
+        """Run a tool-calling loop with OpenAI Chat Completions.
+        
+        Uses non-streaming chat.completions.create for clean tool_call extraction.
+        The loop continues until the model produces a text response (no tool_calls)
+        or max_tool_rounds is reached.
+        """
+        self._ensure_client()
+        import asyncio
+        
+        model_name = model or self.get_fast_model()
+        
+        # Convert ToolRegistry to OpenAI format
+        openai_tools = tools.to_openai_format()
+        
+        # Build conversation with system prompt
+        conversation = []
+        if system:
+            conversation.append({"role": "system", "content": system})
+        conversation.extend(messages)
+        
+        all_tool_calls = []
+        total_usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+        
+        loop = asyncio.get_running_loop()
+        
+        for round_num in range(max_tool_rounds):
+            # Build kwargs with model-appropriate parameters
+            if "gpt-5" in model_name or "o1" in model_name:
+                kwargs = {
+                    "model": model_name,
+                    "messages": conversation,
+                    "max_completion_tokens": max_tokens,
+                    "tools": openai_tools,
+                }
+            else:
+                kwargs = {
+                    "model": model_name,
+                    "messages": conversation,
+                    "max_tokens": max_tokens,
+                    "temperature": 0.3,  # Low temperature for tool-calling reasoning
+                    "tools": openai_tools,
+                }
+            
+            # Non-streaming for clean tool call extraction
+            def _create(kwargs=kwargs):
+                return self._client.chat.completions.create(**kwargs)
+            
+            response = await loop.run_in_executor(None, _create)
+            
+            # Accumulate usage
+            if response.usage:
+                total_usage["prompt_tokens"] += response.usage.prompt_tokens or 0
+                total_usage["completion_tokens"] += response.usage.completion_tokens or 0
+                total_usage["total_tokens"] += response.usage.total_tokens or 0
+            
+            choice = response.choices[0] if response.choices else None
+            if not choice:
+                print(f"[ToolLoop/OpenAI] Round {round_num+1}: No choices returned, ending loop")
+                break
+            
+            message = choice.message
+            
+            # Check if the model returned tool calls
+            if not message.tool_calls:
+                # Model is done — returned text without tool calls
+                final_text = message.content or ""
+                print(f"[ToolLoop/OpenAI] Round {round_num+1}: Final text ({len(final_text)} chars)")
+                return LLMResponse(
+                    content=final_text,
+                    tool_calls=all_tool_calls,
+                    model=model_name,
+                    usage=total_usage,
+                    raw_response=response,
+                    metadata={"tool_rounds": round_num + 1}
+                )
+            
+            # Execute tool calls
+            print(f"[ToolLoop/OpenAI] Round {round_num+1}: {len(message.tool_calls)} tool call(s)")
+            
+            # Add the assistant's message (with tool_calls) to conversation
+            # Must serialize to dict format OpenAI expects
+            assistant_msg = {"role": "assistant", "content": message.content or ""}
+            assistant_msg["tool_calls"] = [
+                {
+                    "id": tc.id,
+                    "type": "function",
+                    "function": {
+                        "name": tc.function.name,
+                        "arguments": tc.function.arguments,
+                    }
+                }
+                for tc in message.tool_calls
+            ]
+            conversation.append(assistant_msg)
+            
+            # Execute each tool and add results
+            for tc in message.tool_calls:
+                tool_name = tc.function.name
+                try:
+                    tool_args = json.loads(tc.function.arguments) if tc.function.arguments else {}
+                except json.JSONDecodeError:
+                    tool_args = {}
+                tool_call_id = tc.id
+                
+                print(f"  [Tool] {tool_name}({tool_args})")
+                
+                # Execute via ToolRegistry
+                result = tools.execute(tool_name, tool_args, round_number=round_num)
+                result_str = result.to_string()
+                
+                # Log for return value
+                all_tool_calls.append({
+                    "name": tool_name,
+                    "arguments": tool_args,
+                    "result_preview": result_str[:200],
+                    "round": round_num + 1
+                })
+                
+                # Add tool result as a tool message
+                conversation.append({
+                    "role": "tool",
+                    "tool_call_id": tool_call_id,
+                    "content": result_str,
+                })
+        
+        # Hit max_tool_rounds — force a final text response without tools
+        print(f"[ToolLoop/OpenAI] Hit max rounds ({max_tool_rounds}), forcing final response")
+        
+        conversation.append({
+            "role": "user",
+            "content": "You've completed your research. Now produce your final response based on everything you've found."
+        })
+        
+        # Final call without tools
+        if "gpt-5" in model_name or "o1" in model_name:
+            final_kwargs = {
+                "model": model_name,
+                "messages": conversation,
+                "max_completion_tokens": max_tokens,
+            }
+        else:
+            final_kwargs = {
+                "model": model_name,
+                "messages": conversation,
+                "max_tokens": max_tokens,
+                "temperature": 0.3,
+            }
+        
+        def _final_create(kwargs=final_kwargs):
+            return self._client.chat.completions.create(**kwargs)
+        
+        final_response = await loop.run_in_executor(None, _final_create)
+        
+        final_text = ""
+        if final_response.choices:
+            final_text = final_response.choices[0].message.content or ""
+        
+        return LLMResponse(
+            content=final_text,
+            tool_calls=all_tool_calls,
+            model=model_name,
+            usage=total_usage,
+            raw_response=final_response,
+            metadata={"tool_rounds": max_tool_rounds, "forced_finish": True}
+        )

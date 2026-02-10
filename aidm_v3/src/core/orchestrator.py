@@ -635,6 +635,15 @@ class Orchestrator:
                     npc_context += f"\n\n[Spotlight Hint] These NPCs need more screen time: {', '.join(underserved)}"
             print(f"[Orchestrator] NPC context: {len(pre_narr_npcs)} NPCs present")
         
+        # === AGENTIC RESEARCH TOOLS (Module 2) ===
+        # Build gameplay tools for KeyAnimator's optional research phase
+        from ..agents.gameplay_tools import build_gameplay_tools
+        gameplay_tools = build_gameplay_tools(
+            memory=self.memory,
+            state=self.state,
+            session_transcript=recent_messages,
+        )
+        
         narrative = await self.key_animator.generate(
             player_input=player_input,
             intent=intent,
@@ -643,7 +652,8 @@ class Orchestrator:
             retrieved_context=rag_context,
             recent_messages=recent_messages,
             sakuga_mode=use_sakuga,
-            npc_context=npc_context or None
+            npc_context=npc_context or None,
+            tools=gameplay_tools
         )
         
         # DEBUG: Log narrative generation
@@ -980,7 +990,16 @@ class Orchestrator:
                     parts = [g for g in [tension_guidance, expression_guidance, focus_guidance] if g]
                     op_mode_guidance = "\n\n".join(parts) if parts else None
                 
-                # Run Director analysis
+                # Run Director analysis with agentic investigation tools
+                from ..agents.director_tools import build_director_tools
+                director_tools = build_director_tools(
+                    memory=self.memory,
+                    state=self.state,
+                    foreshadowing=self.foreshadowing,
+                    current_turn=db_context.turn_number,
+                    session_transcript=recent_messages if 'recent_messages' in dir() else None,
+                )
+                
                 director_output = await self.director.run_session_review(
                     session=session,
                     bible=bible,
@@ -988,7 +1007,8 @@ class Orchestrator:
                     world_state=world_state,
                     op_preset=op_preset,
                     op_tension_source=db_context.op_tension_source,
-                    op_mode_guidance=op_mode_guidance
+                    op_mode_guidance=op_mode_guidance,
+                    tools=director_tools
                 )
                 
                 # Inject spotlight debt from our tracking

@@ -144,3 +144,163 @@ class BaseAgent(ABC):
         parts.append(f"## Player Action\n{user_message}")
         
         return "\n\n".join(parts)
+
+
+class AgenticAgent(BaseAgent):
+    """Agent with tool-calling capability.
+    
+    Extends BaseAgent with the ability to use tools during generation.
+    Supports two operational modes:
+    
+    1. **call_with_tools()**: Full tool-calling loop using the agent's
+       configured model. Returns free-form text.
+    
+    2. **research_with_tools()**: Fast-model investigation phase that
+       returns findings as text. Designed to be called BEFORE the agent's
+       main structured output call (via BaseAgent.call()). This is the
+       two-model pattern: fast model for research, creative model for writing.
+    
+    Unlike BaseAgent (single prompt → structured output), AgenticAgent
+    can iteratively search, investigate, and gather information before
+    producing its final response.
+    """
+    
+    def __init__(self, model_override: Optional[str] = None):
+        super().__init__(model_override=model_override)
+        self._tools: Optional[Any] = None
+    
+    def set_tools(self, tools) -> 'AgenticAgent':
+        """Set the ToolRegistry for this agent. Returns self for chaining."""
+        self._tools = tools
+        return self
+    
+    def get_tools(self):
+        """Return the ToolRegistry for this agent.
+        
+        Override in subclasses, or set self._tools via set_tools().
+        Returns None if no tools are available (falls back to standard call).
+        """
+        return self._tools
+    
+    async def research_with_tools(
+        self,
+        research_prompt: str,
+        system: str = "You are a concise researcher. Use tools to gather facts, then summarize.",
+        max_tool_rounds: int = 3,
+        max_tokens: int = 2048,
+    ) -> str:
+        """Run a fast-model investigation phase using tools.
+        
+        Uses the FAST model (cheap, quick) regardless of the agent's
+        configured model. Returns free-form text findings that can be
+        injected into the agent's main prompt.
+        
+        This is the recommended way to add agentic research to any agent:
+        
+            findings = await self.research_with_tools(prompt, tools=tools)
+            # ... inject findings into the main structured output call ...
+            result = await self.call(message, investigation_findings=findings)
+        
+        Args:
+            research_prompt: What to investigate
+            system: System prompt for the research phase
+            max_tool_rounds: Maximum tool-call iterations
+            max_tokens: Max tokens for research response
+            
+        Returns:
+            Research findings as text, or empty string on failure
+        """
+        from ..llm.tools import ToolRegistry
+        
+        tools = self.get_tools()
+        if not tools or not isinstance(tools, ToolRegistry):
+            return ""
+        
+        try:
+            manager = get_llm_manager()
+            fast_provider = manager.fast_provider
+            fast_model = manager.get_fast_model()
+            
+            response = await fast_provider.complete_with_tools(
+                messages=[{"role": "user", "content": research_prompt}],
+                tools=tools,
+                system=system,
+                model=fast_model,
+                max_tokens=max_tokens,
+                max_tool_rounds=max_tool_rounds,
+            )
+            
+            findings = response.content.strip()
+            if findings:
+                call_log = tools.call_log
+                tool_names = [c.tool_name for c in call_log]
+                print(
+                    f"[{self.agent_name}] Research phase: {len(call_log)} tool calls "
+                    f"({', '.join(tool_names)}), {len(findings)} chars"
+                )
+                return findings
+                
+        except Exception as e:
+            print(f"[{self.agent_name}] Research phase failed (non-fatal): {e}")
+        
+        return ""
+    
+    async def call_with_tools(
+        self,
+        user_message: str,
+        system_prompt_override: Optional[str] = None,
+        max_tool_rounds: int = 5,
+        **context
+    ) -> str:
+        """Make a tool-calling API call. Returns free-form text.
+        
+        Unlike BaseAgent.call() which returns structured Pydantic output,
+        this returns free-form text since tool-calling agents produce
+        natural language responses after their research phase.
+        
+        Uses the agent's configured model (not the fast model).
+        For fast-model research, use research_with_tools() instead.
+        
+        Args:
+            user_message: The main user message/query
+            system_prompt_override: Optional override for the system prompt
+            max_tool_rounds: Maximum tool-call iterations (safety limit)
+            **context: Additional context sections
+            
+        Returns:
+            Final text response after tool-calling loop completes
+        """
+        from ..llm.tools import ToolRegistry
+        
+        tools = self.get_tools()
+        if not tools or not isinstance(tools, ToolRegistry):
+            # No tools — fall back to standard text completion
+            full_message = self._build_message(user_message, context)
+            messages = [{"role": "user", "content": full_message}]
+            system = system_prompt_override if system_prompt_override is not None else self.system_prompt
+            response = await self.provider.complete(
+                messages=messages,
+                system=system,
+                model=self.model,
+                max_tokens=4096,
+            )
+            return response.content
+        
+        # Build context into user message
+        full_message = self._build_message(user_message, context)
+        messages = [{"role": "user", "content": full_message}]
+        
+        # Use override if provided, otherwise use default
+        system = system_prompt_override if system_prompt_override is not None else self.system_prompt
+        
+        response = await self.provider.complete_with_tools(
+            messages=messages,
+            tools=tools,
+            system=system,
+            model=self.model,
+            max_tokens=4096,
+            max_tool_rounds=max_tool_rounds,
+        )
+        
+        return response.content
+

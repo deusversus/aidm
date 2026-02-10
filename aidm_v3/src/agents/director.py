@@ -1,10 +1,18 @@
-"""Director Agent - Long-term narrative planning (Phase 4)."""
+"""Director Agent - Long-term narrative planning (Phase 4).
+
+Supports an optional agentic INVESTIGATION phase before structured planning.
+When tools are provided, the Director uses tool-calling to research NPC
+trajectories, foreshadowing status, and spotlight balance before making
+arc decisions.
+"""
 
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel, Field
 from pathlib import Path
 
-from .base import BaseAgent
+from .base import AgenticAgent
+from ..llm import get_llm_manager
+from ..llm.tools import ToolRegistry
 from ..db.models import Session, CampaignBible, WorldState
 from ..profiles.loader import NarrativeProfile
 
@@ -37,7 +45,7 @@ class DirectorOutput(BaseModel):
     analysis: str = Field(description="Reasoning behind these decisions")
 
 
-class DirectorAgent(BaseAgent):
+class DirectorAgent(AgenticAgent):
     """
     The Showrunner. Plans arcs, tracks foreshadowing, and manages pacing.
     Runs asynchronously at session boundaries or intervals.
@@ -64,6 +72,53 @@ class DirectorAgent(BaseAgent):
     def output_schema(self):
         return DirectorOutput
 
+    async def _investigation_phase(
+        self,
+        session: Session,
+        world_state: Optional[WorldState],
+        tools: ToolRegistry,
+    ) -> str:
+        """Run investigation using tool-calling before arc planning.
+        
+        Uses FAST model (via AgenticAgent.research_with_tools) to gather NPC
+        trajectories, foreshadowing status, and spotlight balance data.
+        
+        Returns:
+            Investigation findings as text, or empty string on failure
+        """
+        location = world_state.location if world_state else "Unknown"
+        situation = world_state.situation if world_state else "Unknown"
+        session_summary = session.summary or "(No summary yet)"
+        
+        investigation_prompt = f"""You are a narrative analyst investigating the current state 
+of an anime RPG campaign to help the Director plan the next arc.
+
+Session summary: {session_summary[:500]}
+Current location: {location}
+Current situation: {situation}
+
+Using the tools available, investigate:
+1. Get the campaign bible to understand previous Director decisions
+2. Check active foreshadowing — any seeds ready for callback or overdue?
+3. Run a spotlight analysis — which NPCs need more or less screen time?
+4. For the top 1-2 underserved NPCs, get their full trajectory
+5. Search memory for any unresolved plot threads
+
+Provide a CONCISE investigation report structured as:
+- ARC CONTINUITY: What did the last Director pass plan? Are we on track?
+- FORESHADOWING STATUS: Seeds ready for payoff, seeds going stale
+- NPC SPOTLIGHT: Who needs attention, who's overexposed
+- UNRESOLVED THREADS: Plot hooks that need addressing
+- RECOMMENDATION: What should the next arc beat focus on?"""
+        
+        # Set tools and delegate to AgenticAgent.research_with_tools()
+        self.set_tools(tools)
+        return await self.research_with_tools(
+            research_prompt=investigation_prompt,
+            system="You are a narrative analyst. Use tools to gather data, then write a concise investigation report.",
+            max_tool_rounds=4,
+        )
+    
     async def run_session_review(
         self, 
         session: Session, 
@@ -72,7 +127,8 @@ class DirectorAgent(BaseAgent):
         world_state: Optional[WorldState] = None,
         op_preset: Optional[str] = None,
         op_tension_source: Optional[str] = None,
-        op_mode_guidance: Optional[str] = None
+        op_mode_guidance: Optional[str] = None,
+        tools: Optional[ToolRegistry] = None
     ) -> DirectorOutput:
         """
         Analyze the session and update the Campaign Bible.
@@ -85,15 +141,26 @@ class DirectorAgent(BaseAgent):
             op_preset: Optional OP preset (e.g., "bored_god", "hidden_ruler")
             op_tension_source: Optional OP tension source axis
             op_mode_guidance: Optional RAG-retrieved 3-axis guidance
+            tools: Optional ToolRegistry for investigation phase
         """
+        
+        # === AGENTIC INVESTIGATION PHASE (optional) ===
+        investigation_findings = ""
+        if tools:
+            investigation_findings = await self._investigation_phase(
+                session=session,
+                world_state=world_state,
+                tools=tools,
+            )
         
         # 1. Build Director Persona
         persona = profile.director_personality or "You are a thoughtful anime director."
         system_prompt = f"{persona}\n\n{self._base_prompt}"
         
-        # 2. Build Context
+        # 2. Build Context (with investigation findings if available)
         context = self._build_review_context(
-            session, bible, world_state, profile, op_preset, op_tension_source, op_mode_guidance
+            session, bible, world_state, profile, op_preset, op_tension_source, op_mode_guidance,
+            investigation_findings=investigation_findings
         )
         
         # 3. Call LLM with dynamic system prompt override
@@ -109,11 +176,18 @@ class DirectorAgent(BaseAgent):
         profile: Optional[NarrativeProfile] = None,
         op_preset: Optional[str] = None,
         op_tension_source: Optional[str] = None,
-        op_mode_guidance: Optional[str] = None
+        op_mode_guidance: Optional[str] = None,
+        investigation_findings: str = ""
     ) -> str:
         """Construct the context prompt for the Director."""
         
         lines = ["# Campaign Status Review"]
+        
+        # === INVESTIGATION FINDINGS (from agentic research) ===
+        if investigation_findings:
+            lines.append("\n## 🔍 Investigation Report (Tool-Based Research)")
+            lines.append(investigation_findings)
+            lines.append("")
         
         # =====================================================================
         # Narrative DNA (Calibrate Arc Pacing)

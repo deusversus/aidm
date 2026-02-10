@@ -418,4 +418,160 @@ Your response must match the required JSON schema.
                     pass
         
         raise ValueError(f"Could not parse structured response from Claude")
-
+    
+    async def complete_with_tools(
+        self,
+        messages: List[Dict[str, str]],
+        tools: Any,  # ToolRegistry
+        system: Optional[str] = None,
+        model: Optional[str] = None,
+        max_tokens: int = 4096,
+        max_tool_rounds: int = 5,
+    ) -> LLMResponse:
+        """Run a tool-calling loop with Anthropic Claude.
+        
+        Uses non-streaming messages.create for clean tool_use block extraction.
+        The loop continues until Claude produces a text response (stop_reason
+        is 'end_turn' with no tool_use blocks) or max_tool_rounds is reached.
+        """
+        self._ensure_client()
+        import asyncio
+        
+        model_name = model or self.get_fast_model()
+        
+        # Convert ToolRegistry to Anthropic format
+        anthropic_tools = tools.to_anthropic_format()
+        
+        # Build conversation history (Anthropic format)
+        conversation = list(messages)  # Copy — we'll append to this
+        
+        all_tool_calls = []
+        total_usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+        
+        loop = asyncio.get_running_loop()
+        
+        for round_num in range(max_tool_rounds):
+            kwargs = {
+                "model": model_name,
+                "max_tokens": max_tokens,
+                "system": system or "",
+                "messages": conversation,
+                "tools": anthropic_tools,
+            }
+            
+            # Non-streaming for clean tool block extraction
+            def _create(kwargs=kwargs):
+                return self._client.messages.create(**kwargs)
+            
+            response = await loop.run_in_executor(None, _create)
+            
+            # Accumulate usage
+            if hasattr(response, 'usage'):
+                total_usage["prompt_tokens"] += response.usage.input_tokens
+                total_usage["completion_tokens"] += response.usage.output_tokens
+                total_usage["total_tokens"] += (
+                    response.usage.input_tokens + response.usage.output_tokens
+                )
+            
+            # Separate text blocks and tool_use blocks
+            text_parts = []
+            tool_use_blocks = []
+            for block in response.content:
+                if hasattr(block, 'type'):
+                    if block.type == "text":
+                        text_parts.append(block.text)
+                    elif block.type == "tool_use":
+                        tool_use_blocks.append(block)
+            
+            if not tool_use_blocks:
+                # Model is done — returned text without tool calls
+                final_text = "\n".join(text_parts)
+                print(f"[ToolLoop/Anthropic] Round {round_num+1}: Final text ({len(final_text)} chars)")
+                return LLMResponse(
+                    content=final_text,
+                    tool_calls=all_tool_calls,
+                    model=model_name,
+                    usage=total_usage,
+                    raw_response=response,
+                    metadata={"tool_rounds": round_num + 1}
+                )
+            
+            # Execute tool calls
+            print(f"[ToolLoop/Anthropic] Round {round_num+1}: {len(tool_use_blocks)} tool call(s)")
+            
+            # Add the assistant's response to conversation
+            # Must include both text and tool_use blocks as returned
+            conversation.append({
+                "role": "assistant",
+                "content": [
+                    {"type": b.type, **({"text": b.text} if b.type == "text" else {"id": b.id, "name": b.name, "input": b.input})}
+                    for b in response.content
+                    if hasattr(b, 'type') and b.type in ("text", "tool_use")
+                ]
+            })
+            
+            # Execute each tool and build tool_result blocks
+            tool_results = []
+            for block in tool_use_blocks:
+                tool_name = block.name
+                tool_args = block.input if isinstance(block.input, dict) else {}
+                tool_id = block.id
+                
+                print(f"  [Tool] {tool_name}({tool_args})")
+                
+                # Execute via ToolRegistry
+                result = tools.execute(tool_name, tool_args, round_number=round_num)
+                result_str = result.to_string()
+                
+                # Log for return value
+                all_tool_calls.append({
+                    "name": tool_name,
+                    "arguments": tool_args,
+                    "result_preview": result_str[:200],
+                    "round": round_num + 1
+                })
+                
+                tool_results.append({
+                    "type": "tool_result",
+                    "tool_use_id": tool_id,
+                    "content": result_str,
+                })
+            
+            # Add tool results as user message
+            conversation.append({
+                "role": "user",
+                "content": tool_results,
+            })
+        
+        # Hit max_tool_rounds — force a final text response without tools
+        print(f"[ToolLoop/Anthropic] Hit max rounds ({max_tool_rounds}), forcing final response")
+        
+        conversation.append({
+            "role": "user",
+            "content": "You've completed your research. Now produce your final response based on everything you've found."
+        })
+        
+        def _final_create():
+            return self._client.messages.create(
+                model=model_name,
+                max_tokens=max_tokens,
+                system=system or "",
+                messages=conversation,
+                # No tools — force text response
+            )
+        
+        final_response = await loop.run_in_executor(None, _final_create)
+        
+        final_text = ""
+        for block in final_response.content:
+            if hasattr(block, 'text'):
+                final_text += block.text
+        
+        return LLMResponse(
+            content=final_text,
+            tool_calls=all_tool_calls,
+            model=model_name,
+            usage=total_usage,
+            raw_response=final_response,
+            metadata={"tool_rounds": max_tool_rounds, "forced_finish": True}
+        )
