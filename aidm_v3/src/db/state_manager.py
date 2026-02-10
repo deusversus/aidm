@@ -953,6 +953,11 @@ class StateManager:
             .first()
         )
     
+    def get_all_npcs(self) -> List[NPC]:
+        """Get all NPCs in the campaign."""
+        db = self._get_db()
+        return db.query(NPC).filter(NPC.campaign_id == self.campaign_id).all()
+    
     def get_npc_disposition(self, npc_id: int) -> int:
         """
         Calculate NPC disposition using Module 04 formula:

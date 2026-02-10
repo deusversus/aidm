@@ -1526,20 +1526,23 @@ async def index_session_zero_to_memory(session: Session) -> int:
     
     indexed = 0
     for chunk in chunks:
-        # Determine category based on content
+        # Classify for metadata enrichment (core/relationship/fact)
         category = _classify_chunk(chunk)
         
-        # Core memories are plot-critical (no decay)
-        flags = ["plot_critical", "session_zero"] if category == "core" else ["session_zero"]
+        # ALL Session Zero content is sacred — never decay.
+        # Session Zero is the campaign's DNA: character identity, GM voice,
+        # tonal rapport, creative intent. Every exchange matters.
+        flags = ["plot_critical", "session_zero"]
         
         memory.add_memory(
             content=chunk["content"],
-            memory_type=category,
+            memory_type="session_zero",  # Consistent type → CATEGORY_DECAY["session_zero"] = "none"
             turn_number=0,  # Pre-gameplay turn
             metadata={
                 "source": "session_zero",
                 "chunk_index": chunk.get("index", 0),
-                "message_count": chunk.get("message_count", 0)
+                "message_count": chunk.get("message_count", 0),
+                "sub_category": category  # Preserve classification for downstream use
             },
             flags=flags
         )

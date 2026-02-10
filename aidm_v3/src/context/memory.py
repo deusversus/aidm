@@ -99,8 +99,25 @@ class MemoryStore:
             flags: Special flags (plot_critical, character_milestone)
             
         Returns:
-            Memory ID
+            Memory ID, or existing ID if duplicate detected
         """
+        # --- Deduplication check ---
+        # Compare first 200 chars to catch near-exact duplicates from
+        # different indexing paths (process_session_zero_state vs index_session_zero_to_memory)
+        content_fingerprint = content.strip()[:200]
+        if self.collection.count() > 0:
+            try:
+                existing = self.collection.get(
+                    include=["documents"]
+                )
+                if existing["documents"]:
+                    for i, doc in enumerate(existing["documents"]):
+                        if doc.strip()[:200] == content_fingerprint:
+                            print(f"[Memory] Dedup: skipping duplicate content (matches {existing['ids'][i]})")
+                            return existing["ids"][i]
+            except Exception:
+                pass  # If dedup check fails, proceed with add
+        
         memory_id = f"{memory_type}_{turn_number}_{int(time.time()*1000)}"
         
         if metadata is None:
