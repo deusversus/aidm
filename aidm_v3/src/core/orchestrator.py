@@ -100,18 +100,31 @@ class Orchestrator:
         # Override Handler (META/OVERRIDE commands)
         db = create_session()
         self.override_handler = OverrideHandler(db=db, memory_store=self.memory)
+        
+        # Background processing lock — ensures previous turn's post-narrative
+        # work completes before the next turn reads state
+        self._bg_lock = asyncio.Lock()
     
-    async def process_turn(self, player_input: str, recent_messages: list = None) -> TurnResult:
+    async def process_turn(self, player_input: str, recent_messages: list = None, compaction_text: str = "") -> TurnResult:
         """Process a single turn.
         
         Args:
             player_input: The player's action/input
             recent_messages: Last N messages from session for working memory (every turn)
+            compaction_text: Flattened compaction buffer (narrative beats from messages
+                that fell off the sliding window). Always present, cached.
             
         Returns:
             TurnResult with narrative and agent decisions
         """
         start = time.time()
+        
+        # Wait for previous turn's background processing to finish
+        # (almost never blocks — users take ~5-10s between turns)
+        if self._bg_lock.locked():
+            print(f"[Orchestrator] Waiting for previous turn's background processing...")
+            async with self._bg_lock:
+                pass  # Just wait for release
         
         # 1. Get current DB context (fast, sync)
         db_context = self.state.get_context()
@@ -653,7 +666,8 @@ class Orchestrator:
             recent_messages=recent_messages,
             sakuga_mode=use_sakuga,
             npc_context=npc_context or None,
-            tools=gameplay_tools
+            tools=gameplay_tools,
+            compaction_text=compaction_text
         )
         
         # DEBUG: Log narrative generation
@@ -665,392 +679,13 @@ class Orchestrator:
         current_turn.narrative = narrative
         
         # =====================================================================
-        # ENTITY EXTRACTION: Mine DM narrative for NPCs, locations, items
-        # Uses WorldBuilder in extract_only mode (no validation, just extraction)
-        # Always runs - WorldBuilder returns empty list if no entities found
-        # =====================================================================
-        if narrative:
-            try:
-                from ..agents.world_builder import WorldBuilderAgent
-                extractor = WorldBuilderAgent()
-                dm_entities = await extractor.call(
-                    player_input=narrative[:800],  # First 800 chars
-                    mode="extract_only"
-                )
-                for entity in dm_entities.entities:
-                    if entity.is_new:
-                        await self._apply_world_building_entity(entity, db_context.turn_number)
-                if dm_entities.entities:
-                    print(f"[Orchestrator] Extracted {len(dm_entities.entities)} entities from DM narrative")
-            except Exception as e:
-                print(f"[Orchestrator] Entity extraction failed: {e}")
-        
-        # =====================================================================
-        # PHASE 4b: NPC RELATIONSHIP ANALYSIS (Module 04)
-        # Detect affinity changes and emotional milestones for present NPCs
-        # =====================================================================
-        if narrative:
-            try:
-                # Detect all NPCs mentioned in the full narrative
-                post_narr_npcs = self.state.detect_npcs_in_text(narrative)
-                if post_narr_npcs:
-                    rel_results = await self.relationship_analyzer.analyze_batch(
-                        npc_names=post_narr_npcs,
-                        action=player_input,
-                        outcome=str(outcome.narrative_weight) if outcome else "neutral",
-                        narrative_excerpt=narrative[:600]
-                    )
-                    for rel in rel_results:
-                        self.state.update_npc_relationship(
-                            npc_name=rel.npc_name,
-                            affinity_delta=rel.affinity_delta,
-                            turn_number=db_context.turn_number,
-                            emotional_milestone=rel.emotional_milestone,
-                            milestone_context=rel.reasoning
-                        )
-                    if rel_results:
-                        print(f"[Orchestrator] Relationship analysis: {len(rel_results)} NPCs updated")
-            except Exception as e:
-                print(f"[Orchestrator] Relationship analysis failed (non-fatal): {e}")
-        
-
-        # 5. Combat Resolution (if applicable)
-        combat_occurred = False
-        combat_result = None
-        if intent.intent == "COMBAT" or "attack" in intent.action.lower():
-            combat_occurred = True
-            # Parse combat action
-            combat_action = self.combat.parse_combat_action(intent, player_input)
-            
-            # Get character and target
-            character = self.state.get_character()
-            target = self.state.get_target(combat_action.target)
-            
-            if character and target:
-                # 5a. Pre-action validation (M10 Error Recovery)
-                if combat_action.action_type == "spell":
-                    mp_cost = 20  # TODO: Get from skill data
-                    pre_validation = self.validator.validate_resource_cost(
-                        resource_name="MP",
-                        current=getattr(character, 'mp_current', 50),
-                        cost=mp_cost
-                    )
-                    if not pre_validation.is_valid:
-                        # Block action, return validation error as narrative
-                        current_turn.narrative = pre_validation.correction
-                        combat_occurred = False
-                        combat_result = None
-                elif combat_action.action_type == "skill":
-                    sp_cost = 15  # TODO: Get from skill data
-                    pre_validation = self.validator.validate_resource_cost(
-                        resource_name="SP",
-                        current=getattr(character, 'sp_current', 50),
-                        cost=sp_cost
-                    )
-                    if not pre_validation.is_valid:
-                        current_turn.narrative = pre_validation.correction
-                        combat_occurred = False
-                        combat_result = None
-                
-                # Execute combat if validation passed
-                if combat_occurred:
-                    combat_result = await self.combat.resolve_action(
-                        action=combat_action,
-                        attacker=character,
-                        target_entity=target,
-                        context=db_context,
-                        profile=self.profile
-                    )
-                    
-                    # Apply combat results to state
-                    if combat_result.damage_dealt > 0:
-                        self.state.apply_combat_result(combat_result, target)
-                    
-                    # 5b. Post-action validation (M10 Error Recovery)
-                    char_state = {
-                        "hp_current": character.hp_current,
-                        "hp_max": character.hp_max,
-                        "mp_current": getattr(character, 'mp_current', 50),
-                        "mp_max": getattr(character, 'mp_max', 50),
-                    }
-                    post_validation = self.validator.validate_state_integrity(char_state)
-                    if not post_validation.is_valid:
-                        # Log and auto-correct
-                        for error in post_validation.errors:
-                            print(f"[Validator] {error.severity.value}: {error.description}")
-        
-        # 6. Update state (if there are consequences)
-        if outcome.consequence:
-            self.state.apply_consequence(outcome.consequence)
-        
-        # 7. Progression (XP calculation) - LAZY: only when XP-worthy events occur
-        character = self.state.get_character()
-        progression_result = None
-        
-        # Determine if progression check is needed
-        should_calculate_progression = (
-            combat_occurred or
-            use_sakuga or
-            outcome.narrative_weight in ["significant", "climactic"] or
-            (hasattr(outcome, 'quest_progress') and outcome.quest_progress)
-        )
-        
-        if character and should_calculate_progression:
-            turn_result_data = {
-                "combat_occurred": combat_occurred,
-                "boss_fight": combat_result.narrative_weight == "climactic" if combat_result else False,
-                "sakuga_moment": combat_result.sakuga_moment if combat_result else use_sakuga,
-                "quest_completed": outcome.quest_progress if hasattr(outcome, 'quest_progress') else False,
-                "significant_roleplay": outcome.narrative_weight in ["significant", "climactic"],
-            }
-            
-            progression_result = await self.progression.calculate_progression(
-                character=character,
-                turn_result=turn_result_data,
-                profile=self.profile
-            )
-            
-            # Apply XP and level-up
-            if progression_result.xp_awarded > 0:
-                self.state.apply_progression(progression_result)
-        elif character and not should_calculate_progression:
-            print(f"[Orchestrator] Skipping progression: no XP-worthy events")
-        
-        # 6. Record turn & Memory
-        latency = int((time.time() - start) * 1000)
-        self.state.record_turn(
-            player_input=player_input,
-            intent=intent.model_dump(),
-            outcome=outcome.model_dump() if outcome else None,
-            narrative=narrative,
-            latency_ms=latency
-        )
-        
-        # Store comprehensive memory of this turn
-        self.memory.add_memory(
-            content=f"Turn {db_context.turn_number}: Player input '{player_input}'. Result: {narrative[:500]}...",
-            memory_type="event",
-            turn_number=db_context.turn_number
-        )
-        
-        # =====================================================================
-        # NPC INTELLIGENCE: Track interactions and evolve cognition
-        # Uses RelationshipAnalyzer agent (judgment = API call policy)
-        # BATCH PROCESSING: Single LLM call for all NPCs present
-        # =====================================================================
-        if db_context.present_npcs:
-            # Build NPC lookup for processing results
-            npc_lookup = {}
-            for npc_name in db_context.present_npcs:
-                npc = self.state.get_npc_by_name(npc_name)
-                if npc:
-                    npc_lookup[npc_name] = npc
-                    # Increment interaction count
-                    self.state.increment_npc_interaction(npc.id)
-            
-            if npc_lookup:
-                # BATCH: Single LLM call for all NPCs
-                try:
-                    print(f"[Orchestrator] Batch NPC analysis for {len(npc_lookup)} NPCs")
-                    batch_results = await self.relationship_analyzer.analyze_batch(
-                        npc_names=list(npc_lookup.keys()),
-                        action=intent.action,
-                        outcome=outcome.consequence or "No specific outcome",
-                        narrative_excerpt=narrative[:400]
-                    )
-                    
-                    # Process each result
-                    for rel_result in batch_results:
-                        npc = npc_lookup.get(rel_result.npc_name)
-                        if not npc:
-                            continue
-                        
-                        interaction_count = self.state.get_npc_interaction_count(npc.id)
-                        
-                        # Apply affinity changes
-                        if rel_result.affinity_delta != 0:
-                            milestone = self.state.update_npc_affinity(
-                                npc.id, 
-                                rel_result.affinity_delta, 
-                                f"Turn {db_context.turn_number}: {rel_result.reasoning}"
-                            )
-                            if milestone:
-                                # Threshold crossed! Create a memory of this moment
-                                self.memory.add_memory(
-                                    content=f"Relationship milestone with {npc.name}: {milestone['description']}",
-                                    memory_type="relationship",
-                                    turn_number=db_context.turn_number,
-                                    heat=8  # High importance
-                                )
-                                print(f"[NPC] Disposition threshold crossed: {milestone['event']}")
-                        
-                        # Record emotional milestone if detected
-                        if rel_result.emotional_milestone:
-                            event = self.state.record_emotional_milestone(
-                                npc.id,
-                                rel_result.emotional_milestone,
-                                context=narrative[:200],
-                                session_id=db_context.session_id
-                            )
-                            if event:
-                                # Trust milestone triggers cognitive evolution
-                                trust_milestone = rel_result.emotional_milestone in ["first_sacrifice", "first_trust_test"]
-                                self.state.evolve_npc_intelligence(
-                                    npc.id, 
-                                    interaction_count,
-                                    trust_milestone
-                                )
-                        else:
-                            # Regular evolution check
-                            self.state.evolve_npc_intelligence(npc.id, interaction_count, False)
-                        
-                        if rel_result.affinity_delta != 0 or rel_result.emotional_milestone:
-                            print(f"[RelationshipAnalyzer] {rel_result.npc_name}: delta={rel_result.affinity_delta}, milestone={rel_result.emotional_milestone}")
-                    
-                except Exception as e:
-                    # Fallback: just evolve intelligence, no relationship changes
-                    print(f"[RelationshipAnalyzer] Batch error: {e}")
-                    for npc_name, npc in npc_lookup.items():
-                        interaction_count = self.state.get_npc_interaction_count(npc.id)
-                        self.state.evolve_npc_intelligence(npc.id, interaction_count, False)
-                
-                # Increment scene counts for spotlight tracking
-                for npc_name in npc_lookup.keys():
-                    self.state.increment_npc_scene_count(npc_name, db_context.turn_number)
-        
-        # 9. Foreshadowing Detection
-        # Check if any active seeds were mentioned in the narrative
-        mentioned_seeds = self.foreshadowing.detect_seed_in_narrative(
-            narrative=narrative,
-            current_turn=db_context.turn_number
-        )
-        
-        # Check for overdue seeds
-        overdue_seeds = self.foreshadowing.get_overdue_seeds(db_context.turn_number)
-        
-        # Phase 4: Director Checkup (HYBRID TRIGGER)
-        # Runs when: turns_since_last >= 3 AND (epicness >= 2.0 OR arc_event OR turns >= 8)
-        # =====================================================================
-        
-        # Accumulate epicness from this turn
-        self._accumulated_epicness += intent.declared_epicness
-        
-        # Detect arc-relevant events this turn
-        arc_events_this_turn = []
-        if mentioned_seeds:
-            arc_events_this_turn.append(f"foreshadowing_mentioned:{len(mentioned_seeds)}")
-        if progression_result and getattr(progression_result, 'level_up', False):
-            arc_events_this_turn.append("level_up")
-        if use_sakuga:
-            arc_events_this_turn.append("sakuga_moment")
-        if combat_occurred and combat_result and combat_result.narrative_weight == "climactic":
-            arc_events_this_turn.append("boss_defeat")
-        # Major NPC shift detected during batch processing
-        # (tracked separately if needed)
-        
-        self._arc_events_since_director.extend(arc_events_this_turn)
-        
-        # Calculate turns since last Director run
-        turns_since_director = db_context.turn_number - self._last_director_turn
-        
-        # HYBRID TRIGGER CONDITIONS
-        should_run_director = (
-            db_context.turn_number > 0 and
-            turns_since_director >= 3 and (  # Minimum floor
-                self._accumulated_epicness >= 2.0 or  # ~3 epic turns worth
-                len(self._arc_events_since_director) > 0 or  # Arc-relevant event occurred
-                turns_since_director >= 8  # Maximum ceiling
-            )
-        )
-        
-        if should_run_director:
-            trigger_reason = []
-            if self._accumulated_epicness >= 2.0:
-                trigger_reason.append(f"epicness:{self._accumulated_epicness:.1f}")
-            if self._arc_events_since_director:
-                trigger_reason.append(f"events:{self._arc_events_since_director}")
-            if turns_since_director >= 8:
-                trigger_reason.append("max_interval")
-            
-            print(f"[Director] HYBRID TRIGGER at turn {db_context.turn_number}: {trigger_reason}")
-            
-            session = self.state.get_current_session_model()
-            bible = self.state.get_campaign_bible()
-            world_state = self.state.get_world_state()
-            
-            if session and bible:
-                # Get OP mode guidance if active
-                op_preset = db_context.op_preset
-                op_mode_guidance = None
-                if db_context.op_tension_source:
-                    # Build combined guidance from all axes
-                    tension_guidance = self.rules.get_op_axis_guidance("tension", db_context.op_tension_source)
-                    expression_guidance = self.rules.get_op_axis_guidance("expression", db_context.op_power_expression)
-                    focus_guidance = self.rules.get_op_axis_guidance("focus", db_context.op_narrative_focus)
-                    parts = [g for g in [tension_guidance, expression_guidance, focus_guidance] if g]
-                    op_mode_guidance = "\n\n".join(parts) if parts else None
-                
-                # Run Director analysis with agentic investigation tools
-                from ..agents.director_tools import build_director_tools
-                director_tools = build_director_tools(
-                    memory=self.memory,
-                    state=self.state,
-                    foreshadowing=self.foreshadowing,
-                    current_turn=db_context.turn_number,
-                    session_transcript=recent_messages if 'recent_messages' in dir() else None,
-                )
-                
-                director_output = await self.director.run_session_review(
-                    session=session,
-                    bible=bible,
-                    profile=self.profile,
-                    world_state=world_state,
-                    op_preset=op_preset,
-                    op_tension_source=db_context.op_tension_source,
-                    op_mode_guidance=op_mode_guidance,
-                    tools=director_tools
-                )
-                
-                # Inject spotlight debt from our tracking
-                spotlight_debt = self.state.compute_spotlight_debt()
-                planning_data = director_output.model_dump()
-                planning_data["spotlight_debt"] = spotlight_debt
-                
-                # Update Campaign Bible with Director's plans
-                self.state.update_campaign_bible(
-                    planning_data, 
-                    db_context.turn_number
-                )
-                
-                # Persist arc phase and tension to WorldState
-                self.state.update_world_state(
-                    arc_phase=director_output.arc_phase,
-                    tension_level=director_output.tension_level
-                )
-                
-                # Reset tracking after Director runs
-                self._last_director_turn = db_context.turn_number
-                self._accumulated_epicness = 0.0
-                self._arc_events_since_director = []
-                
-                print(f"[Director] Checkpoint at turn {db_context.turn_number}: {director_output.arc_phase} (tension: {director_output.tension_level:.1f})")
-        
-        # Memory Compression (every 10 turns)
-        if db_context.turn_number > 0 and db_context.turn_number % 10 == 0:
-            compression_result = await self.memory.compress_cold_memories()
-            if compression_result.get("compressed"):
-                print(f"[Memory] Compressed {compression_result['memories_removed']} memories into {compression_result['summaries_created']} summaries")
-        
-        # =====================================================================
-        # PROGRESSIVE OP MODE: Display suggestion if pending
+        # CRITICAL PATH: OP suggestion display (mutates narrative before return)
         # =====================================================================
         if db_context.pending_op_suggestion:
             suggestion = db_context.pending_op_suggestion
             preset = suggestion.get('preset', suggestion.get('archetype', 'unknown'))
             
-            # Different message if OP already enabled (required) vs suggested (optional)
             if db_context.op_protagonist_enabled and not db_context.op_tension_source:
-                # REQUIRED: OP mode on but no composition
                 suggestion_text = (
                     f"\n\n---\n"
                     f"**⚠️ OP MODE COMPOSITION REQUIRED ⚠️**\n\n"
@@ -1063,7 +698,6 @@ class Orchestrator:
                     f"---"
                 )
             else:
-                # OPTIONAL: Suggested based on gameplay
                 suggestion_text = (
                     f"\n\n---\n"
                     f"**🌟 OP MODE SUGGESTION 🌟**\n\n"
@@ -1076,25 +710,27 @@ class Orchestrator:
                 )
             narrative = narrative + suggestion_text
         
-        # DEBUG: Log final narrative before return
-        print(f"[Orchestrator] FINAL narrative length: {len(narrative) if narrative else 0}")
+        # Measure latency NOW (before background work)
+        latency = int((time.time() - start) * 1000)
+        print(f"[Orchestrator] FINAL narrative length: {len(narrative) if narrative else 0} (latency: {latency}ms)")
         
-        # EPISODIC MEMORY: Write condensed turn summary for long-term recall
-        # This bridges the gap when working memory window slides past this turn
-        try:
-            turn_number = db_context.turn_number if hasattr(db_context, 'turn_number') else 0
-            location = db_context.location if hasattr(db_context, 'location') else "Unknown"
-            # Simple summary: action + outcome (no LLM call)
-            action_summary = player_input[:80].strip()
-            outcome_summary = narrative[:120].strip().replace('\n', ' ') if narrative else "No outcome"
-            self.memory.add_episode(
-                turn=turn_number,
-                location=location,
-                summary=f"Player: {action_summary}. Outcome: {outcome_summary}"
+        # =====================================================================
+        # FIRE-AND-FORGET: All post-narrative processing runs in background
+        # The user gets the narrative immediately while bookkeeping continues
+        # =====================================================================
+        asyncio.create_task(
+            self._post_narrative_processing(
+                narrative=narrative,
+                player_input=player_input,
+                intent=intent,
+                outcome=outcome,
+                db_context=db_context,
+                recent_messages=recent_messages,
+                use_sakuga=use_sakuga,
+                compaction_text=compaction_text,
+                latency_ms=latency
             )
-            print(f"[Orchestrator] Episodic memory written for turn {turn_number}")
-        except Exception as e:
-            print(f"[Orchestrator] Episode write failed: {e}")
+        )
         
         return TurnResult(
             narrative=narrative,
@@ -1102,6 +738,382 @@ class Orchestrator:
             outcome=outcome,
             latency_ms=latency
         )
+    
+    async def _post_narrative_processing(
+        self,
+        narrative: str,
+        player_input: str,
+        intent,
+        outcome,
+        db_context,
+        recent_messages: list,
+        use_sakuga: bool,
+        compaction_text: str,
+        latency_ms: int
+    ):
+        """Background post-narrative processing. All bookkeeping that doesn't
+        affect the current turn's response runs here.
+        
+        Protected by _bg_lock so the next turn waits for this to finish
+        before reading state.
+        """
+        async with self._bg_lock:
+            bg_start = time.time()
+            try:
+                # =============================================================
+                # 1. ENTITY EXTRACTION + RELATIONSHIP ANALYSIS (PARALLEL)
+                # Both only need the narrative text
+                # =============================================================
+                if narrative:
+                    entity_task = asyncio.create_task(self._bg_extract_entities(
+                        narrative, db_context.turn_number
+                    ))
+                    rel_task = asyncio.create_task(self._bg_relationship_analysis(
+                        narrative, player_input, outcome, db_context.turn_number
+                    ))
+                    await asyncio.gather(entity_task, rel_task, return_exceptions=True)
+                
+                # =============================================================
+                # 2. COMBAT RESOLUTION (conditional)
+                # =============================================================
+                combat_occurred = False
+                combat_result = None
+                if intent.intent == "COMBAT" or "attack" in intent.action.lower():
+                    combat_occurred = True
+                    combat_action = self.combat.parse_combat_action(intent, player_input)
+                    character = self.state.get_character()
+                    target = self.state.get_target(combat_action.target)
+                    
+                    if character and target:
+                        if combat_action.action_type == "spell":
+                            mp_cost = 20
+                            pre_validation = self.validator.validate_resource_cost(
+                                resource_name="MP",
+                                current=getattr(character, 'mp_current', 50),
+                                cost=mp_cost
+                            )
+                            if not pre_validation.is_valid:
+                                combat_occurred = False
+                        elif combat_action.action_type == "skill":
+                            sp_cost = 15
+                            pre_validation = self.validator.validate_resource_cost(
+                                resource_name="SP",
+                                current=getattr(character, 'sp_current', 50),
+                                cost=sp_cost
+                            )
+                            if not pre_validation.is_valid:
+                                combat_occurred = False
+                        
+                        if combat_occurred:
+                            combat_result = await self.combat.resolve_action(
+                                action=combat_action,
+                                attacker=character,
+                                target_entity=target,
+                                context=db_context,
+                                profile=self.profile
+                            )
+                            if combat_result.damage_dealt > 0:
+                                self.state.apply_combat_result(combat_result, target)
+                            
+                            char_state = {
+                                "hp_current": character.hp_current,
+                                "hp_max": character.hp_max,
+                                "mp_current": getattr(character, 'mp_current', 50),
+                                "mp_max": getattr(character, 'mp_max', 50),
+                            }
+                            post_validation = self.validator.validate_state_integrity(char_state)
+                            if not post_validation.is_valid:
+                                for error in post_validation.errors:
+                                    print(f"[Validator] {error.severity.value}: {error.description}")
+                
+                # =============================================================
+                # 3. CONSEQUENCE + PROGRESSION
+                # =============================================================
+                if outcome.consequence:
+                    self.state.apply_consequence(outcome.consequence)
+                
+                character = self.state.get_character()
+                progression_result = None
+                should_calculate_progression = (
+                    combat_occurred or
+                    use_sakuga or
+                    outcome.narrative_weight in ["significant", "climactic"] or
+                    (hasattr(outcome, 'quest_progress') and outcome.quest_progress)
+                )
+                
+                if character and should_calculate_progression:
+                    turn_result_data = {
+                        "combat_occurred": combat_occurred,
+                        "boss_fight": combat_result.narrative_weight == "climactic" if combat_result else False,
+                        "sakuga_moment": combat_result.sakuga_moment if combat_result else use_sakuga,
+                        "quest_completed": outcome.quest_progress if hasattr(outcome, 'quest_progress') else False,
+                        "significant_roleplay": outcome.narrative_weight in ["significant", "climactic"],
+                    }
+                    progression_result = await self.progression.calculate_progression(
+                        character=character,
+                        turn_result=turn_result_data,
+                        profile=self.profile
+                    )
+                    if progression_result.xp_awarded > 0:
+                        self.state.apply_progression(progression_result)
+                elif character and not should_calculate_progression:
+                    print(f"[Background] Skipping progression: no XP-worthy events")
+                
+                # =============================================================
+                # 4. TURN RECORDING + EVENT MEMORY
+                # =============================================================
+                self.state.record_turn(
+                    player_input=player_input,
+                    intent=intent.model_dump(),
+                    outcome=outcome.model_dump() if outcome else None,
+                    narrative=narrative,
+                    latency_ms=latency_ms
+                )
+                self.memory.add_memory(
+                    content=f"Turn {db_context.turn_number}: Player input '{player_input}'. Result: {narrative[:500]}...",
+                    memory_type="event",
+                    turn_number=db_context.turn_number
+                )
+                
+                # =============================================================
+                # 5. NPC INTELLIGENCE BATCH
+                # =============================================================
+                if db_context.present_npcs:
+                    npc_lookup = {}
+                    for npc_name in db_context.present_npcs:
+                        npc = self.state.get_npc_by_name(npc_name)
+                        if npc:
+                            npc_lookup[npc_name] = npc
+                            self.state.increment_npc_interaction(npc.id)
+                    
+                    if npc_lookup:
+                        try:
+                            print(f"[Background] Batch NPC analysis for {len(npc_lookup)} NPCs")
+                            batch_results = await self.relationship_analyzer.analyze_batch(
+                                npc_names=list(npc_lookup.keys()),
+                                action=intent.action,
+                                outcome=outcome.consequence or "No specific outcome",
+                                narrative_excerpt=narrative[:400]
+                            )
+                            
+                            for rel_result in batch_results:
+                                npc = npc_lookup.get(rel_result.npc_name)
+                                if not npc:
+                                    continue
+                                
+                                interaction_count = self.state.get_npc_interaction_count(npc.id)
+                                
+                                if rel_result.affinity_delta != 0:
+                                    milestone = self.state.update_npc_affinity(
+                                        npc.id,
+                                        rel_result.affinity_delta,
+                                        f"Turn {db_context.turn_number}: {rel_result.reasoning}"
+                                    )
+                                    if milestone:
+                                        self.memory.add_memory(
+                                            content=f"Relationship milestone with {npc.name}: {milestone['description']}",
+                                            memory_type="relationship",
+                                            turn_number=db_context.turn_number,
+                                            heat=8
+                                        )
+                                        print(f"[NPC] Disposition threshold crossed: {milestone['event']}")
+                                
+                                if rel_result.emotional_milestone:
+                                    event = self.state.record_emotional_milestone(
+                                        npc.id,
+                                        rel_result.emotional_milestone,
+                                        context=narrative[:200],
+                                        session_id=db_context.session_id
+                                    )
+                                    if event:
+                                        trust_milestone = rel_result.emotional_milestone in ["first_sacrifice", "first_trust_test"]
+                                        self.state.evolve_npc_intelligence(npc.id, interaction_count, trust_milestone)
+                                else:
+                                    self.state.evolve_npc_intelligence(npc.id, interaction_count, False)
+                                
+                                if rel_result.affinity_delta != 0 or rel_result.emotional_milestone:
+                                    print(f"[RelationshipAnalyzer] {rel_result.npc_name}: delta={rel_result.affinity_delta}, milestone={rel_result.emotional_milestone}")
+                            
+                        except Exception as e:
+                            print(f"[RelationshipAnalyzer] Batch error: {e}")
+                            for npc_name, npc in npc_lookup.items():
+                                interaction_count = self.state.get_npc_interaction_count(npc.id)
+                                self.state.evolve_npc_intelligence(npc.id, interaction_count, False)
+                        
+                        for npc_name in npc_lookup.keys():
+                            self.state.increment_npc_scene_count(npc_name, db_context.turn_number)
+                
+                # =============================================================
+                # 6. FORESHADOWING DETECTION
+                # =============================================================
+                mentioned_seeds = self.foreshadowing.detect_seed_in_narrative(
+                    narrative=narrative,
+                    current_turn=db_context.turn_number
+                )
+                overdue_seeds = self.foreshadowing.get_overdue_seeds(db_context.turn_number)
+                
+                # =============================================================
+                # 7. DIRECTOR HYBRID TRIGGER
+                # =============================================================
+                self._accumulated_epicness += intent.declared_epicness
+                
+                arc_events_this_turn = []
+                if mentioned_seeds:
+                    arc_events_this_turn.append(f"foreshadowing_mentioned:{len(mentioned_seeds)}")
+                if progression_result and getattr(progression_result, 'level_up', False):
+                    arc_events_this_turn.append("level_up")
+                if use_sakuga:
+                    arc_events_this_turn.append("sakuga_moment")
+                if combat_occurred and combat_result and combat_result.narrative_weight == "climactic":
+                    arc_events_this_turn.append("boss_defeat")
+                
+                self._arc_events_since_director.extend(arc_events_this_turn)
+                
+                turns_since_director = db_context.turn_number - self._last_director_turn
+                should_run_director = (
+                    db_context.turn_number > 0 and
+                    turns_since_director >= 3 and (
+                        self._accumulated_epicness >= 2.0 or
+                        len(self._arc_events_since_director) > 0 or
+                        turns_since_director >= 8
+                    )
+                )
+                
+                if should_run_director:
+                    trigger_reason = []
+                    if self._accumulated_epicness >= 2.0:
+                        trigger_reason.append(f"epicness:{self._accumulated_epicness:.1f}")
+                    if self._arc_events_since_director:
+                        trigger_reason.append(f"events:{self._arc_events_since_director}")
+                    if turns_since_director >= 8:
+                        trigger_reason.append("max_interval")
+                    
+                    print(f"[Director] HYBRID TRIGGER at turn {db_context.turn_number}: {trigger_reason}")
+                    
+                    session = self.state.get_current_session_model()
+                    bible = self.state.get_campaign_bible()
+                    world_state = self.state.get_world_state()
+                    
+                    if session and bible:
+                        op_preset = db_context.op_preset
+                        op_mode_guidance = None
+                        if db_context.op_tension_source:
+                            tension_guidance = self.rules.get_op_axis_guidance("tension", db_context.op_tension_source)
+                            expression_guidance = self.rules.get_op_axis_guidance("expression", db_context.op_power_expression)
+                            focus_guidance = self.rules.get_op_axis_guidance("focus", db_context.op_narrative_focus)
+                            parts = [g for g in [tension_guidance, expression_guidance, focus_guidance] if g]
+                            op_mode_guidance = "\n\n".join(parts) if parts else None
+                        
+                        from ..agents.director_tools import build_director_tools
+                        director_tools = build_director_tools(
+                            memory=self.memory,
+                            state=self.state,
+                            foreshadowing=self.foreshadowing,
+                            current_turn=db_context.turn_number,
+                            session_transcript=recent_messages,
+                        )
+                        
+                        director_output = await self.director.run_session_review(
+                            session=session,
+                            bible=bible,
+                            profile=self.profile,
+                            world_state=world_state,
+                            op_preset=op_preset,
+                            op_tension_source=db_context.op_tension_source,
+                            op_mode_guidance=op_mode_guidance,
+                            tools=director_tools,
+                            compaction_text=compaction_text
+                        )
+                        
+                        spotlight_debt = self.state.compute_spotlight_debt()
+                        planning_data = director_output.model_dump()
+                        planning_data["spotlight_debt"] = spotlight_debt
+                        
+                        self.state.update_campaign_bible(planning_data, db_context.turn_number)
+                        self.state.update_world_state(
+                            arc_phase=director_output.arc_phase,
+                            tension_level=director_output.tension_level
+                        )
+                        
+                        self._last_director_turn = db_context.turn_number
+                        self._accumulated_epicness = 0.0
+                        self._arc_events_since_director = []
+                        
+                        print(f"[Director] Checkpoint at turn {db_context.turn_number}: {director_output.arc_phase} (tension: {director_output.tension_level:.1f})")
+                
+                # =============================================================
+                # 8. MEMORY COMPRESSION (every 10 turns)
+                # =============================================================
+                if db_context.turn_number > 0 and db_context.turn_number % 10 == 0:
+                    compression_result = await self.memory.compress_cold_memories()
+                    if compression_result.get("compressed"):
+                        print(f"[Memory] Compressed {compression_result['memories_removed']} memories into {compression_result['summaries_created']} summaries")
+                
+                # =============================================================
+                # 9. EPISODIC MEMORY
+                # =============================================================
+                try:
+                    turn_number = db_context.turn_number if hasattr(db_context, 'turn_number') else 0
+                    location = db_context.location if hasattr(db_context, 'location') else "Unknown"
+                    action_summary = player_input[:80].strip()
+                    outcome_summary = narrative[:120].strip().replace('\n', ' ') if narrative else "No outcome"
+                    self.memory.add_episode(
+                        turn=turn_number,
+                        location=location,
+                        summary=f"Player: {action_summary}. Outcome: {outcome_summary}"
+                    )
+                    print(f"[Background] Episodic memory written for turn {turn_number}")
+                except Exception as e:
+                    print(f"[Background] Episode write failed: {e}")
+                
+                bg_elapsed = int((time.time() - bg_start) * 1000)
+                print(f"[Background] Post-narrative processing complete ({bg_elapsed}ms)")
+                
+            except Exception as e:
+                print(f"[Background] Post-narrative processing FAILED: {e}")
+                import traceback
+                traceback.print_exc()
+    
+    async def _bg_extract_entities(self, narrative: str, turn_number: int):
+        """Background entity extraction from DM narrative."""
+        try:
+            from ..agents.world_builder import WorldBuilderAgent
+            extractor = WorldBuilderAgent()
+            dm_entities = await extractor.call(
+                player_input=narrative[:800],
+                mode="extract_only"
+            )
+            for entity in dm_entities.entities:
+                if entity.is_new:
+                    await self._apply_world_building_entity(entity, turn_number)
+            if dm_entities.entities:
+                print(f"[Background] Extracted {len(dm_entities.entities)} entities from narrative")
+        except Exception as e:
+            print(f"[Background] Entity extraction failed: {e}")
+    
+    async def _bg_relationship_analysis(self, narrative: str, player_input: str, outcome, turn_number: int):
+        """Background NPC relationship analysis from narrative."""
+        try:
+            post_narr_npcs = self.state.detect_npcs_in_text(narrative)
+            if post_narr_npcs:
+                rel_results = await self.relationship_analyzer.analyze_batch(
+                    npc_names=post_narr_npcs,
+                    action=player_input,
+                    outcome=str(outcome.narrative_weight) if outcome else "neutral",
+                    narrative_excerpt=narrative[:600]
+                )
+                for rel in rel_results:
+                    self.state.update_npc_relationship(
+                        npc_name=rel.npc_name,
+                        affinity_delta=rel.affinity_delta,
+                        turn_number=turn_number,
+                        emotional_milestone=rel.emotional_milestone,
+                        milestone_context=rel.reasoning
+                    )
+                if rel_results:
+                    print(f"[Background] Relationship analysis: {len(rel_results)} NPCs updated")
+        except Exception as e:
+            print(f"[Background] Relationship analysis failed (non-fatal): {e}")
     
     def close(self):
         """Clean up resources."""

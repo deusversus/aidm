@@ -618,7 +618,8 @@ Omit any section that has nothing useful. Brevity over completeness."""
         recent_messages: list = None,
         sakuga_mode: bool = False,
         npc_context: Optional[str] = None,
-        tools: Optional[ToolRegistry] = None
+        tools: Optional[ToolRegistry] = None,
+        compaction_text: str = ""
     ) -> str:
         """Generate narrative prose for this turn.
         
@@ -648,12 +649,14 @@ Omit any section that has nothing useful. Brevity over completeness."""
         # ===================================================================
         # CACHE-AWARE BLOCK CONSTRUCTION
         # 
-        # Split the system prompt into 3 blocks for optimal prefix caching:
+        # Split the system prompt into 4 blocks for optimal prefix caching:
         #   Block 1 (STATIC — cached): Template + Profile DNA
         #     Changes: never (loaded once per session)
-        #   Block 2 (SEMI-STATIC — cached): Working memory transcript
+        #   Block 2 (SEMI-STATIC — cached): Compaction buffer
+        #     Changes: only when new micro-summaries are appended (append-only)
+        #   Block 3 (SEMI-STATIC — cached): Working memory transcript
         #     Changes: only when sliding window shifts
-        #   Block 3 (DYNAMIC — not cached): Scene context, RAG, lore, etc.
+        #   Block 4 (DYNAMIC — not cached): Scene context, RAG, lore, etc.
         #     Changes: every turn
         #
         # Ordering matters for prefix caching — static content first.
@@ -670,7 +673,21 @@ Omit any section that has nothing useful. Brevity over completeness."""
         static_prompt = static_prompt.replace("{{MEMORIES_INJECTION}}", "")
         static_prompt = static_prompt.replace("{{RETRIEVED_CHUNKS_INJECTION}}", "")
         
-        # --- BLOCK 2: Working memory transcript (cache=True) ---
+        # --- BLOCK 2: Compaction buffer (cache=True) ---
+        compaction_block = ""
+        if compaction_text:
+            compaction_block = f"""
+=== NARRATIVE CONTINUITY (Compacted History) ===
+These are narrative beats from earlier in the session that are no longer
+in the verbatim working memory below. Use for voice matching and continuity.
+
+{compaction_text}
+
+=== END COMPACTED HISTORY ===
+"""
+            print(f"[KeyAnimator] Injecting compaction buffer ({len(compaction_text)} chars)")
+        
+        # --- BLOCK 3: Working memory transcript (cache=True) ---
         working_memory_text = ""
         if recent_messages:
             transcript_lines = []
@@ -691,7 +708,7 @@ MATCH the established voice, humor, and style from these exchanges.
 """
             print(f"[KeyAnimator] Injecting working memory ({len(recent_messages)} messages, {len(transcript_text)} chars)")
         
-        # --- BLOCK 3: Dynamic per-turn context (cache=False) ---
+        # --- BLOCK 4: Dynamic per-turn context (cache=False) ---
         dynamic_parts = []
         
         # NPC relationship context (set before building scene context)
@@ -756,8 +773,9 @@ MATCH the established voice, humor, and style from these exchanges.
         # --- Build cache-aware system blocks ---
         system_blocks = [
             (static_prompt, True),         # Block 1: template + Profile DNA (cached)
-            (working_memory_text, True),    # Block 2: working memory (cached)
-            (dynamic_text, False),          # Block 3: per-turn dynamics (not cached)
+            (compaction_block, True),      # Block 2: compaction buffer (cached)
+            (working_memory_text, True),   # Block 3: working memory (cached)
+            (dynamic_text, False),         # Block 4: per-turn dynamics (not cached)
         ]
         # Filter out empty blocks
         system_blocks = [(text, cache) for text, cache in system_blocks if text.strip()]

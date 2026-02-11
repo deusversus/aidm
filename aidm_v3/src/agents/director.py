@@ -128,7 +128,8 @@ Provide a CONCISE investigation report structured as:
         op_preset: Optional[str] = None,
         op_tension_source: Optional[str] = None,
         op_mode_guidance: Optional[str] = None,
-        tools: Optional[ToolRegistry] = None
+        tools: Optional[ToolRegistry] = None,
+        compaction_text: str = ""
     ) -> DirectorOutput:
         """
         Analyze the session and update the Campaign Bible.
@@ -157,10 +158,11 @@ Provide a CONCISE investigation report structured as:
         persona = profile.director_personality or "You are a thoughtful anime director."
         system_prompt = f"{persona}\n\n{self._base_prompt}"
         
-        # 2. Build Context (with investigation findings if available)
+        # 2. Build Context (with investigation findings and compaction if available)
         context = self._build_review_context(
             session, bible, world_state, profile, op_preset, op_tension_source, op_mode_guidance,
-            investigation_findings=investigation_findings
+            investigation_findings=investigation_findings,
+            compaction_text=compaction_text
         )
         
         # 3. Call LLM with dynamic system prompt override
@@ -177,7 +179,8 @@ Provide a CONCISE investigation report structured as:
         op_preset: Optional[str] = None,
         op_tension_source: Optional[str] = None,
         op_mode_guidance: Optional[str] = None,
-        investigation_findings: str = ""
+        investigation_findings: str = "",
+        compaction_text: str = ""
     ) -> str:
         """Construct the context prompt for the Director."""
         
@@ -187,6 +190,14 @@ Provide a CONCISE investigation report structured as:
         if investigation_findings:
             lines.append("\n## 🔍 Investigation Report (Tool-Based Research)")
             lines.append(investigation_findings)
+            lines.append("")
+        
+        # === NARRATIVE INTELLIGENCE (from compaction buffer) ===
+        if compaction_text:
+            lines.append("\n## 📜 Narrative Intelligence (Compacted History)")
+            lines.append("These are narrative beats from earlier in the session that are no longer")
+            lines.append("in verbatim memory. Use for arc awareness, emotional trajectory, and continuity.")
+            lines.append(compaction_text)
             lines.append("")
         
         # =====================================================================

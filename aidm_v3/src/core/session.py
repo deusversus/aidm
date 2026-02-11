@@ -274,6 +274,10 @@ class Session:
     # Conversation history for this session
     messages: List[Dict[str, str]] = field(default_factory=list)
     
+    # Compaction buffer: micro-summaries of messages that fell off the sliding window
+    # Each entry: {"turn": int, "summary": str, "tokens_est": int}
+    compaction_buffer: List[Dict[str, Any]] = field(default_factory=list)
+    
     # Metadata
     created_at: datetime = field(default_factory=datetime.now)
     last_activity: datetime = field(default_factory=datetime.now)
@@ -329,6 +333,7 @@ class Session:
             "phase": self.phase.value,
             "character_draft": self.character_draft.to_dict(),
             "messages": self.messages,
+            "compaction_buffer": self.compaction_buffer,
             "created_at": self.created_at.isoformat(),
             "last_activity": self.last_activity.isoformat(),
             "phase_state": self.phase_state,
@@ -342,6 +347,7 @@ class Session:
             phase=SessionPhase(data.get("phase", "media_detection")),
             character_draft=CharacterDraft.from_dict(data.get("character_draft", {})),
             messages=data.get("messages", []),
+            compaction_buffer=data.get("compaction_buffer", []),
             phase_state=data.get("phase_state", {}),
         )
         # Parse datetime strings

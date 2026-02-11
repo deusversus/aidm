@@ -1309,9 +1309,73 @@ async def process_turn(request: TurnRequest):
     if session:
         session.add_message("user", request.player_input)
     
+    # =====================================================================
+    # COMPACTION: Detect dropped messages and micro-summarize them
+    # The sliding window is 15 messages. When total messages exceeds 15,
+    # the oldest messages fall off. We compact them into narrative beats.
+    # =====================================================================
+    WINDOW_SIZE = 15
+    COMPACTION_MAX_TOKENS = 10_000
+    
+    compaction_text = ""
+    if session and hasattr(session, 'messages') and len(session.messages) > WINDOW_SIZE:
+        # Messages that just fell off the window
+        dropped_start = max(0, len(session.messages) - WINDOW_SIZE - 2)  # -2 for user+assistant from last turn
+        dropped_end = len(session.messages) - WINDOW_SIZE
+        
+        if dropped_end > dropped_start and dropped_end > 0:
+            dropped_messages = session.messages[dropped_start:dropped_end]
+            
+            if dropped_messages:
+                try:
+                    from src.agents.compactor import CompactorAgent
+                    compactor = CompactorAgent()
+                    
+                    # Get last 2 compaction entries for continuity context
+                    prior_context = ""
+                    if hasattr(session, 'compaction_buffer') and session.compaction_buffer:
+                        recent_entries = session.compaction_buffer[-2:]
+                        prior_context = "\n\n".join(e["summary"] for e in recent_entries)
+                    
+                    # Run micro-compaction (fast-tier model, ~500 tokens in, ~200 out)
+                    micro_summary = await compactor.compact(
+                        dropped_messages=dropped_messages,
+                        prior_context=prior_context
+                    )
+                    
+                    if micro_summary:
+                        # Estimate tokens
+                        tokens_est = int(len(micro_summary.split()) * 1.3)
+                        
+                        # Append to buffer
+                        if not hasattr(session, 'compaction_buffer'):
+                            session.compaction_buffer = []
+                        session.compaction_buffer.append({
+                            "turn": len(session.messages) // 2,  # approximate turn number
+                            "summary": micro_summary,
+                            "tokens_est": tokens_est
+                        })
+                        
+                        # Enforce 10k token ceiling (FIFO eviction)
+                        total_tokens = sum(e["tokens_est"] for e in session.compaction_buffer)
+                        while total_tokens > COMPACTION_MAX_TOKENS and len(session.compaction_buffer) > 1:
+                            evicted = session.compaction_buffer.pop(0)
+                            total_tokens -= evicted["tokens_est"]
+                            print(f"[Compaction] Evicted oldest entry (turn {evicted['turn']}, {evicted['tokens_est']} tokens)")
+                        
+                        print(f"[Compaction] Appended micro-summary ({tokens_est} tokens, buffer: {len(session.compaction_buffer)} entries, {total_tokens} total tokens)")
+                except Exception as e:
+                    print(f"[Compaction] Failed (non-fatal): {e}")
+    
+    # Build compaction text from buffer for injection
+    if session and hasattr(session, 'compaction_buffer') and session.compaction_buffer:
+        compaction_text = "\n\n".join(
+            f"**[Beat {e['turn']}]** {e['summary']}" for e in session.compaction_buffer
+        )
+    
     # Working Memory: Get last 15 messages from session (includes Session Zero + gameplay)
     # This replaces the one-time handoff_transcript mechanism
-    recent_messages = session.messages[-15:] if session and hasattr(session, 'messages') else []
+    recent_messages = session.messages[-WINDOW_SIZE:] if session and hasattr(session, 'messages') else []
     if recent_messages:
         print(f"[GameAPI] Working memory: {len(recent_messages)} recent messages")
     
@@ -1323,7 +1387,7 @@ async def process_turn(request: TurnRequest):
             print(f"[GameAPI] Processing turn: '{safe_input}...'")
         except Exception:
             print(f"[GameAPI] Processing turn: (encoding failed)")
-        result = await orchestrator.process_turn(request.player_input, recent_messages=recent_messages)
+        result = await orchestrator.process_turn(player_input=request.player_input, recent_messages=recent_messages, compaction_text=compaction_text)
         
         # DEBUG: Log the actual narrative value
         print(f"[GameAPI] Result received:")
