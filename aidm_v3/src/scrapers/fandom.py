@@ -26,7 +26,7 @@ from typing import Optional
 import requests
 
 from .wiki_normalize import CategoryMapping, discover_categories
-from .wiki_scout import WikiScrapePlan, plan_wiki_scrape
+from .wiki_scout import WikiScrapePlan, plan_wiki_scrape, plan_wiki_scrape_with_tools
 
 logger = logging.getLogger(__name__)
 
@@ -537,9 +537,13 @@ class FandomClient:
         )
         
         # Step 2: WikiScout classification (async LLM call)
+        # Try agentic (tool-based) exploration first, falls back internally
         scrape_plan = None
         if anime_title and all_cats:
-            scrape_plan = await plan_wiki_scrape(wiki_url, anime_title, all_cats)
+            scrape_plan = await plan_wiki_scrape_with_tools(
+                wiki_url, anime_title, all_cats,
+                fandom_client=self,
+            )
             if not scrape_plan.categories:
                 logger.warning("[Fandom] WikiScout returned empty plan, falling back to legacy")
                 scrape_plan = None

@@ -1,4 +1,4 @@
-"""Anthropic Claude LLM provider."""
+﻿"""Anthropic Claude LLM provider."""
 
 import json
 import os
@@ -430,40 +430,86 @@ Your response must match the required JSON schema.
     ) -> LLMResponse:
         """Run a tool-calling loop with Anthropic Claude.
         
-        Uses non-streaming messages.create for clean tool_use block extraction.
-        The loop continues until Claude produces a text response (stop_reason
-        is 'end_turn' with no tool_use blocks) or max_tool_rounds is reached.
+        Uses Programmatic Tool Calling (beta) to let Claude orchestrate
+        multiple tool calls via generated code in a sandboxed container.
+        This reduces API round-trips and avoids intermediate tool results
+        entering the context window — only the final code output is seen
+        by the model, which saves tokens and latency.
+        
+        Falls back to standard tool calling if the beta API errors.
+        
+        Beta: advanced-tool-use-2025-11-20
+        Requires: code_execution_20250825 server tool
         """
         self._ensure_client()
         import asyncio
         
         model_name = model or self.get_fast_model()
         
-        # Convert ToolRegistry to Anthropic format
-        anthropic_tools = tools.to_anthropic_format()
+        # Try programmatic tool calling first, fall back to standard
+        try:
+            return await self._complete_with_tools_programmatic(
+                messages, tools, system, model_name, max_tokens, max_tool_rounds
+            )
+        except Exception as e:
+            print(f"[Anthropic] Programmatic tool calling failed ({e}), falling back to standard")
+            return await self._complete_with_tools_standard(
+                messages, tools, system, model_name, max_tokens, max_tool_rounds
+            )
+    
+    async def _complete_with_tools_programmatic(
+        self,
+        messages: List[Dict[str, str]],
+        tools: Any,  # ToolRegistry
+        system: Optional[str],
+        model_name: str,
+        max_tokens: int,
+        max_tool_rounds: int,
+    ) -> LLMResponse:
+        """Programmatic Tool Calling -- Claude writes code to orchestrate tools.
         
-        # Build conversation history (Anthropic format)
-        conversation = list(messages)  # Copy — we'll append to this
+        Claude generates Python that calls tools as async functions inside a
+        sandbox. The API pauses on each tool_use block and we provide results.
+        Intermediate results stay in the sandbox, not in Claude's context.
+        """
+        import asyncio
+        loop = asyncio.get_running_loop()
         
+        # Convert tools with allowed_callers for programmatic calling
+        anthropic_tools = tools.to_anthropic_format(programmatic=True)
+        
+        # Prepend the code execution server tool
+        anthropic_tools.insert(0, {
+            "type": "code_execution_20250825",
+            "name": "code_execution",
+        })
+        
+        conversation = list(messages)
         all_tool_calls = []
         total_usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
-        
-        loop = asyncio.get_running_loop()
+        container_id = None  # Reuse container across rounds
         
         for round_num in range(max_tool_rounds):
             kwargs = {
                 "model": model_name,
+                "betas": ["advanced-tool-use-2025-11-20"],
                 "max_tokens": max_tokens,
                 "system": system or "",
                 "messages": conversation,
                 "tools": anthropic_tools,
             }
+            if container_id:
+                kwargs["container"] = container_id
             
-            # Non-streaming for clean tool block extraction
             def _create(kwargs=kwargs):
-                return self._client.messages.create(**kwargs)
+                return self._client.beta.messages.create(**kwargs)
             
             response = await loop.run_in_executor(None, _create)
+            
+            # Track container for reuse
+            if hasattr(response, 'container') and response.container:
+                ctr = response.container
+                container_id = ctr.id if hasattr(ctr, 'id') else (ctr.get('id') if isinstance(ctr, dict) else None)
             
             # Accumulate usage
             if hasattr(response, 'usage'):
@@ -473,44 +519,83 @@ Your response must match the required JSON schema.
                     response.usage.input_tokens + response.usage.output_tokens
                 )
             
-            # Separate text blocks and tool_use blocks
+            # Classify response blocks
             text_parts = []
-            tool_use_blocks = []
-            for block in response.content:
-                if hasattr(block, 'type'):
-                    if block.type == "text":
-                        text_parts.append(block.text)
-                    elif block.type == "tool_use":
-                        tool_use_blocks.append(block)
+            tool_use_blocks = []       # Client tool calls we need to execute
+            assistant_content = []      # Full content for conversation history
             
+            for block in response.content:
+                block_type = getattr(block, 'type', None)
+                
+                if block_type == "text":
+                    text_parts.append(block.text)
+                    assistant_content.append({"type": "text", "text": block.text})
+                    
+                elif block_type == "tool_use":
+                    # Client tool call -- we execute this
+                    tool_use_blocks.append(block)
+                    entry = {
+                        "type": "tool_use",
+                        "id": block.id,
+                        "name": block.name,
+                        "input": block.input,
+                    }
+                    if hasattr(block, 'caller') and block.caller:
+                        caller = block.caller
+                        if hasattr(caller, '__dict__'):
+                            entry["caller"] = {"type": getattr(caller, 'type', 'direct')}
+                            if hasattr(caller, 'tool_id'):
+                                entry["caller"]["tool_id"] = caller.tool_id
+                        elif isinstance(caller, dict):
+                            entry["caller"] = caller
+                    assistant_content.append(entry)
+                    
+                elif block_type == "server_tool_use":
+                    # Code execution block -- pass through as-is
+                    assistant_content.append({
+                        "type": "server_tool_use",
+                        "id": block.id,
+                        "name": block.name,
+                        "input": block.input if hasattr(block, 'input') else {},
+                    })
+                    
+                elif block_type == "code_execution_tool_result":
+                    # Code execution result -- pass through
+                    assistant_content.append({
+                        "type": "code_execution_tool_result",
+                        "tool_use_id": block.tool_use_id if hasattr(block, 'tool_use_id') else "",
+                        "content": block.content if hasattr(block, 'content') else {},
+                    })
+            
+            # If no tool_use blocks, we are done
             if not tool_use_blocks:
-                # Model is done — returned text without tool calls
                 final_text = "\n".join(text_parts)
-                print(f"[ToolLoop/Anthropic] Round {round_num+1}: Final text ({len(final_text)} chars)")
+                mode = "programmatic" if container_id else "direct"
+                print(f"[ToolLoop/Anthropic] Round {round_num+1}: Final text ({len(final_text)} chars) [{mode}]")
                 return LLMResponse(
                     content=final_text,
                     tool_calls=all_tool_calls,
                     model=model_name,
                     usage=total_usage,
                     raw_response=response,
-                    metadata={"tool_rounds": round_num + 1}
+                    metadata={
+                        "tool_rounds": round_num + 1,
+                        "programmatic": True,
+                        "container_id": container_id,
+                    }
                 )
             
             # Execute tool calls
-            print(f"[ToolLoop/Anthropic] Round {round_num+1}: {len(tool_use_blocks)} tool call(s)")
+            is_programmatic = any(
+                hasattr(b, 'caller') and b.caller and
+                getattr(b.caller, 'type', None) == 'code_execution_20250825'
+                for b in tool_use_blocks
+            )
+            mode_label = "programmatic" if is_programmatic else "direct"
+            print(f"[ToolLoop/Anthropic] Round {round_num+1}: {len(tool_use_blocks)} tool call(s) [{mode_label}]")
             
-            # Add the assistant's response to conversation
-            # Must include both text and tool_use blocks as returned
-            conversation.append({
-                "role": "assistant",
-                "content": [
-                    {"type": b.type, **({"text": b.text} if b.type == "text" else {"id": b.id, "name": b.name, "input": b.input})}
-                    for b in response.content
-                    if hasattr(b, 'type') and b.type in ("text", "tool_use")
-                ]
-            })
+            conversation.append({"role": "assistant", "content": assistant_content})
             
-            # Execute each tool and build tool_result blocks
             tool_results = []
             for block in tool_use_blocks:
                 tool_name = block.name
@@ -519,16 +604,15 @@ Your response must match the required JSON schema.
                 
                 print(f"  [Tool] {tool_name}({tool_args})")
                 
-                # Execute via ToolRegistry
                 result = tools.execute(tool_name, tool_args, round_number=round_num)
                 result_str = result.to_string()
                 
-                # Log for return value
                 all_tool_calls.append({
                     "name": tool_name,
                     "arguments": tool_args,
                     "result_preview": result_str[:200],
-                    "round": round_num + 1
+                    "round": round_num + 1,
+                    "programmatic": is_programmatic,
                 })
                 
                 tool_results.append({
@@ -537,14 +621,11 @@ Your response must match the required JSON schema.
                     "content": result_str,
                 })
             
-            # Add tool results as user message
-            conversation.append({
-                "role": "user",
-                "content": tool_results,
-            })
+            # For programmatic calls: tool_result-only (no text allowed)
+            conversation.append({"role": "user", "content": tool_results})
         
-        # Hit max_tool_rounds — force a final text response without tools
-        print(f"[ToolLoop/Anthropic] Hit max rounds ({max_tool_rounds}), forcing final response")
+        # Hit max_tool_rounds
+        print(f"[ToolLoop/Anthropic] Hit max rounds ({max_tool_rounds}), forcing final response [programmatic]")
         
         conversation.append({
             "role": "user",
@@ -552,12 +633,12 @@ Your response must match the required JSON schema.
         })
         
         def _final_create():
-            return self._client.messages.create(
+            return self._client.beta.messages.create(
                 model=model_name,
+                betas=["advanced-tool-use-2025-11-20"],
                 max_tokens=max_tokens,
                 system=system or "",
                 messages=conversation,
-                # No tools — force text response
             )
         
         final_response = await loop.run_in_executor(None, _final_create)
@@ -573,5 +654,144 @@ Your response must match the required JSON schema.
             model=model_name,
             usage=total_usage,
             raw_response=final_response,
-            metadata={"tool_rounds": max_tool_rounds, "forced_finish": True}
+            metadata={
+                "tool_rounds": max_tool_rounds,
+                "forced_finish": True,
+                "programmatic": True,
+                "container_id": container_id,
+            }
+        )
+    
+    async def _complete_with_tools_standard(
+        self,
+        messages: List[Dict[str, str]],
+        tools: Any,  # ToolRegistry
+        system: Optional[str],
+        model_name: str,
+        max_tokens: int,
+        max_tool_rounds: int,
+    ) -> LLMResponse:
+        """Standard (non-programmatic) tool calling -- fallback implementation.
+        
+        Uses standard messages.create with tool_use blocks. Each tool call
+        is a separate round-trip through the model.
+        """
+        import asyncio
+        loop = asyncio.get_running_loop()
+        
+        anthropic_tools = tools.to_anthropic_format()
+        conversation = list(messages)
+        all_tool_calls = []
+        total_usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+        
+        for round_num in range(max_tool_rounds):
+            kwargs = {
+                "model": model_name,
+                "max_tokens": max_tokens,
+                "system": system or "",
+                "messages": conversation,
+                "tools": anthropic_tools,
+            }
+            
+            def _create(kwargs=kwargs):
+                return self._client.messages.create(**kwargs)
+            
+            response = await loop.run_in_executor(None, _create)
+            
+            if hasattr(response, 'usage'):
+                total_usage["prompt_tokens"] += response.usage.input_tokens
+                total_usage["completion_tokens"] += response.usage.output_tokens
+                total_usage["total_tokens"] += (
+                    response.usage.input_tokens + response.usage.output_tokens
+                )
+            
+            text_parts = []
+            tool_use_blocks = []
+            for block in response.content:
+                if hasattr(block, 'type'):
+                    if block.type == "text":
+                        text_parts.append(block.text)
+                    elif block.type == "tool_use":
+                        tool_use_blocks.append(block)
+            
+            if not tool_use_blocks:
+                final_text = "\n".join(text_parts)
+                print(f"[ToolLoop/Anthropic] Round {round_num+1}: Final text ({len(final_text)} chars) [standard]")
+                return LLMResponse(
+                    content=final_text,
+                    tool_calls=all_tool_calls,
+                    model=model_name,
+                    usage=total_usage,
+                    raw_response=response,
+                    metadata={"tool_rounds": round_num + 1, "programmatic": False}
+                )
+            
+            print(f"[ToolLoop/Anthropic] Round {round_num+1}: {len(tool_use_blocks)} tool call(s) [standard]")
+            
+            conversation.append({
+                "role": "assistant",
+                "content": [
+                    {"type": b.type, **({
+                        "text": b.text} if b.type == "text" else {
+                        "id": b.id, "name": b.name, "input": b.input})}
+                    for b in response.content
+                    if hasattr(b, 'type') and b.type in ("text", "tool_use")
+                ]
+            })
+            
+            tool_results = []
+            for block in tool_use_blocks:
+                tool_name = block.name
+                tool_args = block.input if isinstance(block.input, dict) else {}
+                tool_id = block.id
+                
+                print(f"  [Tool] {tool_name}({tool_args})")
+                
+                result = tools.execute(tool_name, tool_args, round_number=round_num)
+                result_str = result.to_string()
+                
+                all_tool_calls.append({
+                    "name": tool_name,
+                    "arguments": tool_args,
+                    "result_preview": result_str[:200],
+                    "round": round_num + 1,
+                })
+                
+                tool_results.append({
+                    "type": "tool_result",
+                    "tool_use_id": tool_id,
+                    "content": result_str,
+                })
+            
+            conversation.append({"role": "user", "content": tool_results})
+        
+        print(f"[ToolLoop/Anthropic] Hit max rounds ({max_tool_rounds}), forcing final response [standard]")
+        
+        conversation.append({
+            "role": "user",
+            "content": "You've completed your research. Now produce your final response based on everything you've found."
+        })
+        
+        def _final_create():
+            return self._client.messages.create(
+                model=model_name,
+                max_tokens=max_tokens,
+                system=system or "",
+                messages=conversation,
+            )
+        
+        final_response = await loop.run_in_executor(None, _final_create)
+        
+        final_text = ""
+        for block in final_response.content:
+            if hasattr(block, 'text'):
+                final_text += block.text
+        
+        return LLMResponse(
+            content=final_text,
+            tool_calls=all_tool_calls,
+            model=model_name,
+            usage=total_usage,
+            raw_response=final_response,
+            metadata={"tool_rounds": max_tool_rounds, "forced_finish": True, "programmatic": False}
         )

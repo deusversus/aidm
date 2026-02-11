@@ -247,18 +247,27 @@ class ToolRegistry:
         
         return [types.Tool(function_declarations=declarations)]
     
-    def to_anthropic_format(self) -> list:
+    def to_anthropic_format(self, programmatic: bool = False) -> list:
         """Convert tools to Anthropic tool schema format.
+        
+        Args:
+            programmatic: If True, add allowed_callers for programmatic
+                tool calling (code execution sandbox). This lets Claude
+                orchestrate multiple tool calls via generated code in a
+                single round, reducing latency and token consumption.
         
         Returns a list of dicts for Anthropic's tools parameter.
         """
         tools = []
         for tool in self._tools.values():
-            tools.append({
+            tool_def = {
                 "name": tool.name,
                 "description": tool.description,
                 "input_schema": self._build_json_schema(tool)
-            })
+            }
+            if programmatic:
+                tool_def["allowed_callers"] = ["code_execution_20250825"]
+            tools.append(tool_def)
         return tools
     
     def to_openai_format(self) -> list:

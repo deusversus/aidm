@@ -499,44 +499,113 @@ This is a CLIMACTIC moment. Unleash the full animation budget:
         Returns:
             Research findings as formatted text, or empty string on failure
         """
-        from .base import AgenticAgent
+        # Build intent-adaptive research strategy
+        # Different intents need different investigation priorities
+        intent_strategies = {
+            "COMBAT": (
+                "COMBAT RESEARCH PRIORITY:\n"
+                "1. get_character_sheet — What abilities, level, and combat stats does the protagonist have?\n"
+                "2. get_npc_details — If fighting someone, get their full profile (affinity, disposition, secrets)\n"
+                "3. search_memory — Search for prior encounters with this enemy or similar combat situations\n"
+                "4. get_recent_episodes — What happened in the last few turns leading to this fight?"
+            ),
+            "SOCIAL": (
+                "SOCIAL RESEARCH PRIORITY:\n"
+                "1. get_npc_details — Get the FULL profile of any NPC being interacted with (disposition, emotional milestones, secrets)\n"
+                "2. search_memory — Search for shared history between protagonist and this NPC\n"
+                "3. list_known_npcs — Who else is relevant to this social dynamic?\n"
+                "4. search_transcript — Did the player say something earlier this session that relates?"
+            ),
+            "EXPLORATION": (
+                "EXPLORATION RESEARCH PRIORITY:\n"
+                "1. get_world_state — What's the current location, situation, and arc phase?\n"
+                "2. search_memory — Any established lore about this area or what the player is exploring?\n"
+                "3. get_recent_episodes — What led to the player arriving here?\n"
+                "4. list_known_npcs — Are there NPCs associated with this place?"
+            ),
+            "ABILITY": (
+                "ABILITY RESEARCH PRIORITY:\n"
+                "1. get_character_sheet — What abilities and power level does the protagonist have?\n"
+                "2. get_critical_memories — Are there Session Zero facts about this power/ability?\n"
+                "3. search_memory — Has this ability been used before? What happened?\n"
+                "4. get_world_state — Any environmental factors that affect ability use?"
+            ),
+        }
         
-        # Build a focused research prompt
-        research_prompt = f"""You are a narrative researcher for an anime RPG. 
-Your job is to gather relevant context BEFORE the story is written.
-
-The player just did: "{player_input}"
-Intent: {intent.intent} (sub-intent: {intent.sub_intent or 'none'})
-Location: {context.location or 'Unknown'}
-Situation: {context.situation or 'Unknown'}
-
-Using the tools available to you, investigate:
-1. Search for memories related to this action or situation
-2. If any NPCs are mentioned or present, get their relationship details
-3. If this follows from a recent event, check recent episodes for continuity
-4. Get the character sheet if the action involves abilities or stats
-
-After investigating, provide a CONCISE summary of your findings structured as:
-- RELEVANT HISTORY: What established facts are relevant?
-- PRESENT NPCS: Who is here and what's their disposition?
-- CONTINUITY NOTES: What just happened that this scene should follow from?
-- PLAYER IDENTITY: Key character traits/abilities relevant to this action
-
-Be selective — only include what actually matters for THIS specific scene.
-Do NOT repeat information that's obvious from the player's action."""
-        
-        # Use a lightweight AgenticAgent for the research phase
-        # This avoids duplicating provider/model/error logic
-        researcher = AgenticAgent.__new__(AgenticAgent)
-        researcher.agent_name = "key_animator"
-        researcher._model_override = None
-        researcher._tools = tools
-        
-        return await researcher.research_with_tools(
-            research_prompt=research_prompt,
-            system="You are a concise narrative researcher. Use tools to gather facts, then summarize.",
-            max_tool_rounds=3,
+        # Default strategy for OTHER, WORLD_BUILDING, META_FEEDBACK, etc.
+        default_strategy = (
+            "GENERAL RESEARCH PRIORITY:\n"
+            "1. get_critical_memories — Ground yourself in canonical facts from Session Zero\n"
+            "2. get_recent_episodes — What just happened? Maintain continuity\n"
+            "3. search_memory — Anything relevant to what the player is doing?\n"
+            "4. get_world_state — Current location, situation, arc context"
         )
+        
+        strategy = intent_strategies.get(intent.intent, default_strategy)
+        
+        # Build present NPC names if available
+        npc_hint = ""
+        if context.present_npcs:
+            npc_hint = f"\nNPCs currently present in scene: {', '.join(context.present_npcs)}"
+        
+        research_prompt = f"""You are a narrative researcher preparing context for an anime RPG scene.
+Your job: gather ONLY the facts that matter for THIS specific moment, then summarize.
+
+## Current Situation
+Player action: "{player_input}"
+Intent: {intent.intent} — {intent.action}
+Target: {intent.target or 'none'}
+Location: {context.location or 'Unknown'}
+Situation: {context.situation or 'Unknown'}{npc_hint}
+
+## Investigation Strategy
+{strategy}
+
+## Rules
+- Be SURGICAL. Only use 2-4 tool calls maximum — pick the ones most relevant to this action.
+- SKIP tools that would return information already obvious from the situation above.
+- If an NPC is mentioned or present, ALWAYS get their details — disposition and secrets guide narration.
+- For combat/ability actions, ALWAYS check the character sheet — power levels matter.
+- Do NOT repeat information that's already in the situation context.
+
+## Output Format
+After investigating, provide a TIGHT summary:
+- **RELEVANT FACTS**: Established canon that affects this scene (from memories or character sheet)
+- **NPC INTELLIGENCE**: Disposition, relationship state, secrets for any relevant NPCs
+- **CONTINUITY**: What just happened that this scene follows from (only if non-obvious)
+- **TACTICAL NOTE**: Any specific detail the narrative writer NEEDS to know (ability limits, environmental factors, unresolved threads)
+
+Omit any section that has nothing useful. Brevity over completeness."""
+        
+        # Use fast model directly — KeyAnimator doesn't extend AgenticAgent,
+        # so we call the provider without the base class wrapper.
+        try:
+            from ..llm import get_llm_manager
+            manager = get_llm_manager()
+            fast_provider = manager.fast_provider
+            fast_model = manager.get_fast_model()
+            
+            response = await fast_provider.complete_with_tools(
+                messages=[{"role": "user", "content": research_prompt}],
+                tools=tools,
+                system="You are a concise narrative researcher. Use tools to gather facts, then summarize.",
+                model=fast_model,
+                max_tokens=2048,
+                max_tool_rounds=3,
+            )
+            
+            findings = response.content.strip()
+            if findings:
+                call_log = tools.call_log
+                tool_names = [c.tool_name for c in call_log]
+                print(f"[KeyAnimator] Research phase: {len(call_log)} tool calls ({', '.join(tool_names)})")
+                print(f"[KeyAnimator] Research findings: {len(findings)} chars")
+                return findings
+                
+        except Exception as e:
+            print(f"[KeyAnimator] Research phase failed (non-fatal): {e}")
+        
+        return ""
 
     
     async def generate(
