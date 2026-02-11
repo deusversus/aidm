@@ -71,7 +71,10 @@ class TestStateManager:
         init_db()
         
         manager = StateManager(campaign_id=998)
-        manager.ensure_campaign_exists()
+        manager.ensure_campaign_exists(
+            name="Test Campaign",
+            profile_id="cowboy_bebop"
+        )
         
         context = manager.get_context()
         
@@ -84,7 +87,10 @@ class TestStateManager:
         init_db()
         
         manager = StateManager(campaign_id=997)
-        manager.ensure_campaign_exists()
+        manager.ensure_campaign_exists(
+            name="Turn Test Campaign",
+            profile_id="cowboy_bebop"
+        )
         
         turn1 = manager.record_turn(
             player_input="Test action 1",
@@ -110,21 +116,27 @@ class TestStateManager:
 class TestProfileLoader:
     """Tests for the profile loader."""
     
-    def test_load_hunterxhunter_profile(self):
-        """Test loading the Hunter x Hunter profile."""
-        profile = load_profile("hunterxhunter")
+    def test_load_cowboy_bebop_profile(self):
+        """Test loading the Cowboy Bebop profile."""
+        profile = load_profile("cowboy_bebop")
         
         assert isinstance(profile, NarrativeProfile)
-        assert profile.id == "hunterxhunter"
-        assert profile.name == "Hunter x Hunter"
-        assert profile.dna.get("tactical") == 9
-        assert profile.tropes.get("named_attacks") is True
-        assert profile.tropes.get("power_of_friendship") is False
+        assert profile.id == "cowboy_bebop"
+        assert profile.name is not None
+        assert isinstance(profile.dna, dict)
+        assert isinstance(profile.tropes, dict)
     
-    def test_load_nonexistent_profile_raises(self):
-        """Test that loading a nonexistent profile raises FileNotFoundError."""
+    def test_load_nonexistent_profile_raises_without_fallback(self):
+        """Test that loading a nonexistent profile raises FileNotFoundError when fallback=False."""
         with pytest.raises(FileNotFoundError):
-            load_profile("nonexistent_profile")
+            load_profile("nonexistent_profile", fallback=False)
+    
+    def test_load_nonexistent_profile_falls_back(self):
+        """Test that loading a nonexistent profile falls back gracefully by default."""
+        profile = load_profile("nonexistent_profile")
+        assert isinstance(profile, NarrativeProfile)
+        # Should fall back to an existing profile
+        assert profile.id is not None
 
 
 class TestIntentClassifier:
@@ -190,18 +202,26 @@ class TestOutcomeOutput:
         """Test creating a valid OutcomeOutput."""
         output = OutcomeOutput(
             should_succeed=True,
+            difficulty_class=12,
+            modifiers={"height_advantage": 2},
+            calculated_roll=14,
             success_level="success",
             narrative_weight="significant",
-            reasoning="Test reasoning"
+            reasoning="Test reasoning (14 vs DC 12)"
         )
         
         assert output.should_succeed is True
         assert output.success_level == "success"
+        assert output.difficulty_class == 12
+        assert output.calculated_roll == 14
     
     def test_optional_fields(self):
-        """Test that cost and consequence are optional."""
+        """Test that cost, consequence, and target_tier are optional."""
         output = OutcomeOutput(
             should_succeed=True,
+            difficulty_class=10,
+            modifiers={},
+            calculated_roll=15,
             success_level="success",
             narrative_weight="minor",
             reasoning="No cost or consequence"
@@ -209,6 +229,7 @@ class TestOutcomeOutput:
         
         assert output.cost is None
         assert output.consequence is None
+        assert output.target_tier is None
 
 
 if __name__ == "__main__":

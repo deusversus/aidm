@@ -1,0 +1,95 @@
+﻿============================= test session starts =============================
+collecting ... collected 15 items
+
+tests/test_core_loop.py::TestDatabaseSetup::test_init_db_creates_tables PASSED [  6%]
+tests/test_core_loop.py::TestDatabaseSetup::test_create_campaign PASSED  [ 13%]
+tests/test_core_loop.py::TestStateManager::test_ensure_campaign_exists_creates PASSED [ 20%]
+tests/test_core_loop.py::TestStateManager::test_get_context_returns_valid_context FAILED [ 26%]
+tests/test_core_loop.py::TestStateManager::test_record_turn_increments_count FAILED [ 33%]
+tests/test_core_loop.py::TestProfileLoader::test_load_hunterxhunter_profile FAILED [ 40%]
+tests/test_core_loop.py::TestProfileLoader::test_load_nonexistent_profile_raises FAILED [ 46%]
+tests/test_core_loop.py::TestIntentClassifier::test_output_schema PASSED [ 53%]
+tests/test_core_loop.py::TestIntentClassifier::test_system_prompt_exists PASSED [ 60%]
+tests/test_core_loop.py::TestOutcomeJudge::test_output_schema PASSED     [ 66%]
+tests/test_core_loop.py::TestOutcomeJudge::test_system_prompt_exists PASSED [ 73%]
+tests/test_core_loop.py::TestIntentOutput::test_valid_intent_output PASSED [ 80%]
+tests/test_core_loop.py::TestIntentOutput::test_epicness_bounds PASSED   [ 86%]
+tests/test_core_loop.py::TestOutcomeOutput::test_valid_outcome_output FAILED [ 93%]
+tests/test_core_loop.py::TestOutcomeOutput::test_optional_fields FAILED  [100%]
+
+================================== FAILURES ===================================
+E   sqlite3.IntegrityError: NOT NULL constraint failed: campaigns.profile_id
+
+The above exception was the direct cause of the following exception:
+E   sqlalchemy.exc.IntegrityError: (sqlite3.IntegrityError) NOT NULL constraint failed: campaigns.profile_id
+    [SQL: INSERT INTO campaigns (id, name, profile_id, created_at) VALUES (?, ?, ?, ?)]
+    [parameters: (998, 'Default Campaign', None, '2026-02-11 23:11:40.420913')]
+    (Background on this error at: https://sqlalche.me/e/20/gkpj)
+---------------------------- Captured stdout call -----------------------------
+Database initialized: sqlite:///:memory:
+C:\Users\admin\Downloads\animerpg\aidm_v3\venv313\Lib\site-packages\sqlalchemy\engine\default.py:952: sqlalchemy.exc.IntegrityError: (sqlite3.IntegrityError) NOT NULL constraint failed: campaigns.profile_id
+E   sqlite3.IntegrityError: NOT NULL constraint failed: campaigns.profile_id
+
+The above exception was the direct cause of the following exception:
+E   sqlalchemy.exc.IntegrityError: (sqlite3.IntegrityError) NOT NULL constraint failed: campaigns.profile_id
+    [SQL: INSERT INTO campaigns (id, name, profile_id, created_at) VALUES (?, ?, ?, ?)]
+    [parameters: (997, 'Default Campaign', None, '2026-02-11 23:11:40.427033')]
+    (Background on this error at: https://sqlalche.me/e/20/gkpj)
+---------------------------- Captured stdout call -----------------------------
+Database initialized: sqlite:///:memory:
+C:\Users\admin\Downloads\animerpg\aidm_v3\venv313\Lib\site-packages\sqlalchemy\engine\default.py:952: sqlalchemy.exc.IntegrityError: (sqlite3.IntegrityError) NOT NULL constraint failed: campaigns.profile_id
+E   AssertionError: assert 'cowboy_bebop' == 'hunterxhunter'
+      
+      - hunterxhunter
+      + cowboy_bebop
+---------------------------- Captured stdout call -----------------------------
+[Profile] 'hunterxhunter' not found, falling back to 'cowboy_bebop'
+C:\Users\admin\Downloads\animerpg\aidm_v3\tests\test_core_loop.py:118: AssertionError: assert 'cowboy_bebop' == 'hunterxhunter'
+E   Failed: DID NOT RAISE <class 'FileNotFoundError'>
+---------------------------- Captured stdout call -----------------------------
+[Profile] 'nonexistent_profile' not found, falling back to 'cowboy_bebop'
+C:\Users\admin\Downloads\animerpg\aidm_v3\tests\test_core_loop.py:126: Failed: DID NOT RAISE <class 'FileNotFoundError'>
+E   pydantic_core._pydantic_core.ValidationError: 3 validation errors for OutcomeOutput
+    difficulty_class
+      Field required [type=missing, input_value={'should_succeed': True, ...ning': 'Test reasoning'}, input_type=dict]
+        For further information visit https://errors.pydantic.dev/2.12/v/missing
+    modifiers
+      Field required [type=missing, input_value={'should_succeed': True, ...ning': 'Test reasoning'}, input_type=dict]
+        For further information visit https://errors.pydantic.dev/2.12/v/missing
+    calculated_roll
+      Field required [type=missing, input_value={'should_succeed': True, ...ning': 'Test reasoning'}, input_type=dict]
+        For further information visit https://errors.pydantic.dev/2.12/v/missing
+C:\Users\admin\Downloads\animerpg\aidm_v3\tests\test_core_loop.py:191: pydantic_core._pydantic_core.ValidationError: 3 validation errors for OutcomeOutput
+E   pydantic_core._pydantic_core.ValidationError: 3 validation errors for OutcomeOutput
+    difficulty_class
+      Field required [type=missing, input_value={'should_succeed': True, ...No cost or consequence'}, input_type=dict]
+        For further information visit https://errors.pydantic.dev/2.12/v/missing
+    modifiers
+      Field required [type=missing, input_value={'should_succeed': True, ...No cost or consequence'}, input_type=dict]
+        For further information visit https://errors.pydantic.dev/2.12/v/missing
+    calculated_roll
+      Field required [type=missing, input_value={'should_succeed': True, ...No cost or consequence'}, input_type=dict]
+        For further information visit https://errors.pydantic.dev/2.12/v/missing
+C:\Users\admin\Downloads\animerpg\aidm_v3\tests\test_core_loop.py:203: pydantic_core._pydantic_core.ValidationError: 3 validation errors for OutcomeOutput
+============================== warnings summary ===============================
+src\settings\models.py:159
+  C:\Users\admin\Downloads\animerpg\aidm_v3\src\settings\models.py:159: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    class UserSettings(BaseModel):
+
+tests/test_core_loop.py::TestDatabaseSetup::test_create_campaign
+tests/test_core_loop.py::TestStateManager::test_ensure_campaign_exists_creates
+tests/test_core_loop.py::TestStateManager::test_ensure_campaign_exists_creates
+tests/test_core_loop.py::TestStateManager::test_get_context_returns_valid_context
+tests/test_core_loop.py::TestStateManager::test_record_turn_increments_count
+  C:\Users\admin\Downloads\animerpg\aidm_v3\venv313\Lib\site-packages\sqlalchemy\sql\schema.py:3624: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    return util.wrap_callable(lambda ctx: fn(), fn)  # type: ignore
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED tests/test_core_loop.py::TestStateManager::test_get_context_returns_valid_context
+FAILED tests/test_core_loop.py::TestStateManager::test_record_turn_increments_count
+FAILED tests/test_core_loop.py::TestProfileLoader::test_load_hunterxhunter_profile
+FAILED tests/test_core_loop.py::TestProfileLoader::test_load_nonexistent_profile_raises
+FAILED tests/test_core_loop.py::TestOutcomeOutput::test_valid_outcome_output
+FAILED tests/test_core_loop.py::TestOutcomeOutput::test_optional_fields - pyd...
+=================== 6 failed, 9 passed, 6 warnings in 0.49s ===================
