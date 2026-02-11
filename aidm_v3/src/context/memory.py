@@ -187,7 +187,9 @@ class MemoryStore:
         query: str, 
         limit: int = 5, 
         min_heat: float = 0.0,
-        boost_on_access: bool = True
+        boost_on_access: bool = True,
+        memory_type: str = None,
+        keyword: str = None,
     ) -> List[Dict[str, Any]]:
         """
         Search for relevant memories with heat filtering.
@@ -197,6 +199,8 @@ class MemoryStore:
             limit: Max results
             min_heat: Minimum heat threshold (0-100)
             boost_on_access: Whether to boost heat of accessed memories
+            memory_type: Optional type filter (core, relationship, quest, etc.)
+            keyword: Optional exact keyword filter (uses ChromaDB where_document)
             
         Returns:
             List of matching memories
@@ -205,11 +209,37 @@ class MemoryStore:
         if limit <= 0:
             return []
         
-        # Query more than needed to filter by heat
-        results = self.collection.query(
-            query_texts=[query],
-            n_results=limit * 2
-        )
+        # Build optional filters
+        where = None
+        if memory_type:
+            where = {"type": memory_type}
+        
+        where_document = None
+        if keyword:
+            where_document = {"$contains": keyword}
+        
+        # Clamp n_results to collection size to avoid ChromaDB error
+        collection_count = self.collection.count()
+        if collection_count == 0:
+            return []
+        n_results = min(limit * 2, collection_count)
+        
+        # Query with optional filters
+        query_kwargs = {
+            "query_texts": [query],
+            "n_results": n_results,
+        }
+        if where:
+            query_kwargs["where"] = where
+        if where_document:
+            query_kwargs["where_document"] = where_document
+        
+        try:
+            results = self.collection.query(**query_kwargs)
+        except Exception as e:
+            # Fallback: if filters cause an error (e.g. no matches), return empty
+            print(f"[Memory] Search with filters failed: {e}")
+            return []
         
         memories = []
         if results["ids"]:
@@ -267,6 +297,74 @@ class MemoryStore:
         memories.sort(key=lambda m: m["score"], reverse=True)
                     
         return memories
+    
+    def search_hybrid(
+        self,
+        query: str,
+        keyword: str,
+        limit: int = 5,
+        min_heat: float = 0.0,
+        boost_on_access: bool = True,
+        memory_type: str = None,
+    ) -> List[Dict[str, Any]]:
+        """
+        Hybrid search: merges keyword-filtered and pure semantic results.
+        
+        Runs two queries in parallel:
+        1. Keyword-filtered semantic search (exact match + embedding)
+        2. Pure semantic search (embedding only)
+        
+        Results are merged and deduplicated. Keyword matches get a +0.25
+        score boost to surface exact-name hits above fuzzy semantic matches.
+        
+        Args:
+            query: Semantic search query
+            keyword: Exact keyword to match in memory content
+            limit: Max results to return
+            min_heat: Minimum heat threshold
+            boost_on_access: Whether to boost heat of accessed memories
+            memory_type: Optional type filter
+            
+        Returns:
+            Merged, deduplicated list of memories sorted by score
+        """
+        # Run both searches (keyword+semantic and pure semantic)
+        keyword_results = self.search(
+            query=query,
+            limit=limit,
+            min_heat=min_heat,
+            boost_on_access=boost_on_access,
+            memory_type=memory_type,
+            keyword=keyword,
+        )
+        
+        semantic_results = self.search(
+            query=query,
+            limit=limit,
+            min_heat=min_heat,
+            boost_on_access=False,  # Already boosted in keyword pass
+            memory_type=memory_type,
+        )
+        
+        # Merge: keyword matches get a +0.25 boost
+        seen_ids = set()
+        merged = []
+        
+        for mem in keyword_results:
+            mem = dict(mem)
+            mem["score"] = min(1.0, mem["score"] + 0.25)
+            mem["boost"] = mem.get("boost", 0.0) + 0.25
+            seen_ids.add(mem["id"])
+            merged.append(mem)
+        
+        for mem in semantic_results:
+            if mem["id"] not in seen_ids:
+                merged.append(mem)
+                seen_ids.add(mem["id"])
+        
+        # Sort by score and trim to limit
+        merged.sort(key=lambda m: m["score"], reverse=True)
+        return merged[:limit]
     
     def _boost_heat(self, memory_id: str, current_metadata: Dict[str, Any]):
         """Boost memory heat when accessed (referenced memories stay relevant)."""

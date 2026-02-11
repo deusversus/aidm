@@ -93,7 +93,7 @@ RULES:
             temperature=0.3,  # Low creativity — faithful summarization
         )
         
-        result = response.text.strip()
+        result = response.content.strip()
         
         # Enforce word budget (hard cap)
         words = result.split()

@@ -651,10 +651,13 @@ class Orchestrator:
         # === AGENTIC RESEARCH TOOLS (Module 2) ===
         # Build gameplay tools for KeyAnimator's optional research phase
         from ..agents.gameplay_tools import build_gameplay_tools
+        from ..context.profile_library import get_profile_library
         gameplay_tools = build_gameplay_tools(
             memory=self.memory,
             state=self.state,
             session_transcript=recent_messages,
+            profile_library=get_profile_library(),
+            profile_id=self.profile_id,
         )
         
         narrative = await self.key_animator.generate(
@@ -1005,12 +1008,15 @@ class Orchestrator:
                             op_mode_guidance = "\n\n".join(parts) if parts else None
                         
                         from ..agents.director_tools import build_director_tools
+                        from ..context.profile_library import get_profile_library
                         director_tools = build_director_tools(
                             memory=self.memory,
                             state=self.state,
                             foreshadowing=self.foreshadowing,
                             current_turn=db_context.turn_number,
                             session_transcript=recent_messages,
+                            profile_library=get_profile_library(),
+                            profile_id=self.profile_id,
                         )
                         
                         director_output = await self.director.run_session_review(

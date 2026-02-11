@@ -18,6 +18,8 @@ def build_director_tools(
     foreshadowing: Any,  # ForeshadowingLedger
     current_turn: int,
     session_transcript: list = None,
+    profile_library: Any = None,  # ProfileLibrary (for lore search)
+    profile_id: str = None,       # Active profile ID (for lore search)
 ) -> ToolRegistry:
     """Build tools for Director investigation phase.
     
@@ -30,6 +32,8 @@ def build_director_tools(
         foreshadowing: ForeshadowingLedger instance
         current_turn: Current turn number (for foreshadowing timing)
         session_transcript: Recent messages
+        profile_library: ProfileLibrary instance for lore search (optional)
+        profile_id: Active profile ID for scoping lore search (optional)
         
     Returns:
         ToolRegistry with gameplay + director tools
@@ -39,6 +43,8 @@ def build_director_tools(
         memory=memory,
         state=state,
         session_transcript=session_transcript,
+        profile_library=profile_library,
+        profile_id=profile_id,
     )
     
     # -----------------------------------------------------------------

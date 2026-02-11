@@ -21,6 +21,8 @@ def build_gameplay_tools(
     memory: Any,         # MemoryStore
     state: Any,          # StateManager
     session_transcript: list = None,
+    profile_library: Any = None,  # ProfileLibrary (for lore search)
+    profile_id: str = None,       # Active profile ID (for lore search)
 ) -> ToolRegistry:
     """Build the standard tool registry for gameplay agents.
     
@@ -28,6 +30,8 @@ def build_gameplay_tools(
         memory: MemoryStore instance (ChromaDB)
         state: StateManager instance (SQLite)
         session_transcript: Recent messages for transcript search
+        profile_library: ProfileLibrary instance for lore search (optional)
+        profile_id: Active profile ID for scoping lore search (optional)
         
     Returns:
         ToolRegistry populated with gameplay tools
@@ -43,13 +47,25 @@ def build_gameplay_tools(
         description=(
             "Search long-term memory (ChromaDB) for relevant memories. "
             "Use specific, targeted queries like 'Belial holo-message' or "
-            "'protagonist training with mentor'. Avoid broad queries."
+            "'protagonist training with mentor'. Avoid broad queries. "
+            "Use the 'keyword' parameter for exact name lookups (e.g. an NPC name) "
+            "alongside the semantic query for best results."
         ),
         parameters=[
             ToolParam("query", "str", "The search query — be specific", required=True),
             ToolParam("limit", "int", "Max results to return (default 5)", required=False),
+            ToolParam("memory_type", "str",
+                "Optional: filter to specific type (core, relationship, quest, episode, "
+                "session_zero, fact, combat, dialogue). Default: all types",
+                required=False),
+            ToolParam("keyword", "str",
+                "Optional: exact keyword to match in memory content (e.g. an NPC name). "
+                "Use this for precise name lookups alongside the semantic query.",
+                required=False),
         ],
-        handler=lambda query, limit=5: _search_memory(memory, query, limit)
+        handler=lambda query, limit=5, memory_type=None, keyword=None: _search_memory(
+            memory, query, limit, memory_type, keyword
+        )
     ))
     
     registry.register(ToolDefinition(
@@ -144,6 +160,59 @@ def build_gameplay_tools(
         handler=lambda: _get_character_sheet(state)
     ))
     
+    # -----------------------------------------------------------------
+    # LORE TOOLS (IP canon knowledge)
+    # -----------------------------------------------------------------
+    
+    if profile_library and profile_id:
+        registry.register(ToolDefinition(
+            name="search_lore",
+            description=(
+                "Search the canonical anime/manga lore library for IP-accurate facts. "
+                "Returns passages from the series research: characters, techniques, "
+                "locations, plot events, world-building details. Use this to ground "
+                "your narration in authentic series knowledge."
+            ),
+            parameters=[
+                ToolParam("query", "str", "Semantic search query for anime lore", required=True),
+                ToolParam("page_type", "str",
+                    "Optional: filter by lore category (characters, techniques, locations, "
+                    "world_building, plot, general). Default: all types",
+                    required=False),
+                ToolParam("limit", "int", "Max results (default 3)", required=False),
+            ],
+            handler=lambda query, page_type=None, limit=3: _search_lore(
+                profile_library, profile_id, query, page_type, limit
+            )
+        ))
+    
+    # -----------------------------------------------------------------
+    # FACTION TOOLS
+    # -----------------------------------------------------------------
+    
+    registry.register(ToolDefinition(
+        name="get_faction_details",
+        description=(
+            "Get full details for a faction by name. Returns: description, alignment, "
+            "power level, influence score, inter-faction relationships, PC membership "
+            "status and rank, faction goals, secrets, and current events."
+        ),
+        parameters=[
+            ToolParam("name", "str", "Faction name", required=True),
+        ],
+        handler=lambda name: _get_faction_details(state, name)
+    ))
+    
+    registry.register(ToolDefinition(
+        name="list_factions",
+        description=(
+            "List ALL factions in the campaign with summary info: name, alignment, "
+            "power level, influence score, and PC membership status."
+        ),
+        parameters=[],
+        handler=lambda: _list_factions(state)
+    ))
+    
     return registry
 
 
@@ -151,9 +220,22 @@ def build_gameplay_tools(
 # Tool Handler Implementations
 # =========================================================================
 
-def _search_memory(memory, query: str, limit: int = 5) -> List[Dict]:
+def _search_memory(
+    memory, query: str, limit: int = 5,
+    memory_type: str = None, keyword: str = None,
+) -> List[Dict]:
     """Search ChromaDB for memories matching the query."""
-    results = memory.search(query=query, limit=limit, boost_on_access=False)
+    # Use hybrid search if keyword is provided for best results
+    if keyword:
+        results = memory.search_hybrid(
+            query=query, keyword=keyword, limit=limit,
+            boost_on_access=False, memory_type=memory_type,
+        )
+    else:
+        results = memory.search(
+            query=query, limit=limit, boost_on_access=False,
+            memory_type=memory_type,
+        )
     # Simplify for LLM consumption
     return [
         {
@@ -361,3 +443,66 @@ def _get_character_sheet(state) -> Dict:
         "faction": char.faction,
         "stats": char.stats or {},
     }
+
+
+def _search_lore(
+    profile_library, profile_id: str, query: str,
+    page_type: str = None, limit: int = 3,
+) -> List[Dict]:
+    """Search the canonical lore library for IP-accurate content."""
+    try:
+        results = profile_library.search_lore(
+            profile_id=profile_id,
+            query=query,
+            limit=limit,
+            page_type=page_type,
+        )
+        if not results:
+            return [{"info": f"No lore found for query: '{query}'"}]
+        # Results are raw text strings from ProfileLibrary
+        return [{"lore_passage": passage} for passage in results]
+    except Exception as e:
+        return [{"error": f"Lore search failed: {e}"}]
+
+
+def _get_faction_details(state, name: str) -> Dict:
+    """Get full faction card as a dict."""
+    faction = state.get_faction_by_name(name)
+    if not faction:
+        return {"error": f"No faction found matching '{name}'"}
+    
+    return {
+        "name": faction.name,
+        "description": faction.description or "Unknown",
+        "alignment": faction.alignment or "neutral",
+        "power_level": faction.power_level or "regional",
+        "influence_score": faction.influence_score or 50,
+        "relationships": faction.relationships or {},
+        "pc_is_member": faction.pc_is_member,
+        "pc_rank": faction.pc_rank,
+        "pc_reputation": faction.pc_reputation or 0,
+        "pc_controls": faction.pc_controls,
+        "subordinates": faction.subordinates or [],
+        "faction_goals": faction.faction_goals or [],
+        "secrets": faction.secrets or [],
+        "current_events": faction.current_events or [],
+    }
+
+
+def _list_factions(state) -> List[Dict]:
+    """List all factions with summary info."""
+    factions = state.get_all_factions()
+    if not factions:
+        return [{"info": "No factions in campaign yet"}]
+    
+    return [
+        {
+            "name": f.name,
+            "alignment": f.alignment or "neutral",
+            "power_level": f.power_level or "regional",
+            "influence_score": f.influence_score or 50,
+            "pc_is_member": f.pc_is_member,
+            "pc_rank": f.pc_rank,
+        }
+        for f in factions
+    ]

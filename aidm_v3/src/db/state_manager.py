@@ -1171,6 +1171,11 @@ class StateManager:
             .first()
         )
     
+    # Alias for consistent naming with get_npc_by_name
+    def get_faction_by_name(self, name: str) -> Optional["Faction"]:
+        """Get a faction by name (alias for get_faction)."""
+        return self.get_faction(name)
+    
     def get_all_factions(self) -> List["Faction"]:
         """Get all factions in the campaign."""
         from .models import Faction
