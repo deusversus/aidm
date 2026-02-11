@@ -1,4 +1,4 @@
-﻿"""Anthropic Claude LLM provider."""
+"""Anthropic Claude LLM provider."""
 
 import json
 import os
@@ -54,6 +54,38 @@ class AnthropicProvider(LLMProvider):
         import anthropic
         self._client = anthropic.Anthropic(api_key=self.api_key)
     
+    @staticmethod
+    def _build_system_blocks(system) -> list:
+        """Convert system prompt to Anthropic cache-aware content blocks.
+        
+        Accepts either:
+          - str: plain text (backward compatible, no caching)
+          - list[tuple[str, bool]]: cache-aware blocks [(text, should_cache), ...]
+        
+        Returns an array of content blocks for Anthropic's system parameter.
+        Blocks marked with should_cache=True get cache_control breakpoints,
+        which tells Anthropic to cache that prefix for 5 minutes at 10%
+        of base input token cost.
+        """
+        if not system:
+            return ""
+        
+        # Plain string — no caching, backward compatible
+        if isinstance(system, str):
+            return system
+        
+        # List of (text, should_cache) tuples — build content blocks
+        blocks = []
+        for text, should_cache in system:
+            if not text:
+                continue
+            block = {"type": "text", "text": text}
+            if should_cache:
+                block["cache_control"] = {"type": "ephemeral"}
+            blocks.append(block)
+        
+        return blocks if blocks else ""
+    
     async def complete(
         self,
         messages: List[Dict[str, str]],
@@ -73,7 +105,7 @@ class AnthropicProvider(LLMProvider):
             "model": model_name,
             "max_tokens": max_tokens,
             "temperature": temperature,
-            "system": system if system else "",
+            "system": self._build_system_blocks(system),
             "messages": messages
         }
         
@@ -156,7 +188,7 @@ class AnthropicProvider(LLMProvider):
             "model": model_name,
             "max_tokens": max_tokens,
             "temperature": temperature,
-            "system": system if system else "",
+            "system": self._build_system_blocks(system),
             "messages": messages,
             "tools": tools,
         }
@@ -246,7 +278,7 @@ class AnthropicProvider(LLMProvider):
             "model": model_name,
             "max_tokens": max_tokens,
         # Configure tool choice
-            "system": system if system else "",
+            "system": self._build_system_blocks(system),
             "messages": messages,
             "tools": tools,
         }
@@ -261,8 +293,15 @@ class AnthropicProvider(LLMProvider):
             kwargs["temperature"] = 1.0
             kwargs["max_tokens"] = max(max_tokens, 8192)
             
-            system_instruction = system if system else ""
-            kwargs["system"] = f"{system_instruction}\n\nIMPORTANT: You must respond by calling the 'respond' tool to provide the structured output."
+            # For extended thinking, append instruction to the system prompt
+            # Handle both plain string and cache block formats
+            extra = "\n\nIMPORTANT: You must respond by calling the 'respond' tool to provide the structured output."
+            if isinstance(system, list):
+                # Append extra instruction to the last block (uncached)
+                kwargs["system"] = self._build_system_blocks(system + [(extra, False)])
+            else:
+                system_instruction = system if system else ""
+                kwargs["system"] = self._build_system_blocks([(system_instruction + extra, False)])
         else:
             kwargs["tool_choice"] = {"type": "tool", "name": "respond"}
 
@@ -494,7 +533,7 @@ Your response must match the required JSON schema.
                 "model": model_name,
                 "betas": ["advanced-tool-use-2025-11-20"],
                 "max_tokens": max_tokens,
-                "system": system or "",
+                "system": self._build_system_blocks(system),
                 "messages": conversation,
                 "tools": anthropic_tools,
             }
@@ -688,7 +727,7 @@ Your response must match the required JSON schema.
             kwargs = {
                 "model": model_name,
                 "max_tokens": max_tokens,
-                "system": system or "",
+                "system": self._build_system_blocks(system),
                 "messages": conversation,
                 "tools": anthropic_tools,
             }

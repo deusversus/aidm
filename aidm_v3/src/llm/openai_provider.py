@@ -45,6 +45,20 @@ class OpenAIProvider(LLMProvider):
         import openai
         self._client = openai.OpenAI(api_key=self.api_key)
     
+    @staticmethod
+    def _flatten_system(system) -> str:
+        """Flatten system prompt to a plain string.
+        
+        Accepts either:
+          - str: returned as-is
+          - list[tuple[str, bool]]: concatenated text (OpenAI doesn't support block caching)
+        """
+        if not system:
+            return ""
+        if isinstance(system, str):
+            return system
+        return "\n\n".join(text for text, _ in system if text)
+    
     async def complete(
         self,
         messages: List[Dict[str, str]],
@@ -62,7 +76,7 @@ class OpenAIProvider(LLMProvider):
         # Build messages with system prompt
         full_messages = []
         if system:
-            full_messages.append({"role": "system", "content": system})
+            full_messages.append({"role": "system", "content": self._flatten_system(system)})
         full_messages.extend(messages)
         
         # Generate response using streaming to prevent truncation
@@ -153,7 +167,7 @@ class OpenAIProvider(LLMProvider):
         # Build messages
         full_messages = []
         if system:
-            full_messages.append({"role": "system", "content": system})
+            full_messages.append({"role": "system", "content": self._flatten_system(system)})
         full_messages.extend(messages)
         
         # Enable web search tool
@@ -247,7 +261,7 @@ class OpenAIProvider(LLMProvider):
         # Build messages with system prompt
         full_messages = []
         if system:
-            full_messages.append({"role": "system", "content": system})
+            full_messages.append({"role": "system", "content": self._flatten_system(system)})
         full_messages.extend(messages)
         
         # Create function for structured output
@@ -481,7 +495,7 @@ Respond ONLY with the JSON object, no markdown formatting.
         # Build conversation with system prompt
         conversation = []
         if system:
-            conversation.append({"role": "system", "content": system})
+            conversation.append({"role": "system", "content": self._flatten_system(system)})
         conversation.extend(messages)
         
         all_tool_calls = []

@@ -2,8 +2,16 @@
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Type
+from typing import Any, Dict, List, Optional, Tuple, Type, Union
 from pydantic import BaseModel
+
+# System prompt can be:
+#   str                        — plain text (backward compatible, no caching)
+#   List[Tuple[str, bool]]     — cache-aware blocks: [(text, should_cache), ...]
+#                                Providers that support explicit caching (Anthropic)
+#                                will add cache_control breakpoints on marked blocks.
+#                                Others (Google) flatten to a single string.
+SystemPrompt = Union[str, List[Tuple[str, bool]]]
 
 
 @dataclass

@@ -49,6 +49,21 @@ class GoogleProvider(LLMProvider):
         from google import genai
         self._client = genai.Client(api_key=self.api_key)
     
+    @staticmethod
+    def _flatten_system(system) -> str:
+        """Flatten system prompt to a plain string.
+        
+        Accepts either:
+          - str: returned as-is
+          - list[tuple[str, bool]]: concatenated text (Google uses implicit caching)
+        """
+        if not system:
+            return ""
+        if isinstance(system, str):
+            return system
+        # List of (text, should_cache) tuples — flatten to string
+        return "\n\n".join(text for text, _ in system if text)
+    
     async def complete(
         self,
         messages: List[Dict[str, str]],
@@ -72,7 +87,7 @@ class GoogleProvider(LLMProvider):
             "temperature": temperature,
         }
         if system:
-            config["system_instruction"] = system
+            config["system_instruction"] = self._flatten_system(system)
             
         # Extended thinking
         if extended_thinking:
@@ -166,7 +181,7 @@ class GoogleProvider(LLMProvider):
         config["tools"] = tools_config
         
         if system:
-            config["system_instruction"] = system
+            config["system_instruction"] = self._flatten_system(system)
             
         if extended_thinking:
             config["thinking_config"] = {"include_thoughts": True}
@@ -254,7 +269,7 @@ class GoogleProvider(LLMProvider):
         }
         
         if system:
-            config["system_instruction"] = system
+            config["system_instruction"] = self._flatten_system(system)
             
         if extended_thinking:
             config["thinking_config"] = {"include_thoughts": True}
@@ -403,7 +418,7 @@ Respond ONLY with the JSON object, no markdown formatting or explanation.
             ),
         }
         if system:
-            config["system_instruction"] = system
+            config["system_instruction"] = self._flatten_system(system)
         
         all_tool_calls = []
         total_usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
@@ -501,7 +516,7 @@ Respond ONLY with the JSON object, no markdown formatting or explanation.
             "temperature": 0.3,
         }
         if system:
-            config_no_tools["system_instruction"] = system
+            config_no_tools["system_instruction"] = self._flatten_system(system)
         
         # Add instruction to produce final answer
         contents.append(types.Content(

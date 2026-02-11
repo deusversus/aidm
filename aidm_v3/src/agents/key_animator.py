@@ -645,10 +645,33 @@ Omit any section that has nothing useful. Brevity over completeness."""
                 tools=tools,
             )
         
-        # Build the full prompt
-        prompt = self.vibe_keeper_template
+        # ===================================================================
+        # CACHE-AWARE BLOCK CONSTRUCTION
+        # 
+        # Split the system prompt into 3 blocks for optimal prefix caching:
+        #   Block 1 (STATIC — cached): Template + Profile DNA
+        #     Changes: never (loaded once per session)
+        #   Block 2 (SEMI-STATIC — cached): Working memory transcript
+        #     Changes: only when sliding window shifts
+        #   Block 3 (DYNAMIC — not cached): Scene context, RAG, lore, etc.
+        #     Changes: every turn
+        #
+        # Ordering matters for prefix caching — static content first.
+        # ===================================================================
         
-        # WORKING MEMORY INJECTION: Recent messages from session (includes Session Zero + gameplay)
+        # --- BLOCK 1: Static template + Profile DNA (cache=True) ---
+        static_prompt = self.vibe_keeper_template
+        static_prompt = static_prompt.replace("{{PROFILE_DNA_INJECTION}}", self._build_profile_dna())
+        # Clear dynamic placeholders from the static template — they go in block 3
+        static_prompt = static_prompt.replace("{{SCENE_CONTEXT_INJECTION}}", "")
+        static_prompt = static_prompt.replace("{{DIRECTOR_NOTES_INJECTION}}", "")
+        static_prompt = static_prompt.replace("{{SAKUGA_MODE_INJECTION}}", "")
+        static_prompt = static_prompt.replace("{{LORE_INJECTION}}", "")
+        static_prompt = static_prompt.replace("{{MEMORIES_INJECTION}}", "")
+        static_prompt = static_prompt.replace("{{RETRIEVED_CHUNKS_INJECTION}}", "")
+        
+        # --- BLOCK 2: Working memory transcript (cache=True) ---
+        working_memory_text = ""
         if recent_messages:
             transcript_lines = []
             for msg in recent_messages:
@@ -657,7 +680,7 @@ Omit any section that has nothing useful. Brevity over completeness."""
                 transcript_lines.append(f"[{role}]: {content}")
             
             transcript_text = "\n\n".join(transcript_lines)
-            working_memory_injection = f"""
+            working_memory_text = f"""
 === RECENT CONVERSATION (Working Memory) ===
 This is the recent dialogue. Use this for immediate context and continuity.
 MATCH the established voice, humor, and style from these exchanges.
@@ -667,32 +690,29 @@ MATCH the established voice, humor, and style from these exchanges.
 === CONTINUE THE STORY ===
 """
             print(f"[KeyAnimator] Injecting working memory ({len(recent_messages)} messages, {len(transcript_text)} chars)")
-            prompt = working_memory_injection + prompt
         
-        # Inject Profile DNA
-        prompt = prompt.replace("{{PROFILE_DNA_INJECTION}}", self._build_profile_dna())
+        # --- BLOCK 3: Dynamic per-turn context (cache=False) ---
+        dynamic_parts = []
         
-        # Inject NPC relationship context (set before building scene context)
+        # NPC relationship context (set before building scene context)
         self._npc_context = npc_context
         
-        # Inject Scene Context (includes outcome + NPC cards)
+        # Scene Context (includes outcome + NPC cards)
         scene_context = self._build_scene_context(context)
         scene_context += "\n\n" + self._build_outcome_section(intent, outcome)
-        prompt = prompt.replace("{{SCENE_CONTEXT_INJECTION}}", scene_context)
+        dynamic_parts.append(f"## Scene Context\n\n{scene_context}")
         
-        # Inject Director Notes
+        # Director Notes
         director_notes = getattr(context, "director_notes", None) or "(No specific guidance this turn)"
-        prompt = prompt.replace("{{DIRECTOR_NOTES_INJECTION}}", director_notes)
+        dynamic_parts.append(f"## Director Notes\n\n{director_notes}")
         
         # SAKUGA MODE: Inject high-intensity guidance for climactic moments
         if sakuga_mode:
             sakuga_injection = self._build_sakuga_injection()
-            prompt = prompt.replace("{{SAKUGA_MODE_INJECTION}}", sakuga_injection)
+            dynamic_parts.append(sakuga_injection)
             print("[KeyAnimator] SAKUGA MODE ACTIVE - injecting high-intensity guidance")
-        else:
-            prompt = prompt.replace("{{SAKUGA_MODE_INJECTION}}", "")
         
-        # Inject RAG context (granular)
+        # RAG context (granular)
         memories_text = ""
         chunks_text = ""
         archetype_text = ""
@@ -704,20 +724,16 @@ MATCH the established voice, humor, and style from these exchanges.
                 memories_text = retrieved_context["memories"]
             if retrieved_context.get("rules"):
                 chunks_text = retrieved_context["rules"]
-            # OP Mode guidance (from 3-axis system)
             if retrieved_context.get("op_mode_guidance"):
                 archetype_text = f"\n\n## OP Protagonist Mode Active\n\n{retrieved_context['op_mode_guidance']}"
-            # Tension guidance for high power imbalance
             if retrieved_context.get("tension_guidance"):
                 tension_text = f"\n\n## Non-Combat Tension (Power Imbalance High)\n\n{retrieved_context['tension_guidance']}"
-            # NPC behavior guidance
             if retrieved_context.get("npc_guidance"):
                 npc_text = f"\n\n## Present NPCs (Module 04 Intelligence)\n\n{retrieved_context['npc_guidance']}"
-            # Faction management guidance (Overlord/Rimuru)
             if retrieved_context.get("faction_guidance"):
                 faction_text = f"\n\n{retrieved_context['faction_guidance']}"
         
-        # Inject lore from profile research (canon reference)
+        # Lore from profile research (canon reference)
         lore_text = ""
         if retrieved_context and retrieved_context.get("lore"):
             lore_text = f"""## 📚 Canon Reference (From Source Material)
@@ -725,14 +741,30 @@ MATCH the established voice, humor, and style from these exchanges.
 {retrieved_context['lore']}
 
 **Use this to ground your narrative:** correct terminology, power system rules, known locations."""
-        prompt = prompt.replace("{{LORE_INJECTION}}", lore_text or "")
         
-        # Inject research findings from agentic research phase
+        # Research findings from agentic research phase
         if research_findings:
             memories_text = f"## Agentic Research Findings\n\n{research_findings}\n\n" + (memories_text or "")
         
-        prompt = prompt.replace("{{MEMORIES_INJECTION}}", memories_text or "(No relevant memories)")
-        prompt = prompt.replace("{{RETRIEVED_CHUNKS_INJECTION}}", chunks_text + archetype_text + tension_text + npc_text + faction_text or "(No additional guidance)")
+        if lore_text:
+            dynamic_parts.append(lore_text)
+        dynamic_parts.append(f"## Retrieved Memories\n\n{memories_text or '(No relevant memories)'}")
+        dynamic_parts.append(f"## Additional Guidance\n\n{chunks_text + archetype_text + tension_text + npc_text + faction_text or '(No additional guidance)'}")
+        
+        dynamic_text = "\n\n".join(dynamic_parts)
+        
+        # --- Build cache-aware system blocks ---
+        system_blocks = [
+            (static_prompt, True),         # Block 1: template + Profile DNA (cached)
+            (working_memory_text, True),    # Block 2: working memory (cached)
+            (dynamic_text, False),          # Block 3: per-turn dynamics (not cached)
+        ]
+        # Filter out empty blocks
+        system_blocks = [(text, cache) for text, cache in system_blocks if text.strip()]
+        
+        print(f"[KeyAnimator] System blocks: {len(system_blocks)} blocks, "
+              f"cached={sum(1 for _, c in system_blocks if c)}, "
+              f"total={sum(len(t) for t, _ in system_blocks)} chars")
         
         # Add the player action
         user_message = f"## Player Action\n\n{player_input}\n\n## Write the scene."
@@ -749,7 +781,7 @@ MATCH the established voice, humor, and style from these exchanges.
         
         response = await self.provider.complete(
             messages=messages,
-            system=prompt,
+            system=system_blocks,
             model=self.model,
             max_tokens=8192,  # High limit for full narrative; anthropic_provider adds more if extended_thinking
             temperature=temperature,
