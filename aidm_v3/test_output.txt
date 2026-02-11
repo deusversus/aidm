@@ -1,0 +1,47 @@
+﻿============================= test session starts =============================
+collected 1 item
+
+tests\test_narrative_diversity.py F                                      [100%]
+
+================================== FAILURES ===================================
+____ TestStyleDriftDirective.test_conditional_injection_skips_when_varied _____
+
+self = <tests.test_narrative_diversity.TestStyleDriftDirective object at 0x000001A290D4FAC0>
+
+    def test_conditional_injection_skips_when_varied(self):
+        """When recent DM messages show variety, should return empty string."""
+        ka = KeyAnimator(_make_profile())
+        intent = _make_intent()
+        outcome = _make_outcome()
+    
+        # Simulate varied recent messages
+        recent = [
+            {"role": "assistant", "content": '"Hello," she said, stepping forward.'},
+            {"role": "user", "content": "I attack"},
+            {"role": "assistant", "content": "The sword arced through the air."},
+            {"role": "user", "content": "I dodge"},
+            {"role": "assistant", "content": "Above the battlefield, clouds gathered."},
+        ]
+        # These openings are: dialogue, action, description ù all different
+        result = ka._build_style_drift_directive(intent, outcome, recent)
+>       assert result == "", "Should skip directive when recent messages are structurally varied"
+E       AssertionError: Should skip directive when recent messages are structurally varied
+E       assert '## Style Sug...background.\n' == ''
+E         
+E         + ## Style Suggestion (Secondary Layer)
+E         + The Profile DNA and Director Notes are your PRIMARY voice authority.
+E         + The following is a SECONDARY variation suggestion ù apply it lightly,
+E         + only where it doesn't conflict with the established tone:
+E         + 
+E         + \U0001f4a1 Narrow to ONE dominant sense (smell, sound, or touch). Let that sense carry the scene while others recede into the background.
+
+tests\test_narrative_diversity.py:157: AssertionError
+============================== warnings summary ===============================
+src\settings\models.py:159
+  C:\Users\admin\Downloads\animerpg\aidm_v3\src\settings\models.py:159: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    class UserSettings(BaseModel):
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED tests/test_narrative_diversity.py::TestStyleDriftDirective::test_conditional_injection_skips_when_varied
+======================== 1 failed, 1 warning in 0.54s =========================

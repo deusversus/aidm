@@ -5,10 +5,16 @@ from typing import Literal, Optional, List
 from .base import BaseAgent
 
 
+INTENT_TYPES = Literal[
+    "COMBAT", "SOCIAL", "EXPLORATION", "ABILITY", "INVENTORY",
+    "WORLD_BUILDING", "META_FEEDBACK", "OVERRIDE_COMMAND", "OP_COMMAND", "OTHER"
+]
+
+
 class IntentOutput(BaseModel):
     """Structured output for intent classification."""
     
-    intent: Literal["COMBAT", "SOCIAL", "EXPLORATION", "ABILITY", "WORLD_BUILDING", "META_FEEDBACK", "OVERRIDE_COMMAND", "OP_COMMAND", "OTHER"] = Field(
+    intent: INTENT_TYPES = Field(
         description="The category of action being attempted"
     )
     action: str = Field(
@@ -26,6 +32,14 @@ class IntentOutput(BaseModel):
     special_conditions: List[str] = Field(
         default_factory=list,
         description="Special flags: 'named_attack', 'power_of_friendship', 'underdog_moment', etc."
+    )
+    confidence: float = Field(
+        ge=0, le=1, default=1.0,
+        description="How confident this classification is (1.0=certain, <0.7=ambiguous)"
+    )
+    secondary_intent: Optional[INTENT_TYPES] = Field(
+        default=None,
+        description="If confidence < 0.7, the next most likely intent category"
     )
 
 
@@ -49,6 +63,7 @@ Parse the player's action into structured data. Focus on:
    - SOCIAL: Talking, persuading, intimidating, relationship building
    - EXPLORATION: Investigating, traveling, searching, observing
    - ABILITY: Using a special power/skill outside combat
+   - INVENTORY: Managing items, using/equipping gear, crafting, inspecting objects, checking bags/pockets
    - WORLD_BUILDING: Player asserts facts about world, backstory, NPCs, items, locations
      - "My childhood friend Kai..." (creating/referencing NPC)
      - "...the sword my father gave me" (creating item + NPC relationship)
@@ -82,6 +97,11 @@ Parse the player's action into structured data. Focus on:
    - 'protective_rage': Fighting to protect someone
    - 'training_payoff': Using something they practiced
    - 'first_time_power': Awakening/breakthrough moment
+
+6. CONFIDENCE: How certain are you about the primary intent?
+   - 1.0: Unambiguous ("I attack the guard" → clearly COMBAT)
+   - 0.5-0.7: Ambiguous ("I draw my sword and stare him down" → COMBAT or SOCIAL?)
+   - If confidence < 0.7, provide secondary_intent with the next most likely category
 
 COMMAND DETECTION:
 - If input starts with "/meta " → intent = META_FEEDBACK

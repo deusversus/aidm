@@ -123,16 +123,31 @@ class ContextSelector:
         # 3. Search Profile Lore (for canon grounding)
         # Intent → preferred page_type for filtered retrieval
         INTENT_LORE_CONFIG = {
-            "COMBAT":        {"page_type": None,         "limit": 3},  # broad — techniques, characters, etc.
-            "ABILITY":       {"page_type": "techniques",  "limit": 3},
-            "LORE_QUESTION": {"page_type": None,         "limit": 3},  # broad search for any lore
-            "SOCIAL":        {"page_type": "characters",  "limit": 2},
-            "EXPLORATION":   {"page_type": "locations",   "limit": 2},
-            "DIALOGUE":      {"page_type": "characters",  "limit": 2},
+            "COMBAT":         {"page_type": None,         "limit": 3},  # broad — techniques, characters, etc.
+            "ABILITY":        {"page_type": "techniques",  "limit": 3},
+            "SOCIAL":         {"page_type": "characters",  "limit": 2},
+            "EXPLORATION":    {"page_type": "locations",   "limit": 2},
+            "INVENTORY":      {"page_type": "items",       "limit": 2},
+            "WORLD_BUILDING": {"page_type": None,         "limit": 3},  # broad — player asserting new facts
+            "OTHER":          {"page_type": None,         "limit": 2},  # general fallback
         }
         
         lore_chunks = []
         lore_config = INTENT_LORE_CONFIG.get(intent.intent if intent else None)
+        
+        # Ambiguity-aware lore merging: when confidence is low, merge with secondary intent config
+        if intent and getattr(intent, 'confidence', 1.0) < 0.7 and getattr(intent, 'secondary_intent', None):
+            secondary_config = INTENT_LORE_CONFIG.get(intent.secondary_intent)
+            if secondary_config:
+                # Merge: use broader page_type (None beats specific), take higher limit
+                if lore_config:
+                    merged_page_type = None if (lore_config["page_type"] is None or secondary_config["page_type"] is None) else lore_config["page_type"]
+                    merged_limit = max(lore_config["limit"], secondary_config["limit"])
+                    lore_config = {"page_type": merged_page_type, "limit": merged_limit}
+                else:
+                    lore_config = secondary_config
+                print(f"[ContextSelector] Ambiguous intent ({intent.confidence:.0%}): merging {intent.intent}+{intent.secondary_intent} lore config")
+        
         if lore_config:
             profile_lib = get_profile_library()
             lore_query = f"{intent.action} {intent.target or ''} {state_context.situation}"

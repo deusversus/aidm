@@ -6,7 +6,10 @@ to gather targeted context from memory, NPCs, and world state. The findings are
 injected into the Vibe Keeper template alongside the existing RAG context.
 """
 
-from typing import Optional, Tuple
+import random
+import re
+from collections import Counter
+from typing import Optional, Tuple, List, Dict, Any
 from pathlib import Path
 
 from ..llm import get_llm_manager, LLMProvider
@@ -29,19 +32,6 @@ class KeyAnimator:
     """
     
     agent_name = "key_animator"
-    
-    def __init__(self, profile: NarrativeProfile, model_override: Optional[str] = None):
-        """Initialize the Key Animator.
-        
-        Args:
-            profile: The narrative profile for this campaign
-            model_override: Specific model to use (overrides settings)
-        """
-        self.profile = profile
-        self._model_override = model_override
-        self._cached_provider: Optional[LLMProvider] = None
-        self._cached_model: Optional[str] = None
-        self._vibe_keeper_template: Optional[str] = None
     
     def _get_provider_and_model(self) -> Tuple[LLMProvider, str]:
         """Get the provider and model from settings."""
@@ -421,7 +411,21 @@ Write vivid, anime-appropriate prose. End at a clear decision point if one exist
         lines.append(f"**Epicness:** {intent.declared_epicness:.1f}")
         
         if intent.special_conditions:
-            lines.append(f"**Special:** {', '.join(intent.special_conditions)}")
+            # Map trope flags to narrative directives for the writer
+            CONDITION_DIRECTIVES = {
+                "named_attack": "Player named their technique — give it a SHOWCASE moment with full choreography",
+                "power_of_friendship": "Bond with allies is the theme — show emotional connection powering the action",
+                "underdog_moment": "Against all odds — emphasize gap between power levels, make small victories feel HUGE",
+                "protective_rage": "Protecting someone — visceral fury, stakes are personal not tactical",
+                "training_payoff": "This was practiced — show mastery, callback to training moments",
+                "first_time_power": "AWAKENING — slow-mo, internal revelation, world reacts with shock/awe",
+            }
+            for condition in intent.special_conditions:
+                directive = CONDITION_DIRECTIVES.get(condition)
+                if directive:
+                    lines.append(f"**🎬 {condition.replace('_', ' ').title()}:** {directive}")
+                else:
+                    lines.append(f"**Special:** {condition}")
         
         lines.append("")
         lines.append(f"**Result:** {outcome.success_level.upper()}")
@@ -444,12 +448,343 @@ Write vivid, anime-appropriate prose. End at a clear decision point if one exist
         
         return "\n".join(lines)
     
-    def _build_sakuga_injection(self) -> str:
-        """Build the sakuga mode injection for high-intensity climactic scenes."""
-        return """
-## 🎬 SAKUGA MODE ACTIVE
+    # ===================================================================
+    # NARRATIVE DIVERSITY SYSTEM
+    #
+    # Three injection layers to prevent structural ossification and
+    # vocabulary collapse over long sessions:
+    #   A. Style Drift Directives — per-turn structural variation nudges
+    #   B. Vocabulary Freshness — anti-repetition advisory from working memory
+    #   C. Sakuga Variants — 4 cinematic sub-modes instead of binary on/off
+    #
+    # All inject into Block 4 (dynamic, uncached). Profile DNA (Block 1)
+    # and Director Notes remain PRIMARY voice authority.
+    # ===================================================================
 
-This is a CLIMACTIC moment. Unleash the full animation budget:
+    # --- Approach A: Style Drift Directives ---
+
+    DIRECTIVE_POOL = [
+        {"text": "Consider opening with dialogue — let a character's voice set the scene before the narration fills in the environment.",
+         "exclude_intents": [], "max_weight": "climactic"},
+        {"text": "Try an environmental POV — describe this scene through objects, architecture, weather, or light rather than character interiority.",
+         "exclude_intents": ["COMBAT"], "max_weight": "significant"},
+        {"text": "Include at least one long sentence (40+ words) that builds momentum without a period, letting the rhythm carry the reader forward.",
+         "exclude_intents": [], "max_weight": "climactic"},
+        {"text": "Try a cold open — drop the reader mid-action or mid-thought without setup. Let them piece together the context from the scene itself.",
+         "exclude_intents": ["SOCIAL"], "max_weight": "minor"},
+        {"text": "Narrow to ONE dominant sense (smell, sound, or touch). Let that sense carry the scene while others recede into the background.",
+         "exclude_intents": [], "max_weight": "climactic"},
+        {"text": "Lean into subtext — the characters feel something they don't say. Let the reader infer emotion from behavior and environment, not narration.",
+         "exclude_intents": [], "max_weight": "climactic"},
+        {"text": "Shift your sentence rhythm — if recent scenes used short punchy sentences, try long flowing ones. If flowing, try staccato.",
+         "exclude_intents": [], "max_weight": "climactic"},
+        {"text": "Find one moment of levity, absurdity, or dry humor — even serious scenes have room for a beat of comic relief.",
+         "exclude_intents": ["COMBAT"], "max_weight": "significant"},
+    ]
+
+    WEIGHT_HIERARCHY = {"minor": 0, "significant": 1, "climactic": 2}
+
+    # --- Approach B: Vocabulary Freshness Patterns ---
+
+    SIMILE_PATTERNS = [
+        re.compile(r'(?:like|as)\s+a\s+\w+\s+\w+', re.IGNORECASE),
+        re.compile(r'the way (?:a|an|the)\s+\w+\s+\w+', re.IGNORECASE),
+        re.compile(r'as (?:if|though)\s+[^.,]{10,40}', re.IGNORECASE),
+        re.compile(r'(?:like|as)\s+\w+\s+(?:among|between)', re.IGNORECASE),
+    ]
+
+    PERSONIFICATION_PATTERNS = [
+        re.compile(r'\b\w+(?:s|ed)\s+(?:apologetically|reluctantly|cheerfully|wearily|patiently|hungrily|angrily|nervously|stubbornly|desperately)', re.IGNORECASE),
+        re.compile(r'\b\w+(?:s|ed)\s+(?:with|in)\s+the\s+\w+\s+of', re.IGNORECASE),
+    ]
+
+    NEGATION_PATTERN = re.compile(r'Not [^.]{3,40}\. Not [^.]{3,40}\.', re.IGNORECASE)
+
+    FRESHNESS_THRESHOLD = 3  # Only flag constructions appearing 3+ times
+
+    # --- Approach C: Sakuga Priority Ladder ---
+
+    SAKUGA_PRIORITY = [
+        ("first_time_power",    "frozen_moment"),
+        ("protective_rage",     "frozen_moment"),
+        ("named_attack",        "choreographic"),
+        ("underdog_moment",     "choreographic"),
+        ("power_of_friendship", "choreographic"),
+        ("training_payoff",     "montage"),
+    ]
+
+    def __init__(self, profile: NarrativeProfile, model_override: Optional[str] = None):
+        """Initialize the Key Animator.
+        
+        Args:
+            profile: The narrative profile for this campaign
+            model_override: Specific model to use (overrides settings)
+        """
+        self.profile = profile
+        self._model_override = model_override
+        self._cached_provider: Optional[LLMProvider] = None
+        self._cached_model: Optional[str] = None
+        self._vibe_keeper_template: Optional[str] = None
+        self._npc_context = None
+        # Shuffle-bag for style drift directives
+        self._directive_bag: List[Dict[str, Any]] = []
+        self._last_directive_text: str = ""
+        # Jargon whitelist built from profile
+        self._jargon_whitelist = self._build_jargon_whitelist()
+
+    def _build_jargon_whitelist(self) -> set:
+        """Build protected vocabulary whitelist from profile YAML fields.
+        
+        Layer 1: Hard-coded from structured profile fields.
+        Layer 2: Dynamic extraction from free-text profile sections.
+        """
+        whitelist = set()
+
+        # Layer 1: Structured fields
+        ps = self.profile.power_system
+        if ps and isinstance(ps, dict):
+            name = ps.get('name', '')
+            if name:
+                whitelist.update(name.lower().split())
+            tiers = ps.get('tiers', [])
+            if isinstance(tiers, list):
+                for tier in tiers:
+                    whitelist.add(str(tier).lower())
+            mechanics = ps.get('mechanics', '')
+            if mechanics:
+                # Extract capitalized terms from mechanics description
+                whitelist.update(w.lower() for w in re.findall(r'\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b', mechanics))
+            limitations = ps.get('limitations', '')
+            if limitations:
+                whitelist.update(w.lower() for w in re.findall(r'\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b', limitations))
+
+        # Combat system term
+        combat = getattr(self.profile, 'combat_system', '')
+        if combat:
+            whitelist.add(combat.lower())
+
+        # Layer 2: Author's voice signature phrases
+        author_voice = getattr(self.profile, 'author_voice', None)
+        if author_voice and isinstance(author_voice, dict):
+            for key in ('sentence_patterns', 'structural_motifs', 'dialogue_quirks'):
+                items = author_voice.get(key, [])
+                if isinstance(items, list):
+                    for item in items:
+                        whitelist.add(item.lower())
+
+        # Voice field
+        voice = getattr(self.profile, 'voice', '')
+        if voice:
+            whitelist.update(w.lower() for w in re.findall(r'\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b', voice))
+
+        return whitelist
+
+    def _build_style_drift_directive(self, intent: IntentOutput, outcome: OutcomeOutput, recent_messages: list = None) -> str:
+        """Build a per-turn style variation suggestion (Approach A).
+        
+        Uses a shuffle-bag algorithm for selection, filtered by intent
+        and narrative weight. Only injects when working memory shows
+        structural repetition.
+        
+        Returns:
+            Style suggestion block, or empty string if variety is sufficient.
+        """
+        # --- CONDITIONAL INJECTION ---
+        # Check if working memory already shows structural variety
+        if recent_messages:
+            dm_openings = []
+            for msg in recent_messages[-6:]:  # Check last 6 messages (3 turns)
+                if msg.get("role") == "assistant":
+                    content = msg.get("content", "").strip()
+                    if content:
+                        # Classify opening: dialogue, description, or action
+                        first_line = content.split('\n')[0].strip()
+                        if first_line.startswith('"') or first_line.startswith('"') or first_line.startswith("'"):
+                            dm_openings.append("dialogue")
+                        elif any(first_line.startswith(w) for w in ("The ", "A ", "An ", "In ", "Above ", "Below ", "Through ")):
+                            dm_openings.append("description")
+                        else:
+                            dm_openings.append("action")
+            
+            # If last 3 DM messages show variety (no 2+ of same type), skip directive
+            if len(dm_openings) >= 2:
+                opening_counts = Counter(dm_openings[-3:])
+                if opening_counts.most_common(1)[0][1] < 2:
+                    return ""  # Already varied — no directive needed
+
+        # --- NARRATIVE WEIGHT FILTER ---
+        current_weight = getattr(outcome, 'narrative_weight', 'minor')
+        current_weight_level = self.WEIGHT_HIERARCHY.get(current_weight, 0)
+
+        # --- SHUFFLE-BAG SELECTION ---
+        if not self._directive_bag:
+            # Refill and shuffle
+            self._directive_bag = list(self.DIRECTIVE_POOL)
+            random.shuffle(self._directive_bag)
+
+        # Find a compatible directive from the bag
+        selected = None
+        skipped = []
+        while self._directive_bag:
+            candidate = self._directive_bag.pop(0)
+            
+            # Filter: intent exclusion
+            if intent.intent in candidate.get("exclude_intents", []):
+                skipped.append(candidate)
+                continue
+            
+            # Filter: narrative weight
+            max_weight = candidate.get("max_weight", "climactic")
+            max_weight_level = self.WEIGHT_HIERARCHY.get(max_weight, 2)
+            if current_weight_level > max_weight_level:
+                skipped.append(candidate)
+                continue
+            
+            # Filter: don't repeat last directive
+            if candidate["text"] == self._last_directive_text:
+                skipped.append(candidate)
+                continue
+            
+            selected = candidate
+            break
+        
+        # Return skipped items to bag (they'll be available next turn)
+        self._directive_bag.extend(skipped)
+        
+        if not selected:
+            return ""
+        
+        self._last_directive_text = selected["text"]
+        
+        return f"""## Style Suggestion (Secondary Layer)
+The Profile DNA and Director Notes are your PRIMARY voice authority.
+The following is a SECONDARY variation suggestion — apply it lightly,
+only where it doesn't conflict with the established tone:
+
+💡 {selected['text']}
+"""
+
+    def _build_freshness_check(self, recent_messages: list = None) -> str:
+        """Build a vocabulary freshness advisory from working memory (Approach B).
+        
+        Scans recent DM messages for repeated construction-level patterns
+        and suggests fresh alternatives. Respects the jargon whitelist.
+        
+        Returns:
+            Freshness advisory block, or empty string if no significant repetition.
+        """
+        if not recent_messages:
+            return ""
+        
+        # Collect DM content only
+        dm_text = "\n".join(
+            msg.get("content", "")
+            for msg in recent_messages
+            if msg.get("role") == "assistant"
+        )
+        
+        if len(dm_text) < 200:  # Not enough text to analyze
+            return ""
+        
+        # Extract construction-level patterns
+        found_constructions: List[str] = []
+        
+        # Simile constructions
+        for pattern in self.SIMILE_PATTERNS:
+            matches = pattern.findall(dm_text)
+            found_constructions.extend(m.strip().lower() for m in matches)
+        
+        # Personification patterns
+        for pattern in self.PERSONIFICATION_PATTERNS:
+            matches = pattern.findall(dm_text)
+            found_constructions.extend(m.strip().lower() for m in matches)
+        
+        # Negation triples
+        matches = self.NEGATION_PATTERN.findall(dm_text)
+        found_constructions.extend(m.strip().lower() for m in matches)
+        
+        if not found_constructions:
+            return ""
+        
+        # Count and filter to 3+ threshold
+        counts = Counter(found_constructions)
+        repeated = [(phrase, count) for phrase, count in counts.most_common(8)
+                     if count >= self.FRESHNESS_THRESHOLD]
+        
+        if not repeated:
+            return ""
+        
+        # Apply jargon whitelist (Layer 3: proper noun immunity handled here too)
+        filtered = []
+        for phrase, count in repeated:
+            # Layer 3: Proper noun immunity — skip if phrase contains capitalized words
+            # (we lowercased for counting, but check original)
+            original_matches = [m for p in self.SIMILE_PATTERNS + self.PERSONIFICATION_PATTERNS
+                               for m in p.findall(dm_text) if m.strip().lower() == phrase]
+            has_proper_noun = any(
+                any(w[0].isupper() for w in match.split() if len(w) > 1)
+                for match in original_matches
+            ) if original_matches else False
+            
+            if has_proper_noun:
+                continue
+            
+            # Layer 1+2: Check against jargon whitelist
+            phrase_words = set(phrase.split())
+            if phrase_words & self._jargon_whitelist:
+                continue
+            
+            filtered.append((phrase, count))
+        
+        if not filtered:
+            return ""
+        
+        # Build advisory
+        lines = [
+            "## Vocabulary Freshness",
+            "These constructions have appeared frequently in recent narration.",
+            "Find fresh variations — different structures, different imagery:\n"
+        ]
+        for phrase, count in filtered[:5]:  # Cap at 5 suggestions
+            lines.append(f"- \"{phrase}\" (×{count})")
+        
+        return "\n".join(lines) + "\n"
+
+    def _build_sakuga_injection(self, intent: IntentOutput = None, outcome: OutcomeOutput = None) -> str:
+        """Build sakuga mode injection with cinematic sub-mode selection (Approach C).
+        
+        Selects from 4 sub-modes using a strict priority ladder based on
+        special_conditions from intent, with fallback to Choreographic.
+        
+        Args:
+            intent: The classified intent (for special_conditions)
+            outcome: The outcome judgment (for narrative_weight + intent-based fallback)
+        """
+        # --- RESOLVE SUB-MODE ---
+        sub_mode = "choreographic"  # Default fallback
+        
+        if intent and intent.special_conditions:
+            conditions = set(intent.special_conditions)
+            for condition, mode in self.SAKUGA_PRIORITY:
+                if condition in conditions:
+                    sub_mode = mode
+                    break  # Highest priority wins
+        elif intent and outcome:
+            # No special_conditions — infer from intent + weight
+            weight = getattr(outcome, 'narrative_weight', 'minor')
+            if weight == "climactic":
+                if intent.intent == "SOCIAL":
+                    sub_mode = "frozen_moment"
+                # else stays choreographic
+        
+        print(f"[KeyAnimator] Sakuga sub-mode: {sub_mode}")
+        
+        # --- BUILD INJECTION ---
+        if sub_mode == "choreographic":
+            return """
+## 🎬 SAKUGA MODE ACTIVE — Choreographic
+
+This is a CLIMACTIC action moment. Full animation budget:
 
 ### Choreography Over Action
 - Don't just say "He punched him"
@@ -474,6 +809,86 @@ This is a CLIMACTIC moment. Unleash the full animation budget:
 ### Profile Adherence
 - Match the power system and visual language of this anime
 - Use the DNA scales to calibrate the intensity
+
+"""
+        elif sub_mode == "frozen_moment":
+            return """
+## 🎬 SAKUGA MODE ACTIVE — Frozen Moment
+
+This is a CLIMACTIC emotional moment. Time dilates:
+
+### Time Dilation
+- One second, one heartbeat, one decision — stretched across the scene
+- Internal monologue dominates. The character THINKS before the world moves
+- Sound drops out. Then one detail floods back in — a drip, a breath, a word
+
+### Interiority Over Action
+- The external action is secondary. What matters is what this MEANS
+- Memory fragments surface unbidden — flashes of why this matters
+- The body reacts before the mind catches up: trembling hands, held breath
+
+### Emotional Architecture
+- Build in layers: physical sensation → memory → realization → decision
+- Let silence carry weight. Not every moment needs words
+- The world waits for the character. Then it all crashes back
+
+### Restraint
+- No exposition. The reader should FEEL it, not be told about it
+- Dialogue is minimal — a single word can be enough
+- Match the profile's emotional register, not generic drama
+
+"""
+        elif sub_mode == "aftermath":
+            return """
+## 🎬 SAKUGA MODE ACTIVE — Aftermath
+
+The climax just happened. Now: the silence after the explosion.
+
+### Quiet Devastation
+- The action is over. What's LEFT? Describe damage, wreckage, changed landscape
+- Sound returns slowly — ringing ears, settling dust, dripping water
+- Characters take stock: injuries, losses, what just changed forever
+
+### Environmental Focus
+- The WORLD tells the story of what happened. Cracked walls, scorched earth, shifted light
+- Small details carry enormous weight: a cracked photograph, a single shoe, smoke rising
+- The camera pulls back — show the scale of what occurred
+
+### Emotional Exhaustion
+- Characters are spent. Adrenaline crash. Numbness before the grief hits
+- Dialogue is sparse, practical. "Can you walk?" Not speeches
+- This is where consequences become REAL. Don't rush past the cost
+
+### Bridge Forward
+- Plant one seed of what comes next — a distant sound, a new arrival, a realization
+- End on an image, not a statement
+
+"""
+        else:  # montage
+            return """
+## 🎬 SAKUGA MODE ACTIVE — Montage
+
+Time compresses. Multiple scenes, one momentum:
+
+### Quick Cuts
+- Sentence fragments. Scene changes mid-paragraph
+- `---` dividers between moments — each one a snapshot
+- Dawn. Training. Noon. Failure. Dusk. Breakthrough. Night. Rest
+
+### Show Progress
+- Each cut shows change — improvement, deterioration, accumulation
+- Repetition with variation: the same action, done differently each time
+- Small victories stack. The montage ends differently than it began
+
+### Sensory Snapshots
+- Each beat gets ONE dominant sense — sweat, the sound of impact, the smell of rain
+- No lingering. Quick impressions that imprint and move on
+- The rhythm matters more than the detail
+
+### Emotional Undercurrent
+- Beneath the activity: determination, obsession, fear of failure
+- One quiet moment in the middle — the character alone, the reason WHY
+- End with arrival: they're ready. Or they think they are
 
 """
     
@@ -529,6 +944,13 @@ This is a CLIMACTIC moment. Unleash the full animation budget:
                 "2. get_critical_memories — Are there Session Zero facts about this power/ability?\n"
                 "3. search_memory — Has this ability been used before? What happened?\n"
                 "4. get_world_state — Any environmental factors that affect ability use?"
+            ),
+            "INVENTORY": (
+                "INVENTORY RESEARCH PRIORITY:\n"
+                "1. get_character_sheet — What's in inventory, equipped items, power level?\n"
+                "2. search_memory — Any established lore about this item or its origin?\n"
+                "3. get_world_state — Environmental factors affecting item use?\n"
+                "4. get_recent_episodes — Was this item recently acquired or mentioned?"
             ),
         }
         
@@ -723,9 +1145,21 @@ MATCH the established voice, humor, and style from these exchanges.
         director_notes = getattr(context, "director_notes", None) or "(No specific guidance this turn)"
         dynamic_parts.append(f"## Director Notes\n\n{director_notes}")
         
-        # SAKUGA MODE: Inject high-intensity guidance for climactic moments
+        # NARRATIVE DIVERSITY: Style Drift Directive (Approach A)
+        style_directive = self._build_style_drift_directive(intent, outcome, recent_messages)
+        if style_directive:
+            dynamic_parts.append(style_directive)
+            print("[KeyAnimator] Style drift directive injected")
+        
+        # NARRATIVE DIVERSITY: Vocabulary Freshness (Approach B)
+        freshness_check = self._build_freshness_check(recent_messages)
+        if freshness_check:
+            dynamic_parts.append(freshness_check)
+            print(f"[KeyAnimator] Vocabulary freshness advisory injected")
+        
+        # SAKUGA MODE: Inject variant-aware high-intensity guidance (Approach C)
         if sakuga_mode:
-            sakuga_injection = self._build_sakuga_injection()
+            sakuga_injection = self._build_sakuga_injection(intent, outcome)
             dynamic_parts.append(sakuga_injection)
             print("[KeyAnimator] SAKUGA MODE ACTIVE - injecting high-intensity guidance")
         

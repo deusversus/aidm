@@ -613,6 +613,10 @@ class Orchestrator:
             use_sakuga = True
         elif intent.intent == "COMBAT" or outcome.calculated_roll >= 20: # Natural 20 or high
             use_sakuga = True
+        # Special conditions auto-trigger sakuga
+        elif any(cond in intent.special_conditions for cond in ("named_attack", "first_time_power")):
+            use_sakuga = True
+            print(f"[Orchestrator] Auto-sakuga triggered by special condition: {intent.special_conditions}")
         
         # Single narrative path - KeyAnimator handles both normal and sakuga modes
         
