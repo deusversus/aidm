@@ -342,7 +342,7 @@ For a system whose philosophy is "story > simulation," having a hard mechanical 
 
 ---
 
-### 21. Prompt Management is Inconsistent
+### 21. Prompt Management is Inconsistent ✅ DONE
 
 **Problem:** Some agents use external markdown prompt files (`prompts/` directory): IntentClassifier, OutcomeJudge, KeyAnimator, SessionZero, Director. Others use inline hardcoded prompts: Validator, Compactor, MemoryRanker, WorldBuilder, RelationshipAnalyzer, Combat, Progression, ScaleSelector. This makes prompt iteration difficult — inline prompts require code changes.
 
