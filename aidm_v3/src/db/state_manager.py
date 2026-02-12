@@ -6,7 +6,7 @@ from typing import Optional, List, Dict, Any
 from sqlalchemy.orm import Session as SQLAlchemySession
 from sqlalchemy.exc import OperationalError
 
-from .models import Campaign, Session, Turn, Character, NPC, WorldState, CampaignBible
+from .models import Campaign, Session, Turn, Character, NPC, WorldState, CampaignBible, ForeshadowingSeedDB
 from .session import get_session, create_session, init_db
 
 
@@ -589,6 +589,121 @@ class StateManager:
             }
             for t in results
         ]
+    
+    # -----------------------------------------------------------------
+    # FORESHADOWING PERSISTENCE (#10)
+    # -----------------------------------------------------------------
+    
+    def save_foreshadowing_seed(self, seed_data: dict) -> None:
+        """Upsert a foreshadowing seed to DB.
+        
+        Args:
+            seed_data: Dict with keys matching ForeshadowingSeedDB columns.
+                       Must include 'seed_id' as the logical key.
+        """
+        db = self._get_db()
+        seed_id = seed_data["seed_id"]
+        
+        existing = db.query(ForeshadowingSeedDB).filter(
+            ForeshadowingSeedDB.seed_id == seed_id
+        ).first()
+        
+        if existing:
+            # Update existing
+            for key, value in seed_data.items():
+                if key != "seed_id" and hasattr(existing, key):
+                    setattr(existing, key, value)
+        else:
+            # Insert new
+            row = ForeshadowingSeedDB(
+                campaign_id=self.campaign_id,
+                **seed_data
+            )
+            db.add(row)
+        
+        self._maybe_commit()
+    
+    def load_foreshadowing_seeds(self) -> list:
+        """Load all foreshadowing seeds for this campaign.
+        
+        Returns:
+            List of dicts, each representing a ForeshadowingSeedDB row.
+        """
+        db = self._get_db()
+        rows = db.query(ForeshadowingSeedDB).filter(
+            ForeshadowingSeedDB.campaign_id == self.campaign_id
+        ).all()
+        
+        seeds = []
+        for row in rows:
+            seeds.append({
+                "seed_id": row.seed_id,
+                "seed_type": row.seed_type,
+                "status": row.status,
+                "description": row.description,
+                "planted_narrative": row.planted_narrative or "",
+                "expected_payoff": row.expected_payoff or "",
+                "planted_turn": row.planted_turn,
+                "planted_session": row.planted_session,
+                "mentions": row.mentions,
+                "last_mentioned_turn": row.last_mentioned_turn,
+                "min_turns_to_payoff": row.min_turns_to_payoff,
+                "max_turns_to_payoff": row.max_turns_to_payoff,
+                "urgency": row.urgency,
+                "resolved_turn": row.resolved_turn,
+                "resolution_narrative": row.resolution_narrative,
+                "tags": row.tags or [],
+                "related_npcs": row.related_npcs or [],
+                "related_locations": row.related_locations or [],
+            })
+        return seeds
+    
+    def update_foreshadowing_seed(self, seed_id: str, **fields) -> None:
+        """Partial update of a foreshadowing seed.
+        
+        Args:
+            seed_id: The logical seed ID (e.g. 'seed_1_3')
+            **fields: Column names and new values to update
+        """
+        db = self._get_db()
+        row = db.query(ForeshadowingSeedDB).filter(
+            ForeshadowingSeedDB.seed_id == seed_id
+        ).first()
+        
+        if row:
+            for key, value in fields.items():
+                if hasattr(row, key):
+                    setattr(row, key, value)
+            self._maybe_commit()
+    
+    def get_max_seed_sequence(self) -> int:
+        """Get the next available seed sequence number for this campaign.
+        
+        Parses seed_id format 'seed_{campaign_id}_{N}' to determine max N,
+        so _next_id survives server restarts without ID collision.
+        
+        Returns:
+            Next sequence number (1 if no seeds exist)
+        """
+        db = self._get_db()
+        rows = db.query(ForeshadowingSeedDB.seed_id).filter(
+            ForeshadowingSeedDB.campaign_id == self.campaign_id
+        ).all()
+        
+        if not rows:
+            return 1
+        
+        max_seq = 0
+        for (sid,) in rows:
+            try:
+                # seed_id format: "seed_{campaign_id}_{N}"
+                parts = sid.split("_")
+                if len(parts) >= 3:
+                    max_seq = max(max_seq, int(parts[-1]))
+            except (ValueError, IndexError):
+                continue
+        
+        return max_seq + 1
     
     def apply_consequence(self, consequence: str):
         """Apply a narrative consequence to the world state.

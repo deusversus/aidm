@@ -83,8 +83,8 @@ class Orchestrator:
         self.combat = CombatAgent()
         self.progression = ProgressionAgent()
         
-        # Phase 4: Foreshadowing
-        self.foreshadowing = ForeshadowingLedger(self.campaign_id)
+        # Phase 4: Foreshadowing (DB-backed, #10)
+        self.foreshadowing = ForeshadowingLedger(self.campaign_id, state_manager=self.state)
         
         # Scale Selector (Module 12)
         self.scale_selector = ScaleSelectorAgent()

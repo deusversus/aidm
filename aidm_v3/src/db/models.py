@@ -33,6 +33,7 @@ class Campaign(Base):
     npcs = relationship("NPC", back_populates="campaign", cascade="all, delete-orphan")
     factions = relationship("Faction", back_populates="campaign", cascade="all, delete-orphan")
     overrides = relationship("Override", back_populates="campaign", cascade="all, delete-orphan")
+    foreshadowing_seeds = relationship("ForeshadowingSeedDB", back_populates="campaign", cascade="all, delete-orphan")
     world_state = relationship("WorldState", back_populates="campaign", uselist=False, cascade="all, delete-orphan")
     campaign_bible = relationship("CampaignBible", back_populates="campaign", uselist=False, cascade="all, delete-orphan")
 
@@ -311,5 +312,48 @@ class Override(Base):
     campaign = relationship("Campaign", back_populates="overrides")
 
 
-# Add factions relationship to Campaign (need to update Campaign class)
-
+class ForeshadowingSeedDB(Base):
+    """Persisted foreshadowing seed (#10).
+    
+    Mirrors the Pydantic ForeshadowingSeed schema from core/foreshadowing.py.
+    Seeds survive server restarts — unblocks the full foreshadowing system (#9, #12).
+    """
+    
+    __tablename__ = "foreshadowing_seeds"
+    
+    id = Column(Integer, primary_key=True)
+    campaign_id = Column(Integer, ForeignKey("campaigns.id"), nullable=False)
+    seed_id = Column(String(100), nullable=False, unique=True)  # e.g. "seed_1_3"
+    seed_type = Column(String(50), nullable=False)     # plot, character, mystery, threat, promise, chekhov, relationship
+    status = Column(String(50), default="planted")     # planted, growing, callback, resolved, abandoned, overdue
+    
+    # Content
+    description = Column(Text, nullable=False)
+    planted_narrative = Column(Text, nullable=True)
+    expected_payoff = Column(Text, nullable=True)
+    
+    # Tracking
+    planted_turn = Column(Integer, nullable=False)
+    planted_session = Column(Integer, nullable=False)
+    mentions = Column(Integer, default=1)
+    last_mentioned_turn = Column(Integer, nullable=True)
+    
+    # Timing
+    min_turns_to_payoff = Column(Integer, default=5)
+    max_turns_to_payoff = Column(Integer, default=50)
+    urgency = Column(Float, default=0.5)
+    
+    # Resolution
+    resolved_turn = Column(Integer, nullable=True)
+    resolution_narrative = Column(Text, nullable=True)
+    
+    # Metadata (JSON arrays)
+    tags = Column(JSON, default=list)
+    related_npcs = Column(JSON, default=list)
+    related_locations = Column(JSON, default=list)
+    
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    campaign = relationship("Campaign", back_populates="foreshadowing_seeds")
