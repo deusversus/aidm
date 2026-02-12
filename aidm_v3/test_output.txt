@@ -1,47 +1,93 @@
-﻿============================= test session starts =============================
-collected 1 item
+Testing Hellsing profile generation...
+Provider: GoogleProvider
+Model: gemini-3-flash-preview
+============================================================
 
-tests\test_narrative_diversity.py F                                      [100%]
+RESULTS
+============================================================
+Title: Hellsing
+Research Method: bundled_parallel
+Research Passes: 7
+Topics Covered: ['power_system', 'combat', 'tone', 'characters', 'factions', 'locations', 'arcs', 'sequels', 'adaptations', 'recent', 'series_aliases']
+Confidence: 95%
+Raw Content Length: 32724 chars
 
-================================== FAILURES ===================================
-____ TestStyleDriftDirective.test_conditional_injection_skips_when_varied _____
+Power System: {
+  "name": "Soul Absorption and Control Art Restriction System",
+  "mechanics": "The system is based on the consumption of blood to absorb souls, which serve as a reservoir of 'extra lives' for regeneration and can be manifested as physical familiars. Alucard's specific power is governed by the Control Art Restriction System, which uses release states (Levels 3-0) to unlock shapeshifting, shadow manipulation, and the mass summoning of his soul army.",
+  "limitations": "Vampiric conversion requires the victim to be a virgin; otherwise, they become mindless ghouls. Physical weaknesses include silver, holy weapons, sunlight (which weakens), and the inability to cross large bodies of water without transport. In Level 0, the user is vulnerable because their souls are externalized. Philosophically, monsters can only be truly defeated by humans.",
+  "tiers": [
+    "God Tier: Post-Schr\u00f6dinger Alucard (Omnipresent)",
+    "Top Tier: Level 0 Alucard, Monster of God Anderson, The Captain, Vampire Walter",
+    "High Tier: Awakened Seras Victoria, Base Alexander Anderson, Level 1 Alucard",
+    "Mid Tier: Millennium Officers (Zorin Blitz, Rip Van Winkle, Tubalcain Alhambra), Luke Valentine",
+    "Low Tier: Fodder vampires, Iscariot priests, Ghouls"
+  ]
+}
 
-self = <tests.test_narrative_diversity.TestStyleDriftDirective object at 0x000001A290D4FAC0>
+Combat Style: spectacle
 
-    def test_conditional_injection_skips_when_varied(self):
-        """When recent DM messages show variety, should return empty string."""
-        ka = KeyAnimator(_make_profile())
-        intent = _make_intent()
-        outcome = _make_outcome()
-    
-        # Simulate varied recent messages
-        recent = [
-            {"role": "assistant", "content": '"Hello," she said, stepping forward.'},
-            {"role": "user", "content": "I attack"},
-            {"role": "assistant", "content": "The sword arced through the air."},
-            {"role": "user", "content": "I dodge"},
-            {"role": "assistant", "content": "Above the battlefield, clouds gathered."},
-        ]
-        # These openings are: dialogue, action, description ù all different
-        result = ka._build_style_drift_directive(intent, outcome, recent)
->       assert result == "", "Should skip directive when recent messages are structurally varied"
-E       AssertionError: Should skip directive when recent messages are structurally varied
-E       assert '## Style Sug...background.\n' == ''
-E         
-E         + ## Style Suggestion (Secondary Layer)
-E         + The Profile DNA and Director Notes are your PRIMARY voice authority.
-E         + The following is a SECONDARY variation suggestion ù apply it lightly,
-E         + only where it doesn't conflict with the established tone:
-E         + 
-E         + \U0001f4a1 Narrow to ONE dominant sense (smell, sound, or touch). Let that sense carry the scene while others recede into the background.
+Tone: {
+  "comedy_level": 4,
+  "darkness_level": 9,
+  "optimism": 3
+}
 
-tests\test_narrative_diversity.py:157: AssertionError
-============================== warnings summary ===============================
-src\settings\models.py:159
-  C:\Users\admin\Downloads\animerpg\aidm_v3\src\settings\models.py:159: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
-    class UserSettings(BaseModel):
+DNA Scales: {
+  "introspection_vs_action": 8,
+  "comedy_vs_drama": 3,
+  "simple_vs_complex": 6,
+  "power_fantasy_vs_struggle": 2,
+  "explained_vs_mysterious": 5,
+  "fast_paced_vs_slow_burn": 3,
+  "episodic_vs_serialized": 9,
+  "grounded_vs_absurd": 9,
+  "tactical_vs_instinctive": 8,
+  "hopeful_vs_cynical": 8,
+  "ensemble_vs_solo": 7
+}
 
--- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
-=========================== short test summary info ===========================
-FAILED tests/test_narrative_diversity.py::TestStyleDriftDirective::test_conditional_injection_skips_when_varied
-======================== 1 failed, 1 warning in 0.54s =========================
+Storytelling Tropes: {
+  "tournament_arc": false,
+  "training_montage": false,
+  "power_of_friendship": false,
+  "mentor_death": true,
+  "chosen_one": false,
+  "tragic_backstory": true,
+  "redemption_arc": false,
+  "betrayal": true,
+  "sacrifice": true,
+  "transformation": true,
+  "forbidden_technique": true,
+  "time_loop": false,
+  "false_identity": true,
+  "ensemble_focus": true,
+  "slow_burn_romance": true
+}
+
+
+
+RAW CONTENT PREVIEW (first 2000 chars):
+## Characters
+The *Hellsing* series, created by Kouta Hirano, centers on the Hellsing Organization, a secret branch of the British government dedicated to protecting the Queen and the country from supernatural threats. The story is defined by its ultra-violent action, dark themes of humanity versus monstrosity, and a cast of powerful, morally complex characters.
+
+### **The Protagonists**
+
+#### **1. Alucard (The Protagonist)**
+*   **Role:** The Hellsing Organization’s "Trump Card." He is the original vampire, Count Dracula, who was defeated by Abraham Van Helsing and bound to serve the Hellsing family.
+*   **Abilities:**
+    *   **Immortality & Regeneration:** Virtually unkillable; he can regenerate from being reduced to a puddle of blood.
+    *   **Cromwell Invocation:** A system of seals that limit his power. At "Level Zero," he can release all the souls he has consumed (millions) as an undead army.
+    *   **Shapeshifting:** Can transform into bats, mist, a massive "hellhound" (Baskerville), or a young girl.
+    *   **Weaponry:** He primarily uses two custom-made oversized handguns: the **.454 Casull** and the **Jackal**, which fires explosive silver rounds.
+*   **Relationships:**
+    *   **With Integra:** A complex master-servant bond. He deeply respects her "iron will" and serves her with absolute loyalty, though he often taunts her to test her resolve.
+    *   **With Seras:** His fledgling and protege. He saved her life by turning her into a vampire and acts as a harsh but protective mentor.
+
+#### **2. Sir Integra Fairbrook Wingates Hellsing (The Deuteragonist)**
+*   **Role:** The leader of the Hellsing Organization and a Knight of the Round Table. She inherited the position at age 12 after her father’s death.
+*   **Abilities:**
+    *   **Leadership & Willpower:** Her greatest strength is her unbreakable spirit, which allows her to command even Alucard.
+    *   **Combat:** An expert marksman and a master of the saber.
+*   **Relationships:**
+    *   **With Aluca
