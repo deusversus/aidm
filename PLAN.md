@@ -304,17 +304,17 @@
 
 ## VI. AGENT ARCHITECTURE (The Sprawl Problem)
 
-### 19. 3+ Agents Are Dead Code
+### 19. 2 Agents Are Dead Code
 
 **Problem:**
 - `CalibrationAgent` (`agents/calibration.py`): Never imported or called. Character validation logic either abandoned from v2 or distributed elsewhere.
 - `NPCReactionAgent` (`agents/npc_reaction.py`): Redundant with `RelationshipAnalyzer` (actively used). Nearly identical functionality.
-- `ScopeAgent` (`agents/scope.py`): No clear call site. Possibly replaced by inline logic in AnimeResearch.
+- ~~`ScopeAgent` (`agents/scope.py`)~~: **ALIVE** — actively imported by `anime_research.py:386` as Step 1 of the bundle-based research pipeline (classifies series complexity → determines research depth).
 
 **Proposed Solution:**
 - **Delete** `npc_reaction.py` — RelationshipAnalyzer covers its functionality.
-- **Delete or activate** `calibration.py` — if character validation is needed, integrate it into SessionZero; otherwise remove.
-- **Investigate** `scope.py` — if used indirectly in research flow, document it; otherwise remove.
+- **Delete** `calibration.py` and its standalone test `test_calibration.py`.
+- **Keep** `scope.py` — it's a live dependency of the research pipeline.
 - Clean up `EXTENDED_THINKING_AGENTS` list in `base.py:95-99` which references dead agents ("npc_reaction", "calibration").
 
 **Tension to resolve:** Minimal — this is technical debt cleanup, not a design decision.

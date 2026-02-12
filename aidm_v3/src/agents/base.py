@@ -90,11 +90,9 @@ class BaseAgent(ABC):
             # - key_animator: Complex narrative generation
             # - research: Anime research synthesis
             # - combat: Complex tactical decisions (boss fights)
-            # - npc_reaction: Nuanced relationship dynamics
-            # - calibration: Player preference analysis
             EXTENDED_THINKING_AGENTS = [
                 "director", "key_animator", "research",
-                "combat", "npc_reaction", "calibration"
+                "combat"
             ]
             if self.agent_name in EXTENDED_THINKING_AGENTS:
                 use_extended_thinking = True
