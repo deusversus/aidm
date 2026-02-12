@@ -1499,6 +1499,7 @@ async def reset_game():
     settings = store.load()
     settings.active_profile_id = ""
     settings.active_campaign_id = ""
+    settings.active_session_id = ""
     store.save(settings)
     reset_settings_store()
     
