@@ -43,7 +43,7 @@
 
 ---
 
-### 3. Arc Pacing Has No Structural Gates
+### 3. Arc Pacing Has No Structural Gates ✅ DONE
 
 **Problem:** `arc_phase` is a string field on WorldState (`"setup"`, `"rising_action"`, `"climax"`, `"resolution"`) updated only by the Director asynchronously. There are no gates — nothing prevents the arc from sitting in `"rising_action"` for 50 turns, and nothing forces a climax. The KeyAnimator sees the phase but has no obligation to honor it.
 
@@ -456,7 +456,7 @@ For a system whose philosophy is "story > simulation," having a hard mechanical 
 |---|------|--------|------|--------|
 | 1 | Pre-turn Director micro-check | L | None | ✅ DONE |
 | 2 | Versioned Campaign Bible schema | M | #1 | ✅ DONE |
-| 3 | Arc pacing gates | M | #1, #2 | |
+| 3 | Arc pacing gates | M | #1, #2 | ✅ DONE |
 | 9 | Wire foreshadowing into turn loop | M | #10 | ✅ DONE |
 | 12 | Overdue seeds escalate tension | S | #9 | ✅ DONE |
 

@@ -428,6 +428,7 @@ class Orchestrator:
                     tension_level=db_context.tension_level,
                     situation=db_context.situation,
                     recent_summary=db_context.recent_summary,
+                    turns_in_phase=db_context.turns_in_phase,  # #3: pacing gates
                 )
             )
             
@@ -1030,6 +1031,11 @@ class Orchestrator:
                         new_tension = min(1.0, current_tension + tension_bump)
                         self.state.update_world_state(tension_level=new_tension)
                         print(f"[Foreshadowing] {len(overdue_seeds)} overdue seeds → tension {current_tension:.2f} → {new_tension:.2f}")
+                    
+                    # #3: Increment turns_in_phase counter (resets on phase change via Director)
+                    self.state.update_world_state(
+                        turns_in_phase=(db_context.turns_in_phase or 0) + 1
+                    )
                     
                     # =============================================================
                     # 7. DIRECTOR HYBRID TRIGGER
