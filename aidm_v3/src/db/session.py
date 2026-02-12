@@ -76,6 +76,14 @@ def init_db():
                 conn.execute(text("ALTER TABLE world_state ADD COLUMN turns_in_phase INTEGER DEFAULT 0"))
                 conn.commit()
                 print("[Migration] Added turns_in_phase column to world_state")
+            
+            # #5: pinned_messages on world_state
+            result = conn.execute(text("PRAGMA table_info(world_state)"))
+            columns = [row[1] for row in result]
+            if "pinned_messages" not in columns:
+                conn.execute(text("ALTER TABLE world_state ADD COLUMN pinned_messages TEXT DEFAULT '[]'"))
+                conn.commit()
+                print("[Migration] Added pinned_messages column to world_state")
         except Exception as e:
             print(f"[Migration] Column check skipped: {e}")
     
