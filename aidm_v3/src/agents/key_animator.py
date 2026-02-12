@@ -1144,11 +1144,18 @@ MATCH the established voice, humor, and style from these exchanges.
         # Pacing Directive — pre-turn micro-check (#1)
         pacing = retrieved_context.get("pacing_directive") if retrieved_context else None
         if pacing:
+            # #3: Strength-aware indicator
+            strength = getattr(pacing, 'strength', 'suggestion')
+            strength_icon = {"suggestion": "\U0001f4a1", "strong": "\u26a0\ufe0f", "override": "\U0001f6a8"}.get(strength, "\U0001f4a1")
             pacing_text = (
-                f"## \U0001f3ac Pacing Directive (This Turn)\n\n"
+                f"## {strength_icon} Pacing Directive (This Turn) [{strength.upper()}]\n\n"
                 f"**Beat**: {pacing.arc_beat} | **Tone**: {pacing.tone} | "
                 f"**Escalation**: {pacing.escalation_target:.0%}\n"
             )
+            # #3: Phase transition signal
+            phase_transition = getattr(pacing, 'phase_transition', '')
+            if phase_transition:
+                pacing_text += f"**\u26a1 Phase Transition**: {phase_transition}\n"
             if pacing.must_reference:
                 pacing_text += f"**Must reference**: {', '.join(pacing.must_reference)}\n"
             if pacing.avoid:

@@ -204,6 +204,7 @@ class WorldState(Base):
     arc_name = Column(String(255), nullable=True)
     arc_phase = Column(String(50), default="rising_action")
     tension_level = Column(Float, default=0.5)  # 0.0 to 1.0
+    turns_in_phase = Column(Integer, default=0)  # #3: pacing gate counter
     
     # Canonicality (from Session Zero)
     timeline_mode = Column(String(50), nullable=True)      # canon_adjacent, alternate, inspired

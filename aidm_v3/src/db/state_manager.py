@@ -37,6 +37,9 @@ class GameContext:
     # Present NPCs
     present_npcs: List[str]
     
+    # #3: Pacing gate counter (default field must come after non-default fields)
+    turns_in_phase: int = 0
+    
     # OP Protagonist Mode (3-Axis System)
     op_protagonist_enabled: bool = False
     op_tension_source: Optional[str] = None      # existential, relational, moral, burden, information, consequence, control
@@ -461,6 +464,7 @@ class StateManager:
             situation=world_state.situation if world_state else "The adventure begins...",
             arc_phase=world_state.arc_phase if world_state else "rising_action",
             tension_level=world_state.tension_level if world_state else 0.5,
+            turns_in_phase=getattr(world_state, 'turns_in_phase', 0) or 0 if world_state else 0,
             recent_summary=recent_summary,
             present_npcs=self._detect_present_npcs(recent_summary, world_state),
             director_notes=director_notes,
@@ -732,7 +736,8 @@ class StateManager:
         tension_level: Optional[float] = None,
         timeline_mode: Optional[str] = None,
         canon_cast_mode: Optional[str] = None,
-        event_fidelity: Optional[str] = None
+        event_fidelity: Optional[str] = None,
+        turns_in_phase: Optional[int] = None
     ):
         """Update world state fields."""
         db = self._get_db()
@@ -750,9 +755,15 @@ class StateManager:
             if situation is not None:
                 world_state.situation = situation
             if arc_phase is not None:
+                # #3: Reset turns_in_phase on phase transition
+                if world_state.arc_phase != arc_phase:
+                    world_state.turns_in_phase = 0
+                    print(f"[Pacing] Phase transition: {world_state.arc_phase} → {arc_phase}, turns_in_phase reset")
                 world_state.arc_phase = arc_phase
             if tension_level is not None:
                 world_state.tension_level = tension_level
+            if turns_in_phase is not None:
+                world_state.turns_in_phase = turns_in_phase
             # Canonicality
             if timeline_mode is not None:
                 world_state.timeline_mode = timeline_mode
