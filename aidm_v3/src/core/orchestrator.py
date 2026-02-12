@@ -688,23 +688,26 @@ class Orchestrator:
                 )
         
         # Inject OP Mode guidance if enabled (uses 3-axis system)
+        # #28 Cache Economics: OP axis guidance is session-stable → Block 1 via set_static_rule_guidance()
         if db_context.op_protagonist_enabled and db_context.op_tension_source:
-            # Get guidance for each axis
-            tension_guidance = self.rules.get_op_axis_guidance("tension", db_context.op_tension_source)
-            expression_guidance = self.rules.get_op_axis_guidance("expression", db_context.op_power_expression)
-            focus_guidance = self.rules.get_op_axis_guidance("focus", db_context.op_narrative_focus)
-            
-            op_guidance_parts = []
-            if tension_guidance:
-                op_guidance_parts.append(f"## Tension Source: {db_context.op_tension_source.upper()}\n{tension_guidance}")
-            if expression_guidance:
-                op_guidance_parts.append(f"## Power Expression: {db_context.op_power_expression.upper()}\n{expression_guidance}")
-            if focus_guidance:
-                op_guidance_parts.append(f"## Narrative Focus: {db_context.op_narrative_focus.upper()}\n{focus_guidance}")
-            
-            if op_guidance_parts:
-                rag_context["op_mode_guidance"] = "\n\n".join(op_guidance_parts)
-                print(f"[OP Mode] Injected 3-axis guidance: {db_context.op_tension_source}/{db_context.op_power_expression}/{db_context.op_narrative_focus}")
+            if not self.key_animator._static_rule_guidance:
+                # First turn: compute once, store on KeyAnimator for Block 1 injection
+                tension_guidance = self.rules.get_op_axis_guidance("tension", db_context.op_tension_source)
+                expression_guidance = self.rules.get_op_axis_guidance("expression", db_context.op_power_expression)
+                focus_guidance = self.rules.get_op_axis_guidance("focus", db_context.op_narrative_focus)
+
+                static_parts = []
+                if tension_guidance:
+                    static_parts.append(f"## Tension Source: {db_context.op_tension_source.upper()}\n{tension_guidance}")
+                if expression_guidance:
+                    static_parts.append(f"## Power Expression: {db_context.op_power_expression.upper()}\n{expression_guidance}")
+                if focus_guidance:
+                    static_parts.append(f"## Narrative Focus: {db_context.op_narrative_focus.upper()}\n{focus_guidance}")
+
+                if static_parts:
+                    self.key_animator.set_static_rule_guidance("\n\n".join(static_parts))
+                    print(f"[OP Mode] Set static 3-axis guidance in Block 1 (cache-stable): "
+                          f"{db_context.op_tension_source}/{db_context.op_power_expression}/{db_context.op_narrative_focus}")
         
         # =====================================================================
         # OP MODE COMPOSITION REQUIREMENT: Auto-suggest if missing axes
@@ -772,43 +775,54 @@ class Orchestrator:
         # #13: RULE LIBRARY WIRING — Structural guidance from dead methods
         # =====================================================================
         
-        # 1. DNA Narration Guidance: inject for extreme DNA scales (≤3 or ≥7)
-        if self.profile.dna:
-            dna_parts = []
-            # Sort by extremity (distance from 5), take top 3
-            extreme_scales = sorted(
-                self.profile.dna.items(),
-                key=lambda x: abs(x[1] - 5),
-                reverse=True
-            )[:3]
-            for scale_name, value in extreme_scales:
-                if value <= 3 or value >= 7:  # Only inject for extreme values
-                    guidance = self.rules.get_dna_guidance(scale_name, value)
+        # 1. DNA Narration Guidance + 2. Genre Guidance
+        # #28 Cache Economics: profile-derived guidance is session-stable → Block 1
+        # Compute once on first turn, append to KeyAnimator's static rule guidance.
+        if not self.key_animator._static_rule_guidance:
+            static_rule_parts = []
+
+            # DNA Narration Guidance: extreme DNA scales (≤3 or ≥7)
+            if self.profile.dna:
+                dna_parts = []
+                extreme_scales = sorted(
+                    self.profile.dna.items(),
+                    key=lambda x: abs(x[1] - 5),
+                    reverse=True
+                )[:3]
+                for scale_name, value in extreme_scales:
+                    if value <= 3 or value >= 7:
+                        guidance = self.rules.get_dna_guidance(scale_name, value)
+                        if guidance:
+                            level = "HIGH" if value >= 7 else "LOW"
+                            dna_parts.append(f"**{scale_name.title()} ({level}, {value}/10):** {guidance}")
+                if dna_parts:
+                    static_rule_parts.append(
+                        "## 🧬 DNA Narration Style\n"
+                        "Adapt your writing to match these narrative DNA settings:\n\n"
+                        + "\n\n".join(dna_parts)
+                    )
+                    print(f"[RuleLibrary] DNA guidance for {len(dna_parts)} extreme scales → Block 1 (cache-stable)")
+
+            # Genre Guidance: structural storytelling guidance for detected genres
+            if self.profile.detected_genres:
+                genre_parts = []
+                for genre in self.profile.detected_genres[:2]:
+                    guidance = self.rules.get_genre_guidance(genre)
                     if guidance:
-                        level = "HIGH" if value >= 7 else "LOW"
-                        dna_parts.append(f"**{scale_name.title()} ({level}, {value}/10):** {guidance}")
-            if dna_parts:
-                rag_context["dna_guidance"] = (
-                    "## 🧬 DNA Narration Style\n"
-                    "Adapt your writing to match these narrative DNA settings:\n\n"
-                    + "\n\n".join(dna_parts)
-                )
-                print(f"[RuleLibrary] Injected DNA guidance for {len(dna_parts)} extreme scales")
-        
-        # 2. Genre Guidance: structural storytelling guidance for detected genres
-        if self.profile.detected_genres:
-            genre_parts = []
-            for genre in self.profile.detected_genres[:2]:  # Cap at 2 genres
-                guidance = self.rules.get_genre_guidance(genre)
-                if guidance:
-                    genre_parts.append(f"**{genre.title()}:** {guidance}")
-            if genre_parts:
-                rag_context["genre_guidance"] = (
-                    "## 📚 Genre Framework\n"
-                    "Structure scenes according to these genre conventions:\n\n"
-                    + "\n\n".join(genre_parts)
-                )
-                print(f"[RuleLibrary] Injected genre guidance: {', '.join(g for g in self.profile.detected_genres[:2])}")
+                        genre_parts.append(f"**{genre.title()}:** {guidance}")
+                if genre_parts:
+                    static_rule_parts.append(
+                        "## 📚 Genre Framework\n"
+                        "Structure scenes according to these genre conventions:\n\n"
+                        + "\n\n".join(genre_parts)
+                    )
+                    print(f"[RuleLibrary] Genre guidance → Block 1 (cache-stable): {', '.join(g for g in self.profile.detected_genres[:2])}")
+
+            if static_rule_parts:
+                # Merge with any existing static guidance (e.g. OP axis set earlier)
+                existing = self.key_animator._static_rule_guidance or ""
+                combined = existing + ("\n\n" if existing else "") + "\n\n".join(static_rule_parts)
+                self.key_animator.set_static_rule_guidance(combined)
         
         # 3. Scale Guidance: narrative scale for current story scope
         if db_context.narrative_scale:
@@ -876,7 +890,9 @@ class Orchestrator:
             validation = await self.validator.validate(
                  turn=current_turn,
                  context={
-                     "rules_summary": "Standard Physics + Anime Logic",  # TODO: Get from RuleLibrary
+                     "rules_summary": self.rules.get_relevant_rules(
+                         f"{intent.action} {db_context.situation}", top_k=2
+                     ) or "Standard Physics + Anime Logic"
                      "character_state": db_context.character_summary
                  }
             )

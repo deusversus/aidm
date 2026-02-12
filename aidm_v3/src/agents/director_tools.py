@@ -122,6 +122,25 @@ def build_director_tools(
     ))
     
     # -----------------------------------------------------------------
+    # MEMORY TOOLS
+    # -----------------------------------------------------------------
+
+    registry.register(ToolDefinition(
+        name="mark_memory_critical",
+        description=(
+            "Mark a memory as plot-critical so it never decays. "
+            "Use this for key revelations, betrayals, character-defining moments, "
+            "or any narrative beat that should be permanently retrievable. "
+            "Searches for the best-matching memory and flags it."
+        ),
+        parameters=[
+            ToolParam("query", "str", "Search term to find the memory to flag (be specific)", required=True),
+            ToolParam("reason", "str", "Why this memory is plot-critical (for audit trail)", required=True),
+        ],
+        handler=lambda **kwargs: _mark_memory_critical(memory, **kwargs)
+    ))
+
+    # -----------------------------------------------------------------
     # ARC HISTORY
     # -----------------------------------------------------------------
     
@@ -240,6 +259,38 @@ def _plant_seed(foreshadowing, current_turn: int, session_number: int, **kwargs)
         "min_payoff_turns": min_payoff,
         "max_payoff_turns": max_payoff,
     }
+
+def _mark_memory_critical(memory, **kwargs) -> Dict:
+    """Mark a memory as plot-critical via search + flag."""
+    query = kwargs.get("query", "")
+    reason = kwargs.get("reason", "")
+
+    if not query:
+        return {"error": "query parameter is required"}
+
+    try:
+        # Search for the best matching memory
+        results = memory.search(query, top_k=1)
+        if not results:
+            return {"error": f"No memories found matching '{query}'", "flagged": False}
+
+        best = results[0]
+        memory_id = best.get("id", "")
+        content_preview = best.get("content", "")[:200]
+
+        # Flag as plot-critical
+        memory.mark_plot_critical(memory_id)
+
+        print(f"[Director] Marked memory as plot-critical: {content_preview[:80]}... (reason: {reason})")
+        return {
+            "flagged": True,
+            "memory_id": memory_id,
+            "content_preview": content_preview,
+            "reason": reason,
+        }
+    except Exception as e:
+        return {"error": f"Failed to mark memory: {str(e)}", "flagged": False}
+
 
 def _get_spotlight_analysis(state) -> Dict:
     """Combined spotlight debt and NPC relationship overview."""

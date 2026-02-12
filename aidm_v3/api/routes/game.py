@@ -271,6 +271,7 @@ class ResumeSessionResponse(BaseModel):
     phase: str
     messages: list
     character_draft: Optional[Dict[str, Any]] = None
+    recap: Optional[str] = None  # "Previously On..." recap for session continuity
 
 
 @router.get("/session/{session_id}/resume", response_model=ResumeSessionResponse)
@@ -290,17 +291,63 @@ async def resume_session(session_id: str):
     
     # Put it back into the session manager
     manager._sessions[session_id] = session
-    
+
     # Get character draft if exists
     draft_dict = None
     if session.character_draft:
         draft_dict = session.character_draft.to_dict()
-    
+
+    # Generate "Previously On..." recap for gameplay sessions with history
+    recap_text = None
+    if session.phase.value == "GAMEPLAY" and session.messages and len(session.messages) > 2:
+        try:
+            from ..src.agents.recap_agent import RecapAgent
+            from ..src.db.state_manager import StateManager
+
+            recap_agent = RecapAgent()
+            state = StateManager(campaign_id=session.campaign_id)
+
+            # Gather context for recap
+            bible = state.get_campaign_bible()
+            arc_history = (bible.planning_data or {}).get("arc_history", []) if bible else []
+            world = state.get_world_state()
+            situation = world.situation if world else "Unknown"
+            arc_phase = world.arc_phase if world else "unknown"
+            character = state.get_character()
+            char_name = character.name if character else "Protagonist"
+
+            # Get top narrative beat memories (if memory system available)
+            narrative_beats = []
+            try:
+                from ..src.context.memory import MemoryStore
+                memory = MemoryStore(campaign_id=session.campaign_id)
+                beat_results = memory.search("recent emotional narrative moments", top_k=5, category="narrative_beat")
+                narrative_beats = [r["content"] for r in beat_results] if beat_results else []
+            except Exception:
+                pass  # Memory not available, proceed without beats
+
+            director_notes = (bible.planning_data or {}).get("director_notes", "") if bible else ""
+
+            recap_output = await recap_agent.generate_recap(
+                arc_history=arc_history,
+                narrative_beats=narrative_beats,
+                director_notes=director_notes,
+                current_situation=situation,
+                character_name=char_name,
+                arc_phase=arc_phase,
+            )
+            if recap_output:
+                recap_text = recap_output.recap_text
+                print(f"[Resume] Generated recap: {recap_text[:100]}...")
+        except Exception as e:
+            print(f"[Resume] Recap generation failed (non-fatal): {e}")
+
     return ResumeSessionResponse(
         session_id=session_id,
         phase=session.phase.value,
         messages=session.messages,
-        character_draft=draft_dict
+        character_draft=draft_dict,
+        recap=recap_text
     )
 
 
