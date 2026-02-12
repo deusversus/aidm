@@ -61,7 +61,7 @@
 
 ## II. MEMORY & CONTINUITY (The Forgetting Problem)
 
-### 4. Narrative Prose is Never Indexed to Long-Term Memory 🔥
+### 4. Narrative Prose is Never Indexed to Long-Term Memory ✅ DONE
 
 **Problem:** KeyAnimator's output goes into the sliding window (15 messages) and `Turn.narrative` (SQL archive), but is **never stored in ChromaDB** as a retrievable memory (`memory.py` — no `add()` call for narrative content). The system can recall "Alice's affinity is +45" but cannot recall "the specific scene where Alice opened up about her past." Emotional texture — the basis of callbacks — is lost to compaction, reduced to ~200-word summaries.
 
@@ -95,7 +95,7 @@
 
 ---
 
-### 6. No Automatic Plot-Critical Detection
+### 6. No Automatic Plot-Critical Detection ✅ DONE
 
 **Problem:** `mark_plot_critical()` in `memory.py:466-484` requires **explicit marking**. If a memory isn't flagged, it decays normally. Session Zero memories auto-get the flag, but gameplay-discovered plot points (twists, revelations, betrayals) rely on someone calling `mark_plot_critical()` — which nothing in the turn loop does.
 
@@ -159,7 +159,7 @@
 
 ---
 
-### 10. ForeshadowingLedger is In-Memory Only 🔥
+### 10. ForeshadowingLedger is In-Memory Only ✅ DONE
 
 **Problem:** The ledger lives only in Python runtime memory. Server restart = all seeds lost. This is catastrophic for multi-session campaigns.
 
@@ -304,7 +304,7 @@
 
 ## VI. AGENT ARCHITECTURE (The Sprawl Problem)
 
-### 19. 2 Agents Are Dead Code
+### 19. 2 Agents Are Dead Code ✅ DONE
 
 **Problem:**
 - `CalibrationAgent` (`agents/calibration.py`): Never imported or called. Character validation logic either abandoned from v2 or distributed elsewhere.
@@ -571,7 +571,7 @@ These systems are working well and should be preserved:
 
 ---
 
-### 29. ChromaDB Error Recovery
+### 29. ChromaDB Error Recovery ✅ DONE
 
 **Problem:** The `deferred_commit()` infrastructure handles SQL transaction integrity, but steps 8-9 of `_post_narrative_processing` (memory compression and episodic memory) write to ChromaDB, which has **no rollback mechanism**. A ChromaDB failure after SQL commit creates an inconsistent state.
 
@@ -584,7 +584,7 @@ These systems are working well and should be preserved:
 
 ---
 
-### 30. Deep Recall GameplayTool
+### 30. Deep Recall GameplayTool ✅ DONE
 
 **Problem (extends #5):** `Turn.narrative` in SQL contains the complete verbatim record of every turn, but no agent can query it. This is a goldmine of narrative context locked behind an inaccessible API.
 
