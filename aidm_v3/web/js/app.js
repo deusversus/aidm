@@ -1247,6 +1247,8 @@ async function resetSession() {
 
         await API.Game.reset();
 
+        // Clear stored session ID so reload starts fresh
+        localStorage.removeItem('aidm_session_id');
         btn.textContent = '✅ Reset Complete!';
 
         // Reload the page to start fresh
