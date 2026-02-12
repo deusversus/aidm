@@ -302,8 +302,26 @@ Write vivid, anime-appropriate prose. End at a clear decision point if one exist
             if example_voice:
                 lines.append(f"*Example:* \"{example_voice}\"")
         
+        # === SESSION-STABLE RULE LIBRARY GUIDANCE (#28 Cache Economics) ===
+        # OP axis guidance, DNA guidance, genre guidance, scale guidance, and
+        # compatibility guidance don't change turn-to-turn. Inject into Block 1
+        # (cache-stable prefix) instead of Block 4 (dynamic per-turn).
+        if self._static_rule_guidance:
+            lines.append("")
+            lines.append("### 📏 Rule Library Guidance (Structural)")
+            lines.append(self._static_rule_guidance)
+
         return "\n".join(lines)
-    
+
+    def set_static_rule_guidance(self, guidance: str) -> None:
+        """Set session-stable rule library guidance for Block 1 injection.
+
+        Call once at session start (from orchestrator) with pre-fetched OP axis,
+        DNA, genre, scale, and compatibility guidance. This avoids re-tokenizing
+        ~500-800 tokens of static content every turn in Block 4.
+        """
+        self._static_rule_guidance = guidance
+
     def _build_scene_context(self, context: GameContext) -> str:
         """Build the scene context section."""
         lines = [
@@ -358,8 +376,21 @@ Write vivid, anime-appropriate prose. End at a clear decision point if one exist
                                 break
                 
                 if matching_cards:
+                    # Co-locate voice + relationship data (#7 — voice cards enrichment)
+                    # Parse _npc_context to find relationship blocks per NPC
+                    npc_rel_blocks = {}
+                    if hasattr(self, '_npc_context') and self._npc_context:
+                        for block in self._npc_context.split("\n\n"):
+                            block = block.strip()
+                            if block.startswith("**"):
+                                # Extract NPC name from "**Name** (role, disposition)"
+                                npc_key = block.split("**")[1].strip().lower() if "**" in block else ""
+                                if npc_key:
+                                    npc_rel_blocks[npc_key] = block
+
+                    voiced_npcs = set()
                     lines.append("")
-                    lines.append("### 🎭 Voice Cards (Write Each NPC Distinctly)")
+                    lines.append("### 🎭 NPC Voice & Relationship Cards (Write Each NPC Distinctly)")
                     for card in matching_cards[:3]:  # Limit to 3 NPCs
                         name = card.get('name', 'Unknown')
                         patterns = card.get('speech_patterns', '')
@@ -370,14 +401,34 @@ Write vivid, anime-appropriate prose. End at a clear decision point if one exist
                             lines.append(f"  *Humor:* {humor}")
                         if rhythm:
                             lines.append(f"  *Rhythm:* {rhythm}")
-        
-        # === NPC RELATIONSHIP CARDS (Module 04) ===
-        # Inject structured relationship data so narration reflects actual NPC disposition
-        if hasattr(self, '_npc_context') and self._npc_context:
-            lines.append("")
-            lines.append("### 🧠 NPC Relationship Context (Write Disposition-Aware Dialogue)")
-            lines.append("Use these relationship states to color NPC behavior and dialogue:")
-            lines.append(self._npc_context)
+                        # Co-locate relationship data alongside voice patterns
+                        name_lower = name.lower()
+                        for npc_key, rel_block in npc_rel_blocks.items():
+                            if name_lower in npc_key or npc_key in name_lower:
+                                # Extract the enrichment lines (skip the **Name** header line)
+                                rel_lines = rel_block.split("\n")
+                                for rl in rel_lines[1:]:  # Skip header, keep Affinity/Personality/Milestones
+                                    lines.append(f"  {rl.strip()}")
+                                voiced_npcs.add(npc_key)
+                                break
+
+                    # Show remaining NPC relationship data for NPCs without voice cards
+                    remaining = {k: v for k, v in npc_rel_blocks.items() if k not in voiced_npcs}
+                    if remaining:
+                        lines.append("")
+                        lines.append("### 🧠 Other Present NPCs")
+                        for block in remaining.values():
+                            lines.append(block)
+                elif hasattr(self, '_npc_context') and self._npc_context:
+                    # No voice cards matched — show relationship context as before
+                    lines.append("")
+                    lines.append("### 🧠 NPC Relationship Context (Write Disposition-Aware Dialogue)")
+                    lines.append(self._npc_context)
+            elif hasattr(self, '_npc_context') and self._npc_context:
+                # No voice cards at all — show relationship context standalone
+                lines.append("")
+                lines.append("### 🧠 NPC Relationship Context (Write Disposition-Aware Dialogue)")
+                lines.append(self._npc_context)
         
         # Inject Director's Guidance (Phase 4)
         if hasattr(context, "director_notes") and context.director_notes:
@@ -526,6 +577,7 @@ Write vivid, anime-appropriate prose. End at a clear decision point if one exist
         self._cached_model: Optional[str] = None
         self._vibe_keeper_template: Optional[str] = None
         self._npc_context = None
+        self._static_rule_guidance: Optional[str] = None
         # Shuffle-bag for style drift directives
         self._directive_bag: List[Dict[str, Any]] = []
         self._last_directive_text: str = ""
@@ -1200,7 +1252,8 @@ MATCH the established voice, humor, and style from these exchanges.
                 memories_text = retrieved_context["memories"]
             if retrieved_context.get("rules"):
                 chunks_text = retrieved_context["rules"]
-            if retrieved_context.get("op_mode_guidance"):
+            if retrieved_context.get("op_mode_guidance") and not self._static_rule_guidance:
+                # Fallback: only inject dynamically if not already in Block 1
                 archetype_text = f"\n\n## OP Protagonist Mode Active\n\n{retrieved_context['op_mode_guidance']}"
             if retrieved_context.get("tension_guidance"):
                 tension_text = f"\n\n## Non-Combat Tension (Power Imbalance High)\n\n{retrieved_context['tension_guidance']}"
@@ -1209,9 +1262,11 @@ MATCH the established voice, humor, and style from these exchanges.
             if retrieved_context.get("faction_guidance"):
                 faction_text = f"\n\n{retrieved_context['faction_guidance']}"
             # #13: Rule library structural guidance
-            if retrieved_context.get("dna_guidance"):
+            # DNA and genre guidance are in Block 1 (cache-stable) when available.
+            # Only inject dynamically as fallback.
+            if retrieved_context.get("dna_guidance") and not self._static_rule_guidance:
                 faction_text += f"\n\n{retrieved_context['dna_guidance']}"
-            if retrieved_context.get("genre_guidance"):
+            if retrieved_context.get("genre_guidance") and not self._static_rule_guidance:
                 faction_text += f"\n\n{retrieved_context['genre_guidance']}"
             if retrieved_context.get("scale_guidance"):
                 faction_text += f"\n\n{retrieved_context['scale_guidance']}"
