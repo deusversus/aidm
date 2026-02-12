@@ -167,6 +167,171 @@ Provide a CONCISE investigation report structured as:
         
         return result
 
+    async def run_startup_briefing(
+        self,
+        session_zero_summary: str,
+        profile: NarrativeProfile,
+        character_name: str = "Unknown",
+        character_concept: str = "",
+        starting_location: str = "Unknown",
+        op_mode: bool = False,
+        op_preset: Optional[str] = None,
+        op_tension_source: Optional[str] = None,
+        op_power_expression: Optional[str] = None,
+        op_narrative_focus: Optional[str] = None,
+    ) -> DirectorOutput:
+        """
+        Create an initial storyboard at gameplay handoff (pilot episode planning).
+        
+        Unlike run_session_review which analyzes an ongoing session, this method
+        plans from scratch using Session Zero context and the narrative profile.
+        Called once when Session Zero completes and gameplay begins.
+        
+        Args:
+            session_zero_summary: Summary of the Session Zero conversation
+            profile: The full narrative profile (DNA, tropes, voice, etc.)
+            character_name: Player character's name
+            character_concept: Character concept/tagline
+            starting_location: Where the story begins
+            op_mode: Whether OP protagonist mode is enabled
+            op_preset: OP config name if applicable
+            op_tension_source: OP tension axis values
+            op_power_expression: OP power expression axis values
+            op_narrative_focus: OP narrative focus axis values
+            
+        Returns:
+            DirectorOutput with initial arc plan, foreshadowing seeds, and voice guidance
+        """
+        from pathlib import Path
+        
+        # 1. Load startup-specific prompt
+        startup_prompt_path = Path(__file__).parent.parent / "prompts" / "director_startup.md"
+        try:
+            startup_prompt = startup_prompt_path.read_text(encoding="utf-8")
+        except FileNotFoundError:
+            startup_prompt = "You are directing the pilot episode of a new anime series. Plan the opening arc."
+        
+        # 2. Build Director persona from profile
+        persona = profile.director_personality or "You are a thoughtful anime director."
+        system_prompt = f"{persona}\n\n{startup_prompt}"
+        
+        # 3. Build startup context
+        context = self._build_startup_context(
+            session_zero_summary=session_zero_summary,
+            profile=profile,
+            character_name=character_name,
+            character_concept=character_concept,
+            starting_location=starting_location,
+            op_mode=op_mode,
+            op_preset=op_preset,
+            op_tension_source=op_tension_source,
+            op_power_expression=op_power_expression,
+            op_narrative_focus=op_narrative_focus,
+        )
+        
+        # 4. Replace {context} placeholder in prompt
+        system_prompt = system_prompt.replace("{context}", "")
+        
+        # 5. Call LLM
+        result = await self.call(context, system_prompt_override=system_prompt)
+        
+        return result
+
+    def _build_startup_context(
+        self,
+        session_zero_summary: str,
+        profile: NarrativeProfile,
+        character_name: str,
+        character_concept: str,
+        starting_location: str,
+        op_mode: bool,
+        op_preset: Optional[str],
+        op_tension_source: Optional[str],
+        op_power_expression: Optional[str],
+        op_narrative_focus: Optional[str],
+    ) -> str:
+        """Build context for the Director's startup briefing."""
+        
+        lines = ["# Pilot Episode Planning — Director Startup Briefing"]
+        
+        # === CHARACTER DOSSIER ===
+        lines.append("\n## 🎭 Character Dossier")
+        lines.append(f"**Name:** {character_name}")
+        if character_concept:
+            lines.append(f"**Concept:** {character_concept}")
+        lines.append(f"**Starting Location:** {starting_location}")
+        
+        # === OP MODE ===
+        if op_mode:
+            lines.append("\n## ⚡ OP Protagonist Mode: ACTIVE")
+            if op_preset:
+                lines.append(f"**Configuration:** {op_preset.replace('_', ' ').title()}")
+            if op_tension_source:
+                lines.append(f"**Tension Source:** {op_tension_source}")
+            if op_power_expression:
+                lines.append(f"**Power Expression:** {op_power_expression}")
+            if op_narrative_focus:
+                lines.append(f"**Narrative Focus:** {op_narrative_focus}")
+            lines.append("\n*IMPORTANT: The protagonist is already powerful. Opening tension must come from")
+            lines.append("the configured axes above, NOT from combat difficulty.*")
+        
+        # === NARRATIVE PROFILE DNA ===
+        if profile.dna:
+            lines.append("\n## 🧬 Narrative DNA (IP Identity)")
+            dna = profile.dna
+            for key, value in dna.items():
+                label = key.replace('_', ' ').replace('vs', '↔').title()
+                lines.append(f"- {label}: {value}/10")
+        
+        # === GENRE ===
+        if hasattr(profile, 'detected_genres') and profile.detected_genres:
+            lines.append(f"\n**Detected Genres:** {', '.join(profile.detected_genres)}")
+        
+        # === TROPES ===
+        if profile.tropes:
+            active = [k.replace('_', ' ').title() for k, v in profile.tropes.items() if v]
+            if active:
+                lines.append(f"\n## 📖 Active Tropes: {', '.join(active)}")
+                lines.append("*Consider planting seeds for these tropes in the opening arc.*")
+        
+        # === VOICE / AUTHOR VOICE ===
+        if hasattr(profile, 'author_voice') and profile.author_voice:
+            lines.append("\n## ✍️ Author's Voice")
+            lines.append(profile.author_voice)
+        
+        if hasattr(profile, 'voice_cards') and profile.voice_cards:
+            lines.append("\n## 🗣️ Character Voice Cards")
+            for card in profile.voice_cards[:3]:  # Top 3
+                if isinstance(card, dict):
+                    name = card.get('name', 'Unknown')
+                    voice = card.get('voice', card.get('description', ''))
+                    lines.append(f"- **{name}:** {voice[:200]}")
+        
+        # === SESSION ZERO TRANSCRIPT SUMMARY ===
+        lines.append("\n## 📝 Session Zero Summary")
+        lines.append("This is what happened during character creation:")
+        lines.append(session_zero_summary)
+        
+        # === CAMPAIGN BIBLE ===
+        lines.append("\n## Campaign Bible")
+        lines.append("(Empty — this is the first session. You are creating the initial plan.)")
+        
+        # === INSTRUCTIONS ===
+        lines.append("\n## Your Task")
+        lines.append("Plan the OPENING ARC for this character in this world.")
+        lines.append("1. Name the arc (IP-appropriate, evocative)")
+        lines.append("2. Set arc_phase to 'Setup'")
+        lines.append("3. Set initial tension_level (0.3-0.5)")
+        lines.append("4. Plant 1-2 foreshadowing seeds")
+        lines.append("5. Write director_notes with SPECIFIC guidance for the Key Animator's first scene:")
+        lines.append("   - Opening mood/atmosphere")
+        lines.append("   - Visual language and imagery")
+        lines.append("   - Hook to draw the player in")
+        lines.append("   - What to AVOID (generic tropes that don't fit this IP)")
+        lines.append("6. Set voice_patterns matching this IP's tone")
+        
+        return "\n".join(lines)
+
     def _build_review_context(
         self, 
         session: Session, 

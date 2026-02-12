@@ -392,6 +392,81 @@ async def delete_session(session_id: str):
 
 
 
+def _build_session_zero_summary(session, draft) -> str:
+    """Build a summary of Session Zero for the Director Startup Briefing.
+    
+    Extracts character identity, player preferences, and key conversation
+    highlights from the Session Zero session and character draft.
+    """
+    parts = []
+    
+    # Character identity
+    parts.append("### Character")
+    if draft.name:
+        parts.append(f"- Name: {draft.name}")
+    if draft.concept:
+        parts.append(f"- Concept: {draft.concept}")
+    if draft.backstory:
+        backstory = draft.backstory[:500] if len(str(draft.backstory)) > 500 else draft.backstory
+        parts.append(f"- Backstory: {backstory}")
+    if draft.personality_traits:
+        parts.append(f"- Personality: {', '.join(draft.personality_traits)}")
+    if draft.values:
+        parts.append(f"- Values: {', '.join(draft.values)}")
+    if draft.fears:
+        parts.append(f"- Fears: {', '.join(draft.fears)}")
+    if draft.quirks:
+        parts.append(f"- Quirks: {', '.join(draft.quirks)}")
+    if draft.goals:
+        parts.append(f"- Goals: {draft.goals}")
+    
+    # World context
+    parts.append("\n### World Context")
+    if draft.media_reference:
+        parts.append(f"- IP: {draft.media_reference}")
+    if draft.starting_location:
+        parts.append(f"- Starting Location: {draft.starting_location}")
+    
+    # Canonicality
+    timeline = getattr(draft, 'timeline_mode', None)
+    canon_cast = getattr(draft, 'canon_cast_mode', None)
+    event_fidelity = getattr(draft, 'event_fidelity', None)
+    if any([timeline, canon_cast, event_fidelity]):
+        parts.append("\n### Canonicality")
+        if timeline:
+            parts.append(f"- Timeline: {timeline}")
+        if canon_cast:
+            parts.append(f"- Canon Cast: {canon_cast}")
+        if event_fidelity:
+            parts.append(f"- Event Fidelity: {event_fidelity}")
+    
+    # OP Mode
+    if draft.op_protagonist_enabled:
+        parts.append("\n### OP Mode: ACTIVE")
+        if draft.op_preset:
+            parts.append(f"- Configuration: {draft.op_preset}")
+        if draft.op_tension_source:
+            parts.append(f"- Tension Source: {draft.op_tension_source}")
+        if draft.op_power_expression:
+            parts.append(f"- Power Expression: {draft.op_power_expression}")
+        if draft.op_narrative_focus:
+            parts.append(f"- Narrative Focus: {draft.op_narrative_focus}")
+    
+    # Key conversation highlights (last few exchanges)
+    if session.messages:
+        parts.append("\n### Key Conversation Highlights")
+        # Take last 6 messages to capture the character confirmation exchange
+        recent = session.messages[-6:]
+        for msg in recent:
+            role = msg.get('role', 'unknown').upper()
+            content = msg.get('content', '')
+            if len(content) > 300:
+                content = content[:300] + "..."
+            parts.append(f"[{role}]: {content}")
+    
+    return "\n".join(parts)
+
+
 @router.post("/session/{session_id}/turn", response_model=SessionZeroResponse)
 async def session_zero_turn(session_id: str, request: TurnRequest):
     """Process a turn during Session Zero.
@@ -1096,7 +1171,25 @@ I found several entries in the **{media_ref}** franchise:
                     session_store = get_session_store()
                     session_store.save(session)
                 
-                # 5. Initialize Campaign Bible (Director) if needed
+                # 5. Director Startup Briefing — create initial storyboard
+                try:
+                    s0_summary = _build_session_zero_summary(session, draft)
+                    await orchestrator.run_director_startup(
+                        session_zero_summary=s0_summary,
+                        character_name=draft.name or "Unknown",
+                        character_concept=draft.concept or "",
+                        starting_location=draft.starting_location or "Unknown",
+                        op_mode=draft.op_protagonist_enabled,
+                        op_preset=draft.op_preset,
+                        op_tension_source=draft.op_tension_source,
+                        op_power_expression=draft.op_power_expression,
+                        op_narrative_focus=draft.op_narrative_focus,
+                    )
+                    print(f"[Handoff] Director startup complete — initial storyboard created")
+                except Exception as dir_err:
+                    print(f"[Handoff] Director startup failed (non-critical): {dir_err}")
+                    import traceback
+                    traceback.print_exc()
         
         # DEPRECATED: Legacy phase_complete handling (for backward compatibility)
         elif result.phase_complete and not result.ready_for_gameplay:

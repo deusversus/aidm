@@ -118,6 +118,61 @@ class Orchestrator:
         # work completes before the next turn reads state
         self._bg_lock = asyncio.Lock()
     
+    async def run_director_startup(
+        self,
+        session_zero_summary: str,
+        character_name: str = "Unknown",
+        character_concept: str = "",
+        starting_location: str = "Unknown",
+        op_mode: bool = False,
+        op_preset: str = None,
+        op_tension_source: str = None,
+        op_power_expression: str = None,
+        op_narrative_focus: str = None,
+    ):
+        """
+        Run the Director's startup briefing at gameplay handoff.
+        
+        Creates an initial storyboard (arc plan, foreshadowing, voice guidance)
+        from Session Zero context + the narrative profile. Called once when
+        Session Zero completes, before the first gameplay turn.
+        """
+        print(f"[Director Startup] Beginning pilot episode planning...")
+        
+        # Run the Director's startup briefing
+        director_output = await self.director.run_startup_briefing(
+            session_zero_summary=session_zero_summary,
+            profile=self.profile,
+            character_name=character_name,
+            character_concept=character_concept,
+            starting_location=starting_location,
+            op_mode=op_mode,
+            op_preset=op_preset,
+            op_tension_source=op_tension_source,
+            op_power_expression=op_power_expression,
+            op_narrative_focus=op_narrative_focus,
+        )
+        
+        # Persist to Campaign Bible
+        planning_data = director_output.model_dump()
+        self.state.update_campaign_bible(planning_data, turn_number=0)
+        
+        # Seed world state with Director's arc phase and tension
+        self.state.update_world_state(
+            arc_phase=director_output.arc_phase,
+            tension_level=director_output.tension_level
+        )
+        
+        # Mark Director as having run at turn 0
+        self._last_director_turn = 0
+        self._arc_events_since_director = []
+        
+        print(f"[Director Startup] Opening arc: '{director_output.current_arc}' "
+              f"(phase: {director_output.arc_phase}, tension: {director_output.tension_level:.1f})")
+        print(f"[Director Startup] Director notes: {director_output.director_notes[:200]}...")
+        if director_output.active_foreshadowing:
+            print(f"[Director Startup] Foreshadowing seeds: {len(director_output.active_foreshadowing)}")
+
     async def process_turn(self, player_input: str, recent_messages: list = None, compaction_text: str = "") -> TurnResult:
         """Process a single turn.
         
