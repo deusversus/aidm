@@ -28,7 +28,7 @@
 
 ---
 
-### 2. Campaign Bible is Unstructured and Overwritten
+### 2. Campaign Bible is Unstructured and Overwritten ✅ DONE
 
 **Problem:** The Campaign Bible is a single JSON blob (`models.py: CampaignBible.planning_data = Column(JSON, default=dict)`) overwritten entirely on each Director pass (`orchestrator.py:1042-1046`). Previous plans are lost — no versioning, no diffing, no arc history. The schema is whatever `DirectorOutput.model_dump()` happens to produce.
 
@@ -455,7 +455,7 @@ For a system whose philosophy is "story > simulation," having a hard mechanical 
 | # | Item | Effort | Deps | Status |
 |---|------|--------|------|--------|
 | 1 | Pre-turn Director micro-check | L | None | ✅ DONE |
-| 2 | Versioned Campaign Bible schema | M | #1 | |
+| 2 | Versioned Campaign Bible schema | M | #1 | ✅ DONE |
 | 3 | Arc pacing gates | M | #1, #2 | |
 | 9 | Wire foreshadowing into turn loop | M | #10 | ✅ DONE |
 | 12 | Overdue seeds escalate tension | S | #9 | ✅ DONE |

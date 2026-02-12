@@ -56,6 +56,20 @@ def init_db():
     """Initialize the database by creating all tables."""
     engine = get_engine()
     Base.metadata.create_all(bind=engine)
+    
+    # Inline migrations for existing databases (#2: bible_version)
+    with engine.connect() as conn:
+        from sqlalchemy import text
+        try:
+            result = conn.execute(text("PRAGMA table_info(campaign_bible)"))
+            columns = [row[1] for row in result]
+            if "bible_version" not in columns:
+                conn.execute(text("ALTER TABLE campaign_bible ADD COLUMN bible_version INTEGER DEFAULT 0"))
+                conn.commit()
+                print("[Migration] Added bible_version column to campaign_bible")
+        except Exception as e:
+            print(f"[Migration] bible_version check skipped: {e}")
+    
     print(f"Database initialized: {get_database_url()}")
 
 

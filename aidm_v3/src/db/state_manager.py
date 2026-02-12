@@ -939,7 +939,10 @@ class StateManager:
             db.commit()
     
     def update_campaign_bible(self, planning_data: Dict[str, Any], turn_number: int):
-        """Update the campaign bible."""
+        """Update the campaign bible with arc history (#2).
+        
+        Instead of overwriting, merges new data and appends to arc_history.
+        """
         db = self._get_db()
         bible = (
             db.query(CampaignBible)
@@ -948,9 +951,34 @@ class StateManager:
         )
         
         if bible:
-            bible.planning_data = planning_data
+            existing = bible.planning_data or {}
+            
+            # Build arc_history entry from this Director pass
+            arc_entry = {
+                "turn": turn_number,
+                "version": (bible.bible_version or 0) + 1,
+                "arc_phase": planning_data.get("arc_phase"),
+                "tension_level": planning_data.get("tension_level"),
+                "current_arc": planning_data.get("current_arc"),
+                "director_notes": planning_data.get("director_notes", ""),
+            }
+            
+            # Append to arc_history (cap at 10 entries)
+            arc_history = existing.get("arc_history", [])
+            arc_history.append(arc_entry)
+            if len(arc_history) > 10:
+                arc_history = arc_history[-10:]
+            
+            # Merge: new data overwrites current fields, but preserves arc_history
+            merged = {**existing, **planning_data}
+            merged["arc_history"] = arc_history
+            
+            bible.planning_data = merged
+            bible.bible_version = (bible.bible_version or 0) + 1
             bible.last_updated_turn = turn_number
             self._maybe_commit()
+            
+            print(f"[Bible] v{bible.bible_version}: {arc_entry.get('arc_phase')} @ turn {turn_number} ({len(arc_history)} history entries)")
 
     def get_target(self, target_name: str) -> Optional[NPC]:
         """Get an NPC by name for combat targeting."""
