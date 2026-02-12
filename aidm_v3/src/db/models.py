@@ -231,6 +231,9 @@ class CampaignBible(Base):
     # The "Series Bible" content
     planning_data = Column(JSON, default=dict)
     
+    # Versioning (#2) — increments on each Director update
+    bible_version = Column(Integer, default=0)
+    
     # Tracking
     last_updated_turn = Column(Integer, default=0)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
