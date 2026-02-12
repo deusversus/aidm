@@ -16,7 +16,8 @@ from pathlib import Path
 # Decay rates per memory type (per-turn multiplier)
 DECAY_CURVES = {
     "none": 1.0,      # Plot-critical: never decay
-    "slow": 0.95,     # Relationships: 5% decay per turn
+    "very_slow": 0.97, # Relationships: 3% decay per turn (#7: gentler curve)
+    "slow": 0.95,     # Important details: 5% decay per turn
     "normal": 0.90,   # Events: 10% decay per turn
     "fast": 0.80,     # Transient details: 20% decay per turn
     "very_fast": 0.70, # Episodes: 30% decay per turn (fades in ~6 turns)
@@ -26,7 +27,7 @@ DECAY_CURVES = {
 CATEGORY_DECAY = {
     "core": "none",           # Origins, abilities
     "character_state": "fast", # HP/MP/SP/inventory
-    "relationship": "slow",    # Affinity, history
+    "relationship": "very_slow",  # Affinity, history (#7: 0.97/turn instead of 0.95)
     "quest": "normal",         # Objectives, consequences
     "world_state": "normal",   # Time, politics, environment
     "consequence": "slow",     # Moral choices, reputation
@@ -371,8 +372,11 @@ class MemoryStore:
         """Boost memory heat when accessed (referenced memories stay relevant)."""
         current_heat = float(current_metadata.get("heat", 50.0))
         
-        # Boost by 20 points, cap at 100
-        new_heat = min(100.0, current_heat + 20.0)
+        # #7: Stronger boost for relationship memories (+30 vs +20)
+        category = current_metadata.get("type", "")
+        boost_amount = 30.0 if category == "relationship" else 20.0
+        
+        new_heat = min(100.0, current_heat + boost_amount)
         
         # Update metadata
         updated_metadata = dict(current_metadata)
@@ -425,6 +429,14 @@ class MemoryStore:
             
             # Floor at 1.0 (don't go to zero)
             new_heat = max(1.0, new_heat)
+        
+            # #7: Milestone heat floor — relationship memories with milestones
+            # or plot_critical flags never drop below 40
+            category = metadata.get("type", "")
+            flags_str = metadata.get("flags", "")
+            has_milestone = "milestone" in str(flags_str) or "plot_critical" in str(flags_str)
+            if category == "relationship" and has_milestone:
+                new_heat = max(40.0, new_heat)
             
             # Only update if changed significantly
             if abs(new_heat - current_heat) > 0.1:
