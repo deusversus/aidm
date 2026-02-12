@@ -143,7 +143,7 @@
 
 ## III. FORESHADOWING & NARRATIVE THREADING (The Chekhov Problem)
 
-### 9. Foreshadowing System is Fully Built but Never Called During Gameplay 🔧 PARTIAL
+### 9. Foreshadowing System is Fully Built but Never Called During Gameplay ✅ DONE
 
 **Problem:** `ForeshadowingLedger` in `core/foreshadowing.py` has complete plant/mention/callback/resolve logic with 6 seed types, urgency scoring, and overdue detection. But during gameplay: `plant_seed()` is never called by any agent, `detect_seed_in_narrative()` is never called by the turn loop, and `resolve_seed()` is never called by any agent. The system is inert.
 
@@ -186,7 +186,7 @@
 
 ---
 
-### 12. Overdue Seeds Don't Escalate Tension
+### 12. Overdue Seeds Don't Escalate Tension ✅ DONE
 
 **Problem:** Seeds past `max_turns_to_payoff` get status `OVERDUE` but nothing happens. Overdue seeds should be narrative pressure — the longer a Chekhov's gun sits on the mantle, the more the audience expects it to fire.
 
@@ -457,8 +457,8 @@ For a system whose philosophy is "story > simulation," having a hard mechanical 
 | 1 | Pre-turn Director micro-check | L | None | 🔥 |
 | 2 | Versioned Campaign Bible schema | M | #1 | |
 | 3 | Arc pacing gates | M | #1, #2 | |
-| 9 | Wire foreshadowing into turn loop | M | #10 | 🔧 |
-| 12 | Overdue seeds escalate tension | S | #9 | *Moved from Phase 3* |
+| 9 | Wire foreshadowing into turn loop | M | #10 | ✅ DONE |
+| 12 | Overdue seeds escalate tension | S | #9 | ✅ DONE |
 
 ### Phase 3: Memory & Continuity
 *Enables coherent long-form storytelling.*

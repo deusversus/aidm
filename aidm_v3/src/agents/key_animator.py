@@ -1184,6 +1184,11 @@ MATCH the established voice, humor, and style from these exchanges.
             if retrieved_context.get("faction_guidance"):
                 faction_text = f"\n\n{retrieved_context['faction_guidance']}"
         
+        # Foreshadowing callback opportunities (#9)
+        foreshadowing_text = ""
+        if retrieved_context and retrieved_context.get("foreshadowing_callbacks"):
+            foreshadowing_text = f"\n\n{retrieved_context['foreshadowing_callbacks']}"
+        
         # Lore from profile research (canon reference)
         lore_text = ""
         if retrieved_context and retrieved_context.get("lore"):
@@ -1200,7 +1205,7 @@ MATCH the established voice, humor, and style from these exchanges.
         if lore_text:
             dynamic_parts.append(lore_text)
         dynamic_parts.append(f"## Retrieved Memories\n\n{memories_text or '(No relevant memories)'}")
-        dynamic_parts.append(f"## Additional Guidance\n\n{chunks_text + archetype_text + tension_text + npc_text + faction_text or '(No additional guidance)'}")
+        dynamic_parts.append(f"## Additional Guidance\n\n{chunks_text + archetype_text + tension_text + npc_text + faction_text + foreshadowing_text or '(No additional guidance)'}")
         
         dynamic_text = "\n\n".join(dynamic_parts)
         
