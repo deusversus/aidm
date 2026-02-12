@@ -36,6 +36,7 @@ class Campaign(Base):
     foreshadowing_seeds = relationship("ForeshadowingSeedDB", back_populates="campaign", cascade="all, delete-orphan")
     world_state = relationship("WorldState", back_populates="campaign", uselist=False, cascade="all, delete-orphan")
     campaign_bible = relationship("CampaignBible", back_populates="campaign", uselist=False, cascade="all, delete-orphan")
+    consequences = relationship("Consequence", back_populates="campaign", cascade="all, delete-orphan")  # #17
 
 
 class Session(Base):
@@ -220,6 +221,29 @@ class WorldState(Base):
     campaign = relationship("Campaign", back_populates="world_state")
 
 
+class Consequence(Base):
+    """#17: Structured consequence tracking for a campaign.
+    
+    Replaces unstructured text appends to world_state.situation with
+    queryable, categorized, expirable consequence records.
+    """
+    
+    __tablename__ = "consequences"
+    
+    id = Column(Integer, primary_key=True)
+    campaign_id = Column(Integer, ForeignKey("campaigns.id"), nullable=False)
+    turn = Column(Integer, nullable=False)                    # When it occurred
+    source_action = Column(String(500), nullable=True)        # What caused it
+    description = Column(Text, nullable=False)                 # The consequence text
+    category = Column(String(50), default="general")           # political/environmental/relational/economic/magical/general
+    severity = Column(String(20), default="minor")             # minor/moderate/major/catastrophic
+    active = Column(Boolean, default=True)                     # Still in effect?
+    expires_turn = Column(Integer, nullable=True)              # Auto-expire after N turns (null = permanent)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    campaign = relationship("Campaign", back_populates="consequences")
+
+
 class CampaignBible(Base):
     """The Director's private planning document (Phase 4).
     
@@ -358,6 +382,11 @@ class ForeshadowingSeedDB(Base):
     tags = Column(JSON, default=list)
     related_npcs = Column(JSON, default=list)
     related_locations = Column(JSON, default=list)
+    
+    # Causal Chains (#11)
+    depends_on = Column(JSON, default=list)       # Seed IDs that must resolve before this seed is callback-ready
+    triggers = Column(JSON, default=list)          # Seed IDs to auto-plant when this seed resolves
+    conflicts_with = Column(JSON, default=list)    # Seed IDs that get abandoned when this seed resolves
     
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow)

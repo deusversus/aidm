@@ -203,7 +203,7 @@
 
 ## IV. RULE LIBRARY & IP AUTHENTICITY (The Dead Wiring Problem)
 
-### 13. Rule Library is ~50% Dead Code
+### 13. Rule Library is ~50% Dead Code ✅ DONE
 
 **Problem:** The RuleLibrary (`context/rule_library.py`) has 7+ specific retrieval methods (`get_op_axis_guidance()`, `get_dna_guidance()`, `get_power_tier_guidance()`, `get_ceremony_text()`, `get_compatibility_guidance()`) that are **never called** by any agent. Instead, only the generic `get_relevant_rules(query)` semantic search is used. The beautiful YAML rule files are a museum — carefully curated but rarely visited.
 
@@ -220,7 +220,7 @@
 
 ---
 
-### 14. OP Axis Guidance is Retrieved by Accident, Not by Design
+### 14. OP Axis Guidance is Retrieved by Accident, Not by Design ✅ DONE
 
 **Problem:** When a character has `tension_source: "existential"`, `power_expression: "instantaneous"`, and `narrative_focus: "internal"`, the system should retrieve the specific existential/instantaneous/internal guidance chunks. Instead, it runs `get_relevant_rules(f"{player_input} {situation}")` — semantic search that might accidentally match "existential" if the player's input happens to mention boredom or meaninglessness. Most turns, the OP rules simply don't surface.
 
@@ -232,7 +232,7 @@
 
 ---
 
-### 15. Composition Mode Not Recalculated Per-Turn
+### 15. Composition Mode Not Recalculated Per-Turn ✅ DONE
 
 **Problem:** `get_effective_composition()` in `loader.py:224-303` calculates the narrative composition mode (standard/blended/op_dominant) once at profile load time based on a static power differential. But the threat tier changes per encounter — a T7 character fighting a T3 mob vs. a T7 boss should trigger different composition modes. The current system doesn't recalculate.
 
@@ -247,7 +247,7 @@
 
 ---
 
-### 16. Voice Cards Are One-Dimensional 🔥
+### 16. Voice Cards Are One-Dimensional ✅ DONE
 
 **Problem:** Voice cards in profiles only contain `speech_patterns`, optionally `humor_type` and `dialogue_rhythm`. They lack: disposition history, current emotional state, relationship to protagonist, memory of past interactions, secrets/hidden agendas. NPCs are essentially one-dimensional speech generators — they sound right but don't *know* anything.
 
@@ -267,7 +267,7 @@
 
 ## V. CONSEQUENCES & WORLD STATE (The Accumulation Problem)
 
-### 17. Consequences Are Unstructured Text Appended to Situation
+### 17. Consequences Are Unstructured Text Appended to Situation ✅ DONE
 
 **Problem:** `apply_consequence()` in `state_manager.py:502-518` just appends free text to `world_state.situation`. By turn 50, the situation field is an unstructured string of accumulated consequences, unqueryable and increasingly noisy. Earlier consequences get buried by later ones.
 
@@ -283,7 +283,7 @@
 
 ---
 
-### 18. No "Previously On" Recap System
+### 18. No "Previously On" Recap System ✅ DONE
 
 **Problem:** When a player resumes a session, they see raw message history. There's no LLM-generated recap, no "three-arc summary," no formal session summary stored in the DB. The `/session/{id}/resume` endpoint (game.py:276-305) just loads the session object.
 
@@ -321,7 +321,7 @@
 
 ---
 
-### 20. Validator Has Identity Crisis: Blocking vs. Advisory 🔧 PARTIAL
+### 20. Validator Has Identity Crisis: Blocking vs. Advisory ✅ DONE
 
 **Problem:** The Validator (`agents/validator.py`, 1,177 lines) serves two contradictory roles:
 - **Blocking (pre-action):** Resource validation, skill ownership checks hard-stop actions.
@@ -440,14 +440,14 @@ For a system whose philosophy is "story > simulation," having a hard mechanical 
 
 | # | Item | Effort | Deps | Status |
 |---|------|--------|------|--------|
-| 10 | Persist ForeshadowingLedger to DB | S | None | 🔥 |
-| 19 | Delete dead agents, clean up imports | S | None | |
-| 22 | Fix agent naming inconsistencies | S | None | |
-| 21 | Extract inline prompts to files | M | None | |
-| 4 | Index narrative prose to memory | M | None | 🔥 |
-| 6 | Auto-detect plot-critical memories | S | #4 | |
-| 29 | ChromaDB error recovery | S | #4 | |
-| 30 | Deep recall GameplayTool | S | None | |
+| 10 | Persist ForeshadowingLedger to DB | S | None | ✅ DONE |
+| 19 | Delete dead agents, clean up imports | S | None | ✅ DONE |
+| 22 | Fix agent naming inconsistencies | S | None | ✅ DONE |
+| 21 | Extract inline prompts to files | M | None | ✅ DONE |
+| 4 | Index narrative prose to memory | M | None | ✅ DONE |
+| 6 | Auto-detect plot-critical memories | S | #4 | ✅ DONE |
+| 29 | ChromaDB error recovery | S | #4 | ✅ DONE |
+| 30 | Deep recall GameplayTool | S | None | ✅ DONE |
 
 ### Phase 2: Director Overhaul
 *Makes the system proactive instead of reactive.*
@@ -465,10 +465,10 @@ For a system whose philosophy is "story > simulation," having a hard mechanical 
 
 | # | Item | Effort | Deps | Status |
 |---|------|--------|------|--------|
-| 5 | Expand working memory + pinned messages + deep recall | M | None | |
-| 7 | Fix heat decay for secondary characters | S | None | |
+| 5 | Expand working memory + pinned messages + deep recall | M | None | ✅ DONE |
+| 7 | Fix heat decay for secondary characters | S | None | ✅ DONE |
 | ~~8~~ | ~~Wire or remove memory compression~~ | ~~S~~ | ~~None~~ | ✅ DONE |
-| 18 | "Previously On" recap system | M | #2 | |
+| 18 | "Previously On" recap system | M | #2 | ✅ DONE |
 
 ### Phase 4: Rule Library & IP Authenticity
 *Activates the dead wiring.*
@@ -485,11 +485,11 @@ For a system whose philosophy is "story > simulation," having a hard mechanical 
 
 | # | Item | Effort | Deps | Status |
 |---|------|--------|------|--------|
-| 17 | Structured consequences model (full `Consequence` SQLAlchemy model) | M | None | |
-| 20 | Full Validator split: ResourceGuard + NarrativeValidator | M | None | 🔧 |
-| 23 | Move combat resolution before narrative | M | None | 🔥 |
-| 24 | NPC intelligence transition narratives | S | #16 | |
-| 11 | Foreshadowing causal chains | M | #9 | |
+| 17 | Structured consequences model (full `Consequence` SQLAlchemy model) | M | None | ✅ DONE |
+| 20 | Full Validator split: ResourceGuard + NarrativeValidator | M | None | ✅ DONE |
+| 23 | Move combat resolution before narrative | M | None | ✅ DONE |
+| 24 | NPC intelligence transition narratives | S | #16 | ✅ DONE |
+| 11 | Foreshadowing causal chains | M | #9 | ✅ DONE |
 
 ### Phase 6: Session Zero Hardening
 *Foundation quality.*
