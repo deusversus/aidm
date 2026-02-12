@@ -242,6 +242,54 @@ def test_pure_in_memory_mode():
     print("✓ test_pure_in_memory_mode")
 
 
+def test_causal_chains_persist():
+    """Causal chain fields (depends_on, triggers, conflicts_with) must round-trip through DB."""
+    engine, Session = make_test_db()
+    db = Session()
+    sm = make_state_manager(db)
+
+    ledger1 = ForeshadowingLedger(campaign_id=1, state_manager=sm)
+
+    # Plant a seed, then manually set causal chain fields on the DB row
+    sid = ledger1.plant_seed(
+        seed_type=SeedType.PLOT, description="The betrayal",
+        planted_narrative="Ally acts suspicious.", expected_payoff="Ally reveals true allegiance.",
+        turn_number=5, session_number=1,
+        tags=["betrayal", "alliance"]
+    )
+
+    # Update causal chain fields directly (as Director would via tool call)
+    row = db.query(ForeshadowingSeedDB).filter(
+        ForeshadowingSeedDB.seed_id == sid
+    ).first()
+    row.depends_on = ["seed_1_0"]  # Must resolve seed_1_0 first
+    row.triggers = ["seed_1_2"]    # Resolving this plants seed_1_2
+    row.conflicts_with = ["seed_1_3"]  # Resolving this abandons seed_1_3
+    db.commit()
+
+    # "Restart" — new ledger loads from DB
+    ledger2 = ForeshadowingLedger(campaign_id=1, state_manager=sm)
+
+    # Verify causal chain fields survived
+    loaded_seed = ledger2._seeds.get(sid)
+    assert loaded_seed is not None, f"Seed {sid} should exist after restart"
+
+    # Check the fields are populated (they should be attributes or in raw data)
+    # The ForeshadowingSeed Pydantic model may store these differently,
+    # so verify via the state_manager load path directly
+    loaded_rows = sm.load_foreshadowing_seeds()
+    target = [r for r in loaded_rows if r["seed_id"] == sid]
+    assert len(target) == 1, f"Should find exactly 1 row for {sid}"
+    row_data = target[0]
+
+    assert row_data["depends_on"] == ["seed_1_0"], f"depends_on lost: {row_data.get('depends_on')}"
+    assert row_data["triggers"] == ["seed_1_2"], f"triggers lost: {row_data.get('triggers')}"
+    assert row_data["conflicts_with"] == ["seed_1_3"], f"conflicts_with lost: {row_data.get('conflicts_with')}"
+
+    print("✓ test_causal_chains_persist")
+    db.close()
+
+
 if __name__ == "__main__":
     test_plant_persists_to_db()
     test_restart_loads_from_db()
@@ -250,4 +298,5 @@ if __name__ == "__main__":
     test_resolve_persists()
     test_abandon_persists()
     test_pure_in_memory_mode()
-    print("\n✅ All 7 foreshadowing persistence tests passed!")
+    test_causal_chains_persist()
+    print("\n✅ All 8 foreshadowing persistence tests passed!")
