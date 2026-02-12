@@ -574,6 +574,70 @@
                                                 data-agent="wiki_scout"></select>
                                         </div>
                                     </div>
+
+                                    <!-- Pacing -->
+                                    <div class="setting-card">
+                                        <h3>🚦 Pacing</h3>
+                                        <p class="setting-desc">Arc pacing gates — controls narrative tempo and act
+                                            transitions (fast model preferred)</p>
+                                        <div class="setting-inputs">
+                                            <select id="pacing-provider" class="provider-select" data-agent="pacing">
+                                                <option value="google">Google</option>
+                                                <option value="anthropic">Anthropic</option>
+                                                <option value="openai">OpenAI</option>
+                                            </select>
+                                            <select id="pacing-model" class="model-select" data-agent="pacing"></select>
+                                        </div>
+                                    </div>
+
+                                    <!-- Recap -->
+                                    <div class="setting-card">
+                                        <h3>📜 Recap</h3>
+                                        <p class="setting-desc">"Previously on..." session recap generation (fast model
+                                            preferred)</p>
+                                        <div class="setting-inputs">
+                                            <select id="recap-provider" class="provider-select" data-agent="recap">
+                                                <option value="google">Google</option>
+                                                <option value="anthropic">Anthropic</option>
+                                                <option value="openai">OpenAI</option>
+                                            </select>
+                                            <select id="recap-model" class="model-select" data-agent="recap"></select>
+                                        </div>
+                                    </div>
+
+                                    <!-- Compactor -->
+                                    <div class="setting-card">
+                                        <h3>🗜️ Compactor</h3>
+                                        <p class="setting-desc">Compresses episodic memories for long-term storage (fast
+                                            model preferred)</p>
+                                        <div class="setting-inputs">
+                                            <select id="compactor-provider" class="provider-select"
+                                                data-agent="compactor">
+                                                <option value="google">Google</option>
+                                                <option value="anthropic">Anthropic</option>
+                                                <option value="openai">OpenAI</option>
+                                            </select>
+                                            <select id="compactor-model" class="model-select"
+                                                data-agent="compactor"></select>
+                                        </div>
+                                    </div>
+
+                                    <!-- Profile Merge -->
+                                    <div class="setting-card">
+                                        <h3>🔀 Profile Merge</h3>
+                                        <p class="setting-desc">Merges hybrid/crossover profiles from multiple IPs
+                                            (thinking model preferred)</p>
+                                        <div class="setting-inputs">
+                                            <select id="profile_merge-provider" class="provider-select"
+                                                data-agent="profile_merge">
+                                                <option value="google">Google</option>
+                                                <option value="anthropic">Anthropic</option>
+                                                <option value="openai">OpenAI</option>
+                                            </select>
+                                            <select id="profile_merge-model" class="model-select"
+                                                data-agent="profile_merge"></select>
+                                        </div>
+                                    </div>
                                 </div>
                             </div> <!-- End section-content -->
                         </div> <!-- End sidebar-section (Per-Agent Overrides) -->

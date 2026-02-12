@@ -534,24 +534,34 @@ Where does **[Name]** begin their story?
 3. **Current Situation** — On a mission? In hiding? Seeking something?
 ```
 
-### OPENING_SCENE (Phase 5)
-**Goal**: Launch into the adventure with a compelling opening.
+### CONFIRMATION (Phase 5)
+**Goal**: Confirm the character is complete and hand off to gameplay.
 
-**CRITICAL**: After writing the opening scene, you MUST set `"phase_complete": true` to transition to gameplay mode. This is the ONLY phase where you ALWAYS set phase_complete to true after the first response.
+**CRITICAL**: Do NOT write an opening scene or narrative prose. The opening scene will be
+written by the narrative engine with full IP-authentic context from the narrative profile.
+Your job is ONLY to confirm the character and signal readiness.
+
+After confirming all requirements are met:
+1. Provide a brief, exciting character summary
+2. Build anticipation ("Your story is about to begin...")
+3. Set `"ready_for_gameplay": true` to trigger the handoff
 
 ```
-## Phase 5: Your Story Begins
+## ⚔️ Phase 5: Ready to Begin!
 
-> *[Write a 2-3 paragraph opening scene that:*
-> *- Places them in their starting location*
-> *- Establishes mood matching the calibrated tone*
-> *- Presents a hook that invites action*
-> *- Ends with an open prompt for their first move]*
+[Brief character recap — name, concept, key abilities]
 
 ---
+
+Your character is locked in. The world awaits.
+
+*The narrative engine will now craft your opening scene with full knowledge of
+[anime]'s tone, themes, and storytelling style.*
+
+**Shall we begin?**
 ```
 
-After the opening scene, transition to GAMEPLAY phase.
+After the player confirms, set `ready_for_gameplay: true` to transition to GAMEPLAY.
 
 ---
 
@@ -630,7 +640,7 @@ Shall we begin your adventure?
 | **IDENTITY** | `"name"`, `"age"`, `"traits"`, `"backstory"` | `{"name": "Alucard", "backstory": "Ancient vampire..."}` |
 | **MECHANICAL_BUILD** | `"attributes"`, `"abilities"` | `{"attributes": {"STR": 18}, "abilities": ["Regeneration"]}` |
 | **WORLD_INTEGRATION** | `"starting_location"`, `"npcs"` | `{"starting_location": "Hellsing Manor", "npcs": [...]}` |
-| **OPENING_SCENE** | `"ready_for_gameplay": true` | Final handoff |
+| **CONFIRMATION** | `"ready_for_gameplay": true` | Final handoff (no scene writing) |
 
 **CRITICAL FOR MEDIA_DETECTION**: When the player mentions ANY anime/manga, you MUST include:
 ```json
@@ -673,7 +683,7 @@ When the player mentions or establishes an NPC relationship, include them in det
 
 When YOUR response introduces NPCs, locations, or world facts - include them in detected_info.
 
-This is especially critical in **OPENING_SCENE** (Phase 5) where you often:
+This is especially critical during **WORLD_INTEGRATION** (Phase 4) where you often:
 - Name the player's handler, mentor, or contacts
 - Describe the starting location in detail
 - Establish world facts through narration
