@@ -475,10 +475,10 @@ For a system whose philosophy is "story > simulation," having a hard mechanical 
 
 | # | Item | Effort | Deps | Status |
 |---|------|--------|------|--------|
-| 13 | Wire rule library retrieval methods | M | None | |
-| 14 | Static OP axis guidance injection | S | #13 | |
-| 15 | Per-turn composition recalculation | M | #14 | |
-| 16 | Enrich voice cards with DB data | M | None | 🔥 |
+| 13 | Wire rule library retrieval methods | M | None | ✅ DONE |
+| 14 | Static OP axis guidance injection | S | #13 | ✅ DONE |
+| 15 | Per-turn composition recalculation | M | #14 | ✅ DONE |
+| 16 | Enrich voice cards with DB data | M | None | ✅ DONE |
 
 ### Phase 5: Structural Refinement
 *Polish and coherence.*
@@ -496,8 +496,8 @@ For a system whose philosophy is "story > simulation," having a hard mechanical 
 
 | # | Item | Effort | Deps | Status |
 |---|------|--------|------|--------|
-| 25 | Profile research confidence scoring | M | None | |
-| 26 | Hybrid merge rules + coherence check | M | None | |
+| 25 | Profile research confidence scoring | M | None | ✅ DONE |
+| 26 | Hybrid merge rules + coherence check | M | None | ✅ DONE |
 
 ---
 
