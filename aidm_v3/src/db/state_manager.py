@@ -539,6 +539,57 @@ class StateManager:
         self._maybe_commit()
         return turn
     
+    def search_turn_narratives(
+        self,
+        query: str,
+        npc: str = None,
+        location: str = None,
+        turn_range: tuple = None,
+        limit: int = 3
+    ) -> list:
+        """Search Turn.narrative by keyword with optional filters.
+        
+        Deep recall tool — searches past turn narratives for specific scenes,
+        events, or character moments. More detailed than episodic memory summaries.
+        
+        Args:
+            query: Keyword to search for in narratives
+            npc: Optional NPC name to filter by
+            location: Optional location name to filter by
+            turn_range: Optional (start, end) tuple for turn number range
+            limit: Max results to return
+            
+        Returns:
+            List of dicts with turn, narrative_excerpt, player_input
+        """
+        db = self._get_db()
+        session_id = self.get_or_create_session()
+        
+        q = db.query(Turn).filter(
+            Turn.session_id == session_id,
+            Turn.narrative.isnot(None)
+        )
+        
+        if turn_range and len(turn_range) == 2:
+            q = q.filter(Turn.turn_number.between(turn_range[0], turn_range[1]))
+        
+        # Keyword search on narrative text
+        q = q.filter(Turn.narrative.contains(query))
+        
+        if npc:
+            q = q.filter(Turn.narrative.contains(npc))
+        
+        results = q.order_by(Turn.turn_number.desc()).limit(limit).all()
+        
+        return [
+            {
+                "turn": t.turn_number,
+                "narrative_excerpt": t.narrative[:300],
+                "player_input": t.player_input[:100] if t.player_input else "",
+            }
+            for t in results
+        ]
+    
     def apply_consequence(self, consequence: str):
         """Apply a narrative consequence to the world state.
         
