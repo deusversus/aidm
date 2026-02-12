@@ -310,12 +310,14 @@ class SessionManager:
         
         db.commit()
         
-        # Restore foreshadowing
+        # Restore foreshadowing (writes through to DB via #10)
         if export.foreshadowing and self.foreshadowing:
             self.foreshadowing._seeds = {}
             for sid, seed_data in export.foreshadowing.get("seeds", {}).items():
                 from .foreshadowing import ForeshadowingSeed
-                self.foreshadowing._seeds[sid] = ForeshadowingSeed(**seed_data)
+                seed = ForeshadowingSeed(**seed_data)
+                self.foreshadowing._seeds[sid] = seed
+                self.foreshadowing._persist_seed(seed)  # Write-through (#10)
             self.foreshadowing._next_id = export.foreshadowing.get("next_id", 1)
         
         return campaign_id

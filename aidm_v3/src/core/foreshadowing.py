@@ -8,6 +8,9 @@ Per Module 12 / Phase 4 spec:
 - Seeds are hints/setup planted in narrative
 - Callbacks are when seeds pay off
 - Overdue seeds need resolution or explicit abandonment
+
+#10: DB-backed write-through cache. Seeds persist across server restarts
+via StateManager CRUD methods. In-memory _seeds dict is kept for fast reads.
 """
 
 from typing import List, Dict, Any, Optional, Literal
@@ -73,6 +76,11 @@ class ForeshadowingLedger:
     """
     Manages the foreshadowing system.
     
+    DB-backed write-through cache (#10):
+    - On init, loads all seeds from DB (survives server restarts)
+    - Every mutation (plant/mention/resolve/abandon) writes through to DB
+    - In-memory _seeds dict provides fast reads during gameplay
+    
     Features:
     - Plant seeds during narrative generation
     - Track seed mentions and momentum
@@ -81,10 +89,87 @@ class ForeshadowingLedger:
     - Provide Director with seed context
     """
     
-    def __init__(self, campaign_id: int):
+    def __init__(self, campaign_id: int, state_manager=None):
         self.campaign_id = campaign_id
+        self._state = state_manager  # Optional: None = pure in-memory (tests)
         self._seeds: Dict[str, ForeshadowingSeed] = {}
         self._next_id = 1
+        
+        # Load from DB if state_manager provided (#10)
+        if self._state:
+            self._load_from_db()
+    
+    def _load_from_db(self):
+        """Load seeds from DB into in-memory cache."""
+        try:
+            seed_rows = self._state.load_foreshadowing_seeds()
+            for row in seed_rows:
+                seed = ForeshadowingSeed(
+                    id=row["seed_id"],
+                    seed_type=SeedType(row["seed_type"]),
+                    status=SeedStatus(row["status"]),
+                    description=row["description"],
+                    planted_narrative=row["planted_narrative"],
+                    expected_payoff=row["expected_payoff"],
+                    planted_turn=row["planted_turn"],
+                    planted_session=row["planted_session"],
+                    mentions=row["mentions"],
+                    last_mentioned_turn=row["last_mentioned_turn"],
+                    min_turns_to_payoff=row["min_turns_to_payoff"],
+                    max_turns_to_payoff=row["max_turns_to_payoff"],
+                    urgency=row["urgency"],
+                    resolved_turn=row["resolved_turn"],
+                    resolution_narrative=row["resolution_narrative"],
+                    tags=row["tags"],
+                    related_npcs=row["related_npcs"],
+                    related_locations=row["related_locations"],
+                )
+                self._seeds[seed.id] = seed
+            
+            # Restore _next_id from DB to avoid ID collision
+            self._next_id = self._state.get_max_seed_sequence()
+            
+            if self._seeds:
+                print(f"[Foreshadowing] Loaded {len(self._seeds)} seeds from DB (next_id={self._next_id})")
+        except Exception as e:
+            print(f"[Foreshadowing] Failed to load seeds from DB: {e}")
+    
+    def _persist_seed(self, seed: ForeshadowingSeed):
+        """Write-through: persist a seed to DB."""
+        if not self._state:
+            return
+        try:
+            self._state.save_foreshadowing_seed({
+                "seed_id": seed.id,
+                "seed_type": seed.seed_type.value,
+                "status": seed.status.value,
+                "description": seed.description,
+                "planted_narrative": seed.planted_narrative,
+                "expected_payoff": seed.expected_payoff,
+                "planted_turn": seed.planted_turn,
+                "planted_session": seed.planted_session,
+                "mentions": seed.mentions,
+                "last_mentioned_turn": seed.last_mentioned_turn,
+                "min_turns_to_payoff": seed.min_turns_to_payoff,
+                "max_turns_to_payoff": seed.max_turns_to_payoff,
+                "urgency": seed.urgency,
+                "resolved_turn": seed.resolved_turn,
+                "resolution_narrative": seed.resolution_narrative,
+                "tags": seed.tags,
+                "related_npcs": seed.related_npcs,
+                "related_locations": seed.related_locations,
+            })
+        except Exception as e:
+            print(f"[Foreshadowing] Failed to persist seed {seed.id}: {e}")
+    
+    def _update_seed_db(self, seed_id: str, **fields):
+        """Write-through: partial update to DB."""
+        if not self._state:
+            return
+        try:
+            self._state.update_foreshadowing_seed(seed_id, **fields)
+        except Exception as e:
+            print(f"[Foreshadowing] Failed to update seed {seed_id}: {e}")
     
     def plant_seed(
         self,
@@ -135,6 +220,7 @@ class ForeshadowingLedger:
         )
         
         self._seeds[seed_id] = seed
+        self._persist_seed(seed)  # Write-through (#10)
         return seed_id
     
     def mention_seed(self, seed_id: str, turn_number: int):
@@ -150,6 +236,14 @@ class ForeshadowingLedger:
             # Upgrade status if mentioned enough
             if seed.status == SeedStatus.PLANTED and seed.mentions >= 3:
                 seed.status = SeedStatus.GROWING
+            
+            # Write-through (#10)
+            self._update_seed_db(seed_id,
+                mentions=seed.mentions,
+                last_mentioned_turn=seed.last_mentioned_turn,
+                urgency=seed.urgency,
+                status=seed.status.value
+            )
     
     def check_callback_ready(self, seed_id: str, current_turn: int) -> bool:
         """Check if a seed is ready for callback (payoff)."""
@@ -168,6 +262,7 @@ class ForeshadowingLedger:
         """Mark a seed as ready for callback."""
         if seed_id in self._seeds:
             self._seeds[seed_id].status = SeedStatus.CALLBACK
+            self._update_seed_db(seed_id, status=SeedStatus.CALLBACK.value)
     
     def resolve_seed(self, seed_id: str, turn_number: int, resolution_narrative: str):
         """Resolve a seed (successful payoff)."""
@@ -176,14 +271,28 @@ class ForeshadowingLedger:
             seed.status = SeedStatus.RESOLVED
             seed.resolved_turn = turn_number
             seed.resolution_narrative = resolution_narrative[:500]
+            
+            # Write-through (#10)
+            self._update_seed_db(seed_id,
+                status=SeedStatus.RESOLVED.value,
+                resolved_turn=turn_number,
+                resolution_narrative=resolution_narrative[:500]
+            )
     
     def abandon_seed(self, seed_id: str, reason: str = ""):
         """Abandon a seed (explicitly drop it)."""
         if seed_id in self._seeds:
             seed = self._seeds[seed_id]
             seed.status = SeedStatus.ABANDONED
+            resolution = f"Abandoned: {reason}" if reason else None
             if reason:
-                seed.resolution_narrative = f"Abandoned: {reason}"
+                seed.resolution_narrative = resolution
+            
+            # Write-through (#10)
+            self._update_seed_db(seed_id,
+                status=SeedStatus.ABANDONED.value,
+                resolution_narrative=resolution
+            )
     
     def get_overdue_seeds(self, current_turn: int) -> List[ForeshadowingSeed]:
         """Get seeds that are past their due date."""
@@ -194,6 +303,7 @@ class ForeshadowingLedger:
                 turns_since = current_turn - seed.planted_turn
                 if turns_since > seed.max_turns_to_payoff:
                     seed.status = SeedStatus.OVERDUE
+                    self._update_seed_db(seed.id, status=SeedStatus.OVERDUE.value)
                     overdue.append(seed)
         
         return overdue
@@ -312,6 +422,6 @@ class ForeshadowingLedger:
 
 
 # Convenience function
-def create_foreshadowing_ledger(campaign_id: int) -> ForeshadowingLedger:
+def create_foreshadowing_ledger(campaign_id: int, state_manager=None) -> ForeshadowingLedger:
     """Create a new foreshadowing ledger for a campaign."""
-    return ForeshadowingLedger(campaign_id=campaign_id)
+    return ForeshadowingLedger(campaign_id=campaign_id, state_manager=state_manager)
