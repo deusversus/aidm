@@ -168,7 +168,7 @@ class SettingsStore:
             "intent_classifier", "outcome_judge", "validator", "memory_ranker",
             "context_selector", "combat", "progression", "scale_selector",
             "relationship_analyzer", "session_zero", "world_builder",
-            "wiki_scout", "compactor", "scope",
+            "wiki_scout", "compactor", "scope", "pacing",
         }
         creative_tier_agents = {"key_animator"}  # Prose generation
         thinking_tier_agents = {"director", "research", "profile_merge"}  # Reasoning/planning

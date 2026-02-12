@@ -24,6 +24,9 @@ from ..agents.relationship_analyzer import RelationshipAnalyzer
 # Phase 4: Foreshadowing
 from .foreshadowing import ForeshadowingLedger
 
+# Phase 2: Pre-turn Pacing (#1)
+from ..agents.pacing_agent import PacingAgent, PacingDirective
+
 # Override Handler (META/OVERRIDE commands)
 from ..agents.override_handler import OverrideHandler
 from ..db.session import create_session
@@ -88,6 +91,9 @@ class Orchestrator:
         
         # Scale Selector (Module 12)
         self.scale_selector = ScaleSelectorAgent()
+        
+        # Pre-turn Pacing micro-check (#1)
+        self.pacing_agent = PacingAgent()
         
         # Relationship Analyzer (NPC Intelligence, fast model)
         self.relationship_analyzer = RelationshipAnalyzer()
@@ -366,8 +372,8 @@ class Orchestrator:
         is_trivial = self.context_selector.is_trivial_action(intent)
         
         if is_trivial:
-            # TIER 0 FAST-PATH: Skip OutcomeJudge and memory ranking
-            print(f"[Orchestrator] TIER 0 fast-path: trivial action, skipping Outcome/Memory")
+            # TIER 0 FAST-PATH: Skip OutcomeJudge, memory ranking, and pacing
+            print(f"[Orchestrator] TIER 0 fast-path: trivial action, skipping Outcome/Memory/Pacing")
             
             # Synthetic auto-success outcome for trivial actions
             from ..agents.outcome_judge import OutcomeOutput
@@ -383,6 +389,7 @@ class Orchestrator:
                 reasoning="Trivial action auto-success"
             )
             ranked_memories = "No relevant past memories found."
+            pacing_directive = None  # Skip pacing for trivial actions
         else:
             # Normal path: parallel OutcomeJudge and MemoryRanker
             # Build power context for the Outcome Judge
@@ -411,20 +418,40 @@ class Orchestrator:
                 )
             )
             
-            # Wait for both to complete (parallel execution)
+            # Pre-turn pacing micro-check (#1) — runs in parallel
+            pacing_task = asyncio.create_task(
+                self.pacing_agent.check(
+                    player_input=player_input,
+                    intent_summary=f"{intent.intent}: {intent.action}",
+                    bible_notes=db_context.director_notes,
+                    arc_phase=db_context.arc_phase,
+                    tension_level=db_context.tension_level,
+                    situation=db_context.situation,
+                    recent_summary=db_context.recent_summary,
+                )
+            )
+            
+            # Wait for all three to complete (parallel execution)
             phase2_results = await asyncio.gather(
-                outcome_task, memory_rank_task, return_exceptions=True
+                outcome_task, memory_rank_task, pacing_task,
+                return_exceptions=True
             )
             
             # Handle potential exceptions
             outcome = phase2_results[0]
             ranked_memories = phase2_results[1]
+            pacing_directive = phase2_results[2]
             
             if isinstance(outcome, Exception):
                 raise RuntimeError(f"Outcome judgment failed: {outcome}")
             if isinstance(ranked_memories, Exception):
                 print(f"[Orchestrator] Memory ranking failed: {ranked_memories}, using unranked")
                 ranked_memories = "No relevant past memories found."
+            if isinstance(pacing_directive, Exception):
+                print(f"[Orchestrator] Pacing micro-check failed (non-fatal): {pacing_directive}")
+                pacing_directive = None
+            elif pacing_directive:
+                print(f"[PacingAgent] Beat: {pacing_directive.arc_beat}, Tone: {pacing_directive.tone}, Escalation: {pacing_directive.escalation_target:.0%}")
         
         current_turn.outcome = outcome
         
@@ -434,6 +461,10 @@ class Orchestrator:
             "rules": rag_base["rules"],
             "short_term": rag_base["short_term"]
         }
+        
+        # Inject pacing directive if available (#1)
+        if pacing_directive and isinstance(pacing_directive, PacingDirective):
+            rag_context["pacing_directive"] = pacing_directive
         
         # Calculate power imbalance with context modifiers (Module 12)
         target_tier = getattr(outcome, 'target_tier', None)
