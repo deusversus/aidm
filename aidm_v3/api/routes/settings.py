@@ -76,6 +76,16 @@ async def update_settings(settings: UserSettings):
     if not settings.api_keys.openai_api_key:
         settings.api_keys.openai_api_key = current.api_keys.openai_api_key
     
+    # Preserve active session state — these are set by Session Zero / gameplay,
+    # not by the settings UI. Without this, saving model config overwrites the
+    # active profile with whatever the frontend sends (or null).
+    if current.active_profile_id and not settings.active_profile_id:
+        settings.active_profile_id = current.active_profile_id
+    if current.active_session_id and not settings.active_session_id:
+        settings.active_session_id = current.active_session_id
+    if current.active_campaign_id and not settings.active_campaign_id:
+        settings.active_campaign_id = current.active_campaign_id
+    
     store.save(settings)
     
     # Reset LLM manager and cached agents to pick up new provider settings

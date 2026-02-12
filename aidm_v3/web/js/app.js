@@ -581,27 +581,27 @@ async function loadSettings() {
         // Validation & Memory
         populateAgentSetting('validator', agentModels.validator);
         populateAgentSetting('memory_ranker', agentModels.memory_ranker);
-        populateAgentSetting('context_selector', agentModels.context_selector);
 
         // Judgment agents
         populateAgentSetting('combat', agentModels.combat);
         populateAgentSetting('progression', agentModels.progression);
         populateAgentSetting('scale_selector', agentModels.scale_selector);
-        populateAgentSetting('npc_reaction', agentModels.npc_reaction);
-        populateAgentSetting('sakuga', agentModels.sakuga);
-        populateAgentSetting('calibration', agentModels.calibration);
 
         // NPC Intelligence
         populateAgentSetting('relationship_analyzer', agentModels.relationship_analyzer);
 
-        // Session Zero
+        // Session Zero & Profile
         populateAgentSetting('session_zero', agentModels.session_zero);
+        populateAgentSetting('profile_merge', agentModels.profile_merge);
 
-        // World Building
+        // World Building & Research Support
         populateAgentSetting('world_builder', agentModels.world_builder);
-
-        // Wiki Scraping
         populateAgentSetting('wiki_scout', agentModels.wiki_scout);
+        populateAgentSetting('compactor', agentModels.compactor);
+
+        // Narrative Pacing
+        populateAgentSetting('pacing', agentModels.pacing);
+        populateAgentSetting('recap', agentModels.recap);
 
         // Extended thinking toggle
         const extendedThinkingToggle = document.getElementById('extended-thinking-toggle');
@@ -805,14 +805,16 @@ async function applyBasicSettings() {
 
         // Build settings object mapping agents to their categories
         const fastAgents = ['intent_classifier', 'outcome_judge', 'validator', 'combat', 'progression',
-            'scale_selector', 'npc_reaction', 'sakuga', 'memory_ranker', 'context_selector', 'relationship_analyzer', 'scope'];
-        const creativeAgents = ['key_animator', 'calibration'];
-        const thinkingAgents = ['director', 'research'];
+            'scale_selector', 'memory_ranker', 'relationship_analyzer', 'scope',
+            'session_zero', 'world_builder', 'wiki_scout', 'compactor', 'pacing', 'recap'];
+        const creativeAgents = ['key_animator'];
+        const thinkingAgents = ['director', 'research', 'profile_merge'];
 
         const agent_models = {
             // Base defaults (used by fallback for unconfigured agents)
             base_fast: { provider: fastProvider, model: fastModel },
             base_thinking: { provider: thinkingProvider, model: thinkingModel },
+            base_creative: { provider: creativeProvider, model: creativeModel },
         };
 
         fastAgents.forEach(agent => {
@@ -828,7 +830,6 @@ async function applyBasicSettings() {
         const settings = {
             agent_models,
             debug_mode: true,
-            active_profile_id: 'hunterxhunter',
             extended_thinking: extendedThinkingToggle?.checked || false,
         };
 
@@ -887,25 +888,24 @@ async function saveAdvancedSettings() {
                 // Validation & Memory
                 validator: getAgentConfig('validator'),
                 memory_ranker: getAgentConfig('memory_ranker'),
-                context_selector: getAgentConfig('context_selector'),
                 // Judgment agents
                 combat: getAgentConfig('combat'),
                 progression: getAgentConfig('progression'),
                 scale_selector: getAgentConfig('scale_selector'),
-                npc_reaction: getAgentConfig('npc_reaction'),
-                sakuga: getAgentConfig('sakuga'),
-                calibration: getAgentConfig('calibration'),
                 // NPC Intelligence
                 relationship_analyzer: getAgentConfig('relationship_analyzer'),
-                // Session Zero
+                // Session Zero & Profile
                 session_zero: getAgentConfig('session_zero'),
-                // World Building
+                profile_merge: getAgentConfig('profile_merge'),
+                // World Building & Research Support
                 world_builder: getAgentConfig('world_builder'),
-                // Wiki Scraping
                 wiki_scout: getAgentConfig('wiki_scout'),
+                compactor: getAgentConfig('compactor'),
+                // Narrative Pacing
+                pacing: getAgentConfig('pacing'),
+                recap: getAgentConfig('recap'),
             },
             debug_mode: true,
-            active_profile_id: 'hunterxhunter',
             extended_thinking: extendedThinkingToggle?.checked || false,
         };
 

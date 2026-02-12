@@ -265,9 +265,6 @@ class ValidatorAgent(BaseAgent):
     - Narrative validation (outcome sensibility, NPC consistency)
     - Research validation (content completeness, corruption detection)
     - Recovery protocols (confidence-based auto-recovery)
-    
-    validate_resource_cost() is DEPRECATED — use StateTransaction.subtract()
-    with .validate() instead (see orchestrator.py combat block).
     """
     
     agent_name = "validator"
@@ -285,58 +282,6 @@ class ValidatorAgent(BaseAgent):
     def output_schema(self) -> Type[BaseModel]:
         return ValidationResult
     
-    # =========================================================================
-    # PRE-ACTION VALIDATION (Block invalid actions before execution)
-    # =========================================================================
-    
-    def validate_resource_cost(
-        self,
-        resource_name: str,
-        current: int,
-        cost: int,
-        min_allowed: int = 0
-    ) -> ValidationResult:
-        """
-        DEPRECATED: Use StateTransaction.subtract() + .validate() instead.
-        Kept for backward compatibility. StateTransaction provides atomic
-        resource gating with rollback support.
-        
-        Validate if a resource cost can be afforded.
-        
-        Per M10: Check won't go below 0, block with alternatives.
-        """
-        result = ValidationResult(complete=True, is_valid=True)
-        
-        new_value = current - cost
-        
-        if new_value < min_allowed:
-            shortage = cost - (current - min_allowed)
-            
-            result.is_valid = False
-            result.errors.append(ErrorReport(
-                severity=ErrorSeverity.VALIDATION,
-                category=ErrorCategory.RESOURCE,
-                description=f"Insufficient {resource_name}",
-                context={
-                    "resource": resource_name,
-                    "current": current,
-                    "cost": cost,
-                    "shortage": shortage
-                },
-                recoverable=True,
-                confidence=1.0,  # Clear math
-                alternatives=[
-                    f"Use lower-cost ability",
-                    f"Use {resource_name} potion first",
-                    f"Different action (no {resource_name} cost)"
-                ]
-            ))
-            
-            result.correction = self._format_resource_block(
-                resource_name, current, cost, shortage
-            )
-        
-        return result
     
     async def judge_narrative_override(
         self,

@@ -26,9 +26,10 @@ class AgentSettings(BaseModel):
     
     Agent Tiers:
     - FAST: intent_classifier, outcome_judge, validator, memory_ranker, 
-      context_selector, combat, progression, scale_selector, 
-      relationship_analyzer, session_zero, compactor, scope
-    - THINKING: director, research, world_builder, profile_merge
+      combat, progression, scale_selector, relationship_analyzer,
+      session_zero, world_builder, compactor, scope, pacing, recap,
+      wiki_scout
+    - THINKING: director, research, profile_merge
     - CREATIVE: key_animator (prose generation)
     
     The 'base_fast', 'base_thinking', and 'base_creative' fields serve as 
@@ -74,7 +75,7 @@ class AgentSettings(BaseModel):
     )
     context_selector: Optional[ModelConfig] = Field(
         default=None,
-        description="Model for context assembly (fast model preferred)"
+        description="RESERVED: ContextSelector is not a BaseAgent and does not use this field"
     )
     
     # === JUDGMENT AGENTS (Phase 3) ===
@@ -133,7 +134,17 @@ class AgentSettings(BaseModel):
     # === WORLD BUILDING (Entity Extraction & Validation) ===
     world_builder: Optional[ModelConfig] = Field(
         default=None,
-        description="Model for validating player world-building assertions (thinking model preferred)"
+        description="Model for validating player world-building assertions (fast model preferred)"
+    )
+
+    # === NARRATIVE PACING ===
+    pacing: Optional[ModelConfig] = Field(
+        default=None,
+        description="Model for arc pacing micro-checks (fast model preferred)"
+    )
+    recap: Optional[ModelConfig] = Field(
+        default=None,
+        description="Model for 'Previously On' recap generation (fast model preferred)"
     )
 
     # === WIKI SCRAPING ===

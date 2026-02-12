@@ -166,7 +166,7 @@ class SettingsStore:
         # Determine agent tier for fallback
         fast_tier_agents = {
             "intent_classifier", "outcome_judge", "validator", "memory_ranker",
-            "context_selector", "combat", "progression", "scale_selector",
+            "combat", "progression", "scale_selector",
             "relationship_analyzer", "session_zero", "world_builder",
             "wiki_scout", "compactor", "scope", "pacing", "recap",
         }
