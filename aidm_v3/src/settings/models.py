@@ -27,9 +27,9 @@ class AgentSettings(BaseModel):
     Agent Tiers:
     - FAST: intent_classifier, outcome_judge, validator, memory_ranker, 
       context_selector, combat, progression, scale_selector, 
-      npc_reaction, relationship_analyzer, session_zero
-    - THINKING: director, research
-    - CREATIVE: key_animator, calibration (prose generation)
+      relationship_analyzer, session_zero, compactor, scope
+    - THINKING: director, research, world_builder, profile_merge
+    - CREATIVE: key_animator (prose generation)
     
     The 'base_fast', 'base_thinking', and 'base_creative' fields serve as 
     fallbacks when an agent is not explicitly configured.
@@ -46,7 +46,7 @@ class AgentSettings(BaseModel):
     )
     base_creative: Optional[ModelConfig] = Field(
         default=None,
-        description="Default model for creative-tier agents (key_animator, calibration) - prose generation"
+        description="Default model for creative-tier agents (key_animator) - prose generation"
     )
     
     # === CORE AGENTS (Phase 1) ===
@@ -90,13 +90,20 @@ class AgentSettings(BaseModel):
         default=None,
         description="Model for narrative scale selection (fast model preferred)"
     )
-    npc_reaction: Optional[ModelConfig] = Field(
+    # === MEMORY & COMPRESSION ===
+    compactor: Optional[ModelConfig] = Field(
         default=None,
-        description="Model for NPC disposition changes (balanced model preferred)"
+        description="Model for memory compaction (fast model preferred)"
     )
-    calibration: Optional[ModelConfig] = Field(
+    
+    # === RESEARCH SUPPORT ===
+    scope: Optional[ModelConfig] = Field(
         default=None,
-        description="Model for player preference calibration (balanced model preferred)"
+        description="Model for series scope/complexity detection (fast model preferred)"
+    )
+    profile_merge: Optional[ModelConfig] = Field(
+        default=None,
+        description="Model for multi-source profile merging (thinking model preferred)"
     )
     
     # === DIRECTOR LAYER (Phase 4) ===
