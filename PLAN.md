@@ -80,7 +80,7 @@
 
 ---
 
-### 5. 15-Message Working Memory Window is Aggressively Short
+### 5. 15-Message Working Memory Window is Aggressively Short ✅ DONE
 
 **Problem:** `WINDOW_SIZE = 15` in `game.py:1317` means ~7-8 player+DM exchanges before compaction kicks in. At 5-minute turns, that's ~40 minutes of verbatim context. Compaction preserves emotional texture but loses specific dialogue, callbacks, and atmospheric details. By turn 50, turns 1-35 exist only as compacted beats (~200 words each) or decayed ChromaDB entries.
 
@@ -108,7 +108,7 @@
 
 ---
 
-### 7. Heat Decay is Too Aggressive for Secondary Characters
+### 7. Heat Decay is Too Aggressive for Secondary Characters ✅ DONE
 
 **Problem:** An NPC introduced at turn 1 with `decay_rate="slow"` (0.95/turn) drops to ~38% heat by turn 20 if never re-accessed. The boost-on-access mechanism (+20 heat, `memory.py:374`) only fires if the memory is already retrieved — creating a death spiral where low-heat memories stop surfacing.
 
