@@ -27,6 +27,9 @@ from .foreshadowing import ForeshadowingLedger
 # Phase 2: Pre-turn Pacing (#1)
 from ..agents.pacing_agent import PacingAgent, PacingDirective
 
+# Phase 3: Session recap (#18)
+from ..agents.recap_agent import RecapAgent
+
 # Override Handler (META/OVERRIDE commands)
 from ..agents.override_handler import OverrideHandler
 from ..db.session import create_session
@@ -94,6 +97,10 @@ class Orchestrator:
         
         # Pre-turn Pacing micro-check (#1)
         self.pacing_agent = PacingAgent()
+        
+        # Session recap (#18)
+        self.recap_agent = RecapAgent()
+        self._recap_generated = False  # True after first turn's recap
         
         # Relationship Analyzer (NPC Intelligence, fast model)
         self.relationship_analyzer = RelationshipAnalyzer()
@@ -390,6 +397,7 @@ class Orchestrator:
             )
             ranked_memories = "No relevant past memories found."
             pacing_directive = None  # Skip pacing for trivial actions
+            recap_result = None  # #18: No recap on trivial actions
         else:
             # Normal path: parallel OutcomeJudge and MemoryRanker
             # Build power context for the Outcome Judge
@@ -433,8 +441,47 @@ class Orchestrator:
             )
             
             # Wait for all three to complete (parallel execution)
+            recap_task = None
+            
+            # #18: Session recap on first gameplay turn (non-blocking)
+            if not self._recap_generated and db_context.turn_number <= 2:
+                bible = self.state.get_campaign_bible()
+                arc_history = []
+                if bible and bible.planning_data:
+                    arc_history = bible.planning_data.get('arc_history', [])
+                
+                # Only generate recap if we have story to recap
+                if arc_history or db_context.director_notes:
+                    # Get top narrative_beat memories
+                    beat_mems = []
+                    try:
+                        beat_results = self.memory.search(
+                            "important emotional narrative moment",
+                            limit=5, min_heat=20.0,
+                            memory_type="narrative_beat",
+                            boost_on_access=False
+                        )
+                        beat_mems = [m['content'] for m in beat_results] if beat_results else []
+                    except Exception:
+                        pass
+                    
+                    recap_task = asyncio.create_task(
+                        self.recap_agent.generate_recap(
+                            arc_history=arc_history,
+                            narrative_beats=beat_mems,
+                            director_notes=db_context.director_notes,
+                            current_situation=db_context.situation,
+                            character_name=db_context.character_name,
+                            arc_phase=db_context.arc_phase,
+                        )
+                    )
+            
+            tasks_to_gather = [outcome_task, memory_rank_task, pacing_task]
+            if recap_task:
+                tasks_to_gather.append(recap_task)
+            
             phase2_results = await asyncio.gather(
-                outcome_task, memory_rank_task, pacing_task,
+                *tasks_to_gather,
                 return_exceptions=True
             )
             
@@ -453,6 +500,16 @@ class Orchestrator:
                 pacing_directive = None
             elif pacing_directive:
                 print(f"[PacingAgent] Beat: {pacing_directive.arc_beat}, Tone: {pacing_directive.tone}, Escalation: {pacing_directive.escalation_target:.0%}")
+            
+            # #18: Extract recap result (index 3, if present)
+            recap_result = None
+            if recap_task and len(phase2_results) > 3:
+                recap_result = phase2_results[3]
+                if isinstance(recap_result, Exception):
+                    print(f"[Orchestrator] Recap generation failed (non-fatal): {recap_result}")
+                    recap_result = None
+                elif recap_result:
+                    print(f"[RecapAgent] Recap generated: {len(recap_result.recap_text)} chars")
         
         current_turn.outcome = outcome
         
@@ -735,6 +792,22 @@ class Orchestrator:
         print(f"[Orchestrator]   - empty: {not narrative or narrative.strip() == ''}")
         
         current_turn.narrative = narrative
+        
+        # =====================================================================
+        # #18: Prepend session recap on first gameplay turn
+        # =====================================================================
+        if not self._recap_generated and recap_result is not None:
+            self._recap_generated = True
+            recap_text = (
+                f"---\n\n"
+                f"**\U0001f3ac Previously On...**\n\n"
+                f"{recap_result.recap_text}\n\n"
+            )
+            if recap_result.key_threads:
+                recap_text += "**Active Threads:** " + " \u2022 ".join(recap_result.key_threads) + "\n\n"
+            recap_text += "---\n\n"
+            narrative = recap_text + narrative
+            print(f"[Orchestrator] Recap prepended ({len(recap_text)} chars)")
         
         # =====================================================================
         # CRITICAL PATH: OP suggestion display (mutates narrative before return)
