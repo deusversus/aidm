@@ -663,6 +663,10 @@ class StateManager:
                 "tags": row.tags or [],
                 "related_npcs": row.related_npcs or [],
                 "related_locations": row.related_locations or [],
+                # Causal chains (#11) — were missing, causing silent data loss on restart
+                "depends_on": row.depends_on or [],
+                "triggers": row.triggers or [],
+                "conflicts_with": row.conflicts_with or [],
             })
         return seeds
     
@@ -1159,9 +1163,17 @@ class StateManager:
             if len(arc_history) > 10:
                 arc_history = arc_history[-10:]
             
-            # Merge: new data overwrites current fields, but preserves arc_history
+            # Ensure active_threads is always present (#5 — multi-arc thread tracking)
+            # Director can populate threads during review pass; we ensure the key exists.
+            active_threads = existing.get("active_threads", [])
+            if "active_threads" in planning_data:
+                # Director provided updated threads — use them
+                active_threads = planning_data["active_threads"]
+
+            # Merge: new data overwrites current fields, but preserves arc_history + active_threads
             merged = {**existing, **planning_data}
             merged["arc_history"] = arc_history
+            merged["active_threads"] = active_threads
             
             bible.planning_data = merged
             bible.bible_version = (bible.bible_version or 0) + 1
