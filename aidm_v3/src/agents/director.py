@@ -8,7 +8,6 @@ arc decisions.
 
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel, Field
-from pathlib import Path
 
 from .base import AgenticAgent
 from ..llm import get_llm_manager
@@ -56,12 +55,10 @@ class DirectorAgent(AgenticAgent):
     def __init__(self, model_override: Optional[str] = None):
         super().__init__(model_override=model_override)
         
-        # Load the base system prompt
-        prompt_path = Path(__file__).parent.parent.parent / "prompts" / "director.md"
-        if prompt_path.exists():
-            self._base_prompt = prompt_path.read_text(encoding="utf-8")
-        else:
-            self._base_prompt = "You are the Director. Plan the campaign flow."
+        # Load the base system prompt via shared helper
+        self._base_prompt = self._load_prompt_file(
+            "director.md", "You are the Director. Plan the campaign flow."
+        )
 
     @property
     def system_prompt(self):

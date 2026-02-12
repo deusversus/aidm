@@ -355,7 +355,7 @@ For a system whose philosophy is "story > simulation," having a hard mechanical 
 
 ---
 
-### 22. Agent Naming Inconsistencies Break Model Selection
+### 22. Agent Naming Inconsistencies Break Model Selection ✅ DONE
 
 **Problem:** Many agents reference `get_provider_for_agent(self.agent_name)` but `agent_name` values are inconsistent — some use snake_case, some use class names. `EXTENDED_THINKING_AGENTS` in `base.py:95-99` lists `"research"` which doesn't match any agent's `agent_name` (should be `"anime_research"`).
 

@@ -1,11 +1,15 @@
 """Base agent class for all AIDM agents."""
 
 from abc import ABC, abstractmethod
+from pathlib import Path
 from typing import Any, Type, Optional, Tuple
 from pydantic import BaseModel
 
 from ..llm import get_llm_manager, LLMProvider
 from ..settings import get_settings_store
+
+# Shared prompts directory (aidm_v3/prompts/)
+_PROMPTS_DIR = Path(__file__).parent.parent.parent / "prompts"
 
 
 class BaseAgent(ABC):
@@ -26,6 +30,19 @@ class BaseAgent(ABC):
             model_override: Specific model to use (overrides settings)
         """
         self._model_override = model_override
+    
+    @staticmethod
+    def _load_prompt_file(filename: str, fallback: str = "") -> str:
+        """Load a system prompt from prompts/{filename}.
+        
+        Args:
+            filename: e.g. 'compactor.md'
+            fallback: returned if file doesn't exist
+        """
+        path = _PROMPTS_DIR / filename
+        if path.exists():
+            return path.read_text(encoding="utf-8").strip()
+        return fallback
     
     def _get_provider_and_model(self) -> Tuple[LLMProvider, str]:
         """Get the provider and model for this agent from settings.
