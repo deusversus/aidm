@@ -652,6 +652,25 @@ class Orchestrator:
                     npc_context += f"\n\n[Spotlight Hint] These NPCs need more screen time: {', '.join(underserved)}"
             print(f"[Orchestrator] NPC context: {len(pre_narr_npcs)} NPCs present")
         
+        # === FORESHADOWING CALLBACKS (#9) ===
+        # Surface seeds that are ready for payoff to the KeyAnimator
+        callback_seeds = self.foreshadowing.get_callback_opportunities(db_context.turn_number)
+        if callback_seeds:
+            callbacks = []
+            for seed in callback_seeds[:3]:  # Cap at 3 to avoid context bloat
+                seed_type_val = seed.seed_type.value if hasattr(seed.seed_type, 'value') else str(seed.seed_type)
+                callbacks.append(
+                    f"- **{seed_type_val}**: {seed.description} "
+                    f"(planted turn {seed.planted_turn}, payoff: {seed.expected_payoff})"
+                )
+            rag_context["foreshadowing_callbacks"] = (
+                "## \U0001f3ad Callback Opportunities\n"
+                "These story threads are READY for payoff. Weave them into the narrative "
+                "if the situation permits \u2014 don't force them.\n\n"
+                + "\n".join(callbacks)
+            )
+            print(f"[Foreshadowing] Injected {len(callbacks)} callback opportunities for KeyAnimator")
+        
         # === AGENTIC RESEARCH TOOLS (Module 2) ===
         # Build gameplay tools for KeyAnimator's optional research phase
         from ..agents.gameplay_tools import build_gameplay_tools
@@ -953,13 +972,33 @@ class Orchestrator:
                                 self.state.increment_npc_scene_count(npc_name, db_context.turn_number)
                 
                     # =============================================================
-                    # 6. FORESHADOWING DETECTION
+                    # 6. FORESHADOWING DETECTION + AUTO-RESOLVE (#9)
                     # =============================================================
                     mentioned_seeds = self.foreshadowing.detect_seed_in_narrative(
                         narrative=narrative,
                         current_turn=db_context.turn_number
                     )
                     overdue_seeds = self.foreshadowing.get_overdue_seeds(db_context.turn_number)
+                    
+                    # Auto-resolve: if a callback/overdue seed was mentioned, it's been paid off
+                    for seed_id in mentioned_seeds:
+                        seed = self.foreshadowing._seeds.get(seed_id)
+                        if seed and seed.status.value in ("callback", "overdue"):
+                            self.foreshadowing.resolve_seed(
+                                seed_id, db_context.turn_number,
+                                resolution_narrative=f"Paid off in turn {db_context.turn_number} narrative"
+                            )
+                            print(f"[Foreshadowing] Auto-resolved seed '{seed_id}': {seed.description}")
+                    
+                    # #12: Overdue seeds escalate world tension
+                    if overdue_seeds:
+                        tension_bump = len(overdue_seeds) * 0.05  # +0.05 per overdue seed
+                        world = self.state.get_world_state()
+                        current_tension = getattr(world, 'tension_level', 0.5) if world else 0.5
+                        current_tension = current_tension or 0.5
+                        new_tension = min(1.0, current_tension + tension_bump)
+                        self.state.update_world_state(tension_level=new_tension)
+                        print(f"[Foreshadowing] {len(overdue_seeds)} overdue seeds → tension {current_tension:.2f} → {new_tension:.2f}")
                     
                     # =============================================================
                     # 7. DIRECTOR HYBRID TRIGGER
@@ -1020,6 +1059,7 @@ class Orchestrator:
                                 state=self.state,
                                 foreshadowing=self.foreshadowing,
                                 current_turn=db_context.turn_number,
+                                session_number=db_context.session_id,
                                 session_transcript=recent_messages,
                                 profile_library=get_profile_library(),
                                 profile_id=self.profile_id,

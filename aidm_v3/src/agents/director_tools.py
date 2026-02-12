@@ -17,6 +17,7 @@ def build_director_tools(
     state: Any,          # StateManager
     foreshadowing: Any,  # ForeshadowingLedger
     current_turn: int,
+    session_number: int = 1,
     session_transcript: list = None,
     profile_library: Any = None,  # ProfileLibrary (for lore search)
     profile_id: str = None,       # Active profile ID (for lore search)
@@ -31,6 +32,7 @@ def build_director_tools(
         state: StateManager instance
         foreshadowing: ForeshadowingLedger instance
         current_turn: Current turn number (for foreshadowing timing)
+        session_number: Current session number (for seed planting)
         session_transcript: Recent messages
         profile_library: ProfileLibrary instance for lore search (optional)
         profile_id: Active profile ID for scoping lore search (optional)
@@ -70,6 +72,26 @@ def build_director_tools(
         ),
         parameters=[],
         handler=lambda: _get_overdue_seeds(foreshadowing, current_turn)
+    ))
+    
+    registry.register(ToolDefinition(
+        name="plant_foreshadowing_seed",
+        description=(
+            "Plant a new foreshadowing seed for future payoff. Use this to set up "
+            "mysteries, character reveals, threats, promises, or Chekhov's guns. "
+            "Seeds will be tracked and surfaced to the KeyAnimator when ready for callback."
+        ),
+        parameters=[
+            ToolParam("seed_type", "str", "Type: plot, character, mystery, threat, promise, chekhov, relationship", required=True),
+            ToolParam("description", "str", "What this seed sets up (for tracking)", required=True),
+            ToolParam("planted_narrative", "str", "How it was introduced in the story", required=True),
+            ToolParam("expected_payoff", "str", "How this should pay off later", required=True),
+            ToolParam("tags", "str", "Comma-separated keywords for narrative detection", required=False),
+            ToolParam("related_npcs", "str", "Comma-separated NPC names involved", required=False),
+            ToolParam("min_payoff_turns", "int", "Minimum turns before payoff (default 5)", required=False),
+            ToolParam("max_payoff_turns", "int", "Maximum turns before overdue (default 50)", required=False),
+        ],
+        handler=lambda **kwargs: _plant_seed(foreshadowing, current_turn, session_number, **kwargs)
     ))
     
     # -----------------------------------------------------------------
@@ -175,6 +197,49 @@ def _get_overdue_seeds(foreshadowing, current_turn: int) -> List[Dict]:
         for s in overdue
     ]
 
+
+def _plant_seed(foreshadowing, current_turn: int, session_number: int, **kwargs) -> Dict:
+    """Plant a new foreshadowing seed via Director tool call."""
+    from ..core.foreshadowing import SeedType
+    
+    # Parse seed_type string to enum
+    seed_type_str = kwargs.get("seed_type", "plot").lower().strip()
+    try:
+        seed_type = SeedType(seed_type_str)
+    except ValueError:
+        return {"error": f"Invalid seed_type '{seed_type_str}'. Valid: plot, character, mystery, threat, promise, chekhov, relationship"}
+    
+    # Parse comma-separated lists
+    tags = [t.strip() for t in kwargs.get("tags", "").split(",") if t.strip()] if kwargs.get("tags") else []
+    related_npcs = [n.strip() for n in kwargs.get("related_npcs", "").split(",") if n.strip()] if kwargs.get("related_npcs") else []
+    
+    # Parse payoff windows
+    min_payoff = int(kwargs.get("min_payoff_turns", 5))
+    max_payoff = int(kwargs.get("max_payoff_turns", 50))
+    
+    seed_id = foreshadowing.plant_seed(
+        seed_type=seed_type,
+        description=kwargs["description"],
+        planted_narrative=kwargs["planted_narrative"],
+        expected_payoff=kwargs["expected_payoff"],
+        turn_number=current_turn,
+        session_number=session_number,
+        tags=tags,
+        related_npcs=related_npcs,
+        min_payoff=min_payoff,
+        max_payoff=max_payoff,
+    )
+    
+    print(f"[Foreshadowing] Seed planted: {seed_id} ({seed_type_str}) — {kwargs['description'][:60]}")
+    
+    return {
+        "planted": True,
+        "seed_id": seed_id,
+        "type": seed_type_str,
+        "description": kwargs["description"],
+        "min_payoff_turns": min_payoff,
+        "max_payoff_turns": max_payoff,
+    }
 
 def _get_spotlight_analysis(state) -> Dict:
     """Combined spotlight debt and NPC relationship overview."""
