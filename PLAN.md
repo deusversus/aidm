@@ -9,7 +9,6 @@
 | ✅ DONE | Completed in recent sessions |
 | 🔧 PARTIAL | Partially implemented |
 | 🔥 HIGH PRIORITY | Top 5 impact items |
-| ⚠️ DEFER | Lower priority or blocked on dependencies |
 
 ---
 
@@ -56,7 +55,7 @@
 
 **Tension to resolve:** Hard gates risk feeling mechanical. Should gates be "strong suggestions" or actual constraints? How does the player retain agency to delay or accelerate?
 
-> **Engineer review:** Skeptical of explicit gate conditions — they assume the Director can write good gates AND the micro-check can evaluate them reliably. **Prefer pacing pressure over hard gates:** Add `turns_in_phase: int` to WorldState (concrete deliverable). The micro-check then applies implicit pressure: "You've been in rising_action for 12 turns. Consider escalating." Softer than hard gates but still prevents 50-turn stalls. The gate conditions themselves are Director prompt engineering, not code.
+> **Engineer review:** Add `turns_in_phase: int` to WorldState. Design PacingDirective with a `strength` field (`suggestion | strong | override`) so the Director can escalate from nudge to hard constraint when stalls persist. All three strengths ship when PacingDirective ships — no incremental rollout. Gate evaluation logic lives in the pre-turn micro-check.
 
 ---
 
@@ -92,7 +91,7 @@
 
 **Tension to resolve:** Larger windows increase token cost per turn. Pinned messages add complexity. Is the real fix better compaction rather than a wider window?
 
-> **Engineer review:** Partially disagree. We already implemented smart compaction with emotional texture preservation. **Modest increase to `WINDOW_SIZE = 20`** is sufficient (~30% more tokens, offset by cache hits). Skip pinned messages — they add UI complexity with marginal benefit. The real prize is a **"deep recall" GameplayTool** that lets KeyAnimator query `Turn.narrative` SQL by NPC/location/turn range. This data exists but is inaccessible to agents. Trivially implementable.
+> **Engineer review:** Increase `WINDOW_SIZE` to 20. Build **both** pinned messages and deep recall (#30) — they solve different problems. Deep recall is reactive (agent must decide to search). Pinned messages are proactive (critical exchanges always present regardless of whether the agent thinks to look). The failure mode of reactive-only: KeyAnimator generates a scene without callbacks because it didn't know to search for the emotionally significant moment. Both ship in Phase 3.
 
 ---
 
@@ -233,7 +232,7 @@
 
 ---
 
-### 15. Composition Mode Not Recalculated Per-Turn ⚠️ DEFER
+### 15. Composition Mode Not Recalculated Per-Turn
 
 **Problem:** `get_effective_composition()` in `loader.py:224-303` calculates the narrative composition mode (standard/blended/op_dominant) once at profile load time based on a static power differential. But the threat tier changes per encounter — a T7 character fighting a T3 mob vs. a T7 boss should trigger different composition modes. The current system doesn't recalculate.
 
@@ -244,7 +243,7 @@
 
 **Tension to resolve:** Does per-turn recalculation cause narrative whiplash? (One turn is "standard" dialogue, next is "OP dominant" combat, then back.) Maybe composition should be per-scene, not per-turn.
 
-> **⚠️ Engineer review:** Low priority. Most sessions don't have wildly varying threat tiers turn-to-turn. Recalculate on explicit Director directive (phase transition to "climax" implies boss tier), not every turn. This is a **Phase 5 item disguised as Phase 4**.
+> **Engineer review:** Ships with #13-14 in Phase 4 — composition recalculation is part of the rule library wiring, not separate. Recalculate per-scene (Director phase transitions), not per-turn, to avoid whiplash.
 
 ---
 
@@ -280,7 +279,7 @@
 
 **Tension to resolve:** Structured consequences require classification (another LLM call or heuristic). Is the juice worth the squeeze for typical session lengths?
 
-> **Engineer review:** Functionally ugly but working for sessions under 50 turns. Do this **when the Director overhaul lands (#1-3)**, since a structured Director naturally produces structured consequences. Don't build the Consequence model in isolation.
+> **Engineer review:** Build the proper `Consequence` SQLAlchemy model with `turn`, `description`, `category`, `severity`, `active`, `expires_turn`. No JSON stopgap — do it right the first time. Ships in Phase 5 with the full model, not a lightweight placeholder.
 
 ---
 
@@ -339,7 +338,7 @@ For a system whose philosophy is "story > simulation," having a hard mechanical 
 
 **Tension to resolve:** Some players want mechanical consistency (resources matter). Others want pure narrative. Should this be a campaign-level setting?
 
-> **🔧 Engineer review: PARTIALLY DONE.** The `StateTransaction` system (with `begin_transaction()` / `validate()`) that we just built IS effectively the `ResourceGuard`. It handles before-value verification and constraint checking for MP/SP costs within the `deferred_commit()` block. What remains: extract the narrative sensibility checks into a standalone component and remove overlap with entity extraction. Don't create a separate `ResourceGuard` class — `StateTransaction` already serves that role.
+> **🔧 Engineer review:** `StateTransaction` (with `begin_transaction()` / `validate()`) already serves as the ResourceGuard for MP/SP costs. When this ships in Phase 5: **full split** — extract NarrativeValidator into a standalone component, remove overlap with entity extraction, and delete the monolithic Validator.
 
 ---
 
@@ -446,6 +445,9 @@ For a system whose philosophy is "story > simulation," having a hard mechanical 
 | 22 | Fix agent naming inconsistencies | S | None | |
 | 21 | Extract inline prompts to files | M | None | |
 | 4 | Index narrative prose to memory | M | None | 🔥 |
+| 6 | Auto-detect plot-critical memories | S | #4 | |
+| 29 | ChromaDB error recovery | S | #4 | |
+| 30 | Deep recall GameplayTool | S | None | |
 
 ### Phase 2: Director Overhaul
 *Makes the system proactive instead of reactive.*
@@ -463,8 +465,7 @@ For a system whose philosophy is "story > simulation," having a hard mechanical 
 
 | # | Item | Effort | Deps | Status |
 |---|------|--------|------|--------|
-| 5 | Expand working memory + deep recall tool | M | None | |
-| 6 | Auto-detect plot-critical memories | M | #4 | |
+| 5 | Expand working memory + pinned messages + deep recall | M | None | |
 | 7 | Fix heat decay for secondary characters | S | None | |
 | ~~8~~ | ~~Wire or remove memory compression~~ | ~~S~~ | ~~None~~ | ✅ DONE |
 | 18 | "Previously On" recap system | M | #2 | |
@@ -476,7 +477,7 @@ For a system whose philosophy is "story > simulation," having a hard mechanical 
 |---|------|--------|------|--------|
 | 13 | Wire rule library retrieval methods | M | None | |
 | 14 | Static OP axis guidance injection | S | #13 | |
-| ~~15~~ | ~~Per-turn composition recalculation~~ | ~~M~~ | ~~#14~~ | ⚠️ *Moved to Phase 5* |
+| 15 | Per-turn composition recalculation | M | #14 | |
 | 16 | Enrich voice cards with DB data | M | None | 🔥 |
 
 ### Phase 5: Structural Refinement
@@ -484,20 +485,19 @@ For a system whose philosophy is "story > simulation," having a hard mechanical 
 
 | # | Item | Effort | Deps | Status |
 |---|------|--------|------|--------|
-| 17 | Structured consequences model | M | #1-3 | |
-| 20 | Split Validator into ResourceGuard + NarrativeValidator | M | None | 🔧 |
+| 17 | Structured consequences model (full `Consequence` SQLAlchemy model) | M | None | |
+| 20 | Full Validator split: ResourceGuard + NarrativeValidator | M | None | 🔧 |
 | 23 | Move combat resolution before narrative | M | None | 🔥 |
 | 24 | NPC intelligence transition narratives | S | #16 | |
 | 11 | Foreshadowing causal chains | M | #9 | |
-| 15 | Per-turn composition recalculation | M | #14 | ⚠️ |
 
 ### Phase 6: Session Zero Hardening
 *Foundation quality.*
 
 | # | Item | Effort | Deps | Status |
 |---|------|--------|------|--------|
-| 25 | Profile research confidence scoring | M | None | ⚠️ |
-| 26 | Hybrid merge rules + coherence check | M | None | ⚠️ |
+| 25 | Profile research confidence scoring | M | None | |
+| 26 | Hybrid merge rules + coherence check | M | None | |
 
 ---
 
@@ -578,7 +578,9 @@ These systems are working well and should be preserved:
 **Proposed Solution:**
 - Add try/except around ChromaDB operations with logging (don't propagate failures to the user)
 - ChromaDB writes are already idempotent (upsert semantics), so retrying on next turn is safe
-- Consider a "pending memory" queue in SQL that's drained by background processing, ensuring SQL stays the source of truth
+- Implement a "pending memory" queue in SQL that's drained by background processing, ensuring SQL stays the source of truth
+
+> **Engineer review:** Ships with Phase 1 alongside #4 — we're touching memory writes anyway, add the resilience layer at the same time. Known gap, not speculative.
 
 ---
 
