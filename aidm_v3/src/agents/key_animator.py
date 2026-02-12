@@ -1141,6 +1141,24 @@ MATCH the established voice, humor, and style from these exchanges.
         scene_context += "\n\n" + self._build_outcome_section(intent, outcome)
         dynamic_parts.append(f"## Scene Context\n\n{scene_context}")
         
+        # Pacing Directive — pre-turn micro-check (#1)
+        pacing = retrieved_context.get("pacing_directive") if retrieved_context else None
+        if pacing:
+            pacing_text = (
+                f"## \U0001f3ac Pacing Directive (This Turn)\n\n"
+                f"**Beat**: {pacing.arc_beat} | **Tone**: {pacing.tone} | "
+                f"**Escalation**: {pacing.escalation_target:.0%}\n"
+            )
+            if pacing.must_reference:
+                pacing_text += f"**Must reference**: {', '.join(pacing.must_reference)}\n"
+            if pacing.avoid:
+                pacing_text += f"**Avoid**: {', '.join(pacing.avoid)}\n"
+            if pacing.foreshadowing_hint:
+                pacing_text += f"**Foreshadowing**: {pacing.foreshadowing_hint}\n"
+            if pacing.pacing_note:
+                pacing_text += f"\n{pacing.pacing_note}\n"
+            dynamic_parts.append(pacing_text)
+        
         # Director Notes
         director_notes = getattr(context, "director_notes", None) or "(No specific guidance this turn)"
         dynamic_parts.append(f"## Director Notes\n\n{director_notes}")

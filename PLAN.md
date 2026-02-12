@@ -14,7 +14,7 @@
 
 ## I. STRUCTURAL / ARCHITECTURAL (The Director Problem)
 
-### 1. The Director is Retrospective, Not Proactive
+### 1. The Director is Retrospective, Not Proactive ✅ DONE
 
 **Problem:** The Director runs *after* narrative is returned to the player (`asyncio.create_task` in background, `orchestrator.py:728-740`). It fires every 3-8 turns based on accumulated epicness or elapsed time (`orchestrator.py:963-987`). This means it's perpetually one turn behind: if the player derails the arc at turn 3, the Director doesn't notice until turn 8+, leaving turns 3-8 narratively adrift. The KeyAnimator receives `director_notes` as raw text, not structured pacing directives.
 
@@ -454,7 +454,7 @@ For a system whose philosophy is "story > simulation," having a hard mechanical 
 
 | # | Item | Effort | Deps | Status |
 |---|------|--------|------|--------|
-| 1 | Pre-turn Director micro-check | L | None | 🔥 |
+| 1 | Pre-turn Director micro-check | L | None | ✅ DONE |
 | 2 | Versioned Campaign Bible schema | M | #1 | |
 | 3 | Arc pacing gates | M | #1, #2 | |
 | 9 | Wire foreshadowing into turn loop | M | #10 | ✅ DONE |
