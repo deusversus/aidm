@@ -142,6 +142,9 @@ class Orchestrator:
         # 1. Get current DB context (fast, sync)
         db_context = self.state.get_context()
         
+        # #17: Expire old consequences at turn start
+        self.state.expire_consequences(db_context.turn_number)
+        
         # =====================================================================
         # PHASE 1a: Intent Classification (fast, ~1s)
         # Run first to determine memory tier for RAG
@@ -513,6 +516,50 @@ class Orchestrator:
         
         current_turn.outcome = outcome
         
+        # =====================================================================
+        # #23: PRE-NARRATIVE COMBAT RESOLUTION
+        # Combat MUST resolve before KeyAnimator so narrative reflects actual
+        # mechanical outcomes (hit/miss/damage). HP/state changes are applied
+        # in _post_narrative_processing to keep critical path fast.
+        # =====================================================================
+        combat_occurred = False
+        combat_result = None
+        if intent.intent == "COMBAT" or "attack" in intent.action.lower():
+            combat_occurred = True
+            combat_action = self.combat.parse_combat_action(intent, player_input)
+            character = self.state.get_character()
+            target = self.state.get_target(combat_action.target)
+            
+            if character and target:
+                # Pre-validate resource costs via StateTransaction
+                if combat_action.action_type in ("spell", "skill"):
+                    resource_path = "resources.mp.current" if combat_action.action_type == "spell" else "resources.sp.current"
+                    resource_cost = 20 if combat_action.action_type == "spell" else 15
+                    
+                    with self.state.begin_transaction(f"{combat_action.action_type.title()} resource cost") as txn:
+                        txn.subtract(resource_path, resource_cost, reason=f"{combat_action.action_type.title()} cost")
+                        validation = txn.validate()
+                        if not validation.is_valid:
+                            combat_occurred = False
+                            for err in validation.errors:
+                                print(f"[Transaction] Pre-validation failed: {err.message}")
+                            txn.rollback()
+                        # If valid, txn auto-commits on exit
+                
+                if combat_occurred:
+                    combat_result = await self.combat.resolve_action(
+                        action=combat_action,
+                        attacker=character,
+                        target_entity=target,
+                        context=db_context,
+                        profile=self.profile
+                    )
+                    print(f"[Combat] Pre-narrative resolution: {combat_result.damage_dealt} damage, hit={combat_result.hit}")
+        
+        # Store for _post_narrative_processing bookkeeping
+        self._last_combat_occurred = combat_occurred
+        self._last_combat_result = combat_result
+        
         # Assemble final RAG context
         rag_context = {
             "memories": ranked_memories,
@@ -666,6 +713,106 @@ class Orchestrator:
             if faction_context:
                 rag_context["faction_guidance"] = faction_context
         
+        # =====================================================================
+        # #13: RULE LIBRARY WIRING — Structural guidance from dead methods
+        # =====================================================================
+        
+        # 1. DNA Narration Guidance: inject for extreme DNA scales (≤3 or ≥7)
+        if self.profile.dna:
+            dna_parts = []
+            # Sort by extremity (distance from 5), take top 3
+            extreme_scales = sorted(
+                self.profile.dna.items(),
+                key=lambda x: abs(x[1] - 5),
+                reverse=True
+            )[:3]
+            for scale_name, value in extreme_scales:
+                if value <= 3 or value >= 7:  # Only inject for extreme values
+                    guidance = self.rules.get_dna_guidance(scale_name, value)
+                    if guidance:
+                        level = "HIGH" if value >= 7 else "LOW"
+                        dna_parts.append(f"**{scale_name.title()} ({level}, {value}/10):** {guidance}")
+            if dna_parts:
+                rag_context["dna_guidance"] = (
+                    "## 🧬 DNA Narration Style\n"
+                    "Adapt your writing to match these narrative DNA settings:\n\n"
+                    + "\n\n".join(dna_parts)
+                )
+                print(f"[RuleLibrary] Injected DNA guidance for {len(dna_parts)} extreme scales")
+        
+        # 2. Genre Guidance: structural storytelling guidance for detected genres
+        if self.profile.detected_genres:
+            genre_parts = []
+            for genre in self.profile.detected_genres[:2]:  # Cap at 2 genres
+                guidance = self.rules.get_genre_guidance(genre)
+                if guidance:
+                    genre_parts.append(f"**{genre.title()}:** {guidance}")
+            if genre_parts:
+                rag_context["genre_guidance"] = (
+                    "## 📚 Genre Framework\n"
+                    "Structure scenes according to these genre conventions:\n\n"
+                    + "\n\n".join(genre_parts)
+                )
+                print(f"[RuleLibrary] Injected genre guidance: {', '.join(g for g in self.profile.detected_genres[:2])}")
+        
+        # 3. Scale Guidance: narrative scale for current story scope
+        if db_context.narrative_scale:
+            scale_guidance = self.rules.get_scale_guidance(db_context.narrative_scale)
+            if scale_guidance:
+                rag_context["scale_guidance"] = (
+                    f"## 🌍 Narrative Scale: {db_context.narrative_scale.upper()}\n"
+                    f"{scale_guidance}"
+                )
+                print(f"[RuleLibrary] Injected scale guidance: {db_context.narrative_scale}")
+        
+        # 4. Compatibility Guidance: tier×scale combo guidance for Director-aware narration
+        power_tier_str = db_context.power_tier or self.profile.world_tier or "T8"
+        try:
+            tier_num = int(power_tier_str.replace("T", "").replace("t", ""))
+        except (ValueError, AttributeError):
+            tier_num = 8
+        if db_context.narrative_scale:
+            compat_guidance = self.rules.get_compatibility_guidance(tier_num, db_context.narrative_scale)
+            if compat_guidance:
+                rag_context["compatibility_guidance"] = (
+                    f"## ⚖️ Power×Scale: T{tier_num} at {db_context.narrative_scale}\n"
+                    f"{compat_guidance}"
+                )
+                print(f"[RuleLibrary] Injected compatibility guidance: T{tier_num} × {db_context.narrative_scale}")
+        
+        # #17: Inject active consequences for narrative awareness
+        active_consequences = self.state.get_active_consequences(limit=8)
+        if active_consequences:
+            consequence_lines = []
+            for c in active_consequences:
+                severity_icon = {"minor": "•", "moderate": "▸", "major": "★", "catastrophic": "⚠"}.get(c["severity"], "•")
+                consequence_lines.append(
+                    f"{severity_icon} [{c['category'].title()}] {c['description']} *(turn {c['turn']})*"
+                )
+            rag_context["active_consequences"] = (
+                "## 📋 Active World Consequences\n"
+                "These are narrative consequences still in effect. Reference them for continuity:\n\n"
+                + "\n".join(consequence_lines)
+            )
+            print(f"[Consequence] Injected {len(active_consequences)} active consequences into context")
+        
+        # #23: Inject pre-resolved combat result for KeyAnimator
+        if combat_result:
+            combat_text = (
+                f"## ⚔️ Combat Resolution (pre-computed)\n"
+                f"**Hit:** {'Yes' if combat_result.hit else 'Miss'}\n"
+                f"**Damage Dealt:** {combat_result.damage_dealt}\n"
+            )
+            if hasattr(combat_result, 'damage_type') and combat_result.damage_type:
+                combat_text += f"**Damage Type:** {combat_result.damage_type}\n"
+            if hasattr(combat_result, 'critical') and combat_result.critical:
+                combat_text += f"**CRITICAL HIT!**\n"
+            if hasattr(combat_result, 'description') and combat_result.description:
+                combat_text += f"**Mechanical Detail:** {combat_result.description}\n"
+            combat_text += "\n*Narrate the above mechanical result. Do NOT contradict these numbers.*"
+            rag_context["combat_result"] = combat_text
+            print(f"[Combat] Injected combat result into KeyAnimator context")
+        
         # 3b. Validation Loop
         # Check if the outcome makes sense. If not, retry outcome generation with feedback.
         # Limit retries to avoid infinite loops.
@@ -711,7 +858,10 @@ class Orchestrator:
         
         # === UNIFIED POWER DIFFERENTIAL: Calculate effective composition ===
         # Blends profile composition with character OP settings based on power tier gap
+        # #15: Per-scene recalculation — pass current threat tier when available
         from ..profiles.loader import get_effective_composition
+        current_threat = getattr(outcome, 'target_tier', None)
+        prev_mode = (self.profile.composition or {}).get('mode', 'standard')
         effective_comp = get_effective_composition(
             profile_composition=self.profile.composition or {},
             world_tier=self.profile.world_tier or "T8",
@@ -719,11 +869,16 @@ class Orchestrator:
             character_op_enabled=db_context.op_protagonist_enabled,
             character_op_tension=db_context.op_tension_source,
             character_op_expression=db_context.op_power_expression,
-            character_op_focus=db_context.op_narrative_focus
+            character_op_focus=db_context.op_narrative_focus,
+            current_threat_tier=current_threat  # #15: encounter-responsive composition
         )
         # Inject effective composition into profile for KeyAnimator
         self.profile.composition = effective_comp
-        print(f"[Orchestrator] Power Differential: {effective_comp.get('differential', 0)} tiers, mode={effective_comp.get('mode', 'standard')}")
+        new_mode = effective_comp.get('mode', 'standard')
+        # #15: Log mode transitions (per-scene awareness for Director)
+        if prev_mode != new_mode:
+            print(f"[Composition] Mode transition: {prev_mode} → {new_mode} (threat: {current_threat or 'world baseline'})")
+        print(f"[Orchestrator] Power Differential: {effective_comp.get('differential', 0)} tiers, mode={new_mode}")
         
         # === NPC CONTEXT CARDS (Module 04) ===
         # Build structured NPC relationship data for disposition-aware narration
@@ -911,42 +1066,17 @@ class Orchestrator:
                 # =============================================================
                 with self.state.deferred_commit():
                     # =============================================================
-                    # 2. COMBAT RESOLUTION (conditional)
+                    # 2. COMBAT BOOKKEEPING (#23: resolution moved pre-narrative)
+                    # Apply HP/state changes from pre-resolved combat result
                     # =============================================================
-                    combat_occurred = False
-                    combat_result = None
-                    if intent.intent == "COMBAT" or "attack" in intent.action.lower():
-                        combat_occurred = True
-                        combat_action = self.combat.parse_combat_action(intent, player_input)
-                        character = self.state.get_character()
-                        target = self.state.get_target(combat_action.target)
-                        
-                        if character and target:
-                            # Pre-validate resource costs via StateTransaction
-                            if combat_action.action_type in ("spell", "skill"):
-                                resource_path = "resources.mp.current" if combat_action.action_type == "spell" else "resources.sp.current"
-                                resource_cost = 20 if combat_action.action_type == "spell" else 15
-                                
-                                with self.state.begin_transaction(f"{combat_action.action_type.title()} resource cost") as txn:
-                                    txn.subtract(resource_path, resource_cost, reason=f"{combat_action.action_type.title()} cost")
-                                    validation = txn.validate()
-                                    if not validation.is_valid:
-                                        combat_occurred = False
-                                        for err in validation.errors:
-                                            print(f"[Transaction] Pre-validation failed: {err.message}")
-                                        txn.rollback()
-                                    # If valid, txn auto-commits on exit (through _maybe_commit → deferred)
-                            
-                            if combat_occurred:
-                                combat_result = await self.combat.resolve_action(
-                                    action=combat_action,
-                                    attacker=character,
-                                    target_entity=target,
-                                    context=db_context,
-                                    profile=self.profile
-                                )
-                                if combat_result.damage_dealt > 0:
-                                    self.state.apply_combat_result(combat_result, target)
+                    combat_occurred = getattr(self, '_last_combat_occurred', False)
+                    combat_result = getattr(self, '_last_combat_result', None)
+                    if combat_occurred and combat_result:
+                        if combat_result.damage_dealt > 0:
+                            character = self.state.get_character()
+                            target = self.state.get_target(getattr(combat_result, 'target_name', None))
+                            if character and target:
+                                self.state.apply_combat_result(combat_result, target)
                                 
                                 char_state = {
                                     "hp_current": character.hp_current,
@@ -958,12 +1088,21 @@ class Orchestrator:
                                 if not post_validation.is_valid:
                                     for error in post_validation.errors:
                                         print(f"[Validator] {error.severity.value}: {error.description}")
+                        # Clear instance state
+                        self._last_combat_occurred = False
+                        self._last_combat_result = None
                 
                     # =============================================================
                     # 3. CONSEQUENCE + PROGRESSION
                     # =============================================================
                     if outcome.consequence:
-                        self.state.apply_consequence(outcome.consequence)
+                        self.state.apply_consequence(
+                            consequence=outcome.consequence,
+                            turn_number=db_context.turn_number,
+                            source_action=intent.action,
+                            narrative_weight=outcome.narrative_weight,
+                            category=getattr(outcome, 'consequence_category', None)
+                        )
                     
                     character = self.state.get_character()
                     progression_result = None
@@ -1248,6 +1387,42 @@ class Orchestrator:
         entity_task = self._extract_world_entities(narrative, turn_number)
         beat_task = self._extract_narrative_beats(narrative, turn_number)
         await asyncio.gather(entity_task, beat_task, return_exceptions=True)
+        
+        # #24: Check NPC intelligence evolution for NPCs present in scene
+        try:
+            from ..db.models import NPC
+            db = self.state._get_db()
+            campaign_npcs = db.query(NPC).filter(
+                NPC.campaign_id == self.state.campaign_id
+            ).all()
+            
+            for npc in campaign_npcs:
+                # Only check NPCs who appeared this turn (scene_count just incremented)
+                if npc.last_appeared == turn_number:
+                    evolution = self.state.evolve_npc_intelligence(npc.id)
+                    if evolution:
+                        # Only store narrative beats for major transitions
+                        if evolution["new_stage"] in ("anticipatory", "autonomous"):
+                            beat_text = (
+                                f"{evolution['npc_name']} has evolved to {evolution['new_stage']} intelligence "
+                                f"— they now {evolution['behavior_desc']}."
+                            )
+                            # Store as a high-importance memory for future narrative injection
+                            if self.memory:
+                                await self.memory.add_memory(
+                                    text=beat_text,
+                                    metadata={
+                                        "type": "npc_evolution",
+                                        "npc_name": evolution["npc_name"],
+                                        "stage": evolution["new_stage"],
+                                        "turn": turn_number,
+                                        "importance": "high"
+                                    },
+                                    turn_number=turn_number
+                                )
+                            print(f"[NPC Evolution] Stored narrative beat: {beat_text}")
+        except Exception as e:
+            print(f"[NPC Evolution] Intelligence check failed (non-fatal): {e}")
     
     async def _extract_world_entities(self, narrative: str, turn_number: int):
         """Extract world-building entities (NPCs, locations, items) from narrative."""

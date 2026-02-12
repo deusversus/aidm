@@ -70,6 +70,11 @@ class ForeshadowingSeed(BaseModel):
     tags: List[str] = Field(default_factory=list)
     related_npcs: List[str] = Field(default_factory=list)
     related_locations: List[str] = Field(default_factory=list)
+    
+    # Causal Chains (#11)
+    depends_on: List[str] = Field(default_factory=list)       # Seed IDs that must resolve first
+    triggers: List[str] = Field(default_factory=list)          # Seed IDs to plant on resolution
+    conflicts_with: List[str] = Field(default_factory=list)    # Seed IDs that can't coexist
 
 
 class ForeshadowingLedger:
@@ -123,6 +128,10 @@ class ForeshadowingLedger:
                     tags=row["tags"],
                     related_npcs=row["related_npcs"],
                     related_locations=row["related_locations"],
+                    # #11: Causal chains
+                    depends_on=row.get("depends_on", []),
+                    triggers=row.get("triggers", []),
+                    conflicts_with=row.get("conflicts_with", []),
                 )
                 self._seeds[seed.id] = seed
             
@@ -158,6 +167,10 @@ class ForeshadowingLedger:
                 "tags": seed.tags,
                 "related_npcs": seed.related_npcs,
                 "related_locations": seed.related_locations,
+                # #11: Causal chains
+                "depends_on": seed.depends_on,
+                "triggers": seed.triggers,
+                "conflicts_with": seed.conflicts_with,
             })
         except Exception as e:
             print(f"[Foreshadowing] Failed to persist seed {seed.id}: {e}")
@@ -182,7 +195,10 @@ class ForeshadowingLedger:
         tags: Optional[List[str]] = None,
         related_npcs: Optional[List[str]] = None,
         min_payoff: int = 5,
-        max_payoff: int = 50
+        max_payoff: int = 50,
+        depends_on: Optional[List[str]] = None,
+        triggers: Optional[List[str]] = None,
+        conflicts_with: Optional[List[str]] = None
     ) -> str:
         """
         Plant a new foreshadowing seed.
@@ -198,6 +214,9 @@ class ForeshadowingLedger:
             related_npcs: NPCs involved
             min_payoff: Minimum turns before payoff (avoid premature)
             max_payoff: Maximum turns before overdue
+            depends_on: (#11) Seed IDs that must resolve before callback
+            triggers: (#11) Seed IDs to auto-plant on resolution
+            conflicts_with: (#11) Seed IDs to abandon on resolution
             
         Returns:
             Seed ID
@@ -216,7 +235,10 @@ class ForeshadowingLedger:
             tags=tags or [],
             related_npcs=related_npcs or [],
             min_turns_to_payoff=min_payoff,
-            max_turns_to_payoff=max_payoff
+            max_turns_to_payoff=max_payoff,
+            depends_on=depends_on or [],
+            triggers=triggers or [],
+            conflicts_with=conflicts_with or [],
         )
         
         self._seeds[seed_id] = seed
@@ -246,17 +268,29 @@ class ForeshadowingLedger:
             )
     
     def check_callback_ready(self, seed_id: str, current_turn: int) -> bool:
-        """Check if a seed is ready for callback (payoff)."""
+        """Check if a seed is ready for callback (payoff).
+        
+        #11: Also checks that all dependencies are resolved.
+        """
         if seed_id not in self._seeds:
             return False
         
         seed = self._seeds[seed_id]
         turns_since_plant = current_turn - seed.planted_turn
         
-        return (
-            seed.status in [SeedStatus.PLANTED, SeedStatus.GROWING] and
-            turns_since_plant >= seed.min_turns_to_payoff
-        )
+        # Basic readiness
+        if not (seed.status in [SeedStatus.PLANTED, SeedStatus.GROWING] and
+                turns_since_plant >= seed.min_turns_to_payoff):
+            return False
+        
+        # #11: Dependency gate — all depends_on seeds must be resolved
+        if seed.depends_on:
+            for dep_id in seed.depends_on:
+                dep = self._seeds.get(dep_id)
+                if not dep or dep.status != SeedStatus.RESOLVED:
+                    return False
+        
+        return True
     
     def mark_callback(self, seed_id: str):
         """Mark a seed as ready for callback."""
@@ -265,7 +299,11 @@ class ForeshadowingLedger:
             self._update_seed_db(seed_id, status=SeedStatus.CALLBACK.value)
     
     def resolve_seed(self, seed_id: str, turn_number: int, resolution_narrative: str):
-        """Resolve a seed (successful payoff)."""
+        """Resolve a seed (successful payoff).
+        
+        #11: Also triggers causal chain effects — auto-abandons conflicting
+        seeds and logs triggered seeds for the Director to plant.
+        """
         if seed_id in self._seeds:
             seed = self._seeds[seed_id]
             seed.status = SeedStatus.RESOLVED
@@ -278,6 +316,20 @@ class ForeshadowingLedger:
                 resolved_turn=turn_number,
                 resolution_narrative=resolution_narrative[:500]
             )
+            
+            # #11: Causal chain — abandon conflicting seeds
+            for conflict_id in seed.conflicts_with:
+                if conflict_id in self._seeds:
+                    conflict_seed = self._seeds[conflict_id]
+                    if conflict_seed.status not in (SeedStatus.RESOLVED, SeedStatus.ABANDONED):
+                        self.abandon_seed(conflict_id, reason=f"Conflicting seed {seed_id} resolved")
+                        print(f"[Foreshadowing] Auto-abandoned {conflict_id} (conflicts with resolved {seed_id})")
+            
+            # #11: Causal chain — store triggered seed IDs for Director to plant
+            # We don't auto-plant here because triggered seeds need Director context
+            # (description, expected_payoff, etc). Instead, surface them in director context.
+            if seed.triggers:
+                print(f"[Foreshadowing] Seed {seed_id} resolved — triggers pending: {seed.triggers}")
     
     def abandon_seed(self, seed_id: str, reason: str = ""):
         """Abandon a seed (explicitly drop it)."""
@@ -357,7 +409,7 @@ class ForeshadowingLedger:
         # Overdue
         overdue = self.get_overdue_seeds(current_turn)
         if overdue:
-            lines.append(f"\n### ⚠️ OVERDUE ({len(overdue)})")
+            lines.append(f"\n### \u26a0\ufe0f OVERDUE ({len(overdue)})")
             for seed in overdue:
                 turns_over = current_turn - seed.planted_turn - seed.max_turns_to_payoff
                 lines.append(f"- **{seed.description}** ({turns_over} turns overdue)")
@@ -369,7 +421,73 @@ class ForeshadowingLedger:
             for seed in growing[:3]:
                 lines.append(f"- {seed.description} (mentions: {seed.mentions})")
         
+        # #11: Convergence detection — seeds sharing dependencies approaching callback
+        convergence = self._detect_convergence(current_turn)
+        if convergence:
+            lines.append(f"\n### \U0001f4a5 Convergence Points")
+            lines.append("Multiple plot threads are approaching climax simultaneously:")
+            for group_desc, seeds in convergence:
+                seed_names = ", ".join(s.description[:40] for s in seeds)
+                lines.append(f"- **{group_desc}:** {seed_names}")
+        
+        # #11: Pending triggers — seeds that need planting after resolution
+        for seed in active:
+            if seed.triggers:
+                # Check if any trigger targets are from resolved seeds
+                resolved_triggers = [
+                    tid for tid in seed.triggers 
+                    if tid not in self._seeds  # Not yet planted
+                ]
+                if resolved_triggers:
+                    lines.append(f"\n### \U0001f331 Pending Trigger Seeds")
+                    lines.append(f"- **{seed.description}** resolving would trigger: {resolved_triggers}")
+                    break  # Only show first to avoid context bloat
+        
         return "\n".join(lines)
+    
+    def _detect_convergence(self, current_turn: int) -> List[tuple]:
+        """#11: Detect seeds sharing dependencies that are all near callback.
+        
+        Returns list of (description, [seeds]) tuples for convergence groups.
+        """
+        active = self.get_active_seeds()
+        if len(active) < 2:
+            return []
+        
+        # Group seeds by shared dependencies
+        dep_groups: Dict[str, List[ForeshadowingSeed]] = {}
+        for seed in active:
+            for dep_id in seed.depends_on:
+                dep_groups.setdefault(dep_id, []).append(seed)
+        
+        convergences = []
+        for dep_id, seeds in dep_groups.items():
+            if len(seeds) >= 2:
+                # Check if the shared dependency is resolved (convergence imminent)
+                dep = self._seeds.get(dep_id)
+                if dep and dep.status == SeedStatus.RESOLVED:
+                    convergences.append(
+                        (f"Shared resolution of '{dep.description[:40]}'", seeds)
+                    )
+                # Or if 2+ seeds are both callback-ready
+                elif all(self.check_callback_ready(s.id, current_turn) for s in seeds):
+                    convergences.append(
+                        (f"Multiple threads ready (dep: {dep_id})", seeds)
+                    )
+        
+        # Also detect seeds with no shared deps but both callback-ready AND related
+        ready = self.get_callback_opportunities(current_turn)
+        if len(ready) >= 2:
+            for i, s1 in enumerate(ready):
+                for s2 in ready[i+1:]:
+                    shared_npcs = set(s1.related_npcs) & set(s2.related_npcs)
+                    if shared_npcs and (s1, s2) not in [(s for _, ss in convergences for s in ss)]:
+                        convergences.append(
+                            (f"Shared NPCs: {', '.join(shared_npcs)}", [s1, s2])
+                        )
+                        break  # Cap at 1 NPC convergence
+        
+        return convergences[:3]  # Cap output
     
     def detect_seed_in_narrative(
         self,

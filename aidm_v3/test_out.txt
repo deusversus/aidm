@@ -141,4 +141,4 @@ tests/test_deferred_commit.py::TestStateTransactionWithDeferredCommit::test_tran
 =========================== short test summary info ===========================
 ERROR tests/test_profile_flow.py::test_profile_generation
 !!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 1 failures !!!!!!!!!!!!!!!!!!!!!!!!!!
-77 passed, 68 warnings, 1 error in 145.16s (0:02:25)
+77 passed, 68 warnings, 1 error in 110.32s (0:01:50)

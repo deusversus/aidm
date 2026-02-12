@@ -1208,6 +1208,21 @@ MATCH the established voice, humor, and style from these exchanges.
                 npc_text = f"\n\n## Present NPCs (Module 04 Intelligence)\n\n{retrieved_context['npc_guidance']}"
             if retrieved_context.get("faction_guidance"):
                 faction_text = f"\n\n{retrieved_context['faction_guidance']}"
+            # #13: Rule library structural guidance
+            if retrieved_context.get("dna_guidance"):
+                faction_text += f"\n\n{retrieved_context['dna_guidance']}"
+            if retrieved_context.get("genre_guidance"):
+                faction_text += f"\n\n{retrieved_context['genre_guidance']}"
+            if retrieved_context.get("scale_guidance"):
+                faction_text += f"\n\n{retrieved_context['scale_guidance']}"
+            if retrieved_context.get("compatibility_guidance"):
+                faction_text += f"\n\n{retrieved_context['compatibility_guidance']}"
+            # #17: Active world consequences
+            if retrieved_context.get("active_consequences"):
+                faction_text += f"\n\n{retrieved_context['active_consequences']}"
+            # #23: Pre-resolved combat result
+            if retrieved_context.get("combat_result"):
+                faction_text += f"\n\n{retrieved_context['combat_result']}"
         
         # Foreshadowing callback opportunities (#9)
         foreshadowing_text = ""

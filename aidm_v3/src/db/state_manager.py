@@ -6,7 +6,7 @@ from typing import Optional, List, Dict, Any
 from sqlalchemy.orm import Session as SQLAlchemySession
 from sqlalchemy.exc import OperationalError
 
-from .models import Campaign, Session, Turn, Character, NPC, WorldState, CampaignBible, ForeshadowingSeedDB
+from .models import Campaign, Session, Turn, Character, NPC, WorldState, CampaignBible, ForeshadowingSeedDB, Consequence
 from .session import get_session, create_session, init_db
 
 
@@ -713,23 +713,198 @@ class StateManager:
         
         return max_seq + 1
     
-    def apply_consequence(self, consequence: str):
-        """Apply a narrative consequence to the world state.
+    # #17: Category classification keywords (no LLM needed)
+    _CONSEQUENCE_CATEGORIES = {
+        "political": {"ally", "faction", "treaty", "war", "rebellion", "authority", "kingdom", "ruler", "council", "government", "alliance", "throne", "diplomacy", "exile"},
+        "environmental": {"destroyed", "collapsed", "weather", "terrain", "landscape", "fire", "flood", "earthquake", "ruin", "barrier", "sealed", "opened", "blocked"},
+        "relational": {"trust", "betrayal", "friendship", "enemy", "respect", "reputation", "bond", "grudge", "loyalty", "hatred", "love", "rivalry"},
+        "economic": {"gold", "trade", "market", "debt", "wealth", "shop", "merchant", "price", "cost", "treasure", "payment", "reward"},
+        "magical": {"curse", "enchantment", "seal", "barrier", "artifact", "power", "spell", "ritual", "transformation", "awakening", "mana", "nen", "chakra"},
+    }
+    
+    def _classify_consequence(self, description: str) -> str:
+        """Classify consequence category via keyword matching."""
+        desc_lower = description.lower()
+        scores = {}
+        for category, keywords in self._CONSEQUENCE_CATEGORIES.items():
+            score = sum(1 for kw in keywords if kw in desc_lower)
+            if score > 0:
+                scores[category] = score
+        return max(scores, key=scores.get) if scores else "general"
+    
+    def apply_consequence(
+        self, 
+        consequence: str, 
+        turn_number: int = 0, 
+        source_action: str = None,
+        narrative_weight: str = "minor",
+        category: str = None
+    ):
+        """Apply a structured consequence to the campaign.
         
-        For Phase 1 MVP, this is a simple text update.
-        Later phases will parse structured consequences.
+        #17: Stores as a queryable Consequence record with category/severity.
+        Also appends to situation for backward compatibility.
+        
+        Args:
+            consequence: Description of the consequence
+            turn_number: Turn when it occurred
+            source_action: What action caused it
+            narrative_weight: From outcome (minor/significant/climactic)
+            category: LLM-classified category (preferred). Falls back to keyword heuristic if null.
         """
         db = self._get_db()
+        
+        # Prefer LLM classification, fall back to keyword heuristic
+        if not category:
+            category = self._classify_consequence(consequence)
+        
+        # Map narrative weight to severity
+        severity_map = {
+            "minor": "minor",
+            "significant": "moderate",
+            "climactic": "major"
+        }
+        severity = severity_map.get(narrative_weight, "minor")
+        
+        # Minor consequences expire after 20 turns, moderate after 50, major are permanent
+        expiry_map = {"minor": 20, "moderate": 50, "major": None, "catastrophic": None}
+        expires_turn = None
+        if expiry_map.get(severity) is not None:
+            expires_turn = turn_number + expiry_map[severity]
+        
+        # Store structured consequence
+        consequence_record = Consequence(
+            campaign_id=self.campaign_id,
+            turn=turn_number,
+            source_action=source_action,
+            description=consequence,
+            category=category,
+            severity=severity,
+            active=True,
+            expires_turn=expires_turn
+        )
+        db.add(consequence_record)
+        
+        # Backward compat: still append to situation
         world_state = (
             db.query(WorldState)
             .filter(WorldState.campaign_id == self.campaign_id)
             .first()
         )
-        
         if world_state:
-            # Append consequence to situation
             world_state.situation = f"{world_state.situation}\n{consequence}"
+        
+        self._maybe_commit()
+        print(f"[Consequence] Stored: [{category}/{severity}] {consequence[:80]}..." if len(consequence) > 80 else f"[Consequence] Stored: [{category}/{severity}] {consequence}")
+    
+    def get_active_consequences(self, limit: int = 10) -> list:
+        """#17: Query active, non-expired consequences for context injection.
+        
+        Returns:
+            List of dicts with description, category, severity, turn
+        """
+        db = self._get_db()
+        consequences = (
+            db.query(Consequence)
+            .filter(
+                Consequence.campaign_id == self.campaign_id,
+                Consequence.active == True
+            )
+            .order_by(Consequence.turn.desc())
+            .limit(limit)
+            .all()
+        )
+        return [
+            {
+                "description": c.description,
+                "category": c.category,
+                "severity": c.severity,
+                "turn": c.turn,
+                "source_action": c.source_action
+            }
+            for c in consequences
+        ]
+    
+    def expire_consequences(self, current_turn: int) -> int:
+        """#17: Mark expired consequences as inactive.
+        
+        Args:
+            current_turn: Current turn number
+            
+        Returns:
+            Number of consequences expired
+        """
+        db = self._get_db()
+        expired = (
+            db.query(Consequence)
+            .filter(
+                Consequence.campaign_id == self.campaign_id,
+                Consequence.active == True,
+                Consequence.expires_turn != None,
+                Consequence.expires_turn <= current_turn
+            )
+            .all()
+        )
+        for c in expired:
+            c.active = False
+        if expired:
             self._maybe_commit()
+            print(f"[Consequence] Expired {len(expired)} consequences at turn {current_turn}")
+        return len(expired)
+    
+    def evolve_npc_intelligence(self, npc_id: int) -> Optional[Dict[str, str]]:
+        """#24: Check if NPC qualifies for intelligence stage evolution.
+        
+        Thresholds (scene_count-based):
+          reactive → contextual: 3+ scenes
+          contextual → anticipatory: 8+ scenes  
+          anticipatory → autonomous: 15+ scenes + has emotional milestones
+        
+        Returns:
+            Dict with old_stage, new_stage, behavior_desc if transition occurred,
+            None otherwise.
+        """
+        db = self._get_db()
+        npc = db.query(NPC).filter(NPC.id == npc_id).first()
+        if not npc:
+            return None
+        
+        stage_order = ["reactive", "contextual", "anticipatory", "autonomous"]
+        current_idx = stage_order.index(npc.intelligence_stage) if npc.intelligence_stage in stage_order else 0
+        
+        # Check threshold for next stage
+        new_stage = None
+        if current_idx == 0 and npc.scene_count >= 3:
+            new_stage = "contextual"
+        elif current_idx == 1 and npc.scene_count >= 8:
+            new_stage = "anticipatory"
+        elif current_idx == 2 and npc.scene_count >= 15:
+            # Autonomous requires emotional milestones (depth of relationship)
+            milestones = npc.emotional_milestones or {}
+            if len([v for v in milestones.values() if v]) >= 2:
+                new_stage = "autonomous"
+        
+        if not new_stage:
+            return None
+        
+        old_stage = npc.intelligence_stage
+        npc.intelligence_stage = new_stage
+        self._maybe_commit()
+        
+        # Stage behavior descriptions for narrative injection
+        behavior_map = {
+            "contextual": "remembers past interactions and references shared history",
+            "anticipatory": "predicts the protagonist's moves and acts proactively",
+            "autonomous": "pursues their own agenda independently, sometimes surprising even the protagonist"
+        }
+        
+        print(f"[NPC Evolution] {npc.name}: {old_stage} → {new_stage}")
+        return {
+            "npc_name": npc.name,
+            "old_stage": old_stage,
+            "new_stage": new_stage,
+            "behavior_desc": behavior_map.get(new_stage, "exhibits new behavioral patterns")
+        }
     
     def update_world_state(
         self,

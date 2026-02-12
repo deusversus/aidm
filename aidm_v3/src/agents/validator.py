@@ -259,12 +259,15 @@ Be concise and direct. Return structured validation results.
 class ValidatorAgent(BaseAgent):
     """Validator Agent with full M10 Error Recovery.
     
-    Features:
-    - Pre-action validation (block invalid actions)
-    - Post-action validation (catch state errors)
-    - Error classification and recovery
-    - Confidence-based auto-recovery
-    - Player notifications for blocked actions
+    ARCHITECTURE NOTE (#20): Resource gating is now handled by StateTransaction
+    (see core/state_transaction.py). This class focuses on:
+    - Post-action validation (bounds checking, state integrity)
+    - Narrative validation (outcome sensibility, NPC consistency)
+    - Research validation (content completeness, corruption detection)
+    - Recovery protocols (confidence-based auto-recovery)
+    
+    validate_resource_cost() is DEPRECATED — use StateTransaction.subtract()
+    with .validate() instead (see orchestrator.py combat block).
     """
     
     agent_name = "validator"
@@ -294,15 +297,13 @@ class ValidatorAgent(BaseAgent):
         min_allowed: int = 0
     ) -> ValidationResult:
         """
+        DEPRECATED: Use StateTransaction.subtract() + .validate() instead.
+        Kept for backward compatibility. StateTransaction provides atomic
+        resource gating with rollback support.
+        
         Validate if a resource cost can be afforded.
         
         Per M10: Check won't go below 0, block with alternatives.
-        
-        Args:
-            resource_name: Name of resource (HP, MP, SP)
-            current: Current value
-            cost: Amount to deduct
-            min_allowed: Minimum allowed value (usually 0, but HP might be 1)
         """
         result = ValidationResult(complete=True, is_valid=True)
         

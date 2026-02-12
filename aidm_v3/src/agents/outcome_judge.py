@@ -34,6 +34,10 @@ class OutcomeOutput(BaseModel):
         default=None,
         description="ONLY set for significant narrative turning points — null for routine actions. An OP character casting a basic spell has NO consequence."
     )
+    consequence_category: Optional[Literal["political", "environmental", "relational", "economic", "magical"]] = Field(
+        default=None,
+        description="Category of the consequence if one exists. political=alliances/authority/governance. environmental=terrain/destruction/weather. relational=trust/betrayal/reputation. economic=wealth/trade/debt. magical=curses/enchantments/power shifts. Null if no consequence."
+    )
     reasoning: str = Field(
         description="Brief explanation including the math (Roll vs DC)"
     )
