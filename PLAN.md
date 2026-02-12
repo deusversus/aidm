@@ -3,6 +3,14 @@
 > **Goal:** IP-authentic, coherent long-form storytelling.
 > Every item below is framed as Problem → Proposed Solution to seed dialectic.
 
+### Status Legend
+| Badge | Meaning |
+|---|---|
+| ✅ DONE | Completed in recent sessions |
+| 🔧 PARTIAL | Partially implemented |
+| 🔥 HIGH PRIORITY | Top 5 impact items |
+| ⚠️ DEFER | Lower priority or blocked on dependencies |
+
 ---
 
 ## I. STRUCTURAL / ARCHITECTURAL (The Director Problem)
@@ -17,6 +25,8 @@
 
 **Tension to resolve:** Does a pre-turn Director add unacceptable latency? Can the micro-check be parallelized with memory retrieval?
 
+> **🔥 Engineer review:** Highest-impact item in the plan. Frame the micro-check as **structured extraction** (not generation) — it reads existing Bible + WorldState and outputs a decision tree via tool-use on Haiku/Flash, not prose. Can parallelize with memory retrieval (already ~300ms). Net critical path addition: **~200ms**. The latency question is answerable: current turn time 2-4s → 2.2-4.2s. Acceptable.
+
 ---
 
 ### 2. Campaign Bible is Unstructured and Overwritten
@@ -29,6 +39,8 @@
 - Add a `bible_version: int` field that increments on each update.
 
 **Tension to resolve:** Schema rigidity vs. the flexibility the Director needs to express novel narrative structures. Should the schema be partially open (fixed keys + freeform `notes` field)?
+
+> **Engineer review:** Agree, but scope carefully. The full schema (`arc_history`, `active_threads`, `resolved_threads`, `character_arcs`, `world_state_changelog`) is a campaign management system. **Start with two changes only:** (1) Add `bible_version: int` to CampaignBible model, (2) Append to `arc_history` instead of overwriting — store last 5 Director outputs with turn numbers. Build the full thread schema only after #1 lands and the Director actually produces structured thread data.
 
 ---
 
@@ -44,11 +56,13 @@
 
 **Tension to resolve:** Hard gates risk feeling mechanical. Should gates be "strong suggestions" or actual constraints? How does the player retain agency to delay or accelerate?
 
+> **Engineer review:** Skeptical of explicit gate conditions — they assume the Director can write good gates AND the micro-check can evaluate them reliably. **Prefer pacing pressure over hard gates:** Add `turns_in_phase: int` to WorldState (concrete deliverable). The micro-check then applies implicit pressure: "You've been in rising_action for 12 turns. Consider escalating." Softer than hard gates but still prevents 50-turn stalls. The gate conditions themselves are Director prompt engineering, not code.
+
 ---
 
 ## II. MEMORY & CONTINUITY (The Forgetting Problem)
 
-### 4. Narrative Prose is Never Indexed to Long-Term Memory
+### 4. Narrative Prose is Never Indexed to Long-Term Memory 🔥
 
 **Problem:** KeyAnimator's output goes into the sliding window (15 messages) and `Turn.narrative` (SQL archive), but is **never stored in ChromaDB** as a retrievable memory (`memory.py` — no `add()` call for narrative content). The system can recall "Alice's affinity is +45" but cannot recall "the specific scene where Alice opened up about her past." Emotional texture — the basis of callbacks — is lost to compaction, reduced to ~200-word summaries.
 
@@ -63,6 +77,8 @@
 
 **Tension to resolve:** This adds an LLM call per turn. Can it piggyback on existing background processing (entity extraction already runs)? Is there a risk of "memory pollution" where mundane narration gets indexed?
 
+> **🔥 Engineer review:** Highest ROI item in the entire plan. **Zero additional LLM calls needed** — piggyback on the existing `_bg_extract_entities` pass (runs every turn). Expand the entity extraction prompt to also emit 2-3 "narrative beats" stored as ChromaDB memories tagged `narrative_beat` with slow decay and NPC/location tags. This alone probably delivers more narrative quality improvement than items 1-3 combined.
+
 ---
 
 ### 5. 15-Message Working Memory Window is Aggressively Short
@@ -75,6 +91,8 @@
 - Add a **"deep recall"** tool to KeyAnimator's GameplayTools: when generating narrative, KeyAnimator can explicitly search `Turn.narrative` in SQL for specific past scenes (currently this data exists but is inaccessible to agents).
 
 **Tension to resolve:** Larger windows increase token cost per turn. Pinned messages add complexity. Is the real fix better compaction rather than a wider window?
+
+> **Engineer review:** Partially disagree. We already implemented smart compaction with emotional texture preservation. **Modest increase to `WINDOW_SIZE = 20`** is sufficient (~30% more tokens, offset by cache hits). Skip pinned messages — they add UI complexity with marginal benefit. The real prize is a **"deep recall" GameplayTool** that lets KeyAnimator query `Turn.narrative` SQL by NPC/location/turn range. This data exists but is inaccessible to agents. Trivially implementable.
 
 ---
 
@@ -104,7 +122,7 @@
 
 ---
 
-### 8. Memory Compression is Dead Code
+### 8. Memory Compression is Dead Code ✅ DONE
 
 **Problem:** `compress_cold_memories()` exists in `memory.py:490-588` but is **never called anywhere in the codebase**. Long sessions accumulate ChromaDB records indefinitely without culling.
 
@@ -114,11 +132,19 @@
 
 **Tension to resolve:** Is this actually a problem at expected session lengths (50-100 turns)? Or only at 500+ turn mega-campaigns?
 
+> **✅ Engineer review: ALREADY DONE.** `compress_cold_memories()` was wired into `_post_narrative_processing` step 8, triggered every 10 turns. This was completed during the pipeline optimization session. **No action needed.**
+>
+> ```python
+> # Step 8: MEMORY COMPRESSION (every 10 turns)
+> if db_context.turn_number > 0 and db_context.turn_number % 10 == 0:
+>     compression_result = await self.memory.compress_cold_memories()
+> ```
+
 ---
 
 ## III. FORESHADOWING & NARRATIVE THREADING (The Chekhov Problem)
 
-### 9. Foreshadowing System is Fully Built but Never Called During Gameplay
+### 9. Foreshadowing System is Fully Built but Never Called During Gameplay 🔧 PARTIAL
 
 **Problem:** `ForeshadowingLedger` in `core/foreshadowing.py` has complete plant/mention/callback/resolve logic with 6 seed types, urgency scoring, and overdue detection. But during gameplay: `plant_seed()` is never called by any agent, `detect_seed_in_narrative()` is never called by the turn loop, and `resolve_seed()` is never called by any agent. The system is inert.
 
@@ -130,9 +156,11 @@
 
 **Tension to resolve:** Seeds planted by the Director may conflict with player agency. Should seed planting be transparent to the player? Should players be able to /override seeds?
 
+> **🔧 Engineer review: PARTIALLY DONE.** `detect_seed_in_narrative()` and `get_overdue_seeds()` are already wired into `_post_narrative_processing` step 6. What's still missing: `plant_seed()` (needs a Director tool), seed injection into KeyAnimator context (callback opportunities in PacingDirective), and `resolve_seed()` (detection-to-resolution piping). **#10 (persistence) must come first**, then finish this wiring.
+
 ---
 
-### 10. ForeshadowingLedger is In-Memory Only
+### 10. ForeshadowingLedger is In-Memory Only 🔥
 
 **Problem:** The ledger lives only in Python runtime memory. Server restart = all seeds lost. This is catastrophic for multi-session campaigns.
 
@@ -142,6 +170,8 @@
 - Seeds persist across sessions and server restarts.
 
 **Tension to resolve:** Minimal — this is a clear bug/omission, not a design tradeoff.
+
+> **🔥 Engineer review:** Clear bug. Small effort — mirror the existing Pydantic schema as a SQLAlchemy model, add CRUD methods to StateManager. Unblocks #9 and #12. This + #9 together activate the best piece of dead code in the project.
 
 ---
 
@@ -168,6 +198,8 @@
 
 **Tension to resolve:** Forced resolution can feel contrived. Is the better approach to let some seeds die naturally (not every setup needs a payoff)?
 
+> **Engineer review:** Elegant and trivial — 5 lines of code once foreshadowing is wired. Should arguably be Phase 2 alongside #9, not Phase 3. `+0.05 tension per overdue seed per turn` is a clean mechanic. Adding forced resolution at 2x max_turns is smart narratively.
+
 ---
 
 ## IV. RULE LIBRARY & IP AUTHENTICITY (The Dead Wiring Problem)
@@ -185,6 +217,8 @@
 
 **Tension to resolve:** More injected context = more tokens = higher cost + risk of diluting the signal. Should these inject only when specifically relevant (e.g., ceremony only at tier-up), or should they be always-on?
 
+> **Engineer review:** These should inject into the **cache-stable prefix** (Block 1) of prompts, not per-turn dynamic context. OP axis guidance, DNA narration guidance, etc. don't change turn-to-turn — they're structural. This means **zero marginal token cost after the first turn** (cache hit). The plan's token budget concern is resolved by caching.
+
 ---
 
 ### 14. OP Axis Guidance is Retrieved by Accident, Not by Design
@@ -199,7 +233,7 @@
 
 ---
 
-### 15. Composition Mode Not Recalculated Per-Turn
+### 15. Composition Mode Not Recalculated Per-Turn ⚠️ DEFER
 
 **Problem:** `get_effective_composition()` in `loader.py:224-303` calculates the narrative composition mode (standard/blended/op_dominant) once at profile load time based on a static power differential. But the threat tier changes per encounter — a T7 character fighting a T3 mob vs. a T7 boss should trigger different composition modes. The current system doesn't recalculate.
 
@@ -210,9 +244,11 @@
 
 **Tension to resolve:** Does per-turn recalculation cause narrative whiplash? (One turn is "standard" dialogue, next is "OP dominant" combat, then back.) Maybe composition should be per-scene, not per-turn.
 
+> **⚠️ Engineer review:** Low priority. Most sessions don't have wildly varying threat tiers turn-to-turn. Recalculate on explicit Director directive (phase transition to "climax" implies boss tier), not every turn. This is a **Phase 5 item disguised as Phase 4**.
+
 ---
 
-### 16. Voice Cards Are One-Dimensional
+### 16. Voice Cards Are One-Dimensional 🔥
 
 **Problem:** Voice cards in profiles only contain `speech_patterns`, optionally `humor_type` and `dialogue_rhythm`. They lack: disposition history, current emotional state, relationship to protagonist, memory of past interactions, secrets/hidden agendas. NPCs are essentially one-dimensional speech generators — they sound right but don't *know* anything.
 
@@ -225,6 +261,8 @@
 - This data already exists in `state_manager.py` — it just needs to be piped into the voice card block.
 
 **Tension to resolve:** More NPC context per card = fewer NPCs can fit in context. Cap at 3 enriched cards? Or 5 lightweight + 2 enriched for the most important NPCs in the scene?
+
+> **🔥 Engineer review:** High-impact, low-cost. All this data already exists in the DB (disposition, milestones, intelligence stage, last interaction). Just needs piping into `key_animator.py:330-372`. ~40 lines of code. **Cap at 3 enriched cards** — present NPCs sorted by interaction count, top 3 get full enrichment. NPCs become *people*, not speech generators.
 
 ---
 
@@ -241,6 +279,8 @@
 - The `situation` field remains as a human-readable summary, regenerated from active consequences by the Director during its review pass.
 
 **Tension to resolve:** Structured consequences require classification (another LLM call or heuristic). Is the juice worth the squeeze for typical session lengths?
+
+> **Engineer review:** Functionally ugly but working for sessions under 50 turns. Do this **when the Director overhaul lands (#1-3)**, since a structured Director naturally produces structured consequences. Don't build the Consequence model in isolation.
 
 ---
 
@@ -282,7 +322,7 @@
 
 ---
 
-### 20. Validator Has Identity Crisis: Blocking vs. Advisory
+### 20. Validator Has Identity Crisis: Blocking vs. Advisory 🔧 PARTIAL
 
 **Problem:** The Validator (`agents/validator.py`, 1,177 lines) serves two contradictory roles:
 - **Blocking (pre-action):** Resource validation, skill ownership checks hard-stop actions.
@@ -298,6 +338,8 @@ For a system whose philosophy is "story > simulation," having a hard mechanical 
 - Consider making ResourceGuard **advisory** for narrative override situations (player attempts something "impossible" — should the system block or let the story decide?).
 
 **Tension to resolve:** Some players want mechanical consistency (resources matter). Others want pure narrative. Should this be a campaign-level setting?
+
+> **🔧 Engineer review: PARTIALLY DONE.** The `StateTransaction` system (with `begin_transaction()` / `validate()`) that we just built IS effectively the `ResourceGuard`. It handles before-value verification and constraint checking for MP/SP costs within the `deferred_commit()` block. What remains: extract the narrative sensibility checks into a standalone component and remove overlap with entity extraction. Don't create a separate `ResourceGuard` class — `StateTransaction` already serves that role.
 
 ---
 
@@ -330,7 +372,7 @@ For a system whose philosophy is "story > simulation," having a hard mechanical 
 
 ## VII. COMBAT & MECHANICAL SYSTEMS (The Background Problem)
 
-### 23. Combat Resolution Happens After Narrative
+### 23. Combat Resolution Happens After Narrative 🔥
 
 **Problem:** Combat is resolved in the background *after* KeyAnimator generates the narrative (`orchestrator.py:788-835`). This means the narrative is written before damage is calculated, HP is deducted, or death is confirmed. The narrative might describe a "devastating blow" while the combat system calculates a miss.
 
@@ -340,6 +382,8 @@ For a system whose philosophy is "story > simulation," having a hard mechanical 
 - Pass `CombatResult` to KeyAnimator so it can narrate the actual mechanical outcome, not a guess.
 
 **Tension to resolve:** This adds latency to combat turns (CombatAgent must run before KeyAnimator). Acceptable if CombatAgent is fast (<500ms on fast model). Could also pre-resolve in parallel with memory ranking.
+
+> **🔥 Engineer review:** This is a **correctness bug**, not a feature gap. The narrative describes outcomes that haven't been computed. Straightforward fix: run `CombatAgent.resolve_action()` before KeyAnimator, pass `CombatResult` as context. CombatAgent uses fast model (~300ms), can parallelize with memory ranking. The `deferred_commit()` infrastructure we just built directly supports this refactoring.
 
 ---
 
@@ -357,7 +401,7 @@ For a system whose philosophy is "story > simulation," having a hard mechanical 
 
 ## VIII. SESSION ZERO & PROFILE SYSTEMS (The Foundation Problem)
 
-### 25. Profile Research Quality is Opaque
+### 25. Profile Research Quality is Opaque ⚠️ DEFER
 
 **Problem:** AnimeResearch does a two-pass research (web search → parse to structured schema) but there's no quality gate. If the research returns sparse or inaccurate data (obscure anime, incorrect power system), the profile propagates errors into every subsequent turn. No human review step, no confidence scoring, no fallback.
 
@@ -368,9 +412,11 @@ For a system whose philosophy is "story > simulation," having a hard mechanical 
 
 **Tension to resolve:** Player review adds friction to the onboarding flow. Is a confidence-gated review better than always showing the profile for confirmation?
 
+> **⚠️ Engineer review:** Low priority. Current system works well for popular anime. Obscure anime is an edge case. Adding confidence scoring is nice but doesn't fix a burning problem. Defer until single-profile quality is perfect.
+
 ---
 
-### 26. Hybrid Profile Merging is Underspecified
+### 26. Hybrid Profile Merging is Underspecified ⚠️ DEFER
 
 **Problem:** `ProfileMerge` blends two anime profiles with a ratio, but the merge logic for contradictory elements is delegated entirely to the LLM. If Anime A has "magic system" and Anime B has "ki system," the merge might produce incoherent results. No post-merge validation exists.
 
@@ -384,6 +430,8 @@ For a system whose philosophy is "story > simulation," having a hard mechanical 
 
 **Tension to resolve:** Strict merge rules may produce bland results. Should creative merging be encouraged even at the cost of occasional incoherence?
 
+> **⚠️ Engineer review:** Hybrid profiles are an advanced feature most users won't use immediately. Defer until single-profile quality is perfect.
+
 ---
 
 ## IX. IMPLEMENTATION SEQUENCING
@@ -391,64 +439,65 @@ For a system whose philosophy is "story > simulation," having a hard mechanical 
 ### Phase 1: Critical Path (Foundation)
 *These unblock everything else.*
 
-| # | Item | Effort | Deps |
-|---|------|--------|------|
-| 10 | Persist ForeshadowingLedger to DB | S | None |
-| 19 | Delete dead agents, clean up imports | S | None |
-| 22 | Fix agent naming inconsistencies | S | None |
-| 21 | Extract inline prompts to files | M | None |
-| 4 | Index narrative prose to memory | M | None |
+| # | Item | Effort | Deps | Status |
+|---|------|--------|------|--------|
+| 10 | Persist ForeshadowingLedger to DB | S | None | 🔥 |
+| 19 | Delete dead agents, clean up imports | S | None | |
+| 22 | Fix agent naming inconsistencies | S | None | |
+| 21 | Extract inline prompts to files | M | None | |
+| 4 | Index narrative prose to memory | M | None | 🔥 |
 
 ### Phase 2: Director Overhaul
 *Makes the system proactive instead of reactive.*
 
-| # | Item | Effort | Deps |
-|---|------|--------|------|
-| 1 | Pre-turn Director micro-check | L | None |
-| 2 | Versioned Campaign Bible schema | M | #1 |
-| 3 | Arc pacing gates | M | #1, #2 |
-| 9 | Wire foreshadowing into turn loop | M | #10 |
-| 12 | Overdue seeds escalate tension | S | #9 |
+| # | Item | Effort | Deps | Status |
+|---|------|--------|------|--------|
+| 1 | Pre-turn Director micro-check | L | None | 🔥 |
+| 2 | Versioned Campaign Bible schema | M | #1 | |
+| 3 | Arc pacing gates | M | #1, #2 | |
+| 9 | Wire foreshadowing into turn loop | M | #10 | 🔧 |
+| 12 | Overdue seeds escalate tension | S | #9 | *Moved from Phase 3* |
 
 ### Phase 3: Memory & Continuity
 *Enables coherent long-form storytelling.*
 
-| # | Item | Effort | Deps |
-|---|------|--------|------|
-| 5 | Expand working memory + pinned messages | M | None |
-| 6 | Auto-detect plot-critical memories | M | #4 |
-| 7 | Fix heat decay for secondary characters | S | None |
-| 8 | Wire or remove memory compression | S | None |
-| 18 | "Previously On" recap system | M | #2 |
+| # | Item | Effort | Deps | Status |
+|---|------|--------|------|--------|
+| 5 | Expand working memory + deep recall tool | M | None | |
+| 6 | Auto-detect plot-critical memories | M | #4 | |
+| 7 | Fix heat decay for secondary characters | S | None | |
+| ~~8~~ | ~~Wire or remove memory compression~~ | ~~S~~ | ~~None~~ | ✅ DONE |
+| 18 | "Previously On" recap system | M | #2 | |
 
 ### Phase 4: Rule Library & IP Authenticity
 *Activates the dead wiring.*
 
-| # | Item | Effort | Deps |
-|---|------|--------|------|
-| 13 | Wire rule library retrieval methods | M | None |
-| 14 | Static OP axis guidance injection | S | #13 |
-| 15 | Per-turn composition recalculation | M | #14 |
-| 16 | Enrich voice cards with DB data | M | None |
+| # | Item | Effort | Deps | Status |
+|---|------|--------|------|--------|
+| 13 | Wire rule library retrieval methods | M | None | |
+| 14 | Static OP axis guidance injection | S | #13 | |
+| ~~15~~ | ~~Per-turn composition recalculation~~ | ~~M~~ | ~~#14~~ | ⚠️ *Moved to Phase 5* |
+| 16 | Enrich voice cards with DB data | M | None | 🔥 |
 
 ### Phase 5: Structural Refinement
 *Polish and coherence.*
 
-| # | Item | Effort | Deps |
-|---|------|--------|------|
-| 17 | Structured consequences model | M | None |
-| 20 | Split Validator into ResourceGuard + NarrativeValidator | M | None |
-| 23 | Move combat resolution before narrative | M | None |
-| 24 | NPC intelligence transition narratives | S | #16 |
-| 11 | Foreshadowing causal chains | M | #9 |
+| # | Item | Effort | Deps | Status |
+|---|------|--------|------|--------|
+| 17 | Structured consequences model | M | #1-3 | |
+| 20 | Split Validator into ResourceGuard + NarrativeValidator | M | None | 🔧 |
+| 23 | Move combat resolution before narrative | M | None | 🔥 |
+| 24 | NPC intelligence transition narratives | S | #16 | |
+| 11 | Foreshadowing causal chains | M | #9 | |
+| 15 | Per-turn composition recalculation | M | #14 | ⚠️ |
 
 ### Phase 6: Session Zero Hardening
 *Foundation quality.*
 
-| # | Item | Effort | Deps |
-|---|------|--------|------|
-| 25 | Profile research confidence scoring | M | None |
-| 26 | Hybrid merge rules + coherence check | M | None |
+| # | Item | Effort | Deps | Status |
+|---|------|--------|------|--------|
+| 25 | Profile research confidence scoring | M | None | ⚠️ |
+| 26 | Hybrid merge rules + coherence check | M | None | ⚠️ |
 
 ---
 
@@ -480,6 +529,67 @@ These systems are working well and should be preserved:
 5. **Memory fidelity vs. noise:** Indexing narrative prose to memory risks polluting the retrieval space with mundane descriptions. How do we ensure only *meaningful* beats are stored?
 
 6. **Complexity ceiling:** 26 items in this plan is itself a form of overreach. Which items deliver 80% of the value? If we could only do 5, which 5?
+
+> **Engineer answer to #6 — The Top 5:**
+>
+> | Rank | Item | Why |
+> |---|---|---|
+> | **1** | #4 — Index narrative to memory | Highest ROI. Near-zero cost (piggyback on entity extraction), transforms narrative quality |
+> | **2** | #1 — Pre-turn Director micro-check | Single most impactful architectural change. Makes the system proactive |
+> | **3** | #16 — Enrich voice cards with DB data | NPCs become *people*, not speech generators. ~40 lines of code |
+> | **4** | #10+9 — Persist + wire foreshadowing | Activates the best piece of dead code in the project |
+> | **5** | #23 — Combat before narrative | Correctness bug. Narratives should reflect actual computed outcomes |
+>
+> Close runner-ups: #19 (delete dead agents, trivial effort), #7 (heat decay fix, 20 lines), #12 (overdue seeds → tension, 5 lines).
+
+---
+
+## XII. WHAT THE PLAN MISSES
+
+*Items not in the original gap analysis but identified during implementation.*
+
+### 27. State Transactional Integrity ✅ DONE
+
+**Problem:** Multiple `StateManager` mutation methods called `db.commit()` independently. An error mid-turn left earlier mutations persisted — partial state corruption.
+
+**Solution (implemented):**
+- `deferred_commit()` context manager batches all SQL commits into a single atomic operation per turn
+- `_maybe_commit()` replaces 15 individual `db.commit()` calls
+- `StateTransaction` provides before-value verification and constraint checking for resource costs
+- `_post_narrative_processing` steps 2-7 wrapped in `deferred_commit()` block
+- 12 new tests verify atomicity, rollback, reentrancy, and transaction composition
+
+---
+
+### 28. Prompt Caching Economics
+
+**Problem:** The plan repeatedly raises token budget concerns when adding context (OP guidance, enriched voice cards, rule library chunks). But it doesn't account for the existing **cache-aware prompt block** architecture.
+
+**Key insight:** Static additions (OP axis guidance, DNA narration guidance, voice card enrichment, rule library chunks) go in **Block 1** of the prompt — the cache-stable prefix. After the first turn of a session, these are cache hits with **zero marginal token cost**. The plan's token anxiety is largely unfounded for static context additions.
+
+**Action needed:** When implementing #13, #14, and #16, ensure all new context is injected into Block 1 (cache-stable prefix), not Block 3 (per-turn dynamic context).
+
+---
+
+### 29. ChromaDB Error Recovery
+
+**Problem:** The `deferred_commit()` infrastructure handles SQL transaction integrity, but steps 8-9 of `_post_narrative_processing` (memory compression and episodic memory) write to ChromaDB, which has **no rollback mechanism**. A ChromaDB failure after SQL commit creates an inconsistent state.
+
+**Proposed Solution:**
+- Add try/except around ChromaDB operations with logging (don't propagate failures to the user)
+- ChromaDB writes are already idempotent (upsert semantics), so retrying on next turn is safe
+- Consider a "pending memory" queue in SQL that's drained by background processing, ensuring SQL stays the source of truth
+
+---
+
+### 30. Deep Recall GameplayTool
+
+**Problem (extends #5):** `Turn.narrative` in SQL contains the complete verbatim record of every turn, but no agent can query it. This is a goldmine of narrative context locked behind an inaccessible API.
+
+**Proposed Solution:**
+- Add a `recall_scene` tool to GameplayTools that queries `Turn.narrative` by NPC name, location, turn range, or keyword
+- Returns 2-3 matching turn excerpts for KeyAnimator to reference in callbacks
+- Trivially implementable as a SQL query + result formatting
 
 ---
 
