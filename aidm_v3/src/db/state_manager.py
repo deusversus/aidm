@@ -1,5 +1,6 @@
 """State manager for CRUD operations on game state."""
 
+from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Optional, List, Dict, Any
 from sqlalchemy.orm import Session as SQLAlchemySession
@@ -205,6 +206,7 @@ class StateManager:
         self._db: Optional[SQLAlchemySession] = None
         self._session_id: Optional[int] = None
         self._turn_number: int = 0
+        self._commit_deferred: bool = False
     
     def _get_db(self) -> SQLAlchemySession:
         """Get or create database session."""
@@ -217,6 +219,44 @@ class StateManager:
         if self._db:
             self._db.close()
             self._db = None
+    
+    def _maybe_commit(self):
+        """Commit only if not inside a deferred_commit() block."""
+        if not self._commit_deferred:
+            db = self._get_db()
+            db.commit()
+    
+    @contextmanager
+    def deferred_commit(self):
+        """
+        Context manager that batches all db.commit() calls into a single
+        atomic commit at the end of the block.
+        
+        Usage:
+            with state.deferred_commit():
+                state.apply_combat_result(result, target)
+                state.apply_progression(progression)
+                # ... all mutations are held in-memory
+            # Single commit here, or full rollback on exception
+        """
+        if self._commit_deferred:
+            # Already inside a deferred block — no-op (reentrant safe)
+            yield
+            return
+        
+        self._commit_deferred = True
+        db = self._get_db()
+        try:
+            yield
+            # All mutations succeeded — single atomic commit
+            db.commit()
+            print("[StateManager] Deferred commit: all changes committed atomically")
+        except Exception:
+            db.rollback()
+            print("[StateManager] Deferred commit: ROLLBACK due to exception")
+            raise
+        finally:
+            self._commit_deferred = False
     
     def ensure_campaign_exists(self, name: str = "Default Campaign", profile_id: str = None):
         """Ensure campaign exists, create if not."""
@@ -496,7 +536,7 @@ class StateManager:
         if session:
             session.turn_count = self._turn_number
         
-        db.commit()
+        self._maybe_commit()
         return turn
     
     def apply_consequence(self, consequence: str):
@@ -515,7 +555,7 @@ class StateManager:
         if world_state:
             # Append consequence to situation
             world_state.situation = f"{world_state.situation}\n{consequence}"
-            db.commit()
+            self._maybe_commit()
     
     def update_world_state(
         self,
@@ -554,7 +594,7 @@ class StateManager:
                 world_state.canon_cast_mode = canon_cast_mode
             if event_fidelity is not None:
                 world_state.event_fidelity = event_fidelity
-            db.commit()
+            self._maybe_commit()
     
     def get_character(self) -> Optional[Character]:
         """Get the player character."""
@@ -744,7 +784,7 @@ class StateManager:
         if bible:
             bible.planning_data = planning_data
             bible.last_updated_turn = turn_number
-            db.commit()
+            self._maybe_commit()
 
     def get_target(self, target_name: str) -> Optional[NPC]:
         """Get an NPC by name for combat targeting."""
@@ -774,7 +814,7 @@ class StateManager:
                 if hasattr(character, 'sp_current'):
                     character.sp_current = max(0, character.sp_current - combat_result.resources_consumed.sp)
         
-        db.commit()
+        self._maybe_commit()
     
     def apply_progression(self, progression_result: Any):
         """Apply progression results (XP, level-up, abilities)."""
@@ -814,7 +854,7 @@ class StateManager:
             if progression_result.tier_changed and progression_result.new_tier:
                 character.power_tier = progression_result.new_tier
         
-        db.commit()
+        self._maybe_commit()
     
     def update_op_mode(
         self, 
@@ -919,7 +959,7 @@ class StateManager:
         if npc:
             npc.scene_count = (npc.scene_count or 0) + 1
             npc.last_appeared = turn_number
-            db.commit()
+            self._maybe_commit()
     
     def get_world_state(self) -> Optional[WorldState]:
         """Get the WorldState object for Director context."""
@@ -1012,7 +1052,7 @@ class StateManager:
         # Evolve intelligence stage based on interaction count
         self.evolve_npc_intelligence(npc)
         
-        db.commit()
+        self._maybe_commit()
         
         if affinity_delta != 0:
             print(f"[NPC] {npc.name}: affinity {affinity_delta:+d} → {npc.affinity} (disposition: {npc.disposition})")
@@ -1580,7 +1620,7 @@ class StateManager:
         # Check for threshold crossing
         milestone = self._check_disposition_milestone(old_disposition, new_disposition, npc.name)
         
-        db.commit()
+        self._maybe_commit()
         print(f"[NPC] {npc.name} affinity: {old_affinity} → {new_affinity} ({reason})")
         
         return milestone  # Returns event dict or None
@@ -1713,7 +1753,7 @@ class StateManager:
         if new_stage != current_stage:
             db = self._get_db()
             npc.intelligence_stage = new_stage
-            db.commit()
+            self._maybe_commit()
             print(f"[NPC Evolution] {npc.name}: {current_stage} → {new_stage}")
     
     # Valid emotional milestone types (Module 04 P5-16)
@@ -1770,7 +1810,7 @@ class StateManager:
             "turn": self._turn_number
         }
         npc.emotional_milestones = milestones
-        db.commit()
+        self._maybe_commit()
         
         print(f"[NPC Milestone] {npc.name}: {milestone_type} - {context[:50]}...")
         
@@ -1829,7 +1869,7 @@ class StateManager:
         
         db = self._get_db()
         npc.interaction_count = (npc.interaction_count or 0) + 1
-        db.commit()
+        self._maybe_commit()
         
         return npc.interaction_count
     
@@ -1984,7 +2024,7 @@ class StateManager:
                     else:
                         character.sp_max = int(value)
             
-            db.commit()
+            self._maybe_commit()
         
         # Character fields
         elif parts[0] == "character":
@@ -2004,7 +2044,7 @@ class StateManager:
             elif field == "power_tier":
                 character.power_tier = value
             
-            db.commit()
+            self._maybe_commit()
         
         # World state
         elif parts[0] == "world":
@@ -2026,5 +2066,5 @@ class StateManager:
             elif field == "arc_phase":
                 world.arc_phase = value
             
-            db.commit()
+            self._maybe_commit()
 

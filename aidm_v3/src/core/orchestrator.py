@@ -781,276 +781,279 @@ class Orchestrator:
                     await asyncio.gather(entity_task, rel_task, return_exceptions=True)
                 
                 # =============================================================
-                # 2. COMBAT RESOLUTION (conditional)
+                # TRANSACTIONAL BLOCK: Steps 2-7
+                # All SQL mutations in this block commit atomically.
+                # ChromaDB writes (steps 8-9) are outside this block.
                 # =============================================================
-                combat_occurred = False
-                combat_result = None
-                if intent.intent == "COMBAT" or "attack" in intent.action.lower():
-                    combat_occurred = True
-                    combat_action = self.combat.parse_combat_action(intent, player_input)
+                with self.state.deferred_commit():
+                    # =============================================================
+                    # 2. COMBAT RESOLUTION (conditional)
+                    # =============================================================
+                    combat_occurred = False
+                    combat_result = None
+                    if intent.intent == "COMBAT" or "attack" in intent.action.lower():
+                        combat_occurred = True
+                        combat_action = self.combat.parse_combat_action(intent, player_input)
+                        character = self.state.get_character()
+                        target = self.state.get_target(combat_action.target)
+                        
+                        if character and target:
+                            # Pre-validate resource costs via StateTransaction
+                            if combat_action.action_type in ("spell", "skill"):
+                                resource_path = "resources.mp.current" if combat_action.action_type == "spell" else "resources.sp.current"
+                                resource_cost = 20 if combat_action.action_type == "spell" else 15
+                                
+                                with self.state.begin_transaction(f"{combat_action.action_type.title()} resource cost") as txn:
+                                    txn.subtract(resource_path, resource_cost, reason=f"{combat_action.action_type.title()} cost")
+                                    validation = txn.validate()
+                                    if not validation.is_valid:
+                                        combat_occurred = False
+                                        for err in validation.errors:
+                                            print(f"[Transaction] Pre-validation failed: {err.message}")
+                                        txn.rollback()
+                                    # If valid, txn auto-commits on exit (through _maybe_commit → deferred)
+                            
+                            if combat_occurred:
+                                combat_result = await self.combat.resolve_action(
+                                    action=combat_action,
+                                    attacker=character,
+                                    target_entity=target,
+                                    context=db_context,
+                                    profile=self.profile
+                                )
+                                if combat_result.damage_dealt > 0:
+                                    self.state.apply_combat_result(combat_result, target)
+                                
+                                char_state = {
+                                    "hp_current": character.hp_current,
+                                    "hp_max": character.hp_max,
+                                    "mp_current": getattr(character, 'mp_current', 50),
+                                    "mp_max": getattr(character, 'mp_max', 50),
+                                }
+                                post_validation = self.validator.validate_state_integrity(char_state)
+                                if not post_validation.is_valid:
+                                    for error in post_validation.errors:
+                                        print(f"[Validator] {error.severity.value}: {error.description}")
+                
+                    # =============================================================
+                    # 3. CONSEQUENCE + PROGRESSION
+                    # =============================================================
+                    if outcome.consequence:
+                        self.state.apply_consequence(outcome.consequence)
+                    
                     character = self.state.get_character()
-                    target = self.state.get_target(combat_action.target)
-                    
-                    if character and target:
-                        if combat_action.action_type == "spell":
-                            mp_cost = 20
-                            pre_validation = self.validator.validate_resource_cost(
-                                resource_name="MP",
-                                current=getattr(character, 'mp_current', 50),
-                                cost=mp_cost
-                            )
-                            if not pre_validation.is_valid:
-                                combat_occurred = False
-                        elif combat_action.action_type == "skill":
-                            sp_cost = 15
-                            pre_validation = self.validator.validate_resource_cost(
-                                resource_name="SP",
-                                current=getattr(character, 'sp_current', 50),
-                                cost=sp_cost
-                            )
-                            if not pre_validation.is_valid:
-                                combat_occurred = False
-                        
-                        if combat_occurred:
-                            combat_result = await self.combat.resolve_action(
-                                action=combat_action,
-                                attacker=character,
-                                target_entity=target,
-                                context=db_context,
-                                profile=self.profile
-                            )
-                            if combat_result.damage_dealt > 0:
-                                self.state.apply_combat_result(combat_result, target)
-                            
-                            char_state = {
-                                "hp_current": character.hp_current,
-                                "hp_max": character.hp_max,
-                                "mp_current": getattr(character, 'mp_current', 50),
-                                "mp_max": getattr(character, 'mp_max', 50),
-                            }
-                            post_validation = self.validator.validate_state_integrity(char_state)
-                            if not post_validation.is_valid:
-                                for error in post_validation.errors:
-                                    print(f"[Validator] {error.severity.value}: {error.description}")
-                
-                # =============================================================
-                # 3. CONSEQUENCE + PROGRESSION
-                # =============================================================
-                if outcome.consequence:
-                    self.state.apply_consequence(outcome.consequence)
-                
-                character = self.state.get_character()
-                progression_result = None
-                should_calculate_progression = (
-                    combat_occurred or
-                    use_sakuga or
-                    outcome.narrative_weight in ["significant", "climactic"] or
-                    (hasattr(outcome, 'quest_progress') and outcome.quest_progress)
-                )
-                
-                if character and should_calculate_progression:
-                    turn_result_data = {
-                        "combat_occurred": combat_occurred,
-                        "boss_fight": combat_result.narrative_weight == "climactic" if combat_result else False,
-                        "sakuga_moment": combat_result.sakuga_moment if combat_result else use_sakuga,
-                        "quest_completed": outcome.quest_progress if hasattr(outcome, 'quest_progress') else False,
-                        "significant_roleplay": outcome.narrative_weight in ["significant", "climactic"],
-                    }
-                    progression_result = await self.progression.calculate_progression(
-                        character=character,
-                        turn_result=turn_result_data,
-                        profile=self.profile
+                    progression_result = None
+                    should_calculate_progression = (
+                        combat_occurred or
+                        use_sakuga or
+                        outcome.narrative_weight in ["significant", "climactic"] or
+                        (hasattr(outcome, 'quest_progress') and outcome.quest_progress)
                     )
-                    if progression_result.xp_awarded > 0:
-                        self.state.apply_progression(progression_result)
-                elif character and not should_calculate_progression:
-                    print(f"[Background] Skipping progression: no XP-worthy events")
-                
-                # =============================================================
-                # 4. TURN RECORDING + EVENT MEMORY
-                # =============================================================
-                self.state.record_turn(
-                    player_input=player_input,
-                    intent=intent.model_dump(),
-                    outcome=outcome.model_dump() if outcome else None,
-                    narrative=narrative,
-                    latency_ms=latency_ms
-                )
-                self.memory.add_memory(
-                    content=f"Turn {db_context.turn_number}: Player input '{player_input}'. Result: {narrative[:500]}...",
-                    memory_type="event",
-                    turn_number=db_context.turn_number
-                )
-                
-                # =============================================================
-                # 5. NPC INTELLIGENCE BATCH
-                # =============================================================
-                if db_context.present_npcs:
-                    npc_lookup = {}
-                    for npc_name in db_context.present_npcs:
-                        npc = self.state.get_npc_by_name(npc_name)
-                        if npc:
-                            npc_lookup[npc_name] = npc
-                            self.state.increment_npc_interaction(npc.id)
                     
-                    if npc_lookup:
-                        try:
-                            print(f"[Background] Batch NPC analysis for {len(npc_lookup)} NPCs")
-                            batch_results = await self.relationship_analyzer.analyze_batch(
-                                npc_names=list(npc_lookup.keys()),
-                                action=intent.action,
-                                outcome=outcome.consequence or "No specific outcome",
-                                narrative_excerpt=narrative[:400]
-                            )
-                            
-                            for rel_result in batch_results:
-                                npc = npc_lookup.get(rel_result.npc_name)
-                                if not npc:
-                                    continue
+                    if character and should_calculate_progression:
+                        turn_result_data = {
+                            "combat_occurred": combat_occurred,
+                            "boss_fight": combat_result.narrative_weight == "climactic" if combat_result else False,
+                            "sakuga_moment": combat_result.sakuga_moment if combat_result else use_sakuga,
+                            "quest_completed": outcome.quest_progress if hasattr(outcome, 'quest_progress') else False,
+                            "significant_roleplay": outcome.narrative_weight in ["significant", "climactic"],
+                        }
+                        progression_result = await self.progression.calculate_progression(
+                            character=character,
+                            turn_result=turn_result_data,
+                            profile=self.profile
+                        )
+                        if progression_result.xp_awarded > 0:
+                            self.state.apply_progression(progression_result)
+                    elif character and not should_calculate_progression:
+                        print(f"[Background] Skipping progression: no XP-worthy events")
+                
+                    # =============================================================
+                    # 4. TURN RECORDING + EVENT MEMORY
+                    # =============================================================
+                    self.state.record_turn(
+                        player_input=player_input,
+                        intent=intent.model_dump(),
+                        outcome=outcome.model_dump() if outcome else None,
+                        narrative=narrative,
+                        latency_ms=latency_ms
+                    )
+                    self.memory.add_memory(
+                        content=f"Turn {db_context.turn_number}: Player input '{player_input}'. Result: {narrative[:500]}...",
+                        memory_type="event",
+                        turn_number=db_context.turn_number
+                    )
+                    
+                    # =============================================================
+                    # 5. NPC INTELLIGENCE BATCH
+                    # =============================================================
+                    if db_context.present_npcs:
+                        npc_lookup = {}
+                        for npc_name in db_context.present_npcs:
+                            npc = self.state.get_npc_by_name(npc_name)
+                            if npc:
+                                npc_lookup[npc_name] = npc
+                                self.state.increment_npc_interaction(npc.id)
+                        
+                        if npc_lookup:
+                            try:
+                                print(f"[Background] Batch NPC analysis for {len(npc_lookup)} NPCs")
+                                batch_results = await self.relationship_analyzer.analyze_batch(
+                                    npc_names=list(npc_lookup.keys()),
+                                    action=intent.action,
+                                    outcome=outcome.consequence or "No specific outcome",
+                                    narrative_excerpt=narrative[:400]
+                                )
                                 
-                                interaction_count = self.state.get_npc_interaction_count(npc.id)
-                                
-                                if rel_result.affinity_delta != 0:
-                                    milestone = self.state.update_npc_affinity(
-                                        npc.id,
-                                        rel_result.affinity_delta,
-                                        f"Turn {db_context.turn_number}: {rel_result.reasoning}"
-                                    )
-                                    if milestone:
-                                        self.memory.add_memory(
-                                            content=f"Relationship milestone with {npc.name}: {milestone['description']}",
-                                            memory_type="relationship",
-                                            turn_number=db_context.turn_number,
-                                            heat=8
+                                for rel_result in batch_results:
+                                    npc = npc_lookup.get(rel_result.npc_name)
+                                    if not npc:
+                                        continue
+                                    
+                                    interaction_count = self.state.get_npc_interaction_count(npc.id)
+                                    
+                                    if rel_result.affinity_delta != 0:
+                                        milestone = self.state.update_npc_affinity(
+                                            npc.id,
+                                            rel_result.affinity_delta,
+                                            f"Turn {db_context.turn_number}: {rel_result.reasoning}"
                                         )
-                                        print(f"[NPC] Disposition threshold crossed: {milestone['event']}")
+                                        if milestone:
+                                            self.memory.add_memory(
+                                                content=f"Relationship milestone with {npc.name}: {milestone['description']}",
+                                                memory_type="relationship",
+                                                turn_number=db_context.turn_number,
+                                                heat=8
+                                            )
+                                            print(f"[NPC] Disposition threshold crossed: {milestone['event']}")
+                                    
+                                    if rel_result.emotional_milestone:
+                                        event = self.state.record_emotional_milestone(
+                                            npc.id,
+                                            rel_result.emotional_milestone,
+                                            context=narrative[:200],
+                                            session_id=db_context.session_id
+                                        )
+                                        if event:
+                                            trust_milestone = rel_result.emotional_milestone in ["first_sacrifice", "first_trust_test"]
+                                            self.state.evolve_npc_intelligence(npc.id, interaction_count, trust_milestone)
+                                    else:
+                                        self.state.evolve_npc_intelligence(npc.id, interaction_count, False)
+                                    
+                                    if rel_result.affinity_delta != 0 or rel_result.emotional_milestone:
+                                        print(f"[RelationshipAnalyzer] {rel_result.npc_name}: delta={rel_result.affinity_delta}, milestone={rel_result.emotional_milestone}")
                                 
-                                if rel_result.emotional_milestone:
-                                    event = self.state.record_emotional_milestone(
-                                        npc.id,
-                                        rel_result.emotional_milestone,
-                                        context=narrative[:200],
-                                        session_id=db_context.session_id
-                                    )
-                                    if event:
-                                        trust_milestone = rel_result.emotional_milestone in ["first_sacrifice", "first_trust_test"]
-                                        self.state.evolve_npc_intelligence(npc.id, interaction_count, trust_milestone)
-                                else:
+                            except Exception as e:
+                                print(f"[RelationshipAnalyzer] Batch error: {e}")
+                                for npc_name, npc in npc_lookup.items():
+                                    interaction_count = self.state.get_npc_interaction_count(npc.id)
                                     self.state.evolve_npc_intelligence(npc.id, interaction_count, False)
-                                
-                                if rel_result.affinity_delta != 0 or rel_result.emotional_milestone:
-                                    print(f"[RelationshipAnalyzer] {rel_result.npc_name}: delta={rel_result.affinity_delta}, milestone={rel_result.emotional_milestone}")
                             
-                        except Exception as e:
-                            print(f"[RelationshipAnalyzer] Batch error: {e}")
-                            for npc_name, npc in npc_lookup.items():
-                                interaction_count = self.state.get_npc_interaction_count(npc.id)
-                                self.state.evolve_npc_intelligence(npc.id, interaction_count, False)
-                        
-                        for npc_name in npc_lookup.keys():
-                            self.state.increment_npc_scene_count(npc_name, db_context.turn_number)
+                            for npc_name in npc_lookup.keys():
+                                self.state.increment_npc_scene_count(npc_name, db_context.turn_number)
                 
-                # =============================================================
-                # 6. FORESHADOWING DETECTION
-                # =============================================================
-                mentioned_seeds = self.foreshadowing.detect_seed_in_narrative(
-                    narrative=narrative,
-                    current_turn=db_context.turn_number
-                )
-                overdue_seeds = self.foreshadowing.get_overdue_seeds(db_context.turn_number)
-                
-                # =============================================================
-                # 7. DIRECTOR HYBRID TRIGGER
-                # =============================================================
-                self._accumulated_epicness += intent.declared_epicness
-                
-                arc_events_this_turn = []
-                if mentioned_seeds:
-                    arc_events_this_turn.append(f"foreshadowing_mentioned:{len(mentioned_seeds)}")
-                if progression_result and getattr(progression_result, 'level_up', False):
-                    arc_events_this_turn.append("level_up")
-                if use_sakuga:
-                    arc_events_this_turn.append("sakuga_moment")
-                if combat_occurred and combat_result and combat_result.narrative_weight == "climactic":
-                    arc_events_this_turn.append("boss_defeat")
-                
-                self._arc_events_since_director.extend(arc_events_this_turn)
-                
-                turns_since_director = db_context.turn_number - self._last_director_turn
-                should_run_director = (
-                    db_context.turn_number > 0 and
-                    turns_since_director >= 3 and (
-                        self._accumulated_epicness >= 2.0 or
-                        len(self._arc_events_since_director) > 0 or
-                        turns_since_director >= 8
+                    # =============================================================
+                    # 6. FORESHADOWING DETECTION
+                    # =============================================================
+                    mentioned_seeds = self.foreshadowing.detect_seed_in_narrative(
+                        narrative=narrative,
+                        current_turn=db_context.turn_number
                     )
-                )
+                    overdue_seeds = self.foreshadowing.get_overdue_seeds(db_context.turn_number)
+                    
+                    # =============================================================
+                    # 7. DIRECTOR HYBRID TRIGGER
+                    # =============================================================
+                    self._accumulated_epicness += intent.declared_epicness
+                    
+                    arc_events_this_turn = []
+                    if mentioned_seeds:
+                        arc_events_this_turn.append(f"foreshadowing_mentioned:{len(mentioned_seeds)}")
+                    if progression_result and getattr(progression_result, 'level_up', False):
+                        arc_events_this_turn.append("level_up")
+                    if use_sakuga:
+                        arc_events_this_turn.append("sakuga_moment")
+                    if combat_occurred and combat_result and combat_result.narrative_weight == "climactic":
+                        arc_events_this_turn.append("boss_defeat")
+                    
+                    self._arc_events_since_director.extend(arc_events_this_turn)
+                    
+                    turns_since_director = db_context.turn_number - self._last_director_turn
+                    should_run_director = (
+                        db_context.turn_number > 0 and
+                        turns_since_director >= 3 and (
+                            self._accumulated_epicness >= 2.0 or
+                            len(self._arc_events_since_director) > 0 or
+                            turns_since_director >= 8
+                        )
+                    )
+                    
+                    if should_run_director:
+                        trigger_reason = []
+                        if self._accumulated_epicness >= 2.0:
+                            trigger_reason.append(f"epicness:{self._accumulated_epicness:.1f}")
+                        if self._arc_events_since_director:
+                            trigger_reason.append(f"events:{self._arc_events_since_director}")
+                        if turns_since_director >= 8:
+                            trigger_reason.append("max_interval")
+                        
+                        print(f"[Director] HYBRID TRIGGER at turn {db_context.turn_number}: {trigger_reason}")
+                        
+                        session = self.state.get_current_session_model()
+                        bible = self.state.get_campaign_bible()
+                        world_state = self.state.get_world_state()
+                        
+                        if session and bible:
+                            op_preset = db_context.op_preset
+                            op_mode_guidance = None
+                            if db_context.op_tension_source:
+                                tension_guidance = self.rules.get_op_axis_guidance("tension", db_context.op_tension_source)
+                                expression_guidance = self.rules.get_op_axis_guidance("expression", db_context.op_power_expression)
+                                focus_guidance = self.rules.get_op_axis_guidance("focus", db_context.op_narrative_focus)
+                                parts = [g for g in [tension_guidance, expression_guidance, focus_guidance] if g]
+                                op_mode_guidance = "\n\n".join(parts) if parts else None
+                            
+                            from ..agents.director_tools import build_director_tools
+                            from ..context.profile_library import get_profile_library
+                            director_tools = build_director_tools(
+                                memory=self.memory,
+                                state=self.state,
+                                foreshadowing=self.foreshadowing,
+                                current_turn=db_context.turn_number,
+                                session_transcript=recent_messages,
+                                profile_library=get_profile_library(),
+                                profile_id=self.profile_id,
+                            )
+                            
+                            director_output = await self.director.run_session_review(
+                                session=session,
+                                bible=bible,
+                                profile=self.profile,
+                                world_state=world_state,
+                                op_preset=op_preset,
+                                op_tension_source=db_context.op_tension_source,
+                                op_mode_guidance=op_mode_guidance,
+                                tools=director_tools,
+                                compaction_text=compaction_text
+                            )
+                            
+                            spotlight_debt = self.state.compute_spotlight_debt()
+                            planning_data = director_output.model_dump()
+                            planning_data["spotlight_debt"] = spotlight_debt
+                            
+                            self.state.update_campaign_bible(planning_data, db_context.turn_number)
+                            self.state.update_world_state(
+                                arc_phase=director_output.arc_phase,
+                                tension_level=director_output.tension_level
+                            )
+                            
+                            self._last_director_turn = db_context.turn_number
+                            self._accumulated_epicness = 0.0
+                            self._arc_events_since_director = []
+                            
+                            print(f"[Director] Checkpoint at turn {db_context.turn_number}: {director_output.arc_phase} (tension: {director_output.tension_level:.1f})")
                 
-                if should_run_director:
-                    trigger_reason = []
-                    if self._accumulated_epicness >= 2.0:
-                        trigger_reason.append(f"epicness:{self._accumulated_epicness:.1f}")
-                    if self._arc_events_since_director:
-                        trigger_reason.append(f"events:{self._arc_events_since_director}")
-                    if turns_since_director >= 8:
-                        trigger_reason.append("max_interval")
-                    
-                    print(f"[Director] HYBRID TRIGGER at turn {db_context.turn_number}: {trigger_reason}")
-                    
-                    session = self.state.get_current_session_model()
-                    bible = self.state.get_campaign_bible()
-                    world_state = self.state.get_world_state()
-                    
-                    if session and bible:
-                        op_preset = db_context.op_preset
-                        op_mode_guidance = None
-                        if db_context.op_tension_source:
-                            tension_guidance = self.rules.get_op_axis_guidance("tension", db_context.op_tension_source)
-                            expression_guidance = self.rules.get_op_axis_guidance("expression", db_context.op_power_expression)
-                            focus_guidance = self.rules.get_op_axis_guidance("focus", db_context.op_narrative_focus)
-                            parts = [g for g in [tension_guidance, expression_guidance, focus_guidance] if g]
-                            op_mode_guidance = "\n\n".join(parts) if parts else None
-                        
-                        from ..agents.director_tools import build_director_tools
-                        from ..context.profile_library import get_profile_library
-                        director_tools = build_director_tools(
-                            memory=self.memory,
-                            state=self.state,
-                            foreshadowing=self.foreshadowing,
-                            current_turn=db_context.turn_number,
-                            session_transcript=recent_messages,
-                            profile_library=get_profile_library(),
-                            profile_id=self.profile_id,
-                        )
-                        
-                        director_output = await self.director.run_session_review(
-                            session=session,
-                            bible=bible,
-                            profile=self.profile,
-                            world_state=world_state,
-                            op_preset=op_preset,
-                            op_tension_source=db_context.op_tension_source,
-                            op_mode_guidance=op_mode_guidance,
-                            tools=director_tools,
-                            compaction_text=compaction_text
-                        )
-                        
-                        spotlight_debt = self.state.compute_spotlight_debt()
-                        planning_data = director_output.model_dump()
-                        planning_data["spotlight_debt"] = spotlight_debt
-                        
-                        self.state.update_campaign_bible(planning_data, db_context.turn_number)
-                        self.state.update_world_state(
-                            arc_phase=director_output.arc_phase,
-                            tension_level=director_output.tension_level
-                        )
-                        
-                        self._last_director_turn = db_context.turn_number
-                        self._accumulated_epicness = 0.0
-                        self._arc_events_since_director = []
-                        
-                        print(f"[Director] Checkpoint at turn {db_context.turn_number}: {director_output.arc_phase} (tension: {director_output.tension_level:.1f})")
-                
+                # END deferred_commit block — single atomic SQL commit here
                 # =============================================================
                 # 8. MEMORY COMPRESSION (every 10 turns)
                 # =============================================================
