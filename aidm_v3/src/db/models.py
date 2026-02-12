@@ -214,6 +214,9 @@ class WorldState(Base):
     # Foreshadowing seeds planted (for Phase 4)
     foreshadowing = Column(JSON, default=list)
     
+    # #5: Pinned messages (up to 5 exchanges that stay in working memory)
+    pinned_messages = Column(JSON, default=list)
+    
     campaign = relationship("Campaign", back_populates="world_state")
 
 

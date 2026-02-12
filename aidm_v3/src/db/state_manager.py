@@ -1,7 +1,7 @@
 """State manager for CRUD operations on game state."""
 
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional, List, Dict, Any
 from sqlalchemy.orm import Session as SQLAlchemySession
 from sqlalchemy.exc import OperationalError
@@ -39,6 +39,9 @@ class GameContext:
     
     # #3: Pacing gate counter (default field must come after non-default fields)
     turns_in_phase: int = 0
+    
+    # #5: Pinned messages (exchanges that stay in working memory regardless of window)
+    pinned_messages: List[Dict] = field(default_factory=list)
     
     # OP Protagonist Mode (3-Axis System)
     op_protagonist_enabled: bool = False
@@ -465,6 +468,7 @@ class StateManager:
             arc_phase=world_state.arc_phase if world_state else "rising_action",
             tension_level=world_state.tension_level if world_state else 0.5,
             turns_in_phase=getattr(world_state, 'turns_in_phase', 0) or 0 if world_state else 0,
+            pinned_messages=getattr(world_state, 'pinned_messages', []) or [] if world_state else [],
             recent_summary=recent_summary,
             present_npcs=self._detect_present_npcs(recent_summary, world_state),
             director_notes=director_notes,

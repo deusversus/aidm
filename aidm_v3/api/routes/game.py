@@ -1314,7 +1314,7 @@ async def process_turn(request: TurnRequest):
     # The sliding window is 15 messages. When total messages exceeds 15,
     # the oldest messages fall off. We compact them into narrative beats.
     # =====================================================================
-    WINDOW_SIZE = 15
+    WINDOW_SIZE = 20  # #5: Increased from 15 → 20 (~10 exchanges)
     COMPACTION_MAX_TOKENS = 10_000
     
     compaction_text = ""
@@ -1376,6 +1376,26 @@ async def process_turn(request: TurnRequest):
     # Working Memory: Get last 15 messages from session (includes Session Zero + gameplay)
     # This replaces the one-time handoff_transcript mechanism
     recent_messages = session.messages[-WINDOW_SIZE:] if session and hasattr(session, 'messages') else []
+    
+    # #5: Prepend pinned messages (always in working memory regardless of window)
+    if session and recent_messages:
+        try:
+            orchestrator_temp = get_orchestrator()
+            db_context_temp = orchestrator_temp.state.get_context()
+            pinned = getattr(db_context_temp, 'pinned_messages', []) or []
+            if pinned:
+                # Deduplicate: only prepend pinned messages not already in window
+                window_contents = {msg.get('content', '')[:100] for msg in recent_messages}
+                unique_pinned = [
+                    p for p in pinned 
+                    if p.get('content', '')[:100] not in window_contents
+                ]
+                if unique_pinned:
+                    recent_messages = unique_pinned + recent_messages
+                    print(f"[GameAPI] Pinned {len(unique_pinned)} messages prepended to working memory")
+        except Exception as e:
+            print(f"[GameAPI] Pinned messages failed (non-fatal): {e}")
+    
     if recent_messages:
         print(f"[GameAPI] Working memory: {len(recent_messages)} recent messages")
     
