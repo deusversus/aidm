@@ -35,6 +35,7 @@ CATEGORY_DECAY = {
     "npc_state": "normal",     # NPC status
     "location": "slow",        # Visited places
     "episode": "very_fast",    # Per-turn summaries (working memory overflow)
+    "narrative_beat": "slow",  # Extracted narrative beats (emotional moments, revelations)
     "session_zero": "none",    # Session Zero memories (never decay)
     "session_zero_voice": "none", # Tonal/voice memories (never decay)
 }

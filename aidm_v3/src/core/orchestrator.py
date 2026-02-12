@@ -1056,14 +1056,19 @@ class Orchestrator:
                 # END deferred_commit block — single atomic SQL commit here
                 # =============================================================
                 # 8. MEMORY COMPRESSION (every 10 turns)
+                # ChromaDB error recovery (#29): independent try/except
                 # =============================================================
-                if db_context.turn_number > 0 and db_context.turn_number % 10 == 0:
-                    compression_result = await self.memory.compress_cold_memories()
-                    if compression_result.get("compressed"):
-                        print(f"[Memory] Compressed {compression_result['memories_removed']} memories into {compression_result['summaries_created']} summaries")
+                try:
+                    if db_context.turn_number > 0 and db_context.turn_number % 10 == 0:
+                        compression_result = await self.memory.compress_cold_memories()
+                        if compression_result.get("compressed"):
+                            print(f"[Memory] Compressed {compression_result['memories_removed']} memories into {compression_result['summaries_created']} summaries")
+                except Exception as e:
+                    print(f"[ChromaDB Recovery] Memory compression failed (will retry next cycle): {e}")
                 
                 # =============================================================
                 # 9. EPISODIC MEMORY
+                # ChromaDB error recovery (#29): independent try/except
                 # =============================================================
                 try:
                     turn_number = db_context.turn_number if hasattr(db_context, 'turn_number') else 0
@@ -1077,7 +1082,7 @@ class Orchestrator:
                     )
                     print(f"[Background] Episodic memory written for turn {turn_number}")
                 except Exception as e:
-                    print(f"[Background] Episode write failed: {e}")
+                    print(f"[ChromaDB Recovery] Episodic write failed (idempotent, will retry): {e}")
                 
                 bg_elapsed = int((time.time() - bg_start) * 1000)
                 print(f"[Background] Post-narrative processing complete ({bg_elapsed}ms)")
@@ -1088,7 +1093,14 @@ class Orchestrator:
                 traceback.print_exc()
     
     async def _bg_extract_entities(self, narrative: str, turn_number: int):
-        """Background entity extraction from DM narrative."""
+        """Background entity extraction + narrative beat indexing from DM narrative."""
+        # Run entity extraction and narrative beat extraction in parallel
+        entity_task = self._extract_world_entities(narrative, turn_number)
+        beat_task = self._extract_narrative_beats(narrative, turn_number)
+        await asyncio.gather(entity_task, beat_task, return_exceptions=True)
+    
+    async def _extract_world_entities(self, narrative: str, turn_number: int):
+        """Extract world-building entities (NPCs, locations, items) from narrative."""
         try:
             from ..agents.world_builder import WorldBuilderAgent
             extractor = WorldBuilderAgent()
@@ -1103,6 +1115,82 @@ class Orchestrator:
                 print(f"[Background] Extracted {len(dm_entities.entities)} entities from narrative")
         except Exception as e:
             print(f"[Background] Entity extraction failed: {e}")
+    
+    async def _extract_narrative_beats(self, narrative: str, turn_number: int):
+        """Extract narrative beats from DM narrative and index to ChromaDB.
+        
+        Identifies emotionally significant moments, character revelations,
+        and world-changing events. Also classifies each beat as plot-critical
+        or not (PLAN #6: auto-detect plot-critical memories).
+        """
+        try:
+            from pydantic import BaseModel, Field
+            from typing import List
+            from ..llm import get_llm_manager
+            
+            class NarrativeBeat(BaseModel):
+                description: str = Field(description="One-sentence summary of the beat")
+                npcs: List[str] = Field(default_factory=list, description="NPC names involved")
+                location: str = Field(default="", description="Where this happened")
+                is_plot_critical: bool = Field(
+                    default=False,
+                    description="True if losing this memory would break narrative continuity"
+                )
+            
+            class NarrativeBeatsOutput(BaseModel):
+                beats: List[NarrativeBeat] = Field(
+                    default_factory=list,
+                    description="1-3 narrative beats extracted from the text"
+                )
+            
+            manager = get_llm_manager()
+            fast_provider = manager.fast_provider
+            fast_model = manager.get_fast_model()
+            
+            system = (
+                "You extract narrative beats from RPG game master narration. "
+                "A narrative beat is an emotionally significant moment, character revelation, "
+                "world-changing event, or dramatic turning point. "
+                "Extract 1-3 beats. Skip mundane descriptions. "
+                "Mark a beat as plot_critical ONLY if losing it would break narrative continuity "
+                "(e.g., a character death, a major alliance formed, a secret revealed)."
+            )
+            
+            result = await fast_provider.complete_with_schema(
+                messages=[{"role": "user", "content": narrative[:800]}],
+                schema=NarrativeBeatsOutput,
+                system=system,
+                model=fast_model,
+                max_tokens=512,
+            )
+            
+            if not result.beats:
+                return
+            
+            # Index each beat to ChromaDB
+            for beat in result.beats:
+                try:
+                    flags = ["plot_critical"] if beat.is_plot_critical else []
+                    self.memory.add_memory(
+                        content=beat.description,
+                        memory_type="narrative_beat",
+                        turn_number=turn_number,
+                        metadata={
+                            "npcs_involved": ",".join(beat.npcs),
+                            "location": beat.location,
+                        },
+                        flags=flags,
+                    )
+                except Exception as e:
+                    print(f"[ChromaDB Recovery] Narrative beat write failed: {e}")
+            
+            critical_count = sum(1 for b in result.beats if b.is_plot_critical)
+            print(
+                f"[Background] Extracted {len(result.beats)} narrative beats "
+                f"({critical_count} plot-critical) from turn {turn_number}"
+            )
+        except Exception as e:
+            print(f"[Background] Narrative beat extraction failed (non-fatal): {e}")
     
     async def _bg_relationship_analysis(self, narrative: str, player_input: str, outcome, turn_number: int):
         """Background NPC relationship analysis from narrative."""

@@ -213,6 +213,33 @@ def build_gameplay_tools(
         handler=lambda: _list_factions(state)
     ))
     
+    # -----------------------------------------------------------------
+    # DEEP RECALL TOOLS (#30)
+    # -----------------------------------------------------------------
+    
+    registry.register(ToolDefinition(
+        name="recall_scene",
+        description=(
+            "Search past turn narratives for specific scenes, events, or "
+            "character moments. Use this to find what happened in earlier turns — "
+            "exact dialogue, descriptions, and outcomes. More detailed than "
+            "episodic memory summaries. Good for 'what did X say?' or "
+            "'what happened when we fought Y?'"
+        ),
+        parameters=[
+            ToolParam("query", "str", "Keyword to search for in past narratives", required=True),
+            ToolParam("npc", "str",
+                "Optional: filter results to scenes mentioning this NPC name",
+                required=False),
+            ToolParam("turn_range", "str",
+                "Optional: limit to a turn range as 'start-end' (e.g. '1-10')",
+                required=False),
+        ],
+        handler=lambda query, npc=None, turn_range=None: _recall_scene(
+            state, query, npc, turn_range
+        )
+    ))
+    
     return registry
 
 
@@ -506,3 +533,25 @@ def _list_factions(state) -> List[Dict]:
         }
         for f in factions
     ]
+
+
+def _recall_scene(state, query: str, npc: str = None, turn_range: str = None):
+    """Search past turn narratives for specific scenes."""
+    tr = None
+    if turn_range:
+        parts = turn_range.split("-")
+        if len(parts) == 2:
+            try:
+                tr = (int(parts[0]), int(parts[1]))
+            except ValueError:
+                pass
+    
+    results = state.search_turn_narratives(query, npc=npc, turn_range=tr)
+    if not results:
+        return "No matching scenes found."
+    
+    lines = []
+    for r in results:
+        player_ctx = f" (Player: {r['player_input']})" if r.get("player_input") else ""
+        lines.append(f"**Turn {r['turn']}**{player_ctx}\n{r['narrative_excerpt']}")
+    return "\n---\n".join(lines)
