@@ -297,7 +297,15 @@ Provide a CONCISE investigation report structured as:
         # === VOICE / AUTHOR VOICE ===
         if hasattr(profile, 'author_voice') and profile.author_voice:
             lines.append("\n## ✍️ Author's Voice")
-            lines.append(profile.author_voice)
+            if isinstance(profile.author_voice, dict):
+                for key, value in profile.author_voice.items():
+                    label = key.replace('_', ' ').title()
+                    if isinstance(value, list):
+                        lines.append(f"**{label}:** {'; '.join(str(v) for v in value)}")
+                    else:
+                        lines.append(f"**{label}:** {value}")
+            else:
+                lines.append(str(profile.author_voice))
         
         if hasattr(profile, 'voice_cards') and profile.voice_cards:
             lines.append("\n## 🗣️ Character Voice Cards")

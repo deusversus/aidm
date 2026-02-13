@@ -1201,14 +1201,12 @@ I found several entries in the **{media_ref}** franchise:
                     
                     # Inject Session Zero context as high-priority memory
                     try:
-                        orchestrator.memory.add(
-                            text=f"SESSION ZERO CONTEXT (Character creation and opening scene):\n\n{recent_summary}",
-                            metadata={
-                                "source": "session_zero_handoff",
-                                "importance": 10,
-                                "permanent": True,
-                                "type": "session_zero_context"
-                            }
+                        orchestrator.memory.add_memory(
+                            content=f"SESSION ZERO CONTEXT (Character creation and opening scene):\n\n{recent_summary}",
+                            memory_type="session_zero",
+                            turn_number=0,
+                            metadata={"source": "session_zero_handoff"},
+                            flags=["plot_critical", "session_zero"]
                         )
                         print(f"[Handoff] Session Zero context injected ({len(recent_summary)} chars)")
                     except Exception as mem_err:

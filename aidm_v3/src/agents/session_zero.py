@@ -232,7 +232,8 @@ def apply_detected_info(session: Session, detected: Dict[str, Any]) -> None:
 async def process_session_zero_state(
     session: Session,
     detected_info: Dict[str, Any],
-    session_id: str
+    session_id: str,
+    campaign_id: int = None
 ) -> Dict[str, int]:
     """
     Process Session Zero detected_info using the same systems as gameplay.
@@ -347,8 +348,12 @@ async def process_session_zero_state(
     if "npcs" in detected_info:
         npcs = detected_info["npcs"]
         if isinstance(npcs, list):
-            # Initialize StateManager for DB writes
-            state = StateManager(game_id=session_id)
+            # Initialize StateManager for DB writes (needs integer campaign_id)
+            if campaign_id is not None:
+                state = StateManager(campaign_id)
+            else:
+                print("[SessionZero→State] No campaign_id provided, skipping NPC DB creation")
+                state = None
             
             for npc in npcs:
                 if isinstance(npc, dict) and "name" in npc:
@@ -358,16 +363,17 @@ async def process_session_zero_state(
                     disposition = npc.get("disposition", "neutral")
                     background = npc.get("background", "")
                     
-                    # 1. Create NPC in SQLite database
-                    try:
-                        state.create_npc(
-                            name=npc_name,
-                            role=role,
-                            relationship_notes=f"{disposition}. {background}"
-                        )
-                        print(f"[SessionZero→State] Created NPC in DB: {npc_name}")
-                    except Exception as e:
-                        print(f"[SessionZero→State] NPC DB creation failed: {e}")
+                    # 1. Create NPC in SQLite database (if StateManager available)
+                    if state is not None:
+                        try:
+                            state.create_npc(
+                                name=npc_name,
+                                role=role,
+                                relationship_notes=f"{disposition}. {background}"
+                            )
+                            print(f"[SessionZero→State] Created NPC in DB: {npc_name}")
+                        except Exception as e:
+                            print(f"[SessionZero→State] NPC DB creation failed: {e}")
                     
                     # 2. Create NPC memory in ChromaDB
                     memory.add_memory(
