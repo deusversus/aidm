@@ -1,7 +1,0 @@
-{
-  "description": "Kingdom-building/Strategy anime",
-  "enabled_modes": ["faction_building", "investigation", "social_links"],
-  "default_mode": "faction_building",
-  "time_tracking": true,
-  "use_case": "Overlord, That Time I Got Reincarnated as a Slime, Maoyu. Focus on managing organization/nation. Social links for diplomacy. Investigation for intel gathering."
-}

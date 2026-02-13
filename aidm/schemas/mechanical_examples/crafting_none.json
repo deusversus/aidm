@@ -1,6 +1,0 @@
-{
-  "description": "No crafting system",
-  "type": "none",
-  "parameters": {},
-  "use_case": "Characters cannot craft items. All equipment/items found or purchased. Common in pure combat anime (Dragon Ball, most battle shonen), sports anime, psychological thrillers."
-}

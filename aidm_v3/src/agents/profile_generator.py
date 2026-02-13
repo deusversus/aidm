@@ -418,6 +418,20 @@ async def generate_and_save_profile(
             else:
                 raise ValueError("Research returned no raw_content. Retry needed.")
             
+            # --- COMPLETENESS CHECK (warnings, not blockers) ---
+            # Surface incomplete scrapes immediately rather than discovering them later
+            if hasattr(research, 'fandom_pages') and research.fandom_pages:
+                page_types = set(p['page_type'] for p in research.fandom_pages)
+                if len(page_types) <= 1:
+                    print(f"[ProfileGenerator] WARNING: LOW COVERAGE — only {page_types} page types found. Profile may be incomplete.")
+                elif len(page_types) <= 3:
+                    print(f"[ProfileGenerator] NOTE: Moderate coverage — {len(page_types)} page types: {sorted(page_types)}")
+                else:
+                    print(f"[ProfileGenerator] Coverage OK — {len(page_types)} page types: {sorted(page_types)}")
+            
+            if not research.power_system or not research.power_system.get('name'):
+                print(f"[ProfileGenerator] WARNING: power_system is empty — this IP may lack a power system, or wiki scrape may have missed technique pages")
+            
             # --- ALL VALIDATION PASSED - NOW SAVE ATOMICALLY ---
             
             # 1. Store structured lore in SQL (replaces .txt dump)

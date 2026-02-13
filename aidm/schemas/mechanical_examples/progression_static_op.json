@@ -1,9 +1,0 @@
-{
-  "description": "Static overpowered (Overlord Ainz, One Punch Man Saitama)",
-  "type": "static_op",
-  "parameters": {
-    "starting_power_tier": 8,
-    "growth_focus": "technique_variety"
-  },
-  "use_case": "Character starts at maximum power and doesn't level up. Growth is in technique variety, control, or strategic thinking rather than raw power. Perfect for Overlord (already max level), One Punch Man (already strongest), or transferred-at-max-power isekai."
-}
