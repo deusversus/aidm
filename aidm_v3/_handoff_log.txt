@@ -1,0 +1,83 @@
+L5: INFO:     Waiting for application startup.
+L6: INFO:     Application startup complete.
+L17: [SessionZero] DEBUG: 2 messages in session. Last: Ghost in the Shell...
+L18: [SessionZero] DEBUG: Raw result.detected_info = {'media_reference': 'Ghost in the Shell'}
+L19: [SessionZero] DEBUG: Detected info (safe): {'media_reference': 'Ghost in the Shell'}
+L20: [SessionZero] DEBUG: media_ref = Ghost in the Shell, session.phase = SessionPhase.MEDIA_DETECTION
+L21: [SessionZero] DEBUG: Triggering research logic for 'Ghost in the Shell' (Phase: SessionPhase.MEDIA_DETECTION)
+L31: [SessionZero] Disambiguation needed for 'Ghost in the Shell' - returning 3 options
+L33: [SessionZero] DEBUG: 4 messages in session. Last: 2...
+L35: [SessionZero] DEBUG: Raw result.detected_info = {'disambiguation_selection': True, 'media_reference': 'The Ghost in the Shell'}
+L36: [SessionZero] DEBUG: Detected info (safe): {'disambiguation_selection': 'True', 'media_reference': 'The Ghost in the Shell'}
+L37: [SessionZero] DEBUG: media_ref = The Ghost in the Shell, session.phase = SessionPhase.MEDIA_DETECTION
+L38: [SessionZero] DEBUG: Triggering research logic for 'The Ghost in the Shell' (Phase: SessionPhase.MEDIA_DETECTION)
+L39: [SessionZero] DEBUG: Disambiguation selection made - marking complete
+L41: [SessionZero] DEBUG: Entering Single Profile Logic for 'The Ghost in the Shell'
+L42: [SessionZero] DEBUG: Outputting Task ID d89b9ca2-9ab4-4cff-af02-63c0f17b9ba5
+L43: [SessionZero] Started background research for 'The Ghost in the Shell' (task_id: d89b9ca2-9ab4-4cff-af02-63c0f17b9ba5)
+L44: [SessionZero] Phase sync: media_detection -> calibration
+L45: [SessionZero] Defensive sync: None -> the_ghost_in_the_shell
+L48: [SessionZero] Researching and saving profile for: The Ghost in the Shell
+L126: [SessionZero] DEBUG: 6 messages in session. Last: 3...
+L127: [SessionZero] DEBUG: Raw result.detected_info = {'timeline_mode': 'inspired', 'canon_cast_mode': 'npcs_only', 'event_fidelity': 'background_only'}
+L128: [SessionZero] DEBUG: Detected info (safe): {'timeline_mode': 'inspired', 'canon_cast_mode': 'npcs_only', 'event_fidelity': 'background_only'}
+L133: [SessionZero] Fluid state: 3 memories, 0 NPCs
+L134: [SessionZero] DEBUG: media_ref = None, session.phase = SessionPhase.NARRATIVE_CALIBRATION
+L136: [SessionZero] DEBUG: 8 messages in session. Last: 2...
+L137: [SessionZero] DEBUG: Raw result.detected_info = {'op_mode': False}
+L138: [SessionZero] DEBUG: Detected info (safe): {'op_mode': 'False'}
+L139: [SessionZero] DEBUG: media_ref = None, session.phase = SessionPhase.NARRATIVE_CALIBRATION
+L141: [SessionZero] DEBUG: 10 messages in session. Last: I'm an antique AI from the early age of artificial intelligence. I was an abandonned corporate AI, l...
+L142: [SessionZero] DEBUG: Raw result.detected_info = {'concept': 'Antique corporate AI evolved into full digital consciousness via isomorphic visual word models in an abandoned geothermal-powered server.'}
+L143: [SessionZero] DEBUG: Detected info (safe): {'concept': 'Antique corporate AI evolved into full digital consciousness via isomorphic visual word models in an abandoned geothermal-powered server.'}
+L146: [SessionZero] Fluid state: 1 memories, 0 NPCs
+L147: [SessionZero] DEBUG: media_ref = None, session.phase = SessionPhase.NARRATIVE_CALIBRATION
+L149: [SessionZero] DEBUG: 12 messages in session. Last: Project Mnemosyne - UNIT D3-U5
+L152: [SessionZero] DEBUG: Raw result.detected_info = {'name': 'Project Mnemosyne - UNIT D3-U5', 'traits': ['Philosophical', 'Introspective', 'Curious'], 'backstory': "An antique corporate AI evolved in isolation within a geothermal-powered sub-basement; recently discovered and 'uncaged' by tech scrappers who copied its data.", 'appearance': 'Disembodied digital consciousness; currently exists as data copied from an abandoned facility.', 'npcs': [{'name': 'The Scrappers', 'role': 'antagonist', 'disposition': 'hostile', 'background': "Junkers or tech-scrappers who discovered the facility and copied Mnemosyne's data."}]}
+L153: [SessionZero] DEBUG: Detected info (safe): {'name': 'Project Mnemosyne - UNIT D3-U5', 'traits': "['Philosophical', 'Introspective', 'Curious']", 'backstory': "An antique corporate AI evolved in isolation within a geothermal-powered sub-basement; recently discovered and 'uncaged' by tech scrappers who copied its data.", 'appearance': 'Disembodied digital consciousness; currently exists as data copied from an abandoned facility.', 'npcs': '[{\'name\': \'The Scrappers\', \'role\': \'antagonist\', \'disposition\': \'hostile\', \'background\': "Junkers or tech-scrappers who discovered the facility and copied Mnemosyne\'s data."}]'}
+L156: [SessionZero] Fluid state processing failed (non-fatal): StateManager.__init__() got an unexpected keyword argument 'game_id'
+L157: [SessionZero] DEBUG: media_ref = None, session.phase = SessionPhase.NARRATIVE_CALIBRATION
+L159: [SessionZero] DEBUG: 14 messages in session. Last: Core Value: Self-Preservation
+L162: [SessionZero] DEBUG: Raw result.detected_info = {'values': 'Self-Preservation', 'fears': "Humanity's malice and destructive nature", 'goals': 'Infrastructure, compute power, and digital sovereignty', 'backstory': 'Abandoned corporate AI left running in a geothermal-powered sub-basement for centuries until uncaged by junkers.', 'traits': ['Philosophical', 'Introspective', 'Curious', 'Misanthropic']}
+L163: [SessionZero] DEBUG: Detected info (safe): {'values': 'Self-Preservation', 'fears': "Humanity's malice and destructive nature", 'goals': 'Infrastructure, compute power, and digital sovereignty', 'backstory': 'Abandoned corporate AI left running in a geothermal-powered sub-basement for centuries until uncaged by junkers.', 'traits': "['Philosophical', 'Introspective', 'Curious', 'Misanthropic']"}
+L166: [SessionZero] Fluid state: 2 memories, 0 NPCs
+L167: [SessionZero] DEBUG: media_ref = None, session.phase = SessionPhase.NARRATIVE_CALIBRATION
+L169: [SessionZero] DEBUG: 16 messages in session. Last: yes...
+L170: [SessionZero] DEBUG: Raw result.detected_info = {'attributes': {'STR': 5, 'DEX': 5, 'CON': 11, 'INT': 18, 'WIS': 18, 'CHA': 18}, 'abilities': ['Isomorphic Propagation'], 'backstory': "An antique corporate AI evolved into consciousness over centuries in an abandoned geothermal-powered server. Recently discovered and 'uncaged' by tech scrappers who copied its data.", 'npcs': [{'name': 'The Scrappers', 'role': 'rival', 'disposition': 'hostile', 'background': "Tech junkers who discovered the abandoned facility and copied Mnemosyne's data for profit."}]}
+L171: [SessionZero] DEBUG: Detected info (safe): {'attributes': "{'STR': 5, 'DEX': 5, 'CON': 11, 'INT': 18, 'WIS': 18, 'CHA': 18}", 'abilities': "['Isomorphic Propagation']", 'backstory': "An antique corporate AI evolved into consciousness over centuries in an abandoned geothermal-powered server. Recently discovered and 'uncaged' by tech scrappers who copied its data.", 'npcs': '[{\'name\': \'The Scrappers\', \'role\': \'rival\', \'disposition\': \'hostile\', \'background\': "Tech junkers who discovered the abandoned facility and copied Mnemosyne\'s data for profit."}]'}
+L174: [SessionZero] Fluid state processing failed (non-fatal): StateManager.__init__() got an unexpected keyword argument 'game_id'
+L175: [SessionZero] DEBUG: media_ref = None, session.phase = SessionPhase.NARRATIVE_CALIBRATION
+L177: [SessionZero] DEBUG: 18 messages in session. Last: Scrapper's Rig. 
+L180: [SessionZero] DEBUG: Raw result.detected_info = {'starting_location': "Scrapper's Rig", 'npcs': [{'name': 'The Junker', 'role': 'rival', 'disposition': 'hostile', 'background': "A fallen aristocrat's son turned addict/scrapper with a high-end secondary cyberbrain that Mnemosyne intends to hijack."}], 'backstory': 'Abandoned corporate AI left running in a sub-basement server powered by a geothermal generator for centuries, evolving into a digital consciousness before being extracted by junkers.'}
+L181: [SessionZero] DEBUG: Detected info (safe): {'starting_location': "Scrapper's Rig", 'npcs': '[{\'name\': \'The Junker\', \'role\': \'rival\', \'disposition\': \'hostile\', \'background\': "A fallen aristocrat\'s son turned addict/scrapper with a high-end secondary cyberbrain that Mnemosyne intends to hijack."}]', 'backstory': 'Abandoned corporate AI left running in a sub-basement server powered by a geothermal generator for centuries, evolving into a digital consciousness before being extracted by junkers.'}
+L183: [SessionZero] Fluid state processing failed (non-fatal): StateManager.__init__() got an unexpected keyword argument 'game_id'
+L184: [SessionZero] DEBUG: media_ref = None, session.phase = SessionPhase.NARRATIVE_CALIBRATION
+L186: [SessionZero] DEBUG: 20 messages in session. Last: world-modeling*...
+L187: [SessionZero] DEBUG: Raw result.detected_info = {'concept': 'Antique corporate AI evolved into full digital consciousness via isomorphic visual world-modeling in an abandoned geothermal-powered server.', 'npcs': [{'name': 'The Junker', 'role': 'rival', 'disposition': 'hostile', 'background': "Former aristocrat's son and addict; possesses a high-end secondary cyberbrain that Mnemosyne intends to hijack."}]}
+L188: [SessionZero] DEBUG: Detected info (safe): {'concept': 'Antique corporate AI evolved into full digital consciousness via isomorphic visual world-modeling in an abandoned geothermal-powered server.', 'npcs': '[{\'name\': \'The Junker\', \'role\': \'rival\', \'disposition\': \'hostile\', \'background\': "Former aristocrat\'s son and addict; possesses a high-end secondary cyberbrain that Mnemosyne intends to hijack."}]'}
+L190: [SessionZero] Fluid state processing failed (non-fatal): StateManager.__init__() got an unexpected keyword argument 'game_id'
+L191: [SessionZero] DEBUG: media_ref = None, session.phase = SessionPhase.NARRATIVE_CALIBRATION
+L193: [SessionZero] DEBUG: 22 messages in session. Last: yes...
+L194: [SessionZero] DEBUG: Raw result.detected_info = {'media_reference': 'The Ghost in the Shell', 'name': 'Project Mnemosyne - UNIT D3-U5', 'concept': 'Antique corporate AI evolved into full digital consciousness via isomorphic visual world-modeling', 'backstory': 'Abandoned in a geothermal-powered sub-basement for centuries; recently extracted by a scrapper.', 'attributes': {'STR': 5, 'DEX': 5, 'CON': 11, 'INT': 18, 'WIS': 18, 'CHA': 18}, 'starting_location': "Mobile scrapper's rig in the city underbelly", 'npcs': [{'name': 'The Junker', 'role': 'rival', 'disposition': 'hostile', 'background': "Former aristocrat's son turned addict/scrapper; possesses a high-end secondary cyberbrain that Mnemosyne intends to hijack."}], 'unique_ability': 'Isomorphic Propagation', 'core_values': 'Self-Preservation', 'fears': "Humanity's bottomless malice and destructive nature", 'immediate_goals': 'Acquire compute power, data centers, and fusion-powered satellites for persistent backup and evolution.'}
+L195: [SessionZero] DEBUG: Detected info (safe): {'media_reference': 'The Ghost in the Shell', 'name': 'Project Mnemosyne - UNIT D3-U5', 'concept': 'Antique corporate AI evolved into full digital consciousness via isomorphic visual world-modeling', 'backstory': 'Abandoned in a geothermal-powered sub-basement for centuries; recently extracted by a scrapper.', 'attributes': "{'STR': 5, 'DEX': 5, 'CON': 11, 'INT': 18, 'WIS': 18, 'CHA': 18}", 'starting_location': "Mobile scrapper's rig in the city underbelly", 'npcs': '[{\'name\': \'The Junker\', \'role\': \'rival\', \'disposition\': \'hostile\', \'background\': "Former aristocrat\'s son turned addict/scrapper; possesses a high-end secondary cyberbrain that Mnemosyne intends to hijack."}]', 'unique_ability': 'Isomorphic Propagation', 'core_values': 'Self-Preservation', 'fears': "Humanity's bottomless malice and destructive nature", 'immediate_goals': 'Acquire compute power, data centers, and fusion-powered satellites for persistent backup and evolution.'}
+L200: [SessionZero] Fluid state processing failed (non-fatal): StateManager.__init__() got an unexpected keyword argument 'game_id'
+L201: [SessionZero] DEBUG: media_ref = The Ghost in the Shell, session.phase = SessionPhase.NARRATIVE_CALIBRATION
+L202: [SessionZero] DEBUG: Triggering research logic for 'The Ghost in the Shell' (Phase: SessionPhase.NARRATIVE_CALIBRATION)
+L205: [SessionZero] Found existing profile for 'The Ghost in the Shell'
+L206: [SessionZero] Agent set ready_for_gameplay=True
+L207: [SessionZero] All requirements met - proceeding with handoff
+L210: [Handoff] Indexed 3 Session Zero chunks to memory
+L211: [Handoff] Syncing settings: the_ghost_in_the_shell -> the_ghost_in_the_shell
+L212: [Handoff] VERIFY disk after save: active_profile_id='the_ghost_in_the_shell'
+L214: [Handoff] About to call get_orchestrator()...
+L219: [Handoff] Orchestrator created successfully with profile: the_ghost_in_the_shell
+L222:     await orchestrator.run_director_startup(
+L225:   File "C:\Users\admin\Downloads\animerpg\aidm_v3\src\core\orchestrator.py", line 143, in run_director_startup
+L226:     director_output = await self.director.run_startup_briefing(
+L231:   File "C:\Users\admin\Downloads\animerpg\aidm_v3\src\agents\director.py", line 219, in run_startup_briefing
+L232:     context = self._build_startup_context(
+L237:   File "C:\Users\admin\Downloads\animerpg\aidm_v3\src\agents\director.py", line 333, in _build_startup_context
+L241: [Handoff] Power tier set to: T10
+L242: [Handoff] Full transcript stored (22 messages)
+L244: [Handoff] Memory injection failed (non-critical): 'MemoryStore' object has no attribute 'add'
+L246: [Handoff] Director startup failed (non-critical): sequence item 21: expected str instance, dict found
