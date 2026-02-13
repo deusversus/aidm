@@ -892,7 +892,7 @@ class Orchestrator:
                  context={
                      "rules_summary": self.rules.get_relevant_rules(
                          f"{intent.action} {db_context.situation}", top_k=2
-                     ) or "Standard Physics + Anime Logic"
+                     ) or "Standard Physics + Anime Logic",
                      "character_state": db_context.character_summary
                  }
             )
