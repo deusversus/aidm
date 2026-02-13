@@ -31,7 +31,7 @@ class CategorySelection(BaseModel):
     """A single wiki category selected for scraping."""
     wiki_category: str = Field(description="Exact category name from the wiki")
     canonical_type: str = Field(description="One of: characters, techniques, locations, arcs, factions, items, lore")
-    priority: int = Field(description="1=must scrape, 2=good to have, 3=nice-to-have")
+    priority: int = Field(description="Scrape order: 1=primary source for this type, 2=supplementary, 3=fallback/overlap. ALL priorities are scraped.")
     reasoning: str = Field(description="Brief justification for this selection")
 
 
@@ -52,7 +52,11 @@ class WikiScrapePlan(BaseModel):
 
 WIKI_SCOUT_SYSTEM = """You are a wiki category classifier for an anime RPG game engine.
 
-Given a list of category names from a Fandom wiki, select the categories that contain 
+This is a ONE-TIME profile generation for a comprehensive RAG (retrieval-augmented generation)
+database. Your goal is MAXIMUM COVERAGE — include every category that contains narrative lore.
+Page counts are capped downstream; your job is to ensure no valuable content is missed.
+
+Given a list of category names from a Fandom wiki, select the categories that contain
 RPG-relevant lore pages. Map each to a canonical type.
 
 ## Canonical Types
@@ -69,16 +73,23 @@ RPG-relevant lore pages. Map each to a canonical type.
 
 ## Rules
 
-1. **Pick the BROADEST container category for each type.** Prefer "Characters" over "Male Characters" or "Antagonists". Pick the one that contains the most relevant pages.
+1. **BE GREEDY — include every category that could contain narrative lore.** When in doubt,
+   include it. We filter at retrieval time, not ingestion time.
 
-2. **You may pick MULTIPLE categories per type** if they cover genuinely different content (e.g. "Jutsu" and "Kekkei Genkai" are both valid techniques categories).
+2. **Pick the BROADEST container category for each type.** Prefer "Characters" over
+   "Male Characters" or "Antagonists". Pick the one that contains the most relevant pages.
 
-3. **Priority**:
-   - 1 = essential for RPG (characters, main abilities, key locations)
-   - 2 = valuable context (factions, arcs, secondary abilities)  
-   - 3 = nice-to-have (trivia, minor lore)
+3. **You may pick MULTIPLE categories per type** if they cover genuinely different content
+   (e.g. "Jutsu" and "Kekkei Genkai" are both valid techniques categories).
 
-4. **Not every IP has every type.** Death Note has no "techniques". Vinland Saga has no power system. That's fine — don't force categories into types they don't fit.
+4. **Priority** determines scrape order, NOT whether to scrape:
+   - 1 = primary source for this type (scrape first)
+   - 2 = supplementary content (scrape second)
+   - 3 = fallback/overlap (scrape last, but STILL SCRAPED)
+
+5. **Aim for coverage across ALL 7 canonical types.** If a type has no matching category,
+   that's fine (Death Note has no "techniques"), but err on the side of including categories
+   rather than skipping. For small wikis, prefer broader categories to maximize coverage.
 
 ## COMMON PITFALLS — avoid these:
 

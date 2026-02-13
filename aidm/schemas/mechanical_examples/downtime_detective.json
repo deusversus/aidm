@@ -1,7 +1,0 @@
-{
-  "description": "Detective/Mystery anime",
-  "enabled_modes": ["investigation", "social_links"],
-  "default_mode": "investigation",
-  "time_tracking": true,
-  "use_case": "Death Note, Detective Conan, Moriarty the Patriot. Focus on clue gathering and investigation. Social links for information networks. No training (mental game)."
-}

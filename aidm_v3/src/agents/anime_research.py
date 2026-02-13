@@ -1143,14 +1143,42 @@ Supplemental knowledge: {response.content}
             
             fandom_result = await fandom_client.scrape_wiki(
                 wiki_url,
-                max_pages_per_type=25,
-                character_limit=15,
                 anime_title=official_title,
             )
             
             scope = self._determine_scope_from_count(fandom_result.article_count)
             print(f"[AnimeResearch/API] Fandom: {fandom_result.article_count} articles, scope={scope}")
-            print(f"[AnimeResearch/API] Scraped: {fandom_result.get_total_page_count()} pages")
+            print(f"[AnimeResearch/API] Scraped: {fandom_result.get_total_page_count()} pages across {len(fandom_result.pages)} types")
+            
+            # Thin-scrape fallback: if WikiScout only found 1-2 types,
+            # supplement with legacy discover_categories for missing types
+            if fandom_result.get_total_page_count() > 0 and len(fandom_result.pages) <= 2:
+                print(f"[AnimeResearch/API] WARNING: Only {list(fandom_result.pages.keys())} types found, attempting legacy fallback...")
+                try:
+                    from ..scrapers.wiki_normalize import discover_categories
+                    all_cats = fandom_client._get_all_categories(wiki_url)
+                    legacy_mapping = discover_categories(all_cats, wiki_url)
+                    # Scrape types that WikiScout missed
+                    for ctype in legacy_mapping.types_found:
+                        if ctype not in fandom_result.pages:
+                            primary_cat = legacy_mapping.primary.get(ctype)
+                            if primary_cat:
+                                members = fandom_client._get_category_members(wiki_url, primary_cat, limit=500)
+                                members = [t for t in members if not t.startswith(('User:', 'File:', 'Category:', 'Template:', 'Thread:', 'Board:', 'Message Wall:', 'User blog:'))]
+                                type_pages = []
+                                for title in members:
+                                    page = fandom_client._parse_page(wiki_url, title, page_type=ctype)
+                                    if page:
+                                        type_pages.append(page)
+                                if type_pages:
+                                    fandom_result.pages[ctype] = type_pages
+                                    # Append to all_content
+                                    for page in type_pages:
+                                        fandom_result.all_content += f"\n\n## [{ctype.upper()}] {page.title}\n{page.clean_text}"
+                                    print(f"[AnimeResearch/API]   Legacy fallback: +{len(type_pages)} '{ctype}' pages")
+                    print(f"[AnimeResearch/API] After fallback: {fandom_result.get_total_page_count()} pages across {len(fandom_result.pages)} types")
+                except Exception as e:
+                    print(f"[AnimeResearch/API] Legacy fallback failed (non-fatal): {e}")
             
             if progress_tracker:
                 await progress_tracker.emit(

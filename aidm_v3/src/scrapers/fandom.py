@@ -511,8 +511,8 @@ class FandomClient:
     async def scrape_wiki(
         self,
         wiki_url: str,
-        max_pages_per_type: int = 25,
-        character_limit: int = 15,
+        max_pages_per_type: int = 0,
+        character_limit: int = 0,
         anime_title: str = "",
     ) -> FandomResult:
         """
@@ -523,8 +523,8 @@ class FandomClient:
         
         Args:
             wiki_url: Base URL of the Fandom wiki (e.g., "https://naruto.fandom.com")
-            max_pages_per_type: Max pages to scrape per canonical type
-            character_limit: Max character pages to scrape (usually fewer needed)
+            max_pages_per_type: Max pages per type (0 = uncapped, limited only by wiki API rate)
+            character_limit: Max character pages (0 = uncapped)
             anime_title: The anime/manga title (used by WikiScout for context)
             
         Returns:
@@ -620,21 +620,27 @@ class FandomClient:
         max_pages_per_type: int,
         character_limit: int,
     ) -> FandomResult:
-        """Execute a WikiScout scraping plan."""
+        """Execute a WikiScout scraping plan.
+        
+        All priorities are scraped (1, 2, AND 3). Priority only determines
+        scrape order. Page limits of 0 mean uncapped (uses MediaWiki API max).
+        """
         all_text_sections = []
         
         # Group categories by canonical type, sorted by priority
+        # ALL priorities are included — priority is scrape order, not a filter
         type_categories: dict[str, list] = {}
         for sel in sorted(plan.categories, key=lambda s: s.priority):
-            if sel.priority > 2:  # Skip "nice-to-have" in default mode
-                continue
             if sel.canonical_type not in type_categories:
                 type_categories[sel.canonical_type] = []
             type_categories[sel.canonical_type].append(sel)
         
         for canonical_type, selections in type_categories.items():
-            # Determine page limit for this type
-            page_limit = character_limit if canonical_type == "characters" else max_pages_per_type
+            # Determine page limit for this type (0 = uncapped)
+            if canonical_type == "characters":
+                page_limit = character_limit if character_limit > 0 else 500
+            else:
+                page_limit = max_pages_per_type if max_pages_per_type > 0 else 500
             
             type_pages = []
             pages_remaining = page_limit
@@ -643,7 +649,9 @@ class FandomClient:
                 if pages_remaining <= 0:
                     break
                 
-                members = self._get_category_members(wiki_url, sel.wiki_category, limit=pages_remaining)
+                # Use MediaWiki API max (500) when uncapped
+                fetch_limit = min(pages_remaining, 500)
+                members = self._get_category_members(wiki_url, sel.wiki_category, limit=fetch_limit)
                 logger.info(
                     f"[Fandom] Scraping {len(members)} '{canonical_type}' pages "
                     f"(from '{sel.wiki_category}', priority={sel.priority})..."
@@ -672,10 +680,27 @@ class FandomClient:
         
         total_pages = result.get_total_page_count()
         total_chars = len(result.all_content)
+        
+        # Post-scrape coverage audit
+        from .wiki_scout import CANONICAL_TYPES
+        types_found = set(result.pages.keys())
+        types_missing = set(CANONICAL_TYPES) - types_found
+        
         logger.info(
-            f"[Fandom] Scrape complete: {total_pages} pages, "
-            f"{total_chars:,} chars total content"
+            f"[Fandom] Scrape complete: {total_pages} pages across "
+            f"{len(types_found)} types, {total_chars:,} chars total"
         )
+        logger.info(f"[Fandom]   Types found: {sorted(types_found)}")
+        if types_missing:
+            logger.warning(
+                f"[Fandom]   Types missing: {sorted(types_missing)} "
+                f"— these may not exist for this IP, or WikiScout may have missed them"
+            )
+        if len(types_found) <= 1:
+            logger.warning(
+                f"[Fandom] LOW COVERAGE: Only '{next(iter(types_found))}' type found. "
+                f"WikiScout may have under-classified this wiki."
+            )
         
         return result
     

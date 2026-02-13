@@ -1,5 +1,0 @@
-Testing Hellsing profile generation...
-Provider: GoogleProvider
-Model: gemini-3-flash-preview
-============================================================
-
