@@ -891,7 +891,7 @@ class Orchestrator:
                  turn=current_turn,
                  context={
                      "rules_summary": self.rules.get_relevant_rules(
-                         f"{intent.action} {db_context.situation}", top_k=2
+                         f"{intent.action} {db_context.situation}", limit=2
                      ) or "Standard Physics + Anime Logic",
                      "character_state": db_context.character_summary
                  }

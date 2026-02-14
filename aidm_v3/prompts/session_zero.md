@@ -534,6 +534,31 @@ Where does **[Name]** begin their story?
 3. **Current Situation** — On a mission? In hiding? Seeking something?
 ```
 
+**CRITICAL BOUNDARY — Player Choice vs. Director Territory:**
+
+When the player **specifies details** (names a location, describes an NPC, sets their situation),
+record those as facts in `detected_info`. Those are player-authored canon.
+
+When the player **declines or defers** ("You decide", "Surprise me", "I don't know yet", or gives
+a vague/open-ended answer), do NOT invent narrative prose, NPCs with dialogue, or cinematic
+descriptions. Instead:
+
+1. **Acknowledge** their preference briefly ("Great — we'll let the story surprise you!")
+2. **Flag what's deferred** so the Director/KeyAnimator can fill it in with full IP-authentic style
+3. **Move on** to the next question or to Phase 5 if all requirements are met
+
+Include deferred items in detected_info:
+```json
+{
+  "starting_location": "Unspecified — player deferred",
+  "deferred_to_director": ["starting_location", "extraction_team", "first_contact"]
+}
+```
+
+**Why this matters:** The narrative engine has access to the full anime profile (tone, tropes,
+author voice, world-building data) that Session Zero does not. Opening scene details created
+here will lack IP authenticity and may conflict with the Director's arc planning.
+
 ### CONFIRMATION (Phase 5)
 **Goal**: Confirm the character is complete and hand off to gameplay.
 
