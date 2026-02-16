@@ -1344,10 +1344,11 @@ async function loadInventory() {
         }).join('');
     } catch (e) {
         console.error('Failed to load inventory:', e);
+        countEl.textContent = '0 items';
         grid.innerHTML = `<div class="empty-state-page">
-            <span class="empty-icon">⚠️</span>
-            <p>Could not load inventory</p>
-            <p class="empty-hint">${escapeHtml(e.message)}</p>
+            <span class="empty-icon">🎒</span>
+            <p>No items yet</p>
+            <p class="empty-hint">Start an adventure to discover items.</p>
         </div>`;
     }
 }
@@ -1390,10 +1391,11 @@ async function loadAbilities() {
         }).join('');
     } catch (e) {
         console.error('Failed to load abilities:', e);
+        countEl.textContent = '0 abilities';
         grid.innerHTML = `<div class="empty-state-page">
-            <span class="empty-icon">⚠️</span>
-            <p>Could not load abilities</p>
-            <p class="empty-hint">${escapeHtml(e.message)}</p>
+            <span class="empty-icon">⚔️</span>
+            <p>No abilities yet</p>
+            <p class="empty-hint">Abilities will unlock as your character grows.</p>
         </div>`;
     }
 }
@@ -1466,11 +1468,13 @@ async function loadJournal(page = null, expandTurn = null) {
         }
     } catch (e) {
         console.error('Failed to load journal:', e);
+        countEl.textContent = '0 entries';
         container.innerHTML = `<div class="empty-state-page">
-            <span class="empty-icon">⚠️</span>
-            <p>Could not load journal</p>
-            <p class="empty-hint">${escapeHtml(e.message)}</p>
+            <span class="empty-icon">📖</span>
+            <p>No journal entries yet</p>
+            <p class="empty-hint">Your adventure will be chronicled here as you play.</p>
         </div>`;
+        pagination.style.display = 'none';
     }
 }
 
@@ -1536,10 +1540,11 @@ async function loadLocations() {
         }).join('');
     } catch (e) {
         console.error('Failed to load locations:', e);
+        countEl.textContent = '0 discovered';
         grid.innerHTML = `<div class="empty-state-page">
-            <span class="empty-icon">⚠️</span>
-            <p>Could not load locations</p>
-            <p class="empty-hint">${escapeHtml(e.message)}</p>
+            <span class="empty-icon">🗺️</span>
+            <p>No locations discovered yet</p>
+            <p class="empty-hint">Explore the world to discover new places.</p>
         </div>`;
     }
 }
@@ -1612,10 +1617,13 @@ async function loadQuests() {
         }).join('');
     } catch (e) {
         console.error('Failed to load quests:', e);
+        activeCountEl.textContent = '0 active';
+        completedCountEl.textContent = '0 completed';
+        arcBanner.style.display = 'none';
         list.innerHTML = `<div class="empty-state-page">
-            <span class="empty-icon">⚠️</span>
-            <p>Could not load quests</p>
-            <p class="empty-hint">${escapeHtml(e.message)}</p>
+            <span class="empty-icon">📜</span>
+            <p>No quests yet</p>
+            <p class="empty-hint">Quests will appear as your story unfolds.</p>
         </div>`;
     }
 }
