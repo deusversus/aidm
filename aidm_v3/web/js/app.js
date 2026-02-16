@@ -105,9 +105,10 @@ async function startSessionZero() {
             if (resumed && resumed.messages) {
                 isSessionZero = resumed.phase !== 'gameplay';
 
-                // Restore conversation history
+                // Restore conversation history (filter out auto-sent [BEGIN])
                 display.innerHTML = '';
                 for (const msg of resumed.messages) {
+                    if (msg.role === 'user' && msg.content?.trim() === '[BEGIN]') continue;
                     addNarrativeEntry(msg.content, msg.role === 'user');
                 }
 
@@ -126,7 +127,10 @@ async function startSessionZero() {
 
                 // Auto-trigger opening scene on first gameplay resume
                 // If we just handed off from Session Zero, fire the first turn
-                if (!isSessionZero && resumed.turn_number === 0) {
+                // Guard: only fire if no [BEGIN] was already sent (prevents duplicates on refresh)
+                const alreadyBegan = resumed.messages.some(m =>
+                    m.role === 'user' && m.content && m.content.trim() === '[BEGIN]');
+                if (!isSessionZero && resumed.turn_number === 0 && !alreadyBegan) {
                     console.log('[Handoff] First gameplay resume — auto-generating opening scene...');
 
                     // Keep input disabled while generating opening scene
@@ -142,13 +146,14 @@ async function startSessionZero() {
                     }
 
                     addNarrativeEntry('*The story begins...*', false);
+                    // Tag the placeholder so we can reliably remove it
+                    const placeholder = display.lastElementChild;
+                    if (placeholder) placeholder.id = 'opening-placeholder';
 
                     try {
                         const openingResult = await API.Game.processTurn('[BEGIN]');
                         const openingText = openingResult.narrative || openingResult.response || '';
                         if (openingText) {
-                            // Remove the placeholder
-                            display.lastElementChild?.remove();
                             addNarrativeEntry(openingText, false, openingResult.portrait_map);
                             updateDebugHUD(openingResult);
                             await loadContext();
@@ -158,6 +163,8 @@ async function startSessionZero() {
                         console.error('[Handoff] Opening scene generation failed:', openErr);
                         addNarrativeEntry(`⚠️ Opening scene generation failed: ${openErr.message}`, false);
                     } finally {
+                        // Always remove the placeholder
+                        document.getElementById('opening-placeholder')?.remove();
                         // Re-enable input after opening scene completes
                         if (input) input.disabled = false;
                         if (submitBtn) {
