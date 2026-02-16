@@ -1188,15 +1188,16 @@ Supplemental knowledge: {response.content}
                     {"wiki": wiki_url, "pages": fandom_result.get_total_page_count(), "scope": scope}
                 )
         else:
-            scope = "MICRO"
-            print(f"[AnimeResearch/API] No Fandom wiki found, proceeding with AniList-only")
+            print(f"[AnimeResearch/API] No relevant Fandom wiki found, falling back to web-search pipeline")
             
             if progress_tracker:
                 await progress_tracker.emit(
                     ProgressPhase.RESEARCH,
-                    "No wiki found, using AniList data only",
+                    "No relevant wiki found, falling back to web-search research...",
                     50
                 )
+            
+            return await self.research_anime(anime_name, progress_tracker=progress_tracker)
         
         # ========== STEP 3: Build Output from API Data (No LLM) ==========
         if progress_tracker:
