@@ -37,6 +37,8 @@ class Campaign(Base):
     world_state = relationship("WorldState", back_populates="campaign", uselist=False, cascade="all, delete-orphan")
     campaign_bible = relationship("CampaignBible", back_populates="campaign", uselist=False, cascade="all, delete-orphan")
     consequences = relationship("Consequence", back_populates="campaign", cascade="all, delete-orphan")  # #17
+    quests = relationship("Quest", back_populates="campaign", cascade="all, delete-orphan")
+    locations = relationship("Location", back_populates="campaign", cascade="all, delete-orphan")
 
 
 class Session(Base):
@@ -393,3 +395,90 @@ class ForeshadowingSeedDB(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     campaign = relationship("Campaign", back_populates="foreshadowing_seeds")
+
+
+class Quest(Base):
+    """A quest/objective tracked by the dual-agent management system.
+    
+    Director Agent: Creates quests, retires completed arcs, plans objectives.
+    Pacing Agent: Marks objectives complete, updates status per-turn.
+    Override Handler: Routes player /META quest requests to Director.
+    """
+    
+    __tablename__ = "quests"
+    
+    id = Column(Integer, primary_key=True)
+    campaign_id = Column(Integer, ForeignKey("campaigns.id"), nullable=False)
+    
+    title = Column(String(255), nullable=False)
+    description = Column(Text, nullable=True)
+    status = Column(String(50), default="active")       # active, completed, failed, abandoned
+    quest_type = Column(String(50), default="main")      # main, side, personal, faction
+    source = Column(String(50), default="director")      # director, player, npc, world
+    
+    # Objectives: [{ description, completed, turn_completed }]
+    objectives = Column(JSON, default=list)
+    
+    # Tracking
+    created_turn = Column(Integer, nullable=True)
+    completed_turn = Column(Integer, nullable=True)
+    
+    # Connections
+    related_npcs = Column(JSON, default=list)
+    related_locations = Column(JSON, default=list)
+    
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    campaign = relationship("Campaign", back_populates="quests")
+
+
+class Location(Base):
+    """A discovered location with rich visual and spatial data.
+    
+    Enriched for media generation: visual_tags, atmosphere, lighting, scale
+    provide grounding for image/video prompts. Spatial relationships enable
+    consistent camera movements and scene transitions.
+    """
+    
+    __tablename__ = "locations"
+    
+    id = Column(Integer, primary_key=True)
+    campaign_id = Column(Integer, ForeignKey("campaigns.id"), nullable=False)
+    
+    # Identity
+    name = Column(String(255), nullable=False)
+    aliases = Column(JSON, default=list)
+    location_type = Column(String(50), nullable=True)     # city, dungeon, wilderness, building, interior, region
+    
+    # Visual grounding (media generation)
+    description = Column(Text, nullable=True)              # Vivid atmospheric prose
+    visual_tags = Column(JSON, default=list)               # ["gothic_architecture", "neon_signs", "rain"]
+    atmosphere = Column(String(100), nullable=True)        # "oppressive", "serene", "chaotic"
+    lighting = Column(String(100), nullable=True)          # "dim torchlight", "moonlit"
+    scale = Column(String(50), nullable=True)              # "intimate", "grand", "vast"
+    
+    # Spatial relationships
+    parent_location = Column(String(255), nullable=True)
+    connected_locations = Column(JSON, default=list)       # [{ name, direction, distance, travel_descriptor }]
+    
+    # State tracking
+    current_state = Column(String(100), default="intact")
+    state_history = Column(JSON, default=list)             # [{ turn, from_state, to_state, cause }]
+    
+    # Discovery & visits
+    discovered_turn = Column(Integer, nullable=True)
+    times_visited = Column(Integer, default=1)
+    last_visited_turn = Column(Integer, nullable=True)
+    is_current = Column(Boolean, default=False)
+    
+    # Narrative
+    notable_events = Column(JSON, default=list)
+    known_npcs = Column(JSON, default=list)
+    
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    campaign = relationship("Campaign", back_populates="locations")

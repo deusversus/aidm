@@ -1118,8 +1118,8 @@ class Orchestrator:
             bg_start = time.time()
             try:
                 # =============================================================
-                # 1. ENTITY EXTRACTION + RELATIONSHIP ANALYSIS (PARALLEL)
-                # Both only need the narrative text
+                # 1. ENTITY EXTRACTION + RELATIONSHIP ANALYSIS + PRODUCTION (PARALLEL)
+                # All three only need the narrative text + context
                 # =============================================================
                 if narrative:
                     entity_task = asyncio.create_task(self._bg_extract_entities(
@@ -1128,7 +1128,14 @@ class Orchestrator:
                     rel_task = asyncio.create_task(self._bg_relationship_analysis(
                         narrative, player_input, outcome, db_context.turn_number
                     ))
-                    await asyncio.gather(entity_task, rel_task, return_exceptions=True)
+                    prod_task = asyncio.create_task(self._bg_production_check(
+                        narrative=narrative,
+                        player_input=player_input,
+                        intent=intent,
+                        outcome=outcome,
+                        db_context=db_context,
+                    ))
+                    await asyncio.gather(entity_task, rel_task, prod_task, return_exceptions=True)
                 
                 # =============================================================
                 # TRANSACTIONAL BLOCK: Steps 2-7
@@ -1451,6 +1458,74 @@ class Orchestrator:
                 print(f"[Background] Post-narrative processing FAILED: {e}")
                 import traceback
                 traceback.print_exc()
+    
+    async def _bg_production_check(
+        self,
+        narrative: str,
+        player_input: str,
+        intent,
+        outcome,
+        db_context,
+    ):
+        """Background ProductionAgent — quest tracking + location discovery.
+        
+        Runs in parallel with entity extraction and relationship analysis.
+        Non-fatal: failures are logged and never crash the pipeline.
+        """
+        try:
+            from ..agents.production_agent import ProductionAgent
+            from ..agents.production_tools import build_production_tools
+
+            agent = ProductionAgent()
+            tools = build_production_tools(
+                state=self.state,
+                current_turn=db_context.turn_number,
+            )
+            agent.set_tools(tools)
+
+            # Pre-format active quests for the agent's context
+            active_quests = ""
+            try:
+                quests = self.state.get_quests(status="active")
+                if quests:
+                    lines = []
+                    for q in quests:
+                        obj_lines = []
+                        for i, obj in enumerate(q.objectives or []):
+                            status = "✓" if obj.get("completed") else "○"
+                            obj_lines.append(f"  {status} [{i}] {obj.get('description', '???')}")
+                        objectives_text = "\n".join(obj_lines) if obj_lines else "  (no sub-objectives)"
+                        lines.append(f"Quest #{q.id} \"{q.title}\"\n{objectives_text}")
+                    active_quests = "\n\n".join(lines)
+            except Exception:
+                active_quests = "(error loading quests)"
+
+            # Summarize intent/outcome for the agent
+            intent_summary = f"{intent.intent}: {intent.action}" if intent else "(unknown)"
+            outcome_summary = (
+                f"{outcome.consequence or 'No consequence'} "
+                f"(weight: {outcome.narrative_weight})"
+            ) if outcome else "(unknown)"
+
+            # Pacing note if available
+            pacing_note = ""
+            if hasattr(db_context, 'pacing_directive') and db_context.pacing_directive:
+                pd = db_context.pacing_directive
+                pacing_note = getattr(pd, 'pacing_note', '') or ''
+
+            await agent.react(
+                narrative=narrative,
+                player_input=player_input,
+                intent_summary=intent_summary,
+                outcome_summary=outcome_summary,
+                active_quests=active_quests,
+                pacing_note=pacing_note,
+                situation=db_context.situation or "",
+                current_location=db_context.location or "",
+            )
+            print(f"[ProductionAgent] Post-narrative check complete")
+        except Exception as e:
+            print(f"[ProductionAgent] Failed (non-fatal): {e}")
     
     async def _bg_extract_entities(self, narrative: str, turn_number: int):
         """Background entity extraction + narrative beat indexing from DM narrative."""

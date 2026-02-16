@@ -603,6 +603,9 @@ async function loadSettings() {
         populateAgentSetting('pacing', agentModels.pacing);
         populateAgentSetting('recap', agentModels.recap);
 
+        // Post-Narrative Production
+        populateAgentSetting('production', agentModels.production);
+
         // Extended thinking toggle
         const extendedThinkingToggle = document.getElementById('extended-thinking-toggle');
         if (extendedThinkingToggle) {
@@ -806,7 +809,7 @@ async function applyBasicSettings() {
         // Build settings object mapping agents to their categories
         const fastAgents = ['intent_classifier', 'outcome_judge', 'validator', 'combat', 'progression',
             'scale_selector', 'memory_ranker', 'relationship_analyzer', 'scope',
-            'session_zero', 'world_builder', 'wiki_scout', 'compactor', 'pacing', 'recap'];
+            'session_zero', 'world_builder', 'wiki_scout', 'compactor', 'pacing', 'recap', 'production'];
         const creativeAgents = ['key_animator'];
         const thinkingAgents = ['director', 'research', 'profile_merge'];
 
@@ -904,6 +907,8 @@ async function saveAdvancedSettings() {
                 // Narrative Pacing
                 pacing: getAgentConfig('pacing'),
                 recap: getAgentConfig('recap'),
+                // Post-Narrative Production
+                production: getAgentConfig('production'),
             },
             debug_mode: true,
             extended_thinking: extendedThinkingToggle?.checked || false,

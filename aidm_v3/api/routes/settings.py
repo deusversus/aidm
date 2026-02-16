@@ -109,16 +109,26 @@ async def update_agent_model(agent_name: str, config: ModelConfig):
         config: The new model configuration
     """
     valid_agents = [
+        # Base defaults
+        "base_fast", "base_thinking", "base_creative",
         # Core agents
         "intent_classifier", "outcome_judge", "key_animator",
         # Validation & Memory
-        "validator", "memory_ranker", "context_selector",
+        "validator", "memory_ranker",
         # Judgment agents
-        "combat", "progression", "scale_selector", "npc_reaction", "sakuga", "calibration",
+        "combat", "progression", "scale_selector",
         # Director layer
-        "director", "research",
+        "director", "research", "scope", "profile_merge",
         # NPC Intelligence
-        "relationship_analyzer"
+        "relationship_analyzer",
+        # Session Zero & World Building
+        "session_zero", "world_builder", "wiki_scout",
+        # Narrative Pacing
+        "pacing", "recap",
+        # Memory & Compression
+        "compactor",
+        # Post-Narrative Production
+        "production",
     ]
     if agent_name not in valid_agents:
         raise HTTPException(
