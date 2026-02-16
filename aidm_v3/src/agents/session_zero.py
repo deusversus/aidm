@@ -223,6 +223,8 @@ def apply_detected_info(session: Session, detected: Dict[str, Any]) -> None:
             draft.values.extend(value)
         elif key == "fears" and isinstance(value, list):
             draft.fears.extend(value)
+        elif key == "visual_tags" and isinstance(value, list):
+            draft.visual_tags.extend(value)
         elif key == "skills" and isinstance(value, list):
             draft.skills.extend(value)
         elif key == "goals" and isinstance(value, dict):
@@ -362,6 +364,8 @@ async def process_session_zero_state(
                     role = npc.get("role", "unknown")
                     disposition = npc.get("disposition", "neutral")
                     background = npc.get("background", "")
+                    npc_appearance = npc.get("appearance", {})
+                    npc_visual_tags = npc.get("visual_tags", [])
                     
                     # 1. Create NPC in SQLite database (if StateManager available)
                     if state is not None:
@@ -369,9 +373,11 @@ async def process_session_zero_state(
                             state.create_npc(
                                 name=npc_name,
                                 role=role,
-                                relationship_notes=f"{disposition}. {background}"
+                                relationship_notes=f"{disposition}. {background}",
+                                appearance=npc_appearance,
+                                visual_tags=npc_visual_tags,
                             )
-                            print(f"[SessionZero→State] Created NPC in DB: {npc_name}")
+                            print(f"[SessionZero→State] Created NPC in DB: {npc_name} (visual_tags={npc_visual_tags})")
                         except Exception as e:
                             print(f"[SessionZero→State] NPC DB creation failed: {e}")
                     
@@ -383,6 +389,20 @@ async def process_session_zero_state(
                         metadata={"npc_name": npc_name, "role": role},
                         flags=["session_zero"]
                     )
+                    
+                    # 3. Fire-and-forget: generate NPC portrait (if campaign exists and appearance known)
+                    if campaign_id and (npc_appearance or npc_visual_tags):
+                        try:
+                            import asyncio
+                            asyncio.create_task(
+                                _generate_session_zero_npc_portrait(
+                                    campaign_id, npc_name, npc_appearance, npc_visual_tags
+                                )
+                            )
+                            print(f"[SessionZero→Media] Queued portrait gen for NPC: {npc_name}")
+                        except Exception as media_err:
+                            print(f"[SessionZero→Media] Portrait queue failed (non-fatal): {media_err}")
+                    
                     stats["memories_added"] += 1
                     stats["npcs_created"] += 1
                     print(f"[SessionZero→State] Created NPC: {npc_name} ({role})")
@@ -1645,3 +1665,61 @@ def _classify_chunk(chunk: Dict[str, Any]) -> str:
     
     # Default to "fact" (slow decay) for world-building decisions
     return "fact"
+
+
+async def _generate_session_zero_npc_portrait(
+    campaign_id: int,
+    npc_name: str,
+    appearance: dict,
+    visual_tags: list,
+) -> None:
+    """Fire-and-forget: generate an NPC portrait during Session Zero.
+    
+    Non-blocking — called via asyncio.create_task so it doesn't slow
+    down the Session Zero response. Results are persisted to the NPC
+    record so the portrait resolver can find them during gameplay.
+    """
+    try:
+        from ..media.generator import MediaGenerator
+        from ..db.session import create_session
+        from ..db.models import NPC
+        
+        # Check if media generation is enabled in settings
+        from src.settings import get_settings_store
+        settings = get_settings_store().load()
+        if not settings.media_enabled:
+            print(f"[SessionZero→Media] Media disabled, skipping portrait for {npc_name}")
+            return
+        
+        # Get style context from profile
+        style_context = settings.active_profile_id or "anime"
+        
+        gen = MediaGenerator()
+        result = await gen.generate_full_character_media(
+            visual_tags=visual_tags or [],
+            appearance=appearance or {},
+            style_context=style_context,
+            campaign_id=campaign_id,
+            entity_name=npc_name,
+        )
+        
+        # Update NPC record with generated URLs
+        if result.get("portrait") or result.get("model_sheet"):
+            db = create_session()
+            npc = (
+                db.query(NPC)
+                .filter(NPC.campaign_id == campaign_id)
+                .filter(NPC.name.ilike(f"%{npc_name}%"))
+                .first()
+            )
+            if npc:
+                if result.get("portrait"):
+                    npc.portrait_url = f"/api/game/media/{campaign_id}/{result['portrait'].name}"
+                    print(f"[SessionZero→Media] Portrait saved for {npc_name}: {npc.portrait_url}")
+                if result.get("model_sheet"):
+                    npc.model_sheet_url = f"/api/game/media/{campaign_id}/{result['model_sheet'].name}"
+                db.commit()
+            db.close()
+            
+    except Exception as e:
+        print(f"[SessionZero→Media] NPC portrait gen failed for {npc_name}: {e}")

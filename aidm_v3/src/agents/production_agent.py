@@ -31,6 +31,11 @@ class ProductionAgent(AgenticAgent):
     agent_name = "production"
 
     @property
+    def output_schema(self):
+        """Not used — ProductionAgent uses call_with_tools() (free-form text), not call() (structured)."""
+        return None
+
+    @property
     def system_prompt(self) -> str:
         return _SYSTEM_PROMPT
 

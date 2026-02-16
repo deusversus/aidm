@@ -1004,6 +1004,7 @@ class StateManager:
         age: Optional[int] = None,
         backstory: Optional[str] = None,
         appearance: Optional[Dict] = None,
+        visual_tags: Optional[List] = None,
         personality_traits: Optional[List[str]] = None,
         values: Optional[List[str]] = None,
         fears: Optional[List[str]] = None,
@@ -1038,6 +1039,8 @@ class StateManager:
                 character.backstory = backstory
             if appearance is not None:
                 character.appearance = appearance
+            if visual_tags is not None:
+                character.visual_tags = visual_tags
             if personality_traits is not None:
                 character.personality_traits = personality_traits
             if values is not None:
@@ -1111,6 +1114,8 @@ class StateManager:
             personality=kwargs.get("personality", ""),
             goals=kwargs.get("goals", []),
             ensemble_archetype=kwargs.get("ensemble_archetype"),
+            appearance=kwargs.get("appearance", {}),
+            visual_tags=kwargs.get("visual_tags", []),
             growth_stage="introduction",
             intelligence_stage="reactive",
             scene_count=0,

@@ -2036,3 +2036,39 @@ body {
     color: var(--text-muted);
     flex-wrap: wrap;
 }
+
+/* Handoff Transition Indicator */
+.system-transition {
+    border-left-color: var(--accent-primary) !important;
+    background: transparent !important;
+    padding: var(--spacing-lg) var(--spacing-md) !important;
+}
+
+.transition-indicator {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    justify-content: center;
+    color: var(--accent-secondary);
+    font-style: italic;
+    font-size: 0.95rem;
+    animation: fadeInPulse 1.5s ease-in-out infinite alternate;
+}
+
+.transition-spinner {
+    width: 18px;
+    height: 18px;
+    border: 2px solid var(--border-color);
+    border-top: 2px solid var(--accent-primary);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+@keyframes fadeInPulse {
+    from { opacity: 0.6; }
+    to { opacity: 1; }
+}

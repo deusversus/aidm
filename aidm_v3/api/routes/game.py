@@ -386,6 +386,7 @@ class ResumeSessionResponse(BaseModel):
     messages: list
     character_draft: Optional[Dict[str, Any]] = None
     recap: Optional[str] = None  # "Previously On..." recap for session continuity
+    turn_number: int = 0  # Current turn count (0 = no gameplay turns yet)
 
 
 @router.get("/session/{session_id}/resume", response_model=ResumeSessionResponse)
@@ -456,12 +457,27 @@ async def resume_session(session_id: str):
         except Exception as e:
             print(f"[Resume] Recap generation failed (non-fatal): {e}")
 
+    # Get current turn count from DB for gameplay detection
+    current_turn = 0
+    if session.phase.value == "GAMEPLAY" and session.campaign_id:
+        try:
+            from ..src.db.models import Turn, get_db
+            db = next(get_db())
+            last_turn = db.query(Turn).filter(
+                Turn.campaign_id == session.campaign_id
+            ).order_by(Turn.turn_number.desc()).first()
+            current_turn = last_turn.turn_number if last_turn else 0
+            db.close()
+        except Exception:
+            pass
+    
     return ResumeSessionResponse(
         session_id=session_id,
         phase=session.phase.value,
         messages=session.messages,
         character_draft=draft_dict,
-        recap=recap_text
+        recap=recap_text,
+        turn_number=current_turn
     )
 
 
@@ -628,6 +644,60 @@ def _build_session_zero_summary(session, draft) -> str:
     return "\n".join(parts)
 
 
+async def _generate_handoff_character_media(
+    campaign_id: int,
+    character_name: str,
+    appearance: dict,
+    visual_tags: list,
+) -> None:
+    """Fire-and-forget: generate player character model sheet + portrait during handoff.
+    
+    Non-blocking — runs as background task so it doesn't delay the handoff response.
+    """
+    try:
+        from src.media.generator import MediaGenerator
+        from src.db.session import create_session
+        from src.db.models import Character
+        from src.settings import get_settings_store
+        
+        settings = get_settings_store().load()
+        if not settings.media_enabled:
+            print(f"[Handoff→Media] Media disabled, skipping character media gen")
+            return
+        
+        style_context = settings.active_profile_id or "anime"
+        
+        gen = MediaGenerator()
+        result = await gen.generate_full_character_media(
+            visual_tags=visual_tags or [],
+            appearance=appearance or {},
+            style_context=style_context,
+            campaign_id=campaign_id,
+            entity_name=character_name,
+        )
+        
+        # Update Character record with generated URLs
+        if result.get("portrait") or result.get("model_sheet"):
+            db = create_session()
+            char = (
+                db.query(Character)
+                .filter(Character.campaign_id == campaign_id)
+                .first()
+            )
+            if char:
+                if result.get("portrait"):
+                    char.portrait_url = f"/api/game/media/{campaign_id}/{result['portrait'].name}"
+                    print(f"[Handoff→Media] Player portrait saved: {char.portrait_url}")
+                if result.get("model_sheet"):
+                    char.model_sheet_url = f"/api/game/media/{campaign_id}/{result['model_sheet'].name}"
+                    print(f"[Handoff→Media] Player model sheet saved: {char.model_sheet_url}")
+                db.commit()
+            db.close()
+            
+    except Exception as e:
+        print(f"[Handoff→Media] Character media gen failed (non-critical): {e}")
+
+
 @router.post("/session/{session_id}/turn", response_model=SessionZeroResponse)
 async def session_zero_turn(session_id: str, request: TurnRequest):
     """Process a turn during Session Zero.
@@ -711,6 +781,17 @@ async def session_zero_turn(session_id: str, request: TurnRequest):
             # TRIGGER RESEARCH: If media reference detected in Phase 0
             media_ref = result.detected_info.get("media_reference") or result.detected_info.get("anime")
             secondary_ref = result.detected_info.get("secondary_reference") or result.detected_info.get("secondary_media_reference") or result.detected_info.get("blend_with")
+            
+            # STABILITY GUARD: If we already resolved a media reference on a previous turn,
+            # prefer it over the LLM's potentially truncated version.
+            # e.g. LLM might return "I Was Reincarnated as the 7th Prince" on turn 3
+            # when turn 1 correctly returned the full title. Without this guard,
+            # the short title triggers a duplicate profile generation.
+            if media_ref and session.character_draft.media_reference and session.character_draft.narrative_profile:
+                established = session.character_draft.media_reference
+                if media_ref != established:
+                    print(f"[SessionZero] Stability guard: LLM returned '{media_ref}' but we already have '{established}' — using established")
+                    media_ref = established
             
             print(f"[SessionZero] DEBUG: media_ref = {media_ref}, session.phase = {session.phase}")
             
@@ -1245,9 +1326,38 @@ I found several entries in the **{media_ref}** franchise:
                     hp_current=draft.resources.get("HP", 100),
                     hp_max=draft.resources.get("HP", 100),
                     power_tier=final_tier,
-                    abilities=draft.skills
+                    abilities=draft.skills,
+                    # Identity sync from Session Zero
+                    concept=draft.concept,
+                    age=draft.age,
+                    backstory=draft.backstory,
+                    appearance=draft.appearance,
+                    visual_tags=draft.visual_tags,
+                    personality_traits=draft.personality_traits,
+                    values=draft.values,
+                    fears=draft.fears,
+                    quirks=draft.quirks,
+                    short_term_goal=draft.goals.get("short_term") if draft.goals else None,
+                    long_term_goal=draft.goals.get("long_term") if draft.goals else None,
+                    inventory=draft.inventory,
                 )
                 print(f"[Handoff] Power tier set to: {final_tier}")
+                
+                # 1b. Fire-and-forget: Generate player character media (portrait + model sheet)
+                if draft.appearance or draft.visual_tags:
+                    try:
+                        import asyncio
+                        asyncio.create_task(
+                            _generate_handoff_character_media(
+                                campaign_id=orchestrator.state.campaign_id,
+                                character_name=draft.name or "protagonist",
+                                appearance=draft.appearance,
+                                visual_tags=draft.visual_tags,
+                            )
+                        )
+                        print(f"[Handoff] Queued player character media generation")
+                    except Exception as media_err:
+                        print(f"[Handoff] Character media queue failed (non-fatal): {media_err}")
                 
                 # 2. Update World State (Location)
                 if draft.starting_location:

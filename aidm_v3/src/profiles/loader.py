@@ -515,13 +515,14 @@ def find_profile_by_title(
         
         # Check if alias tokens are a subset of query tokens
         # e.g., {"dragon", "ball"} ⊆ {"dragon", "ball", "z"}
-        if token_subset_match(alias_tokens, query_tokens):
-            # Calculate similarity via Jaccard to prefer better matches
+        if token_subset_match(alias_tokens, query_tokens, min_alias_tokens=2):
+            # When alias is a COMPLETE subset, it's always a valid match.
+            # Use Jaccard only for ranking among multiple candidates
+            # (higher overlap = better match).
+            # Require min 2 alias tokens to prevent false positives from
+            # single common words.
             similarity = jaccard_similarity(alias_tokens, query_tokens)
-            
-            # When alias is complete subset, require only 30% overlap
-            # e.g., "demon slayer" (2 words) in "demon slayer mugen train movie" (5 words) = 40%
-            if similarity >= 0.3 and similarity > best_similarity:
+            if similarity > best_similarity:
                 best_token_match = (profile_id, alias, similarity)
                 best_similarity = similarity
         

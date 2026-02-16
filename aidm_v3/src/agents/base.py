@@ -118,7 +118,7 @@ class BaseAgent(ABC):
         system = system_prompt_override if system_prompt_override is not None else self.system_prompt
         
         # Increase token limit for thinking models
-        max_tokens = 8192 if use_extended_thinking else 4096
+        max_tokens = 16384 if use_extended_thinking else 8192
         
         result = await self.provider.complete_with_schema(
             messages=messages,

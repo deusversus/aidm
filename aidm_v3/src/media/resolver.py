@@ -41,9 +41,9 @@ def resolve_portraits(
     
     try:
         from src.db.models import NPC, Character
-        from src.db.database import get_session
+        from src.db.session import create_session
         
-        db = session or get_session()
+        db = session or create_session()
         close_session = session is None
         
         try:

@@ -166,6 +166,7 @@ class CharacterDraft:
     name: Optional[str] = None
     age: Optional[int] = None
     appearance: Dict[str, str] = field(default_factory=dict)
+    visual_tags: List[str] = field(default_factory=list)  # ["blue_hair", "scar_left_eye", "tall"]
     personality_traits: List[str] = field(default_factory=list)
     values: List[str] = field(default_factory=list)
     fears: List[str] = field(default_factory=list)
@@ -206,6 +207,7 @@ class CharacterDraft:
             "name": self.name,
             "age": self.age,
             "appearance": self.appearance,
+            "visual_tags": self.visual_tags,
             "personality_traits": self.personality_traits,
             "values": self.values,
             "fears": self.fears,
@@ -244,6 +246,7 @@ class CharacterDraft:
             name=data.get("name"),
             age=data.get("age"),
             appearance=data.get("appearance", {}),
+            visual_tags=data.get("visual_tags", []),
             personality_traits=data.get("personality_traits", []),
             values=data.get("values", []),
             fears=data.get("fears", []),
