@@ -64,7 +64,7 @@ class AnimeResearchOutput(BaseModel):
     # Genre detection (for arc templates)
     detected_genres: List[str] = Field(
         default_factory=list,
-        description="Detected genres (primary + secondary): shonen, seinen, shoujo_romance, isekai, supernatural, etc."
+        description="Detected genres, e.g. ['isekai', 'fantasy', 'action', 'comedy']. Always populate with at least primary + secondary genre."
     )
     
     # Character voice cards (for NPC differentiation)
@@ -1197,7 +1197,11 @@ Supplemental knowledge: {response.content}
                     50
                 )
             
-            return await self.research_anime(anime_name, progress_tracker=progress_tracker)
+            fallback_result = await self.research_anime(anime_name, progress_tracker=progress_tracker)
+            # Carry AniList genres into the fallback if the legacy pipeline didn't populate them
+            if not fallback_result.detected_genres and anilist and anilist.genres:
+                fallback_result.detected_genres = anilist.genres
+            return fallback_result
         
         # ========== STEP 3: Build Output from API Data (No LLM) ==========
         if progress_tracker:

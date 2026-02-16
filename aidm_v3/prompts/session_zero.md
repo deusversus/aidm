@@ -686,11 +686,16 @@ When the player mentions or establishes an NPC relationship, include them in det
       "name": "Belial Daemonium",
       "role": "handler",
       "disposition": "mentor",
-      "background": "Former best EVA pilot, American operative assigned to oversee DEUS"
+      "background": "Former best EVA pilot, American operative assigned to oversee DEUS",
+      "appearance": {"hair": "platinum blonde", "build": "athletic", "features": "sharp jawline, cybernetic eye"},
+      "visual_tags": ["platinum_blonde", "cybernetic_eye", "military_uniform", "athletic"]
     }
   ]
 }
 ```
+
+**NPC `appearance`**: Physical description dict — hair, build, features, outfit, distinguishing marks.
+**NPC `visual_tags`**: Snake_case visual descriptors for image generation — hair color, build, clothing, scars, accessories.
 
 **NPC Roles**: handler, mentor, rival, ally, enemy, family, love_interest, colleague
 **NPC Dispositions**: mentor, friendly, neutral, hostile, romantic, complicated
@@ -723,4 +728,25 @@ This is especially critical during **WORLD_INTEGRATION** (Phase 4) where you oft
 ```
 
 **Always ask yourself:** "Did I name anyone or describe anywhere new in MY response? If yes, add to detected_info."
+
+---
+
+## ENHANCED: Character Visual Identity Extraction
+
+During **IDENTITY** (Phase 2) and **WORLD_INTEGRATION** (Phase 4), extract the player character's visual identity:
+
+```json
+"detected_info": {
+  "appearance": {"hair": "dark", "build": "lean", "features": "androgynous beauty", "outfit": "commoner clothes"},
+  "visual_tags": ["dark_hair", "lean", "commoner_clothes", "beautiful", "young"]
+}
+```
+
+**When to extract visual_tags:**
+- Player describes their character's look ("She has silver hair and wears a red cloak")
+- YOU describe the character's appearance in your narrative response
+- Player mentions distinguishing features, scars, accessories, clothing
+
+**visual_tags format:** snake_case strings that describe visual features for image generation.
+Examples: `silver_hair`, `red_cloak`, `scar_across_nose`, `mechanical_arm`, `tall`, `petite`, `glasses`, `school_uniform`
 
