@@ -908,6 +908,29 @@ body {
     background: var(--error);
 }
 
+/* Portrait chips — inline in narrative next to NPC names */
+.npc-portrait-chip {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid var(--accent);
+    box-shadow: 0 0 8px rgba(var(--accent-rgb, 139, 92, 246), 0.4);
+    vertical-align: middle;
+    margin-right: 6px;
+    display: inline-block;
+}
+
+/* Sidebar portraits — replace indicator dots when available */
+.npc-sidebar-portrait {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 1.5px solid var(--border);
+    flex-shrink: 0;
+}
+
 .npc-name,
 .faction-name,
 .quest-name {
@@ -1429,18 +1452,60 @@ body {
     letter-spacing: 0.05em;
 }
 
-.type-badge.weapon { background: rgba(239, 68, 68, 0.15); color: #f87171; }
-.type-badge.armor { background: rgba(59, 130, 246, 0.15); color: #60a5fa; }
-.type-badge.consumable { background: rgba(34, 197, 94, 0.15); color: #4ade80; }
-.type-badge.key { background: rgba(245, 158, 11, 0.15); color: #fbbf24; }
-.type-badge.material { background: rgba(168, 85, 247, 0.15); color: #c084fc; }
-.type-badge.miscellaneous { background: rgba(148, 163, 184, 0.15); color: #94a3b8; }
+.type-badge.weapon {
+    background: rgba(239, 68, 68, 0.15);
+    color: #f87171;
+}
 
-.type-badge.active { background: rgba(34, 197, 94, 0.15); color: #4ade80; }
-.type-badge.passive { background: rgba(59, 130, 246, 0.15); color: #60a5fa; }
-.type-badge.ultimate { background: rgba(245, 158, 11, 0.15); color: #fbbf24; }
-.type-badge.special { background: rgba(168, 85, 247, 0.15); color: #c084fc; }
-.type-badge.unknown { background: rgba(148, 163, 184, 0.15); color: #94a3b8; }
+.type-badge.armor {
+    background: rgba(59, 130, 246, 0.15);
+    color: #60a5fa;
+}
+
+.type-badge.consumable {
+    background: rgba(34, 197, 94, 0.15);
+    color: #4ade80;
+}
+
+.type-badge.key {
+    background: rgba(245, 158, 11, 0.15);
+    color: #fbbf24;
+}
+
+.type-badge.material {
+    background: rgba(168, 85, 247, 0.15);
+    color: #c084fc;
+}
+
+.type-badge.miscellaneous {
+    background: rgba(148, 163, 184, 0.15);
+    color: #94a3b8;
+}
+
+.type-badge.active {
+    background: rgba(34, 197, 94, 0.15);
+    color: #4ade80;
+}
+
+.type-badge.passive {
+    background: rgba(59, 130, 246, 0.15);
+    color: #60a5fa;
+}
+
+.type-badge.ultimate {
+    background: rgba(245, 158, 11, 0.15);
+    color: #fbbf24;
+}
+
+.type-badge.special {
+    background: rgba(168, 85, 247, 0.15);
+    color: #c084fc;
+}
+
+.type-badge.unknown {
+    background: rgba(148, 163, 184, 0.15);
+    color: #94a3b8;
+}
 
 .quantity-badge {
     font-size: 0.75rem;
@@ -1511,9 +1576,20 @@ body {
     border-radius: 999px;
 }
 
-.journal-heat.low { background: rgba(59, 130, 246, 0.15); color: #60a5fa; }
-.journal-heat.medium { background: rgba(245, 158, 11, 0.15); color: #fbbf24; }
-.journal-heat.high { background: rgba(239, 68, 68, 0.15); color: #f87171; }
+.journal-heat.low {
+    background: rgba(59, 130, 246, 0.15);
+    color: #60a5fa;
+}
+
+.journal-heat.medium {
+    background: rgba(245, 158, 11, 0.15);
+    color: #fbbf24;
+}
+
+.journal-heat.high {
+    background: rgba(239, 68, 68, 0.15);
+    color: #f87171;
+}
 
 .journal-content {
     font-size: 0.9rem;
@@ -1714,9 +1790,20 @@ body {
     letter-spacing: 0.05em;
 }
 
-.quest-status-badge.active { background: rgba(59, 130, 246, 0.15); color: #60a5fa; }
-.quest-status-badge.completed { background: rgba(34, 197, 94, 0.15); color: #4ade80; }
-.quest-status-badge.failed { background: rgba(239, 68, 68, 0.15); color: #f87171; }
+.quest-status-badge.active {
+    background: rgba(59, 130, 246, 0.15);
+    color: #60a5fa;
+}
+
+.quest-status-badge.completed {
+    background: rgba(34, 197, 94, 0.15);
+    color: #4ade80;
+}
+
+.quest-status-badge.failed {
+    background: rgba(239, 68, 68, 0.15);
+    color: #f87171;
+}
 
 .quest-type-badge {
     font-size: 0.65rem;
@@ -1728,9 +1815,20 @@ body {
     margin-left: 0.5rem;
 }
 
-.quest-type-badge.main { background: rgba(245, 158, 11, 0.15); color: #fbbf24; }
-.quest-type-badge.side { background: rgba(148, 163, 184, 0.15); color: #94a3b8; }
-.quest-type-badge.personal { background: rgba(168, 85, 247, 0.15); color: #c084fc; }
+.quest-type-badge.main {
+    background: rgba(245, 158, 11, 0.15);
+    color: #fbbf24;
+}
+
+.quest-type-badge.side {
+    background: rgba(148, 163, 184, 0.15);
+    color: #94a3b8;
+}
+
+.quest-type-badge.personal {
+    background: rgba(168, 85, 247, 0.15);
+    color: #c084fc;
+}
 
 .quest-desc {
     font-size: 0.85rem;

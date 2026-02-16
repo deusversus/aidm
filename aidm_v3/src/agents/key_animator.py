@@ -98,6 +98,8 @@ Your goal: Make every moment feel like a scene from their favorite anime.
 ## Response Structure
 
 Write vivid, anime-appropriate prose. End at a clear decision point if one exists.
+When an NPC speaks dramatically, wrap their name in double curly braces: {{NPC Name}}.
+This triggers a portrait panel. Use sparingly — only for panel-worthy moments.
 
 {{PROFILE_DNA_INJECTION}}
 

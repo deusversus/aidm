@@ -1088,12 +1088,23 @@ class Orchestrator:
                 latency_ms=latency
             )
         )
+        # =====================================================================
+        # PORTRAIT RESOLUTION: Replace {{Name}} markers with bold + portrait map
+        # Lightweight post-KA step — DB lookup only, no LLM
+        # =====================================================================
+        portrait_map = {}
+        try:
+            from src.media.resolver import resolve_portraits
+            narrative, portrait_map = resolve_portraits(narrative, self.campaign_id)
+        except Exception as e:
+            print(f"[Orchestrator] Portrait resolution failed (non-fatal): {e}")
         
         return TurnResult(
             narrative=narrative,
             intent=intent,
             outcome=outcome,
-            latency_ms=latency
+            latency_ms=latency,
+            portrait_map=portrait_map or None,
         )
     
     async def _post_narrative_processing(
