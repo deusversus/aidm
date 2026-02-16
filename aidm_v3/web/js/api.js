@@ -272,6 +272,45 @@ const GameAPI = {
     async changeProfile(profileId) {
         return apiRequest(`/game/profile/${profileId}`, { method: 'PUT' });
     },
+
+    // === Phase 3: Data Pages ===
+
+    /**
+     * Get character inventory
+     */
+    async getInventory() {
+        return apiRequest('/game/inventory');
+    },
+
+    /**
+     * Get character abilities
+     */
+    async getAbilities() {
+        return apiRequest('/game/abilities');
+    },
+
+    /**
+     * Get journal entries (compactor beats, paginated)
+     */
+    async getJournal(page = 1, perPage = 20, expandTurn = null) {
+        let url = `/game/journal?page=${page}&per_page=${perPage}`;
+        if (expandTurn !== null) url += `&expand_turn=${expandTurn}`;
+        return apiRequest(url);
+    },
+
+    /**
+     * Get discovered locations
+     */
+    async getLocations() {
+        return apiRequest('/game/locations');
+    },
+
+    /**
+     * Get full quest tracker
+     */
+    async getQuestTracker() {
+        return apiRequest('/game/quests');
+    },
 };
 
 /**

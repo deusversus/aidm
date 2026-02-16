@@ -19,7 +19,12 @@
             </div>
             <div class="nav-links">
                 <a href="#game" class="nav-link active" data-page="game">Game</a>
-                <a href="#settings" class="nav-link" data-page="settings">Settings</a>
+                <a href="#inventory" class="nav-link" data-page="inventory">🎒 Inventory</a>
+                <a href="#skills" class="nav-link" data-page="skills">⚔️ Skills</a>
+                <a href="#journal" class="nav-link" data-page="journal">📖 Journal</a>
+                <a href="#map" class="nav-link" data-page="map">🗺️ Map</a>
+                <a href="#quests" class="nav-link" data-page="quests">📜 Quests</a>
+                <a href="#settings" class="nav-link" data-page="settings">⚙️</a>
             </div>
         </nav>
 
@@ -752,6 +757,104 @@
                         </div>
                     </div>
                 </div>
+                <!-- Inventory Page -->
+                <div id="inventory-page" class="page">
+                    <div class="data-page-container">
+                        <div class="data-page-header">
+                            <h2>🎒 Inventory</h2>
+                            <span class="data-page-count" id="inventory-count">0 items</span>
+                        </div>
+                        <div class="data-page-grid" id="inventory-grid">
+                            <div class="empty-state-page">
+                                <span class="empty-icon">🎒</span>
+                                <p>No items yet</p>
+                                <p class="empty-hint">Items will appear here as you discover them in your adventure.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Skills Page -->
+                <div id="skills-page" class="page">
+                    <div class="data-page-container">
+                        <div class="data-page-header">
+                            <h2>⚔️ Skills & Abilities</h2>
+                            <span class="data-page-count" id="skills-count">0 abilities</span>
+                        </div>
+                        <div class="data-page-grid" id="skills-grid">
+                            <div class="empty-state-page">
+                                <span class="empty-icon">⚔️</span>
+                                <p>No abilities yet</p>
+                                <p class="empty-hint">Abilities will appear here as your character grows.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Journal Page -->
+                <div id="journal-page" class="page">
+                    <div class="data-page-container">
+                        <div class="data-page-header">
+                            <h2>📖 Journal</h2>
+                            <span class="data-page-count" id="journal-count">0 entries</span>
+                        </div>
+                        <div class="journal-entries" id="journal-entries">
+                            <div class="empty-state-page">
+                                <span class="empty-icon">📖</span>
+                                <p>No journal entries yet</p>
+                                <p class="empty-hint">Your adventure will be chronicled here as you play.</p>
+                            </div>
+                        </div>
+                        <div class="journal-pagination" id="journal-pagination" style="display: none;">
+                            <button class="btn-secondary btn-small" id="journal-prev" disabled>← Prev</button>
+                            <span class="pagination-info" id="journal-page-info">Page 1</span>
+                            <button class="btn-secondary btn-small" id="journal-next">Next →</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Map / Locations Page -->
+                <div id="map-page" class="page">
+                    <div class="data-page-container">
+                        <div class="data-page-header">
+                            <h2>🗺️ Locations</h2>
+                            <span class="data-page-count" id="locations-count">0 discovered</span>
+                        </div>
+                        <div class="data-page-grid" id="locations-grid">
+                            <div class="empty-state-page">
+                                <span class="empty-icon">🗺️</span>
+                                <p>No locations discovered yet</p>
+                                <p class="empty-hint">As you explore, discovered locations will be catalogued here.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quests Page -->
+                <div id="quests-page" class="page">
+                    <div class="data-page-container">
+                        <div class="data-page-header">
+                            <h2>📜 Quest Tracker</h2>
+                            <div class="quest-header-info">
+                                <span class="data-page-count" id="quests-active-count">0 active</span>
+                                <span class="data-page-count quest-completed-count" id="quests-completed-count">0
+                                    completed</span>
+                            </div>
+                        </div>
+                        <div class="quest-arc-banner" id="quest-arc-banner" style="display: none;">
+                            <span class="arc-label">Current Arc:</span>
+                            <span class="arc-name" id="quest-arc-name">—</span>
+                        </div>
+                        <div class="quest-list-page" id="quests-list">
+                            <div class="empty-state-page">
+                                <span class="empty-icon">📜</span>
+                                <p>No quests yet</p>
+                                <p class="empty-hint">Quests will appear here as they are assigned by the Director.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
         </main>
     </div>
 
