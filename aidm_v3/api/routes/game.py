@@ -131,6 +131,9 @@ class SessionZeroResponse(BaseModel):
     # Disambiguation fields
     disambiguation_options: Optional[list] = None  # List of series options to choose from
     awaiting_disambiguation: bool = False  # True if user needs to choose
+    # Server-side stitched opening scene (returned during handoff)
+    opening_scene: Optional[str] = None
+    opening_portrait_map: Optional[Dict[str, str]] = None
 
 
 class ContextResponse(BaseModel):
@@ -746,6 +749,10 @@ async def session_zero_turn(session_id: str, request: TurnRequest):
     
     try:
         result = await agent.process_turn(session, request.player_input)
+        
+        # Initialize opening scene vars (only populated during handoff)
+        opening_narrative = None
+        opening_portrait_map = None
         
         # Apply any detected information to the character draft
 
@@ -1459,6 +1466,30 @@ I found several entries in the **{media_ref}** franchise:
                     print(f"[Handoff] Director startup failed (non-critical): {dir_err}")
                     import traceback
                     traceback.print_exc()
+                
+                # 6. SERVER-SIDE OPENING SCENE GENERATION
+                # Generate the opening scene inline so the frontend gets farewell + scene
+                # in a single response. No [BEGIN] auto-send needed.
+                opening_narrative = None
+                opening_portrait_map = None
+                try:
+                    print(f"[Handoff] Generating opening scene server-side...")
+                    opening_result = await orchestrator.process_turn(
+                        player_input="[opening scene — the story begins]",
+                        recent_messages=session.messages[-20:],
+                        compaction_text=""
+                    )
+                    opening_narrative = opening_result.narrative
+                    opening_portrait_map = opening_result.portrait_map
+                    # Save opening to session history
+                    session.add_message("assistant", opening_narrative)
+                    session_store = get_session_store()
+                    session_store.save(session)
+                    print(f"[Handoff] Opening scene generated ({len(opening_narrative)} chars)")
+                except Exception as scene_err:
+                    print(f"[Handoff] Opening scene generation failed (non-critical): {scene_err}")
+                    import traceback
+                    traceback.print_exc()
         
         # DEPRECATED: Legacy phase_complete handling (for backward compatibility)
         elif result.phase_complete and not result.ready_for_gameplay:
@@ -1562,7 +1593,9 @@ I found several entries in the **{media_ref}** franchise:
             missing_requirements=result.missing_requirements,
             ready_for_gameplay=result.ready_for_gameplay,
             research_task_id=result.detected_info.get("research_task_id") if result.detected_info else None,
-            detected_info=result.detected_info
+            detected_info=result.detected_info,
+            opening_scene=opening_narrative if result.ready_for_gameplay else None,
+            opening_portrait_map=opening_portrait_map if result.ready_for_gameplay else None,
         )
     
     except Exception as e:
