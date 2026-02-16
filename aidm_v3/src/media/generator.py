@@ -43,7 +43,15 @@ class MediaGenerator:
         Args:
             api_key: Google API key. Falls back to GOOGLE_API_KEY env var.
         """
-        self._api_key = api_key or os.environ.get("GOOGLE_API_KEY")
+        self._api_key = api_key
+        if not self._api_key:
+            try:
+                from src.settings import get_settings_store
+                self._api_key = get_settings_store().get_api_key("google")
+            except Exception:
+                pass
+        if not self._api_key:
+            self._api_key = os.environ.get("GOOGLE_API_KEY")
         self._client = None
     
     def _ensure_client(self):
