@@ -231,9 +231,25 @@ class UserSettings(BaseModel):
         default=False,
         description="Enable AI-generated character art and visuals"
     )
+    media_budget_enabled: bool = Field(
+        default=False,
+        description="Enforce per-session spending cap on media generation"
+    )
     media_budget_per_session_usd: float = Field(
         default=2.00,
         description="Maximum media generation spend per session in USD"
+    )
+    media_image_model: str = Field(
+        default="gemini-3-pro-image-preview",
+        description="Model for AI image generation (Google)"
+    )
+    media_video_model: str = Field(
+        default="veo-3.1-generate-preview",
+        description="Model for AI video generation (Google)"
+    )
+    media_auto_play: bool = Field(
+        default=True,
+        description="Auto-play generated cutscene videos (muted)"
     )
     
     class Config:

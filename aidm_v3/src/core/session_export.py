@@ -15,11 +15,11 @@ from typing import Optional, Dict, Any, List
 from ..db.session import create_session
 from ..db.models import (
     Campaign, Character, WorldState, NPC, Faction, 
-    CampaignBible, Session, Turn
+    CampaignBible, Session, Turn, MediaAsset, Quest, Location
 )
 
 
-EXPORT_VERSION = "1.0"
+EXPORT_VERSION = "1.1"
 
 
 def export_session(campaign_id: int) -> bytes:
@@ -217,9 +217,83 @@ def export_session(campaign_id: int) -> bytes:
             print(f"[Export] Warning: Could not export Session Zero state: {e}")
             export_data["session_zero"] = []
         
+        # Quests
+        quests = db.query(Quest).filter(Quest.campaign_id == campaign_id).all()
+        export_data["quests"] = [
+            {
+                "title": q.title,
+                "description": q.description,
+                "status": q.status,
+                "quest_type": q.quest_type,
+                "source": q.source,
+                "objectives": q.objectives,
+                "created_turn": q.created_turn,
+                "completed_turn": q.completed_turn,
+                "related_npcs": q.related_npcs,
+                "related_locations": q.related_locations,
+            }
+            for q in quests
+        ]
+
+        # Locations
+        locations = db.query(Location).filter(Location.campaign_id == campaign_id).all()
+        export_data["locations"] = [
+            {
+                "name": loc.name,
+                "aliases": loc.aliases,
+                "location_type": loc.location_type,
+                "description": loc.description,
+                "visual_tags": loc.visual_tags,
+                "atmosphere": loc.atmosphere,
+                "lighting": loc.lighting,
+                "scale": loc.scale,
+                "parent_location": loc.parent_location,
+                "connected_locations": loc.connected_locations,
+                "current_state": loc.current_state,
+                "state_history": loc.state_history,
+                "discovered_turn": loc.discovered_turn,
+                "times_visited": loc.times_visited,
+                "last_visited_turn": loc.last_visited_turn,
+                "is_current": loc.is_current,
+                "notable_events": loc.notable_events,
+                "known_npcs": loc.known_npcs,
+            }
+            for loc in locations
+        ]
+
+        # Media Assets
+        media_assets = db.query(MediaAsset).filter(MediaAsset.campaign_id == campaign_id).all()
+        export_data["media_assets"] = [
+            {
+                "asset_type": ma.asset_type,
+                "cutscene_type": ma.cutscene_type,
+                "file_path": ma.file_path,
+                "thumbnail_path": ma.thumbnail_path,
+                "image_prompt": ma.image_prompt,
+                "motion_prompt": ma.motion_prompt,
+                "duration_seconds": ma.duration_seconds,
+                "cost_usd": ma.cost_usd,
+                "status": ma.status,
+                "turn_number": ma.turn_number,
+                "created_at": ma.created_at.isoformat() if ma.created_at else None,
+            }
+            for ma in media_assets
+        ]
+        if media_assets:
+            print(f"[Export] Included {len(media_assets)} media asset record(s)")
+
     finally:
         db.close()
     
+    # Collect media files for inclusion
+    media_files = {}
+    media_dir = Path(f"./data/media/{campaign_id}")
+    if media_dir.exists():
+        for fpath in media_dir.rglob("*"):
+            if fpath.is_file():
+                rel = fpath.relative_to(media_dir)
+                media_files[f"media/{rel.as_posix()}"] = fpath
+
     # Create ZIP file in memory
     zip_buffer = io.BytesIO()
     with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
@@ -227,6 +301,12 @@ def export_session(campaign_id: int) -> bytes:
         for key, data in export_data.items():
             zf.writestr(f"{key}.json", json.dumps(data, indent=2, default=str))
         
+        # Include media files
+        for arcname, fpath in media_files.items():
+            zf.write(fpath, arcname)
+        if media_files:
+            print(f"[Export] Included {len(media_files)} media file(s)")
+
         # Include custom profile folder if it exists (for hybrids)
         profile_id = campaign.profile_id
         if profile_id and profile_id.startswith("hybrid_"):
@@ -261,6 +341,7 @@ def import_session(zip_bytes: bytes) -> int:
     zip_buffer = io.BytesIO(zip_bytes)
     export_data = {}
     custom_profile_files = {}
+    media_file_entries = {}
     
     with zipfile.ZipFile(zip_buffer, 'r') as zf:
         for name in zf.namelist():
@@ -269,6 +350,8 @@ def import_session(zip_bytes: bytes) -> int:
                 export_data[key] = json.loads(zf.read(name))
             elif name.startswith('custom_profile/'):
                 custom_profile_files[name] = zf.read(name)
+            elif name.startswith('media/'):
+                media_file_entries[name] = zf.read(name)
     
     # Validate manifest
     manifest = export_data.get("manifest", {})
@@ -391,6 +474,48 @@ def import_session(zip_bytes: bytes) -> int:
             )
             db.add(faction)
         
+        # Quests
+        for q_data in export_data.get("quests", []):
+            quest = Quest(
+                campaign_id=new_campaign_id,
+                title=q_data.get("title"),
+                description=q_data.get("description"),
+                status=q_data.get("status", "active"),
+                quest_type=q_data.get("quest_type", "main"),
+                source=q_data.get("source", "director"),
+                objectives=q_data.get("objectives"),
+                created_turn=q_data.get("created_turn"),
+                completed_turn=q_data.get("completed_turn"),
+                related_npcs=q_data.get("related_npcs"),
+                related_locations=q_data.get("related_locations"),
+            )
+            db.add(quest)
+
+        # Locations
+        for loc_data in export_data.get("locations", []):
+            location = Location(
+                campaign_id=new_campaign_id,
+                name=loc_data.get("name"),
+                aliases=loc_data.get("aliases"),
+                location_type=loc_data.get("location_type"),
+                description=loc_data.get("description"),
+                visual_tags=loc_data.get("visual_tags"),
+                atmosphere=loc_data.get("atmosphere"),
+                lighting=loc_data.get("lighting"),
+                scale=loc_data.get("scale"),
+                parent_location=loc_data.get("parent_location"),
+                connected_locations=loc_data.get("connected_locations"),
+                current_state=loc_data.get("current_state", "intact"),
+                state_history=loc_data.get("state_history"),
+                discovered_turn=loc_data.get("discovered_turn"),
+                times_visited=loc_data.get("times_visited", 1),
+                last_visited_turn=loc_data.get("last_visited_turn"),
+                is_current=loc_data.get("is_current", False),
+                notable_events=loc_data.get("notable_events"),
+                known_npcs=loc_data.get("known_npcs"),
+            )
+            db.add(location)
+        
         # CampaignBible
         bible_data = export_data.get("campaign_bible")
         if bible_data:
@@ -426,6 +551,28 @@ def import_session(zip_bytes: bytes) -> int:
         
         db.commit()
         
+        # Media Assets
+        for ma_data in export_data.get("media_assets", []):
+            # Remap file paths from old campaign_id to new
+            old_path = ma_data.get("file_path", "")
+            new_path = old_path  # Paths in media/ dir are relative, remapped below
+            ma = MediaAsset(
+                campaign_id=new_campaign_id,
+                turn_number=ma_data.get("turn_number"),
+                asset_type=ma_data.get("asset_type", "image"),
+                cutscene_type=ma_data.get("cutscene_type"),
+                file_path=new_path,
+                thumbnail_path=ma_data.get("thumbnail_path"),
+                image_prompt=ma_data.get("image_prompt"),
+                motion_prompt=ma_data.get("motion_prompt"),
+                duration_seconds=ma_data.get("duration_seconds"),
+                cost_usd=ma_data.get("cost_usd", 0.0),
+                status=ma_data.get("status", "complete"),
+            )
+            db.add(ma)
+        
+        db.commit()
+        
     finally:
         db.close()
     
@@ -456,6 +603,17 @@ def import_session(zip_bytes: bytes) -> int:
             target_path.parent.mkdir(parents=True, exist_ok=True)
             target_path.write_bytes(content)
         print(f"[Import] Restored custom profile files")
+    
+    # Restore media files
+    if media_file_entries:
+        media_dir = Path(f"./data/media/{new_campaign_id}")
+        for arcname, content in media_file_entries.items():
+            # arcname = "media/cutscenes/file.png" → data/media/{new_id}/cutscenes/file.png
+            rel_path = arcname[len("media/"):]  # strip "media/" prefix
+            target_path = media_dir / rel_path
+            target_path.parent.mkdir(parents=True, exist_ok=True)
+            target_path.write_bytes(content)
+        print(f"[Import] Restored {len(media_file_entries)} media file(s)")
     
     # Update settings
     settings_data = export_data.get("settings", {})
