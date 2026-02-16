@@ -41,8 +41,24 @@ function setupNavigation() {
 
             pages.forEach(p => p.classList.remove('active'));
             document.getElementById(`${pageName}-page`).classList.add('active');
+
+            // Load data for the page
+            loadPageData(pageName);
         });
     });
+}
+
+/**
+ * Load data for a specific page on navigation
+ */
+function loadPageData(pageName) {
+    switch (pageName) {
+        case 'inventory': loadInventory(); break;
+        case 'skills': loadAbilities(); break;
+        case 'journal': loadJournal(); break;
+        case 'map': loadLocations(); break;
+        case 'quests': loadQuests(); break;
+    }
 }
 
 /**
@@ -1268,6 +1284,350 @@ async function resetSession() {
             btn.disabled = false;
         }, 3000);
     }
+}
+// === Phase 3: Data Page Load Functions ===
+
+// Item type icons
+const ITEM_TYPE_ICONS = {
+    weapon: '⚔️', armor: '🛡️', consumable: '🧪', key: '🔑',
+    material: '🔧', miscellaneous: '📦'
+};
+
+// Ability type icons
+const ABILITY_TYPE_ICONS = {
+    active: '⚡', passive: '🔮', ultimate: '💥', special: '✨', unknown: '❓'
+};
+
+// Location type icons
+const LOCATION_TYPE_ICONS = {
+    city: '🏙️', town: '🏘️', village: '🏡', dungeon: '🏚️', wilderness: '🌲',
+    fortress: '🏰', shrine: '⛩️', ruins: '🏛️', cave: '🕳️', coast: '🏖️',
+    mountain: '⛰️', forest: '🌳', desert: '🏜️', building: '🏢', interior: '🚪',
+    unknown: '📍'
+};
+
+/**
+ * Load and render inventory
+ */
+async function loadInventory() {
+    const grid = document.getElementById('inventory-grid');
+    const countEl = document.getElementById('inventory-count');
+    try {
+        const data = await API.Game.getInventory();
+        countEl.textContent = `${data.total_items} item${data.total_items !== 1 ? 's' : ''}`;
+
+        if (!data.items || data.items.length === 0) {
+            grid.innerHTML = `<div class="empty-state-page">
+                <span class="empty-icon">🎒</span>
+                <p>No items yet</p>
+                <p class="empty-hint">Items will appear here as you discover them in your adventure.</p>
+            </div>`;
+            return;
+        }
+
+        grid.innerHTML = data.items.map(item => {
+            const icon = ITEM_TYPE_ICONS[item.type] || '📦';
+            const typeClass = item.type || 'miscellaneous';
+            const qty = item.quantity > 1 ? `<span class="quantity-badge">×${item.quantity}</span>` : '';
+            const source = item.source ? `<span class="type-badge miscellaneous">${item.source}</span>` : '';
+            return `<div class="data-card">
+                <div class="data-card-header">
+                    <span class="data-card-name">${icon} ${escapeHtml(item.name)}</span>
+                    ${qty}
+                </div>
+                ${item.description ? `<p class="data-card-desc">${escapeHtml(item.description)}</p>` : ''}
+                <div class="data-card-meta">
+                    <span class="type-badge ${typeClass}">${item.type}</span>
+                    ${source}
+                </div>
+            </div>`;
+        }).join('');
+    } catch (e) {
+        console.error('Failed to load inventory:', e);
+        grid.innerHTML = `<div class="empty-state-page">
+            <span class="empty-icon">⚠️</span>
+            <p>Could not load inventory</p>
+            <p class="empty-hint">${escapeHtml(e.message)}</p>
+        </div>`;
+    }
+}
+
+/**
+ * Load and render abilities
+ */
+async function loadAbilities() {
+    const grid = document.getElementById('skills-grid');
+    const countEl = document.getElementById('skills-count');
+    try {
+        const data = await API.Game.getAbilities();
+        countEl.textContent = `${data.total_abilities} abilit${data.total_abilities !== 1 ? 'ies' : 'y'}`;
+
+        if (!data.abilities || data.abilities.length === 0) {
+            grid.innerHTML = `<div class="empty-state-page">
+                <span class="empty-icon">⚔️</span>
+                <p>No abilities yet</p>
+                <p class="empty-hint">Abilities will appear here as your character grows.</p>
+            </div>`;
+            return;
+        }
+
+        grid.innerHTML = data.abilities.map(ability => {
+            const icon = ABILITY_TYPE_ICONS[ability.type] || '❓';
+            const typeClass = ability.type || 'unknown';
+            const levelTag = ability.level_acquired
+                ? `<span class="type-badge miscellaneous">Lv ${ability.level_acquired}</span>`
+                : '';
+            return `<div class="data-card">
+                <div class="data-card-header">
+                    <span class="data-card-name">${icon} ${escapeHtml(ability.name)}</span>
+                </div>
+                ${ability.description ? `<p class="data-card-desc">${escapeHtml(ability.description)}</p>` : ''}
+                <div class="data-card-meta">
+                    <span class="type-badge ${typeClass}">${ability.type}</span>
+                    ${levelTag}
+                </div>
+            </div>`;
+        }).join('');
+    } catch (e) {
+        console.error('Failed to load abilities:', e);
+        grid.innerHTML = `<div class="empty-state-page">
+            <span class="empty-icon">⚠️</span>
+            <p>Could not load abilities</p>
+            <p class="empty-hint">${escapeHtml(e.message)}</p>
+        </div>`;
+    }
+}
+
+/**
+ * Journal state
+ */
+let journalCurrentPage = 1;
+let journalExpandedTurn = null;
+const JOURNAL_PER_PAGE = 20;
+
+/**
+ * Load and render journal entries
+ */
+async function loadJournal(page = null, expandTurn = null) {
+    if (page !== null) journalCurrentPage = page;
+    if (expandTurn !== undefined) journalExpandedTurn = expandTurn;
+
+    const container = document.getElementById('journal-entries');
+    const countEl = document.getElementById('journal-count');
+    const pagination = document.getElementById('journal-pagination');
+
+    try {
+        const data = await API.Game.getJournal(
+            journalCurrentPage, JOURNAL_PER_PAGE, journalExpandedTurn
+        );
+        countEl.textContent = `${data.total_entries} entr${data.total_entries !== 1 ? 'ies' : 'y'}`;
+
+        if (!data.entries || data.entries.length === 0) {
+            container.innerHTML = `<div class="empty-state-page">
+                <span class="empty-icon">📖</span>
+                <p>No journal entries yet</p>
+                <p class="empty-hint">Your adventure will be chronicled here as you play.</p>
+            </div>`;
+            pagination.style.display = 'none';
+            return;
+        }
+
+        container.innerHTML = data.entries.map(entry => {
+            const isExpanded = data.expanded_turn !== null && entry.turn === data.expanded_turn;
+            const heatClass = entry.heat !== null
+                ? (entry.heat > 0.7 ? 'high' : entry.heat > 0.4 ? 'medium' : 'low')
+                : '';
+            const heatLabel = entry.heat !== null
+                ? `<span class="journal-heat ${heatClass}">${entry.heat > 0.7 ? '🔥' : entry.heat > 0.4 ? '⚡' : '❄️'} ${Math.round(entry.heat * 100)}%</span>`
+                : '';
+
+            return `<div class="journal-entry ${isExpanded ? 'journal-expanded' : ''}"
+                        onclick="toggleJournalEntry(${entry.turn})">
+                <div class="journal-entry-header">
+                    ${entry.turn ? `<span class="journal-turn">Turn ${entry.turn}</span>` : ''}
+                    ${heatLabel}
+                </div>
+                <div class="journal-content">${escapeHtml(entry.content)}</div>
+            </div>`;
+        }).join('');
+
+        // Pagination
+        const totalPages = Math.ceil(data.total_entries / JOURNAL_PER_PAGE);
+        if (totalPages > 1) {
+            pagination.style.display = 'flex';
+            document.getElementById('journal-page-info').textContent = `Page ${data.page} of ${totalPages}`;
+            document.getElementById('journal-prev').disabled = data.page <= 1;
+            document.getElementById('journal-next').disabled = data.page >= totalPages;
+
+            document.getElementById('journal-prev').onclick = () => loadJournal(data.page - 1, null);
+            document.getElementById('journal-next').onclick = () => loadJournal(data.page + 1, null);
+        } else {
+            pagination.style.display = 'none';
+        }
+    } catch (e) {
+        console.error('Failed to load journal:', e);
+        container.innerHTML = `<div class="empty-state-page">
+            <span class="empty-icon">⚠️</span>
+            <p>Could not load journal</p>
+            <p class="empty-hint">${escapeHtml(e.message)}</p>
+        </div>`;
+    }
+}
+
+/**
+ * Toggle expanded journal entry
+ */
+function toggleJournalEntry(turn) {
+    const newExpand = journalExpandedTurn === turn ? null : turn;
+    loadJournal(null, newExpand);
+}
+
+/**
+ * Load and render locations
+ */
+async function loadLocations() {
+    const grid = document.getElementById('locations-grid');
+    const countEl = document.getElementById('locations-count');
+    try {
+        const data = await API.Game.getLocations();
+        countEl.textContent = `${data.total_locations} discovered`;
+
+        if (!data.locations || data.locations.length === 0) {
+            grid.innerHTML = `<div class="empty-state-page">
+                <span class="empty-icon">🗺️</span>
+                <p>No locations discovered yet</p>
+                <p class="empty-hint">As you explore, discovered locations will be catalogued here.</p>
+            </div>`;
+            return;
+        }
+
+        // Current location first, then alphabetical
+        const sorted = [...data.locations].sort((a, b) => {
+            if (a.is_current && !b.is_current) return -1;
+            if (!a.is_current && b.is_current) return 1;
+            return a.name.localeCompare(b.name);
+        });
+
+        grid.innerHTML = sorted.map(loc => {
+            const typeIcon = LOCATION_TYPE_ICONS[loc.location_type] || LOCATION_TYPE_ICONS.unknown;
+            const currentClass = loc.is_current ? 'current' : '';
+
+            // Build expandable details
+            let details = '';
+            if (loc.atmosphere) details += `<div class="location-detail-item"><strong>Atmosphere:</strong> ${escapeHtml(loc.atmosphere)}</div>`;
+            if (loc.current_state && loc.current_state !== 'intact') details += `<div class="location-detail-item"><strong>State:</strong> ${escapeHtml(loc.current_state)}</div>`;
+            if (loc.known_npcs && loc.known_npcs.length > 0) details += `<div class="location-detail-item"><strong>NPCs:</strong> ${loc.known_npcs.map(n => escapeHtml(n)).join(', ')}</div>`;
+            if (loc.connected_locations && loc.connected_locations.length > 0) {
+                const connections = loc.connected_locations.map(c => escapeHtml(typeof c === 'string' ? c : c.name || c.location || JSON.stringify(c))).join(', ');
+                details += `<div class="location-detail-item"><strong>Connects to:</strong> ${connections}</div>`;
+            }
+            if (loc.notable_events && loc.notable_events.length > 0) details += `<div class="location-detail-item"><strong>Events:</strong> ${loc.notable_events.map(e => escapeHtml(e)).join('; ')}</div>`;
+
+            return `<div class="location-card ${currentClass}" onclick="this.classList.toggle('expanded')">
+                <div class="location-name">${typeIcon} ${escapeHtml(loc.name)}</div>
+                ${loc.location_type ? `<div class="location-type">${escapeHtml(loc.location_type)}</div>` : ''}
+                ${loc.description ? `<div class="location-desc">${escapeHtml(loc.description)}</div>` : ''}
+                <div class="location-stats">
+                    <span>Visited: ${loc.times_visited}×</span>
+                    ${loc.discovered_turn ? `<span>Discovered: Turn ${loc.discovered_turn}</span>` : ''}
+                </div>
+                ${details ? `<div class="location-details">${details}</div>` : ''}
+            </div>`;
+        }).join('');
+    } catch (e) {
+        console.error('Failed to load locations:', e);
+        grid.innerHTML = `<div class="empty-state-page">
+            <span class="empty-icon">⚠️</span>
+            <p>Could not load locations</p>
+            <p class="empty-hint">${escapeHtml(e.message)}</p>
+        </div>`;
+    }
+}
+
+/**
+ * Load and render quest tracker
+ */
+async function loadQuests() {
+    const list = document.getElementById('quests-list');
+    const activeCountEl = document.getElementById('quests-active-count');
+    const completedCountEl = document.getElementById('quests-completed-count');
+    const arcBanner = document.getElementById('quest-arc-banner');
+    const arcName = document.getElementById('quest-arc-name');
+
+    try {
+        const data = await API.Game.getQuestTracker();
+        activeCountEl.textContent = `${data.total_active} active`;
+        completedCountEl.textContent = `${data.total_completed} completed`;
+
+        // Arc banner
+        if (data.current_arc) {
+            arcBanner.style.display = 'flex';
+            arcName.textContent = data.current_arc;
+        } else {
+            arcBanner.style.display = 'none';
+        }
+
+        if (!data.quests || data.quests.length === 0) {
+            list.innerHTML = `<div class="empty-state-page">
+                <span class="empty-icon">📜</span>
+                <p>No quests yet</p>
+                <p class="empty-hint">Quests will appear here as they are assigned by the Director.</p>
+            </div>`;
+            return;
+        }
+
+        // Active quests first, then completed, then failed
+        const order = { active: 0, completed: 1, failed: 2 };
+        const sorted = [...data.quests].sort((a, b) => (order[a.status] || 0) - (order[b.status] || 0));
+
+        list.innerHTML = sorted.map(quest => {
+            const objectives = (quest.objectives || []).map(obj =>
+                `<li class="quest-objective ${obj.completed ? 'completed' : ''}">
+                    <span class="quest-checkbox">${obj.completed ? '✓' : ''}</span>
+                    <span>${escapeHtml(obj.description)}</span>
+                </li>`
+            ).join('');
+
+            // Meta info
+            let metaItems = [];
+            if (quest.source) metaItems.push(`Source: ${escapeHtml(quest.source)}`);
+            if (quest.created_turn) metaItems.push(`Started: Turn ${quest.created_turn}`);
+            if (quest.completed_turn) metaItems.push(`Completed: Turn ${quest.completed_turn}`);
+            if (quest.related_npcs && quest.related_npcs.length > 0) metaItems.push(`NPCs: ${quest.related_npcs.map(n => escapeHtml(n)).join(', ')}`);
+            if (quest.related_locations && quest.related_locations.length > 0) metaItems.push(`Locations: ${quest.related_locations.map(l => escapeHtml(l)).join(', ')}`);
+            const meta = metaItems.length > 0 ? `<div class="quest-meta">${metaItems.map(m => `<span>${m}</span>`).join('')}</div>` : '';
+
+            return `<div class="quest-card ${quest.status}" onclick="this.classList.toggle('expanded')">
+                <div class="quest-card-header">
+                    <span class="quest-title">
+                        ${escapeHtml(quest.title)}
+                        <span class="quest-type-badge ${quest.quest_type}">${quest.quest_type}</span>
+                    </span>
+                    <span class="quest-status-badge ${quest.status}">${quest.status}</span>
+                </div>
+                ${quest.description ? `<p class="quest-desc">${escapeHtml(quest.description)}</p>` : ''}
+                ${meta}
+                ${objectives ? `<ul class="quest-objectives">${objectives}</ul>` : ''}
+            </div>`;
+        }).join('');
+    } catch (e) {
+        console.error('Failed to load quests:', e);
+        list.innerHTML = `<div class="empty-state-page">
+            <span class="empty-icon">⚠️</span>
+            <p>Could not load quests</p>
+            <p class="empty-hint">${escapeHtml(e.message)}</p>
+        </div>`;
+    }
+}
+
+/**
+ * Escape HTML entities
+ */
+function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = String(text);
+    return div.innerHTML;
 }
 
 // Initialize on load
