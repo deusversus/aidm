@@ -83,11 +83,26 @@ class TestCheckWikiRelevance:
         client._get_site_stats = lambda url: stats_response.get("query", {}).get("statistics", {})
         return client
 
-    def test_relevant_wiki_passes_via_sitename(self):
-        """Wiki whose sitename contains a title word should pass."""
+    def test_relevant_wiki_passes_via_search(self):
+        """Wiki where search returns hits should pass (primary gate)."""
         client = self._make_client_with_mocks(
             stats_response={"query": {"statistics": {"articles": 500}}},
-            general_response={"query": {"general": {"sitename": "Naruto Wiki"}}},
+            general_response={"query": {"general": {"sitename": "Narutopedia"}}},
+            search_response={"query": {"searchinfo": {"totalhits": 42}, "search": [
+                {"title": "Naruto Uzumaki", "snippet": "Naruto is the main..."}
+            ]}},
+        )
+        result = run_async(client.check_wiki_relevance(
+            "https://naruto.fandom.com", "Naruto Shippuden"
+        ))
+        assert result is True
+
+    def test_relevant_wiki_passes_via_sitename_substring(self):
+        """Wiki where sitename contains a title word should pass (secondary gate)."""
+        client = self._make_client_with_mocks(
+            stats_response={"query": {"statistics": {"articles": 500}}},
+            general_response={"query": {"general": {"sitename": "Narutopedia"}}},
+            # Search returns nothing but sitename contains "naruto"
             search_response={"query": {"searchinfo": {"totalhits": 0}, "search": []}},
         )
         result = run_async(client.check_wiki_relevance(
@@ -95,8 +110,9 @@ class TestCheckWikiRelevance:
         ))
         assert result is True
 
-    def test_irrelevant_wiki_rejected(self):
-        """Wiki with no sitename overlap and no search hits should be rejected."""
+    def test_tensei_wiki_rejected_for_7th_prince(self):
+        """Tensei wiki should be rejected for 7th Prince — search finds nothing,
+        and sitename matching only uses the primary (English) title, not romaji alt titles."""
         client = self._make_client_with_mocks(
             stats_response={"query": {"statistics": {"articles": 200}}},
             general_response={"query": {"general": {"sitename": "Tensei Wiki"}}},
@@ -107,11 +123,11 @@ class TestCheckWikiRelevance:
             "I Was Reincarnated as the 7th Prince so I Can Take My Time Perfecting My Magical Ability",
             alt_titles=["Tensei Shitara Dai Nana Ouji Datta node, Kimamani Majutsu wo Kiwamemasu"],
         ))
-        # "tensei" appears in the romaji alt_title AND in the sitename "Tensei Wiki"
-        # So this actually DOES overlap on the word "tensei"
-        # This test validates that the overlap check works correctly
-        # The word "tensei" IS in both — so it should pass
-        assert result is True
+        # "tensei" appears in the romaji alt title and the sitename, but
+        # sitename matching only uses the PRIMARY title (English), not alt titles.
+        # The English title has no word overlap with "tenseiwiki", and search
+        # returned 0 hits — so it's correctly rejected.
+        assert result is False
 
     def test_truly_irrelevant_wiki_rejected(self):
         """Wiki with completely unrelated sitename and no search hits should be rejected."""
@@ -127,8 +143,8 @@ class TestCheckWikiRelevance:
         ))
         assert result is False
 
-    def test_search_fallback_passes(self):
-        """Wiki where sitename doesn't match but search returns hits should pass."""
+    def test_search_primary_gate_passes(self):
+        """Search hits are the primary gate — should pass even with unrelated sitename."""
         client = self._make_client_with_mocks(
             stats_response={"query": {"statistics": {"articles": 1000}}},
             general_response={"query": {"general": {"sitename": "Anime Database Wiki"}}},
@@ -153,8 +169,8 @@ class TestCheckWikiRelevance:
         ))
         assert result is False
 
-    def test_stop_words_excluded(self):
-        """Stop words like 'the', 'was', 'no' should not count as matches."""
+    def test_stop_words_excluded_from_sitename(self):
+        """Stop words like 'the', 'was', 'no' should not count as sitename matches."""
         client = self._make_client_with_mocks(
             stats_response={"query": {"statistics": {"articles": 100}}},
             general_response={"query": {"general": {"sitename": "The Wiki"}}},
@@ -165,7 +181,21 @@ class TestCheckWikiRelevance:
             "The Rising of the Shield Hero",
         ))
         # "the" is a stop word, shouldn't match
-        # "rising", "shield", "hero" don't appear in "The Wiki"
+        # "rising" (6 chars) is not in "thewiki", "shield" (6) is not, "hero" (4) is not
+        assert result is False
+
+    def test_short_words_excluded_from_sitename(self):
+        """Words shorter than _MIN_SITENAME_WORD_LEN should not match sitename."""
+        client = self._make_client_with_mocks(
+            stats_response={"query": {"statistics": {"articles": 100}}},
+            general_response={"query": {"general": {"sitename": "Ran Wiki"}}},
+            search_response={"query": {"searchinfo": {"totalhits": 0}, "search": []}},
+        )
+        result = run_async(client.check_wiki_relevance(
+            "https://ran.fandom.com",
+            "Ran and the Gray World",
+        ))
+        # "ran" is only 3 chars, below _MIN_SITENAME_WORD_LEN=4
         assert result is False
 
     def test_api_error_returns_false(self):

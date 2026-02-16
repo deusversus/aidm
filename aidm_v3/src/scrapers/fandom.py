@@ -845,18 +845,20 @@ class FandomClient:
             
             # 4. Sitename substring match (SECONDARY GATE)
             # Only used if search API found nothing. Checks if a distinctive
-            # title word is a substring of the sitename (handles compound names
-            # like "Narutopedia" containing "naruto").
-            for t in all_titles:
-                title_words = set(re.sub(r'[^a-z0-9\s]', '', t.lower()).split())
-                title_words -= self._STOP_WORDS
-                for word in title_words:
-                    if len(word) >= self._MIN_SITENAME_WORD_LEN and word in sitename_clean:
-                        logger.info(
-                            f"[Fandom] Relevance PASS for {wiki_url}: "
-                            f"title word '{word}' found in sitename '{sitename}'"
-                        )
-                        return True
+            # word from the PRIMARY title is a substring of the sitename.
+            # We intentionally only use primary title (typically English) here,
+            # not alt titles (romaji), because romaji titles contain generic
+            # Japanese words like "tensei" (reincarnation) or "shitara" (if)
+            # that appear in many unrelated wiki names.
+            primary_words = set(re.sub(r'[^a-z0-9\s]', '', anime_title.lower()).split())
+            primary_words -= self._STOP_WORDS
+            for word in primary_words:
+                if len(word) >= self._MIN_SITENAME_WORD_LEN and word in sitename_clean:
+                    logger.info(
+                        f"[Fandom] Relevance PASS for {wiki_url}: "
+                        f"primary title word '{word}' found in sitename '{sitename}'"
+                    )
+                    return True
             
             # No relevance signal found
             logger.warning(
