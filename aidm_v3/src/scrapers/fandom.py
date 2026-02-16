@@ -772,12 +772,17 @@ class FandomClient:
         except Exception:
             return False
     
-    # Words too common to use for sitename matching
+    # Words too common/generic to use for sitename matching
     _STOP_WORDS = {
         'the', 'a', 'an', 'of', 'in', 'on', 'at', 'to', 'for', 'and', 'or',
         'no', 'na', 'ni', 'wa', 'ga', 'wo', 'de', 'ka', 'so', 'my', 'i',
         'is', 'it', 'as', 'was', 'can', 'wiki', 'fandom',
     }
+    
+    # Minimum word length for sitename substring matching.
+    # Short Japanese words like "tensei" (reincarnation) are too generic
+    # and appear in many unrelated wikis.
+    _MIN_SITENAME_WORD_LEN = 4
     
     async def check_wiki_relevance(
         self, wiki_url: str, anime_title: str, alt_titles: list = None
@@ -785,10 +790,13 @@ class FandomClient:
         """
         Check if a wiki exists AND is relevant to the target anime.
         
-        Uses a 3-signal approach:
+        Strategy (ordered by reliability):
         1. Basic existence check (articles > 0)
-        2. Sitename word overlap with any title variant
-        3. MediaWiki search API probe — does the wiki contain pages about this anime?
+        2. Search API probe — definitive signal: does the wiki have pages
+           matching the anime title?  (Primary gate)
+        3. Sitename substring match — secondary signal: does the wiki's name
+           contain a distinctive title word?  Uses substring matching to handle
+           compound names like "Narutopedia".
         
         This prevents scraping unrelated wikis that happen to share a slug word
         (e.g. "tensei.fandom.com" being an Indonesian RPF wiki, not 7th Prince).
@@ -810,24 +818,11 @@ class FandomClient:
             })
             general = general_result.get("query", {}).get("general", {})
             sitename = general.get("sitename", "").lower()
+            sitename_clean = re.sub(r'[^a-z0-9]', '', sitename)
             
-            # Extract meaningful words from sitename
-            site_words = set(re.sub(r'[^a-z0-9\s]', '', sitename).split())
-            site_words -= self._STOP_WORDS
-            
-            # Check each title variant for sitename word overlap
-            for t in all_titles:
-                title_words = set(re.sub(r'[^a-z0-9\s]', '', t.lower()).split())
-                title_words -= self._STOP_WORDS
-                overlap = title_words & site_words
-                if overlap:
-                    logger.info(
-                        f"[Fandom] Relevance PASS for {wiki_url}: "
-                        f"sitename '{sitename}' overlaps with title words {overlap}"
-                    )
-                    return True
-            
-            # 3. Search API probe — does the wiki have content about this anime?
+            # 3. Search API probe (PRIMARY GATE)
+            # This is the most reliable signal: does the wiki actually
+            # contain content about this anime?
             for t in all_titles:
                 search_result = self._api_query(wiki_url, {
                     "action": "query",
@@ -847,6 +842,21 @@ class FandomClient:
                         f"search for '{t}' returned {total_hits} hits"
                     )
                     return True
+            
+            # 4. Sitename substring match (SECONDARY GATE)
+            # Only used if search API found nothing. Checks if a distinctive
+            # title word is a substring of the sitename (handles compound names
+            # like "Narutopedia" containing "naruto").
+            for t in all_titles:
+                title_words = set(re.sub(r'[^a-z0-9\s]', '', t.lower()).split())
+                title_words -= self._STOP_WORDS
+                for word in title_words:
+                    if len(word) >= self._MIN_SITENAME_WORD_LEN and word in sitename_clean:
+                        logger.info(
+                            f"[Fandom] Relevance PASS for {wiki_url}: "
+                            f"title word '{word}' found in sitename '{sitename}'"
+                        )
+                        return True
             
             # No relevance signal found
             logger.warning(
