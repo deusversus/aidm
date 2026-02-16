@@ -33,8 +33,8 @@ $excludeDirNames = @(
     'test_chroma'
 )
 
-# File patterns to exclude (Allow .db, .sqlite, settings.json now)
-$excludeFilePatterns = @('*.pyc', '*.pyo', '*.zip', '*.log', 'pyvenv.cfg')
+# File patterns to exclude
+$excludeFilePatterns = @('*.pyc', '*.pyo', '*.zip', '*.log', 'pyvenv.cfg', '.env', '.env.example', 'settings.json', 'apikeys_unencrypted')
 
 Write-Host "Creating backup..." -ForegroundColor Cyan
 Write-Host "  Source: $source"

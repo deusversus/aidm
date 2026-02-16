@@ -39,6 +39,7 @@ class Campaign(Base):
     consequences = relationship("Consequence", back_populates="campaign", cascade="all, delete-orphan")  # #17
     quests = relationship("Quest", back_populates="campaign", cascade="all, delete-orphan")
     locations = relationship("Location", back_populates="campaign", cascade="all, delete-orphan")
+    media_assets = relationship("MediaAsset", back_populates="campaign", cascade="all, delete-orphan")
 
 
 class Session(Base):
@@ -491,3 +492,47 @@ class Location(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     campaign = relationship("Campaign", back_populates="locations")
+
+
+class MediaAsset(Base):
+    """Tracks all generated media assets (images, videos, cutscenes).
+    
+    Used for:
+    - Budget enforcement (sum cost_usd per session)
+    - Gallery display (all media for a campaign)
+    - Turn-level media association (which turn triggered this media)
+    - Async status tracking (Veo generation polling)
+    """
+    
+    __tablename__ = "media_assets"
+    
+    id = Column(Integer, primary_key=True)
+    campaign_id = Column(Integer, ForeignKey("campaigns.id"), nullable=False)
+    session_id = Column(Integer, ForeignKey("sessions.id"), nullable=True)
+    turn_number = Column(Integer, nullable=True)
+    
+    # Classification
+    asset_type = Column(String(20), nullable=False)          # "image" or "video"
+    cutscene_type = Column(String(50), nullable=True)        # CutsceneType value
+    
+    # File references
+    file_path = Column(String(500), nullable=False)          # Relative to data/media/
+    thumbnail_path = Column(String(500), nullable=True)      # For video thumbnails
+    
+    # Generation details
+    image_prompt = Column(Text, nullable=True)
+    motion_prompt = Column(Text, nullable=True)              # For video
+    duration_seconds = Column(Float, nullable=True)          # Video duration
+    
+    # Cost tracking
+    cost_usd = Column(Float, default=0.0)
+    
+    # Async status
+    status = Column(String(20), default="pending")           # pending/generating/complete/failed
+    error_message = Column(Text, nullable=True)
+    
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow)
+    completed_at = Column(DateTime, nullable=True)
+    
+    campaign = relationship("Campaign", back_populates="media_assets")

@@ -263,7 +263,7 @@
                                 <div>
                                     <h3 style="margin: 0;">🎨 Media Generation</h3>
                                     <p class="setting-desc" style="margin: 0.5rem 0 0;">Generate AI character
-                                        model sheets and portraits using Gemini image generation
+                                        portraits, cutscene stills, and animated video clips
                                     </p>
                                 </div>
                                 <div style="display: flex; align-items: center; gap: 0.75rem;">
@@ -275,10 +275,47 @@
                                     </label>
                                 </div>
                             </div>
-                            <div style="margin-top: 0.75rem; display: flex; align-items: center; gap: 0.75rem;">
-                                <label style="font-size: 0.85rem; opacity: 0.8;">Session Budget $</label>
-                                <input type="number" id="media-budget" value="2.00" min="0.50" max="20.00" step="0.50"
-                                    style="width: 70px; padding: 4px 8px; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary); font-size: 0.85rem;">
+
+                            <!-- Model info + budget row -->
+                            <div
+                                style="margin-top: 0.75rem; display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem 1.5rem;">
+                                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                    <label style="font-size: 0.8rem; opacity: 0.7;">🖼️ Image</label>
+                                    <span id="media-image-model"
+                                        style="font-size: 0.8rem; font-family: monospace; color: var(--accent); opacity: 0.9;">gemini-3-pro-image-preview</span>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                    <label style="font-size: 0.8rem; opacity: 0.7;">🎬 Video</label>
+                                    <span id="media-video-model"
+                                        style="font-size: 0.8rem; font-family: monospace; color: var(--accent); opacity: 0.9;">veo-3.1-generate-preview</span>
+                                </div>
+                            </div>
+
+                            <!-- Budget + auto-play row -->
+                            <div
+                                style="margin-top: 0.5rem; display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem 1.5rem;">
+                                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                    <label style="font-size: 0.85rem; opacity: 0.8;">Session Budget</label>
+                                    <label class="toggle-switch" style="transform: scale(0.75);">
+                                        <input type="checkbox" id="media-budget-toggle"
+                                            onchange="document.getElementById('media-budget-amount').style.display = this.checked ? 'flex' : 'none'">
+                                        <span class="toggle-slider"></span>
+                                    </label>
+                                    <span id="media-budget-amount"
+                                        style="display: none; align-items: center; gap: 0.35rem;">
+                                        <span style="font-size: 0.85rem; opacity: 0.7;">$</span>
+                                        <input type="number" id="media-budget" value="2.00" min="0.50" max="20.00"
+                                            step="0.50"
+                                            style="width: 60px; padding: 3px 6px; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary); font-size: 0.8rem;">
+                                    </span>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                    <label style="font-size: 0.85rem; opacity: 0.8;">Auto-play videos</label>
+                                    <label class="toggle-switch" style="transform: scale(0.85);">
+                                        <input type="checkbox" id="media-autoplay-toggle" checked>
+                                        <span class="toggle-slider"></span>
+                                    </label>
+                                </div>
                             </div>
                         </div>
 

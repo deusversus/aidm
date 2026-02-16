@@ -312,6 +312,11 @@ async function handlePlayerAction() {
             updateDebugHUD(result);
             await loadContext();
             await loadAllTrackers();  // Update sidebar trackers
+
+            // Start media polling if turn_number + campaign_id provided
+            if (result.turn_number != null && result.campaign_id != null) {
+                pollForTurnMedia(result.campaign_id, result.turn_number);
+            }
         }
 
     } catch (error) {
@@ -654,6 +659,24 @@ async function loadSettings() {
         if (mediaBudget) {
             mediaBudget.value = settings.media_budget_per_session_usd || 2.00;
         }
+        const mediaBudgetToggle = document.getElementById('media-budget-toggle');
+        if (mediaBudgetToggle) {
+            mediaBudgetToggle.checked = settings.media_budget_enabled || false;
+            const budgetAmount = document.getElementById('media-budget-amount');
+            if (budgetAmount) budgetAmount.style.display = mediaBudgetToggle.checked ? 'flex' : 'none';
+        }
+        const mediaImageModel = document.getElementById('media-image-model');
+        if (mediaImageModel) {
+            mediaImageModel.textContent = settings.media_image_model || 'gemini-3-pro-image-preview';
+        }
+        const mediaVideoModel = document.getElementById('media-video-model');
+        if (mediaVideoModel) {
+            mediaVideoModel.textContent = settings.media_video_model || 'veo-3.1-generate-preview';
+        }
+        const mediaAutoplay = document.getElementById('media-autoplay-toggle');
+        if (mediaAutoplay) {
+            mediaAutoplay.checked = settings.media_auto_play !== false;  // default true
+        }
 
         // Load API keys
         await loadApiKeys();
@@ -964,7 +987,11 @@ async function saveAdvancedSettings() {
             debug_mode: true,
             extended_thinking: extendedThinkingToggle?.checked || false,
             media_enabled: mediaToggle?.checked || false,
+            media_budget_enabled: document.getElementById('media-budget-toggle')?.checked || false,
             media_budget_per_session_usd: parseFloat(mediaBudget?.value) || 2.00,
+            media_image_model: document.getElementById('media-image-model')?.textContent || 'gemini-3-pro-image-preview',
+            media_video_model: document.getElementById('media-video-model')?.textContent || 'veo-3.1-generate-preview',
+            media_auto_play: document.getElementById('media-autoplay-toggle')?.checked !== false,
         };
 
         await API.Settings.update(settings);
@@ -1680,3 +1707,126 @@ function escapeHtml(text) {
 
 // Initialize on load
 document.addEventListener('DOMContentLoaded', init);
+
+
+// =========================================================================
+// Media Cutscene Display — Phase 5/6
+// =========================================================================
+
+/**
+ * Poll for media generated during a turn (fire-and-forget cutscenes).
+ * Polls every 10s for up to 2 minutes.
+ */
+function pollForTurnMedia(campaignId, turnNumber, maxAttempts = 12) {
+    let attempt = 0;
+    const interval = setInterval(async () => {
+        attempt++;
+        try {
+            const resp = await fetch(`/api/game/turn/${campaignId}/${turnNumber}/media`);
+            if (!resp.ok) return;
+            const data = await resp.json();
+            if (data.assets && data.assets.length > 0) {
+                data.assets.forEach(asset => {
+                    if (asset.status === 'complete' || asset.status === 'partial') {
+                        injectCutsceneInline(asset);
+                    }
+                });
+                clearInterval(interval);  // Got media, stop polling
+            }
+        } catch (e) {
+            console.warn('[Media] Poll error:', e);
+        }
+        if (attempt >= maxAttempts) clearInterval(interval);
+    }, 10000);  // Every 10 seconds
+}
+
+/**
+ * Inject a cutscene inline at the bottom of the narrative display.
+ */
+function injectCutsceneInline(asset) {
+    const display = document.getElementById('narrative-display');
+    if (!display) return;
+
+    // Skip if already injected
+    if (document.getElementById(`cutscene-${asset.id}`)) return;
+
+    const container = document.createElement('div');
+    container.className = 'cutscene-container';
+    container.id = `cutscene-${asset.id}`;
+
+    if (asset.asset_type === 'video' && asset.file_url) {
+        const autoplay = document.getElementById('media-autoplay-toggle')?.checked ?? true;
+        container.innerHTML = `
+            <video
+                src="${asset.file_url}"
+                ${autoplay ? 'autoplay' : ''}
+                loop muted playsinline
+                style="width: 100%; height: 100%; object-fit: cover;"
+                onclick="openCutsceneFullscreen(this.src)"
+            ></video>
+            <div class="cutscene-badge">${formatCutsceneType(asset.cutscene_type)}</div>
+        `;
+    } else if (asset.file_url) {
+        container.innerHTML = `
+            <img
+                src="${asset.file_url}"
+                alt="Cutscene: ${asset.cutscene_type || 'scene'}"
+                style="width: 100%; height: 100%; object-fit: cover; cursor: pointer;"
+                onclick="openCutsceneFullscreen(this.src)"
+            />
+            <div class="cutscene-badge">${formatCutsceneType(asset.cutscene_type)}</div>
+        `;
+    }
+
+    display.appendChild(container);
+    display.scrollTop = display.scrollHeight;
+}
+
+/**
+ * Format cutscene type for display badge.
+ */
+function formatCutsceneType(type) {
+    if (!type) return 'SCENE';
+    return type.replace(/_/g, ' ').toUpperCase();
+}
+
+/**
+ * Open a cutscene in fullscreen viewer.
+ */
+function openCutsceneFullscreen(src) {
+    // Remove existing viewer if any
+    const existing = document.querySelector('.cutscene-fullscreen');
+    if (existing) existing.remove();
+
+    const overlay = document.createElement('div');
+    overlay.className = 'cutscene-fullscreen';
+    overlay.onclick = (e) => {
+        if (e.target === overlay) overlay.remove();
+    };
+
+    const isVideo = src.endsWith('.mp4') || src.endsWith('.webm');
+    if (isVideo) {
+        overlay.innerHTML = `
+            <video src="${src}" controls autoplay loop
+                style="max-width: 95vw; max-height: 90vh; border-radius: 12px;"
+            ></video>
+        `;
+    } else {
+        overlay.innerHTML = `
+            <img src="${src}"
+                style="max-width: 95vw; max-height: 90vh; border-radius: 12px;"
+            />
+        `;
+    }
+
+    document.body.appendChild(overlay);
+
+    // Close on Escape key
+    const handleEsc = (e) => {
+        if (e.key === 'Escape') {
+            overlay.remove();
+            document.removeEventListener('keydown', handleEsc);
+        }
+    };
+    document.addEventListener('keydown', handleEsc);
+}

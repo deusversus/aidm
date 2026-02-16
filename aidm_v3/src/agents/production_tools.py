@@ -1,32 +1,41 @@
 """
-Production Agent tools — post-narrative quest tracking + location discovery.
+Production Agent tools — post-narrative quest tracking + location discovery + media generation.
 
 These tools let the ProductionAgent react to a completed narrative by
-updating quest objectives, managing quest status, and discovering/updating
-locations.  In Phase 4 this registry will be extended with media-generation
-tools (trigger_cutscene, generate_location_visual).
+updating quest objectives, managing quest status, discovering/updating
+locations, and triggering media generation (when enabled).
 
 Design: standalone registry (no gameplay tools inheritance) because the
 ProductionAgent doesn't need memory search / NPC cards — it only writes
 back to the DB after reading the narrative.
 """
 
-from typing import Any
+from typing import Any, Optional
 from ..llm.tools import ToolDefinition, ToolParam, ToolRegistry
 
 
 def build_production_tools(
     state: Any,          # StateManager
     current_turn: int,
+    media_enabled: bool = False,
+    media_budget_enabled: bool = False,
+    media_budget_remaining: Optional[float] = None,
+    campaign_id: Optional[int] = None,
+    style_context: str = "",
 ) -> ToolRegistry:
     """Build the tool registry for the ProductionAgent.
 
     Args:
         state: StateManager instance (bound to the active campaign).
         current_turn: Current turn number for tracking.
+        media_enabled: Whether AI media generation is active.
+        media_budget_enabled: Whether to enforce budget caps.
+        media_budget_remaining: Remaining budget in USD (None = uncapped).
+        campaign_id: Campaign ID for media file organization.
+        style_context: IP-specific art style guidance for prompts.
 
     Returns:
-        ToolRegistry with quest + location tools.
+        ToolRegistry with quest + location + (optional) media tools.
     """
     registry = ToolRegistry()
 
@@ -143,11 +152,88 @@ def build_production_tools(
         handler=lambda **kw: _set_current_location(state, **kw),
     ))
 
+    # -----------------------------------------------------------------
+    # MEDIA GENERATION TOOLS (only when media_enabled)
+    # -----------------------------------------------------------------
+
+    if media_enabled:
+        # Shared budget context for closures
+        _budget_ctx = {
+            "enabled": media_budget_enabled,
+            "remaining": media_budget_remaining,
+        }
+
+        registry.register(ToolDefinition(
+            name="trigger_cutscene",
+            description=(
+                "Trigger an AI-generated cutscene (still image + animated video). "
+                "Call this for MAJOR cinematic moments only: action climaxes, "
+                "power awakenings, emotional peaks, dramatic reveals, plot twists. "
+                "NOT every turn — aim for ~20% of turns at most. "
+                "Be SELECTIVE and provide vivid, detailed prompts."
+            ),
+            parameters=[
+                ToolParam("cutscene_type", "str",
+                          "Type: character_intro, location_reveal, action_climax, "
+                          "emotional_peak, power_awakening, plot_twist, arc_transition",
+                          required=True),
+                ToolParam("image_prompt", "str",
+                          "Detailed prompt for the still image. Describe the exact scene: "
+                          "characters, poses, expressions, background, lighting, mood. "
+                          "The more specific, the better the result.",
+                          required=True),
+                ToolParam("motion_prompt", "str",
+                          "Prompt for animating the image into a short video. Describe "
+                          "how elements should move: camera pans, character motion, "
+                          "effects (wind, particles, energy). Keep it simple and focused.",
+                          required=True),
+            ],
+            handler=lambda **kw: _trigger_cutscene(
+                state, campaign_id, current_turn, style_context, _budget_ctx, **kw
+            ),
+        ))
+
+        registry.register(ToolDefinition(
+            name="generate_npc_portrait",
+            description=(
+                "Generate an AI portrait for an NPC that has appearance data "
+                "but no portrait yet. Call this when a NEW NPC is introduced "
+                "with a detailed description, or when an existing NPC gains "
+                "visual importance. The portrait will appear in the chat on "
+                "the NEXT turn (fire-and-forget)."
+            ),
+            parameters=[
+                ToolParam("npc_name", "str",
+                          "Exact name of the NPC as stored in the database",
+                          required=True),
+            ],
+            handler=lambda **kw: _generate_npc_portrait(
+                state, campaign_id, style_context, _budget_ctx, **kw
+            ),
+        ))
+
+        registry.register(ToolDefinition(
+            name="generate_location_visual",
+            description=(
+                "Generate an AI visual for a location. Call this when the player "
+                "arrives at a vivid new location that has been upserted with rich "
+                "visual metadata. The image will appear on the Locations page."
+            ),
+            parameters=[
+                ToolParam("location_name", "str",
+                          "Exact name of the location as stored in the database",
+                          required=True),
+            ],
+            handler=lambda **kw: _generate_location_visual(
+                state, campaign_id, style_context, _budget_ctx, **kw
+            ),
+        ))
+
     return registry
 
 
 # =========================================================================
-# Tool Handler Implementations
+# Tool Handler Implementations — Quest Tracking
 # =========================================================================
 
 def _get_active_quests(state) -> str:
@@ -206,6 +292,10 @@ def _update_quest_status(state, quest_id: int, status: str) -> str:
         return f"Error updating quest status: {e}"
 
 
+# =========================================================================
+# Tool Handler Implementations — Location Discovery
+# =========================================================================
+
 def _upsert_location(
     state,
     name: str,
@@ -261,3 +351,259 @@ def _set_current_location(state, name: str) -> str:
         return f"Location \"{name}\" not found — call upsert_location first."
     except Exception as e:
         return f"Error setting current location: {e}"
+
+
+# =========================================================================
+# Tool Handler Implementations — Media Generation
+# =========================================================================
+
+def _check_budget(budget_ctx: dict, estimated_cost: float) -> Optional[str]:
+    """Check if a media generation is within budget. Returns error string or None."""
+    if budget_ctx["enabled"] and budget_ctx["remaining"] is not None:
+        if estimated_cost > budget_ctx["remaining"]:
+            return (
+                f"Session media budget exhausted (${budget_ctx['remaining']:.2f} remaining, "
+                f"estimated cost ${estimated_cost:.2f}). Skipping media generation."
+            )
+    return None
+
+
+def _deduct_budget(budget_ctx: dict, cost: float):
+    """Deduct cost from remaining budget (in-memory tracking for this turn batch)."""
+    if budget_ctx["remaining"] is not None:
+        budget_ctx["remaining"] = max(0, budget_ctx["remaining"] - cost)
+
+
+def _trigger_cutscene(
+    state,
+    campaign_id: int,
+    current_turn: int,
+    style_context: str,
+    budget_ctx: dict,
+    cutscene_type: str,
+    image_prompt: str,
+    motion_prompt: str,
+) -> str:
+    """Trigger image -> video cutscene generation (fire-and-forget)."""
+    import asyncio
+    try:
+        # Budget check (~$0.11 for image + video)
+        budget_error = _check_budget(budget_ctx, 0.11)
+        if budget_error:
+            return budget_error
+
+        # Enrich prompts with style context
+        full_image_prompt = f"{image_prompt}\n\nArt style: {style_context}" if style_context else image_prompt
+
+        async def _generate():
+            try:
+                from ..media.generator import MediaGenerator
+                gen = MediaGenerator()
+                result = await gen.generate_cutscene(
+                    image_prompt=full_image_prompt,
+                    motion_prompt=motion_prompt,
+                    campaign_id=campaign_id,
+                    cutscene_type=cutscene_type,
+                    filename=f"turn{current_turn}_{cutscene_type}",
+                )
+
+                # Save to MediaAsset table
+                if result.get("status") in ("complete", "partial"):
+                    _save_media_asset(
+                        state, campaign_id, current_turn,
+                        asset_type="video" if result.get("video_path") else "image",
+                        cutscene_type=cutscene_type,
+                        file_path=str(result.get("video_path") or result.get("image_path", "")),
+                        image_prompt=image_prompt,
+                        motion_prompt=motion_prompt,
+                        cost_usd=result.get("cost_usd", 0.0),
+                        status=result["status"],
+                    )
+                    _deduct_budget(budget_ctx, result.get("cost_usd", 0.0))
+                print(f"[MediaTools] Cutscene ({cutscene_type}): {result.get('status', 'unknown')}")
+            except Exception as e:
+                print(f"[MediaTools] Cutscene generation error: {e}")
+
+        # Fire-and-forget: schedule as background task
+        loop = asyncio.get_event_loop()
+        loop.create_task(_generate())
+        return f"Cutscene ({cutscene_type}) generation started. It will appear when ready (~30-60s)."
+
+    except Exception as e:
+        return f"Error triggering cutscene: {e}"
+
+
+def _generate_npc_portrait(
+    state,
+    campaign_id: int,
+    style_context: str,
+    budget_ctx: dict,
+    npc_name: str,
+) -> str:
+    """Generate portrait for an NPC that doesn't have one yet."""
+    import asyncio
+    try:
+        # Budget check (~$0.06 for model sheet + portrait)
+        budget_error = _check_budget(budget_ctx, 0.06)
+        if budget_error:
+            return budget_error
+
+        # Look up NPC in DB
+        from ..db.models import NPC
+        db = state._get_db()
+        npc = db.query(NPC).filter(
+            NPC.campaign_id == campaign_id,
+            NPC.name == npc_name,
+        ).first()
+
+        if not npc:
+            return f"NPC \"{npc_name}\" not found in database."
+        if npc.portrait_url:
+            return f"NPC \"{npc_name}\" already has a portrait."
+
+        appearance = npc.appearance or {}
+        visual_tags = npc.visual_tags or []
+
+        if not appearance and not visual_tags:
+            return f"NPC \"{npc_name}\" has no appearance data — cannot generate portrait."
+
+        async def _generate():
+            try:
+                from ..media.generator import MediaGenerator
+                gen = MediaGenerator()
+                result = await gen.generate_full_character_media(
+                    visual_tags=visual_tags,
+                    appearance=appearance,
+                    style_context=style_context,
+                    campaign_id=campaign_id,
+                    entity_name=npc_name,
+                )
+                # Update NPC record with generated URLs
+                if result.get("portrait"):
+                    portrait_url = gen.get_media_url(
+                        campaign_id, "portraits",
+                        result["portrait"].name
+                    )
+                    npc.portrait_url = portrait_url
+                if result.get("model_sheet"):
+                    model_url = gen.get_media_url(
+                        campaign_id, "models",
+                        result["model_sheet"].name
+                    )
+                    npc.model_sheet_url = model_url
+
+                db.commit()
+                _deduct_budget(budget_ctx, 0.06)
+                _save_media_asset(
+                    state, campaign_id, None,
+                    asset_type="image",
+                    cutscene_type="npc_portrait",
+                    file_path=str(result.get("portrait") or result.get("model_sheet", "")),
+                    image_prompt=f"NPC portrait: {npc_name}",
+                    cost_usd=0.06,
+                    status="complete",
+                )
+                print(f"[MediaTools] Portrait generated for NPC \"{npc_name}\"")
+            except Exception as e:
+                print(f"[MediaTools] NPC portrait generation error for \"{npc_name}\": {e}")
+
+        loop = asyncio.get_event_loop()
+        loop.create_task(_generate())
+        return f"Portrait generation started for \"{npc_name}\". It will appear on the next turn."
+
+    except Exception as e:
+        return f"Error generating NPC portrait: {e}"
+
+
+def _generate_location_visual(
+    state,
+    campaign_id: int,
+    style_context: str,
+    budget_ctx: dict,
+    location_name: str,
+) -> str:
+    """Generate visual for a location."""
+    import asyncio
+    try:
+        # Budget check (~$0.03 for one image)
+        budget_error = _check_budget(budget_ctx, 0.03)
+        if budget_error:
+            return budget_error
+
+        # Look up location
+        from ..db.models import Location
+        db = state._get_db()
+        loc = db.query(Location).filter(
+            Location.campaign_id == campaign_id,
+            Location.name == location_name,
+        ).first()
+
+        if not loc:
+            return f"Location \"{location_name}\" not found — call upsert_location first."
+
+        async def _generate():
+            try:
+                from ..media.generator import MediaGenerator
+                gen = MediaGenerator()
+                path = await gen.generate_location_visual(
+                    location_name=location_name,
+                    location_type=loc.location_type or "unknown",
+                    description=loc.description or location_name,
+                    atmosphere=loc.atmosphere or "mysterious",
+                    style_context=style_context,
+                    campaign_id=campaign_id,
+                )
+                if path:
+                    _deduct_budget(budget_ctx, 0.03)
+                    _save_media_asset(
+                        state, campaign_id, None,
+                        asset_type="image",
+                        cutscene_type="location_reveal",
+                        file_path=str(path),
+                        image_prompt=f"Location: {location_name}",
+                        cost_usd=0.03,
+                        status="complete",
+                    )
+                    print(f"[MediaTools] Location visual generated for \"{location_name}\"")
+            except Exception as e:
+                print(f"[MediaTools] Location visual error for \"{location_name}\": {e}")
+
+        loop = asyncio.get_event_loop()
+        loop.create_task(_generate())
+        return f"Location visual generation started for \"{location_name}\"."
+
+    except Exception as e:
+        return f"Error generating location visual: {e}"
+
+
+def _save_media_asset(
+    state,
+    campaign_id: int,
+    turn_number: Optional[int],
+    asset_type: str,
+    cutscene_type: str,
+    file_path: str,
+    image_prompt: str = None,
+    motion_prompt: str = None,
+    cost_usd: float = 0.0,
+    status: str = "complete",
+):
+    """Persist a MediaAsset record to the database."""
+    try:
+        from ..db.models import MediaAsset
+        db = state._get_db()
+        asset = MediaAsset(
+            campaign_id=campaign_id,
+            turn_number=turn_number,
+            asset_type=asset_type,
+            cutscene_type=cutscene_type,
+            file_path=file_path,
+            image_prompt=image_prompt,
+            motion_prompt=motion_prompt,
+            cost_usd=cost_usd,
+            status=status,
+        )
+        db.add(asset)
+        db.commit()
+    except Exception as e:
+        print(f"[MediaTools] Failed to save media asset: {e}")

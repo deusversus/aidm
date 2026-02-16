@@ -6,7 +6,7 @@ from typing import Optional, List, Dict, Any
 from sqlalchemy.orm import Session as SQLAlchemySession
 from sqlalchemy.exc import OperationalError
 
-from .models import Campaign, Session, Turn, Character, NPC, WorldState, CampaignBible, ForeshadowingSeedDB, Consequence, Quest, Location
+from .models import Campaign, Session, Turn, Character, NPC, WorldState, CampaignBible, ForeshadowingSeedDB, Consequence, Quest, Location, MediaAsset
 from .session import get_session, create_session, init_db
 
 
@@ -2696,4 +2696,100 @@ class StateManager:
             location.last_visited_turn = self._turn_number
             self._maybe_commit()
         return location
+
+    # ── Media Asset CRUD ──────────────────────────────────────────────
+
+    def save_media_asset(
+        self,
+        asset_type: str,
+        file_path: str,
+        cutscene_type: str = None,
+        turn_number: int = None,
+        session_id: int = None,
+        image_prompt: str = None,
+        motion_prompt: str = None,
+        duration_seconds: float = None,
+        cost_usd: float = 0.0,
+        status: str = "complete",
+        thumbnail_path: str = None,
+        error_message: str = None,
+    ) -> MediaAsset:
+        """Persist a new MediaAsset record.
+
+        Args:
+            asset_type: "image" or "video"
+            file_path: Relative path under data/media/
+            cutscene_type: CutsceneType value (optional)
+            turn_number: Which turn generated this
+            session_id: Active session ID
+            image_prompt: Prompt used for image generation
+            motion_prompt: Prompt used for video generation
+            duration_seconds: Video duration
+            cost_usd: Generation cost
+            status: pending/generating/complete/failed
+            thumbnail_path: For video thumbnail
+            error_message: Error details if failed
+        """
+        from datetime import datetime
+        db = self._get_db()
+        asset = MediaAsset(
+            campaign_id=self.campaign_id,
+            session_id=session_id,
+            turn_number=turn_number,
+            asset_type=asset_type,
+            cutscene_type=cutscene_type,
+            file_path=file_path,
+            thumbnail_path=thumbnail_path,
+            image_prompt=image_prompt,
+            motion_prompt=motion_prompt,
+            duration_seconds=duration_seconds,
+            cost_usd=cost_usd,
+            status=status,
+            error_message=error_message,
+            completed_at=datetime.utcnow() if status == "complete" else None,
+        )
+        db.add(asset)
+        self._maybe_commit()
+        db.refresh(asset)
+        return asset
+
+    def get_media_for_turn(self, turn_number: int) -> List[MediaAsset]:
+        """Get all media assets generated for a specific turn."""
+        db = self._get_db()
+        return db.query(MediaAsset).filter(
+            MediaAsset.campaign_id == self.campaign_id,
+            MediaAsset.turn_number == turn_number,
+        ).order_by(MediaAsset.created_at).all()
+
+    def get_media_gallery(self, limit: int = 50, offset: int = 0, asset_type: str = None) -> List[MediaAsset]:
+        """Get paginated media assets for the campaign.
+
+        Args:
+            limit: Max results
+            offset: Pagination offset
+            asset_type: Optional filter ("image" or "video")
+        """
+        db = self._get_db()
+        query = db.query(MediaAsset).filter(
+            MediaAsset.campaign_id == self.campaign_id,
+        )
+        if asset_type:
+            query = query.filter(MediaAsset.asset_type == asset_type)
+        return query.order_by(MediaAsset.created_at.desc()).offset(offset).limit(limit).all()
+
+    def get_session_media_cost(self, session_id: int = None) -> float:
+        """Sum cost_usd for media in the current session (for budget enforcement).
+
+        Args:
+            session_id: Session to sum costs for. If None, sums all campaign media.
+        """
+        from sqlalchemy import func
+        db = self._get_db()
+        query = db.query(func.sum(MediaAsset.cost_usd)).filter(
+            MediaAsset.campaign_id == self.campaign_id,
+        )
+        if session_id is not None:
+            query = query.filter(MediaAsset.session_id == session_id)
+        result = query.scalar()
+        return result or 0.0
 

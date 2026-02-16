@@ -111,6 +111,8 @@ class TurnResponse(BaseModel):
     latency_ms: int
     session_phase: Optional[str] = None  # Current session phase
     portrait_map: Optional[Dict[str, str]] = None  # {"NPC Name": "/api/game/media/..."}
+    turn_number: Optional[int] = None
+    campaign_id: Optional[int] = None
 
 
 class SessionZeroResponse(BaseModel):
@@ -1692,6 +1694,8 @@ async def process_turn(request: TurnRequest):
             latency_ms=result.latency_ms,
             session_phase="gameplay",
             portrait_map=result.portrait_map,
+            turn_number=result.turn_number,
+            campaign_id=result.campaign_id,
         )
         
         # DEBUG: Log what we're actually returning
@@ -2351,3 +2355,173 @@ async def serve_media(file_path: str):
     
     return FileResponse(full_path, media_type=media_type)
 
+
+# === Phase 5: Media Gallery & Cost Endpoints ===
+
+class MediaAssetResponse(BaseModel):
+    """Response model for a single media asset."""
+    id: int
+    asset_type: str
+    cutscene_type: Optional[str] = None
+    file_url: str
+    thumbnail_url: Optional[str] = None
+    turn_number: Optional[int] = None
+    cost_usd: float = 0.0
+    status: str = "complete"
+    created_at: Optional[str] = None
+
+
+class GalleryResponse(BaseModel):
+    """All media assets for a campaign."""
+    assets: list = []
+    total: int = 0
+    total_cost_usd: float = 0.0
+
+
+@router.get("/gallery/{campaign_id}")
+async def get_media_gallery(
+    campaign_id: int,
+    asset_type: Optional[str] = None,
+    limit: int = 50,
+    offset: int = 0,
+):
+    """Get all generated media for a campaign.
+    
+    Query params:
+        asset_type: filter by 'image' or 'video'
+        limit: max results (default 50)
+        offset: pagination offset
+    """
+    try:
+        from src.db.state_manager import StateManager
+        from src.db.models import MediaAsset
+        from sqlalchemy import func
+
+        sm = StateManager()
+        sm.set_campaign(campaign_id)
+        db = sm._get_db()
+
+        query = db.query(MediaAsset).filter(
+            MediaAsset.campaign_id == campaign_id,
+            MediaAsset.status.in_(["complete", "partial"]),
+        )
+
+        if asset_type:
+            query = query.filter(MediaAsset.asset_type == asset_type)
+
+        total = query.count()
+        total_cost = db.query(
+            func.coalesce(func.sum(MediaAsset.cost_usd), 0.0)
+        ).filter(MediaAsset.campaign_id == campaign_id).scalar()
+
+        assets = query.order_by(
+            MediaAsset.created_at.desc()
+        ).offset(offset).limit(limit).all()
+
+        return GalleryResponse(
+            assets=[
+                MediaAssetResponse(
+                    id=a.id,
+                    asset_type=a.asset_type,
+                    cutscene_type=a.cutscene_type,
+                    file_url=f"/api/game/media/{a.file_path}" if a.file_path else "",
+                    thumbnail_url=f"/api/game/media/{a.thumbnail_path}" if a.thumbnail_path else None,
+                    turn_number=a.turn_number,
+                    cost_usd=a.cost_usd or 0.0,
+                    status=a.status,
+                    created_at=a.created_at.isoformat() if a.created_at else None,
+                )
+                for a in assets
+            ],
+            total=total,
+            total_cost_usd=total_cost,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/turn/{campaign_id}/{turn_number}/media")
+async def get_turn_media(campaign_id: int, turn_number: int):
+    """Get all media assets generated for a specific turn.
+    
+    The frontend polls this to check if cutscenes have finished generating.
+    """
+    try:
+        from src.db.state_manager import StateManager
+        from src.db.models import MediaAsset
+
+        sm = StateManager()
+        sm.set_campaign(campaign_id)
+        db = sm._get_db()
+
+        assets = db.query(MediaAsset).filter(
+            MediaAsset.campaign_id == campaign_id,
+            MediaAsset.turn_number == turn_number,
+        ).order_by(MediaAsset.created_at.asc()).all()
+
+        return {
+            "turn_number": turn_number,
+            "assets": [
+                MediaAssetResponse(
+                    id=a.id,
+                    asset_type=a.asset_type,
+                    cutscene_type=a.cutscene_type,
+                    file_url=f"/api/game/media/{a.file_path}" if a.file_path else "",
+                    thumbnail_url=f"/api/game/media/{a.thumbnail_path}" if a.thumbnail_path else None,
+                    turn_number=a.turn_number,
+                    cost_usd=a.cost_usd or 0.0,
+                    status=a.status,
+                    created_at=a.created_at.isoformat() if a.created_at else None,
+                )
+                for a in assets
+            ],
+            "total": len(assets),
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class MediaCostResponse(BaseModel):
+    """Cost summary for media generation."""
+    campaign_total_usd: float = 0.0
+    budget_cap_usd: Optional[float] = None
+    budget_enabled: bool = False
+    budget_remaining_usd: Optional[float] = None
+    asset_count: int = 0
+
+
+@router.get("/cost/{campaign_id}")
+async def get_media_cost(campaign_id: int):
+    """Get media generation cost summary for a campaign."""
+    try:
+        from src.db.state_manager import StateManager
+        from src.db.models import MediaAsset
+        from src.settings.manager import SettingsManager
+        from sqlalchemy import func
+
+        sm = StateManager()
+        sm.set_campaign(campaign_id)
+        db = sm._get_db()
+
+        total_cost = db.query(
+            func.coalesce(func.sum(MediaAsset.cost_usd), 0.0)
+        ).filter(MediaAsset.campaign_id == campaign_id).scalar()
+
+        asset_count = db.query(MediaAsset).filter(
+            MediaAsset.campaign_id == campaign_id
+        ).count()
+
+        # Load budget settings
+        settings = SettingsManager().load()
+        budget_enabled = getattr(settings, 'media_budget_enabled', False)
+        budget_cap = getattr(settings, 'media_budget_per_session_usd', 2.0) if budget_enabled else None
+
+        return MediaCostResponse(
+            campaign_total_usd=total_cost,
+            budget_cap_usd=budget_cap,
+            budget_enabled=budget_enabled,
+            budget_remaining_usd=max(0, budget_cap - total_cost) if budget_cap is not None else None,
+            asset_count=asset_count,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

@@ -253,11 +253,60 @@ Requirements:
     ) -> Optional[Path]:
         """Generate a location visual for the map/locations page.
         
-        Future enhancement — currently scaffolded.
+        Uses gemini-3-pro-image-preview to create an establishing shot.
         """
-        # Scaffolded for future implementation
-        print(f"[MediaGen] Location visual generation not yet implemented for {location_name}")
-        return None
+        self._ensure_client()
+        
+        safe_name = self._sanitize_name(location_name)
+        # Store location visuals alongside cutscene stills
+        output_dir = self._campaign_media_dir(campaign_id) / "locations"
+        output_dir.mkdir(exist_ok=True)
+        output_path = output_dir / f"{safe_name}.png"
+        
+        prompt = f"""Create a wide establishing shot of an anime location.
+
+LOCATION: {location_name}
+TYPE: {location_type}
+DESCRIPTION: {description}
+ATMOSPHERE: {atmosphere}
+ART STYLE: {style_context}
+
+Requirements:
+- Wide angle shot suitable for a location card
+- Rich atmospheric detail (lighting, weather, mood)
+- Anime art style consistent with the specified IP
+- No characters in the scene
+- Cinematic composition, 16:9 aspect ratio feel"""
+        
+        try:
+            loop = asyncio.get_running_loop()
+            
+            def _generate():
+                from google.genai import types
+                response = self._client.models.generate_content(
+                    model=self.IMAGE_MODEL,
+                    contents=[prompt],
+                    config=types.GenerateContentConfig(
+                        response_modalities=["image", "text"],
+                    ),
+                )
+                return response
+            
+            response = await loop.run_in_executor(None, _generate)
+            
+            if response.candidates and response.candidates[0].content:
+                for part in response.candidates[0].content.parts:
+                    if hasattr(part, 'inline_data') and part.inline_data:
+                        output_path.write_bytes(part.inline_data.data)
+                        print(f"[MediaGen] Location visual saved: {output_path}")
+                        return output_path
+            
+            print(f"[MediaGen] No image in response for location {location_name}")
+            return None
+            
+        except Exception as e:
+            print(f"[MediaGen] Location visual failed for {location_name}: {e}")
+            return None
     
     async def generate_full_character_media(
         self,
@@ -295,6 +344,221 @@ Requirements:
             "portrait": portrait,
         }
     
+    # =====================================================================
+    # General-purpose image + video generation (cutscene pipeline)
+    # =====================================================================
+    
+    async def generate_image(
+        self,
+        prompt: str,
+        campaign_id: int,
+        filename: str = "cutscene",
+        aspect_ratio: str = "16:9",
+    ) -> Optional[Path]:
+        """Generate a still image via gemini-3-pro-image-preview.
+        
+        General-purpose image generation for cutscene stills, scene
+        illustrations, etc. (Not character-specific like generate_model_sheet.)
+        
+        Args:
+            prompt: Image generation prompt
+            campaign_id: Campaign ID for file organization
+            filename: Base filename (sanitized, no extension)
+            aspect_ratio: Desired aspect ratio hint
+            
+        Returns:
+            Path to saved PNG, or None on failure.
+        """
+        self._ensure_client()
+        
+        safe_name = self._sanitize_name(filename)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        output_path = self._cutscenes_dir(campaign_id) / f"{safe_name}_{timestamp}.png"
+        
+        # Add aspect ratio hint to prompt
+        full_prompt = f"{prompt}\n\nAspect ratio: {aspect_ratio}. Cinematic framing."
+        
+        try:
+            loop = asyncio.get_running_loop()
+            
+            def _generate():
+                from google.genai import types
+                response = self._client.models.generate_content(
+                    model=self.IMAGE_MODEL,
+                    contents=[full_prompt],
+                    config=types.GenerateContentConfig(
+                        response_modalities=["image", "text"],
+                    ),
+                )
+                return response
+            
+            response = await loop.run_in_executor(None, _generate)
+            
+            if response.candidates and response.candidates[0].content:
+                for part in response.candidates[0].content.parts:
+                    if hasattr(part, 'inline_data') and part.inline_data:
+                        output_path.write_bytes(part.inline_data.data)
+                        print(f"[MediaGen] Cutscene still saved: {output_path}")
+                        return output_path
+            
+            print(f"[MediaGen] No image in response for cutscene {filename}")
+            return None
+            
+        except Exception as e:
+            print(f"[MediaGen] Image generation failed: {e}")
+            return None
+    
+    async def generate_video(
+        self,
+        image_path: Path,
+        prompt: str,
+        campaign_id: int,
+        duration: int = 6,
+    ) -> Optional[Path]:
+        """Generate a video from an image via veo-3.1-generate-preview.
+        
+        Uses image-to-video generation. Polls for completion since
+        Veo generation is asynchronous (~15-60 seconds).
+        
+        Args:
+            image_path: Path to source image (PNG)
+            prompt: Motion/animation prompt describing desired movement
+            campaign_id: Campaign ID for file organization
+            duration: Desired video duration in seconds (5-8)
+            
+        Returns:
+            Path to saved MP4, or None on failure.
+        """
+        self._ensure_client()
+        
+        if not image_path.exists():
+            print(f"[MediaGen] Source image not found: {image_path}")
+            return None
+        
+        output_path = image_path.with_suffix(".mp4")
+        
+        try:
+            from google.genai import types
+            loop = asyncio.get_running_loop()
+            image_bytes = image_path.read_bytes()
+            
+            def _start_generation():
+                """Start the Veo generation job (returns an operation to poll)."""
+                image = types.Image.from_bytes(data=image_bytes, mime_type="image/png")
+                operation = self._client.models.generate_videos(
+                    model=self.VIDEO_MODEL,
+                    prompt=prompt,
+                    image=image,
+                    config=types.GenerateVideosConfig(
+                        aspect_ratio="16:9",
+                        number_of_videos=1,
+                    ),
+                )
+                return operation
+            
+            print(f"[MediaGen] Starting Veo generation ({self.VIDEO_MODEL})...")
+            operation = await loop.run_in_executor(None, _start_generation)
+            
+            # Poll for completion (Veo is async, typically 15-60 seconds)
+            def _poll():
+                """Poll until the operation completes."""
+                import time
+                while not operation.done:
+                    time.sleep(5)
+                    operation.reload()
+                return operation.result
+            
+            print(f"[MediaGen] Polling for Veo completion...")
+            result = await loop.run_in_executor(None, _poll)
+            
+            # Extract video from result
+            if result and result.generated_videos:
+                video = result.generated_videos[0]
+                if hasattr(video, 'video') and video.video:
+                    # Download the video data
+                    video_data = video.video
+                    if hasattr(video_data, 'data'):
+                        output_path.write_bytes(video_data.data)
+                    elif hasattr(video_data, 'uri'):
+                        # If we get a URI, download it
+                        import urllib.request
+                        urllib.request.urlretrieve(video_data.uri, str(output_path))
+                    print(f"[MediaGen] Video saved: {output_path}")
+                    return output_path
+            
+            print(f"[MediaGen] No video in Veo response")
+            return None
+            
+        except Exception as e:
+            print(f"[MediaGen] Video generation failed: {e}")
+            return None
+    
+    async def generate_cutscene(
+        self,
+        image_prompt: str,
+        motion_prompt: str,
+        campaign_id: int,
+        cutscene_type: str = "action_climax",
+        filename: str = "cutscene",
+    ) -> Dict[str, Any]:
+        """Full cutscene pipeline: prompt → image → video.
+        
+        Orchestrates both generation steps. Returns result dict with
+        paths and status.
+        
+        Args:
+            image_prompt: Prompt for the still image
+            motion_prompt: Prompt for the video animation
+            campaign_id: Campaign ID
+            cutscene_type: Type classification
+            filename: Base filename
+            
+        Returns:
+            {
+                "image_path": Optional[Path],
+                "video_path": Optional[Path],
+                "cutscene_type": str,
+                "cost_usd": float,   # estimated
+                "status": "complete" | "partial" | "failed"
+            }
+        """
+        result = {
+            "image_path": None,
+            "video_path": None,
+            "cutscene_type": cutscene_type,
+            "cost_usd": 0.0,
+            "status": "failed",
+        }
+        
+        # Step 1: Generate still image
+        image_path = await self.generate_image(
+            prompt=image_prompt,
+            campaign_id=campaign_id,
+            filename=filename,
+        )
+        
+        if not image_path:
+            return result
+        
+        result["image_path"] = image_path
+        result["cost_usd"] = 0.03  # Estimated image cost
+        result["status"] = "partial"
+        
+        # Step 2: Animate the image into video
+        video_path = await self.generate_video(
+            image_path=image_path,
+            prompt=motion_prompt,
+            campaign_id=campaign_id,
+        )
+        
+        if video_path:
+            result["video_path"] = video_path
+            result["cost_usd"] += 0.08  # Estimated video cost
+            result["status"] = "complete"
+        
+        print(f"[MediaGen] Cutscene {cutscene_type}: status={result['status']}, cost=${result['cost_usd']:.2f}")
+        return result
+    
     def _format_appearance(self, appearance: dict) -> str:
         """Format appearance dict into readable description."""
         if not appearance:
@@ -323,7 +587,7 @@ Requirements:
         
         Args:
             campaign_id: Campaign ID
-            category: 'models', 'portraits', 'cutscenes'
+            category: 'models', 'portraits', 'cutscenes', 'locations'
             filename: Image filename
             
         Returns:

@@ -1105,6 +1105,8 @@ class Orchestrator:
             outcome=outcome,
             latency_ms=latency,
             portrait_map=portrait_map or None,
+            turn_number=db_context.turn_number,
+            campaign_id=self.campaign_id,
         )
     
     async def _post_narrative_processing(
@@ -1478,7 +1480,7 @@ class Orchestrator:
         outcome,
         db_context,
     ):
-        """Background ProductionAgent — quest tracking + location discovery.
+        """Background ProductionAgent — quest tracking + location discovery + media.
         
         Runs in parallel with entity extraction and relationship analysis.
         Non-fatal: failures are logged and never crash the pipeline.
@@ -1488,9 +1490,54 @@ class Orchestrator:
             from ..agents.production_tools import build_production_tools
 
             agent = ProductionAgent()
+
+            # Load media settings for conditional tool registration
+            media_enabled = False
+            media_budget_enabled = False
+            media_budget_remaining = None
+            style_context = ""
+            campaign_id = getattr(self.state, 'campaign_id', None)
+
+            try:
+                from ..settings.manager import SettingsManager
+                settings = SettingsManager().load()
+                media_enabled = getattr(settings, 'media_enabled', False)
+                media_budget_enabled = getattr(settings, 'media_budget_enabled', False)
+
+                if media_enabled and media_budget_enabled:
+                    budget_cap = getattr(settings, 'media_budget_per_session_usd', 2.0)
+                    # Calculate remaining budget from current session spend
+                    try:
+                        from sqlalchemy import func
+                        from ..db.models import MediaAsset
+                        db = self.state._get_db()
+                        session_spend = db.query(
+                            func.coalesce(func.sum(MediaAsset.cost_usd), 0.0)
+                        ).filter(
+                            MediaAsset.campaign_id == campaign_id,
+                        ).scalar()
+                        media_budget_remaining = max(0, budget_cap - session_spend)
+                    except Exception:
+                        media_budget_remaining = budget_cap  # Fall back to full budget
+
+                # Style context from campaign profile
+                try:
+                    profile = self.state.get_profile()
+                    if profile:
+                        style_context = getattr(profile, 'art_style', '') or getattr(profile, 'title', '') or ''
+                except Exception:
+                    pass
+            except Exception:
+                pass  # Settings load failure is non-fatal
+
             tools = build_production_tools(
                 state=self.state,
                 current_turn=db_context.turn_number,
+                media_enabled=media_enabled,
+                media_budget_enabled=media_budget_enabled,
+                media_budget_remaining=media_budget_remaining,
+                campaign_id=campaign_id,
+                style_context=style_context,
             )
             agent.set_tools(tools)
 
