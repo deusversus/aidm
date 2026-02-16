@@ -6,7 +6,7 @@ from typing import Optional, List, Dict, Any
 from sqlalchemy.orm import Session as SQLAlchemySession
 from sqlalchemy.exc import OperationalError
 
-from .models import Campaign, Session, Turn, Character, NPC, WorldState, CampaignBible, ForeshadowingSeedDB, Consequence
+from .models import Campaign, Session, Turn, Character, NPC, WorldState, CampaignBible, ForeshadowingSeedDB, Consequence, Quest, Location
 from .session import get_session, create_session, init_db
 
 
@@ -597,6 +597,32 @@ class StateManager:
             }
             for t in results
         ]
+    
+    def get_turn_narrative(self, turn_number: int) -> Optional[str]:
+        """Get the full narrative text for a specific turn.
+        
+        Used by the Journal API for full-text expansion mode.
+        
+        Args:
+            turn_number: The turn number to retrieve
+            
+        Returns:
+            Full narrative text, or None if turn not found
+        """
+        db = self._get_db()
+        session_id = self.get_or_create_session()
+        
+        turn = (
+            db.query(Turn)
+            .filter(
+                Turn.session_id == session_id,
+                Turn.turn_number == turn_number,
+                Turn.narrative.isnot(None)
+            )
+            .first()
+        )
+        
+        return turn.narrative if turn else None
     
     # -----------------------------------------------------------------
     # FORESHADOWING PERSISTENCE (#10)
@@ -2463,4 +2489,211 @@ class StateManager:
                 world.arc_phase = value
             
             self._maybe_commit()
+
+    # -----------------------------------------------------------------
+    # QUEST CRUD (Phase 2A)
+    # -----------------------------------------------------------------
+    
+    def create_quest(
+        self,
+        title: str,
+        description: str = None,
+        quest_type: str = "main",
+        source: str = "director",
+        objectives: list = None,
+        related_npcs: list = None,
+        related_locations: list = None,
+        created_turn: int = None,
+    ) -> Quest:
+        """Create a new quest.
+        
+        Called by Director Agent when establishing new storylines,
+        or by Override Handler when player requests new objectives.
+        """
+        db = self._get_db()
+        quest = Quest(
+            campaign_id=self.campaign_id,
+            title=title,
+            description=description,
+            quest_type=quest_type,
+            source=source,
+            objectives=objectives or [],
+            related_npcs=related_npcs or [],
+            related_locations=related_locations or [],
+            created_turn=created_turn or self._turn_number,
+        )
+        db.add(quest)
+        self._maybe_commit()
+        return quest
+    
+    def get_quests(self, status: str = None) -> list:
+        """Get all quests, optionally filtered by status."""
+        db = self._get_db()
+        q = db.query(Quest).filter(Quest.campaign_id == self.campaign_id)
+        if status:
+            q = q.filter(Quest.status == status)
+        return q.order_by(Quest.created_at.desc()).all()
+    
+    def update_quest_status(self, quest_id: int, status: str) -> Optional[Quest]:
+        """Update quest status (active, completed, failed, abandoned).
+        
+        Called by Pacing Agent per-turn or Director on arc completion.
+        """
+        db = self._get_db()
+        quest = db.query(Quest).filter(
+            Quest.id == quest_id,
+            Quest.campaign_id == self.campaign_id
+        ).first()
+        if quest:
+            quest.status = status
+            if status in ("completed", "failed"):
+                quest.completed_turn = self._turn_number
+            self._maybe_commit()
+        return quest
+    
+    def update_quest_objective(
+        self, quest_id: int, objective_index: int, completed: bool = True
+    ) -> Optional[Quest]:
+        """Mark a specific objective within a quest as complete.
+        
+        Called by Pacing Agent when a sub-objective is achieved.
+        """
+        db = self._get_db()
+        quest = db.query(Quest).filter(
+            Quest.id == quest_id,
+            Quest.campaign_id == self.campaign_id
+        ).first()
+        if quest and quest.objectives and 0 <= objective_index < len(quest.objectives):
+            objectives = list(quest.objectives)  # Make mutable copy
+            objectives[objective_index] = {
+                **objectives[objective_index],
+                "completed": completed,
+                "turn_completed": self._turn_number if completed else None,
+            }
+            quest.objectives = objectives
+            self._maybe_commit()
+        return quest
+    
+    # -----------------------------------------------------------------
+    # LOCATION CRUD (Phase 2B)
+    # -----------------------------------------------------------------
+    
+    def upsert_location(
+        self,
+        name: str,
+        description: str = None,
+        location_type: str = None,
+        visual_tags: list = None,
+        atmosphere: str = None,
+        lighting: str = None,
+        scale: str = None,
+        parent_location: str = None,
+        connected_locations: list = None,
+        known_npcs: list = None,
+        current_state: str = None,
+        aliases: list = None,
+    ) -> Location:
+        """Create or update a location.
+        
+        Upsert semantics: if a location with this name already exists
+        in the campaign, update it. Otherwise create a new one.
+        Called by WorldBuilder agent during environment extraction.
+        """
+        db = self._get_db()
+        location = db.query(Location).filter(
+            Location.campaign_id == self.campaign_id,
+            Location.name == name
+        ).first()
+        
+        if location:
+            # Update existing — only override non-None fields
+            if description is not None:
+                location.description = description
+            if location_type is not None:
+                location.location_type = location_type
+            if visual_tags is not None:
+                location.visual_tags = visual_tags
+            if atmosphere is not None:
+                location.atmosphere = atmosphere
+            if lighting is not None:
+                location.lighting = lighting
+            if scale is not None:
+                location.scale = scale
+            if parent_location is not None:
+                location.parent_location = parent_location
+            if connected_locations is not None:
+                location.connected_locations = connected_locations
+            if known_npcs is not None:
+                location.known_npcs = known_npcs
+            if current_state is not None:
+                location.current_state = current_state
+            if aliases is not None:
+                location.aliases = aliases
+            location.times_visited = (location.times_visited or 0) + 1
+            location.last_visited_turn = self._turn_number
+        else:
+            # Create new
+            location = Location(
+                campaign_id=self.campaign_id,
+                name=name,
+                description=description,
+                location_type=location_type,
+                visual_tags=visual_tags or [],
+                atmosphere=atmosphere,
+                lighting=lighting,
+                scale=scale,
+                parent_location=parent_location,
+                connected_locations=connected_locations or [],
+                known_npcs=known_npcs or [],
+                current_state=current_state or "intact",
+                aliases=aliases or [],
+                discovered_turn=self._turn_number,
+                last_visited_turn=self._turn_number,
+            )
+            db.add(location)
+        
+        self._maybe_commit()
+        return location
+    
+    def get_locations(self) -> list:
+        """Get all discovered locations for the campaign."""
+        db = self._get_db()
+        return (
+            db.query(Location)
+            .filter(Location.campaign_id == self.campaign_id)
+            .order_by(Location.last_visited_turn.desc())
+            .all()
+        )
+    
+    def get_location_by_name(self, name: str) -> Optional[Location]:
+        """Get a specific location by name."""
+        db = self._get_db()
+        return db.query(Location).filter(
+            Location.campaign_id == self.campaign_id,
+            Location.name == name
+        ).first()
+    
+    def set_current_location(self, name: str) -> Optional[Location]:
+        """Mark a location as the current location (clears others).
+        
+        Called when the player moves to a new location.
+        """
+        db = self._get_db()
+        # Clear current from all locations
+        db.query(Location).filter(
+            Location.campaign_id == self.campaign_id,
+            Location.is_current == True
+        ).update({"is_current": False})
+        
+        # Set new current
+        location = db.query(Location).filter(
+            Location.campaign_id == self.campaign_id,
+            Location.name == name
+        ).first()
+        if location:
+            location.is_current = True
+            location.times_visited = (location.times_visited or 0) + 1
+            location.last_visited_turn = self._turn_number
+            self._maybe_commit()
+        return location
 

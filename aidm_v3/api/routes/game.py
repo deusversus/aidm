@@ -1,8 +1,8 @@
 """Game API routes."""
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 import uuid
 
 from src.core.orchestrator import Orchestrator
@@ -201,6 +201,112 @@ class QuestListResponse(BaseModel):
     """List of active quests."""
     quests: list  # List of QuestInfo
     current_arc: Optional[str] = None
+
+
+# === Phase 1: Inventory, Abilities, Journal Response Models ===
+
+class InventoryItemInfo(BaseModel):
+    """A single inventory item."""
+    name: str
+    type: str = "miscellaneous"
+    description: str = ""
+    quantity: int = 1
+    properties: Dict[str, Any] = {}
+    source: Optional[str] = None
+
+
+class InventoryResponse(BaseModel):
+    """Character inventory."""
+    items: List[InventoryItemInfo]
+    total_items: int
+
+
+class AbilityInfo(BaseModel):
+    """A single ability/skill."""
+    name: str
+    description: str = ""
+    type: str = "unknown"
+    level_acquired: Optional[int] = None
+
+
+class AbilitiesResponse(BaseModel):
+    """Character abilities."""
+    abilities: List[AbilityInfo]
+    total_abilities: int
+
+
+class JournalEntry(BaseModel):
+    """A single journal entry (compactor beat or full-text turn)."""
+    turn: Optional[int] = None
+    content: str
+    entry_type: str = "beat"  # "beat" or "full_text"
+    heat: Optional[float] = None
+
+
+class JournalResponse(BaseModel):
+    """Journal with compactor beats and optional full-text expansion."""
+    entries: List[JournalEntry]
+    total_entries: int
+    page: int
+    per_page: int
+    expanded_turn: Optional[int] = None  # If a specific turn was expanded
+
+
+# === Phase 2: Quest and Location Response Models ===
+
+class QuestObjectiveInfo(BaseModel):
+    """A single objective within a quest."""
+    description: str
+    completed: bool = False
+    turn_completed: Optional[int] = None
+
+
+class QuestDetailInfo(BaseModel):
+    """A quest with full details."""
+    id: int
+    title: str
+    description: Optional[str] = None
+    status: str = "active"
+    quest_type: str = "main"
+    source: str = "director"
+    objectives: List[QuestObjectiveInfo] = []
+    created_turn: Optional[int] = None
+    completed_turn: Optional[int] = None
+    related_npcs: List[str] = []
+    related_locations: List[str] = []
+
+
+class QuestTrackerResponse(BaseModel):
+    """Full quest tracker with active quests and current arc."""
+    quests: List[QuestDetailInfo]
+    current_arc: Optional[str] = None
+    total_active: int = 0
+    total_completed: int = 0
+
+
+class LocationInfo(BaseModel):
+    """A discovered location."""
+    id: int
+    name: str
+    location_type: Optional[str] = None
+    description: Optional[str] = None
+    atmosphere: Optional[str] = None
+    current_state: str = "intact"
+    is_current: bool = False
+    times_visited: int = 0
+    discovered_turn: Optional[int] = None
+    last_visited_turn: Optional[int] = None
+    visual_tags: List[str] = []
+    known_npcs: List[str] = []
+    connected_locations: List[dict] = []
+    notable_events: List[str] = []
+
+
+class LocationsResponse(BaseModel):
+    """All discovered locations."""
+    locations: List[LocationInfo]
+    current_location: Optional[str] = None
+    total_locations: int = 0
 
 
 
@@ -1859,62 +1965,339 @@ async def get_factions():
     )
 
 
-@router.get("/quests", response_model=QuestListResponse)
+@router.get("/quests", response_model=QuestTrackerResponse)
 async def get_quests():
-    """Get active quests from character goals and campaign bible."""
+    """Get quests from Quest table, with legacy fallback.
+    
+    Primary source: Quest model (DB-backed, dual-agent managed).
+    Fallback: Character goals + campaign bible (legacy ad-hoc approach).
+    """
     try:
         orchestrator = get_orchestrator()
     except HTTPException:
         raise HTTPException(status_code=404, detail="No active campaign")
     
-    quests = []
     current_arc = None
     
-    # Character-defined goals (personal objectives)
+    # Try DB-backed quests first
+    db_quests = orchestrator.state.get_quests()
+    
+    if db_quests:
+        quests = []
+        active_count = 0
+        completed_count = 0
+        
+        for q in db_quests:
+            objectives = []
+            for obj in (q.objectives or []):
+                if isinstance(obj, dict):
+                    objectives.append(QuestObjectiveInfo(
+                        description=obj.get("description", ""),
+                        completed=obj.get("completed", False),
+                        turn_completed=obj.get("turn_completed"),
+                    ))
+            
+            quests.append(QuestDetailInfo(
+                id=q.id,
+                title=q.title,
+                description=q.description,
+                status=q.status or "active",
+                quest_type=q.quest_type or "main",
+                source=q.source or "director",
+                objectives=objectives,
+                created_turn=q.created_turn,
+                completed_turn=q.completed_turn,
+                related_npcs=q.related_npcs or [],
+                related_locations=q.related_locations or [],
+            ))
+            
+            if q.status == "active":
+                active_count += 1
+            elif q.status in ("completed", "failed"):
+                completed_count += 1
+        
+        # Get current arc from world state or bible
+        bible = orchestrator.state.get_campaign_bible()
+        if bible and bible.planning_data:
+            current_arc = bible.planning_data.get("current_arc", {}).get("name")
+        if not current_arc:
+            world_state = orchestrator.state.get_world_state()
+            if world_state:
+                current_arc = world_state.arc_name
+        
+        return QuestTrackerResponse(
+            quests=quests,
+            current_arc=current_arc,
+            total_active=active_count,
+            total_completed=completed_count,
+        )
+    
+    # Legacy fallback: character goals + campaign bible
+    quests = []
+    
     char = orchestrator.state.get_character()
     if char:
         if char.short_term_goal:
-            quests.append({
-                "name": "Current Objective",
-                "description": char.short_term_goal,
-                "status": "active"
-            })
+            quests.append(QuestDetailInfo(
+                id=0,
+                title="Current Objective",
+                description=char.short_term_goal,
+                quest_type="personal",
+                source="player",
+            ))
         if char.long_term_goal:
-            quests.append({
-                "name": "Ultimate Goal",
-                "description": char.long_term_goal,
-                "status": "active"
-            })
+            quests.append(QuestDetailInfo(
+                id=0,
+                title="Ultimate Goal",
+                description=char.long_term_goal,
+                quest_type="personal",
+                source="player",
+            ))
         for goal in (char.narrative_goals or []):
-            quests.append({
-                "name": goal.get("name", "Quest") if isinstance(goal, dict) else "Quest",
-                "description": goal.get("description", str(goal)) if isinstance(goal, dict) else str(goal),
-                "status": goal.get("status", "active") if isinstance(goal, dict) else "active"
-            })
+            if isinstance(goal, dict):
+                quests.append(QuestDetailInfo(
+                    id=0,
+                    title=goal.get("name", "Quest"),
+                    description=goal.get("description", ""),
+                    status=goal.get("status", "active"),
+                    quest_type="main",
+                    source="director",
+                ))
     
-    # Director-generated objectives (from campaign bible)
     bible = orchestrator.state.get_campaign_bible()
     if bible and bible.planning_data:
         data = bible.planning_data
         current_arc = data.get("current_arc", {}).get("name") or current_arc
         
         for goal in data.get("active_goals", []):
-            quests.append({
-                "name": goal.get("name", "Unknown Objective"),
-                "description": goal.get("description", ""),
-                "status": goal.get("status", "active")
-            })
+            quests.append(QuestDetailInfo(
+                id=0,
+                title=goal.get("name", "Unknown Objective"),
+                description=goal.get("description", ""),
+                status=goal.get("status", "active"),
+                quest_type="main",
+                source="director",
+            ))
         for obj in data.get("arc_objectives", []):
-            quests.append({
-                "name": obj.get("name", "Arc Objective"),
-                "description": obj.get("description", ""),
-                "status": obj.get("status", "active")
-            })
+            quests.append(QuestDetailInfo(
+                id=0,
+                title=obj.get("name", "Arc Objective"),
+                description=obj.get("description", ""),
+                status=obj.get("status", "active"),
+                quest_type="main",
+                source="director",
+            ))
     
-    # Fall back to world state arc name if bible didn't provide one
     if not current_arc:
         world_state = orchestrator.state.get_world_state()
         if world_state:
             current_arc = world_state.arc_name
     
-    return QuestListResponse(quests=quests, current_arc=current_arc)
+    active = sum(1 for q in quests if q.status == "active")
+    completed = sum(1 for q in quests if q.status in ("completed", "failed"))
+    
+    return QuestTrackerResponse(
+        quests=quests,
+        current_arc=current_arc,
+        total_active=active,
+        total_completed=completed,
+    )
+
+
+# === Phase 1: Inventory, Abilities, Journal Endpoints ===
+
+@router.get("/inventory", response_model=InventoryResponse)
+async def get_inventory():
+    """Get character inventory items."""
+    try:
+        orchestrator = get_orchestrator()
+    except HTTPException:
+        raise HTTPException(status_code=404, detail="No active campaign")
+    
+    char = orchestrator.state.get_character()
+    if not char:
+        raise HTTPException(status_code=404, detail="No character found")
+    
+    raw_inventory = char.inventory or []
+    items = []
+    for item in raw_inventory:
+        if isinstance(item, dict):
+            items.append(InventoryItemInfo(
+                name=item.get("name", "Unknown"),
+                type=item.get("type", "miscellaneous"),
+                description=item.get("description", ""),
+                quantity=item.get("quantity", 1),
+                properties=item.get("properties", {}),
+                source=item.get("source"),
+            ))
+        elif isinstance(item, str):
+            items.append(InventoryItemInfo(name=item))
+    
+    return InventoryResponse(items=items, total_items=len(items))
+
+
+@router.get("/abilities", response_model=AbilitiesResponse)
+async def get_abilities():
+    """Get character abilities and skills."""
+    try:
+        orchestrator = get_orchestrator()
+    except HTTPException:
+        raise HTTPException(status_code=404, detail="No active campaign")
+    
+    char = orchestrator.state.get_character()
+    if not char:
+        raise HTTPException(status_code=404, detail="No character found")
+    
+    raw_abilities = char.abilities or []
+    abilities = []
+    for ability in raw_abilities:
+        if isinstance(ability, dict):
+            abilities.append(AbilityInfo(
+                name=ability.get("name", "Unknown"),
+                description=ability.get("description", ""),
+                type=ability.get("type", "unknown"),
+                level_acquired=ability.get("level_acquired"),
+            ))
+        elif isinstance(ability, str):
+            abilities.append(AbilityInfo(name=ability))
+    
+    return AbilitiesResponse(abilities=abilities, total_abilities=len(abilities))
+
+
+@router.get("/journal", response_model=JournalResponse)
+async def get_journal(
+    page: int = Query(1, ge=1, description="Page number"),
+    per_page: int = Query(20, ge=1, le=100, description="Items per page"),
+    expand_turn: Optional[int] = Query(None, description="Expand full narrative for a specific turn"),
+):
+    """Get journal entries from compactor narrative beats.
+    
+    Timeline mode (default): Returns compactor episode beats from ChromaDB,
+    ordered chronologically. These are ~100-200 word narrative summaries.
+    
+    Full text mode (expand_turn=N): Returns the full Turn.narrative for a 
+    specific turn number, alongside the regular timeline.
+    """
+    try:
+        orchestrator = get_orchestrator()
+    except HTTPException:
+        raise HTTPException(status_code=404, detail="No active campaign")
+    
+    entries = []
+    expanded_turn_content = None
+    
+    # Timeline mode: Get episode beats from memory store
+    try:
+        # Search for all episode memories (compactor-generated summaries)
+        episode_results = orchestrator.memory.search(
+            query="narrative events story moments",
+            limit=200,  # Get all available
+            min_heat=0.0,
+            boost_on_access=False,
+            memory_type="episode",
+        )
+        
+        # Also get narrative_beat type memories
+        beat_results = orchestrator.memory.search(
+            query="narrative events story moments",
+            limit=200,
+            min_heat=0.0,
+            boost_on_access=False,
+            memory_type="narrative_beat",
+        )
+        
+        # Combine and deduplicate
+        seen_ids = set()
+        all_beats = []
+        for result in episode_results + beat_results:
+            if result["id"] not in seen_ids:
+                seen_ids.add(result["id"])
+                turn_num = int(result["metadata"].get("turn", 0))
+                all_beats.append(JournalEntry(
+                    turn=turn_num,
+                    content=result["content"],
+                    entry_type="beat",
+                    heat=result.get("heat", 0),
+                ))
+        
+        # Sort chronologically by turn
+        all_beats.sort(key=lambda e: e.turn or 0)
+        
+        # Paginate
+        total = len(all_beats)
+        start = (page - 1) * per_page
+        end = start + per_page
+        entries = all_beats[start:end]
+        
+    except Exception as e:
+        print(f"[Journal] Error fetching episode memories: {e}")
+        total = 0
+    
+    # Full text expansion: Get the full narrative for a specific turn
+    if expand_turn is not None:
+        try:
+            turn_narrative = orchestrator.state.get_turn_narrative(expand_turn)
+            if turn_narrative:
+                expanded_turn_content = expand_turn
+                entries.append(JournalEntry(
+                    turn=expand_turn,
+                    content=turn_narrative,
+                    entry_type="full_text",
+                ))
+        except Exception as e:
+            print(f"[Journal] Error expanding turn {expand_turn}: {e}")
+    
+    return JournalResponse(
+        entries=entries,
+        total_entries=total,
+        page=page,
+        per_page=per_page,
+        expanded_turn=expanded_turn_content,
+    )
+
+
+# === Phase 2: Locations Endpoint ===
+
+@router.get("/locations", response_model=LocationsResponse)
+async def get_locations():
+    """Get all discovered locations."""
+    try:
+        orchestrator = get_orchestrator()
+    except HTTPException:
+        raise HTTPException(status_code=404, detail="No active campaign")
+    
+    db_locations = orchestrator.state.get_locations()
+    current_location_name = None
+    
+    locations = []
+    for loc in db_locations:
+        locations.append(LocationInfo(
+            id=loc.id,
+            name=loc.name,
+            location_type=loc.location_type,
+            description=loc.description,
+            atmosphere=loc.atmosphere,
+            current_state=loc.current_state or "intact",
+            is_current=loc.is_current or False,
+            times_visited=loc.times_visited or 0,
+            discovered_turn=loc.discovered_turn,
+            last_visited_turn=loc.last_visited_turn,
+            visual_tags=loc.visual_tags or [],
+            known_npcs=loc.known_npcs or [],
+            connected_locations=loc.connected_locations or [],
+            notable_events=loc.notable_events or [],
+        ))
+        if loc.is_current:
+            current_location_name = loc.name
+    
+    # Fallback: use world state location if no DB locations marked as current
+    if not current_location_name:
+        world_state = orchestrator.state.get_world_state()
+        if world_state:
+            current_location_name = world_state.location
+    
+    return LocationsResponse(
+        locations=locations,
+        current_location=current_location_name,
+        total_locations=len(locations),
+    )

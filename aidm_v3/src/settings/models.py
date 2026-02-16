@@ -28,7 +28,7 @@ class AgentSettings(BaseModel):
     - FAST: intent_classifier, outcome_judge, validator, memory_ranker, 
       combat, progression, scale_selector, relationship_analyzer,
       session_zero, world_builder, compactor, scope, pacing, recap,
-      wiki_scout
+      wiki_scout, production
     - THINKING: director, research, profile_merge
     - CREATIVE: key_animator (prose generation)
     
@@ -151,6 +151,12 @@ class AgentSettings(BaseModel):
     wiki_scout: Optional[ModelConfig] = Field(
         default=None,
         description="Model for wiki category classification (fast model preferred)"
+    )
+
+    # === POST-NARRATIVE PRODUCTION ===
+    production: Optional[ModelConfig] = Field(
+        default=None,
+        description="Model for post-narrative quest tracking and location discovery (fast model preferred)"
     )
 
 

@@ -155,6 +155,54 @@ def build_director_tools(
         handler=lambda: _get_campaign_bible(state)
     ))
     
+    # -----------------------------------------------------------------
+    # QUEST MANAGEMENT TOOLS (Phase 2A)
+    # -----------------------------------------------------------------
+    
+    registry.register(ToolDefinition(
+        name="create_quest",
+        description=(
+            "Create a new quest/objective for the player. Use this when establishing "
+            "new storylines, side quests, or campaign objectives. Quests are persisted "
+            "in the database and tracked across sessions."
+        ),
+        parameters=[
+            ToolParam("title", "str", "Quest title (concise, evocative)", required=True),
+            ToolParam("description", "str", "Quest description (what the player needs to do)", required=True),
+            ToolParam("quest_type", "str", "Type: main, side, personal, faction (default: main)", required=False),
+            ToolParam("objectives", "str", "Pipe-separated list of sub-objectives, e.g. 'Find the key|Open the gate|Defeat the guardian'", required=False),
+            ToolParam("related_npcs", "str", "Comma-separated NPC names involved", required=False),
+            ToolParam("related_locations", "str", "Comma-separated location names", required=False),
+        ],
+        handler=lambda **kwargs: _create_quest(state, current_turn, **kwargs)
+    ))
+    
+    registry.register(ToolDefinition(
+        name="update_quest_status",
+        description=(
+            "Update a quest's status. Use 'completed' for successful quests, "
+            "'failed' for failed ones, 'abandoned' for dropped storylines."
+        ),
+        parameters=[
+            ToolParam("quest_id", "int", "Quest ID to update", required=True),
+            ToolParam("status", "str", "New status: active, completed, failed, abandoned", required=True),
+        ],
+        handler=lambda **kwargs: _update_quest_status(state, **kwargs)
+    ))
+    
+    registry.register(ToolDefinition(
+        name="complete_quest_objective",
+        description=(
+            "Mark a specific objective within a quest as complete. "
+            "Use the objective index (0-based) to target the right sub-objective."
+        ),
+        parameters=[
+            ToolParam("quest_id", "int", "Quest ID containing the objective", required=True),
+            ToolParam("objective_index", "int", "Index of objective to mark complete (0-based)", required=True),
+        ],
+        handler=lambda **kwargs: _complete_quest_objective(state, **kwargs)
+    ))
+    
     return registry
 
 
@@ -406,3 +454,79 @@ def _get_campaign_bible(state) -> Dict:
         "pacing_notes": planning.get("pacing_adjustment", ""),
         "spotlight_debt": planning.get("spotlight_debt", {}),
     }
+
+
+# =========================================================================
+# Quest Tool Handlers (Phase 2A)
+# =========================================================================
+
+def _create_quest(state, current_turn: int, **kwargs) -> Dict:
+    """Create a new quest via Director tool call."""
+    title = kwargs.get("title", "")
+    if not title:
+        return {"error": "title is required"}
+    
+    # Parse pipe-separated objectives
+    objectives = []
+    if kwargs.get("objectives"):
+        for desc in kwargs["objectives"].split("|"):
+            desc = desc.strip()
+            if desc:
+                objectives.append({"description": desc, "completed": False})
+    
+    # Parse comma-separated lists
+    related_npcs = [n.strip() for n in kwargs.get("related_npcs", "").split(",") if n.strip()] if kwargs.get("related_npcs") else []
+    related_locations = [l.strip() for l in kwargs.get("related_locations", "").split(",") if l.strip()] if kwargs.get("related_locations") else []
+    
+    quest = state.create_quest(
+        title=title,
+        description=kwargs.get("description", ""),
+        quest_type=kwargs.get("quest_type", "main"),
+        source="director",
+        objectives=objectives,
+        related_npcs=related_npcs,
+        related_locations=related_locations,
+        created_turn=current_turn,
+    )
+    
+    print(f"[Director] Quest created: {quest.title} (ID {quest.id}, type={quest.quest_type})")
+    return {
+        "created": True,
+        "quest_id": quest.id,
+        "title": quest.title,
+        "objectives_count": len(objectives),
+    }
+
+
+def _update_quest_status(state, **kwargs) -> Dict:
+    """Update quest status via Director tool call."""
+    quest_id = int(kwargs.get("quest_id", 0))
+    status = kwargs.get("status", "")
+    
+    if not quest_id or not status:
+        return {"error": "quest_id and status are required"}
+    if status not in ("active", "completed", "failed", "abandoned"):
+        return {"error": f"Invalid status '{status}'. Valid: active, completed, failed, abandoned"}
+    
+    quest = state.update_quest_status(quest_id, status)
+    if not quest:
+        return {"error": f"Quest {quest_id} not found"}
+    
+    print(f"[Director] Quest {quest_id} status → {status}: {quest.title}")
+    return {"updated": True, "quest_id": quest_id, "status": status, "title": quest.title}
+
+
+def _complete_quest_objective(state, **kwargs) -> Dict:
+    """Mark a quest objective as complete."""
+    quest_id = int(kwargs.get("quest_id", 0))
+    objective_index = int(kwargs.get("objective_index", 0))
+    
+    if not quest_id:
+        return {"error": "quest_id is required"}
+    
+    quest = state.update_quest_objective(quest_id, objective_index)
+    if not quest:
+        return {"error": f"Quest {quest_id} not found or objective index out of range"}
+    
+    print(f"[Director] Quest {quest_id} objective {objective_index} completed")
+    return {"completed": True, "quest_id": quest_id, "objective_index": objective_index}

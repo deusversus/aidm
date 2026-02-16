@@ -169,6 +169,7 @@ class SettingsStore:
             "combat", "progression", "scale_selector",
             "relationship_analyzer", "session_zero", "world_builder",
             "wiki_scout", "compactor", "scope", "pacing", "recap",
+            "production",
         }
         creative_tier_agents = {"key_animator"}  # Prose generation
         thinking_tier_agents = {"director", "research", "profile_merge"}  # Reasoning/planning
