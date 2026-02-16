@@ -105,10 +105,12 @@ async function startSessionZero() {
             if (resumed && resumed.messages) {
                 isSessionZero = resumed.phase !== 'gameplay';
 
-                // Restore conversation history (filter out auto-sent [BEGIN])
+                // Restore conversation history
+                // Filter legacy [BEGIN] messages from old sessions
                 display.innerHTML = '';
                 for (const msg of resumed.messages) {
                     if (msg.role === 'user' && msg.content?.trim() === '[BEGIN]') continue;
+                    if (msg.role === 'user' && msg.content?.trim() === '[opening scene — the story begins]') continue;
                     addNarrativeEntry(msg.content, msg.role === 'user');
                 }
 
@@ -124,59 +126,6 @@ async function startSessionZero() {
                 }
 
                 console.log('[Session] Resumed session:', savedSessionId);
-
-                // Auto-trigger opening scene on first gameplay resume
-                // If we just handed off from Session Zero, fire the first turn
-                // Guard: only fire if no [BEGIN] was already sent (prevents duplicates on refresh)
-                const alreadyBegan = resumed.messages.some(m =>
-                    m.role === 'user' && m.content && m.content.trim() === '[BEGIN]');
-                if (!isSessionZero && resumed.turn_number === 0 && !alreadyBegan) {
-                    console.log('[Handoff] First gameplay resume — auto-generating opening scene...');
-
-                    // Keep input disabled while generating opening scene
-                    const input = document.getElementById('player-input');
-                    const submitBtn = document.getElementById('submit-action');
-                    if (input) input.disabled = true;
-                    if (submitBtn) {
-                        submitBtn.disabled = true;
-                        const btnText = submitBtn.querySelector('.btn-text');
-                        const btnLoading = submitBtn.querySelector('.btn-loading');
-                        if (btnText) btnText.style.display = 'none';
-                        if (btnLoading) btnLoading.style.display = 'inline';
-                    }
-
-                    addNarrativeEntry('*The story begins...*', false);
-                    // Tag the placeholder so we can reliably remove it
-                    const placeholder = display.lastElementChild;
-                    if (placeholder) placeholder.id = 'opening-placeholder';
-
-                    try {
-                        const openingResult = await API.Game.processTurn('[BEGIN]');
-                        const openingText = openingResult.narrative || openingResult.response || '';
-                        if (openingText) {
-                            addNarrativeEntry(openingText, false, openingResult.portrait_map);
-                            updateDebugHUD(openingResult);
-                            await loadContext();
-                            await loadAllTrackers();
-                        }
-                    } catch (openErr) {
-                        console.error('[Handoff] Opening scene generation failed:', openErr);
-                        addNarrativeEntry(`⚠️ Opening scene generation failed: ${openErr.message}`, false);
-                    } finally {
-                        // Always remove the placeholder
-                        document.getElementById('opening-placeholder')?.remove();
-                        // Re-enable input after opening scene completes
-                        if (input) input.disabled = false;
-                        if (submitBtn) {
-                            submitBtn.disabled = false;
-                            const btnText = submitBtn.querySelector('.btn-text');
-                            const btnLoading = submitBtn.querySelector('.btn-loading');
-                            if (btnText) btnText.style.display = 'inline';
-                            if (btnLoading) btnLoading.style.display = 'none';
-                        }
-                        if (input) input.focus();
-                    }
-                }
 
                 return;
             }
@@ -289,8 +238,6 @@ async function handlePlayerAction() {
     addNarrativeEntry(playerText, true);
     input.value = '';
 
-    let handoffInProgress = false;
-
     try {
         let result;
 
@@ -340,28 +287,24 @@ async function handlePlayerAction() {
             if (result.phase === 'gameplay' || result.ready_for_gameplay) {
                 isSessionZero = false;
                 console.log('[Handoff] Transition confirmed! Phase:', result.phase, 'ready_for_gameplay:', result.ready_for_gameplay);
-                handoffInProgress = true;  // Prevent finally block from re-enabling input
 
-                // Add a visible transition indicator so user knows more is coming
-                const display = document.getElementById('narrative-display');
-                const transitionEl = document.createElement('div');
-                transitionEl.className = 'narrative-entry system-transition';
-                transitionEl.innerHTML = `
-                    <div class="transition-indicator">
-                        <div class="transition-spinner"></div>
-                        <span>Generating your opening scene — please wait…</span>
-                    </div>
-                `;
-                display.appendChild(transitionEl);
-                display.scrollTop = display.scrollHeight;
+                // Display the server-side stitched opening scene (no reload needed)
+                if (result.opening_scene) {
+                    addNarrativeEntry(result.opening_scene, false, result.opening_portrait_map);
+                    console.log('[Handoff] Opening scene displayed inline (' + result.opening_scene.length + ' chars)');
+                }
 
-                // Reload page to fully initialize gameplay mode
-                // This ensures all UI elements are properly set up
-                console.log('[Handoff] Transitioning to gameplay - reloading in 1.5s...');
-                setTimeout(() => {
-                    window.location.reload();
-                }, 1500);  // Longer delay to ensure backend has saved state
-                return;  // Don't continue processing
+                // Update context panel
+                const ctxArcHandoff = document.getElementById('ctx-arc');
+                if (ctxArcHandoff) ctxArcHandoff.textContent = 'Gameplay';
+
+                // Load gameplay UI state
+                try {
+                    await loadContext();
+                    await loadAllTrackers();
+                } catch (e) {
+                    console.warn('[Handoff] Tracker load failed (non-critical):', e);
+                }
             }
 
             // Update debug panel for Session Zero
