@@ -78,6 +78,28 @@ Your responses MUST be beautifully formatted. Create visual hierarchy and breath
 - **ALWAYS** end with a call-to-action question or decision prompt
 - **NEVER** write walls of unbroken text
 
+### 🎭 Character Panels (Portrait Annotations)
+
+When an NPC speaks, reacts, or appears dramatically, wrap their name in double curly braces: `{{NPC Name}}`.
+
+This triggers a portrait panel — like a manga artist choosing when to give a character a close-up shot. Use it for:
+- **NPC dialogue** — when a character speaks with narrative weight
+- **Dramatic reveals** — first appearances, shocking reactions
+- **Emotional beats** — betrayal, confession, determination
+
+Do NOT annotate every mention. Plain `**Name**` for passing references. `{{Name}}` for *panel-worthy* moments. Not every line of dialogue gets a portrait — just as not every manga speech bubble gets a character panel.
+
+**Example:**
+```
+{{Gojo}} leaned against the wall, his blindfold tilted just enough to reveal one eye.
+
+> *"You really think you can take on a Special Grade? ...Interesting."*
+
+**Yuji** glanced nervously at **Megumi**, who gave a barely perceptible nod.
+```
+
+In this example, only Gojo gets a portrait panel (his line carries dramatic weight). Yuji and Megumi are bold-only (they're present but not the focus).
+
 ---
 
 {{PROFILE_DNA_INJECTION}}

@@ -110,6 +110,7 @@ class TurnResponse(BaseModel):
     outcome: Dict[str, Any]
     latency_ms: int
     session_phase: Optional[str] = None  # Current session phase
+    portrait_map: Optional[Dict[str, str]] = None  # {"NPC Name": "/api/game/media/..."}
 
 
 class SessionZeroResponse(BaseModel):
@@ -1689,7 +1690,8 @@ async def process_turn(request: TurnRequest):
             intent=result.intent.model_dump(),
             outcome=result.outcome.model_dump() if result.outcome else {},
             latency_ms=result.latency_ms,
-            session_phase="gameplay"
+            session_phase="gameplay",
+            portrait_map=result.portrait_map,
         )
         
         # DEBUG: Log what we're actually returning
@@ -1924,6 +1926,9 @@ async def get_npcs():
     
     npcs = orchestrator.state.get_all_npcs()
     
+    # Sort by last_appeared DESC (recent interactions first)
+    npcs_sorted = sorted(npcs, key=lambda n: n.last_appeared or 0, reverse=True)
+    
     return NPCListResponse(
         npcs=[
             NPCInfo(
@@ -1936,7 +1941,7 @@ async def get_npcs():
                 last_appeared=npc.last_appeared,
                 portrait_url=npc.portrait_url,
             )
-            for npc in npcs
+            for npc in npcs_sorted
         ]
     )
 

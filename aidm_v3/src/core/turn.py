@@ -26,3 +26,4 @@ class TurnResult:
     latency_ms: int
     cost_usd: Optional[float] = None
     state_changes: Optional[Dict[str, Any]] = None
+    portrait_map: Optional[Dict[str, str]] = None  # {"NPC Name": "/api/game/media/..."}

@@ -308,7 +308,7 @@ async function handlePlayerAction() {
             const text = result.narrative || result.response || '';
             console.log('[Gameplay] Final text length:', text.length);
 
-            addNarrativeEntry(text, false);
+            addNarrativeEntry(text, false, result.portrait_map);
             updateDebugHUD(result);
             await loadContext();
             await loadAllTrackers();  // Update sidebar trackers
@@ -350,7 +350,7 @@ function updateDebugHUDSessionZero(result) {
 /**
  * Add a narrative entry to the display
  */
-function addNarrativeEntry(text, isPlayer) {
+function addNarrativeEntry(text, isPlayer, portraitMap) {
     const display = document.getElementById('narrative-display');
 
     // Remove welcome message if present
@@ -375,6 +375,23 @@ function addNarrativeEntry(text, isPlayer) {
         } catch (e) {
             console.error('[addNarrativeEntry] Markdown parse error:', e);
             entry.innerHTML = `<p>${text}</p>`;
+        }
+
+        // Inject portrait chips next to NPC names if portrait_map is provided
+        if (portraitMap && Object.keys(portraitMap).length > 0) {
+            const strongElements = entry.querySelectorAll('strong');
+            strongElements.forEach(el => {
+                const name = el.textContent.trim();
+                if (portraitMap[name]) {
+                    const chip = document.createElement('img');
+                    chip.className = 'npc-portrait-chip';
+                    chip.src = portraitMap[name];
+                    chip.alt = name;
+                    chip.title = name;
+                    chip.onerror = () => chip.remove();  // Remove if image fails to load
+                    el.parentNode.insertBefore(chip, el);
+                }
+            });
         }
     }
 
@@ -1120,10 +1137,13 @@ async function loadNPCs() {
             const role = npc.role || 'neutral';
             const affinityClass = npc.affinity >= 20 ? 'positive' : (npc.affinity <= -20 ? 'negative' : 'neutral');
             const affinitySign = npc.affinity >= 0 ? '+' : '';
+            const portraitHtml = npc.portrait_url
+                ? `<img class="npc-sidebar-portrait" src="${npc.portrait_url}" alt="${escapeHtml(npc.name)}" onerror="this.style.display='none'">`
+                : '<span class="npc-indicator ' + role + '"></span>';
 
             return `
                 <div class="npc-item">
-                    <span class="npc-indicator ${role}"></span>
+                    ${portraitHtml}
                     <span class="npc-name">${escapeHtml(npc.name)}</span>
                     <span class="npc-role">(${role})</span>
                     <span class="npc-affinity ${affinityClass}">${affinitySign}${npc.affinity}</span>
