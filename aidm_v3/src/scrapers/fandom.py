@@ -772,12 +772,101 @@ class FandomClient:
         except Exception:
             return False
     
+    # Words too common to use for sitename matching
+    _STOP_WORDS = {
+        'the', 'a', 'an', 'of', 'in', 'on', 'at', 'to', 'for', 'and', 'or',
+        'no', 'na', 'ni', 'wa', 'ga', 'wo', 'de', 'ka', 'so', 'my', 'i',
+        'is', 'it', 'as', 'was', 'can', 'wiki', 'fandom',
+    }
+    
+    async def check_wiki_relevance(
+        self, wiki_url: str, anime_title: str, alt_titles: list = None
+    ) -> bool:
+        """
+        Check if a wiki exists AND is relevant to the target anime.
+        
+        Uses a 3-signal approach:
+        1. Basic existence check (articles > 0)
+        2. Sitename word overlap with any title variant
+        3. MediaWiki search API probe — does the wiki contain pages about this anime?
+        
+        This prevents scraping unrelated wikis that happen to share a slug word
+        (e.g. "tensei.fandom.com" being an Indonesian RPF wiki, not 7th Prince).
+        """
+        loop = asyncio.get_event_loop()
+        all_titles = [anime_title] + (alt_titles or [])
+        
+        def _check() -> bool:
+            # 1. Basic existence
+            stats = self._get_site_stats(wiki_url)
+            if stats.get("articles", 0) == 0:
+                return False
+            
+            # 2. Get site general info for sitename
+            general_result = self._api_query(wiki_url, {
+                "action": "query",
+                "meta": "siteinfo",
+                "siprop": "general",
+            })
+            general = general_result.get("query", {}).get("general", {})
+            sitename = general.get("sitename", "").lower()
+            
+            # Extract meaningful words from sitename
+            site_words = set(re.sub(r'[^a-z0-9\s]', '', sitename).split())
+            site_words -= self._STOP_WORDS
+            
+            # Check each title variant for sitename word overlap
+            for t in all_titles:
+                title_words = set(re.sub(r'[^a-z0-9\s]', '', t.lower()).split())
+                title_words -= self._STOP_WORDS
+                overlap = title_words & site_words
+                if overlap:
+                    logger.info(
+                        f"[Fandom] Relevance PASS for {wiki_url}: "
+                        f"sitename '{sitename}' overlaps with title words {overlap}"
+                    )
+                    return True
+            
+            # 3. Search API probe — does the wiki have content about this anime?
+            for t in all_titles:
+                search_result = self._api_query(wiki_url, {
+                    "action": "query",
+                    "list": "search",
+                    "srsearch": t,
+                    "srlimit": "3",
+                })
+                total_hits = (
+                    search_result
+                    .get("query", {})
+                    .get("searchinfo", {})
+                    .get("totalhits", 0)
+                )
+                if total_hits > 0:
+                    logger.info(
+                        f"[Fandom] Relevance PASS for {wiki_url}: "
+                        f"search for '{t}' returned {total_hits} hits"
+                    )
+                    return True
+            
+            # No relevance signal found
+            logger.warning(
+                f"[Fandom] Relevance REJECTED {wiki_url}: "
+                f"sitename='{sitename}', no search hits for any title variant"
+            )
+            return False
+        
+        try:
+            return await loop.run_in_executor(None, _check)
+        except Exception as e:
+            logger.warning(f"[Fandom] Relevance check error for {wiki_url}: {e}")
+            return False
+    
     async def find_wiki_url(self, title: str, alt_titles: list = None) -> Optional[str]:
         """
         Try to find the Fandom wiki URL for an anime title.
         
         Generates multiple candidate URLs from the title (and alt_titles),
-        then checks each until one exists.
+        then validates each for both existence AND relevance before accepting.
         
         Args:
             title: Primary title to search for
@@ -808,11 +897,19 @@ class FandomClient:
                             seen_urls.add(url)
                             candidates.append(url)
         
-        # Try each candidate
-        for url in candidates:
-            if await self.check_wiki_exists(url):
-                print(f"[Fandom] Found wiki: {url}")
-                return url
+        logger.info(f"[Fandom] Trying {len(candidates)} candidate URLs for '{title}': {candidates}")
         
-        print(f"[Fandom] No wiki found after trying {len(candidates)} URLs for '{title}'")
-        return None  # No wiki found
+        # Try each candidate with relevance validation
+        rejected = []
+        for url in candidates:
+            if await self.check_wiki_relevance(url, title, alt_titles):
+                print(f"[Fandom] Found relevant wiki: {url}")
+                return url
+            else:
+                rejected.append(url)
+        
+        print(
+            f"[Fandom] No relevant wiki found after trying {len(candidates)} URLs for '{title}'"
+            f" (rejected: {rejected})"
+        )
+        return None  # No relevant wiki found

@@ -628,6 +628,16 @@ async function loadSettings() {
             extendedThinkingToggle.checked = settings.extended_thinking || false;
         }
 
+        // Media generation settings
+        const mediaToggle = document.getElementById('media-enabled-toggle');
+        if (mediaToggle) {
+            mediaToggle.checked = settings.media_enabled || false;
+        }
+        const mediaBudget = document.getElementById('media-budget');
+        if (mediaBudget) {
+            mediaBudget.value = settings.media_budget_per_session_usd || 2.00;
+        }
+
         // Load API keys
         await loadApiKeys();
 
@@ -846,10 +856,15 @@ async function applyBasicSettings() {
             agent_models[agent] = { provider: thinkingProvider, model: thinkingModel };
         });
 
+        const mediaToggle = document.getElementById('media-enabled-toggle');
+        const mediaBudget = document.getElementById('media-budget');
+
         const settings = {
             agent_models,
             debug_mode: true,
             extended_thinking: extendedThinkingToggle?.checked || false,
+            media_enabled: mediaToggle?.checked || false,
+            media_budget_per_session_usd: parseFloat(mediaBudget?.value) || 2.00,
         };
 
         await API.Settings.update(settings);
@@ -890,6 +905,9 @@ async function saveAdvancedSettings() {
 
         const extendedThinkingToggle = document.getElementById('extended-thinking-toggle');
 
+        const mediaToggle = document.getElementById('media-enabled-toggle');
+        const mediaBudget = document.getElementById('media-budget');
+
         const settings = {
             agent_models: {
                 // Base defaults
@@ -928,6 +946,8 @@ async function saveAdvancedSettings() {
             },
             debug_mode: true,
             extended_thinking: extendedThinkingToggle?.checked || false,
+            media_enabled: mediaToggle?.checked || false,
+            media_budget_per_session_usd: parseFloat(mediaBudget?.value) || 2.00,
         };
 
         await API.Settings.update(settings);
