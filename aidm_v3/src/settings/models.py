@@ -222,6 +222,20 @@ class UserSettings(BaseModel):
         description="Enable deeper reasoning for complex agents (increases latency and token usage)"
     )
     
+    # Media generation
+    media_provider: Optional[str] = Field(
+        default="google",
+        description="Provider for image/video generation (currently only 'google')"
+    )
+    media_enabled: bool = Field(
+        default=False,
+        description="Enable AI-generated character art and visuals"
+    )
+    media_budget_per_session_usd: float = Field(
+        default=2.00,
+        description="Maximum media generation spend per session in USD"
+    )
+    
     class Config:
         """Pydantic config."""
         json_schema_extra = {

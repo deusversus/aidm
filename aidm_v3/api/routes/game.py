@@ -1,8 +1,10 @@
 """Game API routes."""
 
 from fastapi import APIRouter, HTTPException, Query
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from typing import Optional, Dict, Any, List
+from pathlib import Path
 import uuid
 
 from src.core.orchestrator import Orchestrator
@@ -157,6 +159,8 @@ class CharacterStatusResponse(BaseModel):
     power_tier: str
     abilities: list
     character_class: Optional[str] = None
+    portrait_url: Optional[str] = None
+    model_sheet_url: Optional[str] = None
 
 
 class NPCInfo(BaseModel):
@@ -168,6 +172,7 @@ class NPCInfo(BaseModel):
     disposition: int  # calculated disposition
     faction: Optional[str]
     last_appeared: Optional[int]  # turn number
+    portrait_url: Optional[str] = None
 
 
 class NPCListResponse(BaseModel):
@@ -1903,7 +1908,9 @@ async def get_character_status():
         stats=char.stats or {},
         power_tier=char.power_tier or "T10",
         abilities=char.abilities or [],
-        character_class=char.character_class
+        character_class=char.character_class,
+        portrait_url=char.portrait_url,
+        model_sheet_url=char.model_sheet_url,
     )
 
 
@@ -1926,7 +1933,8 @@ async def get_npcs():
                 affinity=npc.affinity or 0,
                 disposition=npc.disposition or 0,
                 faction=npc.faction,
-                last_appeared=npc.last_appeared
+                last_appeared=npc.last_appeared,
+                portrait_url=npc.portrait_url,
             )
             for npc in npcs
         ]
@@ -2301,3 +2309,40 @@ async def get_locations():
         current_location=current_location_name,
         total_locations=len(locations),
     )
+
+
+# === Phase 4: Media Serving Endpoint ===
+
+@router.get("/media/{file_path:path}")
+async def serve_media(file_path: str):
+    """Serve generated media files (model sheets, portraits, cutscenes).
+    
+    Files are stored under data/media/ with the structure:
+        {campaign_id}/models/{name}_model.png
+        {campaign_id}/portraits/{name}_portrait.png
+        {campaign_id}/cutscenes/{name}.mp4
+    """
+    from src.media.generator import MEDIA_BASE_DIR
+    
+    # Resolve and validate path (prevent directory traversal)
+    full_path = (MEDIA_BASE_DIR / file_path).resolve()
+    if not str(full_path).startswith(str(MEDIA_BASE_DIR.resolve())):
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    if not full_path.exists() or not full_path.is_file():
+        raise HTTPException(status_code=404, detail="Media not found")
+    
+    # Determine MIME type
+    suffix = full_path.suffix.lower()
+    mime_types = {
+        ".png": "image/png",
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".webp": "image/webp",
+        ".mp4": "video/mp4",
+        ".webm": "video/webm",
+    }
+    media_type = mime_types.get(suffix, "application/octet-stream")
+    
+    return FileResponse(full_path, media_type=media_type)
+
