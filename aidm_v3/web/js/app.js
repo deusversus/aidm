@@ -336,14 +336,11 @@ async function handlePlayerAction() {
     } catch (error) {
         addNarrativeEntry(`Error: ${error.message}`, false);
     } finally {
-        // Don't re-enable input during handoff — page will reload momentarily
-        if (!handoffInProgress) {
-            input.disabled = false;
-            submitBtn.disabled = false;
-            submitBtn.querySelector('.btn-text').style.display = 'inline';
-            submitBtn.querySelector('.btn-loading').style.display = 'none';
-            input.focus();
-        }
+        input.disabled = false;
+        submitBtn.disabled = false;
+        submitBtn.querySelector('.btn-text').style.display = 'inline';
+        submitBtn.querySelector('.btn-loading').style.display = 'none';
+        input.focus();
     }
 }
 
