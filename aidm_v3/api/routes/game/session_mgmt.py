@@ -1,0 +1,459 @@
+"""Session management routes: start, resume, delete, latest, orchestrator cache."""
+
+from fastapi import APIRouter, HTTPException
+from typing import Optional, Dict, Any
+import uuid
+import logging
+
+from src.core.orchestrator import Orchestrator
+from src.core.session import (
+    get_session_manager, 
+    Session, 
+    SessionPhase,
+    SessionManager,
+    get_missing_requirements,
+    get_current_phase_for_draft,
+    is_ready_for_gameplay,
+)
+from src.agents.session_zero import SessionZeroAgent
+from src.settings import get_settings_store
+from src.db.session import init_db
+from src.db.session_store import get_session_store
+
+from .models import (
+    StartSessionRequest,
+    StartSessionResponse,
+    ResumeSessionResponse,
+)
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter()
+
+# Cache orchestrator instance
+_orchestrator: Optional[Orchestrator] = None
+_session_zero_agent: Optional[SessionZeroAgent] = None
+
+
+def get_orchestrator() -> Orchestrator:
+    """Get or create the orchestrator instance."""
+    global _orchestrator
+    
+    if _orchestrator is None:
+        # Initialize database
+        init_db()
+        
+        # Get active profile from settings
+        # Use reload() to force fresh read from disk - crucial after Session Zero handoff
+        store = get_settings_store()
+        settings = store.reload()
+        
+        profile_id = settings.active_profile_id
+        
+        # DEBUG: Log what we loaded
+        logger.info(f"[get_orchestrator] Loaded settings: active_profile_id='{profile_id}', active_campaign_id='{settings.active_campaign_id}'")
+        
+        # Handle missing profile - requires Session Zero to set it
+        if not profile_id:  # Empty string means not configured
+            logger.error(f"[get_orchestrator] ERROR: No profile set! Settings file may not be synced.")
+            raise HTTPException(
+                status_code=400,
+                detail="No active profile set. Please complete Session Zero first."
+            )
+        
+        # Orchestrator now resolves profile_id -> campaign_id internally
+        # Pass session_id for memory collection isolation
+        session_id = settings.active_session_id or profile_id  # Fallback to profile_id for backward compatibility
+        _orchestrator = Orchestrator(profile_id=profile_id, session_id=session_id)
+    
+    return _orchestrator
+
+
+def reset_orchestrator():
+    """Reset the orchestrator singleton.
+    
+    Call this after Session Zero handoff to ensure the next
+    get_orchestrator() call creates a fresh instance with
+    the newly set active_profile_id.
+    """
+    global _orchestrator
+    if _orchestrator:
+        try:
+            _orchestrator.close()
+        except Exception as e:
+            logger.error(f"[reset_orchestrator] Warning: close() failed: {e}")
+    _orchestrator = None
+    logger.info("[reset_orchestrator] Orchestrator cleared - next call will create fresh instance")
+
+
+
+def get_session_zero_agent() -> SessionZeroAgent:
+    """Get or create the Session Zero agent."""
+    global _session_zero_agent
+    if _session_zero_agent is None:
+        _session_zero_agent = SessionZeroAgent()
+    return _session_zero_agent
+
+
+def reset_session_zero_agent():
+    """Reset the Session Zero agent (after settings change)."""
+    global _session_zero_agent
+    _session_zero_agent = None
+
+
+@router.post("/start-session", response_model=StartSessionResponse)
+async def start_session(request: StartSessionRequest = None):
+    """Start a new Session Zero.
+    
+    This begins the character creation process.
+    Returns the opening message from the AI Dungeon Master.
+    """
+    manager = get_session_manager()
+    store = get_session_store()
+    
+    # Generate or use provided session ID
+    session_id = (request.session_id if request else None) or str(uuid.uuid4())
+    
+    # FIX #4: Validate settings on new session - clear stale data
+    # If there's a stale session_id that doesn't match, reset settings
+    settings_store = get_settings_store()
+    current_settings = settings_store.load()
+    if current_settings.active_session_id and current_settings.active_session_id != session_id:
+        logger.info(f"Clearing stale settings: session_id was '{current_settings.active_session_id}'")
+        current_settings.active_profile_id = ""
+        current_settings.active_session_id = ""
+        current_settings.active_campaign_id = None
+        settings_store.save(current_settings)
+    
+    # Create new session
+    session = manager.create_session(session_id)
+    
+    # Get the Session Zero agent
+    agent = get_session_zero_agent()
+    
+    # Generate opening message
+    try:
+        opening = await agent.get_opening_message(session)
+        
+        # Store the opening in message history
+        session.add_message("assistant", opening)
+        
+        # Save to persistent store
+        store.save(session)
+        
+        return StartSessionResponse(
+            session_id=session_id,
+            phase=session.phase.value,
+            opening_message=opening
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to start session: {str(e)}")
+
+
+@router.get("/session/{session_id}/resume", response_model=ResumeSessionResponse)
+async def resume_session(session_id: str):
+    """Resume an existing session.
+    
+    Loads the session from persistent storage and returns its state.
+    """
+    store = get_session_store()
+    manager = get_session_manager()
+    
+    # Try to load from persistent store
+    session = store.load(session_id)
+    
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    # Put it back into the session manager
+    manager._sessions[session_id] = session
+
+    # Get character draft if exists
+    draft_dict = None
+    if session.character_draft:
+        draft_dict = session.character_draft.to_dict()
+
+    # Generate "Previously On..." recap for gameplay sessions with history
+    recap_text = None
+    if session.phase.value == "GAMEPLAY" and session.messages and len(session.messages) > 2:
+        try:
+            from src.agents.recap_agent import RecapAgent
+            from src.db.state_manager import StateManager
+
+            recap_agent = RecapAgent()
+            state = StateManager(campaign_id=session.campaign_id)
+
+            # Gather context for recap
+            bible = state.get_campaign_bible()
+            arc_history = (bible.planning_data or {}).get("arc_history", []) if bible else []
+            world = state.get_world_state()
+            situation = world.situation if world else "Unknown"
+            arc_phase = world.arc_phase if world else "unknown"
+            character = state.get_character()
+            char_name = character.name if character else "Protagonist"
+
+            # Get top narrative beat memories (if memory system available)
+            narrative_beats = []
+            try:
+                from src.context.memory import MemoryStore
+                memory = MemoryStore(campaign_id=session.campaign_id)
+                beat_results = memory.search("recent emotional narrative moments", top_k=5, category="narrative_beat")
+                narrative_beats = [r["content"] for r in beat_results] if beat_results else []
+            except Exception:
+                pass  # Memory not available, proceed without beats
+
+            director_notes = (bible.planning_data or {}).get("director_notes", "") if bible else ""
+
+            recap_output = await recap_agent.generate_recap(
+                arc_history=arc_history,
+                narrative_beats=narrative_beats,
+                director_notes=director_notes,
+                current_situation=situation,
+                character_name=char_name,
+                arc_phase=arc_phase,
+            )
+            if recap_output:
+                recap_text = recap_output.recap_text
+                logger.info(f"Generated recap: {recap_text[:100]}...")
+        except Exception as e:
+            logger.error(f"Recap generation failed (non-fatal): {e}")
+
+    # Get current turn count from DB for gameplay detection
+    current_turn = 0
+    if session.phase.value == "GAMEPLAY" and session.campaign_id:
+        try:
+            from src.db.models import Turn, get_db
+            db = next(get_db())
+            last_turn = db.query(Turn).filter(
+                Turn.campaign_id == session.campaign_id
+            ).order_by(Turn.turn_number.desc()).first()
+            current_turn = last_turn.turn_number if last_turn else 0
+            db.close()
+        except Exception:
+            pass
+    
+    return ResumeSessionResponse(
+        session_id=session_id,
+        phase=session.phase.value,
+        messages=session.messages,
+        character_draft=draft_dict,
+        recap=recap_text,
+        turn_number=current_turn
+    )
+
+
+@router.get("/session/latest")
+async def get_latest_session():
+    """Get the most recently active session.
+    
+    Used for frontend recovery after server restart.
+    If the current session_id returns 404, frontend can use this
+    to recover to the last active session.
+    """
+    store = get_session_store()
+    session_id = store.get_latest_session_id()
+    
+    if not session_id:
+        raise HTTPException(status_code=404, detail="No sessions found")
+    
+    # Load and return session info
+    session = store.load(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session data corrupted")
+    
+    return {
+        "session_id": session_id,
+        "phase": session.phase.value,
+        "is_session_zero": session.is_session_zero(),
+        "profile": session.character_draft.narrative_profile if session.character_draft else None
+    }
+
+@router.delete("/session/{session_id}")
+async def delete_session(session_id: str):
+    """Delete a session (for reset).
+    
+    Removes the session from both memory and persistent storage.
+    Also cleans up any custom profile data for this session.
+    """
+    store = get_session_store()
+    manager = get_session_manager()
+    
+    # Remove from memory
+    if session_id in manager._sessions:
+        del manager._sessions[session_id]
+    
+    # Remove from persistent store
+    deleted = store.delete(session_id)
+    
+    # Clean up custom profile (if any)
+    from src.context.custom_profile_library import (
+        get_custom_profile_library, 
+        delete_custom_profile
+    )
+    custom_lib = get_custom_profile_library()
+    lore_deleted = custom_lib.delete_session_lore(session_id)
+    folder_deleted = delete_custom_profile(session_id)
+    
+    # Clear campaign memory (ChromaDB collection)
+    # Now uses session_id for proper isolation
+    memory_deleted = False
+    try:
+        import chromadb
+        from src.settings import get_settings_store
+        settings_store = get_settings_store()
+        settings = settings_store.load()
+        
+        # Use active_session_id for session-based memory isolation
+        # Fallback to active_profile_id for backward compatibility
+        session_collection_id = settings.active_session_id or settings.active_profile_id
+        
+        if session_collection_id:
+            client = chromadb.PersistentClient(path="./data/chroma")
+            collection_name = f"campaign_{session_collection_id}"
+            
+            # Check if collection exists before deleting
+            existing = [c.name for c in client.list_collections()]
+            if collection_name in existing:
+                client.delete_collection(collection_name)
+                memory_deleted = True
+                logger.info(f"Deleted memory collection: {collection_name}")
+    except Exception as e:
+        logger.error(f"Memory cleanup error: {e}")
+    
+    return {
+        "deleted": deleted, 
+        "session_id": session_id,
+        "custom_lore_deleted": lore_deleted,
+        "custom_folder_deleted": folder_deleted,
+        "memory_deleted": memory_deleted
+    }
+
+
+def _build_session_zero_summary(session, draft) -> str:
+    """Build a summary of Session Zero for the Director Startup Briefing.
+    
+    Extracts character identity, player preferences, and key conversation
+    highlights from the Session Zero session and character draft.
+    """
+    parts = []
+    
+    # Character identity
+    parts.append("### Character")
+    if draft.name:
+        parts.append(f"- Name: {draft.name}")
+    if draft.concept:
+        parts.append(f"- Concept: {draft.concept}")
+    if draft.backstory:
+        backstory = draft.backstory[:500] if len(str(draft.backstory)) > 500 else draft.backstory
+        parts.append(f"- Backstory: {backstory}")
+    if draft.personality_traits:
+        parts.append(f"- Personality: {', '.join(draft.personality_traits)}")
+    if draft.values:
+        parts.append(f"- Values: {', '.join(draft.values)}")
+    if draft.fears:
+        parts.append(f"- Fears: {', '.join(draft.fears)}")
+    if draft.quirks:
+        parts.append(f"- Quirks: {', '.join(draft.quirks)}")
+    if draft.goals:
+        parts.append(f"- Goals: {draft.goals}")
+    
+    # World context
+    parts.append("\n### World Context")
+    if draft.media_reference:
+        parts.append(f"- IP: {draft.media_reference}")
+    if draft.starting_location:
+        parts.append(f"- Starting Location: {draft.starting_location}")
+    
+    # Canonicality
+    timeline = getattr(draft, 'timeline_mode', None)
+    canon_cast = getattr(draft, 'canon_cast_mode', None)
+    event_fidelity = getattr(draft, 'event_fidelity', None)
+    if any([timeline, canon_cast, event_fidelity]):
+        parts.append("\n### Canonicality")
+        if timeline:
+            parts.append(f"- Timeline: {timeline}")
+        if canon_cast:
+            parts.append(f"- Canon Cast: {canon_cast}")
+        if event_fidelity:
+            parts.append(f"- Event Fidelity: {event_fidelity}")
+    
+    # OP Mode
+    if draft.op_protagonist_enabled:
+        parts.append("\n### OP Mode: ACTIVE")
+        if draft.op_preset:
+            parts.append(f"- Configuration: {draft.op_preset}")
+        if draft.op_tension_source:
+            parts.append(f"- Tension Source: {draft.op_tension_source}")
+        if draft.op_power_expression:
+            parts.append(f"- Power Expression: {draft.op_power_expression}")
+        if draft.op_narrative_focus:
+            parts.append(f"- Narrative Focus: {draft.op_narrative_focus}")
+    
+    # Key conversation highlights (last few exchanges)
+    if session.messages:
+        parts.append("\n### Key Conversation Highlights")
+        # Take last 6 messages to capture the character confirmation exchange
+        recent = session.messages[-6:]
+        for msg in recent:
+            role = msg.get('role', 'unknown').upper()
+            content = msg.get('content', '')
+            if len(content) > 300:
+                content = content[:300] + "..."
+            parts.append(f"[{role}]: {content}")
+    
+    return "\n".join(parts)
+
+
+async def _generate_handoff_character_media(
+    campaign_id: int,
+    character_name: str,
+    appearance: dict,
+    visual_tags: list,
+) -> None:
+    """Fire-and-forget: generate player character model sheet + portrait during handoff.
+    
+    Non-blocking — runs as background task so it doesn't delay the handoff response.
+    """
+    try:
+        from src.media.generator import MediaGenerator
+        from src.db.session import create_session
+        from src.db.models import Character
+        from src.settings import get_settings_store
+        
+        settings = get_settings_store().load()
+        if not settings.media_enabled:
+            logger.warning(f"[Handoff→Media] Media disabled, skipping character media gen")
+            return
+        
+        style_context = settings.active_profile_id or "anime"
+        
+        gen = MediaGenerator()
+        result = await gen.generate_full_character_media(
+            visual_tags=visual_tags or [],
+            appearance=appearance or {},
+            style_context=style_context,
+            campaign_id=campaign_id,
+            entity_name=character_name,
+        )
+        
+        # Update Character record with generated URLs
+        if result.get("portrait") or result.get("model_sheet"):
+            db = create_session()
+            char = (
+                db.query(Character)
+                .filter(Character.campaign_id == campaign_id)
+                .first()
+            )
+            if char:
+                if result.get("portrait"):
+                    # Portrait is under portraits/ subdir, e.g. data/media/1/portraits/name_portrait.png
+                    char.portrait_url = f"/api/game/media/{campaign_id}/portraits/{result['portrait'].name}"
+                    logger.info(f"[Handoff→Media] Player portrait saved: {char.portrait_url}")
+                if result.get("model_sheet"):
+                    char.model_sheet_url = f"/api/game/media/{campaign_id}/models/{result['model_sheet'].name}"
+                    logger.info(f"[Handoff→Media] Player model sheet saved: {char.model_sheet_url}")
+                db.commit()
+            db.close()
+            
+    except Exception as e:
+        logger.error(f"[Handoff→Media] Character media gen failed (non-critical): {e}")
