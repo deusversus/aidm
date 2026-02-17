@@ -429,8 +429,8 @@ def _trigger_cutscene(
                 logger.error(f"Cutscene generation error: {e}")
 
         # Fire-and-forget: schedule as background task
-        loop = asyncio.get_running_loop()
-        loop.create_task(_generate())
+        from ..utils.tasks import safe_create_task
+        safe_create_task(_generate(), name="cutscene_gen")
         return f"Cutscene ({cutscene_type}) generation started. It will appear when ready (~30-60s)."
 
     except Exception as e:
@@ -521,8 +521,8 @@ def _generate_npc_portrait(
             except Exception as e:
                 logger.error(f"NPC portrait generation error for \"{npc_name}\": {e}")
 
-        loop = asyncio.get_running_loop()
-        loop.create_task(_generate())
+        from ..utils.tasks import safe_create_task
+        safe_create_task(_generate(), name="npc_portrait_gen")
         return f"Portrait generation started for \"{npc_name}\". It will appear on the next turn."
 
     except Exception as e:
@@ -582,8 +582,8 @@ def _generate_location_visual(
             except Exception as e:
                 logger.error(f"Location visual error for \"{location_name}\": {e}")
 
-        loop = asyncio.get_running_loop()
-        loop.create_task(_generate())
+        from ..utils.tasks import safe_create_task
+        safe_create_task(_generate(), name="location_visual_gen")
         return f"Location visual generation started for \"{location_name}\"."
 
     except Exception as e:

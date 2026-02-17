@@ -23,6 +23,7 @@ from src.settings import get_settings_store
 from src.db.session import init_db
 from src.db.session_store import get_session_store
 from src.db.models import Character, NPC, Faction, WorldState
+from src.utils.tasks import safe_create_task
 
 import logging
 
@@ -1046,7 +1047,7 @@ I found several entries in the **{media_ref}** franchise:
                                         await progress_tracker.complete() # Close stream on error
                                 
                                 # Start background task
-                                asyncio.create_task(run_hybrid_preload())
+                                safe_create_task(run_hybrid_preload(), name="hybrid_preload")
                                 logger.info(f"Started hybrid preload (task_id: {progress_tracker.task_id})")
                                 
                             except Exception as preload_error:
@@ -1076,13 +1077,13 @@ I found several entries in the **{media_ref}** franchise:
                                 power_choice = result.detected_info.get("power_system_choice", "coexist")
                                 
                                 # Run without tracker since it will complete instantly
-                                asyncio.create_task(research_hybrid_profile_cached(
+                                safe_create_task(research_hybrid_profile_cached(
                                     session, 
                                     media_ref, 
                                     secondary_ref,
                                     user_preferences={"power_system": power_choice},
                                     progress_tracker=None  # No tracker for instant operations
-                                ))
+                                ), name="hybrid_profile_cached")
                                 
                                 result.detected_info["research_status"] = "fast_merge"
                                 result.detected_info["profile_type"] = "hybrid"
@@ -1123,7 +1124,7 @@ I found several entries in the **{media_ref}** franchise:
                                         await progress_tracker.complete()
                                 
                                 # Start research in background - don't await!
-                                asyncio.create_task(run_hybrid_research_background())
+                                safe_create_task(run_hybrid_research_background(), name="hybrid_research_bg")
                                 logger.info(f"Started cached hybrid research (task_id: {progress_tracker.task_id})")
                                 
                             except Exception as hybrid_error:
@@ -1167,11 +1168,11 @@ I found several entries in the **{media_ref}** franchise:
                             
                             # EMIT IMMEDIATE START to verify connection
                             import asyncio
-                            asyncio.create_task(progress_tracker.emit(
+                            safe_create_task(progress_tracker.emit(
                                 ProgressPhase.INITIALIZING, 
                                 f"Initializing research for {media_ref}...", 
                                 1
-                            ))
+                            ), name="progress_emit_init")
                             result.detected_info["research_task_id"] = progress_tracker.task_id
                             result.detected_info["research_status"] = "in_progress"
                             result.detected_info["profile_type"] = "canonical"
@@ -1211,7 +1212,7 @@ I found several entries in the **{media_ref}** franchise:
                                     await progress_tracker.complete()
                             
                             # Start research in background - don't await!
-                            asyncio.create_task(run_research_background())
+                            safe_create_task(run_research_background(), name="research_bg")
                             logger.info(f"Started background research for '{media_ref}' (task_id: {progress_tracker.task_id})")
                             
                         except Exception as research_error:
@@ -1359,13 +1360,14 @@ I found several entries in the **{media_ref}** franchise:
                 if draft.appearance or draft.visual_tags:
                     try:
                         import asyncio
-                        asyncio.create_task(
+                        safe_create_task(
                             _generate_handoff_character_media(
                                 campaign_id=orchestrator.state.campaign_id,
                                 character_name=draft.name or "protagonist",
                                 appearance=draft.appearance,
                                 visual_tags=draft.visual_tags,
-                            )
+                            ),
+                            name="handoff_character_media",
                         )
                         logger.info(f"Queued player character media generation")
                     except Exception as media_err:

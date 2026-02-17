@@ -33,7 +33,8 @@ from ..agents.recap_agent import RecapAgent
 # Override Handler (META/OVERRIDE commands)
 from ..agents.override_handler import OverrideHandler
 from ..db.session import create_session
-from ..enums import NarrativeWeight
+from ..enums import NarrativeWeight, ArcPhase, IntentType
+from ..utils.tasks import safe_create_task
 
 
 import logging
@@ -1080,7 +1081,7 @@ class Orchestrator:
         # FIRE-AND-FORGET: All post-narrative processing runs in background
         # The user gets the narrative immediately while bookkeeping continues
         # =====================================================================
-        asyncio.create_task(
+        safe_create_task(
             self._post_narrative_processing(
                 narrative=narrative,
                 player_input=player_input,
@@ -1091,7 +1092,8 @@ class Orchestrator:
                 use_sakuga=use_sakuga,
                 compaction_text=compaction_text,
                 latency_ms=latency
-            )
+            ),
+            name="post_narrative_processing",
         )
         # =====================================================================
         # PORTRAIT RESOLUTION: Replace {{Name}} markers with bold + portrait map
