@@ -168,11 +168,30 @@ class RuleLibrary:
         if category:
             where = {"category": category}
         
-        results = self.collection.query(
-            query_texts=[query],
-            n_results=limit,
-            where=where
-        )
+        try:
+            results = self.collection.query(
+                query_texts=[query],
+                n_results=limit,
+                where=where
+            )
+        except Exception as e:
+            if "hnsw" in str(e).lower() or "Nothing found on disk" in str(e):
+                # HNSW index corrupted (e.g. server reload mid-write) — rebuild
+                logger.warning(f"HNSW index corrupted, rebuilding rule_library_v2: {e}")
+                self.client.delete_collection("rule_library_v2")
+                self.collection = self.client.get_or_create_collection(
+                    name="rule_library_v2",
+                    metadata={"hnsw:space": "cosine"}
+                )
+                self.initialize()
+                # Retry the query
+                results = self.collection.query(
+                    query_texts=[query],
+                    n_results=limit,
+                    where=where
+                )
+            else:
+                raise
         
         chunks = []
         if results["ids"]:

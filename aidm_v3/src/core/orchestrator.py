@@ -1620,7 +1620,8 @@ class Orchestrator:
             for npc in campaign_npcs:
                 # Only check NPCs who appeared this turn (scene_count just incremented)
                 if npc.last_appeared == turn_number:
-                    evolution = self.state.evolve_npc_intelligence(npc.id)
+                    interaction_count = self.state.get_npc_interaction_count(npc.id)
+                    evolution = self.state.evolve_npc_intelligence(npc.id, interaction_count)
                     if evolution:
                         # Only store narrative beats for major transitions
                         if evolution["new_stage"] in ("anticipatory", "autonomous"):

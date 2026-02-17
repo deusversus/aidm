@@ -333,4 +333,5 @@ window.API = {
     Game: GameAPI,
     checkHealth,
     getProviders,
+    apiRequest,
 };

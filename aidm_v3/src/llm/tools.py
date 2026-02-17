@@ -150,14 +150,24 @@ class ToolRegistry:
         try:
             # Filter arguments to only those the handler accepts
             sig = inspect.signature(tool.handler)
-            valid_args = {}
-            for param_name, param in sig.parameters.items():
-                if param_name in arguments:
-                    valid_args[param_name] = arguments[param_name]
-                elif param.default is not inspect.Parameter.empty:
-                    pass  # Use the function's default
-                elif param_name in [p.name for p in tool.parameters if not p.required]:
-                    pass  # Optional tool param, not provided
+            has_var_keyword = any(
+                p.kind == inspect.Parameter.VAR_KEYWORD
+                for p in sig.parameters.values()
+            )
+
+            if has_var_keyword:
+                # Handler accepts **kwargs (e.g. lambda **kw: _func(state, **kw))
+                # Pass ALL LLM-provided arguments through
+                valid_args = dict(arguments)
+            else:
+                valid_args = {}
+                for param_name, param in sig.parameters.items():
+                    if param_name in arguments:
+                        valid_args[param_name] = arguments[param_name]
+                    elif param.default is not inspect.Parameter.empty:
+                        pass  # Use the function's default
+                    elif param_name in [p.name for p in tool.parameters if not p.required]:
+                        pass  # Optional tool param, not provided
             
             output = tool.handler(**valid_args)
             result = ToolResult(

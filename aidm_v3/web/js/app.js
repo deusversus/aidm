@@ -103,7 +103,7 @@ async function startSessionZero() {
             const resumed = await API.Game.resumeSession(savedSessionId);
 
             if (resumed && resumed.messages) {
-                isSessionZero = resumed.phase !== 'gameplay';
+                isSessionZero = (resumed.phase || '').toLowerCase() !== 'gameplay';
 
                 // Restore conversation history
                 // Filter legacy [BEGIN] messages from old sessions
@@ -129,12 +129,10 @@ async function startSessionZero() {
 
                 // Load sidebar data for gameplay sessions
                 if (!isSessionZero) {
-                    try {
-                        await loadContext();
-                        await loadAllTrackers();
-                    } catch (e) {
-                        console.warn('[Resume] Sidebar load failed (non-critical):', e);
-                    }
+                    console.log('[DEBUG] Resume: isSessionZero is false, calling loadAllTrackers');
+                    // Run independently — loadContext failure must not block sidebar
+                    loadContext().catch(e => console.warn('[Resume] Context load failed:', e));
+                    loadAllTrackers().catch(e => console.warn('[Resume] Tracker load failed:', e));
                 }
 
                 return;
@@ -294,7 +292,7 @@ async function handlePlayerAction() {
 
             // Check if we've transitioned to gameplay
             console.log('[Handoff] Checking transition - phase:', result.phase, 'ready_for_gameplay:', result.ready_for_gameplay);
-            if (result.phase === 'gameplay' || result.ready_for_gameplay) {
+            if ((result.phase || '').toLowerCase() === 'gameplay' || result.ready_for_gameplay) {
                 isSessionZero = false;
                 console.log('[Handoff] Transition confirmed! Phase:', result.phase, 'ready_for_gameplay:', result.ready_for_gameplay);
 
@@ -334,8 +332,9 @@ async function handlePlayerAction() {
 
             addNarrativeEntry(text, false, result.portrait_map);
             updateDebugHUD(result);
-            await loadContext();
-            await loadAllTrackers();  // Update sidebar trackers
+            // Run independently — loadContext failure must not block sidebar
+            loadContext().catch(e => console.warn('[Turn] Context load failed:', e));
+            loadAllTrackers().catch(e => console.warn('[Turn] Tracker load failed:', e));
 
             // Start media polling if turn_number + campaign_id provided
             if (result.turn_number != null && result.campaign_id != null) {
@@ -1166,8 +1165,10 @@ async function loadCharacterStatus() {
  * Load NPCs from API
  */
 async function loadNPCs() {
+    console.log('[DEBUG] loadNPCs() called');
     try {
         const data = await API.apiRequest('/game/npcs');
+        console.log('[DEBUG] loadNPCs response:', data);
         const container = document.getElementById('npc-list');
 
         if (!data || !data.npcs || data.npcs.length === 0) {
@@ -1253,17 +1254,27 @@ async function loadQuests() {
 }
 
 /**
+ * Retry wrapper — retries once after a delay on failure
+ */
+async function withRetry(fn, delayMs = 2000) {
+    try {
+        return await fn();
+    } catch (e) {
+        await new Promise(r => setTimeout(r, delayMs));
+        return await fn();
+    }
+}
+
+/**
  * Load all sidebar trackers
  */
 async function loadAllTrackers() {
-    // Only load if we're in gameplay mode
-    if (isSessionZero) return;
-
+    console.log('[DEBUG] loadAllTrackers() called, isSessionZero =', isSessionZero);
     await Promise.all([
-        loadCharacterStatus(),
-        loadNPCs(),
-        loadFactions(),
-        loadQuests()
+        withRetry(loadCharacterStatus),
+        withRetry(loadNPCs),
+        withRetry(loadFactions),
+        withRetry(loadQuests)
     ]);
 }
 

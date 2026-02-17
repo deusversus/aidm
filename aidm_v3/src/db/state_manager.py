@@ -1487,7 +1487,8 @@ class StateManager:
         npc.disposition = self.get_npc_disposition(npc.id)
         
         # Evolve intelligence stage based on interaction count
-        self.evolve_npc_intelligence(npc)
+        interaction_count = self.get_npc_interaction_count(npc.id)
+        self.evolve_npc_intelligence(npc.id, interaction_count)
         
         self._maybe_commit()
         
