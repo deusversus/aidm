@@ -127,6 +127,16 @@ async function startSessionZero() {
 
                 console.log('[Session] Resumed session:', savedSessionId);
 
+                // Load sidebar data for gameplay sessions
+                if (!isSessionZero) {
+                    try {
+                        await loadContext();
+                        await loadAllTrackers();
+                    } catch (e) {
+                        console.warn('[Resume] Sidebar load failed (non-critical):', e);
+                    }
+                }
+
                 return;
             }
         } catch (e) {
