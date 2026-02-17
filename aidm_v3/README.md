@@ -153,7 +153,7 @@ Each agent has a designated tier and falls back to the corresponding base model.
 | Provider | Fast | Creative / Thinking | Premium |
 |----------|------|---------------------|---------|
 | **Google** | `gemini-3-flash-preview` | `gemini-3-pro-preview` | — |
-| **Anthropic** | `claude-haiku-4-5` | `claude-sonnet-4-5` / `claude-sonnet-4-6` | `claude-opus-4-6` |
+| **Anthropic** | `claude-haiku-4-5` | `claude-sonnet-4-6` | `claude-opus-4-6` |
 | **OpenAI** | `gpt-5.2-chat-latest` | `gpt-5.2` | `gpt-5.2-pro` |
 
 Mix providers freely — use Gemini Flash for structured calls, Claude for narrative, OpenAI for planning.

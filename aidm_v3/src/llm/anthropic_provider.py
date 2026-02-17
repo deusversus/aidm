@@ -26,7 +26,7 @@ class AnthropicProvider(LLMProvider):
         return "anthropic"
     
     def get_default_model(self) -> str:
-        return "claude-sonnet-4-5"
+        return "claude-sonnet-4-6"
     
     def get_fast_model(self) -> str:
         return "claude-haiku-4-5"
@@ -36,7 +36,7 @@ class AnthropicProvider(LLMProvider):
         preference = os.getenv("ANTHROPIC_CREATIVE_MODEL", "sonnet").lower()
         if preference == "opus":
             return "claude-opus-4-6"
-        return "claude-sonnet-4-5"
+        return "claude-sonnet-4-6"
     
     def get_opus_model(self) -> str:
         """Get Opus model explicitly."""
@@ -44,7 +44,7 @@ class AnthropicProvider(LLMProvider):
     
     def get_research_model(self) -> str:
         """Model optimized for research with web search."""
-        return "claude-sonnet-4-5"
+        return "claude-sonnet-4-6"
     
     def get_max_concurrent_requests(self) -> int:
         """Anthropic Tier 2+ can handle more concurrent requests."""

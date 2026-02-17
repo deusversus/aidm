@@ -11,7 +11,7 @@ async def test():
     
     try:
         response = client.messages.create(
-            model="claude-sonnet-4-5",
+            model="claude-sonnet-4-6",
             max_tokens=2048,
             messages=[{"role": "user", "content": "Research the anime Hellsing. What is the power system?"}],
             tools=[{
