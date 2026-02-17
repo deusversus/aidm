@@ -1453,12 +1453,12 @@ class Orchestrator:
                 try:
                     turn_number = db_context.turn_number if hasattr(db_context, 'turn_number') else 0
                     location = db_context.location if hasattr(db_context, 'location') else "Unknown"
-                    action_summary = player_input[:80].strip()
-                    outcome_summary = narrative[:120].strip().replace('\n', ' ') if narrative else "No outcome"
+                    action_summary = player_input[:150].strip()
+                    outcome_summary = narrative[:400].strip().replace('\n', ' ') if narrative else "No outcome"
                     self.memory.add_episode(
                         turn=turn_number,
                         location=location,
-                        summary=f"Player: {action_summary}. Outcome: {outcome_summary}"
+                        summary=f"{action_summary} — {outcome_summary}"
                     )
                     print(f"[Background] Episodic memory written for turn {turn_number}")
                 except Exception as e:
@@ -1806,7 +1806,19 @@ class Orchestrator:
             )
         
         elif entity.entity_type == "location":
-            # Locations are indexed as memories (no DB table yet)
+            # 1. Create/update Location in SQLite database
+            try:
+                self.state.upsert_location(
+                    name=entity.name,
+                    description=entity.details.get('description', entity.implied_backstory or ''),
+                    location_type=entity.details.get('type', entity.details.get('location_type')),
+                    atmosphere=entity.details.get('atmosphere'),
+                )
+                print(f"[WorldBuilding] Upserted location in DB: {entity.name}")
+            except Exception as e:
+                print(f"[WorldBuilding] Location DB upsert failed: {e}")
+
+            # 2. Index to ChromaDB memory
             self.memory.add_memory(
                 content=f"Location: {entity.name} - {entity.details.get('description', '')} {entity.implied_backstory or ''}",
                 memory_type="fact",
