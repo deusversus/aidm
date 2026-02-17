@@ -949,7 +949,7 @@ Analyze and determine what's missing."""
         logger.info(f"Validating research completeness...")
         
         try:
-            logger.info(f"[Validator] Calling LLM for validation (len={len(research_text)})...", flush=True)
+            logger.info(f"[Validator] Calling LLM for validation (len={len(research_text)})...")
             # Use ContentCompletenessResult for LLM - NO corruption fields
             completeness = await provider.complete_with_schema(
                 messages=[{"role": "user", "content": prompt}],
@@ -958,7 +958,7 @@ Analyze and determine what's missing."""
                 model=model,
                 max_tokens=4096
             )
-            logger.info(f"[Validator] LLM validation returned.", flush=True)
+            logger.info(f"[Validator] LLM validation returned.")
             
             # Merge LLM completeness with heuristic corruption detection
             result = ResearchValidationResult(

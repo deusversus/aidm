@@ -399,10 +399,10 @@ async def generate_and_save_profile(
                 if content_len < 10000:
                     # Small content: run full validation (corruption + completeness)
                     from .validator import ValidatorAgent
-                    logger.info(f"[ProfileGenerator] Validating research (len={content_len})...", flush=True)
+                    logger.info(f"[ProfileGenerator] Validating research (len={content_len})...")
                     validator = ValidatorAgent()
                     validation = await validator.validate_research(research.raw_content)
-                    logger.info(f"[ProfileGenerator] Validation complete. Is Valid: {validation.is_valid}", flush=True)
+                    logger.info(f"[ProfileGenerator] Validation complete. Is Valid: {validation.is_valid}")
                     
                     if validation.has_corruption:
                         raise ValueError(f"Profile lore corrupted: {validation.corruption_type}. Retry needed.")
@@ -413,12 +413,12 @@ async def generate_and_save_profile(
                     # Large content (wiki scrape): skip repetition checks, only check
                     # for leaked reasoning markers which are always invalid
                     from .validator import ValidatorAgent
-                    logger.warning(f"[ProfileGenerator] Large content ({content_len} chars) — skipping repetition checks, checking for leaked reasoning only...", flush=True)
+                    logger.warning(f"[ProfileGenerator] Large content ({content_len} chars) — skipping repetition checks, checking for leaked reasoning only...")
                     validator = ValidatorAgent()
                     _, corruption_type, _ = validator._detect_corruption(research.raw_content[:2000])
                     if corruption_type == "leaked_reasoning":
                         raise ValueError(f"Profile lore corrupted: {corruption_type}. Retry needed.")
-                    logger.info(f"[ProfileGenerator] Large content validation passed.", flush=True)
+                    logger.info(f"[ProfileGenerator] Large content validation passed.")
             else:
                 raise ValueError("Research returned no raw_content. Retry needed.")
             
