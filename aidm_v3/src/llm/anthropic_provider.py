@@ -10,13 +10,14 @@ from .provider import LLMProvider, LLMResponse
 
 class AnthropicProvider(LLMProvider):
     """Anthropic Claude provider implementation.
-    
+
     Supports Claude model family:
     - Haiku 4.5: Fast, affordable for structured tasks
     - Sonnet 4.5: Balanced quality/speed for creative work
-    - Opus 4.6: Latest Opus — highest quality, nearly Sonnet pricing
+    - Sonnet 4.6: Latest Sonnet — fast, sharp, excellent coding
     - Opus 4.5: Previous-gen Opus, still excellent
-    
+    - Opus 4.6: Latest Opus — highest quality, nearly Sonnet pricing
+
     Also supports web search via the Anthropic API (May 2025+).
     """
     
