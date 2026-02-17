@@ -600,6 +600,7 @@ def _save_media_asset(
     motion_prompt: str = None,
     cost_usd: float = 0.0,
     status: str = "complete",
+    session_id: int = None,
 ):
     """Persist a MediaAsset record to the database.
 
@@ -607,12 +608,26 @@ def _save_media_asset(
     since this may be called from fire-and-forget background tasks.
     """
     try:
+        import os
         from ..db.models import MediaAsset
         from ..db.session import create_session as create_db_session
+
+        # Normalize file_path to relative path under data/media/
+        # The serve endpoint expects relative paths, not absolute ones
+        if file_path and os.path.isabs(file_path):
+            # Try to extract relative path from data/media/ onwards
+            parts = file_path.replace("\\", "/").split("data/media/")
+            if len(parts) > 1:
+                file_path = "data/media/" + parts[-1]
+            else:
+                # Fallback: just use the filename
+                file_path = os.path.basename(file_path)
+
         db = create_db_session()
         try:
             asset = MediaAsset(
                 campaign_id=campaign_id,
+                session_id=session_id,
                 turn_number=turn_number,
                 asset_type=asset_type,
                 cutscene_type=cutscene_type,

@@ -1544,6 +1544,14 @@ class Orchestrator:
 
                 # Style context from campaign profile
                 style_context = getattr(self.profile, 'art_style', '') or getattr(self.profile, 'name', '') or ''
+
+                # Diagnostic logging for media pipeline
+                if not media_enabled:
+                    logger.info("[Production] media_enabled=False — media tools will not be registered")
+                else:
+                    google_key = getattr(getattr(settings, 'api_keys', None), 'google_api_key', '')
+                    if not google_key:
+                        logger.warning("[Production] media_enabled=True but no Google API key configured — generation will fail")
             except Exception:
                 pass  # Settings load failure is non-fatal
 
