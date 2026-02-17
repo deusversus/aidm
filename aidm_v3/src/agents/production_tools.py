@@ -39,6 +39,9 @@ def build_production_tools(
     """
     registry = ToolRegistry()
 
+    # Extract session_id from state for media asset tracking
+    _session_id = getattr(state, '_session_id', None)
+
     # -----------------------------------------------------------------
     # QUEST TRACKING TOOLS
     # -----------------------------------------------------------------
@@ -418,6 +421,7 @@ def _trigger_cutscene(
                         motion_prompt=motion_prompt,
                         cost_usd=result.get("cost_usd", 0.0),
                         status=result["status"],
+                        session_id=_session_id,
                     )
                     _deduct_budget(budget_ctx, result.get("cost_usd", 0.0))
                 print(f"[MediaTools] Cutscene ({cutscene_type}): {result.get('status', 'unknown')}")
@@ -512,6 +516,7 @@ def _generate_npc_portrait(
                     image_prompt=f"NPC portrait: {npc_name}",
                     cost_usd=0.06,
                     status="complete",
+                    session_id=_session_id,
                 )
                 print(f"[MediaTools] Portrait generated for NPC \"{npc_name}\"")
             except Exception as e:
@@ -573,6 +578,7 @@ def _generate_location_visual(
                         image_prompt=f"Location: {location_name}",
                         cost_usd=0.03,
                         status="complete",
+                        session_id=_session_id,
                     )
                     print(f"[MediaTools] Location visual generated for \"{location_name}\"")
             except Exception as e:
@@ -596,19 +602,35 @@ def _save_media_asset(
     motion_prompt: str = None,
     cost_usd: float = 0.0,
     status: str = "complete",
+    session_id: Optional[int] = None,
 ):
     """Persist a MediaAsset record to the database.
 
     Uses its own DB session to avoid sharing with the orchestrator's session,
     since this may be called from fire-and-forget background tasks.
+
+    file_path is normalized to be relative to MEDIA_BASE_DIR so the serve
+    endpoint can resolve it correctly.
     """
     try:
         from ..db.models import MediaAsset
         from ..db.session import create_session as create_db_session
+        from ..media.generator import MEDIA_BASE_DIR
+        from pathlib import Path
+
+        # Normalize to relative path for the media serve endpoint
+        p = Path(file_path)
+        try:
+            rel = p.relative_to(MEDIA_BASE_DIR)
+            file_path = str(rel)
+        except ValueError:
+            pass  # Already relative or unrelated — store as-is
+
         db = create_db_session()
         try:
             asset = MediaAsset(
                 campaign_id=campaign_id,
+                session_id=session_id,
                 turn_number=turn_number,
                 asset_type=asset_type,
                 cutscene_type=cutscene_type,

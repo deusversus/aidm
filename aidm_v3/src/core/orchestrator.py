@@ -1522,8 +1522,11 @@ class Orchestrator:
 
                 # Style context from campaign profile
                 style_context = getattr(self.profile, 'art_style', '') or getattr(self.profile, 'name', '') or ''
-            except Exception:
-                pass  # Settings load failure is non-fatal
+            except Exception as e:
+                print(f"[Production] Settings load failed (non-fatal): {e}")
+
+            if not media_enabled:
+                print("[Production] Media generation is disabled — toggle media_enabled in Settings to activate.")
 
             tools = build_production_tools(
                 state=self.state,

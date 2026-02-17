@@ -2561,8 +2561,7 @@ async def get_media_gallery(
         from src.db.models import MediaAsset
         from sqlalchemy import func
 
-        sm = StateManager()
-        sm.set_campaign(campaign_id)
+        sm = StateManager(campaign_id)
         db = sm._get_db()
 
         query = db.query(MediaAsset).filter(
@@ -2614,8 +2613,7 @@ async def get_turn_media(campaign_id: int, turn_number: int):
         from src.db.state_manager import StateManager
         from src.db.models import MediaAsset
 
-        sm = StateManager()
-        sm.set_campaign(campaign_id)
+        sm = StateManager(campaign_id)
         db = sm._get_db()
 
         assets = db.query(MediaAsset).filter(
@@ -2660,11 +2658,10 @@ async def get_media_cost(campaign_id: int):
     try:
         from src.db.state_manager import StateManager
         from src.db.models import MediaAsset
-        from src.settings.manager import SettingsManager
+        from src.settings import get_settings_store
         from sqlalchemy import func
 
-        sm = StateManager()
-        sm.set_campaign(campaign_id)
+        sm = StateManager(campaign_id)
         db = sm._get_db()
 
         total_cost = db.query(
@@ -2676,7 +2673,7 @@ async def get_media_cost(campaign_id: int):
         ).count()
 
         # Load budget settings
-        settings = SettingsManager().load()
+        settings = get_settings_store().load()
         budget_enabled = getattr(settings, 'media_budget_enabled', False)
         budget_cap = getattr(settings, 'media_budget_per_session_usd', 2.0) if budget_enabled else None
 

@@ -1724,6 +1724,7 @@ document.addEventListener('DOMContentLoaded', init);
  */
 function pollForTurnMedia(campaignId, turnNumber, maxAttempts = 12) {
     let attempt = 0;
+    const injectedIds = new Set();
     const interval = setInterval(async () => {
         attempt++;
         try {
@@ -1731,12 +1732,18 @@ function pollForTurnMedia(campaignId, turnNumber, maxAttempts = 12) {
             if (!resp.ok) return;
             const data = await resp.json();
             if (data.assets && data.assets.length > 0) {
+                let allComplete = true;
                 data.assets.forEach(asset => {
                     if (asset.status === 'complete' || asset.status === 'partial') {
-                        injectCutsceneInline(asset);
+                        if (!injectedIds.has(asset.id)) {
+                            injectCutsceneInline(asset);
+                            injectedIds.add(asset.id);
+                        }
                     }
+                    if (asset.status !== 'complete') allComplete = false;
                 });
-                clearInterval(interval);  // Got media, stop polling
+                // Only stop polling when ALL assets are fully complete
+                if (allComplete) clearInterval(interval);
             }
         } catch (e) {
             console.warn('[Media] Poll error:', e);

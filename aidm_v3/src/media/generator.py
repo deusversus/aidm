@@ -52,6 +52,9 @@ class MediaGenerator:
                 pass
         if not self._api_key:
             self._api_key = os.environ.get("GOOGLE_API_KEY")
+        if not self._api_key:
+            print("[MediaGen] WARNING: No Google API key found. Media generation will fail. "
+                  "Set GOOGLE_API_KEY or configure it in Settings.")
         self._client = None
     
     def _ensure_client(self):

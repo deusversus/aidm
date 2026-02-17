@@ -228,7 +228,7 @@ class UserSettings(BaseModel):
         description="Provider for image/video generation (currently only 'google')"
     )
     media_enabled: bool = Field(
-        default=False,
+        default=True,
         description="Enable AI-generated character art and visuals"
     )
     media_budget_enabled: bool = Field(
