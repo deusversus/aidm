@@ -11,6 +11,10 @@ from src.agents.progress import ProgressTracker, ProgressPhase, ProgressEvent
 from src.agents.anime_research import AnimeResearchAgent, research_anime_with_search
 
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/research", tags=["research"])
 
 
@@ -66,10 +70,10 @@ async def stream_progress(task_id: str):
     
     tracker = ProgressTracker.get(task_id)
     if not tracker:
-        print(f"[SSE] Tracker not found for task_id: {task_id}")
+        logger.warning(f"Tracker not found for task_id: {task_id}")
         raise HTTPException(status_code=404, detail="Task not found or already completed")
     
-    print(f"[SSE] Client connected for task: {task_id}, existing events: {len(tracker.events)}")
+    logger.info(f"Client connected for task: {task_id}, existing events: {len(tracker.events)}")
     
     async def event_generator():
         """Generate SSE events from progress updates."""
@@ -80,15 +84,15 @@ async def stream_progress(task_id: str):
         
         # Register callback to push events to queue
         async def on_event(event: ProgressEvent):
-            print(f"[SSE] Queueing event: {event.phase.value} {event.percent}%")
+            logger.info(f"Queueing event: {event.phase.value} {event.percent}%")
             await queue.put(event)
         
         tracker.on_progress_async(on_event)
         
         # Send any existing events first
-        print(f"[SSE] Sending {len(tracker.events)} existing events")
+        logger.info(f"Sending {len(tracker.events)} existing events")
         for event in tracker.events:
-            print(f"[SSE] Replaying: {event.phase.value} {event.percent}%")
+            logger.info(f"Replaying: {event.phase.value} {event.percent}%")
             yield f"event: progress\ndata: {json.dumps(event.to_dict())}\n\n"
         
         # Stream new events as they arrive
@@ -96,7 +100,7 @@ async def stream_progress(task_id: str):
             try:
                 # Wait for next event with timeout
                 event = await asyncio.wait_for(queue.get(), timeout=60.0)
-                print(f"[SSE] Streaming: {event.phase.value} {event.percent}%")
+                logger.info(f"Streaming: {event.phase.value} {event.percent}%")
                 yield f"event: progress\ndata: {json.dumps(event.to_dict())}\n\n"
                 
                 # Stop streaming on completion or error

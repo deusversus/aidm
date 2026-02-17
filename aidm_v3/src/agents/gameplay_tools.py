@@ -15,6 +15,7 @@ import json
 from typing import Any, Dict, List, Optional
 
 from ..llm.tools import ToolDefinition, ToolParam, ToolRegistry
+from ..enums import ArcPhase, NPCIntelligenceStage
 
 
 def build_gameplay_tools(
@@ -355,7 +356,7 @@ def _get_npc_details(state, name: str) -> Dict:
         "disposition": disp,
         "disposition_label": disp_label,
         "personality": npc.personality or "Unknown",
-        "intelligence_stage": npc.intelligence_stage or "reactive",
+        "intelligence_stage": npc.intelligence_stage or NPCIntelligenceStage.REACTIVE,
         "relationship_notes": npc.relationship_notes or "",
         "emotional_milestones": npc.emotional_milestones or {},
         "goals": npc.goals or [],
@@ -389,7 +390,7 @@ def _list_known_npcs(state) -> List[Dict]:
             "disposition_label": disp_label,
             "scene_count": npc.scene_count or 0,
             "last_appeared": npc.last_appeared,
-            "intelligence": npc.intelligence_stage or "reactive",
+            "intelligence": npc.intelligence_stage or NPCIntelligenceStage.REACTIVE,
         })
     
     return result
@@ -428,7 +429,7 @@ def _get_world_state(state) -> Dict:
         "time_of_day": ws.time_of_day or "Unknown",
         "situation": ws.situation or "No current situation",
         "arc_name": ws.arc_name or "None",
-        "arc_phase": ws.arc_phase or "rising_action",
+        "arc_phase": ws.arc_phase or ArcPhase.RISING_ACTION,
         "tension_level": ws.tension_level or 0.5,
         "timeline_mode": ws.timeline_mode,
         "canon_cast_mode": ws.canon_cast_mode,

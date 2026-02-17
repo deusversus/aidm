@@ -16,6 +16,10 @@ from .progress import ProgressPhase
 from typing import TYPE_CHECKING
 import re
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 if TYPE_CHECKING:
     from .progress import ProgressTracker
 
@@ -338,7 +342,7 @@ async def _validate_and_update_series_positions(series_group: str, profiles_dir:
                 profile_data['series_position'] = new_position
                 with open(profile_path, 'w', encoding='utf-8') as f:
                     yaml.dump(profile_data, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
-                print(f"[ProfileGenerator] Updated {profile_name} position: {old_position} → {new_position}")
+                logger.info(f"Updated {profile_name} position: {old_position} → {new_position}")
 
 
 async def generate_and_save_profile(
@@ -380,11 +384,11 @@ async def generate_and_save_profile(
                 raise ValueError(f"Research returned insufficient lore content (len={lore_len}). Retry needed.")
             
             if lore_len < 500:
-                print(f"[ProfileGenerator] WARNING: Lore content is short ({lore_len} chars)")
+                logger.warning(f"WARNING: Lore content is short ({lore_len} chars)")
             
             # --- VALIDATE LORE FIRST (before saving anything) ---
             # This prevents orphaned YAML profiles when validation fails
-            print(f"[ProfileGenerator] DEBUG: research.raw_content is {'PRESENT' if research.raw_content else 'MISSING'}")
+            logger.warning(f"DEBUG: research.raw_content is {'PRESENT' if research.raw_content else 'MISSING'}")
             
             if research.raw_content:
                 # For large content (API-sourced wiki scrape), skip repetition-based
@@ -395,26 +399,26 @@ async def generate_and_save_profile(
                 if content_len < 10000:
                     # Small content: run full validation (corruption + completeness)
                     from .validator import ValidatorAgent
-                    print(f"[ProfileGenerator] Validating research (len={content_len})...", flush=True)
+                    logger.info(f"[ProfileGenerator] Validating research (len={content_len})...", flush=True)
                     validator = ValidatorAgent()
                     validation = await validator.validate_research(research.raw_content)
-                    print(f"[ProfileGenerator] Validation complete. Is Valid: {validation.is_valid}", flush=True)
+                    logger.info(f"[ProfileGenerator] Validation complete. Is Valid: {validation.is_valid}", flush=True)
                     
                     if validation.has_corruption:
                         raise ValueError(f"Profile lore corrupted: {validation.corruption_type}. Retry needed.")
                     
                     if not validation.is_valid:
-                        print(f"[ProfileGenerator] Warning: Lore validation issues: {validation.issues}")
+                        logger.warning(f"Warning: Lore validation issues: {validation.issues}")
                 else:
                     # Large content (wiki scrape): skip repetition checks, only check
                     # for leaked reasoning markers which are always invalid
                     from .validator import ValidatorAgent
-                    print(f"[ProfileGenerator] Large content ({content_len} chars) — skipping repetition checks, checking for leaked reasoning only...", flush=True)
+                    logger.warning(f"[ProfileGenerator] Large content ({content_len} chars) — skipping repetition checks, checking for leaked reasoning only...", flush=True)
                     validator = ValidatorAgent()
                     _, corruption_type, _ = validator._detect_corruption(research.raw_content[:2000])
                     if corruption_type == "leaked_reasoning":
                         raise ValueError(f"Profile lore corrupted: {corruption_type}. Retry needed.")
-                    print(f"[ProfileGenerator] Large content validation passed.", flush=True)
+                    logger.info(f"[ProfileGenerator] Large content validation passed.", flush=True)
             else:
                 raise ValueError("Research returned no raw_content. Retry needed.")
             
@@ -423,14 +427,14 @@ async def generate_and_save_profile(
             if hasattr(research, 'fandom_pages') and research.fandom_pages:
                 page_types = set(p['page_type'] for p in research.fandom_pages)
                 if len(page_types) <= 1:
-                    print(f"[ProfileGenerator] WARNING: LOW COVERAGE — only {page_types} page types found. Profile may be incomplete.")
+                    logger.warning(f"WARNING: LOW COVERAGE — only {page_types} page types found. Profile may be incomplete.")
                 elif len(page_types) <= 3:
-                    print(f"[ProfileGenerator] NOTE: Moderate coverage — {len(page_types)} page types: {sorted(page_types)}")
+                    logger.info(f"NOTE: Moderate coverage — {len(page_types)} page types: {sorted(page_types)}")
                 else:
-                    print(f"[ProfileGenerator] Coverage OK — {len(page_types)} page types: {sorted(page_types)}")
+                    logger.info(f"Coverage OK — {len(page_types)} page types: {sorted(page_types)}")
             
             if not research.power_system or not research.power_system.get('name'):
-                print(f"[ProfileGenerator] WARNING: power_system is empty — this IP may lack a power system, or wiki scrape may have missed technique pages")
+                logger.warning(f"WARNING: power_system is empty — this IP may lack a power system, or wiki scrape may have missed technique pages")
             
             # --- ALL VALIDATION PASSED - NOW SAVE ATOMICALLY ---
             
@@ -445,7 +449,7 @@ async def generate_and_save_profile(
                     research.fandom_pages,
                     source_wiki=getattr(research, 'fandom_wiki_url', ''),
                 )
-                print(f"[ProfileGenerator] Stored {len(research.fandom_pages)} pages in LoreStore for {profile['id']}")
+                logger.info(f"Stored {len(research.fandom_pages)} pages in LoreStore for {profile['id']}")
             elif research.raw_content:
                 # Fallback: parse raw_content into pages by section headers
                 import re
@@ -462,7 +466,7 @@ async def generate_and_save_profile(
                             "content": research.raw_content[match.end():end].strip(),
                         })
                     lore_store.store_pages(profile['id'], pages)
-                    print(f"[ProfileGenerator] Parsed and stored {len(pages)} sections in LoreStore for {profile['id']}")
+                    logger.info(f"Parsed and stored {len(pages)} sections in LoreStore for {profile['id']}")
                 else:
                     # No section headers — store as single page
                     lore_store.store_pages(profile['id'], [{
@@ -470,20 +474,20 @@ async def generate_and_save_profile(
                         "page_type": "general",
                         "content": research.raw_content,
                     }])
-                    print(f"[ProfileGenerator] Stored raw content as single page in LoreStore for {profile['id']}")
+                    logger.debug(f"Stored raw content as single page in LoreStore for {profile['id']}")
             
             # 2. Ingest into ProfileLibrary (ChromaDB) — still uses raw_content for chunking
             from ..context.profile_library import get_profile_library
             library = get_profile_library()
             library.add_profile_lore(profile['id'], research.raw_content, source="auto_research")
-            print(f"[ProfileGenerator] Ingested lore for {profile['id']} into RAG.")
+            logger.info(f"Ingested lore for {profile['id']} into RAG.")
             
             # 3. Save to YAML LAST (after lore is successfully saved)
             profile_path = profiles_dir / f"{profile['id']}.yaml"
             with open(profile_path, 'w', encoding='utf-8') as f:
                 yaml.dump(profile, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
             
-            print(f"[ProfileGenerator] Saved profile {profile['id']}.yaml with lore")
+            logger.info(f"Saved profile {profile['id']}.yaml with lore")
             
             # --- SERIES ORDER VALIDATION ---
             # If profile has a series_group, validate and update positions for all profiles in the series
@@ -496,7 +500,7 @@ async def generate_and_save_profile(
         except Exception as e:
             retry_count += 1
             last_error = e
-            print(f"[ProfileGenerator] Error generating '{anime_name}' (Attempt {retry_count}/{MAX_RETRIES}): {e}")
+            logger.error(f"Error generating '{anime_name}' (Attempt {retry_count}/{MAX_RETRIES}): {e}")
             
             if progress_tracker:
                 await progress_tracker.emit(
@@ -543,7 +547,7 @@ def load_existing_profile(anime_name: str) -> Optional[Dict[str, Any]]:
                 profile = yaml.safe_load(f)
             
             if match_type == "fuzzy":
-                print(f"[Profile] Fuzzy matched '{anime_name}' to profile '{profile_id}'")
+                logger.info(f"Fuzzy matched '{anime_name}' to profile '{profile_id}'")
             
             return profile
     
@@ -611,7 +615,7 @@ def load_profile_with_disambiguation(anime_name: str) -> Dict[str, Any]:
     if disambiguation and len(disambiguation) > 1:
         result['disambiguation'] = disambiguation
         result['needs_choice'] = True
-        print(f"[Profile] '{anime_name}' matched '{profile_id}' which has {len(disambiguation)} series entries")
+        logger.info(f"'{anime_name}' matched '{profile_id}' which has {len(disambiguation)} series entries")
     
     return result
 

@@ -14,6 +14,9 @@ from ..utils.title_utils import (
     token_subset_match,
     normalized_levenshtein
 )
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -327,12 +330,12 @@ def load_profile(profile_id: str, fallback: bool = True) -> NarrativeProfile:
             available = list_profiles()
             if available:
                 fallback_id = available[0]
-                print(f"[Profile] '{profile_id}' not found, falling back to '{fallback_id}'")
+                logger.warning(f"'{profile_id}' not found, falling back to '{fallback_id}'")
                 profile_path = profiles_dir / f"{fallback_id}.yaml"
                 profile_id = fallback_id
             else:
                 # Create minimal default profile
-                print(f"[Profile] No profiles available, creating default")
+                logger.info(f"No profiles available, creating default")
                 return NarrativeProfile(
                     id="default",
                     name="Default Campaign",
@@ -455,10 +458,10 @@ def _build_alias_index() -> None:
             _ALIAS_INDEX[normalize_title(profile_name)] = profile_id
             
         except Exception as e:
-            print(f"[AliasIndex] Error loading {profile_path}: {e}")
+            logger.error(f"Error loading {profile_path}: {e}")
     
     _INDEX_BUILT = True
-    print(f"[AliasIndex] Built index with {len(_ALIAS_INDEX)} aliases for {len(list_profiles())} profiles")
+    logger.info(f"Built index with {len(_ALIAS_INDEX)} aliases for {len(list_profiles())} profiles")
 
 
 def get_alias_index() -> Dict[str, str]:
@@ -539,7 +542,7 @@ def find_profile_by_title(
     
     if best_token_match:
         profile_id, matched_alias, similarity = best_token_match
-        print(f"[AliasIndex] Token match: '{title}' -> '{matched_alias}' (similarity={similarity:.2f}) -> {profile_id}")
+        logger.info(f"Token match: '{title}' -> '{matched_alias}' (similarity={similarity:.2f}) -> {profile_id}")
         return (profile_id, "token")
 
     
@@ -558,7 +561,7 @@ def find_profile_by_title(
         
         if best_fuzzy:
             profile_id = index[best_fuzzy]
-            print(f"[AliasIndex] Fuzzy match: '{title}' -> '{best_fuzzy}' (similarity={best_fuzzy_similarity:.2f}) -> {profile_id}")
+            logger.info(f"Fuzzy match: '{title}' -> '{best_fuzzy}' (similarity={best_fuzzy_similarity:.2f}) -> {profile_id}")
             return (profile_id, "fuzzy")
     
     return None
@@ -768,7 +771,7 @@ def load_profile_with_inheritance(profile_id: str) -> NarrativeProfile:
     # Inherit power_system if not defined
     if not profile.power_system and parent_data.get('power_system'):
         profile.power_system = parent_data['power_system']
-        print(f"[Inheritance] {profile_id} inherited power_system from {parent_data.get('id')}")
+        logger.info(f"{profile_id} inherited power_system from {parent_data.get('id')}")
     
     # Inherit combat_system if default
     if profile.combat_system == "tactical" and parent_data.get('combat_system'):

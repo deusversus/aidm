@@ -9,8 +9,13 @@ Extends the shared gameplay tools with Director-only capabilities.
 from typing import Any, Dict, List, Optional
 
 from ..llm.tools import ToolDefinition, ToolParam, ToolRegistry
+from ..enums import NPCIntelligenceStage
 from .gameplay_tools import build_gameplay_tools
 
+
+import logging
+
+logger = logging.getLogger(__name__)
 
 def build_director_tools(
     memory: Any,         # MemoryStore
@@ -297,7 +302,7 @@ def _plant_seed(foreshadowing, current_turn: int, session_number: int, **kwargs)
         max_payoff=max_payoff,
     )
     
-    print(f"[Foreshadowing] Seed planted: {seed_id} ({seed_type_str}) — {kwargs['description'][:60]}")
+    logger.info(f"Seed planted: {seed_id} ({seed_type_str}) — {kwargs['description'][:60]}")
     
     return {
         "planted": True,
@@ -329,7 +334,7 @@ def _mark_memory_critical(memory, **kwargs) -> Dict:
         # Flag as plot-critical
         memory.mark_plot_critical(memory_id)
 
-        print(f"[Director] Marked memory as plot-critical: {content_preview[:80]}... (reason: {reason})")
+        logger.info(f"Marked memory as plot-critical: {content_preview[:80]}... (reason: {reason})")
         return {
             "flagged": True,
             "memory_id": memory_id,
@@ -366,7 +371,7 @@ def _get_spotlight_analysis(state) -> Dict:
             "spotlight_debt": debt,
             "needs_attention": debt > 2,
             "growth_stage": npc.growth_stage or "introduction",
-            "intelligence": npc.intelligence_stage or "reactive",
+            "intelligence": npc.intelligence_stage or NPCIntelligenceStage.REACTIVE,
         })
     
     # Sort by spotlight debt (most underserved first)
@@ -399,7 +404,7 @@ def _get_npc_trajectory(state, name: str) -> Dict:
         "ensemble_archetype": npc.ensemble_archetype,
         "growth_stage": npc.growth_stage or "introduction",
         "narrative_role": npc.narrative_role,
-        "intelligence_stage": npc.intelligence_stage or "reactive",
+        "intelligence_stage": npc.intelligence_stage or NPCIntelligenceStage.REACTIVE,
         "interaction_count": npc.interaction_count or 0,
         "scene_count": npc.scene_count or 0,
         "last_appeared": npc.last_appeared,
@@ -489,7 +494,7 @@ def _create_quest(state, current_turn: int, **kwargs) -> Dict:
         created_turn=current_turn,
     )
     
-    print(f"[Director] Quest created: {quest.title} (ID {quest.id}, type={quest.quest_type})")
+    logger.info(f"Quest created: {quest.title} (ID {quest.id}, type={quest.quest_type})")
     return {
         "created": True,
         "quest_id": quest.id,
@@ -512,7 +517,7 @@ def _update_quest_status(state, **kwargs) -> Dict:
     if not quest:
         return {"error": f"Quest {quest_id} not found"}
     
-    print(f"[Director] Quest {quest_id} status → {status}: {quest.title}")
+    logger.info(f"Quest {quest_id} status → {status}: {quest.title}")
     return {"updated": True, "quest_id": quest_id, "status": status, "title": quest.title}
 
 
@@ -528,5 +533,5 @@ def _complete_quest_objective(state, **kwargs) -> Dict:
     if not quest:
         return {"error": f"Quest {quest_id} not found or objective index out of range"}
     
-    print(f"[Director] Quest {quest_id} objective {objective_index} completed")
+    logger.info(f"Quest {quest_id} objective {objective_index} completed")
     return {"completed": True, "quest_id": quest_id, "objective_index": objective_index}

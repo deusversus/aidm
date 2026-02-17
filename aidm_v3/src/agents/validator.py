@@ -19,7 +19,12 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from .base import BaseAgent
+from ..enums import NarrativeWeight
 
+
+import logging
+
+logger = logging.getLogger(__name__)
 
 class ErrorSeverity(str, Enum):
     """Error severity levels per M10 spec."""
@@ -371,7 +376,7 @@ Respond with:
             
         except Exception as e:
             # On error, default to conservative (no override)
-            print(f"[Validator] Narrative override judgment failed: {e}")
+            logger.error(f"Narrative override judgment failed: {e}")
             return NarrativeOverrideResult(
                 allow_override=False,
                 explanation=f"Judgment failed: {e}",
@@ -701,7 +706,7 @@ What do?"""
         
         # Check narrative weight consistency
         if hasattr(outcome, 'narrative_weight'):
-            if outcome.narrative_weight == "climactic":
+            if outcome.narrative_weight == NarrativeWeight.CLIMACTIC:
                 # Major moments should have substance
                 if hasattr(outcome, 'consequence') and not outcome.consequence:
                     result.issues.append("Climactic moment without consequence")
@@ -856,7 +861,7 @@ Status: {status}"""
                 # Only flag as corrupt if the repeated line is substantial content
                 # (not just a common phrase like "**Role:**" or similar)
                 if len(most_repeated) > 20:
-                    print(f"[Validator] High repetition detected: '{most_repeated[:50]}...' appears {max_repeats} times (threshold={repeat_threshold})")
+                    logger.info(f"High repetition detected: '{most_repeated[:50]}...' appears {max_repeats} times (threshold={repeat_threshold})")
                     return True, "repetition", min(1.0, max_repeats / 10.0)
             
             # Calculate repetition score (ratio of repeated to unique lines)
@@ -874,7 +879,7 @@ Status: {status}"""
             else:
                 ratio_threshold = 0.85  # Very permissive for large wiki dumps
             
-            print(f"[Validator] Repetition analysis: {unique_lines}/{total_lines} unique lines, score={repetition_score:.2f}, threshold={ratio_threshold}")
+            logger.info(f"Repetition analysis: {unique_lines}/{total_lines} unique lines, score={repetition_score:.2f}, threshold={ratio_threshold}")
             
             if repetition_score > ratio_threshold:
                 return True, "repetition", repetition_score
@@ -902,7 +907,7 @@ Status: {status}"""
         has_corruption, corruption_type, repetition_score = self._detect_corruption(research_text)
         
         if has_corruption:
-            print(f"[Validator] CORRUPTION DETECTED: {corruption_type}")
+            logger.error(f"CORRUPTION DETECTED: {corruption_type}")
             return ResearchValidationResult(
                 complete=False,
                 is_valid=False,
@@ -941,10 +946,10 @@ The research text is **Markdown**, NOT JSON. Square brackets like [Section] are 
 
 Analyze and determine what's missing."""
         
-        print(f"[Validator] Validating research completeness...")
+        logger.info(f"Validating research completeness...")
         
         try:
-            print(f"[Validator] Calling LLM for validation (len={len(research_text)})...", flush=True)
+            logger.info(f"[Validator] Calling LLM for validation (len={len(research_text)})...", flush=True)
             # Use ContentCompletenessResult for LLM - NO corruption fields
             completeness = await provider.complete_with_schema(
                 messages=[{"role": "user", "content": prompt}],
@@ -953,7 +958,7 @@ Analyze and determine what's missing."""
                 model=model,
                 max_tokens=4096
             )
-            print(f"[Validator] LLM validation returned.", flush=True)
+            logger.info(f"[Validator] LLM validation returned.", flush=True)
             
             # Merge LLM completeness with heuristic corruption detection
             result = ResearchValidationResult(
@@ -975,7 +980,7 @@ Analyze and determine what's missing."""
             )
             return result
         except Exception as e:
-            print(f"[Validator] ERROR: {e}")
+            logger.error(f"ERROR: {e}")
             return ResearchValidationResult(
                 complete=True,
                 is_valid=True,
@@ -1013,7 +1018,7 @@ The following text was intended to be valid JSON matching the schema, but failed
 Fix the JSON errors. Ensure it matches the schema perfectly. 
 Do not explain. Just return the valid JSON object.
 """
-        print(f"[Validator] Attempting to repair broken JSON...")
+        logger.info(f"Attempting to repair broken JSON...")
         
         try:
             result = await provider.complete_with_schema(
@@ -1024,10 +1029,10 @@ Do not explain. Just return the valid JSON object.
                 max_tokens=4096,
                 extended_thinking=False
             )
-            print("[Validator] Repair successful!")
+            logger.info("Repair successful!")
             return result
         except Exception as e:
-            print(f"[Validator] Repair failed: {e}")
+            logger.error(f"Repair failed: {e}")
             return None
     
     async def validate_series_order(
@@ -1074,7 +1079,7 @@ Example: {{"Naruto": 1, "Naruto Shippuden": 2, "Boruto": 3}}
 
 IMPORTANT: Use the EXACT title strings provided, do not modify them."""
 
-        print(f"[Validator] Ordering {len(profile_titles)} titles in '{series_group}' series...")
+        logger.info(f"Ordering {len(profile_titles)} titles in '{series_group}' series...")
         
         try:
             # Use a simple Dict[str, int] schema
@@ -1099,14 +1104,14 @@ IMPORTANT: Use the EXACT title strings provided, do not modify them."""
             json_match = re.search(r'\{[^{}]+\}', content)
             if json_match:
                 order_dict = json.loads(json_match.group())
-                print(f"[Validator] Series order determined: {order_dict}")
+                logger.info(f"Series order determined: {order_dict}")
                 return order_dict
             else:
-                print(f"[Validator] Could not parse series order from response")
+                logger.warning(f"Could not parse series order from response")
                 return {}
                 
         except Exception as e:
-            print(f"[Validator] Series order validation failed: {e}")
+            logger.error(f"Series order validation failed: {e}")
             return {}
 
 

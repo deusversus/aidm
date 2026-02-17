@@ -915,12 +915,12 @@ class FandomClient:
         rejected = []
         for url in candidates:
             if await self.check_wiki_relevance(url, title, alt_titles):
-                print(f"[Fandom] Found relevant wiki: {url}")
+                logger.info(f"Found relevant wiki: {url}")
                 return url
             else:
                 rejected.append(url)
         
-        print(
+        logger.info(
             f"[Fandom] No relevant wiki found after trying {len(candidates)} URLs for '{title}'"
             f" (rejected: {rejected})"
         )

@@ -1,17 +1,33 @@
 """FastAPI main application for AIDM v3."""
 
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
+import logging
 
 from .routes import settings, game, research
+from src.logging_config import setup_logging
+
+logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application startup and shutdown lifecycle."""
+    setup_logging()
+    logger.info("AIDM v3 starting up")
+    yield
+    logger.info("AIDM v3 shut down cleanly")
+
 
 # Create FastAPI app
 app = FastAPI(
     title="AIDM v3 API",
     description="Anime Interactive Dungeon Master - AI Orchestration API",
-    version="0.1.0"
+    version="0.1.0",
+    lifespan=lifespan,
 )
 
 # CORS middleware for web frontend

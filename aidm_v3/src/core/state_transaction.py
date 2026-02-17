@@ -14,6 +14,10 @@ from typing import Any, Dict, List, Optional, Callable
 from pydantic import BaseModel, Field
 
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 class ChangeOperation(Enum):
     """Types of state change operations."""
     SET = "set"           # Direct assignment
@@ -311,7 +315,7 @@ class StateTransaction:
         validation = self.validate(constraints)
         if not validation.is_valid:
             error_msgs = [e.message for e in validation.errors]
-            print(f"[Transaction] Validation failed: {error_msgs}")
+            logger.error(f"Validation failed: {error_msgs}")
             return False
         
         # Apply changes atomically
@@ -319,14 +323,14 @@ class StateTransaction:
             for change in self.changes:
                 self.state_setter(change.path, change.after)
                 self._applied.append(change)
-                print(f"[Transaction] {change.path}: {change.before} → {change.after} ({change.reason})")
+                logger.info(f"{change.path}: {change.before} → {change.after} ({change.reason})")
             
             self.committed = True
             return True
             
         except Exception as e:
             # Rollback on any failure
-            print(f"[Transaction] Error during commit: {e}, rolling back...")
+            logger.error(f"Error during commit: {e}, rolling back...")
             self.rollback()
             raise
     
@@ -343,9 +347,9 @@ class StateTransaction:
         for change in reversed(self._applied):
             try:
                 self.state_setter(change.path, change.before)
-                print(f"[Transaction] Rollback {change.path}: {change.after} → {change.before}")
+                logger.info(f"Rollback {change.path}: {change.after} → {change.before}")
             except Exception as e:
-                print(f"[Transaction] Error during rollback: {e}")
+                logger.error(f"Error during rollback: {e}")
         
         self._applied.clear()
         self.rolled_back = True

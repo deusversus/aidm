@@ -22,6 +22,10 @@ from .progress import ProgressTracker, ProgressPhase
 from ..settings import get_settings_store
 
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 class AnimeResearchOutput(BaseModel):
     """Structured output from anime research."""
     
@@ -352,14 +356,14 @@ Return ONLY the title.'''
             # Take first line only (LLM sometimes adds explanation)
             official = raw.split('\n')[0].strip().strip('"').strip("'").strip('.')
             
-            print(f"[AnimeResearch] Title normalization: '{official}'")
+            logger.info(f"Title normalization: '{official}'")
             
             # Basic validation - should look like a title
             if official and len(official) < 150 and not official.startswith("I ") and "Let's" not in official:
                 return official
             return None
         except Exception as e:
-            print(f"[AnimeResearch] Title normalization failed: {e}")
+            logger.error(f"Title normalization failed: {e}")
             return None
     
     async def research_anime(
@@ -403,7 +407,7 @@ Return ONLY the title.'''
         
         official_title = await self._normalize_title(provider, model, anime_name)
         if official_title and official_title != anime_name:
-            print(f"[AnimeResearch] Title normalized: '{anime_name}' → '{official_title}'")
+            logger.info(f"Title normalized: '{anime_name}' → '{official_title}'")
             anime_name = official_title
         
         # ========== STEP 1: Scope Classification ==========
@@ -417,7 +421,7 @@ Return ONLY the title.'''
         scope_agent = ScopeAgent()
         scope = await scope_agent.classify(anime_name)
         
-        print(f"[AnimeResearch] Scope: {scope.scope} ({len(scope.bundles)} bundles, {len(scope.topics)} topics)")
+        logger.info(f"Scope: {scope.scope} ({len(scope.bundles)} bundles, {len(scope.topics)} topics)")
         
         if progress_tracker:
             await progress_tracker.emit(
@@ -471,10 +475,10 @@ Return ONLY the title.'''
                     error_str = str(e).lower()
                     if "429" in str(e) or "rate limit" in error_str:
                         wait_time = (2 ** attempt) * 2
-                        print(f"[AnimeResearch] Rate limited on bundle '{bundle_name}', retry in {wait_time}s...")
+                        logger.warning(f"Rate limited on bundle '{bundle_name}', retry in {wait_time}s...")
                         await asyncio.sleep(wait_time)
                     else:
-                        print(f"[AnimeResearch] Bundle '{bundle_name}' error: {e}")
+                        logger.error(f"Bundle '{bundle_name}' error: {e}")
                         if attempt == max_retries - 1:
                             return {"bundle": bundle, "research": "", "extracted": None, "error": str(e)}
             
@@ -501,13 +505,13 @@ Return ONLY the title.'''
                     if attempt < max_retries - 1:
                         await asyncio.sleep((2 ** attempt))
                     else:
-                        print(f"[AnimeResearch] Extraction failed for bundle '{bundle_name}': {e}")
+                        logger.error(f"Extraction failed for bundle '{bundle_name}': {e}")
             
             # Log extraction status
             if extracted:
-                print(f"[AnimeResearch] Bundle '{bundle_name}' extracted: OK")
+                logger.info(f"Bundle '{bundle_name}' extracted: OK")
             else:
-                print(f"[AnimeResearch] Bundle '{bundle_name}' extraction: FAILED")
+                logger.error(f"Bundle '{bundle_name}' extraction: FAILED")
             
             return {
                 "bundle": bundle,
@@ -521,7 +525,7 @@ Return ONLY the title.'''
         total_bundles = len(scope.bundles)
         completed_count = 0
         
-        print(f"[AnimeResearch] Running {total_bundles} bundles (max {max_concurrent} concurrent)...")
+        logger.info(f"Running {total_bundles} bundles (max {max_concurrent} concurrent)...")
         
         for i in range(0, total_bundles, max_concurrent):
             batch = scope.bundles[i:i + max_concurrent]
@@ -529,7 +533,7 @@ Return ONLY the title.'''
             total_batch_count = (total_bundles + max_concurrent - 1) // max_concurrent
             
             if total_batch_count > 1:
-                print(f"[AnimeResearch] Batch {batch_num}/{total_batch_count}")
+                logger.info(f"Batch {batch_num}/{total_batch_count}")
             
             # Create tasks for this batch
             batch_tasks = {asyncio.create_task(research_and_extract_bundle(bundle)): bundle for bundle in batch}
@@ -543,7 +547,7 @@ Return ONLY the title.'''
                 # Log warning for empty bundles to surface silent failures
                 if not result.get("research"):
                     bundle_name = "+".join(result.get("bundle", []))
-                    print(f"[AnimeResearch] WARNING: Bundle '{bundle_name}' returned empty research")
+                    logger.warning(f"WARNING: Bundle '{bundle_name}' returned empty research")
                 
                 # Emit progress immediately as each bundle completes
                 if progress_tracker and result.get("research"):
@@ -768,7 +772,7 @@ Return ONLY the title.'''
             existing_context=existing_context
         )
         
-        print(f"[AnimeResearch] Pass 1: Web search via {provider.name}...")
+        logger.info(f"Pass 1: Web search via {provider.name}...")
         
         try:
             if hasattr(provider, 'complete_with_search'):
@@ -782,10 +786,10 @@ Return ONLY the title.'''
                 )
                 return response.content
             else:
-                print(f"[AnimeResearch] WARNING: Provider doesn't support search")
+                logger.warning(f"WARNING: Provider doesn't support search")
                 return ""
         except Exception as e:
-            print(f"[AnimeResearch] ERROR in Pass 1: {e}")
+            logger.error(f"ERROR in Pass 1: {e}")
             return ""
     
     async def _pass2_parse_to_schema(
@@ -800,7 +804,7 @@ Return ONLY the title.'''
         
         parse_prompt = PARSE_PROMPT.format(research_text=research_text)
         
-        print(f"[AnimeResearch] Pass 2: Parsing to schema...")
+        logger.info(f"Pass 2: Parsing to schema...")
         
         try:
             result = await provider.complete_with_schema(
@@ -819,11 +823,11 @@ Return ONLY the title.'''
             return result
             
         except Exception as e:
-            print(f"[AnimeResearch] ERROR in Pass 2: {e}")
+            logger.error(f"ERROR in Pass 2: {e}")
             
             # ATTEMPT REPAIR using Validator Agent
             try:
-                print(f"[AnimeResearch] Attempting repair via Validator...")
+                logger.info(f"Attempting repair via Validator...")
                 from .validator import ValidatorAgent
                 validator = ValidatorAgent()
                 repaired = await validator.repair_json(
@@ -832,12 +836,12 @@ Return ONLY the title.'''
                     error_msg=str(e)
                 )
                 if repaired:
-                    print(f"[AnimeResearch] Validator successfully extracted schema!")
+                    logger.info(f"Validator successfully extracted schema!")
                     if repaired.title == "Unknown" or not repaired.title:
                         repaired.title = anime_name
                     return repaired
             except Exception as repair_error:
-                 print(f"[AnimeResearch] Repair failed validation: {repair_error}")
+                 logger.error(f"Repair failed validation: {repair_error}")
             
             # Fallback if repair fails
             return AnimeResearchOutput(
@@ -861,7 +865,7 @@ Return ONLY the title.'''
         
         query = SUPPLEMENTAL_QUERY_TEMPLATES[field].format(anime_name=anime_name)
         
-        print(f"[AnimeResearch] Supplemental search for: {field}")
+        logger.info(f"Supplemental search for: {field}")
         
         try:
             if hasattr(provider, 'complete_with_search'):
@@ -876,7 +880,7 @@ Return ONLY the title.'''
                 return response.content
             return ""
         except Exception as e:
-            print(f"[AnimeResearch] ERROR in supplemental search: {e}")
+            logger.error(f"ERROR in supplemental search: {e}")
             return ""
     
     async def _training_data_fallback(
@@ -888,7 +892,7 @@ Return ONLY the title.'''
     ) -> AnimeResearchOutput:
         """Fallback to LLM training data when search fails."""
         
-        print(f"[AnimeResearch] Using training data fallback...")
+        logger.warning(f"Using training data fallback...")
         
         context = f"""# Research Request: {anime_name}
 
@@ -919,7 +923,7 @@ Include: power system, narrative style, combat approach, key themes.
             
             return result
         except Exception as e:
-            print(f"[AnimeResearch] ERROR in training fallback: {e}")
+            logger.error(f"ERROR in training fallback: {e}")
             return AnimeResearchOutput(
                 title=anime_name,
                 confidence=20,
@@ -946,7 +950,7 @@ Include: power system, narrative style, combat approach, key themes.
         if not missing:
             return partial_result
         
-        print(f"[AnimeResearch] Supplementing missing: {missing}")
+        logger.warning(f"Supplementing missing: {missing}")
         
         # Get training data for missing fields
         supplement_query = f"""For the anime/manga "{anime_name}", provide information about:
@@ -980,7 +984,7 @@ Supplemental knowledge: {response.content}
             return supplemented_result
             
         except Exception as e:
-            print(f"[AnimeResearch] ERROR in supplement: {e}")
+            logger.error(f"ERROR in supplement: {e}")
             return partial_result
     
     def _identify_missing_fields(self, research_text: str) -> List[str]:
@@ -1094,7 +1098,7 @@ Supplemental knowledge: {response.content}
         anilist = await anilist_client.search_with_fallback(anime_name)
         
         if not anilist:
-            print(f"[AnimeResearch/API] AniList returned nothing for '{anime_name}', falling back to web search")
+            logger.info(f"AniList returned nothing for '{anime_name}', falling back to web search")
             return await self.research_anime(anime_name, progress_tracker=progress_tracker)
         
         # Merge all seasons of the same series (walks SEQUEL/PREQUEL relations)
@@ -1102,7 +1106,7 @@ Supplemental knowledge: {response.content}
         
         # Use the official title from AniList
         official_title = anilist.title_english or anilist.title_romaji
-        print(f"[AnimeResearch/API] AniList: {official_title} ({anilist.status}, {anilist.format})")
+        logger.info(f"AniList: {official_title} ({anilist.status}, {anilist.format})")
         
         if progress_tracker:
             await progress_tracker.emit(
@@ -1147,13 +1151,13 @@ Supplemental knowledge: {response.content}
             )
             
             scope = self._determine_scope_from_count(fandom_result.article_count)
-            print(f"[AnimeResearch/API] Fandom: {fandom_result.article_count} articles, scope={scope}")
-            print(f"[AnimeResearch/API] Scraped: {fandom_result.get_total_page_count()} pages across {len(fandom_result.pages)} types")
+            logger.info(f"Fandom: {fandom_result.article_count} articles, scope={scope}")
+            logger.info(f"Scraped: {fandom_result.get_total_page_count()} pages across {len(fandom_result.pages)} types")
             
             # Thin-scrape fallback: if WikiScout only found 1-2 types,
             # supplement with legacy discover_categories for missing types
             if fandom_result.get_total_page_count() > 0 and len(fandom_result.pages) <= 2:
-                print(f"[AnimeResearch/API] WARNING: Only {list(fandom_result.pages.keys())} types found, attempting legacy fallback...")
+                logger.warning(f"WARNING: Only {list(fandom_result.pages.keys())} types found, attempting legacy fallback...")
                 try:
                     from ..scrapers.wiki_normalize import discover_categories
                     all_cats = fandom_client._get_all_categories(wiki_url)
@@ -1175,10 +1179,10 @@ Supplemental knowledge: {response.content}
                                     # Append to all_content
                                     for page in type_pages:
                                         fandom_result.all_content += f"\n\n## [{ctype.upper()}] {page.title}\n{page.clean_text}"
-                                    print(f"[AnimeResearch/API]   Legacy fallback: +{len(type_pages)} '{ctype}' pages")
-                    print(f"[AnimeResearch/API] After fallback: {fandom_result.get_total_page_count()} pages across {len(fandom_result.pages)} types")
+                                    logger.warning(f"Legacy fallback: +{len(type_pages)} '{ctype}' pages")
+                    logger.warning(f"After fallback: {fandom_result.get_total_page_count()} pages across {len(fandom_result.pages)} types")
                 except Exception as e:
-                    print(f"[AnimeResearch/API] Legacy fallback failed (non-fatal): {e}")
+                    logger.error(f"Legacy fallback failed (non-fatal): {e}")
             
             if progress_tracker:
                 await progress_tracker.emit(
@@ -1188,7 +1192,7 @@ Supplemental knowledge: {response.content}
                     {"wiki": wiki_url, "pages": fandom_result.get_total_page_count(), "scope": scope}
                 )
         else:
-            print(f"[AnimeResearch/API] No relevant Fandom wiki found, falling back to web-search pipeline")
+            logger.info(f"No relevant Fandom wiki found, falling back to web-search pipeline")
             
             if progress_tracker:
                 await progress_tracker.emit(
@@ -1385,11 +1389,11 @@ Respond with ONLY valid JSON, no markdown or explanation."""
             }
             output.storytelling_tropes = interp.storytelling_tropes or {}
             
-            print(f"[AnimeResearch/API] LLM interpretation: DNA={len(output.dna_scales)} scales, combat={output.combat_style}, power={output.power_distribution}")
+            logger.info(f"LLM interpretation: DNA={len(output.dna_scales)} scales, combat={output.combat_style}, power={output.power_distribution}")
             
         except Exception as e:
             import traceback
-            print(f"[AnimeResearch/API] LLM interpretation failed: {e}")
+            logger.error(f"LLM interpretation failed: {e}")
             traceback.print_exc()
             output.confidence -= 20
         
@@ -1433,11 +1437,11 @@ Respond with ONLY valid JSON."""
                     "limitations": ps_result.limitations,
                     "tiers": ps_result.tiers,
                 }
-                print(f"[AnimeResearch/API] Power system: {ps_result.name}")
+                logger.info(f"Power system: {ps_result.name}")
                 
             except Exception as e:
                 import traceback
-                print(f"[AnimeResearch/API] Power system synthesis failed: {e}")
+                logger.error(f"Power system synthesis failed: {e}")
                 traceback.print_exc()
         
         # --- LLM Call 3: Voice Cards (only if character pages with quotes exist) ---
@@ -1518,11 +1522,11 @@ Return as a JSON object with key "voice_cards" containing a list of voice card o
                     }
                     for vc in vc_result.voice_cards
                 ]
-                print(f"[AnimeResearch/API] Voice cards: {len(output.voice_cards)} characters")
+                logger.info(f"Voice cards: {len(output.voice_cards)} characters")
                 
             except Exception as e:
                 import traceback
-                print(f"[AnimeResearch/API] Voice card extraction failed: {e}")
+                logger.error(f"Voice card extraction failed: {e}")
                 traceback.print_exc()
         
         # --- LLM Call 4: Narrative Synthesis (director personality + author voice) ---
@@ -1615,12 +1619,12 @@ Respond with ONLY valid JSON."""
                 "example_voice": av.example_voice,
             }
             
-            print(f"[AnimeResearch/API] Narrative synthesis: pacing={output.pacing_style}, director={output.director_personality[:80]}...")
-            print(f"[AnimeResearch/API] Author voice: {len(av.sentence_patterns)} patterns, {len(av.structural_motifs)} motifs")
+            logger.info(f"Narrative synthesis: pacing={output.pacing_style}, director={output.director_personality[:80]}...")
+            logger.info(f"Author voice: {len(av.sentence_patterns)} patterns, {len(av.structural_motifs)} motifs")
             
         except Exception as e:
             import traceback
-            print(f"[AnimeResearch/API] Narrative synthesis failed (non-fatal): {e}")
+            logger.error(f"Narrative synthesis failed (non-fatal): {e}")
             traceback.print_exc()
         
         # ========== STEP 5: Confidence Assessment ==========
@@ -1640,7 +1644,7 @@ Respond with ONLY valid JSON."""
                 {"confidence": output.confidence, "title": output.title, "method": "api_first"}
             )
         
-        print(f"[AnimeResearch/API] Complete: {output.title}, confidence={output.confidence}%, method=api_first")
+        logger.info(f"Complete: {output.title}, confidence={output.confidence}%, method=api_first")
         return output
     
     @staticmethod
@@ -1707,7 +1711,7 @@ async def research_anime_with_search(
         try:
             return await agent.research_anime_api(anime_name, progress_tracker=progress_tracker)
         except Exception as e:
-            print(f"[AnimeResearch] API pipeline failed: {e}, falling back to web search")
+            logger.error(f"API pipeline failed: {e}, falling back to web search")
             return await agent.research_anime(anime_name, progress_tracker=progress_tracker)
     else:
         return await agent.research_anime(anime_name, progress_tracker=progress_tracker)

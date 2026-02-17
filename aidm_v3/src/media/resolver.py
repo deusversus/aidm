@@ -8,6 +8,10 @@ no portrait exists.
 import re
 from typing import Dict, Optional, Tuple
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 # Pattern matches {{Name}} with 1-3 words (covers "Sasuke", "Gojo Satoru", etc.)
 PORTRAIT_MARKER = re.compile(r'\{\{([A-Za-z][A-Za-z\' ]{0,50}?)\}\}')
 
@@ -78,7 +82,7 @@ def resolve_portraits(
                 
     except Exception as e:
         # Resolution failure should never break the narrative
-        print(f"[MediaResolver] Portrait lookup failed: {e}")
+        logger.error(f"Portrait lookup failed: {e}")
     
     # Replace all {{Name}} markers with **Name** (bold fallback)
     def replace_marker(match):
@@ -88,6 +92,6 @@ def resolve_portraits(
     cleaned = PORTRAIT_MARKER.sub(replace_marker, narrative)
     
     if portrait_map:
-        print(f"[MediaResolver] Resolved {len(portrait_map)}/{len(unique_names)} portraits: {list(portrait_map.keys())}")
+        logger.info(f"Resolved {len(portrait_map)}/{len(unique_names)} portraits: {list(portrait_map.keys())}")
     
     return cleaned, portrait_map

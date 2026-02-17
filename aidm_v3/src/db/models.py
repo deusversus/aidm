@@ -1,5 +1,7 @@
 """SQLAlchemy database models for AIDM v3."""
 
+from ..enums import ArcPhase, NPCIntelligenceStage
+
 from sqlalchemy import (
     Column,
     Integer,
@@ -180,7 +182,7 @@ class NPC(Base):
     narrative_role = Column(String(50), nullable=True)  # witness, subordinate, grounding, protagonist
     
     # Cognitive Evolution (Module 04)
-    intelligence_stage = Column(String(50), default="reactive")  # contextual, anticipatory, autonomous
+    intelligence_stage = Column(String(50), default=NPCIntelligenceStage.REACTIVE)  # contextual, anticipatory, autonomous
     
     # Emotional Milestones (Module 04) - Tracking relationship "firsts"
     # {"first_humor": {"session": 3, "context": "..."}, "first_sacrifice": null, ...}
@@ -215,7 +217,7 @@ class WorldState(Base):
     
     # Arc tracking (for Director, Phase 4)
     arc_name = Column(String(255), nullable=True)
-    arc_phase = Column(String(50), default="rising_action")
+    arc_phase = Column(String(50), default=ArcPhase.RISING_ACTION)
     tension_level = Column(Float, default=0.5)  # 0.0 to 1.0
     turns_in_phase = Column(Integer, default=0)  # #3: pacing gate counter
     

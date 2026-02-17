@@ -33,7 +33,12 @@ from ..agents.recap_agent import RecapAgent
 # Override Handler (META/OVERRIDE commands)
 from ..agents.override_handler import OverrideHandler
 from ..db.session import create_session
+from ..enums import NarrativeWeight
 
+
+import logging
+
+logger = logging.getLogger(__name__)
 
 class Orchestrator:
     """Main turn loop for AIDM v3.
@@ -137,7 +142,7 @@ class Orchestrator:
         from Session Zero context + the narrative profile. Called once when
         Session Zero completes, before the first gameplay turn.
         """
-        print(f"[Director Startup] Beginning pilot episode planning...")
+        logger.info(f"Beginning pilot episode planning...")
         
         # Run the Director's startup briefing
         director_output = await self.director.run_startup_briefing(
@@ -167,11 +172,11 @@ class Orchestrator:
         self._last_director_turn = 0
         self._arc_events_since_director = []
         
-        print(f"[Director Startup] Opening arc: '{director_output.current_arc}' "
+        logger.info(f"[Director Startup] Opening arc: '{director_output.current_arc}' "
               f"(phase: {director_output.arc_phase}, tension: {director_output.tension_level:.1f})")
-        print(f"[Director Startup] Director notes: {director_output.director_notes[:200]}...")
+        logger.info(f"Director notes: {director_output.director_notes[:200]}...")
         if director_output.active_foreshadowing:
-            print(f"[Director Startup] Foreshadowing seeds: {len(director_output.active_foreshadowing)}")
+            logger.info(f"Foreshadowing seeds: {len(director_output.active_foreshadowing)}")
 
     async def process_turn(self, player_input: str, recent_messages: list = None, compaction_text: str = "") -> TurnResult:
         """Process a single turn.
@@ -190,7 +195,7 @@ class Orchestrator:
         # Wait for previous turn's background processing to finish
         # (almost never blocks — users take ~5-10s between turns)
         if self._bg_lock.locked():
-            print(f"[Orchestrator] Waiting for previous turn's background processing...")
+            logger.info(f"Waiting for previous turn's background processing...")
             async with self._bg_lock:
                 pass  # Just wait for release
         
@@ -372,7 +377,7 @@ class Orchestrator:
                 profile_id=self.profile_id
             )
             
-            print(f"[Orchestrator] WORLD_BUILDING: {len(wb_result.entities)} entities, status={wb_result.validation_status}")
+            logger.info(f"WORLD_BUILDING: {len(wb_result.entities)} entities, status={wb_result.validation_status}")
             
             if wb_result.validation_status == "rejected":
                 # Return a natural rejection narrative
@@ -438,7 +443,7 @@ class Orchestrator:
         
         if is_trivial:
             # TIER 0 FAST-PATH: Skip OutcomeJudge, memory ranking, and pacing
-            print(f"[Orchestrator] TIER 0 fast-path: trivial action, skipping Outcome/Memory/Pacing")
+            logger.warning(f"TIER 0 fast-path: trivial action, skipping Outcome/Memory/Pacing")
             
             # Synthetic auto-success outcome for trivial actions
             from ..agents.outcome_judge import OutcomeOutput
@@ -448,7 +453,7 @@ class Orchestrator:
                 modifiers={},
                 calculated_roll=15,
                 success_level="success",
-                narrative_weight="minor",
+                narrative_weight=NarrativeWeight.MINOR,
                 cost=None,
                 consequence=None,
                 reasoning="Trivial action auto-success"
@@ -551,23 +556,23 @@ class Orchestrator:
             if isinstance(outcome, Exception):
                 raise RuntimeError(f"Outcome judgment failed: {outcome}")
             if isinstance(ranked_memories, Exception):
-                print(f"[Orchestrator] Memory ranking failed: {ranked_memories}, using unranked")
+                logger.error(f"Memory ranking failed: {ranked_memories}, using unranked")
                 ranked_memories = "No relevant past memories found."
             if isinstance(pacing_directive, Exception):
-                print(f"[Orchestrator] Pacing micro-check failed (non-fatal): {pacing_directive}")
+                logger.error(f"Pacing micro-check failed (non-fatal): {pacing_directive}")
                 pacing_directive = None
             elif pacing_directive:
-                print(f"[PacingAgent] Beat: {pacing_directive.arc_beat}, Tone: {pacing_directive.tone}, Escalation: {pacing_directive.escalation_target:.0%}")
+                logger.info(f"Beat: {pacing_directive.arc_beat}, Tone: {pacing_directive.tone}, Escalation: {pacing_directive.escalation_target:.0%}")
             
             # #18: Extract recap result (index 3, if present)
             recap_result = None
             if recap_task and len(phase2_results) > 3:
                 recap_result = phase2_results[3]
                 if isinstance(recap_result, Exception):
-                    print(f"[Orchestrator] Recap generation failed (non-fatal): {recap_result}")
+                    logger.error(f"Recap generation failed (non-fatal): {recap_result}")
                     recap_result = None
                 elif recap_result:
-                    print(f"[RecapAgent] Recap generated: {len(recap_result.recap_text)} chars")
+                    logger.info(f"Recap generated: {len(recap_result.recap_text)} chars")
         
         current_turn.outcome = outcome
         
@@ -597,7 +602,7 @@ class Orchestrator:
                         if not validation.is_valid:
                             combat_occurred = False
                             for err in validation.errors:
-                                print(f"[Transaction] Pre-validation failed: {err.message}")
+                                logger.error(f"Pre-validation failed: {err.message}")
                             txn.rollback()
                         # If valid, txn auto-commits on exit
                 
@@ -609,7 +614,7 @@ class Orchestrator:
                         context=db_context,
                         profile=self.profile
                     )
-                    print(f"[Combat] Pre-narrative resolution: {combat_result.damage_dealt} damage, hit={combat_result.hit}")
+                    logger.info(f"Pre-narrative resolution: {combat_result.damage_dealt} damage, hit={combat_result.hit}")
         
         # Store for _post_narrative_processing bookkeeping
         self._last_combat_occurred = combat_occurred
@@ -647,8 +652,8 @@ class Orchestrator:
             
             # Log modifiers
             if power_result.context_modifiers:
-                print(f"[Module 12] Power imbalance: {power_result.raw_imbalance:.1f} → {power_result.effective_imbalance:.1f}")
-                print(f"[Module 12] Context modifiers: {', '.join(power_result.context_modifiers)}")
+                logger.info(f"Power imbalance: {power_result.raw_imbalance:.1f} → {power_result.effective_imbalance:.1f}")
+                logger.info(f"Context modifiers: {', '.join(power_result.context_modifiers)}")
             
             # =====================================================================
             # PROGRESSIVE OP MODE: Track high-imbalance encounters
@@ -657,7 +662,7 @@ class Orchestrator:
             if power_result.effective_imbalance > 10 and not db_context.op_protagonist_enabled:
                 # Increment counter
                 count = self.state.increment_high_imbalance_count()
-                print(f"[Progressive OP] High-imbalance encounter #{count}")
+                logger.info(f"High-imbalance encounter #{count}")
                 
                 # Check for suggestion trigger
                 if (count >= 3 
@@ -677,7 +682,7 @@ class Orchestrator:
                     
                     if suggestion and suggestion.get("should_prompt"):
                         db_context.pending_op_suggestion = suggestion
-                        print(f"[Progressive OP] Suggesting preset: {suggestion.get('preset', 'unknown')} (confidence: {suggestion.get('confidence', 0):.0%})")
+                        logger.info(f"Suggesting preset: {suggestion.get('preset', 'unknown')} (confidence: {suggestion.get('confidence', 0):.0%})")
             
             # Add to RAG context for Key Animator
             if power_result.triggers_tension_shift:
@@ -706,7 +711,7 @@ class Orchestrator:
 
                 if static_parts:
                     self.key_animator.set_static_rule_guidance("\n\n".join(static_parts))
-                    print(f"[OP Mode] Set static 3-axis guidance in Block 1 (cache-stable): "
+                    logger.info(f"[OP Mode] Set static 3-axis guidance in Block 1 (cache-stable): "
                           f"{db_context.op_tension_source}/{db_context.op_power_expression}/{db_context.op_narrative_focus}")
         
         # =====================================================================
@@ -729,7 +734,7 @@ class Orchestrator:
                 
                 if suggestion:
                     db_context.pending_op_suggestion = suggestion
-                    print(f"[OP Mode] Missing composition! Suggesting: {suggestion.get('preset', 'unknown')}")
+                    logger.warning(f"Missing composition! Suggesting: {suggestion.get('preset', 'unknown')}")
             
             # Inject tension guidance for high power imbalance
             power_imbalance = db_context.power_imbalance
@@ -737,7 +742,7 @@ class Orchestrator:
                 tension_guidance = self.rules.get_op_axis_guidance("tension", db_context.op_tension_source or "existential")
                 if tension_guidance:
                     rag_context["tension_guidance"] = tension_guidance
-                    print(f"[OP Mode] Injected tension guidance (imbalance: {power_imbalance:.1f})")
+                    logger.info(f"Injected tension guidance (imbalance: {power_imbalance:.1f})")
         
         # Inject NPC behavior context for present NPCs
         if db_context.present_npcs:
@@ -760,7 +765,7 @@ class Orchestrator:
         override_context = self.override_handler.format_overrides_for_context(self.campaign_id)
         if override_context:
             rag_context["player_overrides"] = override_context
-            print(f"[Overrides] Injected {len(self.override_handler.get_active_overrides(self.campaign_id))} active overrides")
+            logger.info(f"Injected {len(self.override_handler.get_active_overrides(self.campaign_id))} active overrides")
         
         # Inject faction context for faction-focused OP modes
         if db_context.op_narrative_focus == "faction":
@@ -801,7 +806,7 @@ class Orchestrator:
                         "Adapt your writing to match these narrative DNA settings:\n\n"
                         + "\n\n".join(dna_parts)
                     )
-                    print(f"[RuleLibrary] DNA guidance for {len(dna_parts)} extreme scales → Block 1 (cache-stable)")
+                    logger.info(f"DNA guidance for {len(dna_parts)} extreme scales → Block 1 (cache-stable)")
 
             # Genre Guidance: structural storytelling guidance for detected genres
             if self.profile.detected_genres:
@@ -816,7 +821,7 @@ class Orchestrator:
                         "Structure scenes according to these genre conventions:\n\n"
                         + "\n\n".join(genre_parts)
                     )
-                    print(f"[RuleLibrary] Genre guidance → Block 1 (cache-stable): {', '.join(g for g in self.profile.detected_genres[:2])}")
+                    logger.info(f"Genre guidance → Block 1 (cache-stable): {', '.join(g for g in self.profile.detected_genres[:2])}")
 
             if static_rule_parts:
                 # Merge with any existing static guidance (e.g. OP axis set earlier)
@@ -832,7 +837,7 @@ class Orchestrator:
                     f"## 🌍 Narrative Scale: {db_context.narrative_scale.upper()}\n"
                     f"{scale_guidance}"
                 )
-                print(f"[RuleLibrary] Injected scale guidance: {db_context.narrative_scale}")
+                logger.info(f"Injected scale guidance: {db_context.narrative_scale}")
         
         # 4. Compatibility Guidance: tier×scale combo guidance for Director-aware narration
         power_tier_str = db_context.power_tier or self.profile.world_tier or "T8"
@@ -847,7 +852,7 @@ class Orchestrator:
                     f"## ⚖️ Power×Scale: T{tier_num} at {db_context.narrative_scale}\n"
                     f"{compat_guidance}"
                 )
-                print(f"[RuleLibrary] Injected compatibility guidance: T{tier_num} × {db_context.narrative_scale}")
+                logger.info(f"Injected compatibility guidance: T{tier_num} × {db_context.narrative_scale}")
         
         # #17: Inject active consequences for narrative awareness
         active_consequences = self.state.get_active_consequences(limit=8)
@@ -863,7 +868,7 @@ class Orchestrator:
                 "These are narrative consequences still in effect. Reference them for continuity:\n\n"
                 + "\n".join(consequence_lines)
             )
-            print(f"[Consequence] Injected {len(active_consequences)} active consequences into context")
+            logger.info(f"Injected {len(active_consequences)} active consequences into context")
         
         # #23: Inject pre-resolved combat result for KeyAnimator
         if combat_result:
@@ -880,7 +885,7 @@ class Orchestrator:
                 combat_text += f"**Mechanical Detail:** {combat_result.description}\n"
             combat_text += "\n*Narrate the above mechanical result. Do NOT contradict these numbers.*"
             rag_context["combat_result"] = combat_text
-            print(f"[Combat] Injected combat result into KeyAnimator context")
+            logger.info(f"Injected combat result into KeyAnimator context")
         
         # 3b. Validation Loop
         # Check if the outcome makes sense. If not, retry outcome generation with feedback.
@@ -901,7 +906,7 @@ class Orchestrator:
                 break
                 
             # If invalid, regenerate outcome with correction
-            print(f"Validation failed: {validation.correction}. Retrying...")
+            logger.error(f"Validation failed: {validation.correction}. Retrying...")
             outcome = await self.outcome_judge.call(
                 f"Action: {intent.action} (RETRY)",
                 intent=intent.model_dump_json(),
@@ -916,14 +921,14 @@ class Orchestrator:
         # 4. Generate narrative (KeyAnimator with optional Sakuga Mode)
         # Determine if this is a sakuga moment (climactic, high intensity)
         use_sakuga = False
-        if outcome.narrative_weight == "climactic":
+        if outcome.narrative_weight == NarrativeWeight.CLIMACTIC:
             use_sakuga = True
         elif intent.intent == "COMBAT" or outcome.calculated_roll >= 20: # Natural 20 or high
             use_sakuga = True
         # Special conditions auto-trigger sakuga
         elif any(cond in intent.special_conditions for cond in ("named_attack", "first_time_power")):
             use_sakuga = True
-            print(f"[Orchestrator] Auto-sakuga triggered by special condition: {intent.special_conditions}")
+            logger.info(f"Auto-sakuga triggered by special condition: {intent.special_conditions}")
         
         # Single narrative path - KeyAnimator handles both normal and sakuga modes
         
@@ -948,8 +953,8 @@ class Orchestrator:
         new_mode = effective_comp.get('mode', 'standard')
         # #15: Log mode transitions (per-scene awareness for Director)
         if prev_mode != new_mode:
-            print(f"[Composition] Mode transition: {prev_mode} → {new_mode} (threat: {current_threat or 'world baseline'})")
-        print(f"[Orchestrator] Power Differential: {effective_comp.get('differential', 0)} tiers, mode={new_mode}")
+            logger.info(f"Mode transition: {prev_mode} → {new_mode} (threat: {current_threat or 'world baseline'})")
+        logger.info(f"Power Differential: {effective_comp.get('differential', 0)} tiers, mode={new_mode}")
         
         # === NPC CONTEXT CARDS (Module 04) ===
         # Build structured NPC relationship data for disposition-aware narration
@@ -965,7 +970,7 @@ class Orchestrator:
                 underserved = [f"{name} (+{debt})" for name, debt in spotlight.items() if debt > 0]
                 if underserved:
                     npc_context += f"\n\n[Spotlight Hint] These NPCs need more screen time: {', '.join(underserved)}"
-            print(f"[Orchestrator] NPC context: {len(pre_narr_npcs)} NPCs present")
+            logger.info(f"NPC context: {len(pre_narr_npcs)} NPCs present")
         
         # === FORESHADOWING CALLBACKS (#9) ===
         # Surface seeds that are ready for payoff to the KeyAnimator
@@ -984,7 +989,7 @@ class Orchestrator:
                 "if the situation permits \u2014 don't force them.\n\n"
                 + "\n".join(callbacks)
             )
-            print(f"[Foreshadowing] Injected {len(callbacks)} callback opportunities for KeyAnimator")
+            logger.info(f"Injected {len(callbacks)} callback opportunities for KeyAnimator")
         
         # === AGENTIC RESEARCH TOOLS (Module 2) ===
         # Build gameplay tools for KeyAnimator's optional research phase
@@ -1012,10 +1017,10 @@ class Orchestrator:
         )
         
         # DEBUG: Log narrative generation
-        print(f"[Orchestrator] Narrative generated:")
-        print(f"[Orchestrator]   - type: {type(narrative)}")
-        print(f"[Orchestrator]   - length: {len(narrative) if narrative else 0}")
-        print(f"[Orchestrator]   - empty: {not narrative or narrative.strip() == ''}")
+        logger.info(f"Narrative generated:")
+        logger.info(f"- type: {type(narrative)}")
+        logger.info(f"- length: {len(narrative) if narrative else 0}")
+        logger.info(f"- empty: {not narrative or narrative.strip() == ''}")
         
         current_turn.narrative = narrative
         
@@ -1033,7 +1038,7 @@ class Orchestrator:
                 recap_text += "**Active Threads:** " + " \u2022 ".join(recap_result.key_threads) + "\n\n"
             recap_text += "---\n\n"
             narrative = recap_text + narrative
-            print(f"[Orchestrator] Recap prepended ({len(recap_text)} chars)")
+            logger.info(f"Recap prepended ({len(recap_text)} chars)")
         
         # =====================================================================
         # CRITICAL PATH: OP suggestion display (mutates narrative before return)
@@ -1069,7 +1074,7 @@ class Orchestrator:
         
         # Measure latency NOW (before background work)
         latency = int((time.time() - start) * 1000)
-        print(f"[Orchestrator] FINAL narrative length: {len(narrative) if narrative else 0} (latency: {latency}ms)")
+        logger.info(f"FINAL narrative length: {len(narrative) if narrative else 0} (latency: {latency}ms)")
         
         # =====================================================================
         # FIRE-AND-FORGET: All post-narrative processing runs in background
@@ -1097,7 +1102,7 @@ class Orchestrator:
             from src.media.resolver import resolve_portraits
             narrative, portrait_map = resolve_portraits(narrative, self.campaign_id)
         except Exception as e:
-            print(f"[Orchestrator] Portrait resolution failed (non-fatal): {e}")
+            logger.error(f"Portrait resolution failed (non-fatal): {e}")
         
         return TurnResult(
             narrative=narrative,
@@ -1178,7 +1183,7 @@ class Orchestrator:
                                 post_validation = self.validator.validate_state_integrity(char_state)
                                 if not post_validation.is_valid:
                                     for error in post_validation.errors:
-                                        print(f"[Validator] {error.severity.value}: {error.description}")
+                                        logger.error(f"{error.severity.value}: {error.description}")
                         # Clear instance state
                         self._last_combat_occurred = False
                         self._last_combat_result = None
@@ -1200,17 +1205,17 @@ class Orchestrator:
                     should_calculate_progression = (
                         combat_occurred or
                         use_sakuga or
-                        outcome.narrative_weight in ["significant", "climactic"] or
+                        outcome.narrative_weight in [NarrativeWeight.SIGNIFICANT, NarrativeWeight.CLIMACTIC] or
                         (hasattr(outcome, 'quest_progress') and outcome.quest_progress)
                     )
                     
                     if character and should_calculate_progression:
                         turn_result_data = {
                             "combat_occurred": combat_occurred,
-                            "boss_fight": combat_result.narrative_weight == "climactic" if combat_result else False,
+                            "boss_fight": combat_result.narrative_weight == NarrativeWeight.CLIMACTIC if combat_result else False,
                             "sakuga_moment": combat_result.sakuga_moment if combat_result else use_sakuga,
                             "quest_completed": outcome.quest_progress if hasattr(outcome, 'quest_progress') else False,
-                            "significant_roleplay": outcome.narrative_weight in ["significant", "climactic"],
+                            "significant_roleplay": outcome.narrative_weight in [NarrativeWeight.SIGNIFICANT, NarrativeWeight.CLIMACTIC],
                         }
                         progression_result = await self.progression.calculate_progression(
                             character=character,
@@ -1220,7 +1225,7 @@ class Orchestrator:
                         if progression_result.xp_awarded > 0:
                             self.state.apply_progression(progression_result)
                     elif character and not should_calculate_progression:
-                        print(f"[Background] Skipping progression: no XP-worthy events")
+                        logger.warning(f"Skipping progression: no XP-worthy events")
                 
                     # =============================================================
                     # 4. TURN RECORDING + EVENT MEMORY
@@ -1251,7 +1256,7 @@ class Orchestrator:
                         
                         if npc_lookup:
                             try:
-                                print(f"[Background] Batch NPC analysis for {len(npc_lookup)} NPCs")
+                                logger.info(f"Batch NPC analysis for {len(npc_lookup)} NPCs")
                                 batch_results = await self.relationship_analyzer.analyze_batch(
                                     npc_names=list(npc_lookup.keys()),
                                     action=intent.action,
@@ -1279,7 +1284,7 @@ class Orchestrator:
                                                 turn_number=db_context.turn_number,
                                                 heat=8
                                             )
-                                            print(f"[NPC] Disposition threshold crossed: {milestone['event']}")
+                                            logger.info(f"Disposition threshold crossed: {milestone['event']}")
                                     
                                     if rel_result.emotional_milestone:
                                         event = self.state.record_emotional_milestone(
@@ -1295,10 +1300,10 @@ class Orchestrator:
                                         self.state.evolve_npc_intelligence(npc.id, interaction_count, False)
                                     
                                     if rel_result.affinity_delta != 0 or rel_result.emotional_milestone:
-                                        print(f"[RelationshipAnalyzer] {rel_result.npc_name}: delta={rel_result.affinity_delta}, milestone={rel_result.emotional_milestone}")
+                                        logger.info(f"{rel_result.npc_name}: delta={rel_result.affinity_delta}, milestone={rel_result.emotional_milestone}")
                                 
                             except Exception as e:
-                                print(f"[RelationshipAnalyzer] Batch error: {e}")
+                                logger.error(f"Batch error: {e}")
                                 for npc_name, npc in npc_lookup.items():
                                     interaction_count = self.state.get_npc_interaction_count(npc.id)
                                     self.state.evolve_npc_intelligence(npc.id, interaction_count, False)
@@ -1323,7 +1328,7 @@ class Orchestrator:
                                 seed_id, db_context.turn_number,
                                 resolution_narrative=f"Paid off in turn {db_context.turn_number} narrative"
                             )
-                            print(f"[Foreshadowing] Auto-resolved seed '{seed_id}': {seed.description}")
+                            logger.info(f"Auto-resolved seed '{seed_id}': {seed.description}")
                     
                     # #12: Overdue seeds escalate world tension
                     if overdue_seeds:
@@ -1333,7 +1338,7 @@ class Orchestrator:
                         current_tension = current_tension or 0.5
                         new_tension = min(1.0, current_tension + tension_bump)
                         self.state.update_world_state(tension_level=new_tension)
-                        print(f"[Foreshadowing] {len(overdue_seeds)} overdue seeds → tension {current_tension:.2f} → {new_tension:.2f}")
+                        logger.info(f"{len(overdue_seeds)} overdue seeds → tension {current_tension:.2f} → {new_tension:.2f}")
                     
                     # #3: Increment turns_in_phase counter (resets on phase change via Director)
                     self.state.update_world_state(
@@ -1352,7 +1357,7 @@ class Orchestrator:
                         arc_events_this_turn.append("level_up")
                     if use_sakuga:
                         arc_events_this_turn.append("sakuga_moment")
-                    if combat_occurred and combat_result and combat_result.narrative_weight == "climactic":
+                    if combat_occurred and combat_result and combat_result.narrative_weight == NarrativeWeight.CLIMACTIC:
                         arc_events_this_turn.append("boss_defeat")
                     
                     self._arc_events_since_director.extend(arc_events_this_turn)
@@ -1376,7 +1381,7 @@ class Orchestrator:
                         if turns_since_director >= 8:
                             trigger_reason.append("max_interval")
                         
-                        print(f"[Director] HYBRID TRIGGER at turn {db_context.turn_number}: {trigger_reason}")
+                        logger.info(f"HYBRID TRIGGER at turn {db_context.turn_number}: {trigger_reason}")
                         
                         session = self.state.get_current_session_model()
                         bible = self.state.get_campaign_bible()
@@ -1431,7 +1436,7 @@ class Orchestrator:
                             self._accumulated_epicness = 0.0
                             self._arc_events_since_director = []
                             
-                            print(f"[Director] Checkpoint at turn {db_context.turn_number}: {director_output.arc_phase} (tension: {director_output.tension_level:.1f})")
+                            logger.info(f"Checkpoint at turn {db_context.turn_number}: {director_output.arc_phase} (tension: {director_output.tension_level:.1f})")
                 
                 # END deferred_commit block — single atomic SQL commit here
                 # =============================================================
@@ -1442,9 +1447,9 @@ class Orchestrator:
                     if db_context.turn_number > 0 and db_context.turn_number % 10 == 0:
                         compression_result = await self.memory.compress_cold_memories()
                         if compression_result.get("compressed"):
-                            print(f"[Memory] Compressed {compression_result['memories_removed']} memories into {compression_result['summaries_created']} summaries")
+                            logger.info(f"Compressed {compression_result['memories_removed']} memories into {compression_result['summaries_created']} summaries")
                 except Exception as e:
-                    print(f"[ChromaDB Recovery] Memory compression failed (will retry next cycle): {e}")
+                    logger.error(f"Memory compression failed (will retry next cycle): {e}")
                 
                 # =============================================================
                 # 9. EPISODIC MEMORY
@@ -1460,15 +1465,15 @@ class Orchestrator:
                         location=location,
                         summary=f"{action_summary} — {outcome_summary}"
                     )
-                    print(f"[Background] Episodic memory written for turn {turn_number}")
+                    logger.info(f"Episodic memory written for turn {turn_number}")
                 except Exception as e:
-                    print(f"[ChromaDB Recovery] Episodic write failed (idempotent, will retry): {e}")
+                    logger.error(f"Episodic write failed (idempotent, will retry): {e}")
                 
                 bg_elapsed = int((time.time() - bg_start) * 1000)
-                print(f"[Background] Post-narrative processing complete ({bg_elapsed}ms)")
+                logger.info(f"Post-narrative processing complete ({bg_elapsed}ms)")
                 
             except Exception as e:
-                print(f"[Background] Post-narrative processing FAILED: {e}")
+                logger.error(f"Post-narrative processing FAILED: {e}")
                 import traceback
                 traceback.print_exc()
     
@@ -1576,9 +1581,9 @@ class Orchestrator:
                 situation=db_context.situation or "",
                 current_location=db_context.location or "",
             )
-            print(f"[ProductionAgent] Post-narrative check complete")
+            logger.info(f"Post-narrative check complete")
         except Exception as e:
-            print(f"[ProductionAgent] Failed (non-fatal): {e}")
+            logger.error(f"Failed (non-fatal): {e}")
     
     async def _bg_extract_entities(self, narrative: str, turn_number: int):
         """Background entity extraction + narrative beat indexing from DM narrative."""
@@ -1619,9 +1624,9 @@ class Orchestrator:
                                     },
                                     turn_number=turn_number
                                 )
-                            print(f"[NPC Evolution] Stored narrative beat: {beat_text}")
+                            logger.info(f"Stored narrative beat: {beat_text}")
         except Exception as e:
-            print(f"[NPC Evolution] Intelligence check failed (non-fatal): {e}")
+            logger.error(f"Intelligence check failed (non-fatal): {e}")
     
     async def _extract_world_entities(self, narrative: str, turn_number: int):
         """Extract world-building entities (NPCs, locations, items) from narrative."""
@@ -1636,9 +1641,9 @@ class Orchestrator:
                 if entity.is_new:
                     await self._apply_world_building_entity(entity, turn_number)
             if dm_entities.entities:
-                print(f"[Background] Extracted {len(dm_entities.entities)} entities from narrative")
+                logger.info(f"Extracted {len(dm_entities.entities)} entities from narrative")
         except Exception as e:
-            print(f"[Background] Entity extraction failed: {e}")
+            logger.error(f"Entity extraction failed: {e}")
     
     async def _extract_narrative_beats(self, narrative: str, turn_number: int):
         """Extract narrative beats from DM narrative and index to ChromaDB.
@@ -1706,15 +1711,15 @@ class Orchestrator:
                         flags=flags,
                     )
                 except Exception as e:
-                    print(f"[ChromaDB Recovery] Narrative beat write failed: {e}")
+                    logger.error(f"Narrative beat write failed: {e}")
             
             critical_count = sum(1 for b in result.beats if b.is_plot_critical)
-            print(
+            logger.info(
                 f"[Background] Extracted {len(result.beats)} narrative beats "
                 f"({critical_count} plot-critical) from turn {turn_number}"
             )
         except Exception as e:
-            print(f"[Background] Narrative beat extraction failed (non-fatal): {e}")
+            logger.error(f"Narrative beat extraction failed (non-fatal): {e}")
     
     async def _bg_relationship_analysis(self, narrative: str, player_input: str, outcome, turn_number: int):
         """Background NPC relationship analysis from narrative."""
@@ -1736,9 +1741,9 @@ class Orchestrator:
                         milestone_context=rel.reasoning
                     )
                 if rel_results:
-                    print(f"[Background] Relationship analysis: {len(rel_results)} NPCs updated")
+                    logger.info(f"Relationship analysis: {len(rel_results)} NPCs updated")
         except Exception as e:
-            print(f"[Background] Relationship analysis failed (non-fatal): {e}")
+            logger.error(f"Relationship analysis failed (non-fatal): {e}")
     
     def close(self):
         """Clean up resources."""
@@ -1777,9 +1782,9 @@ class Orchestrator:
                     role=entity.details.get("role", "acquaintance"),
                     relationship_notes=entity.implied_backstory
                 )
-                print(f"[WorldBuilding] Created NPC: {entity.name}")
+                logger.info(f"Created NPC: {entity.name}")
             except Exception as e:
-                print(f"[WorldBuilding] Failed to create NPC {entity.name}: {e}")
+                logger.error(f"Failed to create NPC {entity.name}: {e}")
             
             # Index to memory
             self.memory.add_memory(
@@ -1793,9 +1798,9 @@ class Orchestrator:
             # Add to character inventory
             try:
                 self.state.add_inventory_item(entity.name, entity.details)
-                print(f"[WorldBuilding] Added item: {entity.name}")
+                logger.info(f"Added item: {entity.name}")
             except Exception as e:
-                print(f"[WorldBuilding] Failed to add item {entity.name}: {e}")
+                logger.error(f"Failed to add item {entity.name}: {e}")
             
             # Index to memory
             self.memory.add_memory(
@@ -1814,9 +1819,9 @@ class Orchestrator:
                     location_type=entity.details.get('type', entity.details.get('location_type')),
                     atmosphere=entity.details.get('atmosphere'),
                 )
-                print(f"[WorldBuilding] Upserted location in DB: {entity.name}")
+                logger.info(f"Upserted location in DB: {entity.name}")
             except Exception as e:
-                print(f"[WorldBuilding] Location DB upsert failed: {e}")
+                logger.error(f"Location DB upsert failed: {e}")
 
             # 2. Index to ChromaDB memory
             self.memory.add_memory(
@@ -1825,7 +1830,7 @@ class Orchestrator:
                 turn_number=turn_number,
                 flags=["world_building", "location"]
             )
-            print(f"[WorldBuilding] Indexed location: {entity.name}")
+            logger.info(f"Indexed location: {entity.name}")
         
         elif entity.entity_type == "faction":
             # 1. Create faction in SQLite database
@@ -1835,9 +1840,9 @@ class Orchestrator:
                     description=entity.details.get('description', entity.implied_backstory or ''),
                     pc_controls=False
                 )
-                print(f"[WorldBuilding] Created faction in DB: {entity.name}")
+                logger.info(f"Created faction in DB: {entity.name}")
             except Exception as e:
-                print(f"[WorldBuilding] Faction DB creation failed: {e}")
+                logger.error(f"Faction DB creation failed: {e}")
             
             # 2. Index faction to ChromaDB memory
             self.memory.add_memory(
@@ -1846,7 +1851,7 @@ class Orchestrator:
                 turn_number=turn_number,
                 flags=["world_building", "faction"]
             )
-            print(f"[WorldBuilding] Indexed faction: {entity.name}")
+            logger.info(f"Indexed faction: {entity.name}")
         
         elif entity.entity_type == "event":
             # Past events are indexed as backstory
@@ -1856,7 +1861,7 @@ class Orchestrator:
                 turn_number=turn_number,
                 flags=["world_building", "backstory", "event"]
             )
-            print(f"[WorldBuilding] Indexed event: {entity.name}")
+            logger.info(f"Indexed event: {entity.name}")
         
         elif entity.entity_type == "relationship":
             # Relationships modify NPC or are indexed
@@ -1866,7 +1871,7 @@ class Orchestrator:
                 turn_number=turn_number,
                 flags=["world_building", "relationship"]
             )
-            print(f"[WorldBuilding] Indexed relationship: {entity.name}")
+            logger.info(f"Indexed relationship: {entity.name}")
         
         elif entity.entity_type == "ability":
             # Abilities mentioned but not in list - flag for later
@@ -1876,5 +1881,5 @@ class Orchestrator:
                 turn_number=turn_number,
                 flags=["world_building", "ability", "unverified"]
             )
-            print(f"[WorldBuilding] Indexed ability reference: {entity.name}")
+            logger.info(f"Indexed ability reference: {entity.name}")
 

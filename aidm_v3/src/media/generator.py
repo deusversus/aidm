@@ -18,6 +18,10 @@ from typing import Optional, Dict, Any
 from datetime import datetime
 
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 # Base paths
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 TEMPLATES_DIR = PROJECT_ROOT / "data" / "media" / "templates"
@@ -174,14 +178,14 @@ Requirements:
                     if hasattr(part, 'inline_data') and part.inline_data:
                         image_bytes = part.inline_data.data
                         output_path.write_bytes(image_bytes)
-                        print(f"[MediaGen] Model sheet saved: {output_path}")
+                        logger.info(f"Model sheet saved: {output_path}")
                         return output_path
             
-            print(f"[MediaGen] No image in response for {entity_name}")
+            logger.info(f"No image in response for {entity_name}")
             return None
             
         except Exception as e:
-            print(f"[MediaGen] Model sheet generation failed for {entity_name}: {e}")
+            logger.error(f"Model sheet generation failed for {entity_name}: {e}")
             return None
     
     async def derive_portrait(
@@ -209,7 +213,7 @@ Requirements:
         output_path = self._portraits_dir(campaign_id) / f"{safe_name}_portrait.png"
         
         if not model_sheet_path.exists():
-            print(f"[MediaGen] Model sheet not found: {model_sheet_path}")
+            logger.warning(f"Model sheet not found: {model_sheet_path}")
             return None
         
         try:
@@ -240,14 +244,14 @@ Requirements:
                     if hasattr(part, 'inline_data') and part.inline_data:
                         image_bytes = part.inline_data.data
                         output_path.write_bytes(image_bytes)
-                        print(f"[MediaGen] Portrait saved: {output_path}")
+                        logger.info(f"Portrait saved: {output_path}")
                         return output_path
             
-            print(f"[MediaGen] No portrait image in response for {entity_name}")
+            logger.info(f"No portrait image in response for {entity_name}")
             return None
             
         except Exception as e:
-            print(f"[MediaGen] Portrait generation failed for {entity_name}: {e}")
+            logger.error(f"Portrait generation failed for {entity_name}: {e}")
             return None
     
     async def generate_location_visual(
@@ -306,14 +310,14 @@ Requirements:
                 for part in response.candidates[0].content.parts:
                     if hasattr(part, 'inline_data') and part.inline_data:
                         output_path.write_bytes(part.inline_data.data)
-                        print(f"[MediaGen] Location visual saved: {output_path}")
+                        logger.info(f"Location visual saved: {output_path}")
                         return output_path
             
-            print(f"[MediaGen] No image in response for location {location_name}")
+            logger.info(f"No image in response for location {location_name}")
             return None
             
         except Exception as e:
-            print(f"[MediaGen] Location visual failed for {location_name}: {e}")
+            logger.error(f"Location visual failed for {location_name}: {e}")
             return None
     
     async def generate_full_character_media(
@@ -406,14 +410,14 @@ Requirements:
                 for part in response.candidates[0].content.parts:
                     if hasattr(part, 'inline_data') and part.inline_data:
                         output_path.write_bytes(part.inline_data.data)
-                        print(f"[MediaGen] Cutscene still saved: {output_path}")
+                        logger.info(f"Cutscene still saved: {output_path}")
                         return output_path
             
-            print(f"[MediaGen] No image in response for cutscene {filename}")
+            logger.info(f"No image in response for cutscene {filename}")
             return None
             
         except Exception as e:
-            print(f"[MediaGen] Image generation failed: {e}")
+            logger.error(f"Image generation failed: {e}")
             return None
     
     async def generate_video(
@@ -440,7 +444,7 @@ Requirements:
         self._ensure_client()
         
         if not image_path.exists():
-            print(f"[MediaGen] Source image not found: {image_path}")
+            logger.warning(f"Source image not found: {image_path}")
             return None
         
         output_path = image_path.with_suffix(".mp4")
@@ -464,7 +468,7 @@ Requirements:
                 )
                 return operation
             
-            print(f"[MediaGen] Starting Veo generation ({self.VIDEO_MODEL})...")
+            logger.info(f"Starting Veo generation ({self.VIDEO_MODEL})...")
             operation = await loop.run_in_executor(None, _start_generation)
             
             # Poll for completion (Veo is async, typically 15-60 seconds)
@@ -476,7 +480,7 @@ Requirements:
                     operation.reload()
                 return operation.result
             
-            print(f"[MediaGen] Polling for Veo completion...")
+            logger.info(f"Polling for Veo completion...")
             result = await loop.run_in_executor(None, _poll)
             
             # Extract video from result
@@ -491,14 +495,14 @@ Requirements:
                         # If we get a URI, download it
                         import urllib.request
                         urllib.request.urlretrieve(video_data.uri, str(output_path))
-                    print(f"[MediaGen] Video saved: {output_path}")
+                    logger.info(f"Video saved: {output_path}")
                     return output_path
             
-            print(f"[MediaGen] No video in Veo response")
+            logger.info(f"No video in Veo response")
             return None
             
         except Exception as e:
-            print(f"[MediaGen] Video generation failed: {e}")
+            logger.error(f"Video generation failed: {e}")
             return None
     
     async def generate_cutscene(
@@ -564,7 +568,7 @@ Requirements:
             result["cost_usd"] += 0.08  # Estimated video cost
             result["status"] = "complete"
         
-        print(f"[MediaGen] Cutscene {cutscene_type}: status={result['status']}, cost=${result['cost_usd']:.2f}")
+        logger.info(f"Cutscene {cutscene_type}: status={result['status']}, cost=${result['cost_usd']:.2f}")
         return result
     
     def _format_appearance(self, appearance: dict) -> str:

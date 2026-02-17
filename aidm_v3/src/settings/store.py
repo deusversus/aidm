@@ -10,6 +10,10 @@ from .defaults import DEFAULT_SETTINGS
 from .crypto import encrypt_api_key, decrypt_api_key, mask_api_key, is_key_configured
 
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 class SettingsStore:
     """Persists user settings to JSON file.
     
@@ -46,7 +50,7 @@ class SettingsStore:
                     data = json.load(f)
                 self._settings = UserSettings.model_validate(data)
             except (json.JSONDecodeError, Exception) as e:
-                print(f"Warning: Could not load settings: {e}")
+                logger.warning(f"Warning: Could not load settings: {e}")
                 self._settings = DEFAULT_SETTINGS.model_copy()
         else:
             self._settings = DEFAULT_SETTINGS.model_copy()

@@ -16,6 +16,10 @@ from pydantic import BaseModel, Field
 from .base import BaseAgent
 
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 class PacingDirective(BaseModel):
     """Structured pacing guidance for a single turn."""
     
@@ -181,5 +185,5 @@ The player drives the story. Gates prevent STALLING, not player agency. If the p
             )
             return result
         except Exception as e:
-            print(f"[PacingAgent] Micro-check failed (non-fatal): {e}")
+            logger.error(f"Micro-check failed (non-fatal): {e}")
             return None

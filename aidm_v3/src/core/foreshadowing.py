@@ -19,6 +19,10 @@ from datetime import datetime
 from enum import Enum
 
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 class SeedStatus(str, Enum):
     """Status of a foreshadowing seed."""
     PLANTED = "planted"       # Seed exists, waiting to grow
@@ -139,9 +143,9 @@ class ForeshadowingLedger:
             self._next_id = self._state.get_max_seed_sequence()
             
             if self._seeds:
-                print(f"[Foreshadowing] Loaded {len(self._seeds)} seeds from DB (next_id={self._next_id})")
+                logger.info(f"Loaded {len(self._seeds)} seeds from DB (next_id={self._next_id})")
         except Exception as e:
-            print(f"[Foreshadowing] Failed to load seeds from DB: {e}")
+            logger.error(f"Failed to load seeds from DB: {e}")
     
     def _persist_seed(self, seed: ForeshadowingSeed):
         """Write-through: persist a seed to DB."""
@@ -173,7 +177,7 @@ class ForeshadowingLedger:
                 "conflicts_with": seed.conflicts_with,
             })
         except Exception as e:
-            print(f"[Foreshadowing] Failed to persist seed {seed.id}: {e}")
+            logger.error(f"Failed to persist seed {seed.id}: {e}")
     
     def _update_seed_db(self, seed_id: str, **fields):
         """Write-through: partial update to DB."""
@@ -182,7 +186,7 @@ class ForeshadowingLedger:
         try:
             self._state.update_foreshadowing_seed(seed_id, **fields)
         except Exception as e:
-            print(f"[Foreshadowing] Failed to update seed {seed_id}: {e}")
+            logger.error(f"Failed to update seed {seed_id}: {e}")
     
     def plant_seed(
         self,
@@ -323,13 +327,13 @@ class ForeshadowingLedger:
                     conflict_seed = self._seeds[conflict_id]
                     if conflict_seed.status not in (SeedStatus.RESOLVED, SeedStatus.ABANDONED):
                         self.abandon_seed(conflict_id, reason=f"Conflicting seed {seed_id} resolved")
-                        print(f"[Foreshadowing] Auto-abandoned {conflict_id} (conflicts with resolved {seed_id})")
+                        logger.info(f"Auto-abandoned {conflict_id} (conflicts with resolved {seed_id})")
             
             # #11: Causal chain — store triggered seed IDs for Director to plant
             # We don't auto-plant here because triggered seeds need Director context
             # (description, expected_payoff, etc). Instead, surface them in director context.
             if seed.triggers:
-                print(f"[Foreshadowing] Seed {seed_id} resolved — triggers pending: {seed.triggers}")
+                logger.info(f"Seed {seed_id} resolved — triggers pending: {seed.triggers}")
     
     def abandon_seed(self, seed_id: str, reason: str = ""):
         """Abandon a seed (explicitly drop it)."""

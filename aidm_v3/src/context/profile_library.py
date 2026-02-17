@@ -5,6 +5,10 @@ from typing import List, Dict, Any, Optional
 from pathlib import Path
 
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 class ProfileLibrary:
     """
     Manages the RAG system for narrative profiles (Lore).
@@ -74,7 +78,7 @@ class ProfileLibrary:
             pt = chunk.get("page_type", "general")
             type_counts[pt] = type_counts.get(pt, 0) + 1
         type_summary = ", ".join(f"{t}:{c}" for t, c in sorted(type_counts.items()))
-        print(f"[ProfileLibrary] Ingested {len(chunks)} lore chunks for {profile_id} ({type_summary})")
+        logger.info(f"Ingested {len(chunks)} lore chunks for {profile_id} ({type_summary})")
     
     def _chunk_by_section(self, content: str, max_chunk_size: int = 1500) -> List[Dict[str, Any]]:
         """

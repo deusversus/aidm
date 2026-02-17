@@ -17,6 +17,9 @@ from ..db.models import (
     Campaign, Character, WorldState, NPC, Faction, 
     CampaignBible, Session, Turn, MediaAsset, Quest, Location
 )
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 EXPORT_VERSION = "1.1"
@@ -211,7 +214,7 @@ def export_session(campaign_id: int) -> bytes:
             except Exception:
                 export_data["memories"] = {"ids": [], "documents": [], "metadatas": []}
         except Exception as e:
-            print(f"[Export] Warning: Could not export memories: {e}")
+            logger.warning(f"Warning: Could not export memories: {e}")
             export_data["memories"] = {"ids": [], "documents": [], "metadatas": []}
         
         # Settings
@@ -237,9 +240,9 @@ def export_session(campaign_id: int) -> bytes:
             
             export_data["session_zero"] = session_zero_data
             if session_zero_data:
-                print(f"[Export] Included {len(session_zero_data)} Session Zero state(s)")
+                logger.info(f"Included {len(session_zero_data)} Session Zero state(s)")
         except Exception as e:
-            print(f"[Export] Warning: Could not export Session Zero state: {e}")
+            logger.warning(f"Warning: Could not export Session Zero state: {e}")
             export_data["session_zero"] = []
         
         # Quests
@@ -305,7 +308,7 @@ def export_session(campaign_id: int) -> bytes:
             for ma in media_assets
         ]
         if media_assets:
-            print(f"[Export] Included {len(media_assets)} media asset record(s)")
+            logger.info(f"Included {len(media_assets)} media asset record(s)")
 
     finally:
         db.close()
@@ -330,7 +333,7 @@ def export_session(campaign_id: int) -> bytes:
         for arcname, fpath in media_files.items():
             zf.write(fpath, arcname)
         if media_files:
-            print(f"[Export] Included {len(media_files)} media file(s)")
+            logger.info(f"Included {len(media_files)} media file(s)")
 
         # Include custom profile folder if it exists (for hybrids)
         profile_id = campaign.profile_id
@@ -393,9 +396,9 @@ def import_session(zip_bytes: bytes) -> int:
             from ..context.profile_library import get_profile_library
             lib = get_profile_library()
             if profile_id not in lib.list_profiles():
-                print(f"[Import] Warning: Profile '{profile_id}' not found locally. You may want to regenerate it via Session Zero.")
+                logger.warning(f"Warning: Profile '{profile_id}' not found locally. You may want to regenerate it via Session Zero.")
         except Exception as e:
-            print(f"[Import] Warning: Could not check profile: {e}")
+            logger.warning(f"Warning: Could not check profile: {e}")
     
     # Full reset first
     StateManager.full_reset()
@@ -641,9 +644,9 @@ def import_session(zip_bytes: bytes) -> int:
                 documents=memories_data["documents"],
                 metadatas=memories_data["metadatas"]
             )
-            print(f"[Import] Restored {len(memories_data['ids'])} memories")
+            logger.info(f"Restored {len(memories_data['ids'])} memories")
         except Exception as e:
-            print(f"[Import] Warning: Could not restore memories: {e}")
+            logger.warning(f"Warning: Could not restore memories: {e}")
     
     # Restore custom profile files
     if custom_profile_files:
@@ -652,7 +655,7 @@ def import_session(zip_bytes: bytes) -> int:
             target_path = Path("./data") / arcname.replace("custom_profile/", "custom_profiles/")
             target_path.parent.mkdir(parents=True, exist_ok=True)
             target_path.write_bytes(content)
-        print(f"[Import] Restored custom profile files")
+        logger.info(f"Restored custom profile files")
     
     # Restore media files
     if media_file_entries:
@@ -663,7 +666,7 @@ def import_session(zip_bytes: bytes) -> int:
             target_path = media_dir / rel_path
             target_path.parent.mkdir(parents=True, exist_ok=True)
             target_path.write_bytes(content)
-        print(f"[Import] Restored {len(media_file_entries)} media file(s)")
+        logger.info(f"Restored {len(media_file_entries)} media file(s)")
     
     # Update settings
     settings_data = export_data.get("settings", {})
@@ -692,9 +695,9 @@ def import_session(zip_bytes: bytes) -> int:
                 sess = Session.from_dict(sess_dict)
                 session_store.save(sess)
             
-            print(f"[Import] Restored {len(session_zero_data)} Session Zero state(s)")
+            logger.info(f"Restored {len(session_zero_data)} Session Zero state(s)")
         except Exception as e:
-            print(f"[Import] Warning: Could not restore Session Zero state: {e}")
+            logger.warning(f"Warning: Could not restore Session Zero state: {e}")
     
-    print(f"[Import] Session imported successfully as campaign {new_campaign_id}")
+    logger.info(f"Session imported successfully as campaign {new_campaign_id}")
     return new_campaign_id

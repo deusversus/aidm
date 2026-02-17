@@ -9,8 +9,11 @@ Uses MICRO/STANDARD/COMPLEX/EPIC classification to scale research queries.
 
 from typing import List, Type
 from pydantic import BaseModel, Field
+import logging
 
 from .base import BaseAgent
+
+logger = logging.getLogger(__name__)
 
 
 class ScopeOutput(BaseModel):
@@ -203,11 +206,10 @@ class ScopeAgent(BaseAgent):
             ScopeOutput with classification and recommended topics
         """
         from ..llm import get_llm_manager
-        
         manager = get_llm_manager()
         provider, model = manager.get_provider_for_agent(self.agent_name)
         
-        print(f"[ScopeAgent] Classifying scope of '{anime_name}'...")
+        logger.info(f"Classifying scope of '{anime_name}'...")
         
         query = SCOPE_QUERY.format(anime_name=anime_name)
         
@@ -224,11 +226,11 @@ class ScopeAgent(BaseAgent):
             result.bundles = self._get_bundles_for_scope(result.scope, result)
             result.topics = [topic for bundle in result.bundles for topic in bundle]
             
-            print(f"[ScopeAgent] Classified as {result.scope} with {len(result.bundles)} bundles ({len(result.topics)} topics)")
+            logger.info(f"Classified as {result.scope} with {len(result.bundles)} bundles ({len(result.topics)} topics)")
             return result
             
         except Exception as e:
-            print(f"[ScopeAgent] ERROR: {e}, defaulting to STANDARD")
+            logger.error(f"ERROR: {e}, defaulting to STANDARD")
             return ScopeOutput(
                 scope="STANDARD",
                 bundles=STANDARD_BUNDLES.copy(),
