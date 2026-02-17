@@ -13,6 +13,7 @@ AVAILABLE_MODELS: Dict[str, List[Dict[str, str]]] = {
     "anthropic": [
         {"id": "claude-haiku-4-5", "name": "Claude Haiku 4.5", "tier": "fast", "description": "Fast, affordable for structured tasks"},
         {"id": "claude-sonnet-4-5", "name": "Claude Sonnet 4.5", "tier": "creative", "description": "Balanced quality and speed"},
+        {"id": "claude-sonnet-4-6", "name": "Claude Sonnet 4.6", "tier": "creative", "description": "Latest Sonnet — fast, sharp, excellent coding"},
         {"id": "claude-opus-4-5", "name": "Claude Opus 4.5", "tier": "premium", "description": "Previous-gen Opus, still excellent"},
         {"id": "claude-opus-4-6", "name": "Claude Opus 4.6", "tier": "premium", "description": "Latest Opus — highest quality, nearly Sonnet pricing"},
     ],
