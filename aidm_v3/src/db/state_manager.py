@@ -101,8 +101,13 @@ class StateManager:
         try:
             # Delete in order (respecting foreign key constraints)
             from .models import Turn, NPC, Faction, CampaignBible
-            
+
             try:
+                db.query(MediaAsset).delete()
+                db.query(Quest).delete()
+                db.query(Location).delete()
+                db.query(Consequence).delete()
+                db.query(ForeshadowingSeedDB).delete()
                 db.query(Turn).delete()
                 db.query(Session).delete()
                 db.query(NPC).delete()

@@ -1499,8 +1499,8 @@ class Orchestrator:
             campaign_id = getattr(self.state, 'campaign_id', None)
 
             try:
-                from ..settings.manager import SettingsManager
-                settings = SettingsManager().load()
+                from src.settings import get_settings_store
+                settings = get_settings_store().load()
                 media_enabled = getattr(settings, 'media_enabled', False)
                 media_budget_enabled = getattr(settings, 'media_budget_enabled', False)
 
@@ -1521,12 +1521,7 @@ class Orchestrator:
                         media_budget_remaining = budget_cap  # Fall back to full budget
 
                 # Style context from campaign profile
-                try:
-                    profile = self.state.get_profile()
-                    if profile:
-                        style_context = getattr(profile, 'art_style', '') or getattr(profile, 'title', '') or ''
-                except Exception:
-                    pass
+                style_context = getattr(self.profile, 'art_style', '') or getattr(self.profile, 'name', '') or ''
             except Exception:
                 pass  # Settings load failure is non-fatal
 

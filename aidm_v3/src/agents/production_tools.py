@@ -410,7 +410,7 @@ def _trigger_cutscene(
                 # Save to MediaAsset table
                 if result.get("status") in ("complete", "partial"):
                     _save_media_asset(
-                        state, campaign_id, current_turn,
+                        campaign_id, current_turn,
                         asset_type="video" if result.get("video_path") else "image",
                         cutscene_type=cutscene_type,
                         file_path=str(result.get("video_path") or result.get("image_path", "")),
@@ -425,7 +425,7 @@ def _trigger_cutscene(
                 print(f"[MediaTools] Cutscene generation error: {e}")
 
         # Fire-and-forget: schedule as background task
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         loop.create_task(_generate())
         return f"Cutscene ({cutscene_type}) generation started. It will appear when ready (~30-60s)."
 
@@ -470,6 +470,7 @@ def _generate_npc_portrait(
         async def _generate():
             try:
                 from ..media.generator import MediaGenerator
+                from ..db.session import create_session as create_db_session
                 gen = MediaGenerator()
                 result = await gen.generate_full_character_media(
                     visual_tags=visual_tags,
@@ -478,24 +479,33 @@ def _generate_npc_portrait(
                     campaign_id=campaign_id,
                     entity_name=npc_name,
                 )
-                # Update NPC record with generated URLs
-                if result.get("portrait"):
-                    portrait_url = gen.get_media_url(
-                        campaign_id, "portraits",
-                        result["portrait"].name
-                    )
-                    npc.portrait_url = portrait_url
-                if result.get("model_sheet"):
-                    model_url = gen.get_media_url(
-                        campaign_id, "models",
-                        result["model_sheet"].name
-                    )
-                    npc.model_sheet_url = model_url
-
-                db.commit()
+                # Update NPC record with generated URLs using own DB session
+                bg_db = create_db_session()
+                try:
+                    from ..db.models import NPC as NPCModel
+                    bg_npc = bg_db.query(NPCModel).filter(
+                        NPCModel.campaign_id == campaign_id,
+                        NPCModel.name == npc_name,
+                    ).first()
+                    if bg_npc:
+                        if result.get("portrait"):
+                            portrait_url = gen.get_media_url(
+                                campaign_id, "portraits",
+                                result["portrait"].name
+                            )
+                            bg_npc.portrait_url = portrait_url
+                        if result.get("model_sheet"):
+                            model_url = gen.get_media_url(
+                                campaign_id, "models",
+                                result["model_sheet"].name
+                            )
+                            bg_npc.model_sheet_url = model_url
+                        bg_db.commit()
+                finally:
+                    bg_db.close()
                 _deduct_budget(budget_ctx, 0.06)
                 _save_media_asset(
-                    state, campaign_id, None,
+                    campaign_id, None,
                     asset_type="image",
                     cutscene_type="npc_portrait",
                     file_path=str(result.get("portrait") or result.get("model_sheet", "")),
@@ -507,7 +517,7 @@ def _generate_npc_portrait(
             except Exception as e:
                 print(f"[MediaTools] NPC portrait generation error for \"{npc_name}\": {e}")
 
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         loop.create_task(_generate())
         return f"Portrait generation started for \"{npc_name}\". It will appear on the next turn."
 
@@ -556,7 +566,7 @@ def _generate_location_visual(
                 if path:
                     _deduct_budget(budget_ctx, 0.03)
                     _save_media_asset(
-                        state, campaign_id, None,
+                        campaign_id, None,
                         asset_type="image",
                         cutscene_type="location_reveal",
                         file_path=str(path),
@@ -568,7 +578,7 @@ def _generate_location_visual(
             except Exception as e:
                 print(f"[MediaTools] Location visual error for \"{location_name}\": {e}")
 
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         loop.create_task(_generate())
         return f"Location visual generation started for \"{location_name}\"."
 
@@ -577,7 +587,6 @@ def _generate_location_visual(
 
 
 def _save_media_asset(
-    state,
     campaign_id: int,
     turn_number: Optional[int],
     asset_type: str,
@@ -588,22 +597,30 @@ def _save_media_asset(
     cost_usd: float = 0.0,
     status: str = "complete",
 ):
-    """Persist a MediaAsset record to the database."""
+    """Persist a MediaAsset record to the database.
+
+    Uses its own DB session to avoid sharing with the orchestrator's session,
+    since this may be called from fire-and-forget background tasks.
+    """
     try:
         from ..db.models import MediaAsset
-        db = state._get_db()
-        asset = MediaAsset(
-            campaign_id=campaign_id,
-            turn_number=turn_number,
-            asset_type=asset_type,
-            cutscene_type=cutscene_type,
-            file_path=file_path,
-            image_prompt=image_prompt,
-            motion_prompt=motion_prompt,
-            cost_usd=cost_usd,
-            status=status,
-        )
-        db.add(asset)
-        db.commit()
+        from ..db.session import create_session as create_db_session
+        db = create_db_session()
+        try:
+            asset = MediaAsset(
+                campaign_id=campaign_id,
+                turn_number=turn_number,
+                asset_type=asset_type,
+                cutscene_type=cutscene_type,
+                file_path=file_path,
+                image_prompt=image_prompt,
+                motion_prompt=motion_prompt,
+                cost_usd=cost_usd,
+                status=status,
+            )
+            db.add(asset)
+            db.commit()
+        finally:
+            db.close()
     except Exception as e:
         print(f"[MediaTools] Failed to save media asset: {e}")
