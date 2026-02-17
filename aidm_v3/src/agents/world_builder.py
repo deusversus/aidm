@@ -118,12 +118,16 @@ This is a DM-generated narrative. The DM is authoritative - DO NOT validate or r
 
 Your ONLY job is to EXTRACT named entities introduced in this narrative:
 - Named NPCs (proper nouns that refer to people/characters)
-- Named locations (specific places mentioned)
-- Named items (specific objects with names)
+- Named locations (specific named places mentioned)
+- Named items: ONLY tangible physical objects the character **received, found, picked up,
+  was given, bought, or now possesses**. Do NOT extract items that are merely mentioned,
+  described in the environment, referenced in dialogue, or part of a memory/flashback.
+  If the character didn't actually ACQUIRE it this turn, it is NOT an inventory item.
 - Named factions/organizations
 
 **CRITICAL**: Only extract entities with ACTUAL NAMES (proper nouns).
 Do NOT extract generic references like "the guard" or "a merchant".
+Do NOT extract abstract concepts, memories, feelings, or narrative elements as items.
 
 Always return validation_status="accepted" in extract_only mode.
 
