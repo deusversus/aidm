@@ -1,9 +1,12 @@
 """Abstract LLM provider interface."""
 
+import asyncio
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple, Type, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, Type, TypeVar, Union
 from pydantic import BaseModel
+
+T = TypeVar("T")
 
 # System prompt can be:
 #   str                        — plain text (backward compatible, no caching)
@@ -167,6 +170,96 @@ class LLMProvider(ABC):
             f"Implement complete_with_tools() in the provider subclass."
         )
     
+    # ── Retry helper ──────────────────────────────────────────────
+
+    @staticmethod
+    def _is_retryable(exc: Exception) -> bool:
+        """Check if an exception is a transient overload/rate-limit error.
+        
+        Works for Anthropic (OverloadedError, RateLimitError, APIStatusError 529)
+        and OpenAI (RateLimitError, APIStatusError 429) without hard-importing
+        either SDK.
+        """
+        cls_name = type(exc).__name__
+        
+        # Direct rate-limit / overloaded exception classes
+        if cls_name in ("OverloadedError", "RateLimitError"):
+            return True
+        
+        # HTTP-level status errors (both SDKs expose .status_code)
+        status = getattr(exc, "status_code", None)
+        if status in (429, 529):
+            return True
+        
+        # Anthropic wraps errors as dict-like messages
+        err_body = getattr(exc, "body", None)
+        if isinstance(err_body, dict):
+            err_type = err_body.get("error", {}).get("type", "")
+            if err_type in ("overloaded_error", "rate_limit_error"):
+                return True
+        
+        return False
+
+    async def _call_with_retry(
+        self,
+        fn: Callable[..., T],
+        *args,
+        max_retries: int = 3,
+        base_delay: float = 2.0,
+        **kwargs,
+    ) -> T:
+        """Execute an async callable with exponential backoff on transient errors.
+        
+        Args:
+            fn: async callable to execute
+            max_retries: number of retry attempts (default 3)
+            base_delay: initial delay in seconds (doubles each retry)
+        """
+        last_exc = None
+        for attempt in range(max_retries + 1):
+            try:
+                return await fn(*args, **kwargs)
+            except Exception as exc:
+                if not self._is_retryable(exc) or attempt == max_retries:
+                    raise
+                last_exc = exc
+                delay = base_delay * (2 ** attempt)
+                print(f"[{self.name}] {type(exc).__name__} — retrying in {delay:.0f}s "
+                      f"(attempt {attempt + 1}/{max_retries})")
+                await asyncio.sleep(delay)
+        raise last_exc  # unreachable, but satisfies type checker
+
+    async def _run_with_retry(
+        self,
+        sync_fn: Callable[..., T],
+        max_retries: int = 3,
+        base_delay: float = 2.0,
+    ) -> T:
+        """Run a synchronous function in an executor with retry on overload.
+        
+        Drop-in replacement for:
+            await loop.run_in_executor(None, sync_fn)
+        
+        Usage:
+            result = await self._run_with_retry(lambda: self._client.messages.create(**kwargs))
+        """
+        loop = asyncio.get_running_loop()
+        last_exc = None
+        for attempt in range(max_retries + 1):
+            try:
+                return await loop.run_in_executor(None, sync_fn)
+            except Exception as exc:
+                if not self._is_retryable(exc) or attempt == max_retries:
+                    raise
+                last_exc = exc
+                delay = base_delay * (2 ** attempt)
+                print(f"[{self.name}] {type(exc).__name__} — retrying in {delay:.0f}s "
+                      f"(attempt {attempt + 1}/{max_retries})")
+                await asyncio.sleep(delay)
+        raise last_exc  # unreachable
+
+    # ── Client lifecycle ─────────────────────────────────────────
+
     def _ensure_client(self):
         """Ensure the client is initialized (lazy loading)."""
         if self._client is None:

@@ -81,9 +81,6 @@ class OpenAIProvider(LLMProvider):
         
         # Generate response using streaming to prevent truncation
         try:
-            import asyncio
-            loop = asyncio.get_running_loop()
-            
             # Handle parameter differences for newer models (GPT-5+)
             if "gpt-5" in model_name or "o1" in model_name:
                 # GPT-5/o1 often don't support temperature or use max_completion_tokens
@@ -119,10 +116,11 @@ class OpenAIProvider(LLMProvider):
                         final_usage = chunk.usage
                 return full_text, final_usage
             
-            full_text, final_usage = await loop.run_in_executor(None, _stream_and_collect)
+            full_text, final_usage = await self._run_with_retry(_stream_and_collect)
             
         except Exception as e:
-            # Fallback or re-raise with context
+            if self._is_retryable(e):
+                raise  # Let retry wrapper handle it
             raise RuntimeError(f"OpenAI completion failed for {model_name}: {e}")
         
         # Extract usage (including cache hits)
@@ -188,9 +186,6 @@ class OpenAIProvider(LLMProvider):
             if extended_thinking:
                 kwargs["reasoning"] = {"effort": "medium"}
                 kwargs["max_output_tokens"] = max(max_tokens, 8192)
-                
-            import asyncio
-            loop = asyncio.get_running_loop()
             
             def _stream_and_collect():
                 stream = self._client.responses.create(**kwargs)
@@ -216,7 +211,7 @@ class OpenAIProvider(LLMProvider):
                 
                 return content, search_info, final_response
             
-            content, search_info, final_response = await loop.run_in_executor(None, _stream_and_collect)
+            content, search_info, final_response = await self._run_with_retry(_stream_and_collect)
             
             # Extract usage from final response
             usage = {}
@@ -276,9 +271,6 @@ class OpenAIProvider(LLMProvider):
         
         # Generate response with function calling using streaming
         try:
-            import asyncio
-            loop = asyncio.get_running_loop()
-            
             if "gpt-5" in model_name or "o1" in model_name:
                 kwargs = {
                     "model": model_name,
@@ -335,9 +327,11 @@ class OpenAIProvider(LLMProvider):
                 
                 return tool_name, tool_args, content, final_usage
             
-            tool_name, tool_args, content, final_usage = await loop.run_in_executor(None, _stream_and_collect)
+            tool_name, tool_args, content, final_usage = await self._run_with_retry(_stream_and_collect)
             
         except Exception as e:
+            if self._is_retryable(e):
+                raise
             raise RuntimeError(f"OpenAI structured completion failed for {model_name}: {e}")
         
         # Parse the streamed tool call response
@@ -432,10 +426,7 @@ Respond ONLY with the JSON object, no markdown formatting.
                 kwargs["reasoning"] = {"effort": "medium"}
                 kwargs["max_output_tokens"] = max(max_tokens, 8192)
                 
-            import asyncio
-            loop = asyncio.get_running_loop()
-            response = await loop.run_in_executor(
-                None,
+            response = await self._run_with_retry(
                 lambda: self._client.responses.create(**kwargs)
             )
             
@@ -501,8 +492,6 @@ Respond ONLY with the JSON object, no markdown formatting.
         all_tool_calls = []
         total_usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
         
-        loop = asyncio.get_running_loop()
-        
         for round_num in range(max_tool_rounds):
             # Build kwargs with model-appropriate parameters
             if "gpt-5" in model_name or "o1" in model_name:
@@ -522,10 +511,9 @@ Respond ONLY with the JSON object, no markdown formatting.
                 }
             
             # Non-streaming for clean tool call extraction
-            def _create(kwargs=kwargs):
-                return self._client.chat.completions.create(**kwargs)
-            
-            response = await loop.run_in_executor(None, _create)
+            response = await self._run_with_retry(
+                lambda kwargs=kwargs: self._client.chat.completions.create(**kwargs)
+            )
             
             # Accumulate usage
             if response.usage:
@@ -626,10 +614,9 @@ Respond ONLY with the JSON object, no markdown formatting.
                 "temperature": 0.3,
             }
         
-        def _final_create(kwargs=final_kwargs):
-            return self._client.chat.completions.create(**kwargs)
-        
-        final_response = await loop.run_in_executor(None, _final_create)
+        final_response = await self._run_with_retry(
+            lambda kwargs=final_kwargs: self._client.chat.completions.create(**kwargs)
+        )
         
         final_text = ""
         if final_response.choices:
