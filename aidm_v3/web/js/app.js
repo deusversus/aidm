@@ -1231,7 +1231,7 @@ async function loadQuests() {
         container.innerHTML = data.quests.map(quest => {
             return `
                 <div class="quest-item">
-                    <span class="quest-name">• ${escapeHtml(quest.name)}</span>
+                    <span class="quest-name">• ${escapeHtml(quest.title)}</span>
                     <span class="quest-status ${quest.status}">${quest.status}</span>
                 </div>
             `;
