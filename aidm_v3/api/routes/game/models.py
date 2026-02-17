@@ -145,7 +145,7 @@ class AbilityInfo(BaseModel):
     """A single ability/skill."""
     name: str
     description: str = ""
-    type: str = "unknown"
+    type: str = "passive"
     level_acquired: Optional[int] = None
 
 

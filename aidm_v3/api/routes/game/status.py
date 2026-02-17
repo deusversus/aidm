@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import FileResponse
 from typing import Optional
 import logging
+import re
 
 from src.settings import get_settings_store
 from src.core.session import get_session_manager
@@ -141,6 +142,28 @@ async def get_npcs():
         raise HTTPException(status_code=404, detail="No active campaign")
     
     npcs = orchestrator.state.get_all_npcs()
+    
+    # Filter out the player character from NPC list
+    char = orchestrator.state.get_character()
+    pc_name = (char.name or "").lower().strip() if char else ""
+    npcs = [
+        n for n in npcs
+        if (n.role or "").lower() != "protagonist"
+        and (n.name or "").lower().strip() != pc_name
+    ]
+    
+    # Deduplicate NPCs by name similarity (keep highest interaction_count)
+    deduped = {}
+    for npc in npcs:
+        key = (npc.name or "").lower().strip()
+        # Normalize common aliases: "Mom" matches "Deus's Mother", etc.
+        normalized = key.replace("'s ", " ").replace("deus ", "")
+        if normalized in ("mom", "mother", "deus mother"):
+            normalized = "mother"
+        existing = deduped.get(normalized)
+        if existing is None or (npc.interaction_count or 0) > (existing.interaction_count or 0):
+            deduped[normalized] = npc
+    npcs = list(deduped.values())
     
     # Sort by last_appeared DESC (recent interactions first)
     npcs_sorted = sorted(npcs, key=lambda n: n.last_appeared or 0, reverse=True)
@@ -296,7 +319,11 @@ async def get_quests():
     bible = orchestrator.state.get_campaign_bible()
     if bible and bible.planning_data:
         data = bible.planning_data
-        current_arc = (data.get("current_arc", {}).get("name") if isinstance(data.get("current_arc"), dict) else data.get("current_arc")) or current_arc
+        current_arc = (
+            data.get("current_arc", {}).get("name")
+            if isinstance(data.get("current_arc"), dict)
+            else data.get("current_arc")
+        ) or current_arc
         
         for goal in data.get("active_goals", []):
             quests.append(QuestDetailInfo(
@@ -379,16 +406,24 @@ async def get_abilities():
     
     raw_abilities = char.abilities or []
     abilities = []
+    seen_names = set()
     for ability in raw_abilities:
         if isinstance(ability, dict):
+            name = ability.get("name", "Unknown")
+            if name.lower() in seen_names:
+                continue
+            seen_names.add(name.lower())
             abilities.append(AbilityInfo(
-                name=ability.get("name", "Unknown"),
+                name=name,
                 description=ability.get("description", ""),
-                type=ability.get("type", "unknown"),
+                type=ability.get("type", "passive"),
                 level_acquired=ability.get("level_acquired"),
             ))
         elif isinstance(ability, str):
-            abilities.append(AbilityInfo(name=ability))
+            if ability.lower() in seen_names:
+                continue
+            seen_names.add(ability.lower())
+            abilities.append(AbilityInfo(name=ability, type="passive"))
     
     return AbilitiesResponse(abilities=abilities, total_abilities=len(abilities))
 
@@ -442,11 +477,26 @@ async def get_journal(
             if result["id"] not in seen_ids:
                 seen_ids.add(result["id"])
                 turn_num = int(result["metadata"].get("turn", 0))
+                raw_heat = result.get("heat", 0) or 0
+                # Normalize heat to 0.0-1.0 range
+                heat = min(float(raw_heat), 1.0) if raw_heat <= 1.0 else min(float(raw_heat) / 100.0, 1.0)
+                
+                # Clean up content — strip raw location/player/outcome prefixes
+                content = result["content"]
+                # Remove "[Turn N] Location: Player: ... Outcome: ---" wrapper
+                content = re.sub(r'^\[Turn \d+\]\s*[^:]+:\s*Player:.*?Outcome:\s*---\s*', '', content, flags=re.DOTALL).strip()
+                # Remove leading markdown headers from compactor output
+                content = re.sub(r'^#{1,4}\s*', '', content).strip()
+                
+                # Skip tiny stubs (character names, one-word entries)
+                if len(content) < 20:
+                    continue
+                
                 all_beats.append(JournalEntry(
                     turn=turn_num,
-                    content=result["content"],
+                    content=content,
                     entry_type="beat",
-                    heat=result.get("heat", 0),
+                    heat=heat,
                 ))
 
         # Fallback: if no ChromaDB memories yet, build journal from Turn narratives
