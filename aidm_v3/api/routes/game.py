@@ -2357,7 +2357,7 @@ async def get_journal(
             boost_on_access=False,
             memory_type="episode",
         )
-        
+
         # Also get narrative_beat type memories
         beat_results = orchestrator.memory.search(
             query="narrative events story moments",
@@ -2366,7 +2366,7 @@ async def get_journal(
             boost_on_access=False,
             memory_type="narrative_beat",
         )
-        
+
         # Combine and deduplicate
         seen_ids = set()
         all_beats = []
@@ -2380,16 +2380,36 @@ async def get_journal(
                     entry_type="beat",
                     heat=result.get("heat", 0),
                 ))
-        
+
+        # Fallback: if no ChromaDB memories yet, build journal from Turn narratives
+        if not all_beats:
+            from ..db.models import Turn, Session
+            db = orchestrator.state._get_db()
+            session_id = orchestrator.state.get_or_create_session()
+            turns = (
+                db.query(Turn)
+                .filter(Turn.session_id == session_id, Turn.narrative.isnot(None))
+                .order_by(Turn.turn_number.asc())
+                .all()
+            )
+            for t in turns:
+                summary = t.narrative[:500].strip().replace('\n', ' ') if t.narrative else ""
+                if summary:
+                    all_beats.append(JournalEntry(
+                        turn=t.turn_number,
+                        content=summary,
+                        entry_type="beat",
+                    ))
+
         # Sort chronologically by turn
         all_beats.sort(key=lambda e: e.turn or 0)
-        
+
         # Paginate
         total = len(all_beats)
         start = (page - 1) * per_page
         end = start + per_page
         entries = all_beats[start:end]
-        
+
     except Exception as e:
         print(f"[Journal] Error fetching episode memories: {e}")
         total = 0
