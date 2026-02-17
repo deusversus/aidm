@@ -123,9 +123,6 @@ class AnthropicProvider(LLMProvider):
             kwargs["max_tokens"] = max(max_tokens, 8192)
             
         # Use streaming to prevent truncation issues with long responses
-        import asyncio
-        loop = asyncio.get_running_loop()
-        
         def _stream_and_collect():
             full_text = ""
             final_message = None
@@ -135,7 +132,7 @@ class AnthropicProvider(LLMProvider):
                 final_message = stream.get_final_message()
             return full_text, final_message
         
-        full_text, final_message = await loop.run_in_executor(None, _stream_and_collect)
+        full_text, final_message = await self._run_with_retry(_stream_and_collect)
         
         # Extract usage (including cache hits) from final message
         usage = {}
@@ -202,9 +199,6 @@ class AnthropicProvider(LLMProvider):
             kwargs["max_tokens"] = max(max_tokens, 8192)
         
         # Use streaming to prevent truncation with long responses
-        import asyncio
-        loop = asyncio.get_running_loop()
-        
         def _stream_and_collect():
             content = ""
             search_results = []
@@ -227,7 +221,7 @@ class AnthropicProvider(LLMProvider):
             
             return content, search_results, citations, final_message
         
-        content, search_results, citations, final_message = await loop.run_in_executor(None, _stream_and_collect)
+        content, search_results, citations, final_message = await self._run_with_retry(_stream_and_collect)
         
         # Extract usage from final message
         usage = {}
@@ -306,9 +300,6 @@ class AnthropicProvider(LLMProvider):
             kwargs["tool_choice"] = {"type": "tool", "name": "respond"}
 
         # Use streaming to prevent truncation with long responses
-        import asyncio
-        loop = asyncio.get_running_loop()
-        
         def _stream_and_collect():
             text_content = ""
             final_message = None
@@ -320,7 +311,7 @@ class AnthropicProvider(LLMProvider):
             
             return text_content, final_message
         
-        text_content, final_message = await loop.run_in_executor(None, _stream_and_collect)
+        text_content, final_message = await self._run_with_retry(_stream_and_collect)
         
         # Extract tool use response from final message
         if final_message:
@@ -435,10 +426,7 @@ Your response must match the required JSON schema.
             kwargs["max_tokens"] = max(max_tokens, 8192)
         
         # Regular messages endpoint - no beta needed for web search
-        import asyncio
-        loop = asyncio.get_running_loop()
-        response = await loop.run_in_executor(
-            None,
+        response = await self._run_with_retry(
             lambda: self._client.messages.create(**kwargs)
         )
         
@@ -512,7 +500,6 @@ Your response must match the required JSON schema.
         Intermediate results stay in the sandbox, not in Claude's context.
         """
         import asyncio
-        loop = asyncio.get_running_loop()
         
         # Convert tools with allowed_callers for programmatic calling
         anthropic_tools = tools.to_anthropic_format(programmatic=True)
@@ -540,10 +527,9 @@ Your response must match the required JSON schema.
             if container_id:
                 kwargs["container"] = container_id
             
-            def _create(kwargs=kwargs):
-                return self._client.beta.messages.create(**kwargs)
-            
-            response = await loop.run_in_executor(None, _create)
+            response = await self._run_with_retry(
+                lambda kwargs=kwargs: self._client.beta.messages.create(**kwargs)
+            )
             
             # Track container for reuse
             if hasattr(response, 'container') and response.container:
@@ -671,16 +657,15 @@ Your response must match the required JSON schema.
             "content": "You've completed your research. Now produce your final response based on everything you've found."
         })
         
-        def _final_create():
-            return self._client.beta.messages.create(
+        final_response = await self._run_with_retry(
+            lambda: self._client.beta.messages.create(
                 model=model_name,
                 betas=["advanced-tool-use-2025-11-20"],
                 max_tokens=max_tokens,
                 system=system or "",
                 messages=conversation,
             )
-        
-        final_response = await loop.run_in_executor(None, _final_create)
+        )
         
         final_text = ""
         for block in final_response.content:
@@ -716,7 +701,6 @@ Your response must match the required JSON schema.
         is a separate round-trip through the model.
         """
         import asyncio
-        loop = asyncio.get_running_loop()
         
         anthropic_tools = tools.to_anthropic_format()
         conversation = list(messages)
@@ -732,10 +716,9 @@ Your response must match the required JSON schema.
                 "tools": anthropic_tools,
             }
             
-            def _create(kwargs=kwargs):
-                return self._client.messages.create(**kwargs)
-            
-            response = await loop.run_in_executor(None, _create)
+            response = await self._run_with_retry(
+                lambda kwargs=kwargs: self._client.messages.create(**kwargs)
+            )
             
             if hasattr(response, 'usage'):
                 total_usage["prompt_tokens"] += response.usage.input_tokens
@@ -811,15 +794,14 @@ Your response must match the required JSON schema.
             "content": "You've completed your research. Now produce your final response based on everything you've found."
         })
         
-        def _final_create():
-            return self._client.messages.create(
+        final_response = await self._run_with_retry(
+            lambda: self._client.messages.create(
                 model=model_name,
                 max_tokens=max_tokens,
                 system=system or "",
                 messages=conversation,
             )
-        
-        final_response = await loop.run_in_executor(None, _final_create)
+        )
         
         final_text = ""
         for block in final_response.content:

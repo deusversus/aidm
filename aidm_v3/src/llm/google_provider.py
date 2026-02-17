@@ -98,9 +98,6 @@ class GoogleProvider(LLMProvider):
 
         
         # Use streaming to prevent truncation issues with long responses
-        import asyncio
-        loop = asyncio.get_running_loop()
-        
         def _stream_and_collect():
             stream = self._client.models.generate_content_stream(
                 model=model_name,
@@ -114,7 +111,7 @@ class GoogleProvider(LLMProvider):
                 last_chunk = chunk
             return full_text, last_chunk
         
-        full_text, last_chunk = await loop.run_in_executor(None, _stream_and_collect)
+        full_text, last_chunk = await self._run_with_retry(_stream_and_collect)
         
         # Extract usage info from final chunk (including cache hits)
         usage = {}
@@ -187,9 +184,6 @@ class GoogleProvider(LLMProvider):
             config["thinking_config"] = {"include_thoughts": True}
         
         # Use streaming to prevent truncation issues with long responses
-        import asyncio
-        loop = asyncio.get_running_loop()
-        
         def _stream_and_collect():
             stream = self._client.models.generate_content_stream(
                 model=model_name,
@@ -206,7 +200,7 @@ class GoogleProvider(LLMProvider):
             print(f"[Google Streaming] Collected {chunk_count} chunks, {len(full_text)} chars")
             return full_text, last_chunk
         
-        full_text, last_chunk = await loop.run_in_executor(None, _stream_and_collect)
+        full_text, last_chunk = await self._run_with_retry(_stream_and_collect)
         
         # Extract grounding metadata if available (from last chunk)
         grounding_info = {}
@@ -275,9 +269,6 @@ class GoogleProvider(LLMProvider):
             config["thinking_config"] = {"include_thoughts": True}
         
         # Use streaming to prevent truncation issues with long responses
-        import asyncio
-        loop = asyncio.get_running_loop()
-        
         def _stream_and_collect():
             stream = self._client.models.generate_content_stream(
                 model=model_name,
@@ -291,7 +282,7 @@ class GoogleProvider(LLMProvider):
                 last_chunk = chunk
             return full_text, last_chunk
         
-        full_text, last_chunk = await loop.run_in_executor(None, _stream_and_collect)
+        full_text, last_chunk = await self._run_with_retry(_stream_and_collect)
         
         # Extract usage (including cache hits) from last chunk
         if last_chunk and hasattr(last_chunk, 'usage_metadata') and last_chunk.usage_metadata:
@@ -423,18 +414,15 @@ Respond ONLY with the JSON object, no markdown formatting or explanation.
         all_tool_calls = []
         total_usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
         
-        loop = asyncio.get_running_loop()
-        
         for round_num in range(max_tool_rounds):
             # Make the API call (non-streaming for tool calling)
-            def _generate(contents=contents, config=config):
-                return self._client.models.generate_content(
+            response = await self._run_with_retry(
+                lambda contents=contents, config=config: self._client.models.generate_content(
                     model=model_name,
                     contents=contents,
                     config=config
                 )
-            
-            response = await loop.run_in_executor(None, _generate)
+            )
             
             # Accumulate usage
             if hasattr(response, 'usage_metadata') and response.usage_metadata:
@@ -526,14 +514,13 @@ Respond ONLY with the JSON object, no markdown formatting or explanation.
             )]
         ))
         
-        def _final_generate(contents=contents, config=config_no_tools):
-            return self._client.models.generate_content(
+        final_response = await self._run_with_retry(
+            lambda contents=contents, config=config_no_tools: self._client.models.generate_content(
                 model=model_name,
                 contents=contents,
                 config=config_no_tools
             )
-        
-        final_response = await loop.run_in_executor(None, _final_generate)
+        )
         final_text = ""
         if final_response.candidates and final_response.candidates[0].content:
             for part in final_response.candidates[0].content.parts:
