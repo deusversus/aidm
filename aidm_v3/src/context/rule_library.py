@@ -16,6 +16,10 @@ from typing import List, Dict, Any, Optional
 from pydantic import BaseModel
 
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 class RuleChunk(BaseModel):
     """A single retrievable rule/guidance chunk."""
     id: str
@@ -64,10 +68,10 @@ class RuleLibrary:
     def initialize(self):
         """Load all YAML chunks from library directory and index them."""
         if not self.library_dir.exists():
-            print(f"Warning: Rule library directory not found at {self.library_dir}")
+            logger.warning(f"Warning: Rule library directory not found at {self.library_dir}")
             return
         
-        print(f"Initializing Rule Library from {self.library_dir}...")
+        logger.info(f"Initializing Rule Library from {self.library_dir}...")
         
         chunks_loaded = 0
         
@@ -77,9 +81,9 @@ class RuleLibrary:
                 chunks = self._load_yaml_file(yaml_file)
                 chunks_loaded += len(chunks)
             except Exception as e:
-                print(f"Error loading {yaml_file}: {e}")
+                logger.error(f"Error loading {yaml_file}: {e}")
         
-        print(f"Loaded {chunks_loaded} chunks into Rule Library.")
+        logger.info(f"Loaded {chunks_loaded} chunks into Rule Library.")
     
     def _load_yaml_file(self, file_path: Path) -> List[RuleChunk]:
         """Load chunks from a YAML file."""

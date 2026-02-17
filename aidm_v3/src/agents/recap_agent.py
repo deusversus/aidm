@@ -16,6 +16,10 @@ from pydantic import BaseModel, Field
 from .base import BaseAgent
 
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 class RecapOutput(BaseModel):
     """Structured recap for session opening."""
     
@@ -116,5 +120,5 @@ Do NOT be generic. Be SPECIFIC to the events provided."""
             )
             return result
         except Exception as e:
-            print(f"[RecapAgent] Recap generation failed (non-fatal): {e}")
+            logger.error(f"Recap generation failed (non-fatal): {e}")
             return None

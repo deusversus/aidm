@@ -8,7 +8,12 @@ from sqlalchemy.exc import OperationalError
 
 from .models import Campaign, Session, Turn, Character, NPC, WorldState, CampaignBible, ForeshadowingSeedDB, Consequence, Quest, Location, MediaAsset
 from .session import get_session, create_session, init_db
+from ..enums import ArcPhase, NarrativeWeight, NPCIntelligenceStage
 
+
+import logging
+
+logger = logging.getLogger(__name__)
 
 @dataclass
 class GameContext:
@@ -117,9 +122,9 @@ class StateManager:
                 db.query(Character).delete()
                 db.query(Campaign).delete()
                 db.commit()
-                print("[StateManager] Full reset: cleared all campaign data from DB")
+                logger.info("Full reset: cleared all campaign data from DB")
             except OperationalError as e:
-                print(f"[StateManager] Warning: Table delete failed (likely missing schema): {e}")
+                logger.error(f"Warning: Table delete failed (likely missing schema): {e}")
                 db.rollback()
         finally:
             db.close()
@@ -128,7 +133,7 @@ class StateManager:
         try:
             init_db()
         except Exception as e:
-            print(f"[StateManager] Warning: init_db failed during reset: {e}")
+            logger.error(f"Warning: init_db failed during reset: {e}")
         
         # Clear campaign memory collections from ChromaDB
         try:
@@ -137,9 +142,9 @@ class StateManager:
             for col in client.list_collections():
                 if col.name.startswith("campaign_"):
                     client.delete_collection(col.name)
-                    print(f"[StateManager] Deleted memory collection: {col.name}")
+                    logger.info(f"Deleted memory collection: {col.name}")
         except Exception as e:
-            print(f"[StateManager] Warning: Could not clear ChromaDB collections: {e}")
+            logger.warning(f"Warning: Could not clear ChromaDB collections: {e}")
     
     @staticmethod
     def get_or_create_campaign_by_profile(profile_id: str, profile_name: str = None) -> int:
@@ -173,7 +178,7 @@ class StateManager:
                 db.add(campaign)
                 db.commit()
                 db.refresh(campaign)
-                print(f"[StateManager] Created new campaign: id={campaign.id}, profile_id={profile_id}")
+                logger.info(f"Created new campaign: id={campaign.id}, profile_id={profile_id}")
                 
                 # Create supporting entities for the new campaign
                 # WorldState
@@ -182,7 +187,7 @@ class StateManager:
                     location="Unknown",
                     time_of_day="Day",
                     situation="The adventure begins...",
-                    arc_phase="rising_action",
+                    arc_phase=ArcPhase.RISING_ACTION,
                     tension_level=0.3
                 )
                 db.add(world_state)
@@ -206,7 +211,7 @@ class StateManager:
                 db.add(bible)
                 
                 db.commit()
-                print(f"[StateManager] Created supporting entities for campaign {campaign.id}")
+                logger.info(f"Created supporting entities for campaign {campaign.id}")
                 
             return campaign.id
         finally:
@@ -261,10 +266,10 @@ class StateManager:
             yield
             # All mutations succeeded — single atomic commit
             db.commit()
-            print("[StateManager] Deferred commit: all changes committed atomically")
+            logger.info("Deferred commit: all changes committed atomically")
         except Exception:
             db.rollback()
-            print("[StateManager] Deferred commit: ROLLBACK due to exception")
+            logger.error("Deferred commit: ROLLBACK due to exception")
             raise
         finally:
             self._commit_deferred = False
@@ -289,7 +294,7 @@ class StateManager:
                 location="Unknown",
                 time_of_day="Day",
                 situation="The adventure begins...",
-                arc_phase="rising_action",
+                arc_phase=ArcPhase.RISING_ACTION,
                 tension_level=0.3
             )
             db.add(world_state)
@@ -470,7 +475,7 @@ class StateManager:
             location=world_state.location if world_state else "Unknown",
             time_of_day=world_state.time_of_day if world_state else "Day",
             situation=world_state.situation if world_state else "The adventure begins...",
-            arc_phase=world_state.arc_phase if world_state else "rising_action",
+            arc_phase=world_state.arc_phase if world_state else ArcPhase.RISING_ACTION,
             tension_level=world_state.tension_level if world_state else 0.5,
             turns_in_phase=getattr(world_state, 'turns_in_phase', 0) or 0 if world_state else 0,
             pinned_messages=getattr(world_state, 'pinned_messages', []) or [] if world_state else [],
@@ -772,7 +777,7 @@ class StateManager:
         consequence: str, 
         turn_number: int = 0, 
         source_action: str = None,
-        narrative_weight: str = "minor",
+        narrative_weight: str = NarrativeWeight.MINOR,
         category: str = None
     ):
         """Apply a structured consequence to the campaign.
@@ -799,7 +804,7 @@ class StateManager:
             "significant": "moderate",
             "climactic": "major"
         }
-        severity = severity_map.get(narrative_weight, "minor")
+        severity = severity_map.get(narrative_weight, NarrativeWeight.MINOR)
         
         # Minor consequences expire after 20 turns, moderate after 50, major are permanent
         expiry_map = {"minor": 20, "moderate": 50, "major": None, "catastrophic": None}
@@ -830,7 +835,7 @@ class StateManager:
             world_state.situation = f"{world_state.situation}\n{consequence}"
         
         self._maybe_commit()
-        print(f"[Consequence] Stored: [{category}/{severity}] {consequence[:80]}..." if len(consequence) > 80 else f"[Consequence] Stored: [{category}/{severity}] {consequence}")
+        logger.info(f"Stored: [{category}/{severity}] {consequence[:80]}..." if len(consequence) > 80 else f"[Consequence] Stored: [{category}/{severity}] {consequence}")
     
     def get_active_consequences(self, limit: int = 10) -> list:
         """#17: Query active, non-expired consequences for context injection.
@@ -884,7 +889,7 @@ class StateManager:
             c.active = False
         if expired:
             self._maybe_commit()
-            print(f"[Consequence] Expired {len(expired)} consequences at turn {current_turn}")
+            logger.info(f"Expired {len(expired)} consequences at turn {current_turn}")
         return len(expired)
     
     def evolve_npc_intelligence(self, npc_id: int) -> Optional[Dict[str, str]]:
@@ -933,7 +938,7 @@ class StateManager:
             "autonomous": "pursues their own agenda independently, sometimes surprising even the protagonist"
         }
         
-        print(f"[NPC Evolution] {npc.name}: {old_stage} → {new_stage}")
+        logger.info(f"{npc.name}: {old_stage} → {new_stage}")
         return {
             "npc_name": npc.name,
             "old_stage": old_stage,
@@ -972,7 +977,7 @@ class StateManager:
                 # #3: Reset turns_in_phase on phase transition
                 if world_state.arc_phase != arc_phase:
                     world_state.turns_in_phase = 0
-                    print(f"[Pacing] Phase transition: {world_state.arc_phase} → {arc_phase}, turns_in_phase reset")
+                    logger.info(f"Phase transition: {world_state.arc_phase} → {arc_phase}, turns_in_phase reset")
                 world_state.arc_phase = arc_phase
             if tension_level is not None:
                 world_state.tension_level = tension_level
@@ -1122,7 +1127,7 @@ class StateManager:
             appearance=kwargs.get("appearance", {}),
             visual_tags=kwargs.get("visual_tags", []),
             growth_stage="introduction",
-            intelligence_stage="reactive",
+            intelligence_stage=NPCIntelligenceStage.REACTIVE,
             scene_count=0,
             interaction_count=0,
         )
@@ -1216,7 +1221,7 @@ class StateManager:
             bible.last_updated_turn = turn_number
             self._maybe_commit()
             
-            print(f"[Bible] v{bible.bible_version}: {arc_entry.get('arc_phase')} @ turn {turn_number} ({len(arc_history)} history entries)")
+            logger.info(f"v{bible.bible_version}: {arc_entry.get('arc_phase')} @ turn {turn_number} ({len(arc_history)} history entries)")
 
     def get_target(self, target_name: str) -> Optional[NPC]:
         """Get an NPC by name for combat targeting."""
@@ -1476,7 +1481,7 @@ class StateManager:
                     "context": milestone_context or ""
                 }
                 npc.emotional_milestones = milestones
-                print(f"[NPC] {npc.name}: Emotional milestone '{emotional_milestone}' at turn {turn_number}")
+                logger.info(f"{npc.name}: Emotional milestone '{emotional_milestone}' at turn {turn_number}")
         
         # Recalculate disposition
         npc.disposition = self.get_npc_disposition(npc.id)
@@ -1487,7 +1492,7 @@ class StateManager:
         self._maybe_commit()
         
         if affinity_delta != 0:
-            print(f"[NPC] {npc.name}: affinity {affinity_delta:+d} → {npc.affinity} (disposition: {npc.disposition})")
+            logger.info(f"{npc.name}: affinity {affinity_delta:+d} → {npc.affinity} (disposition: {npc.disposition})")
         
         return npc
     
@@ -1504,7 +1509,7 @@ class StateManager:
             Current intelligence stage after evaluation
         """
         count = npc.interaction_count or 0
-        old_stage = npc.intelligence_stage or "reactive"
+        old_stage = npc.intelligence_stage or NPCIntelligenceStage.REACTIVE
         
         if count >= 20:
             new_stage = "autonomous"
@@ -1517,7 +1522,7 @@ class StateManager:
         
         if new_stage != old_stage:
             npc.intelligence_stage = new_stage
-            print(f"[NPC] {npc.name}: Intelligence evolved: {old_stage} → {new_stage} ({count} interactions)")
+            logger.info(f"{npc.name}: Intelligence evolved: {old_stage} → {new_stage} ({count} interactions)")
         
         return new_stage
     
@@ -1559,7 +1564,7 @@ class StateManager:
             milestone_str = ", ".join(milestones.keys()) if milestones else "none yet"
             
             # Intelligence stage hint
-            intel = npc.intelligence_stage or "reactive"
+            intel = npc.intelligence_stage or NPCIntelligenceStage.REACTIVE
             
             card = (
                 f"**{npc.name}** ({npc.role or 'unknown'}, {disp_label})\n"
@@ -1689,7 +1694,7 @@ class StateManager:
         db.commit()
         db.refresh(faction)
         
-        print(f"[Faction] Created: {name} (PC controls: {pc_controls})")
+        logger.info(f"Created: {name} (PC controls: {pc_controls})")
         return faction
     
     def get_faction_relationship(self, faction1_name: str, faction2_name: str) -> str:
@@ -1716,7 +1721,7 @@ class StateManager:
             relationship: allied, friendly, neutral, unfriendly, enemy, at_war
         """
         if relationship not in self.FACTION_RELATIONSHIPS:
-            print(f"[Faction] Invalid relationship: {relationship}")
+            logger.warning(f"Invalid relationship: {relationship}")
             return
         
         from .models import Faction
@@ -1736,7 +1741,7 @@ class StateManager:
             faction2.relationships = rels2
         
         db.commit()
-        print(f"[Faction] {faction1_name} ↔ {faction2_name}: {relationship}")
+        logger.info(f"{faction1_name} ↔ {faction2_name}: {relationship}")
     
     def update_faction_reputation(self, faction_name: str, change: int, reason: str = ""):
         """
@@ -1759,7 +1764,7 @@ class StateManager:
                 reps[faction_name] = new_rep
                 character.faction_reputations = reps
                 db.commit()
-                print(f"[Faction] PC reputation with {faction_name}: {old_rep} → {new_rep} ({reason})")
+                logger.info(f"PC reputation with {faction_name}: {old_rep} → {new_rep} ({reason})")
             return
         
         db = self._get_db()
@@ -1768,7 +1773,7 @@ class StateManager:
         faction.pc_reputation = new_rep
         db.commit()
         
-        print(f"[Faction] PC reputation with {faction_name}: {old_rep} → {new_rep} ({reason})")
+        logger.info(f"PC reputation with {faction_name}: {old_rep} → {new_rep} ({reason})")
     
     def get_pc_controlled_factions(self) -> List["Faction"]:
         """
@@ -1797,7 +1802,7 @@ class StateManager:
         """
         faction = self.get_faction(faction_name)
         if not faction or not faction.pc_controls:
-            print(f"[Faction] {faction_name} not PC-controlled")
+            logger.info(f"{faction_name} not PC-controlled")
             return
         
         npc = self.get_npc(npc_id)
@@ -1813,7 +1818,7 @@ class StateManager:
         npc.faction = faction_name
         
         db.commit()
-        print(f"[Faction] {npc.name} joined {faction_name} as {role}")
+        logger.info(f"{npc.name} joined {faction_name} as {role}")
     
     def get_faction_context_for_op_mode(self, narrative_focus: str, preset: Optional[str] = None) -> Optional[str]:
         """
@@ -2053,7 +2058,7 @@ class StateManager:
         milestone = self._check_disposition_milestone(old_disposition, new_disposition, npc.name)
         
         self._maybe_commit()
-        print(f"[NPC] {npc.name} affinity: {old_affinity} → {new_affinity} ({reason})")
+        logger.info(f"{npc.name} affinity: {old_affinity} → {new_affinity} ({reason})")
         
         return milestone  # Returns event dict or None
     
@@ -2123,7 +2128,7 @@ class StateManager:
             event["npc_name"] = npc_name
             event["old_threshold"] = old_label
             event["new_threshold"] = new_label
-            print(f"[NPC Milestone] {npc_name}: {old_label} → {new_label}")
+            logger.info(f"{npc_name}: {old_label} → {new_label}")
             return event
         
         return None
@@ -2169,7 +2174,7 @@ class StateManager:
         if not npc:
             return
         
-        current_stage = npc.intelligence_stage or "reactive"
+        current_stage = npc.intelligence_stage or NPCIntelligenceStage.REACTIVE
         new_stage = current_stage
         disposition = self.get_npc_disposition(npc_id)
         
@@ -2186,7 +2191,7 @@ class StateManager:
             db = self._get_db()
             npc.intelligence_stage = new_stage
             self._maybe_commit()
-            print(f"[NPC Evolution] {npc.name}: {current_stage} → {new_stage}")
+            logger.info(f"{npc.name}: {current_stage} → {new_stage}")
     
     # Valid emotional milestone types (Module 04 P5-16)
     EMOTIONAL_MILESTONE_TYPES = [
@@ -2224,7 +2229,7 @@ class StateManager:
             return None
         
         if milestone_type not in self.EMOTIONAL_MILESTONE_TYPES:
-            print(f"[NPC] Invalid milestone type: {milestone_type}")
+            logger.warning(f"Invalid milestone type: {milestone_type}")
             return None
         
         # Get existing milestones
@@ -2244,7 +2249,7 @@ class StateManager:
         npc.emotional_milestones = milestones
         self._maybe_commit()
         
-        print(f"[NPC Milestone] {npc.name}: {milestone_type} - {context[:50]}...")
+        logger.info(f"{npc.name}: {milestone_type} - {context[:50]}...")
         
         # Return event for potential narrative use
         return {

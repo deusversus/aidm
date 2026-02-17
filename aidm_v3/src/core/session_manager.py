@@ -12,6 +12,10 @@ from datetime import datetime
 from pydantic import BaseModel
 
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 class SessionExport(BaseModel):
     """Exported session data."""
     session_id: int
@@ -438,6 +442,6 @@ class SessionManager:
             tension_level=director_output.tension_level
         )
         
-        print(f"[Director] Session-end review: {director_output.arc_phase} (tension: {director_output.tension_level:.1f})")
+        logger.info(f"Session-end review: {director_output.arc_phase} (tension: {director_output.tension_level:.1f})")
         
         return planning_data

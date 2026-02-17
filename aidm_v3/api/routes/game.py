@@ -24,6 +24,10 @@ from src.db.session import init_db
 from src.db.session_store import get_session_store
 from src.db.models import Character, NPC, Faction, WorldState
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 router = APIRouter()
 
 # Cache orchestrator instance
@@ -47,11 +51,11 @@ def get_orchestrator() -> Orchestrator:
         profile_id = settings.active_profile_id
         
         # DEBUG: Log what we loaded
-        print(f"[get_orchestrator] Loaded settings: active_profile_id='{profile_id}', active_campaign_id='{settings.active_campaign_id}'", flush=True)
+        logger.info(f"[get_orchestrator] Loaded settings: active_profile_id='{profile_id}', active_campaign_id='{settings.active_campaign_id}'", flush=True)
         
         # Handle missing profile - requires Session Zero to set it
         if not profile_id:  # Empty string means not configured
-            print(f"[get_orchestrator] ERROR: No profile set! Settings file may not be synced.", flush=True)
+            logger.error(f"[get_orchestrator] ERROR: No profile set! Settings file may not be synced.", flush=True)
             raise HTTPException(
                 status_code=400,
                 detail="No active profile set. Please complete Session Zero first."
@@ -77,9 +81,9 @@ def reset_orchestrator():
         try:
             _orchestrator.close()
         except Exception as e:
-            print(f"[reset_orchestrator] Warning: close() failed: {e}", flush=True)
+            logger.error(f"[reset_orchestrator] Warning: close() failed: {e}", flush=True)
     _orchestrator = None
-    print("[reset_orchestrator] Orchestrator cleared - next call will create fresh instance", flush=True)
+    logger.info("[reset_orchestrator] Orchestrator cleared - next call will create fresh instance", flush=True)
 
 
 
@@ -351,7 +355,7 @@ async def start_session(request: StartSessionRequest = None):
     settings_store = get_settings_store()
     current_settings = settings_store.load()
     if current_settings.active_session_id and current_settings.active_session_id != session_id:
-        print(f"[StartSession] Clearing stale settings: session_id was '{current_settings.active_session_id}'")
+        logger.info(f"Clearing stale settings: session_id was '{current_settings.active_session_id}'")
         current_settings.active_profile_id = ""
         current_settings.active_session_id = ""
         current_settings.active_campaign_id = None
@@ -456,9 +460,9 @@ async def resume_session(session_id: str):
             )
             if recap_output:
                 recap_text = recap_output.recap_text
-                print(f"[Resume] Generated recap: {recap_text[:100]}...")
+                logger.info(f"Generated recap: {recap_text[:100]}...")
         except Exception as e:
-            print(f"[Resume] Recap generation failed (non-fatal): {e}")
+            logger.error(f"Recap generation failed (non-fatal): {e}")
 
     # Get current turn count from DB for gameplay detection
     current_turn = 0
@@ -558,9 +562,9 @@ async def delete_session(session_id: str):
             if collection_name in existing:
                 client.delete_collection(collection_name)
                 memory_deleted = True
-                print(f"[Session Reset] Deleted memory collection: {collection_name}")
+                logger.info(f"Deleted memory collection: {collection_name}")
     except Exception as e:
-        print(f"[Session Reset] Memory cleanup error: {e}")
+        logger.error(f"Memory cleanup error: {e}")
     
     return {
         "deleted": deleted, 
@@ -665,7 +669,7 @@ async def _generate_handoff_character_media(
         
         settings = get_settings_store().load()
         if not settings.media_enabled:
-            print(f"[Handoff→Media] Media disabled, skipping character media gen")
+            logger.warning(f"[Handoff→Media] Media disabled, skipping character media gen")
             return
         
         style_context = settings.active_profile_id or "anime"
@@ -691,15 +695,15 @@ async def _generate_handoff_character_media(
                 if result.get("portrait"):
                     # Portrait is under portraits/ subdir, e.g. data/media/1/portraits/name_portrait.png
                     char.portrait_url = f"/api/game/media/{campaign_id}/portraits/{result['portrait'].name}"
-                    print(f"[Handoff→Media] Player portrait saved: {char.portrait_url}")
+                    logger.info(f"[Handoff→Media] Player portrait saved: {char.portrait_url}")
                 if result.get("model_sheet"):
                     char.model_sheet_url = f"/api/game/media/{campaign_id}/models/{result['model_sheet'].name}"
-                    print(f"[Handoff→Media] Player model sheet saved: {char.model_sheet_url}")
+                    logger.info(f"[Handoff→Media] Player model sheet saved: {char.model_sheet_url}")
                 db.commit()
             db.close()
             
     except Exception as e:
-        print(f"[Handoff→Media] Character media gen failed (non-critical): {e}")
+        logger.error(f"[Handoff→Media] Character media gen failed (non-critical): {e}")
 
 
 @router.post("/session/{session_id}/turn", response_model=SessionZeroResponse)
@@ -734,7 +738,7 @@ async def session_zero_turn(session_id: str, request: TurnRequest):
             session.character_draft.op_tension_source = "consequence"
             session.character_draft.op_power_expression = "derivative"
             session.character_draft.op_narrative_focus = "faction"
-        print(f"[SessionZero] OP Mode enabled with preset: {session.character_draft.op_preset}")
+        logger.info(f"OP Mode enabled with preset: {session.character_draft.op_preset}")
     
     # Process through Session Zero agent
     agent = get_session_zero_agent()
@@ -744,9 +748,9 @@ async def session_zero_turn(session_id: str, request: TurnRequest):
     last_msg = session.messages[-1]['content'][:100] if session.messages else "None"
     try:
         safe_msg = last_msg.encode('ascii', 'replace').decode('ascii')
-        print(f"[SessionZero] DEBUG: {msg_count} messages in session. Last: {safe_msg}...")
+        logger.debug(f"DEBUG: {msg_count} messages in session. Last: {safe_msg}...")
     except Exception:
-        print(f"[SessionZero] DEBUG: {msg_count} messages in session.")
+        logger.debug(f"DEBUG: {msg_count} messages in session.")
     
     try:
         result = await agent.process_turn(session, request.player_input)
@@ -757,7 +761,7 @@ async def session_zero_turn(session_id: str, request: TurnRequest):
         
         # Apply any detected information to the character draft
 
-        print(f"[SessionZero] DEBUG: Raw result.detected_info = {result.detected_info}")
+        logger.debug(f"DEBUG: Raw result.detected_info = {result.detected_info}")
         if result.detected_info:
             # DEBUG: Log what the LLM returned
             try:
@@ -765,10 +769,10 @@ async def session_zero_turn(session_id: str, request: TurnRequest):
                     k: str(v).encode('ascii', 'replace').decode('ascii')
                     for k, v in result.detected_info.items()
                 }
-                print(f"[SessionZero] DEBUG: Detected info (safe): {safe_detected_info}")
+                logger.debug(f"DEBUG: Detected info (safe): {safe_detected_info}")
             except Exception as e:
-                print(f"[SessionZero] DEBUG: Failed to safely encode detected_info: {e}")
-                print(f"[SessionZero] DEBUG: Raw detected_info: {result.detected_info}")
+                logger.error(f"DEBUG: Failed to safely encode detected_info: {e}")
+                logger.debug(f"DEBUG: Raw detected_info: {result.detected_info}")
             
             apply_detected_info(session, result.detected_info)
             
@@ -782,9 +786,9 @@ async def session_zero_turn(session_id: str, request: TurnRequest):
                     session_id=session.session_id
                 )
                 if state_stats.get("memories_added", 0) > 0:
-                    print(f"[SessionZero] Fluid state: {state_stats['memories_added']} memories, {state_stats.get('npcs_created', 0)} NPCs")
+                    logger.info(f"Fluid state: {state_stats['memories_added']} memories, {state_stats.get('npcs_created', 0)} NPCs")
             except Exception as state_err:
-                print(f"[SessionZero] Fluid state processing failed (non-fatal): {state_err}")
+                logger.error(f"Fluid state processing failed (non-fatal): {state_err}")
             
             # TRIGGER RESEARCH: If media reference detected in Phase 0
             media_ref = result.detected_info.get("media_reference") or result.detected_info.get("anime")
@@ -798,17 +802,17 @@ async def session_zero_turn(session_id: str, request: TurnRequest):
             if media_ref and session.character_draft.media_reference and session.character_draft.narrative_profile:
                 established = session.character_draft.media_reference
                 if media_ref != established:
-                    print(f"[SessionZero] Stability guard: LLM returned '{media_ref}' but we already have '{established}' — using established")
+                    logger.info(f"Stability guard: LLM returned '{media_ref}' but we already have '{established}' — using established")
                     media_ref = established
             
-            print(f"[SessionZero] DEBUG: media_ref = {media_ref}, session.phase = {session.phase}")
+            logger.debug(f"DEBUG: media_ref = {media_ref}, session.phase = {session.phase}")
             
             # Only trigger research/disambiguation in early phases (MEDIA_DETECTION, CONCEPT)
             # Later phases (IDENTITY, WRAP_UP, etc.) should not re-run disambiguation
             early_phases = [SessionPhase.MEDIA_DETECTION, SessionPhase.NARRATIVE_CALIBRATION, SessionPhase.OP_MODE_DETECTION, SessionPhase.CONCEPT]
             if media_ref and session.phase in early_phases:
                 # Note: We include CONCEPT because hybrid flow may need to run research there
-                print(f"[SessionZero] DEBUG: Triggering research logic for '{media_ref}' (Phase: {session.phase})")
+                logger.debug(f"DEBUG: Triggering research logic for '{media_ref}' (Phase: {session.phase})")
                 
                 # Check if this is "original" (custom world) vs canonical anime
                 is_original = media_ref.lower().strip() in ["original", "custom", "new", "fresh"]
@@ -825,7 +829,7 @@ async def session_zero_turn(session_id: str, request: TurnRequest):
                 # If user just made a disambiguation selection, mark it complete
                 if is_disambiguation_response:
                     session.phase_state['disambiguation_complete'] = True
-                    print(f"[SessionZero] DEBUG: Disambiguation selection made - marking complete")
+                    logger.debug(f"DEBUG: Disambiguation selection made - marking complete")
                 
                 # Check if disambiguation already completed OR was shown this session
                 disambiguation_already_done = session.phase_state.get('disambiguation_complete', False)
@@ -836,7 +840,7 @@ async def session_zero_turn(session_id: str, request: TurnRequest):
                 from src.agents.profile_generator import load_existing_profile
                 specific_profile_exists = load_existing_profile(media_ref) is not None
                 
-                print(f"[Disambiguation] Flags: done={disambiguation_already_done}, shown={disambiguation_shown}, specific_exists={specific_profile_exists}")
+                logger.info(f"Flags: done={disambiguation_already_done}, shown={disambiguation_shown}, specific_exists={specific_profile_exists}")
                 
                 # Only run single-title disambiguation if:
                 # - NOT a hybrid (hybrids have their own disambiguation)
@@ -860,7 +864,7 @@ async def session_zero_turn(session_id: str, request: TurnRequest):
                         session.phase_state['disambiguation_for'] = media_ref
                         
                         # Return disambiguation options to user
-                        print(f"[SessionZero] Disambiguation needed for '{media_ref}' - returning {len(disambiguation['options'])} options")
+                        logger.info(f"Disambiguation needed for '{media_ref}' - returning {len(disambiguation['options'])} options")
                         
                         # Build a styled response matching Session Zero formatting
                         options_text = "\n".join([
@@ -908,7 +912,7 @@ I found several entries in the **{media_ref}** franchise:
                         result.detected_info["research_status"] = "custom_profile_created"
                         result.detected_info["profile_type"] = "custom"
                     except Exception as custom_error:
-                        print(f"[SessionZero] Custom profile generation failed: {custom_error}")
+                        logger.error(f"Custom profile generation failed: {custom_error}")
                 
                 elif is_hybrid:
                     # HYBRID PROFILE: Two-phase flow
@@ -950,8 +954,8 @@ I found several entries in the **{media_ref}** franchise:
                             session.phase_state['disambiguation_for'] = f"{media_ref} × {secondary_ref}"
                             
                             # DEBUG: Log actual option counts
-                            print(f"[Hybrid Debug] disambig_a options: {len(disambig_a.get('options', []))}")
-                            print(f"[Hybrid Debug] disambig_b options: {len(disambig_b.get('options', []))}")
+                            logger.debug(f"disambig_a options: {len(disambig_a.get('options', []))}")
+                            logger.debug(f"disambig_b options: {len(disambig_b.get('options', []))}")
                             
                             # Build a combined disambiguation response for both titles
                             response_parts = ["## 🔍 Multiple Series Found\n"]
@@ -1003,7 +1007,7 @@ I found several entries in the **{media_ref}** franchise:
                     if not hybrid_confirmed:
                         # PHASE 1: Just mark that we're awaiting preferences
                         # The agent will generate blend prompts in its response
-                        print(f"[SessionZero] Hybrid detected: {media_ref} × {secondary_ref} - awaiting preferences")
+                        logger.info(f"Hybrid detected: {media_ref} × {secondary_ref} - awaiting preferences")
                         
                         # OPTIMIZATION: Check if we even need to research
                         from src.agents.profile_generator import load_existing_profile
@@ -1011,7 +1015,7 @@ I found several entries in the **{media_ref}** franchise:
                         prof_b = load_existing_profile(secondary_ref)
                         
                         if prof_a and prof_b:
-                            print(f"[SessionZero] Both profiles cached: {media_ref} & {secondary_ref}. Skipping background preload.")
+                            logger.warning(f"Both profiles cached: {media_ref} & {secondary_ref}. Skipping background preload.")
                             # Mark that sources are ready - no tracker needed
                             result.detected_info["research_status"] = "sources_cached"
                             result.detected_info["profile_id"] = f"{media_ref} × {secondary_ref}"
@@ -1038,15 +1042,15 @@ I found several entries in the **{media_ref}** franchise:
                                             progress_tracker=progress_tracker
                                         )
                                     except Exception as e:
-                                        print(f"[SessionZero] Hybrid preload failed: {e}")
+                                        logger.error(f"Hybrid preload failed: {e}")
                                         await progress_tracker.complete() # Close stream on error
                                 
                                 # Start background task
                                 asyncio.create_task(run_hybrid_preload())
-                                print(f"[SessionZero] Started hybrid preload (task_id: {progress_tracker.task_id})")
+                                logger.info(f"Started hybrid preload (task_id: {progress_tracker.task_id})")
                                 
                             except Exception as preload_error:
-                                print(f"[SessionZero] Preload setup failed: {preload_error}")
+                                logger.error(f"Preload setup failed: {preload_error}")
                         
                         result.detected_info["awaiting_hybrid_preferences"] = True
                         result.detected_info["profile_type"] = "hybrid"
@@ -1064,7 +1068,7 @@ I found several entries in the **{media_ref}** franchise:
                         
                         if prof_a and prof_b:
                             # Both cached - run merge synchronously (no tracker needed)
-                            print(f"[SessionZero] Both profiles cached for Phase 2. Running fast merge.")
+                            logger.info(f"Both profiles cached for Phase 2. Running fast merge.")
                             try:
                                 from src.agents.session_zero import research_hybrid_profile_cached
                                 import asyncio
@@ -1083,7 +1087,7 @@ I found several entries in the **{media_ref}** franchise:
                                 result.detected_info["research_status"] = "fast_merge"
                                 result.detected_info["profile_type"] = "hybrid"
                             except Exception as fast_merge_error:
-                                print(f"[SessionZero] Fast merge failed: {fast_merge_error}")
+                                logger.error(f"Fast merge failed: {fast_merge_error}")
                         else:
                             # Need to research - use progress tracker
                             try:
@@ -1111,19 +1115,19 @@ I found several entries in the **{media_ref}** franchise:
                                         # Save session with updated profile
                                         store = get_session_store()
                                         store.save(session)
-                                        print(f"[SessionZero] Hybrid research completed: {media_ref} × {secondary_ref}")
+                                        logger.info(f"Hybrid research completed: {media_ref} × {secondary_ref}")
                                     except Exception as bg_error:
-                                        print(f"[SessionZero] Hybrid research failed: {bg_error}")
+                                        logger.error(f"Hybrid research failed: {bg_error}")
                                         import traceback
                                         traceback.print_exc()
                                         await progress_tracker.complete()
                                 
                                 # Start research in background - don't await!
                                 asyncio.create_task(run_hybrid_research_background())
-                                print(f"[SessionZero] Started cached hybrid research (task_id: {progress_tracker.task_id})")
+                                logger.info(f"Started cached hybrid research (task_id: {progress_tracker.task_id})")
                                 
                             except Exception as hybrid_error:
-                                print(f"[SessionZero] Hybrid research setup failed: {hybrid_error}")
+                                logger.error(f"Hybrid research setup failed: {hybrid_error}")
                 else:
                     # CANONICAL ANIME: Research and save to permanent storage
                     # First check if profile already exists
@@ -1132,7 +1136,7 @@ I found several entries in the **{media_ref}** franchise:
                     
                     if existing:
                         # Profile exists - just apply it, no progress bar needed
-                        print(f"[SessionZero] Found existing profile for '{media_ref}'")
+                        logger.info(f"Found existing profile for '{media_ref}'")
                         profile_id = existing.get("id")
                         session.character_draft.narrative_profile = profile_id
                         session.character_draft.media_reference = media_ref
@@ -1146,12 +1150,12 @@ I found several entries in the **{media_ref}** franchise:
                         settings_store = get_settings_store()
                         current_settings = settings_store.load()
                         if current_settings.active_profile_id != profile_id:
-                            print(f"[SessionZero] Early sync: {current_settings.active_profile_id} -> {profile_id}")
+                            logger.info(f"Early sync: {current_settings.active_profile_id} -> {profile_id}")
                             current_settings.active_profile_id = profile_id
                             current_settings.active_session_id = session.session_id
                             settings_store.save(current_settings)
                     else:
-                        print(f"[SessionZero] DEBUG: Entering Single Profile Logic for '{media_ref}'")
+                        logger.debug(f"DEBUG: Entering Single Profile Logic for '{media_ref}'")
                         # No existing profile - run research as BACKGROUND TASK
                         try:
                             import asyncio
@@ -1159,7 +1163,7 @@ I found several entries in the **{media_ref}** franchise:
                             
                             # Create progress tracker for SSE streaming
                             progress_tracker = ProgressTracker(total_steps=10)
-                            print(f"[SessionZero] DEBUG: Outputting Task ID {progress_tracker.task_id}")
+                            logger.debug(f"DEBUG: Outputting Task ID {progress_tracker.task_id}")
                             
                             # EMIT IMMEDIATE START to verify connection
                             import asyncio
@@ -1188,58 +1192,58 @@ I found several entries in the **{media_ref}** franchise:
                                     session.character_draft.attributes["research_confidence"] = research_result.get("confidence")
                                     
                                     profile_id = session.character_draft.narrative_profile
-                                    print(f"[ProfileLink] narrative_profile set to: '{profile_id}'")
+                                    logger.info(f"narrative_profile set to: '{profile_id}'")
                                     
                                     # Save session with linked profile
                                     store = get_session_store()
                                     store.save(session)
-                                    print(f"[ProfileLink] Session saved to DB with profile '{profile_id}'")
+                                    logger.info(f"Session saved to DB with profile '{profile_id}'")
                                     
                                     # Also update the in-memory session manager to stay in sync
                                     manager = get_session_manager()
                                     manager._sessions[session.session_id] = session
-                                    print(f"[ProfileLink] In-memory session updated")
+                                    logger.info(f"In-memory session updated")
                                     
                                 except Exception as bg_error:
-                                    print(f"[SessionZero] Background research failed: {bg_error}")
+                                    logger.error(f"Background research failed: {bg_error}")
                                     import traceback
                                     traceback.print_exc()
                                     await progress_tracker.complete()
                             
                             # Start research in background - don't await!
                             asyncio.create_task(run_research_background())
-                            print(f"[SessionZero] Started background research for '{media_ref}' (task_id: {progress_tracker.task_id})")
+                            logger.info(f"Started background research for '{media_ref}' (task_id: {progress_tracker.task_id})")
                             
                         except Exception as research_error:
-                            print(f"[SessionZero] Research setup failed: {research_error}")
+                            logger.error(f"Research setup failed: {research_error}")
         
         # COMPLETENESS-DRIVEN PHASE TRACKING
         # Sync phase to actual data completeness (allows multi-phase skip)
         actual_phase = get_current_phase_for_draft(session.character_draft)
         if actual_phase != session.phase:
-            print(f"[SessionZero] Phase sync: {session.phase.value} -> {actual_phase.value}")
+            logger.info(f"Phase sync: {session.phase.value} -> {actual_phase.value}")
             session.skip_to_phase(actual_phase)
         
         # Handle gameplay transition
         if result.ready_for_gameplay:
-            print(f"[SessionZero] Agent set ready_for_gameplay=True")
+            logger.info(f"Agent set ready_for_gameplay=True")
             # Validate that we actually have all requirements
             missing = get_missing_requirements(session.character_draft)
             if missing:
-                print(f"[SessionZero] BLOCKED: Agent claimed ready but missing: {missing}")
+                logger.warning(f"BLOCKED: Agent claimed ready but missing: {missing}")
                 # Override the agent's decision - don't transition
                 result.ready_for_gameplay = False
             else:
-                print(f"[SessionZero] All requirements met - proceeding with handoff")
+                logger.info(f"All requirements met - proceeding with handoff")
                 
                 # INDEX SESSION ZERO TO MEMORY (before creating orchestrator)
                 # This stores character creation dialogue for RAG retrieval during gameplay
                 from src.agents.session_zero import index_session_zero_to_memory
                 try:
                     indexed_count = await index_session_zero_to_memory(session)
-                    print(f"[Handoff] Indexed {indexed_count} Session Zero chunks to memory")
+                    logger.info(f"Indexed {indexed_count} Session Zero chunks to memory")
                 except Exception as mem_err:
-                    print(f"[Handoff] Memory indexing failed (non-fatal): {mem_err}")
+                    logger.error(f"Memory indexing failed (non-fatal): {mem_err}")
                 
                 # HANDOFF HARDENING: Sync settings before initializing orchestrator
                 draft = session.character_draft
@@ -1256,11 +1260,11 @@ I found several entries in the **{media_ref}** franchise:
                     inferred_profile = _sanitize_profile_id(draft.media_reference)
                     if inferred_profile in available_profiles:
                         profile_to_use = inferred_profile
-                        print(f"[Handoff] Inferred profile from media_reference: {profile_to_use}")
+                        logger.info(f"Inferred profile from media_reference: {profile_to_use}")
                 
                 # If profile not found in available profiles, use fallback
                 if profile_to_use and profile_to_use not in available_profiles:
-                    print(f"[Handoff] Profile '{profile_to_use}' not found in: {available_profiles[:5]}...")
+                    logger.warning(f"Profile '{profile_to_use}' not found in: {available_profiles[:5]}...")
                     profile_to_use = None  # Force fallback
                 
                 # CHECK FOR HYBRID PROFILES IN SESSION STORAGE
@@ -1275,22 +1279,22 @@ I found several entries in the **{media_ref}** franchise:
                             custom_lib = get_custom_profile_library()
                             if custom_lib.has_session_profile(session.session_id):
                                 profile_to_use = hybrid_id
-                                print(f"[Handoff] Using hybrid profile from session storage: {profile_to_use}")
+                                logger.info(f"Using hybrid profile from session storage: {profile_to_use}")
                 
                 # Final fallback: use first available or "default"
                 if not profile_to_use:
                     if available_profiles:
                         profile_to_use = available_profiles[0]
-                        print(f"[Handoff] Using fallback profile: {profile_to_use}")
+                        logger.warning(f"Using fallback profile: {profile_to_use}")
                     else:
                         profile_to_use = "default"
-                        print(f"[Handoff] No profiles available, using 'default'")
+                        logger.info(f"No profiles available, using 'default'")
                 
                 # Update global settings with session's profile - ALWAYS do this
                 from src.settings import reset_settings_store
                 settings_store = get_settings_store()
                 current_settings = settings_store.load()
-                print(f"[Handoff] Syncing settings: {current_settings.active_profile_id} -> {profile_to_use}", flush=True)
+                logger.info(f"[Handoff] Syncing settings: {current_settings.active_profile_id} -> {profile_to_use}", flush=True)
                 current_settings.active_profile_id = profile_to_use
                 current_settings.active_campaign_id = profile_to_use
                 current_settings.active_session_id = session.session_id  # Session-based memory isolation
@@ -1302,7 +1306,7 @@ I found several entries in the **{media_ref}** franchise:
                 settings_path = Path(__file__).parent.parent.parent / "settings.json"
                 with open(settings_path, 'r') as f:
                     disk_data = json.load(f)
-                print(f"[Handoff] VERIFY disk after save: active_profile_id='{disk_data.get('active_profile_id')}'", flush=True)
+                logger.info(f"[Handoff] VERIFY disk after save: active_profile_id='{disk_data.get('active_profile_id')}'", flush=True)
                 
                 reset_settings_store()  # Clear settings cache so next load picks up new values
                 reset_orchestrator()  # Clear cached orchestrator to pick up new settings
@@ -1310,9 +1314,9 @@ I found several entries in the **{media_ref}** franchise:
                 # Actually ready for gameplay - commit character
                 session.skip_to_phase(SessionPhase.GAMEPLAY)
                 
-                print(f"[Handoff] About to call get_orchestrator()...", flush=True)
+                logger.info(f"[Handoff] About to call get_orchestrator()...", flush=True)
                 orchestrator = get_orchestrator()
-                print(f"[Handoff] Orchestrator created successfully with profile: {orchestrator.profile_id}", flush=True)
+                logger.info(f"[Handoff] Orchestrator created successfully with profile: {orchestrator.profile_id}", flush=True)
 
                 
                 # 1. Update Character
@@ -1349,7 +1353,7 @@ I found several entries in the **{media_ref}** franchise:
                     long_term_goal=draft.goals.get("long_term") if draft.goals else None,
                     inventory=draft.inventory,
                 )
-                print(f"[Handoff] Power tier set to: {final_tier}")
+                logger.info(f"Power tier set to: {final_tier}")
                 
                 # 1b. Fire-and-forget: Generate player character media (portrait + model sheet)
                 if draft.appearance or draft.visual_tags:
@@ -1363,9 +1367,9 @@ I found several entries in the **{media_ref}** franchise:
                                 visual_tags=draft.visual_tags,
                             )
                         )
-                        print(f"[Handoff] Queued player character media generation")
+                        logger.info(f"Queued player character media generation")
                     except Exception as media_err:
-                        print(f"[Handoff] Character media queue failed (non-fatal): {media_err}")
+                        logger.error(f"Character media queue failed (non-fatal): {media_err}")
                 
                 # 2. Update World State (Location)
                 if draft.starting_location:
@@ -1383,7 +1387,7 @@ I found several entries in the **{media_ref}** franchise:
                         narrative_focus=draft.op_narrative_focus or "faction",
                         preset=draft.op_preset or "hidden_ruler"
                     )
-                    print(f"[Handoff] OP Mode transferred: {draft.op_preset}")
+                    logger.info(f"OP Mode transferred: {draft.op_preset}")
                 
                 # 4. SESSION ZERO CONTEXT TRANSFER
                 # Inject recent Session Zero messages so Orchestrator knows the scene
@@ -1413,7 +1417,7 @@ I found several entries in the **{media_ref}** franchise:
                     # Store FULL transcript for voice/tone continuity on first gameplay turn
                     # (Contains Phase 5 as the last assistant message - no need for separate handoff_scene)
                     session.phase_state["handoff_transcript"] = session.messages.copy()
-                    print(f"[Handoff] Full transcript stored ({len(session.messages)} messages)")
+                    logger.info(f"Full transcript stored ({len(session.messages)} messages)")
                     
                     # Update world state with brief situation summary
                     situation_text = "Continuing from Session Zero opening scene."
@@ -1440,9 +1444,9 @@ I found several entries in the **{media_ref}** franchise:
                             metadata={"source": "session_zero_handoff"},
                             flags=["plot_critical", "session_zero"]
                         )
-                        print(f"[Handoff] Session Zero context injected ({len(recent_summary)} chars)")
+                        logger.info(f"Session Zero context injected ({len(recent_summary)} chars)")
                     except Exception as mem_err:
-                        print(f"[Handoff] Memory injection failed (non-critical): {mem_err}")
+                        logger.error(f"Memory injection failed (non-critical): {mem_err}")
                     
                     # Save session with handoff_scene
                     session_store = get_session_store()
@@ -1462,9 +1466,9 @@ I found several entries in the **{media_ref}** franchise:
                         op_power_expression=draft.op_power_expression,
                         op_narrative_focus=draft.op_narrative_focus,
                     )
-                    print(f"[Handoff] Director startup complete — initial storyboard created")
+                    logger.info(f"Director startup complete — initial storyboard created")
                 except Exception as dir_err:
-                    print(f"[Handoff] Director startup failed (non-critical): {dir_err}")
+                    logger.error(f"Director startup failed (non-critical): {dir_err}")
                     import traceback
                     traceback.print_exc()
                 
@@ -1474,7 +1478,7 @@ I found several entries in the **{media_ref}** franchise:
                 opening_narrative = None
                 opening_portrait_map = None
                 try:
-                    print(f"[Handoff] Generating opening scene server-side...")
+                    logger.info(f"Generating opening scene server-side...")
                     opening_result = await orchestrator.process_turn(
                         player_input="[opening scene — the story begins]",
                         recent_messages=session.messages[-20:],
@@ -1486,9 +1490,9 @@ I found several entries in the **{media_ref}** franchise:
                     session.add_message("assistant", opening_narrative)
                     session_store = get_session_store()
                     session_store.save(session)
-                    print(f"[Handoff] Opening scene generated ({len(opening_narrative)} chars)")
+                    logger.info(f"Opening scene generated ({len(opening_narrative)} chars)")
                 except Exception as scene_err:
-                    print(f"[Handoff] Opening scene generation failed (non-critical): {scene_err}")
+                    logger.error(f"Opening scene generation failed (non-critical): {scene_err}")
                     import traceback
                     traceback.print_exc()
         
@@ -1578,7 +1582,7 @@ I found several entries in the **{media_ref}** franchise:
             settings_store = get_settings_store()
             current_settings = settings_store.load()
             if current_settings.active_profile_id != profile_to_sync:
-                print(f"[SessionZero] Defensive sync: {current_settings.active_profile_id} -> {profile_to_sync}", flush=True)
+                logger.info(f"[SessionZero] Defensive sync: {current_settings.active_profile_id} -> {profile_to_sync}", flush=True)
                 current_settings.active_profile_id = profile_to_sync
                 current_settings.active_campaign_id = profile_to_sync
                 settings_store.save(current_settings)
@@ -1757,11 +1761,11 @@ async def process_turn(request: TurnRequest):
                         while total_tokens > COMPACTION_MAX_TOKENS and len(session.compaction_buffer) > 1:
                             evicted = session.compaction_buffer.pop(0)
                             total_tokens -= evicted["tokens_est"]
-                            print(f"[Compaction] Evicted oldest entry (turn {evicted['turn']}, {evicted['tokens_est']} tokens)")
+                            logger.info(f"Evicted oldest entry (turn {evicted['turn']}, {evicted['tokens_est']} tokens)")
                         
-                        print(f"[Compaction] Appended micro-summary ({tokens_est} tokens, buffer: {len(session.compaction_buffer)} entries, {total_tokens} total tokens)")
+                        logger.info(f"Appended micro-summary ({tokens_est} tokens, buffer: {len(session.compaction_buffer)} entries, {total_tokens} total tokens)")
                 except Exception as e:
-                    print(f"[Compaction] Failed (non-fatal): {e}")
+                    logger.error(f"Failed (non-fatal): {e}")
     
     # Build compaction text from buffer for injection
     if session and hasattr(session, 'compaction_buffer') and session.compaction_buffer:
@@ -1788,48 +1792,48 @@ async def process_turn(request: TurnRequest):
                 ]
                 if unique_pinned:
                     recent_messages = unique_pinned + recent_messages
-                    print(f"[GameAPI] Pinned {len(unique_pinned)} messages prepended to working memory")
+                    logger.info(f"Pinned {len(unique_pinned)} messages prepended to working memory")
         except Exception as e:
-            print(f"[GameAPI] Pinned messages failed (non-fatal): {e}")
+            logger.error(f"Pinned messages failed (non-fatal): {e}")
     
     if recent_messages:
-        print(f"[GameAPI] Working memory: {len(recent_messages)} recent messages")
+        logger.info(f"Working memory: {len(recent_messages)} recent messages")
     
     orchestrator = get_orchestrator()
     
     try:
         try:
             safe_input = request.player_input[:50].encode('ascii', 'replace').decode('ascii')
-            print(f"[GameAPI] Processing turn: '{safe_input}...'")
+            logger.info(f"Processing turn: '{safe_input}...'")
         except Exception:
-            print(f"[GameAPI] Processing turn: (encoding failed)")
+            logger.error(f"Processing turn: (encoding failed)")
         result = await orchestrator.process_turn(player_input=request.player_input, recent_messages=recent_messages, compaction_text=compaction_text)
         
         # DEBUG: Log the actual narrative value
-        print(f"[GameAPI] Result received:")
-        print(f"[GameAPI]   - narrative type: {type(result.narrative)}")
-        print(f"[GameAPI]   - narrative length: {len(result.narrative) if result.narrative else 0}")
+        logger.info(f"Result received:")
+        logger.info(f"- narrative type: {type(result.narrative)}")
+        logger.info(f"- narrative length: {len(result.narrative) if result.narrative else 0}")
         try:
             if result and result.narrative:
                 safe_snippet = result.narrative[:100].encode('ascii', 'replace').decode('ascii')
-                print(f"[GameAPI]   - narrative first 100: {safe_snippet}")
+                logger.info(f"- narrative first 100: {safe_snippet}")
             else:
-                print("[GameAPI]   - narrative first 100: EMPTY")
+                logger.info("- narrative first 100: EMPTY")
         except Exception:
-            print("[GameAPI]   - narrative logging failed")
+            logger.error("- narrative logging failed")
         try:
             safe_intent = str(result.intent.intent).encode('ascii', 'replace').decode('ascii')
             safe_outcome = str(result.outcome.success_level).encode('ascii', 'replace').decode('ascii')
-            print(f"[GameAPI]   - intent: {safe_intent}")
-            print(f"[GameAPI]   - outcome: {safe_outcome}")
+            logger.info(f"- intent: {safe_intent}")
+            logger.info(f"- outcome: {safe_outcome}")
         except Exception:
-            print("[GameAPI]   - intent/outcome logging failed")
+            logger.error("- intent/outcome logging failed")
         
         # Add assistant response to session AFTER processing
         if session:
             session.add_message("assistant", result.narrative)
             store.save(session)
-            print(f"[GameAPI] Session saved with {len(session.messages)} messages")
+            logger.info(f"Session saved with {len(session.messages)} messages")
         
         response = TurnResponse(
             narrative=result.narrative,
@@ -1843,12 +1847,12 @@ async def process_turn(request: TurnRequest):
         )
         
         # DEBUG: Log what we're actually returning
-        print(f"[GameAPI] Returning TurnResponse with narrative length: {len(response.narrative)}")
+        logger.info(f"Returning TurnResponse with narrative length: {len(response.narrative)}")
         
         return response
     except Exception as e:
         import traceback
-        print(f"[GameAPI] ERROR in process_turn: {e}")
+        logger.error(f"ERROR in process_turn: {e}")
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -2411,7 +2415,7 @@ async def get_journal(
         entries = all_beats[start:end]
 
     except Exception as e:
-        print(f"[Journal] Error fetching episode memories: {e}")
+        logger.error(f"Error fetching episode memories: {e}")
         total = 0
     
     # Full text expansion: Get the full narrative for a specific turn
@@ -2426,7 +2430,7 @@ async def get_journal(
                     entry_type="full_text",
                 ))
         except Exception as e:
-            print(f"[Journal] Error expanding turn {expand_turn}: {e}")
+            logger.error(f"Error expanding turn {expand_turn}: {e}")
     
     return JournalResponse(
         entries=entries,

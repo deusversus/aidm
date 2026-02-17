@@ -14,6 +14,10 @@ from typing import Any, Optional
 from ..llm.tools import ToolDefinition, ToolParam, ToolRegistry
 
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 def build_production_tools(
     state: Any,          # StateManager
     current_turn: int,
@@ -420,9 +424,9 @@ def _trigger_cutscene(
                         status=result["status"],
                     )
                     _deduct_budget(budget_ctx, result.get("cost_usd", 0.0))
-                print(f"[MediaTools] Cutscene ({cutscene_type}): {result.get('status', 'unknown')}")
+                logger.info(f"Cutscene ({cutscene_type}): {result.get('status', 'unknown')}")
             except Exception as e:
-                print(f"[MediaTools] Cutscene generation error: {e}")
+                logger.error(f"Cutscene generation error: {e}")
 
         # Fire-and-forget: schedule as background task
         loop = asyncio.get_running_loop()
@@ -513,9 +517,9 @@ def _generate_npc_portrait(
                     cost_usd=0.06,
                     status="complete",
                 )
-                print(f"[MediaTools] Portrait generated for NPC \"{npc_name}\"")
+                logger.info(f"Portrait generated for NPC \"{npc_name}\"")
             except Exception as e:
-                print(f"[MediaTools] NPC portrait generation error for \"{npc_name}\": {e}")
+                logger.error(f"NPC portrait generation error for \"{npc_name}\": {e}")
 
         loop = asyncio.get_running_loop()
         loop.create_task(_generate())
@@ -574,9 +578,9 @@ def _generate_location_visual(
                         cost_usd=0.03,
                         status="complete",
                     )
-                    print(f"[MediaTools] Location visual generated for \"{location_name}\"")
+                    logger.info(f"Location visual generated for \"{location_name}\"")
             except Exception as e:
-                print(f"[MediaTools] Location visual error for \"{location_name}\": {e}")
+                logger.error(f"Location visual error for \"{location_name}\": {e}")
 
         loop = asyncio.get_running_loop()
         loop.create_task(_generate())
@@ -623,4 +627,4 @@ def _save_media_asset(
         finally:
             db.close()
     except Exception as e:
-        print(f"[MediaTools] Failed to save media asset: {e}")
+        logger.error(f"Failed to save media asset: {e}")

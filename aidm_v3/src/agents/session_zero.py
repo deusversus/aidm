@@ -14,6 +14,10 @@ from .base import BaseAgent
 from ..core.session import Session, SessionPhase
 from typing import TYPE_CHECKING
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 if TYPE_CHECKING:
     from .progress import ProgressTracker
 
@@ -275,7 +279,7 @@ async def process_session_zero_state(
             flags=["plot_critical", "session_zero"]
         )
         stats["memories_added"] += 1
-        print(f"[SessionZero→State] Indexed character name: {detected_info['name']}")
+        logger.info(f"[SessionZero→State] Indexed character name: {detected_info['name']}")
     
     if "concept" in detected_info:
         memory.add_memory(
@@ -285,7 +289,7 @@ async def process_session_zero_state(
             flags=["plot_critical", "session_zero"]
         )
         stats["memories_added"] += 1
-        print(f"[SessionZero→State] Indexed character concept")
+        logger.info(f"[SessionZero→State] Indexed character concept")
     
     if "backstory" in detected_info:
         memory.add_memory(
@@ -295,7 +299,7 @@ async def process_session_zero_state(
             flags=["plot_critical", "session_zero"]
         )
         stats["memories_added"] += 1
-        print(f"[SessionZero→State] Indexed character backstory")
+        logger.info(f"[SessionZero→State] Indexed character backstory")
     
     # === ABILITIES/POWERS ===
     
@@ -318,7 +322,7 @@ async def process_session_zero_state(
                 flags=["plot_critical", "session_zero"]
             )
             stats["memories_added"] += 1
-        print(f"[SessionZero→State] Indexed abilities")
+        logger.info(f"[SessionZero→State] Indexed abilities")
     
     # === PERSONALITY ===
     
@@ -354,7 +358,7 @@ async def process_session_zero_state(
             if campaign_id is not None:
                 state = StateManager(campaign_id)
             else:
-                print("[SessionZero→State] No campaign_id provided, skipping NPC DB creation")
+                logger.warning("[SessionZero→State] No campaign_id provided, skipping NPC DB creation")
                 state = None
             
             for npc in npcs:
@@ -377,9 +381,9 @@ async def process_session_zero_state(
                                 appearance=npc_appearance,
                                 visual_tags=npc_visual_tags,
                             )
-                            print(f"[SessionZero→State] Created NPC in DB: {npc_name} (visual_tags={npc_visual_tags})")
+                            logger.info(f"[SessionZero→State] Created NPC in DB: {npc_name} (visual_tags={npc_visual_tags})")
                         except Exception as e:
-                            print(f"[SessionZero→State] NPC DB creation failed: {e}")
+                            logger.error(f"[SessionZero→State] NPC DB creation failed: {e}")
                     
                     # 2. Create NPC memory in ChromaDB
                     memory.add_memory(
@@ -399,13 +403,13 @@ async def process_session_zero_state(
                                     campaign_id, npc_name, npc_appearance, npc_visual_tags
                                 )
                             )
-                            print(f"[SessionZero→Media] Queued portrait gen for NPC: {npc_name}")
+                            logger.info(f"[SessionZero→Media] Queued portrait gen for NPC: {npc_name}")
                         except Exception as media_err:
-                            print(f"[SessionZero→Media] Portrait queue failed (non-fatal): {media_err}")
+                            logger.error(f"[SessionZero→Media] Portrait queue failed (non-fatal): {media_err}")
                     
                     stats["memories_added"] += 1
                     stats["npcs_created"] += 1
-                    print(f"[SessionZero→State] Created NPC: {npc_name} ({role})")
+                    logger.info(f"[SessionZero→State] Created NPC: {npc_name} ({role})")
     
     # === CANONICALITY CHOICES ===
     
@@ -418,7 +422,7 @@ async def process_session_zero_state(
             flags=["plot_critical", "session_zero"]
         )
         stats["memories_added"] += 1
-        print(f"[SessionZero→State] Timeline mode: {mode}")
+        logger.info(f"[SessionZero→State] Timeline mode: {mode}")
     
     if "canon_cast_mode" in detected_info:
         mode = detected_info["canon_cast_mode"]
@@ -429,7 +433,7 @@ async def process_session_zero_state(
             flags=["plot_critical", "session_zero"]
         )
         stats["memories_added"] += 1
-        print(f"[SessionZero→State] Canon cast mode: {mode}")
+        logger.info(f"[SessionZero→State] Canon cast mode: {mode}")
     
     if "event_fidelity" in detected_info:
         mode = detected_info["event_fidelity"]
@@ -440,7 +444,7 @@ async def process_session_zero_state(
             flags=["plot_critical", "session_zero"]
         )
         stats["memories_added"] += 1
-        print(f"[SessionZero→State] Event fidelity: {mode}")
+        logger.info(f"[SessionZero→State] Event fidelity: {mode}")
     
     # === OP MODE ===
     
@@ -455,7 +459,7 @@ async def process_session_zero_state(
                 flags=["plot_critical", "session_zero"]
             )
             stats["memories_added"] += 1
-            print(f"[SessionZero→State] OP Mode enabled: {preset}")
+            logger.info(f"[SessionZero→State] OP Mode enabled: {preset}")
     
     # === WORLD INTEGRATION ===
     
@@ -468,12 +472,12 @@ async def process_session_zero_state(
             flags=["session_zero"]
         )
         stats["memories_added"] += 1
-        print(f"[SessionZero→State] Starting location: {location}")
+        logger.info(f"[SessionZero→State] Starting location: {location}")
     
     memory.close()
     
     if stats["memories_added"] > 0 or stats["npcs_created"] > 0:
-        print(f"[SessionZero→State] Turn processed: {stats['memories_added']} memories, {stats['npcs_created']} NPCs")
+        logger.info(f"[SessionZero→State] Turn processed: {stats['memories_added']} memories, {stats['npcs_created']} NPCs")
     
     return stats
 
@@ -503,7 +507,7 @@ async def get_disambiguation_options(anime_name: str) -> Dict[str, Any]:
     }
     
     # Step 1: Try AniList relation graph (fast, deterministic, season-aware)
-    print(f"[Disambiguation] Checking AniList for '{anime_name}' franchise...")
+    logger.info(f"Checking AniList for '{anime_name}' franchise...")
     try:
         from ..scrapers.anilist import AniListClient
         client = AniListClient()
@@ -526,19 +530,19 @@ async def get_disambiguation_options(anime_name: str) -> Dict[str, Any]:
                 ]
                 result['source'] = 'anilist'
                 titles = [e['title'] for e in franchise]
-                print(f"[Disambiguation] AniList found {len(franchise)} distinct entries: {titles}")
+                logger.info(f"AniList found {len(franchise)} distinct entries: {titles}")
                 return result
             else:
-                print(f"[Disambiguation] AniList entries collapsed to 1, no disambiguation needed")
+                logger.info(f"AniList entries collapsed to 1, no disambiguation needed")
                 return result
         else:
-            print(f"[Disambiguation] AniList: single continuity or not found, no disambiguation needed")
+            logger.warning(f"AniList: single continuity or not found, no disambiguation needed")
             return result
     except Exception as e:
-        print(f"[Disambiguation] AniList franchise check failed: {e}")
+        logger.error(f"AniList franchise check failed: {e}")
     
     # Step 2: Fallback to LLM web search (for obscure titles not on AniList)
-    print(f"[Disambiguation] Falling back to web search for '{anime_name}'...")
+    logger.info(f"Falling back to web search for '{anime_name}'...")
     franchise_entries = await _search_franchise_entries(anime_name)
     
     # Apply season dedup to LLM results
@@ -551,10 +555,10 @@ async def get_disambiguation_options(anime_name: str) -> Dict[str, Any]:
             for entry in franchise_entries
         ]
         result['source'] = 'web_search'
-        print(f"[Disambiguation] Web search found {len(franchise_entries)} entries: {franchise_entries[:5]}")
+        logger.info(f"Web search found {len(franchise_entries)} entries: {franchise_entries[:5]}")
         return result
     else:
-        print(f"[Disambiguation] Single entry or standalone series, no disambiguation needed")
+        logger.info(f"Single entry or standalone series, no disambiguation needed")
     
     return result
 
@@ -612,7 +616,7 @@ def _collapse_season_variants(entries: List[str]) -> List[str]:
     
     if len(result) < len(entries):
         removed = set(entries) - set(result)
-        print(f"[Disambiguation] Collapsed season variants: removed {removed}")
+        logger.info(f"Collapsed season variants: removed {removed}")
     
     return result
 
@@ -637,7 +641,7 @@ async def _search_franchise_entries(anime_name: str) -> List[str]:
     manager = get_llm_manager()
     # Use research agent's provider since it's configured for search
     provider, model = manager.get_provider_for_agent("research")
-    print(f"[Disambiguation] Using provider: {provider.name}, model: {model}")
+    logger.info(f"Using provider: {provider.name}, model: {model}")
     
     # Very explicit prompt - LLM tends to add prose with web search
     query = f'''List all anime series in the same franchise as "{anime_name}".
@@ -652,7 +656,7 @@ RULES:
 
 Start your response with [ and end with ]'''
 
-    print(f"[Disambiguation] Web search for '{anime_name}' franchise...")
+    logger.info(f"Web search for '{anime_name}' franchise...")
     
     # Filter out generic labels
     GENERIC_LABELS = {'original series', 'sequel', 'prequel', 'spinoff', 'movie', 
@@ -670,8 +674,8 @@ Start your response with [ and end with ]'''
             )
             
             content = response.content.strip()
-            print(f"[Disambiguation] RAW RESPONSE LENGTH: {len(content)} chars")
-            print(f"[Disambiguation] RAW RESPONSE: {content[:300]}...")
+            logger.debug(f"RAW RESPONSE LENGTH: {len(content)} chars")
+            logger.debug(f"RAW RESPONSE: {content[:300]}...")
             
             
             # Try to find and parse JSON array
@@ -680,7 +684,7 @@ Start your response with [ and end with ]'''
             
             # Handle truncated responses - if we have [ but no ], add it
             if start_idx != -1 and end_idx == -1:
-                print(f"[Disambiguation] Response truncated, attempting fix...")
+                logger.info(f"Response truncated, attempting fix...")
                 content = content + ']'
                 end_idx = len(content) - 1
             
@@ -688,7 +692,7 @@ Start your response with [ and end with ]'''
                 json_str = content[start_idx:end_idx + 1]
                 # Normalize newlines
                 json_str = json_str.replace('\n', ' ').replace('\r', ' ')
-                print(f"[Disambiguation] Attempting to parse: {json_str[:100]}...")
+                logger.info(f"Attempting to parse: {json_str[:100]}...")
                 
                 try:
                     entries = json.loads(json_str)
@@ -699,12 +703,12 @@ Start your response with [ and end with ]'''
                             and entry.strip()
                             and entry.lower().strip() not in GENERIC_LABELS
                         ]
-                        print(f"[Disambiguation] Web search returned: {valid_entries[:10]}...")
+                        logger.info(f"Web search returned: {valid_entries[:10]}...")
                         return valid_entries  # Return all entries, don't limit
                     else:
-                        print(f"[Disambiguation] Parsed but not a list: {type(entries)}")
+                        logger.info(f"Parsed but not a list: {type(entries)}")
                 except json.JSONDecodeError as e:
-                    print(f"[Disambiguation] JSON parse error: {e}")
+                    logger.error(f"JSON parse error: {e}")
                     
                     # Fallback: Use ValidatorAgent to repair
                     try:
@@ -726,19 +730,19 @@ Start your response with [ and end with ]'''
                                 t.strip() for t in repaired.titles
                                 if t.strip() and t.lower().strip() not in GENERIC_LABELS
                             ]
-                            print(f"[Disambiguation] Validator repair returned: {valid_entries[:10]}...")
+                            logger.info(f"Validator repair returned: {valid_entries[:10]}...")
                             return valid_entries  # Return all, don't limit
                     except Exception as repair_error:
-                        print(f"[Disambiguation] Validator repair failed: {repair_error}")
+                        logger.error(f"Validator repair failed: {repair_error}")
             
-            print(f"[Disambiguation] Could not parse JSON from response: {content[:200]}")
+            logger.warning(f"Could not parse JSON from response: {content[:200]}")
             return [anime_name]
         else:
-            print(f"[Disambiguation] Provider {provider.name} doesn't support search")
+            logger.info(f"Provider {provider.name} doesn't support search")
             return [anime_name]
             
     except Exception as e:
-        print(f"[Disambiguation] Web search failed: {e}")
+        logger.error(f"Web search failed: {e}")
         return [anime_name]
 
 
@@ -784,7 +788,7 @@ async def research_and_apply_profile(
         }
     
     # Research the anime AND save to disk + index to RAG
-    print(f"[SessionZero] Researching and saving profile for: {anime_name}")
+    logger.info(f"Researching and saving profile for: {anime_name}")
     profile = await generate_and_save_profile(anime_name, progress_tracker=progress_tracker)
     
     # Apply to session
@@ -806,12 +810,12 @@ async def research_and_apply_profile(
         current_settings = settings_store.load()
         profile_id = profile.get("id")
         if current_settings.active_profile_id != profile_id:
-            print(f"[SessionZero] Early sync after research: {current_settings.active_profile_id} -> {profile_id}")
+            logger.info(f"Early sync after research: {current_settings.active_profile_id} -> {profile_id}")
             current_settings.active_profile_id = profile_id
             current_settings.active_session_id = session.session_id
             settings_store.save(current_settings)
     except Exception as sync_err:
-        print(f"[SessionZero] Early sync failed (non-fatal): {sync_err}")
+        logger.error(f"Early sync failed (non-fatal): {sync_err}")
     
     return {
         "status": "researched",
@@ -956,7 +960,7 @@ The world will be developed collaboratively during play.
     session.phase_state["profile_data"] = world_data
     session.phase_state["profile_type"] = "custom"
     
-    print(f"[SessionZero] Created custom profile for session {session_id[:8]}, indexed {chunks_indexed} lore chunks")
+    logger.info(f"Created custom profile for session {session_id[:8]}, indexed {chunks_indexed} lore chunks")
     
     return {
         "status": "custom_profile_created",
@@ -1014,7 +1018,7 @@ async def research_hybrid_profile(
         )
     
     # ========== STEP 1: Parallel Research ==========
-    print(f"[SessionZero] Hybrid research: {primary_anime} + {secondary_anime}")
+    logger.info(f"Hybrid research: {primary_anime} + {secondary_anime}")
     
     # Research both in parallel (no individual progress trackers to avoid conflicts)
     if progress_tracker:
@@ -1031,7 +1035,7 @@ async def research_hybrid_profile(
             research_anime_with_search(secondary_anime)
         )
     except Exception as e:
-        print(f"[SessionZero] Hybrid research failed: {e}")
+        logger.error(f"Hybrid research failed: {e}")
         if progress_tracker:
             await progress_tracker.emit(
                 ProgressPhase.ERROR,
@@ -1146,7 +1150,7 @@ This is a hybrid world blending {primary_anime} ({blend_ratio*100:.0f}%) with {s
             {"confidence": merged.confidence, "title": merged.title}
         )
     
-    print(f"[SessionZero] Hybrid profile created: {merged.title} (confidence: {merged.confidence}%)")
+    logger.info(f"Hybrid profile created: {merged.title} (confidence: {merged.confidence}%)")
     
     return {
         "status": "hybrid_profile_created",
@@ -1217,7 +1221,7 @@ async def research_hybrid_profile_cached(
     research_a = None
     
     if profile_a:
-        print(f"[HybridCached] Loaded cached profile for '{primary_anime}'")
+        logger.info(f"Loaded cached profile for '{primary_anime}'")
         if progress_tracker:
             await progress_tracker.emit(
                 ProgressPhase.RESEARCH,
@@ -1225,7 +1229,7 @@ async def research_hybrid_profile_cached(
                 20
             )
     else:
-        print(f"[HybridCached] Researching '{primary_anime}' (not cached)")
+        logger.info(f"Researching '{primary_anime}' (not cached)")
         if progress_tracker:
             await progress_tracker.emit(
                 ProgressPhase.RESEARCH,
@@ -1245,7 +1249,7 @@ async def research_hybrid_profile_cached(
     profile_b = load_existing_profile(secondary_anime)
     
     if profile_b:
-        print(f"[HybridCached] Loaded cached profile for '{secondary_anime}'")
+        logger.info(f"Loaded cached profile for '{secondary_anime}'")
         if progress_tracker:
             await progress_tracker.emit(
                 ProgressPhase.RESEARCH,
@@ -1253,7 +1257,7 @@ async def research_hybrid_profile_cached(
                 60
             )
     else:
-        print(f"[HybridCached] Researching '{secondary_anime}' (not cached)")
+        logger.info(f"Researching '{secondary_anime}' (not cached)")
         if progress_tracker:
             await progress_tracker.emit(
                 ProgressPhase.RESEARCH,
@@ -1384,7 +1388,7 @@ Power system preference: {user_preferences.get('power_system', 'coexist')}
             {"confidence": merged.confidence, "title": merged.title}
         )
     
-    print(f"[HybridCached] Created: {merged.title} (confidence: {merged.confidence}%)")
+    logger.info(f"Created: {merged.title} (confidence: {merged.confidence}%)")
     
     return {
         "status": "hybrid_profile_created",
@@ -1431,14 +1435,14 @@ async def ensure_hybrid_prerequisites(
     tasks = []
     
     if not profile_a:
-        print(f"[HybridPreload] {primary_anime} missing, queuing research...")
+        logger.warning(f"{primary_anime} missing, queuing research...")
         tasks.append(primary_anime)
     else:
         if progress_tracker:
             await progress_tracker.emit(ProgressPhase.RESEARCH, f"✓ {primary_anime} already cached", 20)
 
     if not profile_b:
-        print(f"[HybridPreload] {secondary_anime} missing, queuing research...")
+        logger.warning(f"{secondary_anime} missing, queuing research...")
         tasks.append(secondary_anime)
     else:
         if progress_tracker:
@@ -1490,7 +1494,7 @@ async def ensure_hybrid_prerequisites(
         failed_tasks = []
         for i, result in enumerate(results):
             if isinstance(result, Exception):
-                print(f"[HybridPreload] Task {i} failed: {result}")
+                logger.error(f"Task {i} failed: {result}")
                 failed_tasks.append(str(result))
 
         if failed_tasks and progress_tracker:
@@ -1499,7 +1503,7 @@ async def ensure_hybrid_prerequisites(
             return
 
     # 5. Complete
-    print(f"[HybridPreload] Base profiles ready for {primary_anime} x {secondary_anime}")
+    logger.info(f"Base profiles ready for {primary_anime} x {secondary_anime}")
     if progress_tracker:
         await progress_tracker.emit(
             ProgressPhase.COMPLETE,
@@ -1536,7 +1540,7 @@ async def index_session_zero_to_memory(session: Session) -> int:
     # Use session_id for memory isolation (not profile_id)
     session_id = session.session_id
     
-    print(f"[SessionZero→Memory] Indexing character creation to memory for session: {session_id}")
+    logger.info(f"[SessionZero→Memory] Indexing character creation to memory for session: {session_id}")
     
     # Create memory store for this session
     memory = MemoryStore(campaign_id=session_id)
@@ -1544,7 +1548,7 @@ async def index_session_zero_to_memory(session: Session) -> int:
     # Get all Session Zero messages
     messages = session.messages
     if not messages:
-        print("[SessionZero→Memory] No messages to index")
+        logger.info("[SessionZero→Memory] No messages to index")
         return 0
     
     # Chunk into logical segments
@@ -1574,7 +1578,7 @@ async def index_session_zero_to_memory(session: Session) -> int:
         )
         indexed += 1
     
-    print(f"[SessionZero→Memory] Indexed {indexed} chunks ({memory.count()} total memories)")
+    logger.info(f"[SessionZero→Memory] Indexed {indexed} chunks ({memory.count()} total memories)")
     memory.close()
     return indexed
 
@@ -1688,7 +1692,7 @@ async def _generate_session_zero_npc_portrait(
         from src.settings import get_settings_store
         settings = get_settings_store().load()
         if not settings.media_enabled:
-            print(f"[SessionZero→Media] Media disabled, skipping portrait for {npc_name}")
+            logger.warning(f"[SessionZero→Media] Media disabled, skipping portrait for {npc_name}")
             return
         
         # Get style context from profile
@@ -1715,11 +1719,11 @@ async def _generate_session_zero_npc_portrait(
             if npc:
                 if result.get("portrait"):
                     npc.portrait_url = f"/api/game/media/{campaign_id}/{result['portrait'].name}"
-                    print(f"[SessionZero→Media] Portrait saved for {npc_name}: {npc.portrait_url}")
+                    logger.info(f"[SessionZero→Media] Portrait saved for {npc_name}: {npc.portrait_url}")
                 if result.get("model_sheet"):
                     npc.model_sheet_url = f"/api/game/media/{campaign_id}/{result['model_sheet'].name}"
                 db.commit()
             db.close()
             
     except Exception as e:
-        print(f"[SessionZero→Media] NPC portrait gen failed for {npc_name}: {e}")
+        logger.error(f"[SessionZero→Media] NPC portrait gen failed for {npc_name}: {e}")

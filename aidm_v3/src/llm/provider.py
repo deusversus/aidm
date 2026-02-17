@@ -6,6 +6,10 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Tuple, Type, TypeVar, Union
 from pydantic import BaseModel
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 T = TypeVar("T")
 
 # System prompt can be:
@@ -224,7 +228,7 @@ class LLMProvider(ABC):
                     raise
                 last_exc = exc
                 delay = base_delay * (2 ** attempt)
-                print(f"[{self.name}] {type(exc).__name__} — retrying in {delay:.0f}s "
+                logger.warning(f"[{self.name}] {type(exc).__name__} — retrying in {delay:.0f}s "
                       f"(attempt {attempt + 1}/{max_retries})")
                 await asyncio.sleep(delay)
         raise last_exc  # unreachable, but satisfies type checker
@@ -253,7 +257,7 @@ class LLMProvider(ABC):
                     raise
                 last_exc = exc
                 delay = base_delay * (2 ** attempt)
-                print(f"[{self.name}] {type(exc).__name__} — retrying in {delay:.0f}s "
+                logger.warning(f"[{self.name}] {type(exc).__name__} — retrying in {delay:.0f}s "
                       f"(attempt {attempt + 1}/{max_retries})")
                 await asyncio.sleep(delay)
         raise last_exc  # unreachable

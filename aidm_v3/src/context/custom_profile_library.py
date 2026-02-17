@@ -12,6 +12,10 @@ from typing import List, Optional
 from pathlib import Path
 
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 class CustomProfileLibrary:
     """
     Manages the RAG system for custom (original) profiles.
@@ -68,7 +72,7 @@ class CustomProfileLibrary:
             metadatas=metadatas
         )
         
-        print(f"[CustomProfileLibrary] Indexed {len(chunks)} lore chunks for session {session_id[:8]}...")
+        logger.info(f"Indexed {len(chunks)} lore chunks for session {session_id[:8]}...")
         return len(chunks)
     
     def search_lore(
@@ -117,7 +121,7 @@ class CustomProfileLibrary:
         
         if results["ids"]:
             self.collection.delete(ids=results["ids"])
-            print(f"[CustomProfileLibrary] Deleted {len(results['ids'])} lore chunks for session {session_id[:8]}...")
+            logger.info(f"Deleted {len(results['ids'])} lore chunks for session {session_id[:8]}...")
             return len(results["ids"])
         
         return 0
@@ -184,7 +188,7 @@ class CustomProfileLibrary:
             shutil.rmtree(custom_dir)
             custom_dir.mkdir(parents=True)
         
-        print("[CustomProfileLibrary] Cleared all custom profiles")
+        logger.info("Cleared all custom profiles")
 
 
 def save_custom_profile(
@@ -220,7 +224,7 @@ def save_custom_profile(
     with open(lore_path, 'w', encoding='utf-8') as f:
         f.write(lore_content)
     
-    print(f"[CustomProfileLibrary] Saved custom profile to {profile_dir}")
+    logger.info(f"Saved custom profile to {profile_dir}")
     return profile_dir
 
 
@@ -242,7 +246,7 @@ def delete_custom_profile(
     
     if profile_dir.exists():
         shutil.rmtree(profile_dir)
-        print(f"[CustomProfileLibrary] Deleted custom profile folder for session {session_id[:8]}...")
+        logger.info(f"Deleted custom profile folder for session {session_id[:8]}...")
         return True
     
     return False

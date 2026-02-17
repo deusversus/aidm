@@ -9,6 +9,10 @@ from typing import List, Dict, Any, Optional, Type
 from pydantic import BaseModel, Field, create_model
 
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 # =============================================================================
 # PER-TOPIC EXTRACTION SCHEMAS
 # =============================================================================
@@ -332,7 +336,7 @@ def build_bundle_schema(topics: List[str]) -> Type[BaseModel]:
             # This avoids anyOf/null patterns that confuse some providers
             fields[topic] = (schema_class, Field(default_factory=schema_class))
         else:
-            print(f"[ExtractionSchemas] Warning: Unknown topic '{topic}'")
+            logger.warning(f"Warning: Unknown topic '{topic}'")
     
     # Also include DNA scales, tropes, and power_distribution when tone is in the bundle
     if "tone" in topics:

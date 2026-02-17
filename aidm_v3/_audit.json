@@ -1,0 +1,804 @@
+{
+  "file_sizes": [
+    [
+      2805,
+      "src\\db\\state_manager.py"
+    ],
+    [
+      2691,
+      "api\\routes\\game.py"
+    ],
+    [
+      1880,
+      "src\\core\\orchestrator.py"
+    ],
+    [
+      1725,
+      "src\\agents\\session_zero.py"
+    ],
+    [
+      1714,
+      "src\\agents\\anime_research.py"
+    ],
+    [
+      1349,
+      "src\\agents\\key_animator.py"
+    ],
+    [
+      1122,
+      "src\\agents\\validator.py"
+    ],
+    [
+      927,
+      "src\\scrapers\\fandom.py"
+    ],
+    [
+      858,
+      "src\\scrapers\\anilist.py"
+    ],
+    [
+      847,
+      "src\\profiles\\loader.py"
+    ],
+    [
+      818,
+      "src\\llm\\anthropic_provider.py"
+    ],
+    [
+      714,
+      "src\\agents\\scale_selector.py"
+    ],
+    [
+      700,
+      "src\\core\\session_export.py"
+    ],
+    [
+      661,
+      "src\\context\\memory.py"
+    ],
+    [
+      635,
+      "src\\agents\\profile_generator.py"
+    ],
+    [
+      632,
+      "src\\llm\\openai_provider.py"
+    ],
+    [
+      626,
+      "src\\agents\\production_tools.py"
+    ],
+    [
+      604,
+      "src\\media\\generator.py"
+    ],
+    [
+      567,
+      "src\\agents\\director.py"
+    ],
+    [
+      566,
+      "src\\llm\\google_provider.py"
+    ],
+    [
+      557,
+      "src\\agents\\gameplay_tools.py"
+    ],
+    [
+      545,
+      "src\\core\\foreshadowing.py"
+    ],
+    [
+      538,
+      "src\\db\\models.py"
+    ],
+    [
+      532,
+      "src\\agents\\director_tools.py"
+    ],
+    [
+      478,
+      "src\\agents\\extraction_schemas.py"
+    ],
+    [
+      458,
+      "scripts\\fandom_feasibility_spike.py"
+    ],
+    [
+      446,
+      "src\\context\\rule_library.py"
+    ],
+    [
+      443,
+      "src\\core\\session_manager.py"
+    ],
+    [
+      411,
+      "src\\core\\state_transaction.py"
+    ],
+    [
+      408,
+      "src\\agents\\context_selector.py"
+    ],
+    [
+      400,
+      "src\\core\\session.py"
+    ],
+    [
+      387,
+      "src\\agents\\progression.py"
+    ],
+    [
+      343,
+      "scripts\\batch_world_tier.py"
+    ],
+    [
+      336,
+      "src\\scrapers\\wiki_scout.py"
+    ],
+    [
+      335,
+      "scripts\\backfill_aliases.py"
+    ],
+    [
+      321,
+      "src\\agents\\base.py"
+    ],
+    [
+      318,
+      "api\\routes\\settings.py"
+    ],
+    [
+      311,
+      "src\\scrapers\\lore_store.py"
+    ],
+    [
+      310,
+      "tests\\test_gameplay_tools.py"
+    ],
+    [
+      302,
+      "tests\\test_foreshadowing_persistence.py"
+    ],
+    [
+      296,
+      "tests\\test_narrative_diversity.py"
+    ],
+    [
+      294,
+      "src\\settings\\store.py"
+    ],
+    [
+      289,
+      "src\\settings\\models.py"
+    ],
+    [
+      288,
+      "src\\llm\\tools.py"
+    ],
+    [
+      282,
+      "src\\agents\\combat.py"
+    ],
+    [
+      278,
+      "src\\agents\\profile_merge.py"
+    ],
+    [
+      274,
+      "tests\\test_deferred_commit.py"
+    ],
+    [
+      272,
+      "src\\core\\dice.py"
+    ],
+    [
+      271,
+      "src\\llm\\provider.py"
+    ],
+    [
+      262,
+      "scripts\\diagnose_research.py"
+    ],
+    [
+      260,
+      "src\\utils\\title_utils.py"
+    ],
+    [
+      260,
+      "src\\context\\custom_profile_library.py"
+    ],
+    [
+      258,
+      "src\\agents\\scope.py"
+    ],
+    [
+      256,
+      "src\\scrapers\\cache.py"
+    ],
+    [
+      236,
+      "tests\\test_core_loop.py"
+    ],
+    [
+      223,
+      "src\\llm\\manager.py"
+    ],
+    [
+      223,
+      "src\\agents\\progress.py"
+    ],
+    [
+      222,
+      "src\\context\\profile_library.py"
+    ],
+    [
+      221,
+      "src\\agents\\override_handler.py"
+    ],
+    [
+      214,
+      "tests\\test_wiki_relevance.py"
+    ],
+    [
+      214,
+      "tests\\stress_test_gameplay.py"
+    ],
+    [
+      200,
+      "scripts\\test_scrapers.py"
+    ],
+    [
+      198,
+      "src\\settings\\crypto.py"
+    ],
+    [
+      198,
+      "src\\scrapers\\wiki_scout_tools.py"
+    ],
+    [
+      194,
+      "src\\agents\\world_builder.py"
+    ],
+    [
+      186,
+      "tests\\test_profile_flow.py"
+    ],
+    [
+      185,
+      "src\\agents\\pacing_agent.py"
+    ],
+    [
+      182,
+      "tests\\test_director.py"
+    ],
+    [
+      181,
+      "src\\main.py"
+    ],
+    [
+      181,
+      "scripts\\e2e_test.py"
+    ],
+    [
+      177,
+      "scripts\\migrate_world_tiers.py"
+    ],
+    [
+      175,
+      "scripts\\test_api_pipeline.py"
+    ],
+    [
+      164,
+      "src\\db\\session_store.py"
+    ],
+    [
+      157,
+      "src\\scrapers\\wiki_normalize.py"
+    ],
+    [
+      150,
+      "scripts\\_purge_7th_prince.py"
+    ],
+    [
+      145,
+      "tests\\debug_pipeline.py"
+    ],
+    [
+      144,
+      "src\\agents\\production_agent.py"
+    ],
+    [
+      141,
+      "api\\routes\\research.py"
+    ],
+    [
+      137,
+      "scripts\\migrate_op_mode.py"
+    ],
+    [
+      133,
+      "tests\\test_handoff.py"
+    ],
+    [
+      133,
+      "scripts\\test_op_session_mgmt.py"
+    ],
+    [
+      127,
+      "scripts\\multi_source_audit.py"
+    ],
+    [
+      123,
+      "src\\db\\session.py"
+    ],
+    [
+      122,
+      "lore_cli.py"
+    ],
+    [
+      120,
+      "src\\agents\\recap_agent.py"
+    ],
+    [
+      116,
+      "tests\\stress_test.py"
+    ],
+    [
+      115,
+      "src\\agents\\relationship_analyzer.py"
+    ],
+    [
+      115,
+      "src\\agents\\intent_classifier.py"
+    ],
+    [
+      113,
+      "src\\agents\\memory_ranker.py"
+    ],
+    [
+      110,
+      "src\\settings\\defaults.py"
+    ],
+    [
+      109,
+      "tests\\test_alias_matching.py"
+    ],
+    [
+      102,
+      "tests\\compare_profiles.py"
+    ],
+    [
+      100,
+      "src\\config.py"
+    ],
+    [
+      99,
+      "scripts\\audit_rag_chunks.py"
+    ],
+    [
+      94,
+      "scripts\\test_series_merge.py"
+    ],
+    [
+      93,
+      "src\\media\\resolver.py"
+    ],
+    [
+      93,
+      "src\\agents\\compactor.py"
+    ],
+    [
+      93,
+      "scripts\\explore_fandom.py"
+    ],
+    [
+      93,
+      "run_server.py"
+    ],
+    [
+      90,
+      "src\\utils\\source_trust.py"
+    ],
+    [
+      88,
+      "scripts\\obscure_comparison.py"
+    ],
+    [
+      83,
+      "src\\utils\\power_utils.py"
+    ],
+    [
+      81,
+      "scripts\\test_chunker.py"
+    ],
+    [
+      78,
+      "tests\\debug_orchestrator.py"
+    ],
+    [
+      78,
+      "scripts\\_check_7th_prince.py"
+    ],
+    [
+      73,
+      "scripts\\test_create_model.py"
+    ],
+    [
+      70,
+      "scripts\\clean_profiles.py"
+    ],
+    [
+      67,
+      "tests\\test_orchestrator.py"
+    ],
+    [
+      67,
+      "tests\\test_hellsing.py"
+    ],
+    [
+      62,
+      "src\\agents\\outcome_judge.py"
+    ],
+    [
+      59,
+      "scripts\\audit_profile_data.py"
+    ],
+    [
+      55,
+      "scripts\\_verify_purge.py"
+    ],
+    [
+      54,
+      "tests\\test_profile_gen2.py"
+    ],
+    [
+      54,
+      "tests\\test_profile_gen.py"
+    ],
+    [
+      53,
+      "api\\main.py"
+    ],
+    [
+      47,
+      "scripts\\trim_transcript.py"
+    ],
+    [
+      46,
+      "tests\\test_deathnote.py"
+    ],
+    [
+      45,
+      "tests\\verify_npcs.py"
+    ],
+    [
+      44,
+      "scripts\\read_session.py"
+    ],
+    [
+      44,
+      "scripts\\cleanup_chroma.py"
+    ],
+    [
+      43,
+      "tests\\phase4_checks.py"
+    ],
+    [
+      43,
+      "scripts\\regenerate_rules.py"
+    ],
+    [
+      40,
+      "tests\\test_research.py"
+    ],
+    [
+      40,
+      "scripts\\debug_profile.py"
+    ],
+    [
+      36,
+      "scripts\\check_chroma.py"
+    ],
+    [
+      34,
+      "scripts\\_test_relevance_live.py"
+    ],
+    [
+      33,
+      "tests\\test_websearch.py"
+    ],
+    [
+      31,
+      "src\\core\\turn.py"
+    ],
+    [
+      31,
+      "scripts\\test_flagged.py"
+    ],
+    [
+      30,
+      "scripts\\dump_session.py"
+    ],
+    [
+      29,
+      "scripts\\view_memories.py"
+    ],
+    [
+      28,
+      "scripts\\test_llm_json.py"
+    ],
+    [
+      21,
+      "src\\settings\\__init__.py"
+    ],
+    [
+      18,
+      "tests\\test_arifureta.py"
+    ],
+    [
+      18,
+      "scripts\\view_msgs.py"
+    ],
+    [
+      11,
+      "src\\llm\\__init__.py"
+    ],
+    [
+      9,
+      "src\\media\\__init__.py"
+    ],
+    [
+      3,
+      "src\\__init__.py"
+    ],
+    [
+      1,
+      "tests\\__init__.py"
+    ],
+    [
+      1,
+      "src\\utils\\__init__.py"
+    ],
+    [
+      1,
+      "src\\scrapers\\__init__.py"
+    ],
+    [
+      1,
+      "src\\profiles\\__init__.py"
+    ],
+    [
+      1,
+      "src\\db\\__init__.py"
+    ],
+    [
+      1,
+      "src\\core\\__init__.py"
+    ],
+    [
+      1,
+      "src\\agents\\__init__.py"
+    ],
+    [
+      1,
+      "api\\routes\\__init__.py"
+    ],
+    [
+      1,
+      "api\\__init__.py"
+    ]
+  ],
+  "print_counts": {
+    "lore_cli.py": 24,
+    "run_server.py": 7,
+    "api\\routes\\game.py": 102,
+    "api\\routes\\research.py": 6,
+    "scripts\\audit_profile_data.py": 15,
+    "scripts\\audit_rag_chunks.py": 15,
+    "scripts\\backfill_aliases.py": 19,
+    "scripts\\batch_world_tier.py": 25,
+    "scripts\\check_chroma.py": 9,
+    "scripts\\cleanup_chroma.py": 11,
+    "scripts\\clean_profiles.py": 14,
+    "scripts\\debug_profile.py": 13,
+    "scripts\\diagnose_research.py": 8,
+    "scripts\\dump_session.py": 9,
+    "scripts\\e2e_test.py": 32,
+    "scripts\\explore_fandom.py": 4,
+    "scripts\\fandom_feasibility_spike.py": 36,
+    "scripts\\migrate_op_mode.py": 11,
+    "scripts\\migrate_world_tiers.py": 10,
+    "scripts\\multi_source_audit.py": 10,
+    "scripts\\obscure_comparison.py": 6,
+    "scripts\\read_session.py": 1,
+    "scripts\\regenerate_rules.py": 10,
+    "scripts\\test_api_pipeline.py": 38,
+    "scripts\\test_chunker.py": 20,
+    "scripts\\test_create_model.py": 12,
+    "scripts\\test_flagged.py": 6,
+    "scripts\\test_llm_json.py": 2,
+    "scripts\\test_op_session_mgmt.py": 20,
+    "scripts\\test_scrapers.py": 42,
+    "scripts\\test_series_merge.py": 23,
+    "scripts\\trim_transcript.py": 9,
+    "scripts\\view_memories.py": 7,
+    "scripts\\view_msgs.py": 1,
+    "scripts\\_check_7th_prince.py": 14,
+    "scripts\\_purge_7th_prince.py": 35,
+    "scripts\\_test_relevance_live.py": 8,
+    "scripts\\_verify_purge.py": 11,
+    "src\\main.py": 28,
+    "src\\agents\\anime_research.py": 46,
+    "src\\agents\\base.py": 2,
+    "src\\agents\\context_selector.py": 4,
+    "src\\agents\\director_tools.py": 5,
+    "src\\agents\\extraction_schemas.py": 1,
+    "src\\agents\\key_animator.py": 10,
+    "src\\agents\\memory_ranker.py": 1,
+    "src\\agents\\pacing_agent.py": 1,
+    "src\\agents\\production_agent.py": 1,
+    "src\\agents\\production_tools.py": 7,
+    "src\\agents\\profile_generator.py": 20,
+    "src\\agents\\progress.py": 2,
+    "src\\agents\\recap_agent.py": 1,
+    "src\\agents\\relationship_analyzer.py": 1,
+    "src\\agents\\scale_selector.py": 1,
+    "src\\agents\\scope.py": 3,
+    "src\\agents\\session_zero.py": 61,
+    "src\\agents\\validator.py": 15,
+    "src\\agents\\world_builder.py": 1,
+    "src\\context\\custom_profile_library.py": 5,
+    "src\\context\\memory.py": 3,
+    "src\\context\\profile_library.py": 1,
+    "src\\context\\rule_library.py": 4,
+    "src\\core\\foreshadowing.py": 6,
+    "src\\core\\orchestrator.py": 81,
+    "src\\core\\session_export.py": 14,
+    "src\\core\\session_manager.py": 1,
+    "src\\core\\state_transaction.py": 5,
+    "src\\db\\session.py": 6,
+    "src\\db\\session_store.py": 1,
+    "src\\db\\state_manager.py": 29,
+    "src\\llm\\anthropic_provider.py": 12,
+    "src\\llm\\google_provider.py": 9,
+    "src\\llm\\openai_provider.py": 8,
+    "src\\llm\\provider.py": 2,
+    "src\\media\\generator.py": 20,
+    "src\\media\\resolver.py": 2,
+    "src\\profiles\\loader.py": 7,
+    "src\\scrapers\\anilist.py": 8,
+    "src\\scrapers\\fandom.py": 2,
+    "src\\settings\\store.py": 1,
+    "tests\\compare_profiles.py": 25,
+    "tests\\debug_orchestrator.py": 19,
+    "tests\\debug_pipeline.py": 35,
+    "tests\\phase4_checks.py": 8,
+    "tests\\stress_test.py": 34,
+    "tests\\stress_test_gameplay.py": 39,
+    "tests\\test_alias_matching.py": 45,
+    "tests\\test_arifureta.py": 5,
+    "tests\\test_deathnote.py": 17,
+    "tests\\test_director.py": 43,
+    "tests\\test_foreshadowing_persistence.py": 9,
+    "tests\\test_handoff.py": 22,
+    "tests\\test_hellsing.py": 22,
+    "tests\\test_orchestrator.py": 17,
+    "tests\\test_profile_flow.py": 22,
+    "tests\\test_profile_gen.py": 30,
+    "tests\\test_profile_gen2.py": 9,
+    "tests\\test_research.py": 1,
+    "tests\\test_websearch.py": 7,
+    "tests\\verify_npcs.py": 15
+  },
+  "except_blocks": [
+    "run_server.py:60  SILENT: except (ValueError, OSError, IndexError): -> pass",
+    "api\\routes\\game.py:444  except Exception:",
+    "api\\routes\\game.py:474  except Exception:",
+    "api\\routes\\game.py:475  SILENT: except Exception: -> pass",
+    "api\\routes\\game.py:748  except Exception:",
+    "api\\routes\\game.py:1804  except Exception:",
+    "api\\routes\\game.py:1818  except Exception:",
+    "api\\routes\\game.py:1825  except Exception:",
+    "scripts\\obscure_comparison.py:30  except:",
+    "scripts\\obscure_comparison.py:40  except:",
+    "scripts\\_check_7th_prince.py:53  except:",
+    "scripts\\_check_7th_prince.py:54  SILENT: except: -> pass",
+    "scripts\\_purge_7th_prince.py:78  except Exception:",
+    "scripts\\_purge_7th_prince.py:79  SILENT: except Exception: -> pass",
+    "scripts\\_purge_7th_prince.py:91  except Exception:",
+    "scripts\\_purge_7th_prince.py:92  SILENT: except Exception: -> pass",
+    "scripts\\_verify_purge.py:33  except Exception:",
+    "scripts\\_verify_purge.py:34  SILENT: except Exception: -> pass",
+    "src\\agents\\context_selector.py:350  except Exception:",
+    "src\\agents\\gameplay_tools.py:286  except Exception:",
+    "src\\agents\\gameplay_tools.py:314  except Exception:",
+    "src\\agents\\gameplay_tools.py:547  SILENT: except ValueError: -> pass",
+    "src\\agents\\scale_selector.py:262  except:",
+    "src\\agents\\scale_selector.py:539  except:",
+    "src\\context\\custom_profile_library.py:172  except Exception:",
+    "src\\context\\memory.py:120  except Exception:",
+    "src\\context\\rule_library.py:285  except Exception:",
+    "src\\context\\rule_library.py:286  SILENT: except Exception: -> pass",
+    "src\\core\\orchestrator.py:359  except Exception:",
+    "src\\core\\orchestrator.py:360  SILENT: except Exception: -> pass",
+    "src\\core\\orchestrator.py:523  except Exception:",
+    "src\\core\\orchestrator.py:524  SILENT: except Exception: -> pass",
+    "src\\core\\orchestrator.py:1520  except Exception:",
+    "src\\core\\orchestrator.py:1525  except Exception:",
+    "src\\core\\orchestrator.py:1553  except Exception:",
+    "src\\core\\session_export.py:211  except Exception:",
+    "src\\db\\session.py:113  except Exception:",
+    "src\\db\\state_manager.py:265  except Exception:",
+    "src\\db\\state_manager.py:457  SILENT: except (ValueError, AttributeError): -> pass",
+    "src\\db\\state_manager.py:462  SILENT: except (ValueError, AttributeError): -> pass",
+    "src\\llm\\anthropic_provider.py:328  SILENT: except json.JSONDecodeError: -> pass",
+    "src\\llm\\anthropic_provider.py:353  SILENT: except (json.JSONDecodeError, Exception): -> pass",
+    "src\\llm\\anthropic_provider.py:445  SILENT: except (json.JSONDecodeError, Exception): -> pass",
+    "src\\llm\\manager.py:66  except Exception:",
+    "src\\llm\\openai_provider.py:363  SILENT: except (json.JSONDecodeError, Exception): -> pass",
+    "src\\media\\generator.py:51  except Exception:",
+    "src\\media\\generator.py:52  SILENT: except Exception: -> pass",
+    "src\\profiles\\loader.py:606  except Exception:",
+    "src\\profiles\\loader.py:607  SILENT: except Exception: -> pass",
+    "src\\profiles\\loader.py:652  except Exception:",
+    "src\\profiles\\loader.py:653  SILENT: except Exception: -> pass",
+    "src\\profiles\\loader.py:698  except Exception:",
+    "src\\profiles\\loader.py:739  except Exception:",
+    "src\\profiles\\loader.py:834  except Exception:",
+    "src\\profiles\\loader.py:846  except Exception:",
+    "src\\scrapers\\fandom.py:772  except Exception:",
+    "src\\scrapers\\lore_store.py:202  except Exception:",
+    "src\\settings\\crypto.py:45  except Exception:",
+    "src\\settings\\crypto.py:46  SILENT: except Exception: -> pass",
+    "src\\settings\\crypto.py:167  except Exception:",
+    "src\\settings\\crypto.py:197  except Exception:",
+    "src\\settings\\store.py:247  except Exception:",
+    "src\\utils\\source_trust.py:65  except Exception:"
+  ],
+  "magic_strings": [],
+  "create_task": [
+    "api\\routes\\game.py:1045  asyncio.create_task(run_hybrid_preload())",
+    "api\\routes\\game.py:1075  asyncio.create_task(research_hybrid_profile_cached(",
+    "api\\routes\\game.py:1122  asyncio.create_task(run_hybrid_research_background())",
+    "api\\routes\\game.py:1166  asyncio.create_task(progress_tracker.emit(",
+    "api\\routes\\game.py:1210  asyncio.create_task(run_research_background())",
+    "api\\routes\\game.py:1358  asyncio.create_task(",
+    "api\\routes\\research.py:54  task = asyncio.create_task(run_research())",
+    "src\\agents\\anime_research.py:535  batch_tasks = {asyncio.create_task(research_and_extract_bundle(bundle)): bundle for bundle in batch}",
+    "src\\agents\\production_tools.py:429  loop.create_task(_generate())",
+    "src\\agents\\production_tools.py:521  loop.create_task(_generate())",
+    "src\\agents\\production_tools.py:582  loop.create_task(_generate())",
+    "src\\agents\\session_zero.py:397  asyncio.create_task(",
+    "src\\core\\orchestrator.py:467  outcome_task = asyncio.create_task(",
+    "src\\core\\orchestrator.py:479  memory_rank_task = asyncio.create_task(",
+    "src\\core\\orchestrator.py:488  pacing_task = asyncio.create_task(",
+    "src\\core\\orchestrator.py:526  recap_task = asyncio.create_task(",
+    "src\\core\\orchestrator.py:1078  asyncio.create_task(",
+    "src\\core\\orchestrator.py:1138  entity_task = asyncio.create_task(self._bg_extract_entities(",
+    "src\\core\\orchestrator.py:1141  rel_task = asyncio.create_task(self._bg_relationship_analysis(",
+    "src\\core\\orchestrator.py:1144  prod_task = asyncio.create_task(self._bg_production_check("
+  ],
+  "global_state": [
+    "api\\routes\\game.py:30  _orchestrator: Optional[Orchestrator] = None",
+    "api\\routes\\game.py:31  _session_zero_agent: Optional[SessionZeroAgent] = None",
+    "api\\routes\\game.py:81  _orchestrator = None",
+    "api\\routes\\game.py:97  _session_zero_agent = None",
+    "api\\routes\\research.py:29  _active_tasks: dict[str, asyncio.Task] = {}",
+    "src\\agents\\progress.py:58  _active_trackers: Dict[str, \"ProgressTracker\"] = {}",
+    "src\\agents\\scale_selector.py:443  _output_schema_override = None",
+    "src\\context\\custom_profile_library.py:252  _custom_profile_library: Optional[CustomProfileLibrary] = None",
+    "src\\context\\profile_library.py:216  _profile_library: Optional[ProfileLibrary] = None",
+    "src\\core\\session.py:392  _session_manager: Optional[SessionManager] = None",
+    "src\\db\\session.py:12  _engine = None",
+    "src\\db\\session.py:13  _SessionLocal = None",
+    "src\\db\\session_store.py:156  _session_store: Optional[SessionStore] = None",
+    "src\\llm\\manager.py:209  _manager: Optional[LLMManager] = None",
+    "src\\llm\\manager.py:223  _manager = None",
+    "src\\profiles\\loader.py:408  _ALIAS_INDEX: Dict[str, str] = {}",
+    "src\\scrapers\\lore_store.py:303  _lore_store: Optional[LoreStore] = None",
+    "src\\settings\\crypto.py:76  _encryption_key: Optional[bytes] = None",
+    "src\\settings\\store.py:280  _store: Optional[SettingsStore] = None",
+    "src\\settings\\store.py:294  _store = None"
+  ]
+}

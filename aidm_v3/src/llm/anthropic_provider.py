@@ -8,6 +8,10 @@ from pydantic import BaseModel
 from .provider import LLMProvider, LLMResponse
 
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 class AnthropicProvider(LLMProvider):
     """Anthropic Claude provider implementation.
     
@@ -147,7 +151,7 @@ class AnthropicProvider(LLMProvider):
             cached_tokens = getattr(final_message.usage, 'cache_read_input_tokens', 0)
             if cached_tokens and cached_tokens > 0:
                 usage["cached_tokens"] = cached_tokens
-                print(f"[Cache Hit] {cached_tokens} tokens cached ({cached_tokens/usage.get('prompt_tokens', 1)*100:.0f}% of prompt)")
+                logger.info(f"{cached_tokens} tokens cached ({cached_tokens/usage.get('prompt_tokens', 1)*100:.0f}% of prompt)")
         
         return LLMResponse(
             content=full_text,
@@ -342,7 +346,7 @@ class AnthropicProvider(LLMProvider):
                             if repaired:
                                 return repaired
                         except Exception as repair_error:
-                            print(f"[Schema Repair] Validator repair failed: {repair_error}")
+                            logger.error(f"Validator repair failed: {repair_error}")
         
         # Fallback: try to parse text content as JSON
         if text_content:
@@ -364,7 +368,7 @@ class AnthropicProvider(LLMProvider):
                 if repaired:
                     return repaired
             except Exception as repair_error:
-                print(f"[Schema Repair] Validator repair failed: {repair_error}")
+                logger.error(f"Validator repair failed: {repair_error}")
         
         raise ValueError(f"Could not parse structured response from Claude")
     
@@ -479,7 +483,7 @@ Your response must match the required JSON schema.
                 messages, tools, system, model_name, max_tokens, max_tool_rounds
             )
         except Exception as e:
-            print(f"[Anthropic] Programmatic tool calling failed ({e}), falling back to standard")
+            logger.error(f"Programmatic tool calling failed ({e}), falling back to standard")
             return await self._complete_with_tools_standard(
                 messages, tools, system, model_name, max_tokens, max_tool_rounds
             )
@@ -596,7 +600,7 @@ Your response must match the required JSON schema.
             if not tool_use_blocks:
                 final_text = "\n".join(text_parts)
                 mode = "programmatic" if container_id else "direct"
-                print(f"[ToolLoop/Anthropic] Round {round_num+1}: Final text ({len(final_text)} chars) [{mode}]")
+                logger.info(f"Round {round_num+1}: Final text ({len(final_text)} chars) [{mode}]")
                 return LLMResponse(
                     content=final_text,
                     tool_calls=all_tool_calls,
@@ -617,7 +621,7 @@ Your response must match the required JSON schema.
                 for b in tool_use_blocks
             )
             mode_label = "programmatic" if is_programmatic else "direct"
-            print(f"[ToolLoop/Anthropic] Round {round_num+1}: {len(tool_use_blocks)} tool call(s) [{mode_label}]")
+            logger.info(f"Round {round_num+1}: {len(tool_use_blocks)} tool call(s) [{mode_label}]")
             
             conversation.append({"role": "assistant", "content": assistant_content})
             
@@ -627,7 +631,7 @@ Your response must match the required JSON schema.
                 tool_args = block.input if isinstance(block.input, dict) else {}
                 tool_id = block.id
                 
-                print(f"  [Tool] {tool_name}({tool_args})")
+                logger.info(f"  [Tool] {tool_name}({tool_args})")
                 
                 result = tools.execute(tool_name, tool_args, round_number=round_num)
                 result_str = result.to_string()
@@ -650,7 +654,7 @@ Your response must match the required JSON schema.
             conversation.append({"role": "user", "content": tool_results})
         
         # Hit max_tool_rounds
-        print(f"[ToolLoop/Anthropic] Hit max rounds ({max_tool_rounds}), forcing final response [programmatic]")
+        logger.info(f"Hit max rounds ({max_tool_rounds}), forcing final response [programmatic]")
         
         conversation.append({
             "role": "user",
@@ -738,7 +742,7 @@ Your response must match the required JSON schema.
             
             if not tool_use_blocks:
                 final_text = "\n".join(text_parts)
-                print(f"[ToolLoop/Anthropic] Round {round_num+1}: Final text ({len(final_text)} chars) [standard]")
+                logger.info(f"Round {round_num+1}: Final text ({len(final_text)} chars) [standard]")
                 return LLMResponse(
                     content=final_text,
                     tool_calls=all_tool_calls,
@@ -748,7 +752,7 @@ Your response must match the required JSON schema.
                     metadata={"tool_rounds": round_num + 1, "programmatic": False}
                 )
             
-            print(f"[ToolLoop/Anthropic] Round {round_num+1}: {len(tool_use_blocks)} tool call(s) [standard]")
+            logger.info(f"Round {round_num+1}: {len(tool_use_blocks)} tool call(s) [standard]")
             
             conversation.append({
                 "role": "assistant",
@@ -767,7 +771,7 @@ Your response must match the required JSON schema.
                 tool_args = block.input if isinstance(block.input, dict) else {}
                 tool_id = block.id
                 
-                print(f"  [Tool] {tool_name}({tool_args})")
+                logger.info(f"  [Tool] {tool_name}({tool_args})")
                 
                 result = tools.execute(tool_name, tool_args, round_number=round_num)
                 result_str = result.to_string()
@@ -787,7 +791,7 @@ Your response must match the required JSON schema.
             
             conversation.append({"role": "user", "content": tool_results})
         
-        print(f"[ToolLoop/Anthropic] Hit max rounds ({max_tool_rounds}), forcing final response [standard]")
+        logger.info(f"Hit max rounds ({max_tool_rounds}), forcing final response [standard]")
         
         conversation.append({
             "role": "user",

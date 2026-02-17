@@ -8,6 +8,10 @@ from typing import Generator
 
 from .models import Base
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 # Global engine and session factory
 _engine = None
 _SessionLocal = None
@@ -67,7 +71,7 @@ def init_db():
             if "bible_version" not in columns:
                 conn.execute(text("ALTER TABLE campaign_bible ADD COLUMN bible_version INTEGER DEFAULT 0"))
                 conn.commit()
-                print("[Migration] Added bible_version column to campaign_bible")
+                logger.info("Added bible_version column to campaign_bible")
             
             # #3: turns_in_phase on world_state
             result = conn.execute(text("PRAGMA table_info(world_state)"))
@@ -75,7 +79,7 @@ def init_db():
             if "turns_in_phase" not in columns:
                 conn.execute(text("ALTER TABLE world_state ADD COLUMN turns_in_phase INTEGER DEFAULT 0"))
                 conn.commit()
-                print("[Migration] Added turns_in_phase column to world_state")
+                logger.info("Added turns_in_phase column to world_state")
             
             # #5: pinned_messages on world_state
             result = conn.execute(text("PRAGMA table_info(world_state)"))
@@ -83,18 +87,18 @@ def init_db():
             if "pinned_messages" not in columns:
                 conn.execute(text("ALTER TABLE world_state ADD COLUMN pinned_messages TEXT DEFAULT '[]'"))
                 conn.commit()
-                print("[Migration] Added pinned_messages column to world_state")
+                logger.info("Added pinned_messages column to world_state")
         except Exception as e:
-            print(f"[Migration] Column check skipped: {e}")
+            logger.warning(f"Column check skipped: {e}")
     
-    print(f"Database initialized: {get_database_url()}")
+    logger.info(f"Database initialized: {get_database_url()}")
 
 
 def drop_db():
     """Drop all tables (use with caution!)."""
     engine = get_engine()
     Base.metadata.drop_all(bind=engine)
-    print("Database tables dropped.")
+    logger.info("Database tables dropped.")
 
 
 @contextmanager

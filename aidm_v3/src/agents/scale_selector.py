@@ -14,6 +14,10 @@ from enum import Enum
 from .base import BaseAgent
 
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 class NarrativeScale(str, Enum):
     """The 9 narrative scales from Module 12."""
     TACTICAL = "tactical"           # HxH style - every move matters
@@ -314,7 +318,7 @@ If the player is significantly stronger (2+ tiers above), consider SPECTACLE or 
         # Any tier difference warrants modifier detection (tiers are planet-scale differences)
         # raw_imbalance == 1.0 means exact same tier (player_num / threat_num == 1)
         if raw_imbalance == 1.0:
-            print(f"[ScaleSelector] Same tier fight, skipping modifier detection")
+            logger.warning(f"Same tier fight, skipping modifier detection")
             return PowerImbalanceOutput(
                 raw_imbalance=raw_imbalance,
                 effective_imbalance=raw_imbalance,

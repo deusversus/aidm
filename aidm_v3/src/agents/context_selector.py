@@ -9,6 +9,10 @@ from .memory_ranker import MemoryRanker
 from .intent_classifier import IntentOutput
 from ..db.state_manager import GameContext
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 class ContextSelector:
     """
     Orchestrates context retrieval and assembly.
@@ -146,7 +150,7 @@ class ContextSelector:
                     lore_config = {"page_type": merged_page_type, "limit": merged_limit}
                 else:
                     lore_config = secondary_config
-                print(f"[ContextSelector] Ambiguous intent ({intent.confidence:.0%}): merging {intent.intent}+{intent.secondary_intent} lore config")
+                logger.info(f"Ambiguous intent ({intent.confidence:.0%}): merging {intent.intent}+{intent.secondary_intent} lore config")
         
         if lore_config:
             profile_lib = get_profile_library()
@@ -158,7 +162,7 @@ class ContextSelector:
                 page_type=lore_config.get("page_type"),
             )
             if lore_chunks:
-                print(f"[ContextSelector] Retrieved {len(lore_chunks)} lore chunks for {profile_id} (type={lore_config.get('page_type', 'any')})")
+                logger.info(f"Retrieved {len(lore_chunks)} lore chunks for {profile_id} (type={lore_config.get('page_type', 'any')})")
         
         return {
             "raw_memories": raw_memories,
@@ -210,7 +214,7 @@ class ContextSelector:
         
         if skip_ranking:
             # Use raw memories directly without LLM ranking
-            print(f"[ContextSelector] Skipping memory ranking: {skip_reason}")
+            logger.warning(f"Skipping memory ranking: {skip_reason}")
             relevant_memories = raw_memories[:5]
         else:
             # LLM-based ranking
@@ -313,7 +317,7 @@ class ContextSelector:
         deduped = sorted(seen.values(), key=lambda m: m.get("score", 0), reverse=True)
         
         if len(deduped) != len(all_results):
-            print(f"[ContextSelector] Multi-query: {len(all_results)} raw → {len(deduped)} unique (from {len(queries)} queries)")
+            logger.debug(f"Multi-query: {len(all_results)} raw → {len(deduped)} unique (from {len(queries)} queries)")
         
         return deduped[:total_limit]
     

@@ -12,6 +12,10 @@ import time
 import uuid
 
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 class ProgressPhase(str, Enum):
     """Phases of profile generation."""
     INITIALIZING = "initializing"
@@ -108,14 +112,14 @@ class ProgressTracker:
             try:
                 callback(event)
             except Exception as e:
-                print(f"[Progress] Callback error: {e}")
+                logger.error(f"Callback error: {e}")
         
         # Notify async callbacks
         for callback in self._async_callbacks:
             try:
                 await callback(event)
             except Exception as e:
-                print(f"[Progress] Async callback error: {e}")
+                logger.error(f"Async callback error: {e}")
     
     async def complete(self, message: str = "Complete"):
         """Mark the operation as complete."""

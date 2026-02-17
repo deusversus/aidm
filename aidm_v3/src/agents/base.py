@@ -8,6 +8,10 @@ from pydantic import BaseModel
 from ..llm import get_llm_manager, LLMProvider
 from ..settings import get_settings_store
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 # Shared prompts directory (aidm_v3/prompts/)
 _PROMPTS_DIR = Path(__file__).parent.parent.parent / "prompts"
 
@@ -249,14 +253,14 @@ class AgenticAgent(BaseAgent):
             if findings:
                 call_log = tools.call_log
                 tool_names = [c.tool_name for c in call_log]
-                print(
+                logger.info(
                     f"[{self.agent_name}] Research phase: {len(call_log)} tool calls "
                     f"({', '.join(tool_names)}), {len(findings)} chars"
                 )
                 return findings
                 
         except Exception as e:
-            print(f"[{self.agent_name}] Research phase failed (non-fatal): {e}")
+            logger.error(f"[{self.agent_name}] Research phase failed (non-fatal): {e}")
         
         return ""
     

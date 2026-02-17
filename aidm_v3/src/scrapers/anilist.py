@@ -488,7 +488,7 @@ class AniListClient:
         best = min(media_list, key=score)
         chosen_title = best.get('title', {}).get('english') or best.get('title', {}).get('romaji', '?')
         chosen_fmt = best.get('format', '?')
-        print(f"[AniList] Disambiguated: chose '{chosen_title}' ({chosen_fmt}) from {len(media_list)} candidates")
+        logger.info(f"Disambiguated: chose '{chosen_title}' ({chosen_fmt}) from {len(media_list)} candidates")
         return best
     
     async def search_with_fallback(self, title: str) -> Optional[AniListResult]:
@@ -534,11 +534,11 @@ class AniListClient:
                     visited.add(rel.id)
         
         if not queue:
-            print(f"[AniList] No related seasons found for merging")
+            logger.info(f"No related seasons found for merging")
             return primary
         
         depth = 0
-        print(f"[AniList] Walking relations graph (BFS) for season merging...")
+        logger.info(f"Walking relations graph (BFS) for season merging...")
         
         # BFS: fetch each season, then check ITS relations for more seasons
         while queue and depth < MAX_DEPTH:
@@ -623,7 +623,7 @@ class AniListClient:
                     primary.relations.append(rel)
         
         seasons = len(all_entries)
-        print(f"[AniList] Merged {seasons} seasons (depth={depth}): {total_eps} episodes, "
+        logger.info(f"[AniList] Merged {seasons} seasons (depth={depth}): {total_eps} episodes, "
               f"{len(primary.characters)} characters, {len(primary.tags)} tags, "
               f"status={primary.status}")
         
@@ -767,11 +767,11 @@ class AniListClient:
                                 "season_count": 1,
                             })
                 except Exception as e:
-                    print(f"[AniList] Error fetching sequel {seq_id}: {e}")
+                    logger.error(f"Error fetching sequel {seq_id}: {e}")
                     continue
         
         if len(groups) <= 1:
-            print(f"[AniList] Franchise '{title}': single continuity "
+            logger.info(f"[AniList] Franchise '{title}': single continuity "
                   f"({groups[0]['season_count']} seasons), no disambiguation needed")
             return []
         
@@ -783,10 +783,10 @@ class AniListClient:
                 seen_titles.add(g["title"])
                 unique_groups.append(g)
         
-        print(f"[AniList] Franchise '{title}': {len(unique_groups)} distinct entries")
+        logger.info(f"Franchise '{title}': {len(unique_groups)} distinct entries")
         for r in unique_groups:
             seasons = f" ({r['season_count']} seasons)" if r['season_count'] > 1 else ""
-            print(f"  - {r['title']} [{r['relation']}]{seasons}")
+            logger.info(f"  - {r['title']} [{r['relation']}]{seasons}")
         
         return unique_groups
     

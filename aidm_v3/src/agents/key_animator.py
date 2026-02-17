@@ -19,7 +19,12 @@ from .intent_classifier import IntentOutput
 from .outcome_judge import OutcomeOutput
 from ..db.state_manager import GameContext
 from ..profiles.loader import NarrativeProfile
+from ..enums import NarrativeWeight
 
+
+import logging
+
+logger = logging.getLogger(__name__)
 
 class KeyAnimator:
     """Generates narrative prose using the Vibe Keeper prompt.
@@ -667,7 +672,7 @@ This triggers a portrait panel. Use sparingly — only for panel-worthy moments.
                     return ""  # Already varied — no directive needed
 
         # --- NARRATIVE WEIGHT FILTER ---
-        current_weight = getattr(outcome, 'narrative_weight', 'minor')
+        current_weight = getattr(outcome, 'narrative_weight', NarrativeWeight.MINOR)
         current_weight_level = self.WEIGHT_HIERARCHY.get(current_weight, 0)
 
         # --- SHUFFLE-BAG SELECTION ---
@@ -825,13 +830,13 @@ only where it doesn't conflict with the established tone:
                     break  # Highest priority wins
         elif intent and outcome:
             # No special_conditions — infer from intent + weight
-            weight = getattr(outcome, 'narrative_weight', 'minor')
-            if weight == "climactic":
+            weight = getattr(outcome, 'narrative_weight', NarrativeWeight.MINOR)
+            if weight == NarrativeWeight.CLIMACTIC:
                 if intent.intent == "SOCIAL":
                     sub_mode = "frozen_moment"
                 # else stays choreographic
         
-        print(f"[KeyAnimator] Sakuga sub-mode: {sub_mode}")
+        logger.info(f"Sakuga sub-mode: {sub_mode}")
         
         # --- BUILD INJECTION ---
         if sub_mode == "choreographic":
@@ -1074,12 +1079,12 @@ Omit any section that has nothing useful. Brevity over completeness."""
             if findings:
                 call_log = tools.call_log
                 tool_names = [c.tool_name for c in call_log]
-                print(f"[KeyAnimator] Research phase: {len(call_log)} tool calls ({', '.join(tool_names)})")
-                print(f"[KeyAnimator] Research findings: {len(findings)} chars")
+                logger.info(f"Research phase: {len(call_log)} tool calls ({', '.join(tool_names)})")
+                logger.info(f"Research findings: {len(findings)} chars")
                 return findings
                 
         except Exception as e:
-            print(f"[KeyAnimator] Research phase failed (non-fatal): {e}")
+            logger.error(f"Research phase failed (non-fatal): {e}")
         
         return ""
 
@@ -1161,7 +1166,7 @@ in the verbatim working memory below. Use for voice matching and continuity.
 
 === END COMPACTED HISTORY ===
 """
-            print(f"[KeyAnimator] Injecting compaction buffer ({len(compaction_text)} chars)")
+            logger.info(f"Injecting compaction buffer ({len(compaction_text)} chars)")
         
         # --- BLOCK 3: Working memory transcript (cache=True) ---
         working_memory_text = ""
@@ -1182,7 +1187,7 @@ MATCH the established voice, humor, and style from these exchanges.
 
 === CONTINUE THE STORY ===
 """
-            print(f"[KeyAnimator] Injecting working memory ({len(recent_messages)} messages, {len(transcript_text)} chars)")
+            logger.info(f"Injecting working memory ({len(recent_messages)} messages, {len(transcript_text)} chars)")
         
         # --- BLOCK 4: Dynamic per-turn context (cache=False) ---
         dynamic_parts = []
@@ -1228,19 +1233,19 @@ MATCH the established voice, humor, and style from these exchanges.
         style_directive = self._build_style_drift_directive(intent, outcome, recent_messages)
         if style_directive:
             dynamic_parts.append(style_directive)
-            print("[KeyAnimator] Style drift directive injected")
+            logger.info("Style drift directive injected")
         
         # NARRATIVE DIVERSITY: Vocabulary Freshness (Approach B)
         freshness_check = self._build_freshness_check(recent_messages)
         if freshness_check:
             dynamic_parts.append(freshness_check)
-            print(f"[KeyAnimator] Vocabulary freshness advisory injected")
+            logger.info(f"Vocabulary freshness advisory injected")
         
         # SAKUGA MODE: Inject variant-aware high-intensity guidance (Approach C)
         if sakuga_mode:
             sakuga_injection = self._build_sakuga_injection(intent, outcome)
             dynamic_parts.append(sakuga_injection)
-            print("[KeyAnimator] SAKUGA MODE ACTIVE - injecting high-intensity guidance")
+            logger.info("SAKUGA MODE ACTIVE - injecting high-intensity guidance")
         
         # RAG context (granular)
         memories_text = ""
@@ -1316,7 +1321,7 @@ MATCH the established voice, humor, and style from these exchanges.
         # Filter out empty blocks
         system_blocks = [(text, cache) for text, cache in system_blocks if text.strip()]
         
-        print(f"[KeyAnimator] System blocks: {len(system_blocks)} blocks, "
+        logger.info(f"[KeyAnimator] System blocks: {len(system_blocks)} blocks, "
               f"cached={sum(1 for _, c in system_blocks if c)}, "
               f"total={sum(len(t) for t, _ in system_blocks)} chars")
         

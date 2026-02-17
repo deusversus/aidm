@@ -14,6 +14,10 @@ from pydantic import BaseModel
 from .provider import LLMProvider, LLMResponse
 
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 class GoogleProvider(LLMProvider):
     """Google Gemini provider using the new google.genai SDK.
     
@@ -126,7 +130,7 @@ class GoogleProvider(LLMProvider):
             cached_tokens = getattr(last_chunk.usage_metadata, 'cached_content_token_count', 0) or 0
             if cached_tokens > 0:
                 usage["cached_tokens"] = cached_tokens
-                print(f"[Cache Hit] {cached_tokens} tokens cached ({cached_tokens/max(usage.get('prompt_tokens', 1), 1)*100:.0f}% of prompt)")
+                logger.info(f"{cached_tokens} tokens cached ({cached_tokens/max(usage.get('prompt_tokens', 1), 1)*100:.0f}% of prompt)")
         
         return LLMResponse(
             content=full_text,
@@ -197,7 +201,7 @@ class GoogleProvider(LLMProvider):
                 full_text += chunk.text or ""
                 last_chunk = chunk
                 chunk_count += 1
-            print(f"[Google Streaming] Collected {chunk_count} chunks, {len(full_text)} chars")
+            logger.info(f"Collected {chunk_count} chunks, {len(full_text)} chars")
             return full_text, last_chunk
         
         full_text, last_chunk = await self._run_with_retry(_stream_and_collect)
@@ -289,7 +293,7 @@ class GoogleProvider(LLMProvider):
             cached_tokens = getattr(last_chunk.usage_metadata, 'cached_content_token_count', 0) or 0
             if cached_tokens > 0:
                 prompt_tokens = getattr(last_chunk.usage_metadata, 'prompt_token_count', 1) or 1
-                print(f"[Cache Hit] {cached_tokens} tokens cached ({cached_tokens/max(prompt_tokens, 1)*100:.0f}% of prompt)")
+                logger.info(f"{cached_tokens} tokens cached ({cached_tokens/max(prompt_tokens, 1)*100:.0f}% of prompt)")
         
         # Parse response - should be valid JSON thanks to native mode
         content = full_text.strip() if full_text else "{}"
@@ -310,7 +314,7 @@ class GoogleProvider(LLMProvider):
                 if repaired:
                     return repaired
             except Exception as repair_error:
-                print(f"[Schema Repair] Validator repair also failed: {repair_error}")
+                logger.error(f"Validator repair also failed: {repair_error}")
             
             raise ValueError(f"Failed to parse JSON response: {e}\nResponse: {content[:500]}")
     
@@ -434,7 +438,7 @@ Respond ONLY with the JSON object, no markdown formatting or explanation.
             candidate = response.candidates[0] if response.candidates else None
             if not candidate or not candidate.content or not candidate.content.parts:
                 # No content — return empty
-                print(f"[ToolLoop] Round {round_num+1}: No content returned, ending loop")
+                logger.info(f"Round {round_num+1}: No content returned, ending loop")
                 break
             
             # Separate text parts and function call parts
@@ -449,7 +453,7 @@ Respond ONLY with the JSON object, no markdown formatting or explanation.
             if not function_calls:
                 # Model is done — returned text without function calls
                 final_text = "".join(text_parts)
-                print(f"[ToolLoop] Round {round_num+1}: Model returned final text ({len(final_text)} chars)")
+                logger.info(f"Round {round_num+1}: Model returned final text ({len(final_text)} chars)")
                 return LLMResponse(
                     content=final_text,
                     tool_calls=all_tool_calls,
@@ -460,7 +464,7 @@ Respond ONLY with the JSON object, no markdown formatting or explanation.
                 )
             
             # Execute each function call
-            print(f"[ToolLoop] Round {round_num+1}: {len(function_calls)} tool call(s)")
+            logger.info(f"Round {round_num+1}: {len(function_calls)} tool call(s)")
             
             # Add the model's response (with function calls) to contents
             contents.append(candidate.content)
@@ -471,7 +475,7 @@ Respond ONLY with the JSON object, no markdown formatting or explanation.
                 tool_name = fc.name
                 tool_args = dict(fc.args) if fc.args else {}
                 
-                print(f"  [Tool] {tool_name}({tool_args})")
+                logger.info(f"  [Tool] {tool_name}({tool_args})")
                 
                 # Execute via ToolRegistry
                 result = tools.execute(tool_name, tool_args, round_number=round_num)
@@ -498,7 +502,7 @@ Respond ONLY with the JSON object, no markdown formatting or explanation.
             ))
         
         # Hit max_tool_rounds — force a final text generation without tools
-        print(f"[ToolLoop] Hit max rounds ({max_tool_rounds}), forcing final response")
+        logger.info(f"Hit max rounds ({max_tool_rounds}), forcing final response")
         config_no_tools = {
             "max_output_tokens": max_tokens,
             "temperature": 0.3,

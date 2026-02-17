@@ -5,6 +5,10 @@ from typing import Optional, Literal, List
 from .base import BaseAgent
 
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 class RelationshipOutput(BaseModel):
     """Structured output for relationship analysis."""
     
@@ -110,6 +114,6 @@ Return a result for every NPC, even if the delta is 0."""
             )
             return response.results
         except Exception as e:
-            print(f"[RelationshipAnalyzer] Batch analysis failed: {e}, falling back to empty")
+            logger.error(f"Batch analysis failed: {e}, falling back to empty")
             return []
 

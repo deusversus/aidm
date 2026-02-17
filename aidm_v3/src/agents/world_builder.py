@@ -5,6 +5,10 @@ from typing import Literal, Optional, List, Dict, Any
 from .base import BaseAgent
 
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 class WorldBuildingEntity(BaseModel):
     """A single entity being asserted by the player."""
     
@@ -189,6 +193,6 @@ Use this to validate whether the player's assertions are consistent with establi
 {chunks_text}
 """
         except Exception as e:
-            print(f"[WorldBuilder] Wiki canon lookup failed: {e}")
+            logger.error(f"Wiki canon lookup failed: {e}")
             return ""
 

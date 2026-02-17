@@ -9,6 +9,10 @@ from datetime import datetime
 from ..core.session import Session
 
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 class SessionStore:
     """Persists Session objects to SQLite database.
     
@@ -112,7 +116,7 @@ class SessionStore:
             conn.commit()
             count = cursor.rowcount
             if count > 0:
-                print(f"[SessionStore] Cleared {count} session(s)")
+                logger.info(f"Cleared {count} session(s)")
             return count
     
     def list_sessions(self) -> List[dict]:

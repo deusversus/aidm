@@ -19,6 +19,10 @@ from typing import Optional
 from .base import AgenticAgent
 
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 class ProductionAgent(AgenticAgent):
     """Post-narrative reactor.  Reads the completed turn and takes actions.
 
@@ -92,7 +96,7 @@ class ProductionAgent(AgenticAgent):
             )
             return result
         except Exception as e:
-            print(f"[ProductionAgent] Reaction failed (non-fatal): {e}")
+            logger.error(f"Reaction failed (non-fatal): {e}")
             return None
 
 

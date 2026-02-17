@@ -3,6 +3,10 @@ from pydantic import BaseModel, Field, field_validator
 from .base import BaseAgent
 from ..llm.manager import get_llm_manager
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 class MemoryRanking(BaseModel):
     memory_id: str
     relevance_score: float = Field(default=0.0, description="0.0 to 1.0 relevance score")
@@ -109,5 +113,5 @@ class MemoryRanker(BaseAgent):
             
         except Exception as e:
             # Fallback: Just return candidates as-is if ranking fails
-            print(f"Memory Ranking failed: {e}")
+            logger.error(f"Memory Ranking failed: {e}")
             return candidates

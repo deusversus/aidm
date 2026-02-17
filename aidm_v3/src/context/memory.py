@@ -13,6 +13,10 @@ from pydantic import BaseModel, Field
 from pathlib import Path
 
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 # Decay rates per memory type (per-turn multiplier)
 DECAY_CURVES = {
     "none": 1.0,      # Plot-critical: never decay
@@ -115,7 +119,7 @@ class MemoryStore:
                 if existing["documents"]:
                     for i, doc in enumerate(existing["documents"]):
                         if doc.strip()[:200] == content_fingerprint:
-                            print(f"[Memory] Dedup: skipping duplicate content (matches {existing['ids'][i]})")
+                            logger.warning(f"Dedup: skipping duplicate content (matches {existing['ids'][i]})")
                             return existing["ids"][i]
             except Exception:
                 pass  # If dedup check fails, proceed with add
@@ -240,7 +244,7 @@ class MemoryStore:
             results = self.collection.query(**query_kwargs)
         except Exception as e:
             # Fallback: if filters cause an error (e.g. no matches), return empty
-            print(f"[Memory] Search with filters failed: {e}")
+            logger.error(f"Search with filters failed: {e}")
             return []
         
         memories = []
@@ -652,7 +656,7 @@ SUMMARY:"""
             
             return response.content.strip()
         except Exception as e:
-            print(f"[Memory] Compression error for {category}: {e}")
+            logger.error(f"Compression error for {category}: {e}")
             return None
         
     def close(self):
