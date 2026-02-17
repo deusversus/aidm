@@ -14,13 +14,14 @@ logger = logging.getLogger(__name__)
 
 class AnthropicProvider(LLMProvider):
     """Anthropic Claude provider implementation.
-    
+
     Supports Claude model family:
     - Haiku 4.5: Fast, affordable for structured tasks
     - Sonnet 4.5: Balanced quality/speed for creative work
-    - Opus 4.6: Latest Opus — highest quality, nearly Sonnet pricing
+    - Sonnet 4.6: Latest Sonnet — fast, sharp, excellent coding
     - Opus 4.5: Previous-gen Opus, still excellent
-    
+    - Opus 4.6: Latest Opus — highest quality, nearly Sonnet pricing
+
     Also supports web search via the Anthropic API (May 2025+).
     """
     
@@ -29,7 +30,7 @@ class AnthropicProvider(LLMProvider):
         return "anthropic"
     
     def get_default_model(self) -> str:
-        return "claude-sonnet-4-5"
+        return "claude-sonnet-4-6"
     
     def get_fast_model(self) -> str:
         return "claude-haiku-4-5"
@@ -39,7 +40,7 @@ class AnthropicProvider(LLMProvider):
         preference = os.getenv("ANTHROPIC_CREATIVE_MODEL", "sonnet").lower()
         if preference == "opus":
             return "claude-opus-4-6"
-        return "claude-sonnet-4-5"
+        return "claude-sonnet-4-6"
     
     def get_opus_model(self) -> str:
         """Get Opus model explicitly."""
@@ -47,7 +48,7 @@ class AnthropicProvider(LLMProvider):
     
     def get_research_model(self) -> str:
         """Model optimized for research with web search."""
-        return "claude-sonnet-4-5"
+        return "claude-sonnet-4-6"
     
     def get_max_concurrent_requests(self) -> int:
         """Anthropic Tier 2+ can handle more concurrent requests."""
