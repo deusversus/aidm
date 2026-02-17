@@ -2228,7 +2228,7 @@ async def get_quests():
     bible = orchestrator.state.get_campaign_bible()
     if bible and bible.planning_data:
         data = bible.planning_data
-        current_arc = data.get("current_arc", {}).get("name") or current_arc
+        current_arc = (data.get("current_arc", {}).get("name") if isinstance(data.get("current_arc"), dict) else data.get("current_arc")) or current_arc
         
         for goal in data.get("active_goals", []):
             quests.append(QuestDetailInfo(
