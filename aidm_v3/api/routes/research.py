@@ -7,6 +7,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
+from src.utils.tasks import safe_create_task
 from src.agents.progress import ProgressTracker, ProgressPhase, ProgressEvent
 from src.agents.anime_research import AnimeResearchAgent, research_anime_with_search
 
@@ -55,7 +56,7 @@ async def start_research(request: ResearchRequest):
             raise
     
     # Launch as background task
-    task = asyncio.create_task(run_research())
+    task = safe_create_task(run_research(), name="anime_research")
     _active_tasks[task_id] = task
     
     return ResearchResponse(

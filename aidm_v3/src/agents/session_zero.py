@@ -397,11 +397,12 @@ async def process_session_zero_state(
                     # 3. Fire-and-forget: generate NPC portrait (if campaign exists and appearance known)
                     if campaign_id and (npc_appearance or npc_visual_tags):
                         try:
-                            import asyncio
-                            asyncio.create_task(
+                            from ..utils.tasks import safe_create_task
+                            safe_create_task(
                                 _generate_session_zero_npc_portrait(
                                     campaign_id, npc_name, npc_appearance, npc_visual_tags
-                                )
+                                ),
+                                name=f"npc_portrait_{npc_name}",
                             )
                             logger.info(f"[SessionZero→Media] Queued portrait gen for NPC: {npc_name}")
                         except Exception as media_err:
