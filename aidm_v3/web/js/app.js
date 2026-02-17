@@ -1066,15 +1066,6 @@ function showStatus(message, type) {
     }, 3000);
 }
 
-/**
- * Escape HTML for safe display
- */
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
-
 // === NEW: Sidebar Functions ===
 
 /**

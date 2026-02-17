@@ -87,7 +87,22 @@ def export_session(campaign_id: int) -> bytes:
                 "faction_reputations": character.faction_reputations,
                 "narrative_goals": character.narrative_goals,
                 "calibration_score": character.calibration_score,
-                "story_flags": character.story_flags
+                "story_flags": character.story_flags,
+                # Identity fields
+                "concept": character.concept,
+                "age": character.age,
+                "backstory": character.backstory,
+                "appearance": character.appearance,
+                "personality_traits": character.personality_traits,
+                "values": character.values,
+                "fears": character.fears,
+                "quirks": character.quirks,
+                "short_term_goal": character.short_term_goal,
+                "long_term_goal": character.long_term_goal,
+                # Visual identity
+                "visual_tags": character.visual_tags,
+                "portrait_url": character.portrait_url,
+                "model_sheet_url": character.model_sheet_url,
             }
         
         # WorldState
@@ -116,7 +131,17 @@ def export_session(campaign_id: int) -> bytes:
                 "personality": npc.personality,
                 "goals": npc.goals,
                 "secrets": npc.secrets,
-                "memory_tags": npc.memory_tags
+                "memory_tags": npc.memory_tags,
+                # Visual identity
+                "visual_tags": npc.visual_tags,
+                "appearance": npc.appearance,
+                "portrait_url": npc.portrait_url,
+                "model_sheet_url": npc.model_sheet_url,
+                # Intelligence & growth
+                "intelligence_stage": npc.intelligence_stage,
+                "growth_stage": npc.growth_stage,
+                "ensemble_archetype": npc.ensemble_archetype,
+                "emotional_milestones": npc.emotional_milestones,
             }
             for npc in npcs
         ]
@@ -422,7 +447,22 @@ def import_session(zip_bytes: bytes) -> int:
                 faction_reputations=char_data.get("faction_reputations"),
                 narrative_goals=char_data.get("narrative_goals"),
                 calibration_score=char_data.get("calibration_score"),
-                story_flags=char_data.get("story_flags")
+                story_flags=char_data.get("story_flags"),
+                # Identity fields
+                concept=char_data.get("concept"),
+                age=char_data.get("age"),
+                backstory=char_data.get("backstory"),
+                appearance=char_data.get("appearance"),
+                personality_traits=char_data.get("personality_traits"),
+                values=char_data.get("values"),
+                fears=char_data.get("fears"),
+                quirks=char_data.get("quirks"),
+                short_term_goal=char_data.get("short_term_goal"),
+                long_term_goal=char_data.get("long_term_goal"),
+                # Visual identity
+                visual_tags=char_data.get("visual_tags"),
+                portrait_url=char_data.get("portrait_url"),
+                model_sheet_url=char_data.get("model_sheet_url"),
             )
             db.add(character)
         
@@ -454,7 +494,17 @@ def import_session(zip_bytes: bytes) -> int:
                 personality=npc_data.get("personality"),
                 goals=npc_data.get("goals"),
                 secrets=npc_data.get("secrets"),
-                memory_tags=npc_data.get("memory_tags")
+                memory_tags=npc_data.get("memory_tags"),
+                # Visual identity
+                visual_tags=npc_data.get("visual_tags"),
+                appearance=npc_data.get("appearance"),
+                portrait_url=npc_data.get("portrait_url"),
+                model_sheet_url=npc_data.get("model_sheet_url"),
+                # Intelligence & growth
+                intelligence_stage=npc_data.get("intelligence_stage"),
+                growth_stage=npc_data.get("growth_stage"),
+                ensemble_archetype=npc_data.get("ensemble_archetype"),
+                emotional_milestones=npc_data.get("emotional_milestones"),
             )
             db.add(npc)
         

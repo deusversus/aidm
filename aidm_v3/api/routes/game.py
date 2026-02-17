@@ -689,10 +689,11 @@ async def _generate_handoff_character_media(
             )
             if char:
                 if result.get("portrait"):
-                    char.portrait_url = f"/api/game/media/{campaign_id}/{result['portrait'].name}"
+                    # Portrait is under portraits/ subdir, e.g. data/media/1/portraits/name_portrait.png
+                    char.portrait_url = f"/api/game/media/{campaign_id}/portraits/{result['portrait'].name}"
                     print(f"[Handoff→Media] Player portrait saved: {char.portrait_url}")
                 if result.get("model_sheet"):
-                    char.model_sheet_url = f"/api/game/media/{campaign_id}/{result['model_sheet'].name}"
+                    char.model_sheet_url = f"/api/game/media/{campaign_id}/models/{result['model_sheet'].name}"
                     print(f"[Handoff→Media] Player model sheet saved: {char.model_sheet_url}")
                 db.commit()
             db.close()
