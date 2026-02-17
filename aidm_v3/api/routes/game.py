@@ -51,11 +51,11 @@ def get_orchestrator() -> Orchestrator:
         profile_id = settings.active_profile_id
         
         # DEBUG: Log what we loaded
-        logger.info(f"[get_orchestrator] Loaded settings: active_profile_id='{profile_id}', active_campaign_id='{settings.active_campaign_id}'", flush=True)
+        logger.info(f"[get_orchestrator] Loaded settings: active_profile_id='{profile_id}', active_campaign_id='{settings.active_campaign_id}'")
         
         # Handle missing profile - requires Session Zero to set it
         if not profile_id:  # Empty string means not configured
-            logger.error(f"[get_orchestrator] ERROR: No profile set! Settings file may not be synced.", flush=True)
+            logger.error(f"[get_orchestrator] ERROR: No profile set! Settings file may not be synced.")
             raise HTTPException(
                 status_code=400,
                 detail="No active profile set. Please complete Session Zero first."
@@ -81,9 +81,9 @@ def reset_orchestrator():
         try:
             _orchestrator.close()
         except Exception as e:
-            logger.error(f"[reset_orchestrator] Warning: close() failed: {e}", flush=True)
+            logger.error(f"[reset_orchestrator] Warning: close() failed: {e}")
     _orchestrator = None
-    logger.info("[reset_orchestrator] Orchestrator cleared - next call will create fresh instance", flush=True)
+    logger.info("[reset_orchestrator] Orchestrator cleared - next call will create fresh instance")
 
 
 
@@ -1294,7 +1294,7 @@ I found several entries in the **{media_ref}** franchise:
                 from src.settings import reset_settings_store
                 settings_store = get_settings_store()
                 current_settings = settings_store.load()
-                logger.info(f"[Handoff] Syncing settings: {current_settings.active_profile_id} -> {profile_to_use}", flush=True)
+                logger.info(f"[Handoff] Syncing settings: {current_settings.active_profile_id} -> {profile_to_use}")
                 current_settings.active_profile_id = profile_to_use
                 current_settings.active_campaign_id = profile_to_use
                 current_settings.active_session_id = session.session_id  # Session-based memory isolation
@@ -1306,7 +1306,7 @@ I found several entries in the **{media_ref}** franchise:
                 settings_path = Path(__file__).parent.parent.parent / "settings.json"
                 with open(settings_path, 'r') as f:
                     disk_data = json.load(f)
-                logger.info(f"[Handoff] VERIFY disk after save: active_profile_id='{disk_data.get('active_profile_id')}'", flush=True)
+                logger.info(f"[Handoff] VERIFY disk after save: active_profile_id='{disk_data.get('active_profile_id')}'")
                 
                 reset_settings_store()  # Clear settings cache so next load picks up new values
                 reset_orchestrator()  # Clear cached orchestrator to pick up new settings
@@ -1314,9 +1314,9 @@ I found several entries in the **{media_ref}** franchise:
                 # Actually ready for gameplay - commit character
                 session.skip_to_phase(SessionPhase.GAMEPLAY)
                 
-                logger.info(f"[Handoff] About to call get_orchestrator()...", flush=True)
+                logger.info(f"[Handoff] About to call get_orchestrator()...")
                 orchestrator = get_orchestrator()
-                logger.info(f"[Handoff] Orchestrator created successfully with profile: {orchestrator.profile_id}", flush=True)
+                logger.info(f"[Handoff] Orchestrator created successfully with profile: {orchestrator.profile_id}")
 
                 
                 # 1. Update Character
@@ -1582,7 +1582,7 @@ I found several entries in the **{media_ref}** franchise:
             settings_store = get_settings_store()
             current_settings = settings_store.load()
             if current_settings.active_profile_id != profile_to_sync:
-                logger.info(f"[SessionZero] Defensive sync: {current_settings.active_profile_id} -> {profile_to_sync}", flush=True)
+                logger.info(f"[SessionZero] Defensive sync: {current_settings.active_profile_id} -> {profile_to_sync}")
                 current_settings.active_profile_id = profile_to_sync
                 current_settings.active_campaign_id = profile_to_sync
                 settings_store.save(current_settings)
