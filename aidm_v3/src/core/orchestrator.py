@@ -123,6 +123,21 @@ class Orchestrator:
         # Background processing lock — ensures previous turn's post-narrative
         # work completes before the next turn reads state
         self._bg_lock = asyncio.Lock()
+
+    def close(self):
+        """Release resources held by the orchestrator.
+
+        Called by ``reset_orchestrator()`` and the application lifespan
+        shutdown handler.  Closes the DB session opened in ``__init__``
+        and logs the teardown.
+        """
+        try:
+            if hasattr(self, 'override_handler') and hasattr(self.override_handler, 'db'):
+                self.override_handler.db.close()
+                logger.info("Orchestrator DB session closed")
+        except Exception as e:
+            logger.warning("Orchestrator close — DB session close failed: %s", e)
+        logger.info("Orchestrator for '%s' shut down", self.profile_id)
     
     async def run_director_startup(
         self,

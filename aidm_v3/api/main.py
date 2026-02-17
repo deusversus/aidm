@@ -19,6 +19,9 @@ async def lifespan(app: FastAPI):
     setup_logging()
     logger.info("AIDM v3 starting up")
     yield
+    # Shutdown: release orchestrator resources
+    from .routes.game import reset_orchestrator
+    reset_orchestrator()
     logger.info("AIDM v3 shut down cleanly")
 
 
