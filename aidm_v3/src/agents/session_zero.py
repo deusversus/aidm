@@ -98,14 +98,10 @@ class SessionZeroAgent(BaseAgent):
         return result
 
     def _build_context(self, session: Session, player_input: str) -> str:
-        """Build the context string to send to the LLM.
-        
-        Includes conversation history so the LLM has memory of
-        prior Session Zero exchanges and doesn't repeat questions.
-        """
+        """Build the context string to send to the LLM."""
         parts = [
             f"## Current Phase: {session.phase.value}",
-            f"## Turn: {len(session.messages)}",
+            f"## Turn: {session.turn_count}",
         ]
 
         # Include character draft if any info detected
@@ -122,29 +118,8 @@ class SessionZeroAgent(BaseAgent):
         if session.phase_state:
             parts.append(f"\n## Phase State:\n{session.phase_state}")
 
-        # ----- Conversation history (sliding window) -----
-        # Include recent messages so the LLM remembers what was
-        # already discussed and doesn't repeat questions.
-        # Exclude the LAST message (the current player input we append below).
-        history = session.messages[:-1] if session.messages else []
-        # Keep a sliding window of the most recent messages
-        MAX_HISTORY = 30
-        if len(history) > MAX_HISTORY:
-            history = history[-MAX_HISTORY:]
-            parts.append(f"\n## Conversation History (last {MAX_HISTORY} messages):")
-        elif history:
-            parts.append("\n## Conversation History:")
-
-        for msg in history:
-            role = msg.get("role", "unknown")
-            content = msg.get("content", "")
-            if role == "user":
-                parts.append(f"\n**Player:** {content}")
-            else:
-                parts.append(f"\n**DM:** {content}")
-
-        # Player input (current turn)
-        parts.append(f"\n## Player Input (Current Turn):\n{player_input}")
+        # Player input
+        parts.append(f"\n## Player Input:\n{player_input}")
 
         return "\n".join(parts)
 
