@@ -104,7 +104,7 @@ class SessionZeroAgent(BaseAgent):
         draft_summary = self._format_draft(draft)
         
         # Format recent messages (last 10)
-        recent_messages = session.messages[-10:] if session.messages else []
+        recent_messages = session.messages[-30:] if session.messages else []
         messages_str = "\n".join([
             f"[{m['role'].upper()}]: {m['content']}" 
             for m in recent_messages
