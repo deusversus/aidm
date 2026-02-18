@@ -814,7 +814,7 @@ I found several entries in the **{media_ref}** franchise:
                     logger.info("Generating opening scene server-side...")
                     opening_result = await orchestrator.process_turn(
                         player_input="[opening scene — the story begins]",
-                        recent_messages=session.messages[-20:],
+                        recent_messages=session.messages[-30:],
                         compaction_text=""
                     )
                     opening_narrative = opening_result.narrative
