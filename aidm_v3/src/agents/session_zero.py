@@ -69,9 +69,14 @@ class SessionZeroAgent(BaseAgent):
         self._prompt_path = Path(__file__).parent.parent.parent / "prompts" / "session_zero.md"
 
     @property
-    def system_prompt(self) -> str:
-        """The system prompt for this agent."""
-        return self._prompt_path.read_text(encoding="utf-8")
+    def system_prompt(self) -> list[tuple[str, bool]]:
+        """The system prompt for this agent, with caching enabled.
+        
+        Returns cache-aware format: [(text, should_cache), ...]
+        The session_zero prompt is static and ~28KB — caching saves
+        90% on Anthropic input tokens after the first turn.
+        """
+        return [(self._prompt_path.read_text(encoding="utf-8"), True)]
 
     @property
     def output_schema(self) -> type[BaseModel]:
