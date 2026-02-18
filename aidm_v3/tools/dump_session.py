@@ -19,7 +19,6 @@ and timestamp for each turn.
 import argparse
 import sqlite3
 import sys
-import os
 from pathlib import Path
 
 
@@ -74,7 +73,7 @@ def dump_turns(db_path, last_n=None, turn_number=None, summary_only=False, show_
             if latency:
                 output_lines.append(f"Latency: {latency}ms")
             output_lines.append(f"{'─'*72}")
-            output_lines.append(f"PLAYER INPUT:")
+            output_lines.append("PLAYER INPUT:")
             output_lines.append(player[:500] + ("..." if len(player) > 500 else ""))
             output_lines.append(f"{'─'*72}")
             output_lines.append(f"NARRATIVE ({len(narrative)} chars):")

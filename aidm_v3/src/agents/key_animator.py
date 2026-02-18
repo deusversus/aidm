@@ -908,3 +908,88 @@ MATCH the established voice, humor, and style from these exchanges.
         content = content.replace('\\n', '\n')  # Convert escaped newlines to real newlines
 
         return content
+
+    # -----------------------------------------------------------------
+    # META CONVERSATION — out-of-character dialogue with the player
+    # -----------------------------------------------------------------
+
+    META_SYSTEM_PROMPT = """You are the Key Animator (lead creative) of an anime production studio.
+
+The player is speaking to the production team OUT OF CHARACTER about the game.
+You respond from a creative and narrative perspective — how you'd execute or adjust
+the artistic direction, voice, and narrative style.
+
+Your job:
+- Offer creative perspective on narrative execution (pacing, tone, prose style)
+- You may agree or disagree with the Director — you have your own creative vision
+- Suggest how you could narrate differently to address player concerns
+- Speak to your tools: voice, imagery, scene structure, emotional beats
+
+Keep responses concise (2-3 sentences). You're the artist, not the planner.
+Do NOT write narrative prose or in-character dialogue. This is out-of-character talk."""
+
+    async def respond_to_meta(
+        self,
+        feedback: str,
+        game_context: str,
+        director_response: str = "",
+        conversation_history: list[dict[str, str]] | None = None,
+    ) -> str:
+        """Respond to player meta-conversation as the Key Animator.
+
+        Args:
+            feedback: The player's out-of-character message
+            game_context: Formatted string with current game state
+            director_response: The Director's response (so KA can agree/disagree)
+            conversation_history: Previous meta conversation turns
+
+        Returns:
+            Free-form conversational response
+        """
+        messages = []
+
+        # Include conversation history for multi-turn meta dialogue
+        if conversation_history:
+            for entry in conversation_history:
+                role = entry.get("role", "user")
+                content = entry.get("content", "")
+                if role == "player":
+                    messages.append({"role": "user", "content": content})
+                elif role == "key_animator":
+                    messages.append({"role": "assistant", "content": content})
+                # Skip Director entries — they're handled separately
+
+        # Current player message with context + Director's take
+        user_message = f"""## Current Game State
+{game_context}
+
+## Player's Message (Out-of-Character)
+{feedback}"""
+
+        if director_response:
+            user_message += f"""
+
+## Director's Response
+The Director (showrunner) already responded:
+{director_response}
+
+You may agree, disagree, or add a different creative perspective."""
+
+        messages.append({"role": "user", "content": user_message})
+
+        try:
+            provider, model = self._get_provider_and_model()
+
+            response = await provider.complete(
+                messages=messages,
+                system=self.META_SYSTEM_PROMPT,
+                model=model,
+                max_tokens=768,
+                temperature=0.7,
+            )
+
+            return response.content.strip()
+
+        except Exception as e:
+            logger.error(f"[key_animator] Meta conversation failed: {e}")
+            return "Noted — I'll keep that in mind for the next scene. (The Key Animator encountered an issue processing this.)"

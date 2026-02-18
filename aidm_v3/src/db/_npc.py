@@ -96,6 +96,151 @@ class NPCMixin:
         db.commit()
         return npc
 
+    def upsert_npc(
+        self,
+        name: str,
+        role: str = "acquaintance",
+        relationship_notes: str | None = None,
+        personality: str | None = None,
+        goals: list[str] | None = None,
+        secrets: list[str] | None = None,
+        faction: str | None = None,
+        visual_tags: list[str] | None = None,
+        knowledge_topics: dict[str, str] | None = None,
+        power_tier: str | None = None,
+        ensemble_archetype: str | None = None,
+        appearance: dict | None = None,
+    ) -> NPC:
+        """Create or enrich an NPC.
+
+        - If NPC doesn't exist: creates with all provided fields.
+        - If NPC exists: merges non-empty fields without overwriting
+          existing populated data (enrichment, not replacement).
+
+        Mirrors the ``upsert_location()`` pattern.
+
+        Args:
+            name: NPC name (fuzzy matched for dedup)
+            role: Relationship to player
+            relationship_notes: Backstory/notes
+            personality: 1-2 sentence personality description
+            goals: Known/implied goals
+            secrets: Concealed info hinted at
+            faction: Organization affiliation
+            visual_tags: Visual descriptors for portrait generation
+            knowledge_topics: Topics the NPC knows about
+            power_tier: Estimated power tier
+            ensemble_archetype: Ensemble role
+            appearance: Visual appearance dict
+
+        Returns:
+            Created or enriched NPC instance
+        """
+        db = self._get_db()
+
+        # Check for existing NPC (fuzzy)
+        existing = (
+            db.query(NPC)
+            .filter(NPC.campaign_id == self.campaign_id)
+            .filter(NPC.name.ilike(f"%{name}%"))
+            .first()
+        )
+
+        if existing:
+            # --- ENRICH existing NPC (never overwrite populated fields) ---
+            changed = []
+
+            if role and role != "acquaintance" and (not existing.role or existing.role == "acquaintance"):
+                existing.role = role
+                changed.append("role")
+
+            if relationship_notes and not existing.relationship_notes:
+                existing.relationship_notes = relationship_notes
+                changed.append("relationship_notes")
+
+            if personality and not existing.personality:
+                existing.personality = personality
+                changed.append("personality")
+
+            if goals:
+                existing_goals = existing.goals or []
+                new_goals = [g for g in goals if g not in existing_goals]
+                if new_goals:
+                    existing.goals = existing_goals + new_goals
+                    changed.append("goals")
+
+            if secrets:
+                existing_secrets = existing.secrets or []
+                new_secrets = [s for s in secrets if s not in existing_secrets]
+                if new_secrets:
+                    existing.secrets = existing_secrets + new_secrets
+                    changed.append("secrets")
+
+            if faction and not existing.faction:
+                existing.faction = faction
+                changed.append("faction")
+
+            if visual_tags:
+                existing_tags = existing.visual_tags or []
+                new_tags = [t for t in visual_tags if t not in existing_tags]
+                if new_tags:
+                    existing.visual_tags = existing_tags + new_tags
+                    changed.append("visual_tags")
+
+            if knowledge_topics:
+                existing_topics = existing.knowledge_topics or {}
+                merged = {**existing_topics, **knowledge_topics}
+                if merged != existing_topics:
+                    existing.knowledge_topics = merged
+                    changed.append("knowledge_topics")
+
+            if power_tier and power_tier != "T10" and (not existing.power_tier or existing.power_tier == "T10"):
+                existing.power_tier = power_tier
+                changed.append("power_tier")
+
+            if ensemble_archetype and not existing.ensemble_archetype:
+                existing.ensemble_archetype = ensemble_archetype
+                changed.append("ensemble_archetype")
+
+            if appearance:
+                existing_appearance = existing.appearance or {}
+                merged = {**existing_appearance, **appearance}
+                if merged != existing_appearance:
+                    existing.appearance = merged
+                    changed.append("appearance")
+
+            if changed:
+                db.commit()
+                logger.info(f"Enriched NPC {existing.name}: {', '.join(changed)}")
+            return existing
+
+        # --- CREATE new NPC with all available fields ---
+        npc = NPC(
+            campaign_id=self.campaign_id,
+            name=name,
+            role=role,
+            relationship_notes=relationship_notes or "",
+            personality=personality or "",
+            goals=goals or [],
+            secrets=secrets or [],
+            faction=faction,
+            visual_tags=visual_tags or [],
+            knowledge_topics=knowledge_topics or {},
+            power_tier=power_tier or "T10",
+            ensemble_archetype=ensemble_archetype,
+            appearance=appearance or {},
+            affinity=0,
+            disposition=0,
+            growth_stage="introduction",
+            intelligence_stage=NPCIntelligenceStage.REACTIVE,
+            scene_count=0,
+            interaction_count=0,
+        )
+        db.add(npc)
+        db.commit()
+        logger.info(f"Created NPC: {name} (role={role}, personality={'yes' if personality else 'no'})")
+        return npc
+
     def get_npc(self, npc_id: int) -> NPC | None:
         """Get an NPC by ID."""
         db = self._get_db()

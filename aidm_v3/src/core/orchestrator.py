@@ -128,6 +128,9 @@ class Orchestrator(TurnPipelineMixin, BackgroundMixin):
         # work completes before the next turn reads state
         self._bg_lock = asyncio.Lock()
 
+        # Meta conversation state (out-of-character dialogue with player)
+        self._in_meta_conversation = False
+
     def close(self):
         """Release resources held by the orchestrator.
 

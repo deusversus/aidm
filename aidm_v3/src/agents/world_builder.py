@@ -9,6 +9,51 @@ from .base import BaseAgent
 
 logger = logging.getLogger(__name__)
 
+class NPCDetails(BaseModel):
+    """Structured NPC data extracted from narrative.
+
+    Used by WorldBuilder to populate NPC fields beyond just name/role.
+    All fields optional — LLM populates what it can infer from context.
+    """
+
+    role: str = Field(
+        default="acquaintance",
+        description="Relationship to player: ally, rival, mentor, enemy, neutral, acquaintance, etc."
+    )
+    personality: str = Field(
+        default="",
+        description="Core personality traits in 1-2 sentences, inferred from dialogue and behavior"
+    )
+    goals: list[str] = Field(
+        default_factory=list,
+        description="Known or implied goals/motivations"
+    )
+    secrets: list[str] = Field(
+        default_factory=list,
+        description="Secrets hinted at in the narrative (hidden allegiances, concealed abilities, etc.)"
+    )
+    faction: str | None = Field(
+        default=None,
+        description="Faction or organization affiliation if mentioned"
+    )
+    visual_tags: list[str] = Field(
+        default_factory=list,
+        description="Visual descriptors for portrait generation: hair color, scars, outfit, build, etc."
+    )
+    knowledge_topics: dict[str, str] = Field(
+        default_factory=dict,
+        description='Topics this NPC knows about: {"topic_name": "expert|moderate|basic"}'
+    )
+    power_tier: str = Field(
+        default="T10",
+        description="Estimated power tier if clear from context (T1=godlike, T10=civilian)"
+    )
+    ensemble_archetype: str | None = Field(
+        default=None,
+        description="Ensemble role: struggler, heart, skeptic, dependent, equal, observer, rival"
+    )
+
+
 class WorldBuildingEntity(BaseModel):
     """A single entity being asserted by the player."""
 
@@ -21,6 +66,10 @@ class WorldBuildingEntity(BaseModel):
     details: dict[str, Any] = Field(
         default_factory=dict,
         description="Additional details about the entity (role, description, properties, etc.)"
+    )
+    npc_details: NPCDetails | None = Field(
+        default=None,
+        description="Structured NPC data — REQUIRED when entity_type is 'npc'. Populate personality, goals, secrets, visual_tags from narrative context."
     )
     implied_backstory: str | None = Field(
         default=None,

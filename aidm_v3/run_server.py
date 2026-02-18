@@ -1,8 +1,8 @@
 
-import subprocess
-import sys
 import os
 import signal
+import subprocess
+import sys
 from pathlib import Path
 
 # Auto-detect and use venv Python
@@ -13,7 +13,7 @@ VENV_PYTHON = SCRIPT_DIR / "venv313" / "Scripts" / "python.exe"
 ALREADY_IN_VENV = Path(sys.executable).resolve() == VENV_PYTHON.resolve()
 
 if VENV_PYTHON.exists() and not ALREADY_IN_VENV:
-    print(f"[run_server] Restarting with venv Python...")
+    print("[run_server] Restarting with venv Python...")
     os.execv(str(VENV_PYTHON), [str(VENV_PYTHON), __file__] + sys.argv[1:])
 
 # Unbuffered output
@@ -31,14 +31,14 @@ def kill_all_python_processes(skip_pids=None):
     print("[run_server] Killing all existing Python processes...")
     current_pid = os.getpid()
     parent_pid = os.getppid()  # Get parent PID to avoid killing our parent
-    
+
     # Build set of PIDs to skip
     protected_pids = {current_pid, parent_pid}
     if skip_pids:
         protected_pids.update(skip_pids)
-    
+
     killed = 0
-    
+
     try:
         # Use tasklist to find all python.exe processes
         result = subprocess.run(
@@ -60,7 +60,7 @@ def kill_all_python_processes(skip_pids=None):
                     pass
     except Exception as e:
         print(f"[run_server] Warning: Could not kill processes: {e}")
-    
+
     if killed > 0:
         print(f"[run_server] Killed {killed} Python process(es)")
     else:
@@ -71,6 +71,7 @@ kill_all_python_processes()
 
 # Small delay to let ports clear
 import time
+
 time.sleep(1)
 
 # Ensure UTF-8 for subprocess stdout
