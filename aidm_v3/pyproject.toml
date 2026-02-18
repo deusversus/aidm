@@ -20,6 +20,10 @@ aidm = "src.main:main"
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+markers = [
+    "live: requires API keys (deselect with '-m not live')",
+    "slow: tests taking >5s (deselect with '-m not slow')",
+]
 
 [tool.setuptools.packages.find]
 where = ["."]
