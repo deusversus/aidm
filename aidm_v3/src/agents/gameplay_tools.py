@@ -119,6 +119,26 @@ def build_gameplay_tools(
         handler=lambda: _list_known_npcs(state)
     ))
 
+    registry.register(ToolDefinition(
+        name="update_npc",
+        description=(
+            "Update an NPC's profile with newly learned information. "
+            "Only non-empty fields are applied; existing data is never overwritten. "
+            "Use after learning new personality traits, goals, secrets, faction ties, "
+            "or visual details about an NPC from the narrative."
+        ),
+        parameters=[
+            ToolParam("name", "str", "NPC name (fuzzy match)", required=True),
+            ToolParam("personality", "str", "Personality description (1-2 sentences)", required=False),
+            ToolParam("goals", "list", "Known goals/motivations", required=False),
+            ToolParam("secrets", "list", "Secrets hinted at in narrative", required=False),
+            ToolParam("faction", "str", "Faction/org affiliation", required=False),
+            ToolParam("visual_tags", "list", "Visual descriptors for portraits", required=False),
+            ToolParam("knowledge_topics", "dict", 'Topics NPC knows: {"topic": "expert|moderate|basic"}', required=False),
+        ],
+        handler=lambda **kwargs: _update_npc(state, **kwargs)
+    ))
+
     # -----------------------------------------------------------------
     # TRANSCRIPT TOOLS
     # -----------------------------------------------------------------
@@ -393,6 +413,19 @@ def _list_known_npcs(state) -> list[dict]:
         })
 
     return result
+
+
+def _update_npc(state, name: str, **kwargs) -> dict:
+    """Update an NPC with new information via upsert."""
+    try:
+        npc = state.upsert_npc(name=name, **kwargs)
+        return {
+            "status": "updated",
+            "name": npc.name,
+            "fields_provided": [k for k, v in kwargs.items() if v],
+        }
+    except Exception as e:
+        return {"error": f"Failed to update NPC '{name}': {e}"}
 
 
 def _search_transcript(transcript: list, query: str) -> list[dict]:

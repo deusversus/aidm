@@ -183,12 +183,15 @@ async def process_turn(request: TurnRequest):
             store.save(session)
             logger.info(f"Session saved with {len(session.messages)} messages")
 
+        # Determine session phase — meta conversation or normal gameplay
+        current_phase = "meta_conversation" if orchestrator._in_meta_conversation else "gameplay"
+
         response = TurnResponse(
             narrative=result.narrative,
             intent=result.intent.model_dump(),
             outcome=result.outcome.model_dump() if result.outcome else {},
             latency_ms=result.latency_ms,
-            session_phase="gameplay",
+            session_phase=current_phase,
             portrait_map=result.portrait_map,
             turn_number=result.turn_number,
             campaign_id=result.campaign_id,

@@ -42,6 +42,35 @@ class TurnPipelineMixin:
             async with self._bg_lock:
                 pass  # Just wait for release
 
+        # =====================================================================
+        # META CONVERSATION: Check if we're in an active meta dialogue
+        # If so, skip intent classification — everything is meta until exit
+        # =====================================================================
+        if self._in_meta_conversation:
+            stripped = player_input.strip().lower()
+            exit_commands = {"/resume", "/play", "/back", "/exit"}
+
+            if stripped in exit_commands:
+                # Exit meta mode
+                self._in_meta_conversation = False
+                logger.info("Exiting meta conversation mode")
+                return TurnResult(
+                    narrative="*The production studio lights dim as the cameras roll again...*\n\n---\n\n*You're back in the story. Any adjustments discussed will take effect going forward.*",
+                    intent=await self.intent_classifier.call(
+                        player_input, current_situation="", character_state="", location=""
+                    ),
+                    outcome=None,
+                    state_changes={},
+                    latency_ms=int((time.time() - start) * 1000),
+                    cost_usd=0.0
+                )
+
+            # Continue the meta conversation
+            return await self._handle_meta_conversation(
+                player_input=player_input,
+                start_time=start,
+            )
+
         # 1. Get current DB context (fast, sync)
         db_context = self.state.get_context()
 
@@ -63,18 +92,20 @@ class TurnPipelineMixin:
         # HANDLE META/OVERRIDE COMMANDS (early exit - skip normal turn flow)
         # =====================================================================
         if intent.intent == "META_FEEDBACK":
-            result = self.override_handler.process_meta(
+            # Enter meta conversation mode — multi-turn dialogue with production studio
+            self._in_meta_conversation = True
+            logger.info("Entering meta conversation mode")
+
+            # Still store the calibration memory (existing behavior)
+            self.override_handler.process_meta(
                 content=intent.action,
                 campaign_id=self.campaign_id,
-                session_number=db_context.session_id  # GameContext has session_id, not session_number
+                session_number=db_context.session_id
             )
-            return TurnResult(
-                narrative=result["message"],
-                intent=intent,
-                outcome=None,
-                state_changes={},
-                latency_ms=int((time.time() - start) * 1000),
-                cost_usd=0.0
+
+            return await self._handle_meta_conversation(
+                player_input=player_input,
+                start_time=start,
             )
 
         if intent.intent == "OVERRIDE_COMMAND":
@@ -957,3 +988,145 @@ class TurnPipelineMixin:
             turn_number=db_context.turn_number,
             campaign_id=self.campaign_id,
         )
+
+    # -----------------------------------------------------------------
+    # META CONVERSATION helpers
+    # -----------------------------------------------------------------
+
+    async def _handle_meta_conversation(
+        self,
+        player_input: str,
+        start_time: float,
+    ) -> "TurnResult":
+        """Run the Director + Key Animator meta-conversation dialectic.
+
+        Called both for the initial /meta trigger and for continuation turns
+        while in meta mode.
+        """
+        from ..agents.intent_classifier import IntentOutput
+        from .turn import TurnResult
+
+        # Build game context for agent awareness
+        game_context = self._build_meta_game_context()
+
+        # Get session for meta conversation history
+        from .session import get_session_manager
+        session_mgr = get_session_manager()
+        # Find the session — iterate since we don't have the ID here
+        meta_history = []
+        session = None
+        for sid, s in session_mgr._sessions.items():
+            if hasattr(s, 'meta_conversation_history'):
+                session = s
+                meta_history = s.meta_conversation_history
+                break
+
+        # --- Director responds first ---
+        director_response = await self.director.respond_to_meta(
+            feedback=player_input,
+            game_context=game_context,
+            conversation_history=meta_history,
+        )
+
+        # --- KA responds with Director's context ---
+        ka_response = await self.key_animator.respond_to_meta(
+            feedback=player_input,
+            game_context=game_context,
+            director_response=director_response,
+            conversation_history=meta_history,
+        )
+
+        # Store in meta conversation history
+        if session:
+            session.meta_conversation_history.append(
+                {"role": "player", "content": player_input}
+            )
+            session.meta_conversation_history.append(
+                {"role": "director", "content": director_response}
+            )
+            session.meta_conversation_history.append(
+                {"role": "key_animator", "content": ka_response}
+            )
+
+        # Format the dialectic response
+        narrative = f"🎬 **Director:**\n{director_response}\n\n🎨 **Key Animator:**\n{ka_response}"
+        narrative += "\n\n---\n*Type `/resume` to return to the story, or continue the conversation.*"
+
+        # Build a minimal intent for the TurnResult
+        meta_intent = IntentOutput(
+            intent="META_FEEDBACK",
+            action=player_input,
+            target=None,
+            declared_epicness=0.0,
+            special_conditions=[],
+        )
+
+        latency = int((time.time() - start_time) * 1000)
+        logger.info(f"Meta conversation turn completed ({latency}ms)")
+
+        return TurnResult(
+            narrative=narrative,
+            intent=meta_intent,
+            outcome=None,
+            state_changes={},
+            latency_ms=latency,
+            cost_usd=0.0,
+        )
+
+    def _build_meta_game_context(self) -> str:
+        """Build a context string summarizing current game state for meta-conversations."""
+        lines = []
+
+        try:
+            db_context = self.state.get_context()
+
+            lines.append(f"**Current Arc:** {db_context.arc_phase or 'Unknown'}")
+            lines.append(f"**Tension Level:** {db_context.tension_level}")
+            lines.append(f"**Location:** {db_context.location}")
+            lines.append(f"**Situation:** {db_context.situation}")
+            lines.append(f"**Turn Number:** {db_context.turn_number}")
+
+            # Character info
+            if db_context.character_name:
+                lines.append(f"**Character:** {db_context.character_name}")
+            if db_context.character_summary:
+                lines.append(f"**Character State:** {db_context.character_summary[:200]}")
+
+            # OP Mode
+            if hasattr(db_context, 'op_mode') and db_context.op_mode:
+                lines.append("\n**OP Mode:** Active")
+                if hasattr(db_context, 'op_preset') and db_context.op_preset:
+                    lines.append(f"**OP Preset:** {db_context.op_preset}")
+
+            # Profile DNA
+            if self.profile and self.profile.dna:
+                dna_items = [f"{k.replace('_', ' ').title()}: {v}/10"
+                             for k, v in list(self.profile.dna.items())[:5]]
+                lines.append(f"\n**Narrative DNA:** {', '.join(dna_items)}")
+
+            # Active overrides
+            try:
+                overrides = self.override_handler.list_overrides(self.campaign_id)
+                if overrides:
+                    active = [o for o in overrides if o.get("active")]
+                    if active:
+                        override_strs = [f"{o['category']}: {o['description']}" for o in active[:3]]
+                        lines.append(f"\n**Active Overrides:** {'; '.join(override_strs)}")
+            except Exception:
+                pass
+
+            # Director notes (from campaign bible)
+            try:
+                bible = self.state.get_campaign_bible()
+                if bible and bible.planning_data:
+                    notes = bible.planning_data.get("director_notes", "")
+                    if notes:
+                        lines.append(f"\n**Director Notes:** {str(notes)[:300]}")
+            except Exception:
+                pass
+
+        except Exception as e:
+            logger.error(f"Failed to build meta game context: {e}")
+            lines.append("(Game context unavailable)")
+
+        return "\n".join(lines)

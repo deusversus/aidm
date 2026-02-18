@@ -7,8 +7,9 @@ Usage:
     python lore_cli.py <profile_id> <type> # Show pages of a specific type
     python lore_cli.py --search <term>     # Search page content
 """
-import sys
 import os
+import sys
+
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from src.scrapers.lore_store import get_lore_store

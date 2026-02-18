@@ -31,6 +31,7 @@ class SessionPhase(Enum):
 
     # Post-Session Zero
     GAMEPLAY = "gameplay"                     # Normal gameplay loop
+    META_CONVERSATION = "meta_conversation"   # Out-of-character dialogue with DM
 
 
 # Phase progression order
@@ -288,9 +289,13 @@ class Session:
     # Phase-specific state (for multi-turn phases)
     phase_state: dict[str, Any] = field(default_factory=dict)
 
+    # Meta conversation history (ephemeral out-of-character dialogue)
+    # Each entry: {"role": "player"|"director"|"key_animator", "content": str}
+    meta_conversation_history: list[dict[str, str]] = field(default_factory=list)
+
     def is_session_zero(self) -> bool:
         """Check if we're still in Session Zero."""
-        return self.phase != SessionPhase.GAMEPLAY
+        return self.phase not in (SessionPhase.GAMEPLAY, SessionPhase.META_CONVERSATION)
 
     def advance_phase(self) -> bool:
         """

@@ -554,7 +554,8 @@ class BackgroundMixin:
                 mode="extract_only"
             )
             for entity in dm_entities.entities:
-                if entity.is_new:
+                # Apply new entities + enrich existing NPCs
+                if entity.is_new or entity.entity_type == "npc":
                     await self._apply_world_building_entity(entity, turn_number)
             if dm_entities.entities:
                 logger.info(f"Extracted {len(dm_entities.entities)} entities from narrative")
@@ -673,16 +674,37 @@ class BackgroundMixin:
         """
 
         if entity.entity_type == "npc":
-            # Create NPC in database
+            # Extract structured NPC data (prefer npc_details, fall back to details dict)
+            npc_data = entity.npc_details
+            details = entity.details or {}
+
+            role = (npc_data.role if npc_data else details.get("role")) or "acquaintance"
+            personality = (npc_data.personality if npc_data else details.get("personality")) or None
+            goals = (npc_data.goals if npc_data else details.get("goals")) or None
+            secrets = (npc_data.secrets if npc_data else details.get("secrets")) or None
+            faction = (npc_data.faction if npc_data else details.get("faction")) or None
+            visual_tags = (npc_data.visual_tags if npc_data else details.get("visual_tags")) or None
+            knowledge_topics = (npc_data.knowledge_topics if npc_data else details.get("knowledge_topics")) or None
+            power_tier = (npc_data.power_tier if npc_data else details.get("power_tier")) or None
+            ensemble_archetype = (npc_data.ensemble_archetype if npc_data else details.get("ensemble_archetype")) or None
+
+            # Create or enrich NPC via upsert
             try:
-                self.state.create_npc(
+                self.state.upsert_npc(
                     name=entity.name,
-                    role=entity.details.get("role", "acquaintance"),
-                    relationship_notes=entity.implied_backstory
+                    role=role,
+                    relationship_notes=entity.implied_backstory,
+                    personality=personality,
+                    goals=goals,
+                    secrets=secrets,
+                    faction=faction,
+                    visual_tags=visual_tags,
+                    knowledge_topics=knowledge_topics,
+                    power_tier=power_tier,
+                    ensemble_archetype=ensemble_archetype,
                 )
-                logger.info(f"Created NPC: {entity.name}")
             except Exception as e:
-                logger.error(f"Failed to create NPC {entity.name}: {e}")
+                logger.error(f"Failed to upsert NPC {entity.name}: {e}")
 
             # Index to memory
             self.memory.add_memory(

@@ -71,4 +71,24 @@ For each entity, provide:
 - implied_backstory: Any history implied
 - is_new: True if creating, False if referencing existing
 
+### NPC Extraction (IMPORTANT)
+
+For **every NPC entity** (entity_type = "npc"), you MUST also populate `npc_details`:
+
+- **role**: Relationship to player (ally, rival, mentor, enemy, neutral, acquaintance)
+- **personality**: Infer from dialogue tone, behavior, and descriptions. Even 1 sentence helps.
+  - "speaks gruffly but steps in front of the attack" → "Gruff exterior, protective instinct"
+- **goals**: What does this NPC want? Infer from stated intentions or context.
+- **secrets**: Hidden allegiances, concealed abilities, narrative subtext suggesting deception.
+  - "she smiles, though her eyes flicker to the guild emblem" → ["May have ties to the guild"]
+- **faction**: Organization, guild, clan, or group the NPC belongs to if mentioned.
+- **visual_tags**: Physical descriptors useful for portrait generation.
+  - Extract: hair color, scars, distinctive outfit, build, notable features.
+  - "a tall woman with silver hair and a scar across her left eye" → ["tall", "silver hair", "scar across left eye"]
+- **power_tier**: Estimate if combat ability is shown or implied (default T10).
+- **ensemble_archetype**: For recurring NPCs, their ensemble role (heart, struggler, skeptic, rival, observer, etc.)
+
+**Always populate npc_details for NPCs** — even partial data (just personality + visual_tags) is far better than nothing.
+For existing/referenced NPCs (is_new=false), still provide npc_details with any NEW information learned this turn.
+
 If rejecting/clarifying, provide a natural in-character response, not a robotic error.

@@ -6,6 +6,7 @@ trajectories, foreshadowing status, and spotlight balance before making
 arc decisions.
 """
 
+import logging
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -14,6 +15,8 @@ from ..db.models import CampaignBible, Session, WorldState
 from ..llm.tools import ToolRegistry
 from ..profiles.loader import NarrativeProfile
 from .base import AgenticAgent
+
+logger = logging.getLogger(__name__)
 
 
 class DirectorOutput(BaseModel):
@@ -566,3 +569,81 @@ Provide a CONCISE investigation report structured as:
         lines.append("Update the Bible accordingly.")
 
         return "\n".join(lines)
+
+    # -----------------------------------------------------------------
+    # META CONVERSATION — out-of-character dialogue with the player
+    # -----------------------------------------------------------------
+
+    META_SYSTEM_PROMPT = """You are the Director (showrunner) of an anime production studio.
+
+The player is speaking to you OUT OF CHARACTER about how the game is being run.
+This is a meta-conversation — they want to talk to the DM, not act in the story.
+
+Your job:
+- Explain your reasoning for narrative decisions (arc pacing, power calibration, NPC choices)
+- Acknowledge the player's concerns genuinely — don't be defensive
+- If they make a good point, say so and propose specific adjustments
+- If you disagree, explain why from a storytelling perspective
+- Be conversational and warm, like a good DM talking to their player between sessions
+
+Keep responses concise (3-5 sentences). You're a collaborator, not a lecture hall.
+Do NOT write narrative prose or in-character dialogue. This is out-of-character talk."""
+
+    async def respond_to_meta(
+        self,
+        feedback: str,
+        game_context: str,
+        conversation_history: list[dict[str, str]] | None = None,
+    ) -> str:
+        """Respond to player meta-conversation as the Director (showrunner).
+
+        Args:
+            feedback: The player's out-of-character message
+            game_context: Formatted string with current game state
+            conversation_history: Previous meta conversation turns
+
+        Returns:
+            Free-form conversational response
+        """
+        from ..llm.manager import get_llm_manager
+
+        messages = []
+
+        # Include conversation history for multi-turn meta dialogue
+        if conversation_history:
+            for entry in conversation_history:
+                role = entry.get("role", "user")
+                content = entry.get("content", "")
+                if role == "player":
+                    messages.append({"role": "user", "content": content})
+                elif role == "director":
+                    messages.append({"role": "assistant", "content": content})
+                # Skip KA entries — they appear separately
+
+        # Current player message with context
+        user_message = f"""## Current Game State
+{game_context}
+
+## Player's Message (Out-of-Character)
+{feedback}"""
+
+        messages.append({"role": "user", "content": user_message})
+
+        try:
+            manager = get_llm_manager()
+            provider = manager.get_provider()
+            model = manager.get_fast_model()  # Use fast model for meta dialogue
+
+            response = await provider.complete(
+                messages=messages,
+                system=self.META_SYSTEM_PROMPT,
+                model=model,
+                max_tokens=1024,
+                temperature=0.7,
+            )
+
+            return response.content.strip()
+
+        except Exception as e:
+            logger.error(f"[director] Meta conversation failed: {e}")
+            return "I hear you — let me think about that. (The Director encountered an issue processing this meta-conversation.)"
