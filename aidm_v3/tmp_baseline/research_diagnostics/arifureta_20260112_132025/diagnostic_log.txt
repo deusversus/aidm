@@ -1,0 +1,97 @@
+[2026-01-12 13:20:25.502479] Starting diagnostic for: Arifureta
+
+==================================================
+STAGE 1: FULL RESEARCH (via research_anime)
+==================================================
+Provider: google, Model: gemini-3-flash-preview
+Starting research_anime for 'Arifureta'...
+
+Research complete!
+Title: Arifureta: From Common
+Alternate titles: ['Arifureta Shokugyō de Sekai Saikyō', 'ありふれた職業で世界最強', 'Arifureta', "Arifureta: From Commonplace to World's Strongest"]
+Confidence: 95
+Research method: bundled_parallel
+Research passes: 7
+Supplemental searches: []
+Sources consulted: 11
+Raw content length: 34654 chars
+
+DNA Scales (11 keys):
+  introspection_vs_action: 8
+  comedy_vs_drama: 5
+  simple_vs_complex: 4
+  power_fantasy_vs_struggle: 2
+  explained_vs_mysterious: 2
+  fast_paced_vs_slow_burn: 3
+  episodic_vs_serialized: 9
+  grounded_vs_absurd: 8
+  tactical_vs_instinctive: 4
+  hopeful_vs_cynical: 7
+  ensemble_vs_solo: 4
+
+Power System:
+  name: Mana & Magic...
+  mechanics: A system where mana is channeled through magic circles and triggered by chants. It is quantified via...
+  limitations: Magic is restricted by elemental affinity and mana capacity, with overuse leading to Mana Exhaustion...
+  tiers: ['Tier 0 (Divine)', 'Tier 1 (World-Class)', 'Tier 2 (Hero-Class)', 'Tier 3 (Elite)', 'Modern Magic',...
+
+Combat style: spectacle
+
+Tone: {'comedy_level': 6, 'darkness_level': 7, 'optimism': 6}
+
+Raw content saved (34654 chars)
+
+==================================================
+STAGE 2: CORRUPTION DETECTION (Heuristics)
+==================================================
+Content length: 34654 chars
+Has corruption: False
+Corruption type: None
+Repetition score: 0.004
+✅ No corruption detected by heuristics
+
+==================================================
+STAGE 3: LLM VALIDATION
+==================================================
+Running LLM validation...
+
+Validation Results:
+  Is valid: False
+  Complete: False
+  Confidence: 95
+  Has power system: True
+  Has narrative info: True
+  Has combat style: True
+  Has world setting: True
+  Issues: ["The document is truncated at the end of the 'Locations' section.", "Missing explicit explanation of the 'Status' system (levels, stats) which is a core mechanic of the world's power system."]
+  Recommended supplemental: ['Status plate and RPG leveling mechanics', 'Details on the Seven Great Labyrinths', 'The Holy Church of Heiligh and its political influence']
+
+==================================================
+STAGE 4: PROFILE GENERATION
+==================================================
+
+Generated Profile:
+  ID: arifureta_from_common
+  Name: Arifureta: From Common
+  Confidence: 95
+  Combat system: spectacle
+  DNA scales: {'introspection_vs_action': 8, 'comedy_vs_drama': 5, 'simple_vs_complex': 4, 'power_fantasy_vs_struggle': 2, 'explained_vs_mysterious': 2, 'fast_paced_vs_slow_burn': 3, 'episodic_vs_serialized': 9, 'grounded_vs_absurd': 8, 'tactical_vs_instinctive': 4, 'hopeful_vs_cynical': 7, 'ensemble_vs_solo': 4}
+  Aliases: ['Arifureta Shokugyō de Sekai Saikyō', 'arifureta', 'arifureta from common', 'arifureta from commonplace to worlds strongest', 'arifuretafromcommon']...
+
+✅ Profile generated successfully
+
+==================================================
+DIAGNOSTIC SUMMARY
+==================================================
+
+📊 Results for: Arifureta
+  Title resolved: Arifureta: From Common
+  Raw content: 34654 chars
+  Confidence: 95%
+  Corruption: No
+  Validation: FAIL or SKIPPED
+
+✅ No obvious issues found
+
+📁 All files saved to: research_diagnostics\arifureta_20260112_132025
+[2026-01-12 13:21:42.116325] Diagnostic complete

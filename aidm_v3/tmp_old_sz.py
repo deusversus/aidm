@@ -1,4 +1,4 @@
-"""
+﻿"""
 Session Zero Agent for AIDM v3.
 
 Guides players through the character creation process using the
@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 if TYPE_CHECKING:
     pass
 
-# Re-export research functions for backward compatibility —
+# Re-export research functions for backward compatibility ΓÇö
 # downstream code imports everything from session_zero.
 from ._session_zero_research import (  # noqa: F401
     ensure_hybrid_prerequisites,
@@ -66,7 +66,7 @@ class SessionZeroAgent(BaseAgent):
 
     def __init__(self, model_override: str | None = None):
         super().__init__(model_override=model_override)
-        self._prompt_path = Path(__file__).parent.parent.parent / "prompts" / "session_zero.md"
+        self._prompt_path = Path(__file__).parent.parent / "prompts" / "session_zero.md"
 
     @property
     def system_prompt(self) -> str:
@@ -94,37 +94,34 @@ class SessionZeroAgent(BaseAgent):
             SessionZeroOutput with response and any detected info
         """
         context = self._build_context(session, player_input)
-        result = await self.call(context)
+        result = await self.run(context)
         return result
 
     def _build_context(self, session: Session, player_input: str) -> str:
         """Build the context string to send to the LLM."""
-        # Format character draft as readable summary
+        parts = [
+            f"## Current Phase: {session.current_phase.value}",
+            f"## Turn: {session.turn_count}",
+        ]
+
+        # Include character draft if any info detected
         draft = session.character_draft
-        draft_summary = self._format_draft(draft)
-        
-        # Format recent messages (last 10)
-        recent_messages = session.messages[-10:] if session.messages else []
-        messages_str = "\n".join([
-            f"[{m['role'].upper()}]: {m['content']}" 
-            for m in recent_messages
-        ])
-        
-        # Current player input
-        context = f"""## Current Phase: {session.phase.value}
+        if draft.name or draft.concept or draft.media_reference:
+            parts.append(f"\n## Character Draft So Far:\n{self._format_draft(draft)}")
 
-## Character Draft So Far:
-{draft_summary}
+        # Include profile context if loaded
+        profile_context = get_profile_context_for_agent(session)
+        if profile_context != "(No profile loaded yet)":
+            parts.append(f"\n{profile_context}")
 
-## Recent Conversation:
-{messages_str}
+        # Include available phase state
+        if session.phase_state:
+            parts.append(f"\n## Phase State:\n{session.phase_state}")
 
-## Player's Current Input:
-{player_input}
+        # Player input
+        parts.append(f"\n## Player Input:\n{player_input}")
 
-Based on the phase-specific instructions in the system prompt, generate an appropriate response.
-"""
-        return context
+        return "\n".join(parts)
 
     def _format_draft(self, draft) -> str:
         """Format the character draft as a readable summary."""
@@ -153,26 +150,19 @@ Based on the phase-specific instructions in the system prompt, generate an appro
             lines.append(f"- Power Tier: {draft.power_tier}")
         return "\n".join(lines) if lines else "(empty)"
 
+    #
+    #     Generate the opening message for a new Session Zero.
+    #     This is called when a session first starts.
+    #
     async def get_opening_message(self, session: Session) -> str:
-        """
-        Generate the opening message for a new Session Zero.
-        This is called when a session first starts.
-        """
-        # For the first message, we don't have player input yet
-        # Just generate the Phase 0 opening
-        context = f"""## Current Phase: {session.phase.value}
-
-## Character Draft So Far:
-(No information collected yet)
-
-## Recent Conversation:
-(This is the start of the conversation)
-
-## Instructions:
-Generate the OPENING message for Session Zero - Phase 0 (Media Detection).
-Welcome the player warmly and ask if they have an anime/manga reference in mind.
-"""
-        result = await self.call(context)
+        """Generate the opening message for a new Session Zero."""
+        context = (
+            f"## Session Start\n"
+            f"Phase: {session.current_phase.value}\n"
+            f"Generate your opening greeting and begin the character creation process.\n"
+            f"Ask about the player's anime/manga inspiration."
+        )
+        result = await self.run(context)
         return result.response
 
 
@@ -285,7 +275,7 @@ async def process_session_zero_state(
             flags=["plot_critical", "session_zero"]
         )
         stats["memories_added"] += 1
-        logger.info(f"[SessionZero→State] Indexed character name: {detected_info['name']}")
+        logger.info(f"[SessionZeroΓåÆState] Indexed character name: {detected_info['name']}")
 
     if "concept" in detected_info:
         memory.add_memory(
@@ -295,7 +285,7 @@ async def process_session_zero_state(
             flags=["plot_critical", "session_zero"]
         )
         stats["memories_added"] += 1
-        logger.info("[SessionZero→State] Indexed character concept")
+        logger.info("[SessionZeroΓåÆState] Indexed character concept")
 
     if "backstory" in detected_info:
         memory.add_memory(
@@ -305,7 +295,7 @@ async def process_session_zero_state(
             flags=["plot_critical", "session_zero"]
         )
         stats["memories_added"] += 1
-        logger.info("[SessionZero→State] Indexed character backstory")
+        logger.info("[SessionZeroΓåÆState] Indexed character backstory")
 
     # === ABILITIES/POWERS ===
 
@@ -328,7 +318,7 @@ async def process_session_zero_state(
                 flags=["plot_critical", "session_zero"]
             )
             stats["memories_added"] += 1
-        logger.info("[SessionZero→State] Indexed abilities")
+        logger.info("[SessionZeroΓåÆState] Indexed abilities")
 
     # === PERSONALITY ===
 
@@ -364,7 +354,7 @@ async def process_session_zero_state(
             if campaign_id is not None:
                 state = StateManager(campaign_id)
             else:
-                logger.warning("[SessionZero→State] No campaign_id provided, skipping NPC DB creation")
+                logger.warning("[SessionZeroΓåÆState] No campaign_id provided, skipping NPC DB creation")
                 state = None
 
             for npc in npcs:
@@ -387,9 +377,9 @@ async def process_session_zero_state(
                                 appearance=npc_appearance,
                                 visual_tags=npc_visual_tags,
                             )
-                            logger.info(f"[SessionZero→State] Created NPC in DB: {npc_name} (visual_tags={npc_visual_tags})")
+                            logger.info(f"[SessionZeroΓåÆState] Created NPC in DB: {npc_name} (visual_tags={npc_visual_tags})")
                         except Exception as e:
-                            logger.error(f"[SessionZero→State] NPC DB creation failed: {e}")
+                            logger.error(f"[SessionZeroΓåÆState] NPC DB creation failed: {e}")
 
                     # 2. Create NPC memory in ChromaDB
                     memory.add_memory(
@@ -410,13 +400,13 @@ async def process_session_zero_state(
                                 ),
                                 name=f"npc_portrait_{npc_name}",
                             )
-                            logger.info(f"[SessionZero→Media] Queued portrait gen for NPC: {npc_name}")
+                            logger.info(f"[SessionZeroΓåÆMedia] Queued portrait gen for NPC: {npc_name}")
                         except Exception as media_err:
-                            logger.error(f"[SessionZero→Media] Portrait queue failed (non-fatal): {media_err}")
+                            logger.error(f"[SessionZeroΓåÆMedia] Portrait queue failed (non-fatal): {media_err}")
 
                     stats["memories_added"] += 1
                     stats["npcs_created"] += 1
-                    logger.info(f"[SessionZero→State] Created NPC: {npc_name} ({role})")
+                    logger.info(f"[SessionZeroΓåÆState] Created NPC: {npc_name} ({role})")
 
     # === CANONICALITY CHOICES ===
 
@@ -429,7 +419,7 @@ async def process_session_zero_state(
             flags=["plot_critical", "session_zero"]
         )
         stats["memories_added"] += 1
-        logger.info(f"[SessionZero→State] Timeline mode: {mode}")
+        logger.info(f"[SessionZeroΓåÆState] Timeline mode: {mode}")
 
     if "canon_cast_mode" in detected_info:
         mode = detected_info["canon_cast_mode"]
@@ -440,7 +430,7 @@ async def process_session_zero_state(
             flags=["plot_critical", "session_zero"]
         )
         stats["memories_added"] += 1
-        logger.info(f"[SessionZero→State] Canon cast mode: {mode}")
+        logger.info(f"[SessionZeroΓåÆState] Canon cast mode: {mode}")
 
     if "event_fidelity" in detected_info:
         mode = detected_info["event_fidelity"]
@@ -451,7 +441,7 @@ async def process_session_zero_state(
             flags=["plot_critical", "session_zero"]
         )
         stats["memories_added"] += 1
-        logger.info(f"[SessionZero→State] Event fidelity: {mode}")
+        logger.info(f"[SessionZeroΓåÆState] Event fidelity: {mode}")
 
     # === OP MODE ===
 
@@ -466,7 +456,7 @@ async def process_session_zero_state(
                 flags=["plot_critical", "session_zero"]
             )
             stats["memories_added"] += 1
-            logger.info(f"[SessionZero→State] OP Mode enabled: {preset}")
+            logger.info(f"[SessionZeroΓåÆState] OP Mode enabled: {preset}")
 
     # === WORLD INTEGRATION ===
 
@@ -479,18 +469,18 @@ async def process_session_zero_state(
             flags=["session_zero"]
         )
         stats["memories_added"] += 1
-        logger.info(f"[SessionZero→State] Starting location: {location}")
+        logger.info(f"[SessionZeroΓåÆState] Starting location: {location}")
 
     memory.close()
 
     if stats["memories_added"] > 0 or stats["npcs_created"] > 0:
-        logger.info(f"[SessionZero→State] Turn processed: {stats['memories_added']} memories, {stats['npcs_created']} NPCs")
+        logger.info(f"[SessionZeroΓåÆState] Turn processed: {stats['memories_added']} memories, {stats['npcs_created']} NPCs")
 
     return stats
 
 
 # ============================================================================
-# SESSION ZERO → MEMORY INDEXING
+# SESSION ZERO ΓåÆ MEMORY INDEXING
 # ============================================================================
 
 
@@ -517,7 +507,7 @@ async def index_session_zero_to_memory(session: Session) -> int:
     # Use session_id for memory isolation (not profile_id)
     session_id = session.session_id
 
-    logger.info(f"[SessionZero→Memory] Indexing character creation to memory for session: {session_id}")
+    logger.info(f"[SessionZeroΓåÆMemory] Indexing character creation to memory for session: {session_id}")
 
     # Create memory store for this session
     memory = MemoryStore(campaign_id=session_id)
@@ -525,7 +515,7 @@ async def index_session_zero_to_memory(session: Session) -> int:
     # Get all Session Zero messages
     messages = session.messages
     if not messages:
-        logger.info("[SessionZero→Memory] No messages to index")
+        logger.info("[SessionZeroΓåÆMemory] No messages to index")
         return 0
 
     # Chunk into logical segments
@@ -536,14 +526,14 @@ async def index_session_zero_to_memory(session: Session) -> int:
         # Classify for metadata enrichment (core/relationship/fact)
         category = _classify_chunk(chunk)
 
-        # ALL Session Zero content is sacred — never decay.
+        # ALL Session Zero content is sacred ΓÇö never decay.
         # Session Zero is the campaign's DNA: character identity, GM voice,
         # tonal rapport, creative intent. Every exchange matters.
         flags = ["plot_critical", "session_zero"]
 
         memory.add_memory(
             content=chunk["content"],
-            memory_type="session_zero",  # Consistent type → CATEGORY_DECAY["session_zero"] = "none"
+            memory_type="session_zero",  # Consistent type ΓåÆ CATEGORY_DECAY["session_zero"] = "none"
             turn_number=0,  # Pre-gameplay turn
             metadata={
                 "source": "session_zero",
@@ -555,7 +545,7 @@ async def index_session_zero_to_memory(session: Session) -> int:
         )
         indexed += 1
 
-    logger.info(f"[SessionZero→Memory] Indexed {indexed} chunks ({memory.count()} total memories)")
+    logger.info(f"[SessionZeroΓåÆMemory] Indexed {indexed} chunks ({memory.count()} total memories)")
     memory.close()
     return indexed
 
@@ -626,7 +616,7 @@ def _classify_chunk(chunk: dict[str, Any]) -> str:
     """
     content = chunk.get("content", "").lower()
 
-    # Character identity keywords → "core" (no decay)
+    # Character identity keywords ΓåÆ "core" (no decay)
     core_keywords = [
         "backstory", "name", "concept", "ability", "power", "appearance",
         "personality", "trait", "archetype", "origin", "identity",
@@ -636,7 +626,7 @@ def _classify_chunk(chunk: dict[str, Any]) -> str:
     if any(kw in content for kw in core_keywords):
         return "core"
 
-    # Relationship keywords → "relationship" (slow decay)
+    # Relationship keywords ΓåÆ "relationship" (slow decay)
     relationship_keywords = [
         "handler", "mentor", "friend", "trust", "partner", "ally",
         "companion", "teacher", "relationship", "bond", "assigned to"
@@ -656,7 +646,7 @@ async def _generate_session_zero_npc_portrait(
 ) -> None:
     """Fire-and-forget: generate an NPC portrait during Session Zero.
     
-    Non-blocking — called via asyncio.create_task so it doesn't slow
+    Non-blocking ΓÇö called via asyncio.create_task so it doesn't slow
     down the Session Zero response. Results are persisted to the NPC
     record so the portrait resolver can find them during gameplay.
     """
@@ -669,7 +659,7 @@ async def _generate_session_zero_npc_portrait(
         from ..media.generator import MediaGenerator
         settings = get_settings_store().load()
         if not settings.media_enabled:
-            logger.warning(f"[SessionZero→Media] Media disabled, skipping portrait for {npc_name}")
+            logger.warning(f"[SessionZeroΓåÆMedia] Media disabled, skipping portrait for {npc_name}")
             return
 
         # Get style context from profile
@@ -696,11 +686,11 @@ async def _generate_session_zero_npc_portrait(
             if npc:
                 if result.get("portrait"):
                     npc.portrait_url = f"/api/game/media/{campaign_id}/{result['portrait'].name}"
-                    logger.info(f"[SessionZero→Media] Portrait saved for {npc_name}: {npc.portrait_url}")
+                    logger.info(f"[SessionZeroΓåÆMedia] Portrait saved for {npc_name}: {npc.portrait_url}")
                 if result.get("model_sheet"):
                     npc.model_sheet_url = f"/api/game/media/{campaign_id}/{result['model_sheet'].name}"
                 db.commit()
             db.close()
 
     except Exception as e:
-        logger.error(f"[SessionZero→Media] NPC portrait gen failed for {npc_name}: {e}")
+        logger.error(f"[SessionZeroΓåÆMedia] NPC portrait gen failed for {npc_name}: {e}")

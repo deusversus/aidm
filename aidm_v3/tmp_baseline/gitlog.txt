@@ -1,0 +1,30 @@
+﻿b283651 docs: mark #5 and #7 as DONE in PLAN.md
+680e97b feat(#18): Previously On recap system - RecapAgent, session-start recap from arc_history + narrative beats
+1fcfe42 feat(#5): Working memory expansion - WINDOW_SIZE 20, pinned messages, deep recall tool already wired
+1678267 fix(#7): Gentler relationship decay (0.97), milestone heat floor (40), stronger boost (+30)
+bc99b8e feat(#3): Arc pacing gates with turns_in_phase tracking + strength-tiered directives
+8ee7c90 feat(#2): Versioned Campaign Bible with arc_history + bible_version
+af2c47f feat(#1): Pre-turn Director micro-check via PacingAgent
+d26a54a feat(#9,#12): Wire foreshadowing into turn loop + overdue tension escalation
+d476401 docs: mark #21 as DONE (9c861a8)
+9c861a8 refactor(#21): Extract inline prompts to external .md files
+42e069a fix(#22): Clean agent naming in settings  remove dead, add missing (#22)
+d322d0a docs: Mark completed items in PLAN.md (#4, #6, #10, #19, #29, #30)
+4067b33 feat(#10): Persist ForeshadowingLedger to DB  write-through cache
+d61c3c6 chore(#19): Delete dead agents CalibrationAgent + NPCReactionAgent
+48cbb6a feat: Implement Phase 1 first work unit (#4 + #6 + #29 + #30)
+31ae37b docs: Remove all deferrals from PLAN.md - every item ships fully when its phase arrives
+36e99a2 docs: Annotate PLAN.md with engineer review - status badges, Top 5 priorities, 4 new items (#27-30)
+1bb5121 Merge pull request #1 from deusversus/claude/explain-codebase-mlipwjqyanhigm4n-poD7k
+87df632 feat: State Transactional Integrity - deferred_commit + StateTransaction for atomic per-turn state updates
+b86194d Add comprehensive gap analysis and remediation plan
+32ba3f7 fix: update 6 stale test fixtures in test_core_loop.py
+b029775 feat: narrative diversity system (style drift, vocab freshness, sakuga variants)
+7243d09 feat: RAG & tool enhancements - hybrid search, lore tool, faction tools, compaction fix
+addb47c feat: post-narrative fire-and-forget background processing
+cb31348 feat: prompt caching - cache-aware system prompts for Anthropic/Google/OpenAI providers and KeyAnimator block reordering
+77e3ef4 feat: Anthropic Programmatic Tool Calling + agentic agent refactors
+0f4031d Agentic Evolution: tool infra, provider support, agent refactoring (Modules 0-5)
+b9313a6 Backup 2026-02-10: add analysis scripts and transcripts
+d155b16 Module 04: Full NPC & Faction integration - fix silent bugs, wire RelationshipAnalyzer, NPC context cards for KeyAnimator, backfill migration
+de6542b fix: Session Zero memory indexing - all transcript chunks now plot_critical
