@@ -66,7 +66,7 @@ class SessionZeroAgent(BaseAgent):
 
     def __init__(self, model_override: str | None = None):
         super().__init__(model_override=model_override)
-        self._prompt_path = Path(__file__).parent.parent / "prompts" / "session_zero.md"
+        self._prompt_path = Path(__file__).parent.parent.parent / "prompts" / "session_zero.md"
 
     @property
     def system_prompt(self) -> str:
@@ -94,13 +94,13 @@ class SessionZeroAgent(BaseAgent):
             SessionZeroOutput with response and any detected info
         """
         context = self._build_context(session, player_input)
-        result = await self.run(context)
+        result = await self.call(context)
         return result
 
     def _build_context(self, session: Session, player_input: str) -> str:
         """Build the context string to send to the LLM."""
         parts = [
-            f"## Current Phase: {session.current_phase.value}",
+            f"## Current Phase: {session.phase.value}",
             f"## Turn: {session.turn_count}",
         ]
 
@@ -158,11 +158,11 @@ class SessionZeroAgent(BaseAgent):
         """Generate the opening message for a new Session Zero."""
         context = (
             f"## Session Start\n"
-            f"Phase: {session.current_phase.value}\n"
+            f"Phase: {session.phase.value}\n"
             f"Generate your opening greeting and begin the character creation process.\n"
             f"Ask about the player's anime/manga inspiration."
         )
-        result = await self.run(context)
+        result = await self.call(context)
         return result.response
 
 
