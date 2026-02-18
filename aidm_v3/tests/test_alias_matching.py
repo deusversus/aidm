@@ -1,10 +1,11 @@
 """Test alias matching fixes."""
-import sys
 import os
+import sys
+
 sys.path.append(os.getcwd())
 
-from src.profiles.loader import find_profile_by_title, reload_alias_index
 from src.agents.profile_generator import load_existing_profile
+from src.profiles.loader import find_profile_by_title, reload_alias_index
 
 # Force rebuild alias index
 print("Rebuilding alias index...")
@@ -103,7 +104,7 @@ print(f"  Test 8 (Dragon Ball Z):        {'PASS' if test8_pass else 'FAIL'}")
 print(f"  Test 9 (Re:Zero self):         {'PASS' if test9_pass else 'FAIL'}")
 print(f"  Test 10 (Zero alone):          {'PASS' if test10_pass else 'FAIL'}")
 
-all_pass = all([test1_pass, test2_pass, test3_pass, test4_pass, test5_pass, 
+all_pass = all([test1_pass, test2_pass, test3_pass, test4_pass, test5_pass,
                 test6_pass, test7_pass, test8_pass, test9_pass, test10_pass])
 print("\n" + ("ALL TESTS PASSED!" if all_pass else "SOME TESTS FAILED!"))
 

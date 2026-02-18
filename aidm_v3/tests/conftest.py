@@ -9,11 +9,11 @@ Provides:
 """
 
 import os
-import pytest
 from collections import deque
-from unittest.mock import MagicMock, AsyncMock, patch
-from typing import Any, Dict, List, Optional, Type
-from dataclasses import dataclass, field
+from typing import Any
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 # Set test environment BEFORE any src imports
 os.environ.setdefault("DATABASE_URL", "sqlite:///:memory:")
@@ -21,14 +21,12 @@ os.environ.setdefault("ANTHROPIC_API_KEY", "test-key")
 
 from pydantic import BaseModel
 
-from src.llm.provider import LLMProvider, LLMResponse
-from src.llm.tools import ToolRegistry, ToolDefinition, ToolParam
-from src.db.session import init_db, get_engine
-from src.db.state_manager import StateManager, GameContext
-from src.db.models import Base
 from src.agents.intent_classifier import IntentOutput
 from src.agents.outcome_judge import OutcomeOutput
-
+from src.db.models import Base
+from src.db.session import get_engine, init_db
+from src.db.state_manager import StateManager
+from src.llm.provider import LLMProvider, LLMResponse
 
 # ---------------------------------------------------------------------------
 # MockLLMProvider — deterministic stub
@@ -48,7 +46,7 @@ class MockLLMProvider(LLMProvider):
         super().__init__(api_key="mock-key", default_model="mock-model")
         self._response_queue: deque[LLMResponse] = deque()
         self._schema_queue: deque[BaseModel] = deque()
-        self._call_history: List[Dict[str, Any]] = []
+        self._call_history: list[dict[str, Any]] = []
 
     # --- Queue helpers ---
 
@@ -63,7 +61,7 @@ class MockLLMProvider(LLMProvider):
         self._schema_queue.append(instance)
 
     @property
-    def call_history(self) -> List[Dict[str, Any]]:
+    def call_history(self) -> list[dict[str, Any]]:
         return self._call_history
 
     # --- LLMProvider interface ---

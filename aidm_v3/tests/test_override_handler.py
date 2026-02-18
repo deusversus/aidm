@@ -4,13 +4,12 @@ Covers pattern detection, target extraction, DB operations,
 and context formatting — all with mocked DB and MemoryStore.
 """
 
+from unittest.mock import MagicMock
+
 import pytest
-from unittest.mock import MagicMock, patch
-from datetime import datetime
 
 # We test the pure-logic methods without needing a real DB session
 from src.agents.override_handler import OverrideHandler
-
 
 # ---------------------------------------------------------------------------
 # Fixtures

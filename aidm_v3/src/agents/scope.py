@@ -7,9 +7,9 @@ to determine how much research depth is needed.
 Uses MICRO/STANDARD/COMPLEX/EPIC classification to scale research queries.
 """
 
-from typing import List, Type
-from pydantic import BaseModel, Field
 import logging
+
+from pydantic import BaseModel, Field
 
 from .base import BaseAgent
 
@@ -18,21 +18,21 @@ logger = logging.getLogger(__name__)
 
 class ScopeOutput(BaseModel):
     """Output from scope classification."""
-    
+
     # Required field - no default forces Google to populate it
     scope: str = Field(
         ...,  # Ellipsis makes this explicitly required
         description="Series complexity: MICRO, STANDARD, COMPLEX, or EPIC"
     )
-    topics: List[str] = Field(
+    topics: list[str] = Field(
         default_factory=list,
         description="Flat list of all topics (for backward compatibility)"
     )
-    bundles: List[List[str]] = Field(
+    bundles: list[list[str]] = Field(
         default_factory=list,
         description="Topic bundles for parallel research+extraction"
     )
-    media_variants: List[str] = Field(
+    media_variants: list[str] = Field(
         default_factory=list,
         description="Known media variants (manga, anime, movie, spinoff, etc.)"
     )
@@ -40,7 +40,7 @@ class ScopeOutput(BaseModel):
         default=False,
         description="Whether series has sequels or spinoffs"
     )
-    known_series_entries: List[str] = Field(
+    known_series_entries: list[str] = Field(
         default_factory=list,
         description="All known entries in this franchise (e.g., ['Naruto', 'Naruto Shippuden', 'Boruto'])"
     )
@@ -180,21 +180,21 @@ class ScopeAgent(BaseAgent):
     
     Uses a fast model for quick classification before deeper research.
     """
-    
+
     agent_name = "scope"  # Defaults to base_fast in settings
-    
+
     def __init__(self):
         super().__init__()
         self._system_prompt = SCOPE_PROMPT
-    
+
     @property
     def system_prompt(self) -> str:
         return self._system_prompt
-    
+
     @property
-    def output_schema(self) -> Type[BaseModel]:
+    def output_schema(self) -> type[BaseModel]:
         return ScopeOutput
-    
+
     async def classify(self, anime_name: str) -> ScopeOutput:
         """
         Classify the scope of an anime/manga series.
@@ -208,11 +208,11 @@ class ScopeAgent(BaseAgent):
         from ..llm import get_llm_manager
         manager = get_llm_manager()
         provider, model = manager.get_provider_for_agent(self.agent_name)
-        
+
         logger.info(f"Classifying scope of '{anime_name}'...")
-        
+
         query = SCOPE_QUERY.format(anime_name=anime_name)
-        
+
         try:
             result = await provider.complete_with_schema(
                 messages=[{"role": "user", "content": query}],
@@ -221,14 +221,14 @@ class ScopeAgent(BaseAgent):
                 model=model,
                 max_tokens=1024
             )
-            
+
             # Assign topics and bundles based on scope
             result.bundles = self._get_bundles_for_scope(result.scope, result)
             result.topics = [topic for bundle in result.bundles for topic in bundle]
-            
+
             logger.info(f"Classified as {result.scope} with {len(result.bundles)} bundles ({len(result.topics)} topics)")
             return result
-            
+
         except Exception as e:
             logger.error(f"ERROR: {e}, defaulting to STANDARD")
             return ScopeOutput(
@@ -237,10 +237,10 @@ class ScopeAgent(BaseAgent):
                 topics=ALL_TOPICS.copy(),
                 reasoning=f"Classification failed: {e}"
             )
-    
-    def _get_bundles_for_scope(self, scope: str, result: ScopeOutput) -> List[List[str]]:
+
+    def _get_bundles_for_scope(self, scope: str, result: ScopeOutput) -> list[list[str]]:
         """Get the appropriate topic bundles for a given scope."""
-        
+
         if scope == "MICRO":
             bundles = [b.copy() for b in MICRO_BUNDLES]
         elif scope == "STANDARD":
@@ -251,10 +251,10 @@ class ScopeAgent(BaseAgent):
             bundles = [b.copy() for b in EPIC_BUNDLES]
         else:
             bundles = [b.copy() for b in STANDARD_BUNDLES]
-        
+
         return bundles
-    
-    def _get_topics_for_scope(self, scope: str, result: ScopeOutput) -> List[str]:
+
+    def _get_topics_for_scope(self, scope: str, result: ScopeOutput) -> list[str]:
         """Get flat topic list for backward compatibility."""
         bundles = self._get_bundles_for_scope(scope, result)
         return [topic for bundle in bundles for topic in bundle]

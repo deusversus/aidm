@@ -1,6 +1,8 @@
 """Quick test of profile generation for Arifureta."""
 import asyncio
+
 from src.agents.profile_generator import generate_and_save_profile
+
 
 async def main():
     print("Testing profile generation for Arifureta...")

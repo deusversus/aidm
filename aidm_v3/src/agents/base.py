@@ -1,14 +1,14 @@
 """Base agent class for all AIDM agents."""
 
+import logging
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any, Type, Optional, Tuple
+from typing import Any
+
 from pydantic import BaseModel
 
-from ..llm import get_llm_manager, LLMProvider
+from ..llm import LLMProvider, get_llm_manager
 from ..settings import get_settings_store
-
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -23,18 +23,18 @@ class BaseAgent(ABC):
     which supports Google Gemini, Anthropic Claude, and OpenAI.
     Uses per-agent settings from the settings store.
     """
-    
+
     # Subclasses should set this to their agent name
     agent_name: str = "unknown"
-    
-    def __init__(self, model_override: Optional[str] = None):
+
+    def __init__(self, model_override: str | None = None):
         """Initialize the agent.
         
         Args:
             model_override: Specific model to use (overrides settings)
         """
         self._model_override = model_override
-    
+
     @staticmethod
     def _load_prompt_file(filename: str, fallback: str = "") -> str:
         """Load a system prompt from prompts/{filename}.
@@ -47,45 +47,45 @@ class BaseAgent(ABC):
         if path.exists():
             return path.read_text(encoding="utf-8").strip()
         return fallback
-    
-    def _get_provider_and_model(self) -> Tuple[LLMProvider, str]:
+
+    def _get_provider_and_model(self) -> tuple[LLMProvider, str]:
         """Get the provider and model for this agent from settings.
         
         Always gets fresh from LLMManager - no per-agent caching.
         LLMManager handles caching at the global level.
         """
         manager = get_llm_manager()
-        
+
         if self._model_override:
             return manager.get_provider(), self._model_override
-        
+
         return manager.get_provider_for_agent(self.agent_name)
-    
+
     @property
     def provider(self) -> LLMProvider:
         """Get the LLM provider for this agent."""
         provider, _ = self._get_provider_and_model()
         return provider
-    
+
     @property
     def model(self) -> str:
         """Get the model to use for this agent."""
         _, model = self._get_provider_and_model()
         return model
-    
+
     @property
     @abstractmethod
     def system_prompt(self) -> str:
         """The system prompt for this agent."""
         pass
-    
+
     @property
     @abstractmethod
-    def output_schema(self) -> Type[BaseModel]:
+    def output_schema(self) -> type[BaseModel]:
         """Pydantic model for structured output."""
         pass
-    
-    async def call(self, user_message: str, system_prompt_override: Optional[str] = None, **context) -> BaseModel:
+
+    async def call(self, user_message: str, system_prompt_override: str | None = None, **context) -> BaseModel:
         """Make a structured API call.
         
         Args:
@@ -98,10 +98,10 @@ class BaseAgent(ABC):
         """
         # Build context into user message
         full_message = self._build_message(user_message, context)
-        
+
         # Use provider for structured completion
         messages = [{"role": "user", "content": full_message}]
-        
+
         # Determine extended thinking status
         settings = get_settings_store().load()
         use_extended_thinking = False
@@ -117,13 +117,13 @@ class BaseAgent(ABC):
             ]
             if self.agent_name in EXTENDED_THINKING_AGENTS:
                 use_extended_thinking = True
-        
+
         # Use override if provided, otherwise use default
         system = system_prompt_override if system_prompt_override is not None else self.system_prompt
-        
+
         # Increase token limit for thinking models
         max_tokens = 16384 if use_extended_thinking else 8192
-        
+
         result = await self.provider.complete_with_schema(
             messages=messages,
             schema=self.output_schema,
@@ -133,11 +133,11 @@ class BaseAgent(ABC):
             extended_thinking=use_extended_thinking
         )
         return result
-    
+
     def call_sync(self, user_message: str, **context) -> BaseModel:
         """Synchronous version of call (for non-async contexts)."""
         import asyncio
-        
+
         # Check if we're already in an async context
         try:
             loop = asyncio.get_running_loop()
@@ -149,19 +149,19 @@ class BaseAgent(ABC):
         except RuntimeError:
             # No running loop, we can use asyncio.run directly
             return asyncio.run(self.call(user_message, **context))
-    
+
     def _build_message(self, user_message: str, context: dict) -> str:
         """Format message with context sections."""
         parts = []
-        
+
         for key, value in context.items():
             if value:
                 # Convert key to title case with spaces
                 title = key.replace('_', ' ').title()
                 parts.append(f"## {title}\n{value}")
-        
+
         parts.append(f"## Player Action\n{user_message}")
-        
+
         return "\n\n".join(parts)
 
 
@@ -183,16 +183,16 @@ class AgenticAgent(BaseAgent):
     can iteratively search, investigate, and gather information before
     producing its final response.
     """
-    
-    def __init__(self, model_override: Optional[str] = None):
+
+    def __init__(self, model_override: str | None = None):
         super().__init__(model_override=model_override)
-        self._tools: Optional[Any] = None
-    
+        self._tools: Any | None = None
+
     def set_tools(self, tools) -> 'AgenticAgent':
         """Set the ToolRegistry for this agent. Returns self for chaining."""
         self._tools = tools
         return self
-    
+
     def get_tools(self):
         """Return the ToolRegistry for this agent.
         
@@ -200,7 +200,7 @@ class AgenticAgent(BaseAgent):
         Returns None if no tools are available (falls back to standard call).
         """
         return self._tools
-    
+
     async def research_with_tools(
         self,
         research_prompt: str,
@@ -230,16 +230,16 @@ class AgenticAgent(BaseAgent):
             Research findings as text, or empty string on failure
         """
         from ..llm.tools import ToolRegistry
-        
+
         tools = self.get_tools()
         if not tools or not isinstance(tools, ToolRegistry):
             return ""
-        
+
         try:
             manager = get_llm_manager()
             fast_provider = manager.fast_provider
             fast_model = manager.get_fast_model()
-            
+
             response = await fast_provider.complete_with_tools(
                 messages=[{"role": "user", "content": research_prompt}],
                 tools=tools,
@@ -248,7 +248,7 @@ class AgenticAgent(BaseAgent):
                 max_tokens=max_tokens,
                 max_tool_rounds=max_tool_rounds,
             )
-            
+
             findings = response.content.strip()
             if findings:
                 call_log = tools.call_log
@@ -258,16 +258,16 @@ class AgenticAgent(BaseAgent):
                     f"({', '.join(tool_names)}), {len(findings)} chars"
                 )
                 return findings
-                
+
         except Exception as e:
             logger.error(f"[{self.agent_name}] Research phase failed (non-fatal): {e}")
-        
+
         return ""
-    
+
     async def call_with_tools(
         self,
         user_message: str,
-        system_prompt_override: Optional[str] = None,
+        system_prompt_override: str | None = None,
         max_tool_rounds: int = 5,
         **context
     ) -> str:
@@ -290,7 +290,7 @@ class AgenticAgent(BaseAgent):
             Final text response after tool-calling loop completes
         """
         from ..llm.tools import ToolRegistry
-        
+
         tools = self.get_tools()
         if not tools or not isinstance(tools, ToolRegistry):
             # No tools — fall back to standard text completion
@@ -304,14 +304,14 @@ class AgenticAgent(BaseAgent):
                 max_tokens=4096,
             )
             return response.content
-        
+
         # Build context into user message
         full_message = self._build_message(user_message, context)
         messages = [{"role": "user", "content": full_message}]
-        
+
         # Use override if provided, otherwise use default
         system = system_prompt_override if system_prompt_override is not None else self.system_prompt
-        
+
         response = await self.provider.complete_with_tools(
             messages=messages,
             tools=tools,
@@ -320,6 +320,6 @@ class AgenticAgent(BaseAgent):
             max_tokens=4096,
             max_tool_rounds=max_tool_rounds,
         )
-        
+
         return response.content
 

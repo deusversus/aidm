@@ -5,23 +5,24 @@ have the expected members, and are JSON-serializable.
 """
 
 import json
+
 import pytest
 
 from src.enums import (
-    IntentType,
-    SuccessLevel,
-    NarrativeWeight,
-    ConsequenceCategory,
     ArcPhase,
+    ConsequenceCategory,
+    IntentType,
+    MemoryCategory,
+    NarrativeWeight,
+    NPCIntelligenceStage,
+    OPArchetype,
+    OPNarrativeFocus,
+    OPPowerExpression,
+    OPTensionSource,
     PacingBeat,
     PacingStrength,
-    OPArchetype,
-    OPTensionSource,
-    OPPowerExpression,
-    OPNarrativeFocus,
     StoryScale,
-    NPCIntelligenceStage,
-    MemoryCategory,
+    SuccessLevel,
 )
 
 

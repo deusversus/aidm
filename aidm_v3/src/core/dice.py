@@ -1,8 +1,9 @@
 """Dice engine for random number generation."""
 
 import random
-from typing import Tuple, List, Optional, Dict, Any, Literal
 from enum import Enum
+from typing import Any
+
 from pydantic import BaseModel
 
 
@@ -19,7 +20,7 @@ class CriticalEffect(BaseModel):
     is_critical_hit: bool = False
     is_critical_miss: bool = False
     damage_multiplier: float = 1.0
-    bonus_effect: Optional[str] = None
+    bonus_effect: str | None = None
     narrative_hint: str = ""
 
 
@@ -29,11 +30,11 @@ class RollResult(BaseModel):
     modifier: int = 0
     total: int
     roll_type: str = "normal"
-    threshold: Optional[int] = None
+    threshold: int | None = None
     success: bool = True
     degree: str = "success"  # critical_success, major_success, success, partial_failure, failure, critical_failure
     critical: CriticalEffect = CriticalEffect()
-    all_rolls: List[int] = []  # For advantage/disadvantage, shows both rolls
+    all_rolls: list[int] = []  # For advantage/disadvantage, shows both rolls
 
 
 def roll_d20() -> int:
@@ -41,7 +42,7 @@ def roll_d20() -> int:
     return random.randint(1, 20)
 
 
-def roll_dice(sides: int, count: int = 1) -> List[int]:
+def roll_dice(sides: int, count: int = 1) -> list[int]:
     """Roll multiple dice.
     
     Args:
@@ -54,7 +55,7 @@ def roll_dice(sides: int, count: int = 1) -> List[int]:
     return [random.randint(1, sides) for _ in range(count)]
 
 
-def roll_with_advantage(roll_type: RollType = RollType.NORMAL) -> Tuple[int, List[int]]:
+def roll_with_advantage(roll_type: RollType = RollType.NORMAL) -> tuple[int, list[int]]:
     """Roll d20 with advantage or disadvantage.
     
     Args:
@@ -66,17 +67,17 @@ def roll_with_advantage(roll_type: RollType = RollType.NORMAL) -> Tuple[int, Lis
     if roll_type == RollType.NORMAL:
         roll = roll_d20()
         return roll, [roll]
-    
+
     # Roll 2d20
     rolls = [roll_d20(), roll_d20()]
-    
+
     if roll_type == RollType.ADVANTAGE:
         return max(rolls), rolls
     else:  # DISADVANTAGE
         return min(rolls), rolls
 
 
-def roll_with_modifier(sides: int, modifier: int = 0) -> Tuple[int, int]:
+def roll_with_modifier(sides: int, modifier: int = 0) -> tuple[int, int]:
     """Roll a die with a modifier.
     
     Args:
@@ -93,7 +94,7 @@ def roll_with_modifier(sides: int, modifier: int = 0) -> Tuple[int, int]:
 def get_critical_effect(
     raw_roll: int,
     is_attack: bool = False,
-    profile_criticals: Optional[Dict[str, Any]] = None
+    profile_criticals: dict[str, Any] | None = None
 ) -> CriticalEffect:
     """Determine critical hit/miss effects.
     
@@ -106,14 +107,14 @@ def get_critical_effect(
         CriticalEffect with multipliers and narrative hints
     """
     effect = CriticalEffect()
-    
+
     # Natural 20 - Critical Hit
     if raw_roll == 20:
         effect.is_critical = True
         effect.is_critical_hit = True
         effect.damage_multiplier = 2.0
         effect.narrative_hint = "A perfect strike!"
-        
+
         # Profile-specific critical bonuses
         if profile_criticals:
             if profile_criticals.get("sakuga_on_crit"):
@@ -121,14 +122,14 @@ def get_critical_effect(
                 effect.narrative_hint = "A SAKUGA MOMENT! Time slows as the perfect attack lands!"
             if profile_criticals.get("crit_multiplier"):
                 effect.damage_multiplier = profile_criticals["crit_multiplier"]
-    
+
     # Natural 1 - Critical Miss
     elif raw_roll == 1:
         effect.is_critical = True
         effect.is_critical_miss = True
         effect.damage_multiplier = 0.0  # Miss deals no damage
         effect.narrative_hint = "A catastrophic failure!"
-        
+
         # Profile-specific failure effects
         if profile_criticals:
             if profile_criticals.get("comedy_failures"):
@@ -137,11 +138,11 @@ def get_critical_effect(
             elif profile_criticals.get("dark_failures"):
                 effect.bonus_effect = "consequence"
                 effect.narrative_hint = "The failure has dire consequences..."
-    
+
     return effect
 
 
-def check_threshold(roll: int, threshold: int) -> Tuple[bool, str]:
+def check_threshold(roll: int, threshold: int) -> tuple[bool, str]:
     """Check if a roll meets a threshold.
     
     Args:
@@ -152,7 +153,7 @@ def check_threshold(roll: int, threshold: int) -> Tuple[bool, str]:
         Tuple of (success, description)
     """
     diff = roll - threshold
-    
+
     if roll == 20:
         return True, "critical_success"
     elif roll == 1:
@@ -172,7 +173,7 @@ def roll_check(
     modifier: int = 0,
     roll_type: RollType = RollType.NORMAL,
     is_attack: bool = False,
-    profile_criticals: Optional[Dict[str, Any]] = None
+    profile_criticals: dict[str, Any] | None = None
 ) -> RollResult:
     """Perform a complete roll check with all enhancements.
     
@@ -189,13 +190,13 @@ def roll_check(
     # Roll with advantage/disadvantage
     raw_roll, all_rolls = roll_with_advantage(roll_type)
     total = raw_roll + modifier
-    
+
     # Check threshold
     success, degree = check_threshold(raw_roll, threshold)
-    
+
     # Get critical effect
     critical = get_critical_effect(raw_roll, is_attack, profile_criticals)
-    
+
     return RollResult(
         raw_roll=raw_roll,
         modifier=modifier,
@@ -209,7 +210,7 @@ def roll_check(
     )
 
 
-def get_profile_modifiers(profile: Any, action_type: str) -> Dict[str, Any]:
+def get_profile_modifiers(profile: Any, action_type: str) -> dict[str, Any]:
     """Get profile-specific roll modifiers.
     
     Args:
@@ -219,22 +220,22 @@ def get_profile_modifiers(profile: Any, action_type: str) -> Dict[str, Any]:
     Returns:
         Dict with modifier, advantage, and critical rules
     """
-    modifiers: Dict[str, Any] = {
+    modifiers: dict[str, Any] = {
         "modifier": 0,
         "roll_type": RollType.NORMAL,
         "criticals": {}
     }
-    
+
     if not profile:
         return modifiers
-    
+
     # Check profile tropes for special rules
     tropes = getattr(profile, 'tropes', {}) or {}
-    
+
     # Power fantasy profiles give bonuses
     dna = getattr(profile, 'dna_scales', {}) or getattr(profile, 'dna', {}) or {}
     power_fantasy = dna.get("power_fantasy_vs_struggle", 5)
-    
+
     if power_fantasy >= 8:
         # Power fantasy: easier rolls
         modifiers["modifier"] = 2
@@ -244,17 +245,17 @@ def get_profile_modifiers(profile: Any, action_type: str) -> Dict[str, Any]:
         # Struggle profile: harder, more consequences
         modifiers["modifier"] = -1
         modifiers["criticals"]["dark_failures"] = True
-    
+
     # Comedy profiles get comedy failures
     comedy = dna.get("comedy_vs_drama", 5)
     if comedy >= 7:
         modifiers["criticals"]["comedy_failures"] = True
-    
+
     # Tactical profiles get advantage on planned actions
     tactical = dna.get("tactical_vs_instinctive", 5)
     if tactical >= 8 and action_type in ["attack", "skill"]:
         modifiers["roll_type"] = RollType.ADVANTAGE
-    
+
     return modifiers
 
 

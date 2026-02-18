@@ -7,41 +7,39 @@ multi-phase protocol from V2's 06_session_zero.md.
 Profile research functions are split into _session_zero_research.py.
 """
 
-from dataclasses import dataclass, asdict
-from typing import Optional, Dict, Any, Type, List
+import logging
 from pathlib import Path
+from typing import TYPE_CHECKING, Any
+
 from pydantic import BaseModel, Field
 
+from ..core.session import Session
 from .base import BaseAgent
-from ..core.session import Session, SessionPhase
-from typing import TYPE_CHECKING
-
-import logging
 
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
-    from .progress import ProgressTracker
+    pass
 
 # Re-export research functions for backward compatibility —
 # downstream code imports everything from session_zero.
-from ._session_zero_research import (          # noqa: F401
-    get_disambiguation_options,
-    research_and_apply_profile,
-    get_profile_context_for_agent,
+from ._session_zero_research import (  # noqa: F401
+    ensure_hybrid_prerequisites,
     generate_custom_profile,
+    get_disambiguation_options,
+    get_profile_context_for_agent,
+    research_and_apply_profile,
     research_hybrid_profile,
     research_hybrid_profile_cached,
-    ensure_hybrid_prerequisites,
 )
 
 
 class SessionZeroOutput(BaseModel):
     """Structured output from the Session Zero agent."""
     response: str = Field(description="The narrative response to show the player")
-    
+
     # Goal-oriented fields
-    missing_requirements: List[str] = Field(
+    missing_requirements: list[str] = Field(
         default_factory=list,
         description="Hard requirements still needed: 'media_reference', 'name', 'concept'"
     )
@@ -49,11 +47,11 @@ class SessionZeroOutput(BaseModel):
         default=False,
         description="True when all hard requirements met AND player confirmed"
     )
-    
+
     # Existing fields (phase_complete deprecated, use ready_for_gameplay)
-    detected_info: Dict[str, Any] = Field(default_factory=dict, description="Character data extracted from player input")
+    detected_info: dict[str, Any] = Field(default_factory=dict, description="Character data extracted from player input")
     phase_complete: bool = Field(default=False, description="DEPRECATED: Use ready_for_gameplay instead")
-    suggested_next_phase: Optional[str] = Field(default=None, description="Phase to skip to if player requests")
+    suggested_next_phase: str | None = Field(default=None, description="Phase to skip to if player requests")
 
 
 class SessionZeroAgent(BaseAgent):
@@ -63,26 +61,26 @@ class SessionZeroAgent(BaseAgent):
     Takes the current session state and player input,
     returns a response and any detected character information.
     """
-    
+
     agent_name = "session_zero"
-    
-    def __init__(self, model_override: Optional[str] = None):
+
+    def __init__(self, model_override: str | None = None):
         super().__init__(model_override=model_override)
         self._prompt_path = Path(__file__).parent.parent / "prompts" / "session_zero.md"
-    
+
     @property
     def system_prompt(self) -> str:
         """The system prompt for this agent."""
         return self._prompt_path.read_text(encoding="utf-8")
-    
+
     @property
-    def output_schema(self) -> Type[BaseModel]:
+    def output_schema(self) -> type[BaseModel]:
         """Pydantic model for structured output."""
         return SessionZeroOutput
 
     async def process_turn(
-        self, 
-        session: Session, 
+        self,
+        session: Session,
         player_input: str
     ) -> SessionZeroOutput:
         """
@@ -98,33 +96,33 @@ class SessionZeroAgent(BaseAgent):
         context = self._build_context(session, player_input)
         result = await self.run(context)
         return result
-    
+
     def _build_context(self, session: Session, player_input: str) -> str:
         """Build the context string to send to the LLM."""
         parts = [
             f"## Current Phase: {session.current_phase.value}",
             f"## Turn: {session.turn_count}",
         ]
-        
+
         # Include character draft if any info detected
         draft = session.character_draft
         if draft.name or draft.concept or draft.media_reference:
             parts.append(f"\n## Character Draft So Far:\n{self._format_draft(draft)}")
-        
+
         # Include profile context if loaded
         profile_context = get_profile_context_for_agent(session)
         if profile_context != "(No profile loaded yet)":
             parts.append(f"\n{profile_context}")
-        
+
         # Include available phase state
         if session.phase_state:
             parts.append(f"\n## Phase State:\n{session.phase_state}")
-        
+
         # Player input
         parts.append(f"\n## Player Input:\n{player_input}")
-        
+
         return "\n".join(parts)
-    
+
     def _format_draft(self, draft) -> str:
         """Format the character draft as a readable summary."""
         lines = []
@@ -151,11 +149,11 @@ class SessionZeroAgent(BaseAgent):
         if draft.power_tier:
             lines.append(f"- Power Tier: {draft.power_tier}")
         return "\n".join(lines) if lines else "(empty)"
-    
-    # 
+
+    #
     #     Generate the opening message for a new Session Zero.
     #     This is called when a session first starts.
-    #     
+    #
     async def get_opening_message(self, session: Session) -> str:
         """Generate the opening message for a new Session Zero."""
         context = (
@@ -168,14 +166,14 @@ class SessionZeroAgent(BaseAgent):
         return result.response
 
 
-def apply_detected_info(session: Session, detected: Dict[str, Any]) -> None:
+def apply_detected_info(session: Session, detected: dict[str, Any]) -> None:
     """
     Apply detected information from the agent's response to the character draft.
     
     This maps field names from the agent's output to the CharacterDraft.
     """
     draft = session.character_draft
-    
+
     # Map common field names
     field_mapping = {
         "media_reference": "media_reference",
@@ -208,12 +206,12 @@ def apply_detected_info(session: Session, detected: Dict[str, Any]) -> None:
         # Power Tier
         "power_tier": "power_tier",
     }
-    
+
     for key, value in detected.items():
         if key in field_mapping:
             target_field = field_mapping[key]
             setattr(draft, target_field, value)
-        
+
         # Handle nested fields
         elif key == "appearance" and isinstance(value, dict):
             draft.appearance.update(value)
@@ -235,10 +233,10 @@ def apply_detected_info(session: Session, detected: Dict[str, Any]) -> None:
 
 async def process_session_zero_state(
     session: Session,
-    detected_info: Dict[str, Any],
+    detected_info: dict[str, Any],
     session_id: str,
     campaign_id: int = None
-) -> Dict[str, int]:
+) -> dict[str, int]:
     """
     Process Session Zero detected_info using the same systems as gameplay.
     
@@ -257,18 +255,18 @@ async def process_session_zero_state(
     """
     from ..context.memory import MemoryStore
     from ..db.state_manager import StateManager
-    
+
     stats = {"memories_added": 0, "npcs_created": 0}
-    
+
     # Skip if no detected_info
     if not detected_info:
         return stats
-    
+
     # Initialize stores - use session_id for memory isolation
     memory = MemoryStore(campaign_id=session_id)
-    
+
     # === CHARACTER IDENTITY MEMORIES ===
-    
+
     if "name" in detected_info:
         memory.add_memory(
             content=f"Character name: {detected_info['name']}",
@@ -278,7 +276,7 @@ async def process_session_zero_state(
         )
         stats["memories_added"] += 1
         logger.info(f"[SessionZero→State] Indexed character name: {detected_info['name']}")
-    
+
     if "concept" in detected_info:
         memory.add_memory(
             content=f"Character concept: {detected_info['concept']}",
@@ -287,8 +285,8 @@ async def process_session_zero_state(
             flags=["plot_critical", "session_zero"]
         )
         stats["memories_added"] += 1
-        logger.info(f"[SessionZero→State] Indexed character concept")
-    
+        logger.info("[SessionZero→State] Indexed character concept")
+
     if "backstory" in detected_info:
         memory.add_memory(
             content=f"Character backstory: {detected_info['backstory']}",
@@ -297,10 +295,10 @@ async def process_session_zero_state(
             flags=["plot_critical", "session_zero"]
         )
         stats["memories_added"] += 1
-        logger.info(f"[SessionZero→State] Indexed character backstory")
-    
+        logger.info("[SessionZero→State] Indexed character backstory")
+
     # === ABILITIES/POWERS ===
-    
+
     if "abilities" in detected_info:
         abilities = detected_info["abilities"]
         if isinstance(abilities, list):
@@ -320,10 +318,10 @@ async def process_session_zero_state(
                 flags=["plot_critical", "session_zero"]
             )
             stats["memories_added"] += 1
-        logger.info(f"[SessionZero→State] Indexed abilities")
-    
+        logger.info("[SessionZero→State] Indexed abilities")
+
     # === PERSONALITY ===
-    
+
     if "personality" in detected_info:
         memory.add_memory(
             content=f"Character personality: {detected_info['personality']}",
@@ -332,7 +330,7 @@ async def process_session_zero_state(
             flags=["plot_critical", "session_zero"]
         )
         stats["memories_added"] += 1
-    
+
     if "traits" in detected_info:
         traits = detected_info["traits"]
         if isinstance(traits, list):
@@ -346,9 +344,9 @@ async def process_session_zero_state(
             flags=["plot_critical", "session_zero"]
         )
         stats["memories_added"] += 1
-    
+
     # === NPC CREATION ===
-    
+
     if "npcs" in detected_info:
         npcs = detected_info["npcs"]
         if isinstance(npcs, list):
@@ -358,7 +356,7 @@ async def process_session_zero_state(
             else:
                 logger.warning("[SessionZero→State] No campaign_id provided, skipping NPC DB creation")
                 state = None
-            
+
             for npc in npcs:
                 if isinstance(npc, dict) and "name" in npc:
                     # Create relationship memory
@@ -368,7 +366,7 @@ async def process_session_zero_state(
                     background = npc.get("background", "")
                     npc_appearance = npc.get("appearance", {})
                     npc_visual_tags = npc.get("visual_tags", [])
-                    
+
                     # 1. Create NPC in SQLite database (if StateManager available)
                     if state is not None:
                         try:
@@ -382,7 +380,7 @@ async def process_session_zero_state(
                             logger.info(f"[SessionZero→State] Created NPC in DB: {npc_name} (visual_tags={npc_visual_tags})")
                         except Exception as e:
                             logger.error(f"[SessionZero→State] NPC DB creation failed: {e}")
-                    
+
                     # 2. Create NPC memory in ChromaDB
                     memory.add_memory(
                         content=f"NPC: {npc_name} - Role: {role}, Disposition: {disposition}. {background}",
@@ -391,7 +389,7 @@ async def process_session_zero_state(
                         metadata={"npc_name": npc_name, "role": role},
                         flags=["session_zero"]
                     )
-                    
+
                     # 3. Fire-and-forget: generate NPC portrait (if campaign exists and appearance known)
                     if campaign_id and (npc_appearance or npc_visual_tags):
                         try:
@@ -405,13 +403,13 @@ async def process_session_zero_state(
                             logger.info(f"[SessionZero→Media] Queued portrait gen for NPC: {npc_name}")
                         except Exception as media_err:
                             logger.error(f"[SessionZero→Media] Portrait queue failed (non-fatal): {media_err}")
-                    
+
                     stats["memories_added"] += 1
                     stats["npcs_created"] += 1
                     logger.info(f"[SessionZero→State] Created NPC: {npc_name} ({role})")
-    
+
     # === CANONICALITY CHOICES ===
-    
+
     if "timeline_mode" in detected_info:
         mode = detected_info["timeline_mode"]
         memory.add_memory(
@@ -422,7 +420,7 @@ async def process_session_zero_state(
         )
         stats["memories_added"] += 1
         logger.info(f"[SessionZero→State] Timeline mode: {mode}")
-    
+
     if "canon_cast_mode" in detected_info:
         mode = detected_info["canon_cast_mode"]
         memory.add_memory(
@@ -433,7 +431,7 @@ async def process_session_zero_state(
         )
         stats["memories_added"] += 1
         logger.info(f"[SessionZero→State] Canon cast mode: {mode}")
-    
+
     if "event_fidelity" in detected_info:
         mode = detected_info["event_fidelity"]
         memory.add_memory(
@@ -444,9 +442,9 @@ async def process_session_zero_state(
         )
         stats["memories_added"] += 1
         logger.info(f"[SessionZero→State] Event fidelity: {mode}")
-    
+
     # === OP MODE ===
-    
+
     if "op_mode" in detected_info or "op_protagonist" in detected_info:
         op_enabled = detected_info.get("op_mode") or detected_info.get("op_protagonist")
         if op_enabled:
@@ -459,9 +457,9 @@ async def process_session_zero_state(
             )
             stats["memories_added"] += 1
             logger.info(f"[SessionZero→State] OP Mode enabled: {preset}")
-    
+
     # === WORLD INTEGRATION ===
-    
+
     if "starting_location" in detected_info:
         location = detected_info["starting_location"]
         memory.add_memory(
@@ -472,12 +470,12 @@ async def process_session_zero_state(
         )
         stats["memories_added"] += 1
         logger.info(f"[SessionZero→State] Starting location: {location}")
-    
+
     memory.close()
-    
+
     if stats["memories_added"] > 0 or stats["npcs_created"] > 0:
         logger.info(f"[SessionZero→State] Turn processed: {stats['memories_added']} memories, {stats['npcs_created']} NPCs")
-    
+
     return stats
 
 
@@ -505,34 +503,34 @@ async def index_session_zero_to_memory(session: Session) -> int:
         Number of memory chunks indexed
     """
     from ..context.memory import MemoryStore
-    
+
     # Use session_id for memory isolation (not profile_id)
     session_id = session.session_id
-    
+
     logger.info(f"[SessionZero→Memory] Indexing character creation to memory for session: {session_id}")
-    
+
     # Create memory store for this session
     memory = MemoryStore(campaign_id=session_id)
-    
+
     # Get all Session Zero messages
     messages = session.messages
     if not messages:
         logger.info("[SessionZero→Memory] No messages to index")
         return 0
-    
+
     # Chunk into logical segments
     chunks = _chunk_session_zero_messages(messages)
-    
+
     indexed = 0
     for chunk in chunks:
         # Classify for metadata enrichment (core/relationship/fact)
         category = _classify_chunk(chunk)
-        
+
         # ALL Session Zero content is sacred — never decay.
         # Session Zero is the campaign's DNA: character identity, GM voice,
         # tonal rapport, creative intent. Every exchange matters.
         flags = ["plot_critical", "session_zero"]
-        
+
         memory.add_memory(
             content=chunk["content"],
             memory_type="session_zero",  # Consistent type → CATEGORY_DECAY["session_zero"] = "none"
@@ -546,13 +544,13 @@ async def index_session_zero_to_memory(session: Session) -> int:
             flags=flags
         )
         indexed += 1
-    
+
     logger.info(f"[SessionZero→Memory] Indexed {indexed} chunks ({memory.count()} total memories)")
     memory.close()
     return indexed
 
 
-def _chunk_session_zero_messages(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def _chunk_session_zero_messages(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """
     Chunk Session Zero messages into logical segments for memory indexing.
     
@@ -567,19 +565,19 @@ def _chunk_session_zero_messages(messages: List[Dict[str, Any]]) -> List[Dict[st
     chunks = []
     current_chunk_messages = []
     chunk_index = 0
-    
+
     MESSAGES_PER_CHUNK = 10  # ~5 exchanges (user + assistant)
-    
+
     for msg in messages:
         role = msg.get("role", "user").upper()
         content = msg.get("content", "")
-        
+
         # Skip empty messages
         if not content.strip():
             continue
-            
+
         current_chunk_messages.append(f"[{role}]: {content}")
-        
+
         # Chunk when we hit the limit
         if len(current_chunk_messages) >= MESSAGES_PER_CHUNK:
             chunks.append({
@@ -589,7 +587,7 @@ def _chunk_session_zero_messages(messages: List[Dict[str, Any]]) -> List[Dict[st
             })
             current_chunk_messages = []
             chunk_index += 1
-    
+
     # Don't forget the remainder
     if current_chunk_messages:
         chunks.append({
@@ -597,11 +595,11 @@ def _chunk_session_zero_messages(messages: List[Dict[str, Any]]) -> List[Dict[st
             "index": chunk_index,
             "message_count": len(current_chunk_messages)
         })
-    
+
     return chunks
 
 
-def _classify_chunk(chunk: Dict[str, Any]) -> str:
+def _classify_chunk(chunk: dict[str, Any]) -> str:
     """
     Classify a chunk into a memory category based on content.
     
@@ -617,7 +615,7 @@ def _classify_chunk(chunk: Dict[str, Any]) -> str:
         Memory category string
     """
     content = chunk.get("content", "").lower()
-    
+
     # Character identity keywords → "core" (no decay)
     core_keywords = [
         "backstory", "name", "concept", "ability", "power", "appearance",
@@ -627,7 +625,7 @@ def _classify_chunk(chunk: Dict[str, Any]) -> str:
     ]
     if any(kw in content for kw in core_keywords):
         return "core"
-    
+
     # Relationship keywords → "relationship" (slow decay)
     relationship_keywords = [
         "handler", "mentor", "friend", "trust", "partner", "ally",
@@ -635,7 +633,7 @@ def _classify_chunk(chunk: Dict[str, Any]) -> str:
     ]
     if any(kw in content for kw in relationship_keywords):
         return "relationship"
-    
+
     # Default to "fact" (slow decay) for world-building decisions
     return "fact"
 
@@ -653,20 +651,20 @@ async def _generate_session_zero_npc_portrait(
     record so the portrait resolver can find them during gameplay.
     """
     try:
-        from ..media.generator import MediaGenerator
-        from ..db.session import create_session
-        from ..db.models import NPC
-        
         # Check if media generation is enabled in settings
         from src.settings import get_settings_store
+
+        from ..db.models import NPC
+        from ..db.session import create_session
+        from ..media.generator import MediaGenerator
         settings = get_settings_store().load()
         if not settings.media_enabled:
             logger.warning(f"[SessionZero→Media] Media disabled, skipping portrait for {npc_name}")
             return
-        
+
         # Get style context from profile
         style_context = settings.active_profile_id or "anime"
-        
+
         gen = MediaGenerator()
         result = await gen.generate_full_character_media(
             visual_tags=visual_tags or [],
@@ -675,7 +673,7 @@ async def _generate_session_zero_npc_portrait(
             campaign_id=campaign_id,
             entity_name=npc_name,
         )
-        
+
         # Update NPC record with generated URLs
         if result.get("portrait") or result.get("model_sheet"):
             db = create_session()
@@ -693,6 +691,6 @@ async def _generate_session_zero_npc_portrait(
                     npc.model_sheet_url = f"/api/game/media/{campaign_id}/{result['model_sheet'].name}"
                 db.commit()
             db.close()
-            
+
     except Exception as e:
         logger.error(f"[SessionZero→Media] NPC portrait gen failed for {npc_name}: {e}")

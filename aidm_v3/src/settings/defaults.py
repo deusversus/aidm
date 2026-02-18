@@ -1,11 +1,10 @@
 """Default settings and available models configuration."""
 
-from typing import Dict, List
-from .models import UserSettings, AgentSettings, ModelConfig
 
+from .models import AgentSettings, ModelConfig, UserSettings
 
 # Available models per provider (December 2025)
-AVAILABLE_MODELS: Dict[str, List[Dict[str, str]]] = {
+AVAILABLE_MODELS: dict[str, list[dict[str, str]]] = {
     "google": [
         {"id": "gemini-3-flash-preview", "name": "Gemini 3 Flash", "tier": "fast", "description": "Fast, affordable for structured tasks"},
         {"id": "gemini-3-pro-preview", "name": "Gemini 3 Pro", "tier": "creative", "description": "High quality reasoning and generation"},
@@ -25,7 +24,7 @@ AVAILABLE_MODELS: Dict[str, List[Dict[str, str]]] = {
 }
 
 
-def get_available_models(provider: str = None) -> Dict[str, List[Dict[str, str]]]:
+def get_available_models(provider: str = None) -> dict[str, list[dict[str, str]]]:
     """Get available models, optionally filtered by provider.
     
     Args:
@@ -98,7 +97,7 @@ def create_settings_for_provider(provider: str) -> UserSettings:
     """
     fast = get_default_fast_model(provider)
     creative = get_default_creative_model(provider)
-    
+
     return UserSettings(
         agent_models=AgentSettings(
             # Only base defaults - individual agents use tier fallback

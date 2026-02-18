@@ -76,22 +76,22 @@ class CategoryMapping:
     """Result of category discovery for a single wiki."""
     wiki_url: str
     total_categories: int = 0
-    
+
     # canonical_type -> list of matching wiki category names
     discovered: dict[str, list[str]] = field(default_factory=dict)
-    
+
     # canonical_type -> primary category name (first match, used for scraping)
     primary: dict[str, str | None] = field(default_factory=dict)
-    
+
     @property
     def discovery_rate(self) -> str:
         found = sum(1 for v in self.primary.values() if v is not None)
         return f"{found}/{len(CANONICAL_TYPES)}"
-    
+
     @property
     def types_found(self) -> list[str]:
         return [k for k, v in self.primary.items() if v is not None]
-    
+
     @property
     def types_missing(self) -> list[str]:
         return [k for k, v in self.primary.items() if v is None]
@@ -118,19 +118,19 @@ def discover_categories(all_category_names: list[str], wiki_url: str = "") -> Ca
         wiki_url=wiki_url,
         total_categories=len(all_category_names),
     )
-    
+
     # Build case-insensitive lookup
     lower_to_original = {c.lower(): c for c in all_category_names}
-    
+
     for canonical_type in CANONICAL_TYPES:
         matches = []
-        
+
         # Strategy 1: Exact alias matching
         aliases = CATEGORY_ALIASES.get(canonical_type, [])
         for alias in aliases:
             if alias.lower() in lower_to_original:
                 matches.append(lower_to_original[alias.lower()])
-        
+
         # Strategy 2: Substring fallback (only if no exact match)
         if not matches:
             patterns = SUBSTRING_PATTERNS.get(canonical_type, [])
@@ -139,10 +139,10 @@ def discover_categories(all_category_names: list[str], wiki_url: str = "") -> Ca
                 for pattern in patterns:
                     if pattern in cat_lower and cat_name not in matches:
                         matches.append(cat_name)
-        
+
         mapping.discovered[canonical_type] = matches
         mapping.primary[canonical_type] = matches[0] if matches else None
-    
+
     # Log results
     found = mapping.types_found
     missing = mapping.types_missing
@@ -153,5 +153,5 @@ def discover_categories(all_category_names: list[str], wiki_url: str = "") -> Ca
     )
     if missing:
         logger.info(f"  Missing types: {', '.join(missing)}")
-    
+
     return mapping

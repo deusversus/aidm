@@ -17,7 +17,7 @@ import logging
 import sqlite3
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -26,8 +26,8 @@ logger = logging.getLogger(__name__)
 
 class LoreStore:
     """SQLite-backed storage for structured wiki lore pages."""
-    
-    def __init__(self, db_path: Optional[str] = None):
+
+    def __init__(self, db_path: str | None = None):
         """
         Initialize the lore store.
         
@@ -36,14 +36,14 @@ class LoreStore:
         """
         if db_path is None:
             db_path = str(Path(__file__).parent.parent.parent / "data" / "lore_store.db")
-        
+
         self._db_path = db_path
         self._ensure_db()
-    
+
     def _ensure_db(self):
         """Create the wiki_pages table if it doesn't exist."""
         Path(self._db_path).parent.mkdir(parents=True, exist_ok=True)
-        
+
         with sqlite3.connect(self._db_path) as conn:
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS wiki_pages (
@@ -68,11 +68,11 @@ class LoreStore:
                 ON wiki_pages(profile_id, page_type)
             """)
             conn.commit()
-    
+
     def store_pages(
         self,
         profile_id: str,
-        pages: List[Dict[str, Any]],
+        pages: list[dict[str, Any]],
         source_wiki: str = "",
     ) -> int:
         """
@@ -90,16 +90,16 @@ class LoreStore:
         """
         if not pages:
             return 0
-        
+
         now = time.time()
         stored = 0
-        
+
         try:
             with sqlite3.connect(self._db_path) as conn:
                 for page in pages:
                     content = page.get("content", "")
                     word_count = len(content.split())
-                    
+
                     conn.execute("""
                         INSERT OR REPLACE INTO wiki_pages
                         (profile_id, page_title, page_type, content, word_count, source_wiki, scraped_at)
@@ -114,21 +114,21 @@ class LoreStore:
                         now,
                     ))
                     stored += 1
-                
+
                 conn.commit()
-            
+
             logger.info(f"[LoreStore] Stored {stored} pages for '{profile_id}' from {source_wiki}")
-            
+
         except Exception as e:
             logger.error(f"[LoreStore] Error storing pages for '{profile_id}': {e}")
-        
+
         return stored
-    
+
     def get_pages(
         self,
         profile_id: str,
-        page_type: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+        page_type: str | None = None,
+    ) -> list[dict[str, Any]]:
         """
         Retrieve stored pages for a profile.
         
@@ -142,7 +142,7 @@ class LoreStore:
         try:
             with sqlite3.connect(self._db_path) as conn:
                 conn.row_factory = sqlite3.Row
-                
+
                 if page_type:
                     rows = conn.execute(
                         "SELECT * FROM wiki_pages WHERE profile_id = ? AND page_type = ? ORDER BY id",
@@ -153,13 +153,13 @@ class LoreStore:
                         "SELECT * FROM wiki_pages WHERE profile_id = ? ORDER BY id",
                         (profile_id,)
                     ).fetchall()
-                
+
                 return [dict(row) for row in rows]
-                
+
         except Exception as e:
             logger.error(f"[LoreStore] Error reading pages for '{profile_id}': {e}")
             return []
-    
+
     def get_combined_content(self, profile_id: str) -> str:
         """
         Reconstruct the combined lore content from stored pages.
@@ -177,19 +177,19 @@ class LoreStore:
             Combined text string, or empty string if no pages found
         """
         pages = self.get_pages(profile_id)
-        
+
         if not pages:
             return ""
-        
+
         sections = []
         for page in pages:
             page_type = page.get("page_type", "general").upper()
             title = page.get("page_title", "")
             content = page.get("content", "")
             sections.append(f"\n## [{page_type}] {title}\n{content}")
-        
+
         return "\n\n".join(sections)
-    
+
     def has_profile(self, profile_id: str) -> bool:
         """Check if any pages exist for a profile."""
         try:
@@ -201,7 +201,7 @@ class LoreStore:
                 return count > 0
         except Exception:
             return False
-    
+
     def delete_profile(self, profile_id: str) -> int:
         """
         Delete all pages for a profile.
@@ -226,8 +226,8 @@ class LoreStore:
         except Exception as e:
             logger.error(f"[LoreStore] Error deleting pages for '{profile_id}': {e}")
             return 0
-    
-    def get_stats(self, profile_id: Optional[str] = None) -> Dict[str, Any]:
+
+    def get_stats(self, profile_id: str | None = None) -> dict[str, Any]:
         """
         Get storage statistics.
         
@@ -244,12 +244,12 @@ class LoreStore:
                         "SELECT COUNT(*) FROM wiki_pages WHERE profile_id = ?",
                         (profile_id,)
                     ).fetchone()[0]
-                    
+
                     total_words = conn.execute(
                         "SELECT COALESCE(SUM(word_count), 0) FROM wiki_pages WHERE profile_id = ?",
                         (profile_id,)
                     ).fetchone()[0]
-                    
+
                     by_type = {}
                     for row in conn.execute(
                         "SELECT page_type, COUNT(*), SUM(word_count) FROM wiki_pages "
@@ -257,12 +257,12 @@ class LoreStore:
                         (profile_id,)
                     ):
                         by_type[row[0]] = {"pages": row[1], "words": row[2]}
-                    
+
                     scraped_at = conn.execute(
                         "SELECT MIN(scraped_at) FROM wiki_pages WHERE profile_id = ?",
                         (profile_id,)
                     ).fetchone()[0]
-                    
+
                     return {
                         "profile_id": profile_id,
                         "total_pages": total,
@@ -276,17 +276,17 @@ class LoreStore:
                     profiles = conn.execute(
                         "SELECT DISTINCT profile_id FROM wiki_pages"
                     ).fetchall()
-                    
+
                     return {
                         "total_pages": total,
                         "profiles": [r[0] for r in profiles],
                         "profile_count": len(profiles),
                         "db_path": self._db_path,
                     }
-                    
+
         except Exception as e:
             return {"error": str(e)}
-    
+
     def clear_all(self):
         """Delete all stored pages."""
         try:
@@ -300,7 +300,7 @@ class LoreStore:
 
 # ─── Singleton ───────────────────────────────────────────────────────────────
 
-_lore_store: Optional[LoreStore] = None
+_lore_store: LoreStore | None = None
 
 
 def get_lore_store() -> LoreStore:

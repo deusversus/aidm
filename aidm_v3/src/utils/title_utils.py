@@ -2,7 +2,6 @@
 Title normalization and fuzzy matching utilities for anime profile lookup.
 """
 import re
-from typing import Optional, Dict, List, Tuple
 
 
 def normalize_title(title: str) -> str:
@@ -22,16 +21,16 @@ def normalize_title(title: str) -> str:
     """
     if not title:
         return ""
-    
+
     # Lowercase
     result = title.lower()
-    
+
     # Replace non-alphanumeric (except spaces) with nothing
     result = re.sub(r'[^a-z0-9\s]', '', result)
-    
+
     # Collapse multiple spaces
     result = re.sub(r'\s+', ' ', result)
-    
+
     # Strip
     return result.strip()
 
@@ -73,12 +72,12 @@ def levenshtein_distance(s1: str, s2: str) -> int:
     """
     if len(s1) < len(s2):
         return levenshtein_distance(s2, s1)
-    
+
     if len(s2) == 0:
         return len(s1)
-    
+
     previous_row = range(len(s2) + 1)
-    
+
     for i, c1 in enumerate(s1):
         current_row = [i + 1]
         for j, c2 in enumerate(s2):
@@ -88,15 +87,15 @@ def levenshtein_distance(s1: str, s2: str) -> int:
             substitutions = previous_row[j] + (c1 != c2)
             current_row.append(min(insertions, deletions, substitutions))
         previous_row = current_row
-    
+
     return previous_row[-1]
 
 
 def find_closest_match(
-    query: str, 
-    candidates: List[str], 
+    query: str,
+    candidates: list[str],
     threshold: int = 3
-) -> Optional[Tuple[str, int]]:
+) -> tuple[str, int] | None:
     """
     Find the closest matching string from a list of candidates.
     
@@ -110,19 +109,19 @@ def find_closest_match(
     """
     if not query or not candidates:
         return None
-    
+
     best_match = None
     best_distance = float('inf')
-    
+
     for candidate in candidates:
         distance = levenshtein_distance(query, candidate)
         if distance < best_distance:
             best_distance = distance
             best_match = candidate
-    
+
     if best_distance <= threshold:
         return (best_match, best_distance)
-    
+
     return None
 
 
@@ -160,10 +159,10 @@ def jaccard_similarity(set_a: set, set_b: set) -> float:
     """
     if not set_a or not set_b:
         return 0.0
-    
+
     intersection = len(set_a & set_b)
     union = len(set_a | set_b)
-    
+
     return intersection / union if union > 0 else 0.0
 
 
@@ -188,7 +187,7 @@ def token_subset_match(alias_tokens: set, query_tokens: set, min_alias_tokens: i
     """
     if not alias_tokens or len(alias_tokens) < min_alias_tokens:
         return False
-    
+
     return alias_tokens.issubset(query_tokens)
 
 
@@ -216,14 +215,14 @@ def normalized_levenshtein(s1: str, s2: str) -> float:
         return 1.0
     if not s1 or not s2:
         return 0.0
-    
+
     distance = levenshtein_distance(s1, s2)
     max_len = max(len(s1), len(s2))
-    
+
     return 1.0 - (distance / max_len)
 
 
-def generate_aliases(canonical_name: str) -> List[str]:
+def generate_aliases(canonical_name: str) -> list[str]:
     """
     Generate common aliases from a canonical anime name.
     
@@ -239,15 +238,15 @@ def generate_aliases(canonical_name: str) -> List[str]:
         List of alias strings (all normalized)
     """
     aliases = set()
-    
+
     normalized = normalize_title(canonical_name)
     aliases.add(normalized)
-    
+
     # No-space version
     no_space = normalized.replace(' ', '')
     if no_space != normalized:
         aliases.add(no_space)
-    
+
     # Abbreviation (e.g., "Attack on Titan" -> "aot")
     words = normalized.split()
     if len(words) > 1:
@@ -256,5 +255,5 @@ def generate_aliases(canonical_name: str) -> List[str]:
         abbrev = ''.join(w[0] for w in words if w not in skip_words and len(w) > 0)
         if len(abbrev) >= 2:
             aliases.add(abbrev)
-    
+
     return list(aliases)

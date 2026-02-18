@@ -1,15 +1,13 @@
-from typing import List, Dict, Any, Optional, Set
-from pydantic import BaseModel
+import logging
 import time
+from typing import Any
 
 from ..context.memory import MemoryStore
-from ..context.rule_library import RuleLibrary
 from ..context.profile_library import get_profile_library
-from .memory_ranker import MemoryRanker
-from .intent_classifier import IntentOutput
+from ..context.rule_library import RuleLibrary
 from ..db.state_manager import GameContext
-
-import logging
+from .intent_classifier import IntentOutput
+from .memory_ranker import MemoryRanker
 
 logger = logging.getLogger(__name__)
 
@@ -22,16 +20,16 @@ class ContextSelector:
     3. System rules (from RuleLibrary)
     4. Profile DNA (static)
     """
-    
-    def __init__(self, 
-                 memory_store: MemoryStore, 
+
+    def __init__(self,
+                 memory_store: MemoryStore,
                  rule_library: RuleLibrary,
-                 memory_ranker: Optional[MemoryRanker] = None):
+                 memory_ranker: MemoryRanker | None = None):
         self.memory = memory_store
         self.rules = rule_library
         self.ranker = memory_ranker or MemoryRanker()
-    
-    def is_trivial_action(self, intent: Optional[IntentOutput]) -> bool:
+
+    def is_trivial_action(self, intent: IntentOutput | None) -> bool:
         """Check if an action is trivial and can skip most processing.
         
         Trivial actions:
@@ -44,14 +42,14 @@ class ContextSelector:
         """
         if intent is None:
             return False
-        
+
         return (
             intent.declared_epicness < 0.2 and
             intent.intent not in ["COMBAT", "ABILITY", "SOCIAL"] and
             not intent.special_conditions
         )
-    
-    def determine_memory_tier(self, intent: Optional[IntentOutput] = None) -> int:
+
+    def determine_memory_tier(self, intent: IntentOutput | None = None) -> int:
         """Determine memory candidate count based on action complexity.
         
         Uses IntentClassifier signals to tier memory retrieval:
@@ -65,11 +63,11 @@ class ContextSelector:
         """
         if intent is None:
             return 6  # Default to Tier 2
-        
+
         # Tier 0: Trivial actions skip memory entirely
         if self.is_trivial_action(intent):
             return 0
-        
+
         # Base tier from declared epicness
         if intent.declared_epicness <= 0.3:
             tier = 1
@@ -77,23 +75,23 @@ class ContextSelector:
             tier = 2
         else:
             tier = 3
-        
+
         # Combat always gets at least Tier 2
         if intent.intent == "COMBAT" and tier < 2:
             tier = 2
-        
+
         # Special conditions boost tier by 1
         if intent.special_conditions:
             tier = min(tier + 1, 3)
-        
+
         return {0: 0, 1: 3, 2: 6, 3: 9}[tier]
-        
-    async def get_base_context(self, 
+
+    async def get_base_context(self,
                                game_id: str,
                                player_input: str,
                                state_context: GameContext,
                                profile_id: str,
-                               intent: Optional[IntentOutput] = None) -> Dict[str, Any]:
+                               intent: IntentOutput | None = None) -> dict[str, Any]:
         """
         Fast context retrieval with intent-based memory tiering.
         
@@ -104,26 +102,26 @@ class ContextSelector:
         Returns raw memories and rules for later parallel processing.
         """
         start_time = time.time()
-        
+
         # 1. Determine memory tier based on intent complexity
         memory_limit = self.determine_memory_tier(intent)
-        
+
         # 2. Search Memories (multi-query for better recall)
         # Skip for Tier 0 trivial actions (memory_limit == 0)
         if memory_limit > 0:
             queries = self._decompose_queries(player_input, state_context, intent)
             raw_memories = self._multi_query_search(queries, memory_limit)
-            
+
             # Guaranteed plot-critical injection
             critical = self._get_plot_critical_memories()
             raw_memories = self._merge_and_dedup(raw_memories, critical)
         else:
             raw_memories = []  # Tier 0: no memory retrieval
-        
+
         # 2. Search Rules (fast ChromaDB query)
         rule_query = f"{player_input} {state_context.situation}"
         relevant_rules = self.rules.get_relevant_rules(rule_query, limit=3)
-        
+
         # 3. Search Profile Lore (for canon grounding)
         # Intent → preferred page_type for filtered retrieval
         INTENT_LORE_CONFIG = {
@@ -135,10 +133,10 @@ class ContextSelector:
             "WORLD_BUILDING": {"page_type": None,         "limit": 3},  # broad — player asserting new facts
             "OTHER":          {"page_type": None,         "limit": 2},  # general fallback
         }
-        
+
         lore_chunks = []
         lore_config = INTENT_LORE_CONFIG.get(intent.intent if intent else None)
-        
+
         # Ambiguity-aware lore merging: when confidence is low, merge with secondary intent config
         if intent and getattr(intent, 'confidence', 1.0) < 0.7 and getattr(intent, 'secondary_intent', None):
             secondary_config = INTENT_LORE_CONFIG.get(intent.secondary_intent)
@@ -151,19 +149,19 @@ class ContextSelector:
                 else:
                     lore_config = secondary_config
                 logger.info(f"Ambiguous intent ({intent.confidence:.0%}): merging {intent.intent}+{intent.secondary_intent} lore config")
-        
+
         if lore_config:
             profile_lib = get_profile_library()
             lore_query = f"{intent.action} {intent.target or ''} {state_context.situation}"
             lore_chunks = profile_lib.search_lore(
-                profile_id, 
-                lore_query, 
+                profile_id,
+                lore_query,
                 limit=lore_config["limit"],
                 page_type=lore_config.get("page_type"),
             )
             if lore_chunks:
                 logger.info(f"Retrieved {len(lore_chunks)} lore chunks for {profile_id} (type={lore_config.get('page_type', 'any')})")
-        
+
         return {
             "raw_memories": raw_memories,
             "rules": relevant_rules,
@@ -175,11 +173,11 @@ class ContextSelector:
                 "lore_chunk_count": len(lore_chunks)
             }
         }
-    
-    async def rank_memories(self, 
-                           raw_memories: List[Dict[str, Any]], 
+
+    async def rank_memories(self,
+                           raw_memories: list[dict[str, Any]],
                            situation: str,
-                           intent: Optional[IntentOutput] = None) -> str:
+                           intent: IntentOutput | None = None) -> str:
         """
         LLM-based memory ranking with conditional skip.
         
@@ -197,21 +195,21 @@ class ContextSelector:
         """
         if not raw_memories:
             return "No relevant past memories found."
-        
+
         # Determine if we should skip LLM ranking
         skip_ranking = False
         skip_reason = None
-        
+
         # Skip for system commands (no narrative relevance)
         if intent and intent.intent in ["META_FEEDBACK", "OVERRIDE_COMMAND", "OP_COMMAND"]:
             skip_ranking = True
             skip_reason = f"system_command:{intent.intent}"
-        
+
         # Skip if few candidates (no need to rank)
         if len(raw_memories) <= 3:
             skip_ranking = True
             skip_reason = f"low_candidates:{len(raw_memories)}"
-        
+
         if skip_ranking:
             # Use raw memories directly without LLM ranking
             logger.warning(f"Skipping memory ranking: {skip_reason}")
@@ -223,24 +221,24 @@ class ContextSelector:
                 candidates=raw_memories
             )
             relevant_memories = [m for m in ranked_memories if m.get('rank_score', 0) > 0.4][:5]
-        
+
         # Format for prompt
         if relevant_memories:
             memories_text = "\n".join([
-                f"- [{m.get('metadata', {}).get('type', 'event').upper()}] {m['content']}" 
+                f"- [{m.get('metadata', {}).get('type', 'event').upper()}] {m['content']}"
                 for m in relevant_memories
             ])
         else:
             memories_text = "No relevant past memories found."
-        
+
         return memories_text
-    
+
     def _decompose_queries(
-        self, 
-        player_input: str, 
+        self,
+        player_input: str,
         state_context: GameContext,
-        intent: Optional[IntentOutput] = None
-    ) -> List[str]:
+        intent: IntentOutput | None = None
+    ) -> list[str]:
         """Decompose a single action into 2-3 targeted search queries.
         
         Instead of a single concatenated query, generates focused queries:
@@ -252,36 +250,36 @@ class ContextSelector:
             List of 2-3 search query strings
         """
         queries = []
-        
+
         # Query 1: Action-focused (what the player is doing)
         if intent and intent.action:
             queries.append(f"{intent.action} {intent.target or ''}")
         else:
             queries.append(player_input)
-        
+
         # Query 2: Situation-focused (where they are, what's happening)
         if state_context.situation:
             queries.append(state_context.situation)
-        
-        # Query 3: Entity-focused (NPCs or locations mentioned) 
+
+        # Query 3: Entity-focused (NPCs or locations mentioned)
         if intent and intent.target:
             # Target-specific query for NPC or location recall
             queries.append(f"{intent.target} relationship history")
         elif state_context.location:
             queries.append(f"{state_context.location} events")
-        
+
         # Ensure at least 2 queries — fallback to combined
         if len(queries) < 2:
             queries.append(f"{player_input} {state_context.situation or ''}")
-        
+
         # Cap at 3 queries to limit ChromaDB calls
         return queries[:3]
-    
+
     def _multi_query_search(
-        self, 
-        queries: List[str], 
+        self,
+        queries: list[str],
         total_limit: int
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Run multiple queries against memory and deduplicate results.
         
         Distributes the total limit across queries, then merges and
@@ -296,32 +294,32 @@ class ContextSelector:
         """
         per_query_limit = max(3, total_limit // len(queries) + 1)
         all_results = []
-        
+
         for query in queries:
             query = query.strip()
             if not query:
                 continue
             results = self.memory.search(query, limit=per_query_limit)
             all_results.extend(results)
-        
+
         # Deduplicate by content (keep highest score)
-        seen: Dict[str, Dict[str, Any]] = {}
+        seen: dict[str, dict[str, Any]] = {}
         for mem in all_results:
             content = mem.get("content", "")
             content_key = content[:100]  # First 100 chars as key
             existing = seen.get(content_key)
             if not existing or mem.get("score", 0) > existing.get("score", 0):
                 seen[content_key] = mem
-        
+
         # Sort by score descending
         deduped = sorted(seen.values(), key=lambda m: m.get("score", 0), reverse=True)
-        
+
         if len(deduped) != len(all_results):
             logger.debug(f"Multi-query: {len(all_results)} raw → {len(deduped)} unique (from {len(queries)} queries)")
-        
+
         return deduped[:total_limit]
-    
-    def _get_plot_critical_memories(self) -> List[Dict[str, Any]]:
+
+    def _get_plot_critical_memories(self) -> list[dict[str, Any]]:
         """Get guaranteed-include plot-critical and session-zero memories.
         
         These memories are ALWAYS included regardless of query similarity,
@@ -337,7 +335,7 @@ class ContextSelector:
                 where={"flags": {"$contains": "plot_critical"}},
                 limit=3,
             )
-            
+
             critical = []
             if results and results.get("documents"):
                 for i, doc in enumerate(results["documents"]):
@@ -348,18 +346,18 @@ class ContextSelector:
                         "score": 1.0,  # Max score — always relevant
                         "source": "plot_critical",
                     })
-            
+
             return critical
-            
+
         except Exception:
             # ChromaDB filter may not match — not all collections have this flag
             return []
-    
+
     def _merge_and_dedup(
-        self, 
-        primary: List[Dict[str, Any]], 
-        additional: List[Dict[str, Any]]
-    ) -> List[Dict[str, Any]]:
+        self,
+        primary: list[dict[str, Any]],
+        additional: list[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
         """Merge two memory lists, deduplicating by content.
         
         Additional memories are prepended (highest priority) but
@@ -367,27 +365,27 @@ class ContextSelector:
         """
         if not additional:
             return primary
-        
+
         # Build set of content keys from additional
-        additional_keys: Set[str] = set()
+        additional_keys: set[str] = set()
         for mem in additional:
             additional_keys.add(mem.get("content", "")[:100])
-        
+
         # Filter primary to remove duplicates
         filtered_primary = [
             m for m in primary
             if m.get("content", "")[:100] not in additional_keys
         ]
-        
+
         # Prepend critical memories
         merged = additional + filtered_primary
         return merged
-    
-    async def get_context(self, 
+
+    async def get_context(self,
                          game_id: str,
                          player_input: str,
                          state_context: GameContext,
-                         profile_id: str) -> Dict[str, Any]:
+                         profile_id: str) -> dict[str, Any]:
         """
         Assemble full context for the turn (backward-compatible).
         
@@ -396,10 +394,10 @@ class ContextSelector:
         """
         # Get base context
         base = await self.get_base_context(game_id, player_input, state_context, profile_id)
-        
+
         # Rank memories
         memories_text = await self.rank_memories(base["raw_memories"], state_context.situation)
-        
+
         # Assemble result (same format as before)
         return {
             "memories": memories_text,

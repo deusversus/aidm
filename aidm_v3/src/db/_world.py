@@ -3,23 +3,21 @@
 Split from state_manager.py for maintainability.
 """
 
-from typing import Optional, List, Dict, Any
-
-from .models import Quest, Location, MediaAsset
-from ..enums import NarrativeWeight
-
 import logging
+from typing import Any, Optional
+
+from .models import Location, MediaAsset, Quest
 
 logger = logging.getLogger(__name__)
 
 
 class WorldMixin:
     """Factions, quests, locations, media assets, state transactions."""
-    
+
     # ==== Faction System ====
-    
+
     FACTION_RELATIONSHIPS = ["allied", "friendly", "neutral", "unfriendly", "enemy", "at_war"]
-    
+
     def get_faction(self, faction_name: str) -> Optional["Faction"]:
         """Get a faction by name."""
         from .models import Faction
@@ -30,21 +28,21 @@ class WorldMixin:
             .filter(Faction.name.ilike(f"%{faction_name}%"))
             .first()
         )
-    
+
     # Alias for consistent naming with get_npc_by_name
     def get_faction_by_name(self, name: str) -> Optional["Faction"]:
         """Get a faction by name (alias for get_faction)."""
         return self.get_faction(name)
-    
-    def get_all_factions(self) -> List["Faction"]:
+
+    def get_all_factions(self) -> list["Faction"]:
         """Get all factions in the campaign."""
         from .models import Faction
         db = self._get_db()
         return db.query(Faction).filter(Faction.campaign_id == self.campaign_id).all()
-    
+
     def create_faction(
-        self, 
-        name: str, 
+        self,
+        name: str,
         description: str = "",
         power_level: str = "regional",
         pc_controls: bool = False
@@ -60,7 +58,7 @@ class WorldMixin:
         """
         from .models import Faction
         db = self._get_db()
-        
+
         faction = Faction(
             campaign_id=self.campaign_id,
             name=name,
@@ -76,10 +74,10 @@ class WorldMixin:
         db.add(faction)
         db.commit()
         db.refresh(faction)
-        
+
         logger.info(f"Created: {name} (PC controls: {pc_controls})")
         return faction
-    
+
     def get_faction_relationship(self, faction1_name: str, faction2_name: str) -> str:
         """
         Get the relationship between two factions.
@@ -90,10 +88,10 @@ class WorldMixin:
         faction1 = self.get_faction(faction1_name)
         if not faction1:
             return "neutral"
-        
+
         relationships = faction1.relationships or {}
         return relationships.get(faction2_name, "neutral")
-    
+
     def set_faction_relationship(self, faction1_name: str, faction2_name: str, relationship: str):
         """
         Set the relationship between two factions (bidirectional).
@@ -106,26 +104,25 @@ class WorldMixin:
         if relationship not in self.FACTION_RELATIONSHIPS:
             logger.warning(f"Invalid relationship: {relationship}")
             return
-        
-        from .models import Faction
+
         db = self._get_db()
-        
+
         faction1 = self.get_faction(faction1_name)
         faction2 = self.get_faction(faction2_name)
-        
+
         if faction1:
             rels1 = faction1.relationships or {}
             rels1[faction2_name] = relationship
             faction1.relationships = rels1
-        
+
         if faction2:
             rels2 = faction2.relationships or {}
             rels2[faction1_name] = relationship
             faction2.relationships = rels2
-        
+
         db.commit()
         logger.info(f"{faction1_name} ↔ {faction2_name}: {relationship}")
-    
+
     def update_faction_reputation(self, faction_name: str, change: int, reason: str = ""):
         """
         Update PC's reputation with a faction.
@@ -149,16 +146,16 @@ class WorldMixin:
                 db.commit()
                 logger.info(f"PC reputation with {faction_name}: {old_rep} → {new_rep} ({reason})")
             return
-        
+
         db = self._get_db()
         old_rep = faction.pc_reputation or 0
         new_rep = max(-1000, min(1000, old_rep + change * 10))
         faction.pc_reputation = new_rep
         db.commit()
-        
+
         logger.info(f"PC reputation with {faction_name}: {old_rep} → {new_rep} ({reason})")
-    
-    def get_pc_controlled_factions(self) -> List["Faction"]:
+
+    def get_pc_controlled_factions(self) -> list["Faction"]:
         """
         Get all factions the PC controls (Overlord/Rimuru mode).
         
@@ -173,7 +170,7 @@ class WorldMixin:
             .filter(Faction.pc_controls == True)
             .all()
         )
-    
+
     def add_subordinate_to_faction(self, faction_name: str, npc_id: int, role: str = "member"):
         """
         Add an NPC as a subordinate to a PC-controlled faction.
@@ -187,23 +184,23 @@ class WorldMixin:
         if not faction or not faction.pc_controls:
             logger.info(f"{faction_name} not PC-controlled")
             return
-        
+
         npc = self.get_npc(npc_id)
         if not npc:
             return
-        
+
         db = self._get_db()
         subs = faction.subordinates or []
         subs.append({"npc_id": npc_id, "name": npc.name, "role": role})
         faction.subordinates = subs
-        
+
         # Also update NPC's faction
         npc.faction = faction_name
-        
+
         db.commit()
         logger.info(f"{npc.name} joined {faction_name} as {role}")
-    
-    def get_faction_context_for_op_mode(self, narrative_focus: str, preset: Optional[str] = None) -> Optional[str]:
+
+    def get_faction_context_for_op_mode(self, narrative_focus: str, preset: str | None = None) -> str | None:
         """
         Get faction management context for OP configurations that focus on factions.
         
@@ -216,24 +213,24 @@ class WorldMixin:
         """
         if narrative_focus != "faction":
             return None
-        
+
         controlled_factions = self.get_pc_controlled_factions()
         if not controlled_factions:
             return None
-        
+
         lines = ["## Faction Management (OP Mode)"]
-        
+
         for faction in controlled_factions:
             lines.append(f"\n### {faction.name}")
             lines.append(f"Power Level: {faction.power_level}")
-            
+
             if faction.subordinates:
                 sub_names = [s.get("name", "Unknown") for s in faction.subordinates[:5]]
                 lines.append(f"Key Subordinates: {', '.join(sub_names)}")
-            
+
             if faction.faction_goals:
                 lines.append(f"Active Goals: {', '.join(faction.faction_goals[:3])}")
-        
+
         # Add preset-specific guidance
         if preset == "hidden_ruler":
             lines.append("\n**Hidden Ruler Guidance**: Subordinates report, PC gives orders. "
@@ -244,11 +241,11 @@ class WorldMixin:
         else:
             lines.append("\n**Faction Focus Guidance**: Organization management gets screen time. "
                         "Subordinates have their own personalities and problems. Combat is backdrop.")
-        
+
         return "\n".join(lines)
-    
+
     # ==== State Transaction Layer ====
-    
+
     def begin_transaction(self, description: str = ""):
         """
         Begin a new state transaction.
@@ -267,7 +264,7 @@ class WorldMixin:
             state_setter=self.set_value,
             description=description
         )
-    
+
     def get_value(self, path: str) -> Any:
         """
         Get a value from game state by dot-notation path.
@@ -289,7 +286,7 @@ class WorldMixin:
         from .models import Character, WorldState
         db = self._get_db()
         parts = path.split(".")
-        
+
         # Character resources
         if parts[0] == "resources":
             character = db.query(Character).filter(
@@ -297,18 +294,18 @@ class WorldMixin:
             ).first()
             if not character:
                 return None
-            
+
             if len(parts) >= 2:
                 resource = parts[1]  # hp, mp, sp
                 field = parts[2] if len(parts) > 2 else "current"
-                
+
                 if resource == "hp":
                     return character.hp_current if field == "current" else character.hp_max
                 elif resource == "mp":
                     return getattr(character, "mp_current", 0) if field == "current" else getattr(character, "mp_max", 100)
                 elif resource == "sp":
                     return getattr(character, "sp_current", 0) if field == "current" else getattr(character, "sp_max", 50)
-        
+
         # Character fields
         elif parts[0] == "character":
             character = db.query(Character).filter(
@@ -316,7 +313,7 @@ class WorldMixin:
             ).first()
             if not character:
                 return None
-            
+
             field = parts[1] if len(parts) > 1 else None
             if field == "name":
                 return character.name
@@ -326,7 +323,7 @@ class WorldMixin:
                 return character.current_xp
             elif field == "power_tier":
                 return character.power_tier
-        
+
         # World state
         elif parts[0] == "world":
             world = db.query(WorldState).filter(
@@ -334,7 +331,7 @@ class WorldMixin:
             ).first()
             if not world:
                 return None
-            
+
             field = parts[1] if len(parts) > 1 else None
             if field == "location":
                 return world.location
@@ -346,9 +343,9 @@ class WorldMixin:
                 return world.tension_level
             elif field == "arc_phase":
                 return world.arc_phase
-        
+
         return None
-    
+
     def set_value(self, path: str, value: Any):
         """
         Set a value in game state by dot-notation path.
@@ -360,7 +357,7 @@ class WorldMixin:
         from .models import Character, WorldState
         db = self._get_db()
         parts = path.split(".")
-        
+
         # Character resources
         if parts[0] == "resources":
             character = db.query(Character).filter(
@@ -368,11 +365,11 @@ class WorldMixin:
             ).first()
             if not character:
                 return
-            
+
             if len(parts) >= 2:
                 resource = parts[1]  # hp, mp, sp
                 field = parts[2] if len(parts) > 2 else "current"
-                
+
                 if resource == "hp":
                     if field == "current":
                         character.hp_current = int(value)
@@ -388,9 +385,9 @@ class WorldMixin:
                         character.sp_current = int(value)
                     else:
                         character.sp_max = int(value)
-            
+
             self._maybe_commit()
-        
+
         # Character fields
         elif parts[0] == "character":
             character = db.query(Character).filter(
@@ -398,7 +395,7 @@ class WorldMixin:
             ).first()
             if not character:
                 return
-            
+
             field = parts[1] if len(parts) > 1 else None
             if field == "name":
                 character.name = value
@@ -408,9 +405,9 @@ class WorldMixin:
                 character.current_xp = int(value)
             elif field == "power_tier":
                 character.power_tier = value
-            
+
             self._maybe_commit()
-        
+
         # World state
         elif parts[0] == "world":
             world = db.query(WorldState).filter(
@@ -418,7 +415,7 @@ class WorldMixin:
             ).first()
             if not world:
                 return
-            
+
             field = parts[1] if len(parts) > 1 else None
             if field == "location":
                 world.location = value
@@ -430,13 +427,13 @@ class WorldMixin:
                 world.tension_level = float(value)
             elif field == "arc_phase":
                 world.arc_phase = value
-            
+
             self._maybe_commit()
 
     # -----------------------------------------------------------------
     # QUEST CRUD (Phase 2A)
     # -----------------------------------------------------------------
-    
+
     def create_quest(
         self,
         title: str,
@@ -468,7 +465,7 @@ class WorldMixin:
         db.add(quest)
         self._maybe_commit()
         return quest
-    
+
     def get_quests(self, status: str = None) -> list:
         """Get all quests, optionally filtered by status."""
         db = self._get_db()
@@ -476,8 +473,8 @@ class WorldMixin:
         if status:
             q = q.filter(Quest.status == status)
         return q.order_by(Quest.created_at.desc()).all()
-    
-    def update_quest_status(self, quest_id: int, status: str) -> Optional[Quest]:
+
+    def update_quest_status(self, quest_id: int, status: str) -> Quest | None:
         """Update quest status (active, completed, failed, abandoned).
         
         Called by Pacing Agent per-turn or Director on arc completion.
@@ -493,10 +490,10 @@ class WorldMixin:
                 quest.completed_turn = self._turn_number
             self._maybe_commit()
         return quest
-    
+
     def update_quest_objective(
         self, quest_id: int, objective_index: int, completed: bool = True
-    ) -> Optional[Quest]:
+    ) -> Quest | None:
         """Mark a specific objective within a quest as complete.
         
         Called by Pacing Agent when a sub-objective is achieved.
@@ -516,11 +513,11 @@ class WorldMixin:
             quest.objectives = objectives
             self._maybe_commit()
         return quest
-    
+
     # -----------------------------------------------------------------
     # LOCATION CRUD (Phase 2B)
     # -----------------------------------------------------------------
-    
+
     def upsert_location(
         self,
         name: str,
@@ -547,7 +544,7 @@ class WorldMixin:
             Location.campaign_id == self.campaign_id,
             Location.name == name
         ).first()
-        
+
         if location:
             # Update existing — only override non-None fields
             if description is not None:
@@ -594,10 +591,10 @@ class WorldMixin:
                 last_visited_turn=self._turn_number,
             )
             db.add(location)
-        
+
         self._maybe_commit()
         return location
-    
+
     def get_locations(self) -> list:
         """Get all discovered locations for the campaign."""
         db = self._get_db()
@@ -607,16 +604,16 @@ class WorldMixin:
             .order_by(Location.last_visited_turn.desc())
             .all()
         )
-    
-    def get_location_by_name(self, name: str) -> Optional[Location]:
+
+    def get_location_by_name(self, name: str) -> Location | None:
         """Get a specific location by name."""
         db = self._get_db()
         return db.query(Location).filter(
             Location.campaign_id == self.campaign_id,
             Location.name == name
         ).first()
-    
-    def set_current_location(self, name: str) -> Optional[Location]:
+
+    def set_current_location(self, name: str) -> Location | None:
         """Mark a location as the current location (clears others).
         
         Called when the player moves to a new location.
@@ -627,7 +624,7 @@ class WorldMixin:
             Location.campaign_id == self.campaign_id,
             Location.is_current == True
         ).update({"is_current": False})
-        
+
         # Set new current
         location = db.query(Location).filter(
             Location.campaign_id == self.campaign_id,
@@ -696,7 +693,7 @@ class WorldMixin:
         db.refresh(asset)
         return asset
 
-    def get_media_for_turn(self, turn_number: int) -> List[MediaAsset]:
+    def get_media_for_turn(self, turn_number: int) -> list[MediaAsset]:
         """Get all media assets generated for a specific turn."""
         db = self._get_db()
         return db.query(MediaAsset).filter(
@@ -704,7 +701,7 @@ class WorldMixin:
             MediaAsset.turn_number == turn_number,
         ).order_by(MediaAsset.created_at).all()
 
-    def get_media_gallery(self, limit: int = 50, offset: int = 0, asset_type: str = None) -> List[MediaAsset]:
+    def get_media_gallery(self, limit: int = 50, offset: int = 0, asset_type: str = None) -> list[MediaAsset]:
         """Get paginated media assets for the campaign.
 
         Args:

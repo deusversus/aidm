@@ -12,17 +12,15 @@ Enhanced with full Module 10 Error Recovery implementation:
 Uses fast model (Flash) for low-latency validation checks.
 """
 
-from typing import Optional, Dict, Any, List, Type, Literal, Callable
-from pydantic import BaseModel, Field
-from enum import Enum
-from dataclasses import dataclass
-from datetime import datetime
-
-from .base import BaseAgent
-from ..enums import NarrativeWeight
-
-
 import logging
+from dataclasses import dataclass
+from enum import Enum
+from typing import Any
+
+from pydantic import BaseModel, Field
+
+from ..enums import NarrativeWeight
+from .base import BaseAgent
 
 logger = logging.getLogger(__name__)
 
@@ -62,14 +60,14 @@ class ErrorReport(BaseModel):
     severity: ErrorSeverity
     category: ErrorCategory
     description: str
-    context: Dict[str, Any] = Field(default_factory=dict)
-    
+    context: dict[str, Any] = Field(default_factory=dict)
+
     # Recovery
     recoverable: bool = True
     confidence: float = 0.5      # 0-1, confidence in auto-fix
-    suggested_fix: Optional[str] = None
-    alternatives: List[str] = Field(default_factory=list)
-    
+    suggested_fix: str | None = None
+    alternatives: list[str] = Field(default_factory=list)
+
     # Tracking
     timestamp: str = ""
     turn_number: int = 0
@@ -77,7 +75,7 @@ class ErrorReport(BaseModel):
 
 class ValidationResult(BaseModel):
     """Result of a validation check."""
-    
+
     is_valid: bool = Field(
         default=True,
         description="Whether the validation passed"
@@ -85,15 +83,15 @@ class ValidationResult(BaseModel):
     complete: bool = Field(
         description="Whether the output is complete"
     )
-    missing_fields: List[str] = Field(
+    missing_fields: list[str] = Field(
         default_factory=list,
         description="List of missing or incomplete fields"
     )
-    issues: List[str] = Field(
+    issues: list[str] = Field(
         default_factory=list,
         description="List of detected issues"
     )
-    errors: List[ErrorReport] = Field(
+    errors: list[ErrorReport] = Field(
         default_factory=list,
         description="Detailed error reports"
     )
@@ -101,11 +99,11 @@ class ValidationResult(BaseModel):
         default=80,
         description="0-100 confidence in validation assessment"
     )
-    suggestions: List[str] = Field(
+    suggestions: list[str] = Field(
         default_factory=list,
         description="Suggested actions to fix issues"
     )
-    correction: Optional[str] = Field(
+    correction: str | None = Field(
         default=None,
         description="Correction feedback for retry"
     )
@@ -117,7 +115,7 @@ class ContentCompletenessResult(BaseModel):
     This schema is used for LLM validation - it does NOT include corruption
     detection fields, which are handled by fast heuristics instead.
     """
-    
+
     is_valid: bool = Field(
         default=True,
         description="Whether the research has sufficient content"
@@ -142,11 +140,11 @@ class ContentCompletenessResult(BaseModel):
         default=False,
         description="Whether world/setting is described"
     )
-    recommended_supplemental: List[str] = Field(
+    recommended_supplemental: list[str] = Field(
         default_factory=list,
         description="Recommended supplemental search topics"
     )
-    issues: List[str] = Field(
+    issues: list[str] = Field(
         default_factory=list,
         description="Issues found during validation"
     )
@@ -158,7 +156,7 @@ class ResearchValidationResult(ValidationResult):
     - Content completeness fields: populated by LLM via ContentCompletenessResult
     - Corruption detection fields: populated by fast heuristics, NOT LLM
     """
-    
+
     # Content completeness (from LLM)
     has_power_system: bool = Field(
         default=False,
@@ -176,17 +174,17 @@ class ResearchValidationResult(ValidationResult):
         default=False,
         description="Whether world/setting is described"
     )
-    recommended_supplemental: List[str] = Field(
+    recommended_supplemental: list[str] = Field(
         default_factory=list,
         description="Recommended supplemental search topics"
     )
-    
+
     # Corruption detection (from heuristics only, NOT LLM)
     has_corruption: bool = Field(
         default=False,
         description="Whether corrupted content was detected (leaked reasoning, repetition, etc.)"
     )
-    corruption_type: Optional[str] = Field(
+    corruption_type: str | None = Field(
         default=None,
         description="Type of corruption: 'leaked_reasoning', 'repetition', 'incomplete_json', 'malformed'"
     )
@@ -205,8 +203,8 @@ class RecoveryResult(BaseModel):
     success: bool
     action_taken: str
     state_modified: bool = False
-    player_notification: Optional[str] = None
-    log_entry: Optional[str] = None
+    player_notification: str | None = None
+    log_entry: str | None = None
 
 
 class NarrativeOverrideResult(BaseModel):
@@ -229,7 +227,7 @@ class NarrativeOverrideResult(BaseModel):
         default="",
         description="Why this moment warrants (or doesn't warrant) pushing beyond limits"
     )
-    trope_match: Optional[str] = Field(
+    trope_match: str | None = Field(
         default=None,
         description="Anime trope that applies (e.g., 'push_beyond_limits', 'heroic_sacrifice')"
     )
@@ -271,30 +269,30 @@ class ValidatorAgent(BaseAgent):
     - Research validation (content completeness, corruption detection)
     - Recovery protocols (confidence-based auto-recovery)
     """
-    
+
     agent_name = "validator"
-    
-    def __init__(self, model_override: Optional[str] = None):
+
+    def __init__(self, model_override: str | None = None):
         super().__init__(model_override=model_override)
         self._system_prompt = VALIDATOR_SYSTEM_PROMPT
-        self._error_log: List[ErrorReport] = []
-    
+        self._error_log: list[ErrorReport] = []
+
     @property
     def system_prompt(self) -> str:
         return self._system_prompt
-    
+
     @property
-    def output_schema(self) -> Type[BaseModel]:
+    def output_schema(self) -> type[BaseModel]:
         return ValidationResult
-    
-    
+
+
     async def judge_narrative_override(
         self,
         resource_name: str,
         shortage: int,
         action_description: str,
         situation: str,
-        profile_tropes: Optional[Dict[str, bool]] = None,
+        profile_tropes: dict[str, bool] | None = None,
         arc_phase: str = "rising_action",
         tension_level: float = 0.5
     ) -> NarrativeOverrideResult:
@@ -318,7 +316,7 @@ class ValidatorAgent(BaseAgent):
             NarrativeOverrideResult with LLM judgment
         """
         # (Imports moved inside try block below)
-        
+
         # Check relevant tropes
         relevant_tropes = []
         if profile_tropes:
@@ -332,7 +330,7 @@ class ValidatorAgent(BaseAgent):
             for trope, desc in trope_map.items():
                 if profile_tropes.get(trope):
                     relevant_tropes.append(f"{trope}: {desc}")
-        
+
         prompt = f"""You are judging whether a character should be allowed to "push beyond their limits" in an anime-style narrative.
 
 SITUATION:
@@ -364,16 +362,16 @@ Respond with:
             from ..llm import get_llm_manager
             manager = get_llm_manager()
             provider, model = manager.get_provider_for_agent(self.agent_name)
-            
+
             response = await provider.complete_with_schema(
                 messages=[{"role": "user", "content": prompt}],
                 schema=NarrativeOverrideResult,
                 system="You are a narrative judgment engine for anime-style storytelling. Be dramatic but fair.",
                 model=model
             )
-            
+
             return response
-            
+
         except Exception as e:
             # On error, default to conservative (no override)
             logger.error(f"Narrative override judgment failed: {e}")
@@ -382,12 +380,12 @@ Respond with:
                 explanation=f"Judgment failed: {e}",
                 narrative_cost=""
             )
-    
+
     def validate_skill_owned(
         self,
         skill_name: str,
-        owned_skills: List[str],
-        requirements: Optional[Dict[str, Any]] = None
+        owned_skills: list[str],
+        requirements: dict[str, Any] | None = None
     ) -> ValidationResult:
         """
         Validate if character owns a skill.
@@ -395,11 +393,11 @@ Respond with:
         Per M10: Check skill list, block with alternatives.
         """
         result = ValidationResult(complete=True, is_valid=True)
-        
+
         # Check if skill is owned
         skill_lower = skill_name.lower()
         owned_lower = [s.lower() for s in owned_skills]
-        
+
         if skill_lower not in owned_lower:
             result.is_valid = False
             result.errors.append(ErrorReport(
@@ -419,20 +417,20 @@ Respond with:
                     "Use basic attack instead"
                 ]
             ))
-            
+
             result.correction = f"[Blocked: Skill '{skill_name}' not learned]\n"
             result.correction += f"Your known skills: {', '.join(owned_skills[:5])}"
             if requirements:
                 result.correction += f"\nRequirements: {requirements}"
-        
+
         return result
-    
+
     def validate_npc_state(
         self,
         npc_name: str,
         is_alive: bool,
-        claimed_location: Optional[str] = None,
-        actual_location: Optional[str] = None
+        claimed_location: str | None = None,
+        actual_location: str | None = None
     ) -> ValidationResult:
         """
         Validate NPC is valid for interaction.
@@ -440,7 +438,7 @@ Respond with:
         Per M10: Check alive, check location.
         """
         result = ValidationResult(complete=True, is_valid=True)
-        
+
         if not is_alive:
             result.is_valid = False
             result.errors.append(ErrorReport(
@@ -457,9 +455,9 @@ Respond with:
                     "Let the absence be felt in the scene"
                 ]
             ))
-            
+
             result.correction = f"{npc_name} is deceased. Cannot interact directly."
-        
+
         elif claimed_location and actual_location:
             if claimed_location.lower() != actual_location.lower():
                 result.is_valid = False
@@ -476,19 +474,19 @@ Respond with:
                     confidence=0.8,
                     suggested_fix=f"Update {npc_name} location to {claimed_location}"
                 ))
-        
+
         return result
-    
+
     # =========================================================================
     # POST-ACTION VALIDATION (Catch errors after execution)
     # =========================================================================
-    
+
     def validate_bounds(
         self,
         field_name: str,
         value: Any,
-        min_val: Optional[Any] = None,
-        max_val: Optional[Any] = None
+        min_val: Any | None = None,
+        max_val: Any | None = None
     ) -> ValidationResult:
         """
         Validate a value is within bounds.
@@ -496,7 +494,7 @@ Respond with:
         Per M10: Check current≤max, current≥min.
         """
         result = ValidationResult(complete=True, is_valid=True)
-        
+
         if min_val is not None and value < min_val:
             result.is_valid = False
             corrected = min_val
@@ -515,7 +513,7 @@ Respond with:
                 suggested_fix=f"Correct {field_name} to {corrected}"
             ))
             result.correction = f"[Corrected: {field_name} {value} → {corrected}]"
-        
+
         elif max_val is not None and value > max_val:
             result.is_valid = False
             corrected = max_val
@@ -534,12 +532,12 @@ Respond with:
                 suggested_fix=f"Correct {field_name} to {corrected}"
             ))
             result.correction = f"[Corrected: {field_name} {value} → {corrected}]"
-        
+
         return result
-    
+
     def validate_state_integrity(
         self,
-        character_state: Dict[str, Any]
+        character_state: dict[str, Any]
     ) -> ValidationResult:
         """
         Comprehensive state integrity check.
@@ -547,11 +545,11 @@ Respond with:
         Per M10: HP/MP/SP bounds, inventory non-negative, etc.
         """
         result = ValidationResult(complete=True, is_valid=True)
-        
+
         # HP bounds
         hp_current = character_state.get("hp_current", 0)
         hp_max = character_state.get("hp_max", 100)
-        
+
         if hp_current > hp_max:
             result.is_valid = False
             result.errors.append(ErrorReport(
@@ -563,7 +561,7 @@ Respond with:
                 confidence=1.0,
                 suggested_fix=f"Cap HP to {hp_max}"
             ))
-        
+
         if hp_current < 0:
             result.is_valid = False
             result.errors.append(ErrorReport(
@@ -575,11 +573,11 @@ Respond with:
                 confidence=1.0,
                 suggested_fix="Set HP to 0 or 1"
             ))
-        
+
         # MP bounds
         mp_current = character_state.get("mp_current", 0)
         mp_max = character_state.get("mp_max", 50)
-        
+
         if mp_current > mp_max:
             result.errors.append(ErrorReport(
                 severity=ErrorSeverity.TRIVIAL,
@@ -590,7 +588,7 @@ Respond with:
                 confidence=1.0,
                 suggested_fix=f"Cap MP to {mp_max}"
             ))
-        
+
         # Inventory check
         inventory = character_state.get("inventory", [])
         for item in inventory:
@@ -606,13 +604,13 @@ Respond with:
                         confidence=1.0,
                         suggested_fix="Set quantity to 0"
                     ))
-        
+
         return result
-    
+
     # =========================================================================
     # RECOVERY PROTOCOLS
     # =========================================================================
-    
+
     async def attempt_recovery(
         self,
         error: ErrorReport,
@@ -628,7 +626,7 @@ Respond with:
             return await self._auto_recover(error, state_manager)
         else:
             return self._prepare_player_prompt(error)
-    
+
     async def _auto_recover(
         self,
         error: ErrorReport,
@@ -636,10 +634,10 @@ Respond with:
     ) -> RecoveryResult:
         """Apply automatic recovery for high-confidence errors."""
         action = error.suggested_fix or "No specific fix"
-        
+
         # Log the error
         self._error_log.append(error)
-        
+
         # Build notification based on severity
         notification = None
         if error.severity == ErrorSeverity.MINOR:
@@ -647,7 +645,7 @@ Respond with:
         elif error.severity == ErrorSeverity.MAJOR:
             notification = f"[System: {error.description}. {action}]"
         # TRIVIAL errors have no notification
-        
+
         return RecoveryResult(
             success=True,
             action_taken=action,
@@ -655,14 +653,14 @@ Respond with:
             player_notification=notification,
             log_entry=f"{error.severity.value.upper()}: {error.description} | Action: {action}"
         )
-    
+
     def _prepare_player_prompt(self, error: ErrorReport) -> RecoveryResult:
         """Prepare a prompt for the player when auto-recovery not confident."""
         alternatives = "\n".join(
-            f"{chr(65+i)}) {alt}" 
+            f"{chr(65+i)}) {alt}"
             for i, alt in enumerate(error.alternatives[:4])
         )
-        
+
         notification = f"""[Action blocked: {error.description}]
 Reason: {error.context}
 
@@ -670,22 +668,22 @@ Alternatives:
 {alternatives}
 
 What do?"""
-        
+
         return RecoveryResult(
             success=False,  # Needs player input
             action_taken="Awaiting player choice",
             state_modified=False,
             player_notification=notification
         )
-    
+
     # =========================================================================
     # TURN VALIDATION (for Orchestrator integration)
     # =========================================================================
-    
+
     async def validate(
         self,
         turn: Any,
-        context: Dict[str, Any]
+        context: dict[str, Any]
     ) -> ValidationResult:
         """
         Validate a turn for the Orchestrator.
@@ -698,12 +696,12 @@ What do?"""
             ValidationResult with issues and corrections
         """
         result = ValidationResult(complete=True, is_valid=True)
-        
+
         if not turn.outcome:
             return result
-        
+
         outcome = turn.outcome
-        
+
         # Check narrative weight consistency
         if hasattr(outcome, 'narrative_weight'):
             if outcome.narrative_weight == NarrativeWeight.CLIMACTIC:
@@ -711,7 +709,7 @@ What do?"""
                 if hasattr(outcome, 'consequence') and not outcome.consequence:
                     result.issues.append("Climactic moment without consequence")
                     result.confidence = 70
-        
+
         # Check for impossible outcomes
         character_state = context.get("character_state", "")
         if "HP: 0" in character_state and hasattr(outcome, 'success') and outcome.success:
@@ -725,13 +723,13 @@ What do?"""
                 suggested_fix="Modify outcome to reflect incapacitation"
             ))
             result.correction = "Character is at 0 HP and cannot succeed at actions."
-        
+
         return result
-    
+
     # =========================================================================
     # UTILITY METHODS
     # =========================================================================
-    
+
     def _format_resource_block(
         self,
         resource: str,
@@ -752,30 +750,30 @@ C) Different action (no {resource} cost)
 D) Defend/wait to regen
 
 What do?"""
-    
-    def get_error_log(self) -> List[ErrorReport]:
+
+    def get_error_log(self) -> list[ErrorReport]:
         """Get the error log for this session."""
         return self._error_log
-    
-    def get_error_summary(self) -> Dict[str, int]:
+
+    def get_error_summary(self) -> dict[str, int]:
         """Get error count by severity."""
         summary = {s.value: 0 for s in ErrorSeverity}
         for error in self._error_log:
             summary[error.severity.value] += 1
         return summary
-    
+
     def session_health_check(self) -> str:
         """
         Generate end-of-session health check per M10.
         """
         summary = self.get_error_summary()
-        
+
         status = "HEALTHY"
         if summary["critical"] > 0:
             status = "CRITICAL ERRORS"
         elif summary["major"] > 0:
             status = "MAJOR ERRORS"
-        
+
         return f"""Session Health Check:
 [✓] Validation Agent Active
 [{"✓" if summary["critical"] == 0 else "✗"}] Critical Errors: {summary["critical"]}
@@ -784,11 +782,11 @@ What do?"""
 [·] Trivial Fixes: {summary["trivial"]}
 
 Status: {status}"""
-    
+
     # =========================================================================
     # EXISTING METHODS (preserved for compatibility)
     # =========================================================================
-    
+
     def _detect_corruption(self, text: str) -> tuple:
         """
         Fast heuristic checks for common corruption patterns.
@@ -796,12 +794,12 @@ Status: {status}"""
         Returns:
             (has_corruption: bool, corruption_type: str | None, repetition_score: float)
         """
-        from collections import Counter
         import re
-        
+        from collections import Counter
+
         # 1. Leaked reasoning markers (Gemini thinking tokens, internal monologue)
         leaked_markers = [
-            "{thought", "i'm ready", "i have gathered", "i will now", 
+            "{thought", "i'm ready", "i have gathered", "i will now",
             "let me check", "final check:", "i'll also mention",
             "i'm good to go", "i have all the components"
         ]
@@ -809,11 +807,11 @@ Status: {status}"""
         for marker in leaked_markers:
             if marker in text_lower:
                 return True, "leaked_reasoning", 0.0
-        
+
         # 2. Excessive repetition detection
         # Filter out common Markdown structural patterns that naturally repeat
         lines = [line.strip() for line in text.split('\n') if line.strip()]
-        
+
         # Patterns to exclude from repetition counting (these naturally repeat in Markdown)
         markdown_structural_patterns = {
             '---',      # Horizontal rule
@@ -828,7 +826,7 @@ Status: {status}"""
             '###',
             '####',
         }
-        
+
         def is_structural_line(line: str) -> bool:
             """Check if a line is a Markdown structural element."""
             # Exact matches
@@ -844,14 +842,14 @@ Status: {status}"""
             if re.match(r'^#{1,6}\s*$', line):
                 return True
             return False
-        
+
         # Filter to meaningful content lines only
         content_lines = [line for line in lines if not is_structural_line(line)]
-        
+
         if content_lines:
             line_counts = Counter(content_lines)
             max_repeats = max(line_counts.values()) if line_counts else 0
-            
+
             # Find what line repeats most (for debugging)
             # Threshold scales with content size: 5 repeats in a 50-line doc is
             # suspicious, but 5 repeats in a 5000-line wiki dump is normal
@@ -863,12 +861,12 @@ Status: {status}"""
                 if len(most_repeated) > 20:
                     logger.info(f"High repetition detected: '{most_repeated[:50]}...' appears {max_repeats} times (threshold={repeat_threshold})")
                     return True, "repetition", min(1.0, max_repeats / 10.0)
-            
+
             # Calculate repetition score (ratio of repeated to unique lines)
             unique_lines = len(line_counts)
             total_lines = len(content_lines)
             repetition_score = 1.0 - (unique_lines / total_lines) if total_lines > 0 else 0.0
-            
+
             # Threshold scales with content size: small docs (< 200 lines) use 0.6,
             # large multi-page wiki content naturally has more repetition (common phrases,
             # structural elements) so we raise the threshold proportionally
@@ -878,34 +876,34 @@ Status: {status}"""
                 ratio_threshold = 0.7
             else:
                 ratio_threshold = 0.85  # Very permissive for large wiki dumps
-            
+
             logger.info(f"Repetition analysis: {unique_lines}/{total_lines} unique lines, score={repetition_score:.2f}, threshold={ratio_threshold}")
-            
+
             if repetition_score > ratio_threshold:
                 return True, "repetition", repetition_score
         else:
             repetition_score = 0.0
-        
+
         # 3. Truncated/malformed JSON detection (REMOVED - Text is Markdown, not JSON)
         # open_brackets = text.count('[')
         # ... (Removed false positive check)
-        
+
         if False:  # Disabled
             return True, "incomplete_json", 0.0
-        
+
         # 4. Suspiciously short output (< 500 chars for a lore file)
         if len(text) < 500:
             return True, "malformed", 0.0
-        
+
         return False, None, repetition_score
-    
+
     async def validate_research(self, research_text: str) -> ResearchValidationResult:
         """Validate anime research text for completeness and corruption."""
         from ..llm import get_llm_manager
-        
+
         # Fast heuristic checks FIRST (no LLM call needed)
         has_corruption, corruption_type, repetition_score = self._detect_corruption(research_text)
-        
+
         if has_corruption:
             logger.error(f"CORRUPTION DETECTED: {corruption_type}")
             return ResearchValidationResult(
@@ -918,11 +916,11 @@ Status: {status}"""
                 character_count=len(research_text),
                 repetition_score=repetition_score
             )
-        
+
         # If no corruption, proceed with LLM validation
         manager = get_llm_manager()
         provider, model = manager.get_provider_for_agent(self.agent_name)
-        
+
         prompt = f"""# Validate Anime Research
 
 Check if this research text contains sufficient information to create an anime RPG profile.
@@ -945,9 +943,9 @@ The research text is **Markdown**, NOT JSON. Square brackets like [Section] are 
 - Do NOT flag: Markdown brackets, headers, bullet points, or normal formatting
 
 Analyze and determine what's missing."""
-        
-        logger.info(f"Validating research completeness...")
-        
+
+        logger.info("Validating research completeness...")
+
         try:
             logger.info(f"[Validator] Calling LLM for validation (len={len(research_text)})...")
             # Use ContentCompletenessResult for LLM - NO corruption fields
@@ -958,8 +956,8 @@ Analyze and determine what's missing."""
                 model=model,
                 max_tokens=4096
             )
-            logger.info(f"[Validator] LLM validation returned.")
-            
+            logger.info("[Validator] LLM validation returned.")
+
             # Merge LLM completeness with heuristic corruption detection
             result = ResearchValidationResult(
                 # From LLM completeness check
@@ -988,19 +986,19 @@ Analyze and determine what's missing."""
                 issues=[f"Validation error: {str(e)}"],
                 character_count=len(research_text)
             )
-    
+
     async def repair_json(
         self,
         broken_json: str,
-        target_schema: Type[BaseModel],
+        target_schema: type[BaseModel],
         error_msg: str = ""
-    ) -> Optional[BaseModel]:
+    ) -> BaseModel | None:
         """Attempt to repair invalid JSON by re-parsing it with the LLM."""
         from ..llm import get_llm_manager
-        
+
         manager = get_llm_manager()
         provider, model = manager.get_provider_for_agent(self.agent_name)
-        
+
         prompt = f"""# Repair Invalid JSON
         
 The following text was intended to be valid JSON matching the schema, but failed to parse.
@@ -1018,8 +1016,8 @@ The following text was intended to be valid JSON matching the schema, but failed
 Fix the JSON errors. Ensure it matches the schema perfectly. 
 Do not explain. Just return the valid JSON object.
 """
-        logger.info(f"Attempting to repair broken JSON...")
-        
+        logger.info("Attempting to repair broken JSON...")
+
         try:
             result = await provider.complete_with_schema(
                 messages=[{"role": "user", "content": prompt}],
@@ -1034,12 +1032,12 @@ Do not explain. Just return the valid JSON object.
         except Exception as e:
             logger.error(f"Repair failed: {e}")
             return None
-    
+
     async def validate_series_order(
         self,
         series_group: str,
-        profile_titles: List[str]
-    ) -> Dict[str, int]:
+        profile_titles: list[str]
+    ) -> dict[str, int]:
         """
         Ask LLM to order series titles canonically.
         
@@ -1051,16 +1049,16 @@ Do not explain. Just return the valid JSON object.
             Dict mapping title to position (e.g., {"Naruto": 1, "Naruto Shippuden": 2, "Boruto": 3})
         """
         from ..llm import get_llm_manager
-        
+
         if len(profile_titles) <= 1:
             # Single title, just return position 1
             return {profile_titles[0]: 1} if profile_titles else {}
-        
+
         manager = get_llm_manager()
         provider, model = manager.get_provider_for_agent(self.agent_name)
-        
+
         titles_list = "\n".join(f"- {title}" for title in profile_titles)
-        
+
         prompt = f"""Order these {series_group} series titles in canonical/chronological order.
 
 TITLES:
@@ -1080,7 +1078,7 @@ Example: {{"Naruto": 1, "Naruto Shippuden": 2, "Boruto": 3}}
 IMPORTANT: Use the EXACT title strings provided, do not modify them."""
 
         logger.info(f"Ordering {len(profile_titles)} titles in '{series_group}' series...")
-        
+
         try:
             # Use a simple Dict[str, int] schema
             from pydantic import create_model
@@ -1088,17 +1086,17 @@ IMPORTANT: Use the EXACT title strings provided, do not modify them."""
                 'SeriesOrder',
                 **{title.replace(' ', '_').replace(':', '_'): (int, 1) for title in profile_titles}
             )
-            
+
             response = await provider.complete(
                 messages=[{"role": "user", "content": prompt}],
                 model=model,
                 max_tokens=512
             )
-            
+
             # Parse the response to extract the ordering
             import json
             import re
-            
+
             # Try to extract JSON from response
             content = response.content
             json_match = re.search(r'\{[^{}]+\}', content)
@@ -1107,9 +1105,9 @@ IMPORTANT: Use the EXACT title strings provided, do not modify them."""
                 logger.info(f"Series order determined: {order_dict}")
                 return order_dict
             else:
-                logger.warning(f"Could not parse series order from response")
+                logger.warning("Could not parse series order from response")
                 return {}
-                
+
         except Exception as e:
             logger.error(f"Series order validation failed: {e}")
             return {}

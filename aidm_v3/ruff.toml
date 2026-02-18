@@ -1,0 +1,56 @@
+# Ruff linter configuration for AIDM v3
+# https://docs.astral.sh/ruff/
+
+target-version = "py311"
+line-length = 120
+
+# Exclude non-source directories
+exclude = [
+    "venv313",
+    "data",
+    "scripts",
+    "research_diagnostics",
+    "__pycache__",
+    ".git",
+    "*.egg-info",
+]
+
+[lint]
+# Enable rule sets
+select = [
+    "E",   # pycodestyle errors
+    "F",   # pyflakes
+    "I",   # isort (import ordering)
+    "UP",  # pyupgrade (modern Python idioms)
+    "W",   # pycodestyle warnings
+]
+
+ignore = [
+    "E501",  # line too long — too many violations to fix in one pass
+    "E402",  # module level import not at top — needed for env setup patterns
+    "E701",  # multiple statements on one line — existing style, low priority
+    "E711",  # comparison to None — existing style (== None vs is None)
+    "E712",  # true/false comparison — existing style (== True vs is True)
+    "F821",  # undefined name — false positives from TYPE_CHECKING / forward refs
+    "F841",  # local variable assigned but never used — some are intentional stubs
+    "W291",  # trailing whitespace — pervasive in docstrings, low priority
+    "W293",  # whitespace on blank lines — pervasive in docstrings, low priority
+    "UP007", # non-PEP604 annotations (Optional[X] vs X | None) — cosmetic
+    "UP042", # replace StrEnum — existing pattern, deliberate choice
+    "UP045", # non-PEP604 Optional (same family as UP007)
+]
+
+[lint.per-file-ignores]
+# Allow unused imports in __init__.py (re-exports)
+"__init__.py" = ["F401"]
+# Tests / debug scripts: unused imports, redefined names
+"tests/*" = ["F811", "F401"]
+"audit_state.py" = ["E741"]
+"tests/phase4_checks.py" = ["F401"]
+# Existing patterns: bare except for tier parsing, conditional imports
+"src/agents/scale_selector.py" = ["E722"]
+"src/agents/director_tools.py" = ["E741"]
+"src/core/session_export.py" = ["F823"]
+
+[lint.isort]
+known-first-party = ["src", "api"]

@@ -17,7 +17,7 @@ import sqlite3
 import time
 from datetime import timedelta
 from pathlib import Path
-from typing import Optional, Any
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -54,8 +54,8 @@ CACHE_TYPE_WIKI_CHECK = "wiki_check"
 
 class ScraperCache:
     """SQLite-backed cache for API responses with status-aware TTL."""
-    
-    def __init__(self, db_path: Optional[str] = None):
+
+    def __init__(self, db_path: str | None = None):
         """
         Initialize the cache.
         
@@ -64,14 +64,14 @@ class ScraperCache:
         """
         if db_path is None:
             db_path = str(Path(__file__).parent.parent.parent / "data" / "scraper_cache.db")
-        
+
         self._db_path = db_path
         self._ensure_db()
-    
+
     def _ensure_db(self):
         """Create the cache table if it doesn't exist."""
         Path(self._db_path).parent.mkdir(parents=True, exist_ok=True)
-        
+
         with sqlite3.connect(self._db_path) as conn:
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS cache (
@@ -93,12 +93,12 @@ class ScraperCache:
                 ON cache(expires_at)
             """)
             conn.commit()
-    
+
     def _make_key(self, cache_type: str, identifier: str) -> str:
         """Generate a cache key."""
         return f"{cache_type}:{identifier.lower().strip()}"
-    
-    def get(self, cache_type: str, identifier: str) -> Optional[dict]:
+
+    def get(self, cache_type: str, identifier: str) -> dict | None:
         """
         Retrieve a cached response if it exists and hasn't expired.
         
@@ -111,33 +111,33 @@ class ScraperCache:
         """
         key = self._make_key(cache_type, identifier)
         now = time.time()
-        
+
         try:
             with sqlite3.connect(self._db_path) as conn:
                 row = conn.execute(
                     "SELECT data, expires_at FROM cache WHERE cache_key = ?",
                     (key,)
                 ).fetchone()
-                
+
                 if row is None:
                     return None
-                
+
                 data_json, expires_at = row
-                
+
                 if now > expires_at:
                     # Expired — delete and return miss
                     conn.execute("DELETE FROM cache WHERE cache_key = ?", (key,))
                     conn.commit()
                     logger.debug(f"Cache expired: {key}")
                     return None
-                
+
                 logger.debug(f"Cache hit: {key}")
                 return json.loads(data_json)
-                
+
         except Exception as e:
             logger.warning(f"Cache read error: {e}")
             return None
-    
+
     def put(
         self,
         cache_type: str,
@@ -160,7 +160,7 @@ class ScraperCache:
         """
         key = self._make_key(cache_type, identifier)
         now = time.time()
-        
+
         # Determine TTL
         if cache_type == CACHE_TYPE_ANILIST:
             ttl = ANILIST_TTL
@@ -168,12 +168,12 @@ class ScraperCache:
             ttl = WIKI_CHECK_TTL
         else:
             ttl = FANDOM_TTL_BY_STATUS.get(series_status, DEFAULT_FANDOM_TTL)
-        
+
         expires_at = now + ttl.total_seconds()
-        
+
         try:
             data_json = json.dumps(data, ensure_ascii=False, default=str)
-            
+
             with sqlite3.connect(self._db_path) as conn:
                 conn.execute("""
                     INSERT OR REPLACE INTO cache 
@@ -181,15 +181,15 @@ class ScraperCache:
                     VALUES (?, ?, ?, ?, ?, ?, ?)
                 """, (key, cache_type, data_json, series_status, now, expires_at, title))
                 conn.commit()
-            
+
             logger.debug(
                 f"Cache put: {key} (status={series_status}, "
                 f"ttl={ttl.days}d, title='{title}')"
             )
-            
+
         except Exception as e:
             logger.warning(f"Cache write error: {e}")
-    
+
     def invalidate(self, cache_type: str, identifier: str):
         """Remove a specific cache entry."""
         key = self._make_key(cache_type, identifier)
@@ -199,7 +199,7 @@ class ScraperCache:
                 conn.commit()
         except Exception as e:
             logger.warning(f"Cache invalidate error: {e}")
-    
+
     def clear_expired(self) -> int:
         """Remove all expired entries. Returns count of deleted rows."""
         now = time.time()
@@ -216,7 +216,7 @@ class ScraperCache:
         except Exception as e:
             logger.warning(f"Cache cleanup error: {e}")
             return 0
-    
+
     def clear_all(self):
         """Clear the entire cache."""
         try:
@@ -226,7 +226,7 @@ class ScraperCache:
             logger.info("Cache cleared")
         except Exception as e:
             logger.warning(f"Cache clear error: {e}")
-    
+
     def stats(self) -> dict:
         """Get cache statistics."""
         now = time.time()
@@ -237,14 +237,14 @@ class ScraperCache:
                     "SELECT COUNT(*) FROM cache WHERE expires_at > ?", (now,)
                 ).fetchone()[0]
                 expired = total - valid
-                
+
                 by_type = {}
                 for row in conn.execute(
                     "SELECT cache_type, COUNT(*) FROM cache WHERE expires_at > ? GROUP BY cache_type",
                     (now,)
                 ):
                     by_type[row[0]] = row[1]
-                
+
                 return {
                     "total": total,
                     "valid": valid,

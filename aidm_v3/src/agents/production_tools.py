@@ -10,11 +10,10 @@ ProductionAgent doesn't need memory search / NPC cards — it only writes
 back to the DB after reading the narrative.
 """
 
-from typing import Any, Optional
-from ..llm.tools import ToolDefinition, ToolParam, ToolRegistry
-
-
 import logging
+from typing import Any
+
+from ..llm.tools import ToolDefinition, ToolParam, ToolRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -23,8 +22,8 @@ def build_production_tools(
     current_turn: int,
     media_enabled: bool = False,
     media_budget_enabled: bool = False,
-    media_budget_remaining: Optional[float] = None,
-    campaign_id: Optional[int] = None,
+    media_budget_remaining: float | None = None,
+    campaign_id: int | None = None,
     style_context: str = "",
 ) -> ToolRegistry:
     """Build the tool registry for the ProductionAgent.
@@ -361,7 +360,7 @@ def _set_current_location(state, name: str) -> str:
 # Tool Handler Implementations — Media Generation
 # =========================================================================
 
-def _check_budget(budget_ctx: dict, estimated_cost: float) -> Optional[str]:
+def _check_budget(budget_ctx: dict, estimated_cost: float) -> str | None:
     """Check if a media generation is within budget. Returns error string or None."""
     if budget_ctx["enabled"] and budget_ctx["remaining"] is not None:
         if estimated_cost > budget_ctx["remaining"]:
@@ -389,7 +388,6 @@ def _trigger_cutscene(
     motion_prompt: str,
 ) -> str:
     """Trigger image -> video cutscene generation (fire-and-forget)."""
-    import asyncio
     try:
         # Budget check (~$0.11 for image + video)
         budget_error = _check_budget(budget_ctx, 0.11)
@@ -445,7 +443,6 @@ def _generate_npc_portrait(
     npc_name: str,
 ) -> str:
     """Generate portrait for an NPC that doesn't have one yet."""
-    import asyncio
     try:
         # Budget check (~$0.06 for model sheet + portrait)
         budget_error = _check_budget(budget_ctx, 0.06)
@@ -473,8 +470,8 @@ def _generate_npc_portrait(
 
         async def _generate():
             try:
-                from ..media.generator import MediaGenerator
                 from ..db.session import create_session as create_db_session
+                from ..media.generator import MediaGenerator
                 gen = MediaGenerator()
                 result = await gen.generate_full_character_media(
                     visual_tags=visual_tags,
@@ -537,7 +534,6 @@ def _generate_location_visual(
     location_name: str,
 ) -> str:
     """Generate visual for a location."""
-    import asyncio
     try:
         # Budget check (~$0.03 for one image)
         budget_error = _check_budget(budget_ctx, 0.03)
@@ -592,7 +588,7 @@ def _generate_location_visual(
 
 def _save_media_asset(
     campaign_id: int,
-    turn_number: Optional[int],
+    turn_number: int | None,
     asset_type: str,
     cutscene_type: str,
     file_path: str,
@@ -609,6 +605,7 @@ def _save_media_asset(
     """
     try:
         import os
+
         from ..db.models import MediaAsset
         from ..db.session import create_session as create_db_session
 

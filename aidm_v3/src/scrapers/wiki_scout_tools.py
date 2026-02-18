@@ -7,7 +7,7 @@ page content — before committing to a scraping plan.
 """
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from ..llm.tools import ToolDefinition, ToolParam, ToolRegistry
 
@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 def build_wiki_scout_tools(
     fandom_client: Any,  # FandomClient
     wiki_url: str,
-    all_categories: List[str],
+    all_categories: list[str],
 ) -> ToolRegistry:
     """Build tools for agentic wiki exploration.
     
@@ -30,11 +30,11 @@ def build_wiki_scout_tools(
         ToolRegistry with wiki exploration tools
     """
     registry = ToolRegistry()
-    
+
     # -----------------------------------------------------------------
     # CATEGORY EXPLORATION
     # -----------------------------------------------------------------
-    
+
     registry.register(ToolDefinition(
         name="list_categories",
         description=(
@@ -48,7 +48,7 @@ def build_wiki_scout_tools(
         ],
         handler=lambda filter="": _list_categories(all_categories, filter)
     ))
-    
+
     registry.register(ToolDefinition(
         name="get_category_size",
         description=(
@@ -60,7 +60,7 @@ def build_wiki_scout_tools(
         ],
         handler=lambda category: _get_category_size(fandom_client, wiki_url, category)
     ))
-    
+
     registry.register(ToolDefinition(
         name="preview_category",
         description=(
@@ -72,11 +72,11 @@ def build_wiki_scout_tools(
         ],
         handler=lambda category: _preview_category(fandom_client, wiki_url, category)
     ))
-    
+
     # -----------------------------------------------------------------
     # PAGE EXPLORATION
     # -----------------------------------------------------------------
-    
+
     registry.register(ToolDefinition(
         name="preview_page",
         description=(
@@ -88,7 +88,7 @@ def build_wiki_scout_tools(
         ],
         handler=lambda title: _preview_page(fandom_client, wiki_url, title)
     ))
-    
+
     registry.register(ToolDefinition(
         name="search_wiki",
         description=(
@@ -101,7 +101,7 @@ def build_wiki_scout_tools(
         ],
         handler=lambda query, limit=10: _search_wiki(fandom_client, wiki_url, query, int(limit))
     ))
-    
+
     return registry
 
 
@@ -109,7 +109,7 @@ def build_wiki_scout_tools(
 # Tool Handlers
 # =========================================================================
 
-def _list_categories(all_categories: List[str], filter_str: str = "") -> Dict:
+def _list_categories(all_categories: list[str], filter_str: str = "") -> dict:
     """List categories with optional filtering."""
     if filter_str:
         filtered = [c for c in all_categories if filter_str.lower() in c.lower()]
@@ -125,7 +125,7 @@ def _list_categories(all_categories: List[str], filter_str: str = "") -> Dict:
     }
 
 
-def _get_category_size(client, wiki_url: str, category: str) -> Dict:
+def _get_category_size(client, wiki_url: str, category: str) -> dict:
     """Get page count for a category."""
     try:
         members = client._get_category_members(wiki_url, category, limit=200)
@@ -138,7 +138,7 @@ def _get_category_size(client, wiki_url: str, category: str) -> Dict:
         return {"error": f"Failed to query category '{category}': {e}"}
 
 
-def _preview_category(client, wiki_url: str, category: str) -> Dict:
+def _preview_category(client, wiki_url: str, category: str) -> dict:
     """Get first 10 page titles from a category."""
     try:
         members = client._get_category_members(wiki_url, category, limit=10)
@@ -151,7 +151,7 @@ def _preview_category(client, wiki_url: str, category: str) -> Dict:
         return {"error": f"Failed to preview category '{category}': {e}"}
 
 
-def _preview_page(client, wiki_url: str, title: str) -> Dict:
+def _preview_page(client, wiki_url: str, title: str) -> dict:
     """Get a preview of a wiki page."""
     try:
         page = client._parse_page(wiki_url, title)
@@ -169,7 +169,7 @@ def _preview_page(client, wiki_url: str, title: str) -> Dict:
         return {"error": f"Failed to fetch page '{title}': {e}"}
 
 
-def _search_wiki(client, wiki_url: str, query: str, limit: int = 10) -> Dict:
+def _search_wiki(client, wiki_url: str, query: str, limit: int = 10) -> dict:
     """Search wiki for pages matching query."""
     try:
         params = {

@@ -9,20 +9,18 @@ Verifies:
 5. In-memory-only mode still works (state_manager=None)
 """
 
-import sys
 import os
+import sys
 
 # Add the parent directory so we can import src
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from src.db.models import Base, ForeshadowingSeedDB
-from src.db.state_manager import StateManager
-from src.core.foreshadowing import (
-    ForeshadowingLedger, SeedType, SeedStatus, ForeshadowingSeed
-)
-
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+
+from src.core.foreshadowing import ForeshadowingLedger, SeedStatus, SeedType
+from src.db.models import Base, ForeshadowingSeedDB
+from src.db.state_manager import StateManager
 
 
 def make_test_db():
@@ -50,7 +48,7 @@ def test_plant_persists_to_db():
     engine, Session = make_test_db()
     db = Session()
     sm = make_state_manager(db)
-    
+
     ledger = ForeshadowingLedger(campaign_id=1, state_manager=sm)
     seed_id = ledger.plant_seed(
         seed_type=SeedType.MYSTERY,
@@ -62,12 +60,12 @@ def test_plant_persists_to_db():
         tags=["mysterious_figure", "rooftop"],
         related_npcs=["Mentor"]
     )
-    
+
     # Verify in DB
     row = db.query(ForeshadowingSeedDB).filter(
         ForeshadowingSeedDB.seed_id == seed_id
     ).first()
-    
+
     assert row is not None, "Seed should be in DB"
     assert row.seed_type == "mystery"
     assert row.status == "planted"
@@ -83,7 +81,7 @@ def test_restart_loads_from_db():
     engine, Session = make_test_db()
     db = Session()
     sm = make_state_manager(db)
-    
+
     # Plant seeds in first ledger
     ledger1 = ForeshadowingLedger(campaign_id=1, state_manager=sm)
     id1 = ledger1.plant_seed(
@@ -96,10 +94,10 @@ def test_restart_loads_from_db():
         planted_narrative="B happened.", expected_payoff="B resolves.",
         turn_number=2, session_number=1
     )
-    
+
     # "Restart" — create new instance with same state_manager
     ledger2 = ForeshadowingLedger(campaign_id=1, state_manager=sm)
-    
+
     assert len(ledger2._seeds) == 2, f"Expected 2 seeds, got {len(ledger2._seeds)}"
     assert id1 in ledger2._seeds
     assert id2 in ledger2._seeds
@@ -114,7 +112,7 @@ def test_next_id_survives_restart():
     engine, Session = make_test_db()
     db = Session()
     sm = make_state_manager(db)
-    
+
     ledger1 = ForeshadowingLedger(campaign_id=1, state_manager=sm)
     ledger1.plant_seed(
         seed_type=SeedType.PLOT, description="First",
@@ -127,11 +125,11 @@ def test_next_id_survives_restart():
         turn_number=2, session_number=1
     )
     # _next_id should be 3
-    
+
     # "Restart"
     ledger2 = ForeshadowingLedger(campaign_id=1, state_manager=sm)
     assert ledger2._next_id == 3, f"Expected _next_id=3, got {ledger2._next_id}"
-    
+
     # Plant a new seed — should be seed_1_3, not seed_1_1
     new_id = ledger2.plant_seed(
         seed_type=SeedType.CHARACTER, description="Third",
@@ -148,24 +146,24 @@ def test_mention_persists():
     engine, Session = make_test_db()
     db = Session()
     sm = make_state_manager(db)
-    
+
     ledger = ForeshadowingLedger(campaign_id=1, state_manager=sm)
     sid = ledger.plant_seed(
         seed_type=SeedType.MYSTERY, description="Who?",
         planted_narrative="x", expected_payoff="y",
         turn_number=1, session_number=1
     )
-    
+
     # Mention 3 times to trigger GROWING status
     ledger.mention_seed(sid, turn_number=5)
     ledger.mention_seed(sid, turn_number=6)
     ledger.mention_seed(sid, turn_number=7)
-    
+
     # Verify in DB
     row = db.query(ForeshadowingSeedDB).filter(
         ForeshadowingSeedDB.seed_id == sid
     ).first()
-    
+
     assert row.mentions == 4, f"Expected 4 mentions, got {row.mentions}"
     assert row.last_mentioned_turn == 7
     assert row.status == "growing"
@@ -178,20 +176,20 @@ def test_resolve_persists():
     engine, Session = make_test_db()
     db = Session()
     sm = make_state_manager(db)
-    
+
     ledger = ForeshadowingLedger(campaign_id=1, state_manager=sm)
     sid = ledger.plant_seed(
         seed_type=SeedType.CHEKHOV, description="The sword",
         planted_narrative="A sword on the wall.", expected_payoff="Used in battle.",
         turn_number=1, session_number=1
     )
-    
+
     ledger.resolve_seed(sid, turn_number=20, resolution_narrative="The sword was drawn in the final battle.")
-    
+
     row = db.query(ForeshadowingSeedDB).filter(
         ForeshadowingSeedDB.seed_id == sid
     ).first()
-    
+
     assert row.status == "resolved"
     assert row.resolved_turn == 20
     assert "final battle" in row.resolution_narrative
@@ -204,20 +202,20 @@ def test_abandon_persists():
     engine, Session = make_test_db()
     db = Session()
     sm = make_state_manager(db)
-    
+
     ledger = ForeshadowingLedger(campaign_id=1, state_manager=sm)
     sid = ledger.plant_seed(
         seed_type=SeedType.PROMISE, description="The treasure",
         planted_narrative="A map was found.", expected_payoff="Finding the treasure.",
         turn_number=1, session_number=1
     )
-    
+
     ledger.abandon_seed(sid, reason="Player chose a different path")
-    
+
     row = db.query(ForeshadowingSeedDB).filter(
         ForeshadowingSeedDB.seed_id == sid
     ).first()
-    
+
     assert row.status == "abandoned"
     assert "different path" in row.resolution_narrative
     print("✓ test_abandon_persists")
@@ -232,11 +230,11 @@ def test_pure_in_memory_mode():
         planted_narrative="x", expected_payoff="y",
         turn_number=1, session_number=1
     )
-    
+
     assert sid in ledger._seeds
     ledger.mention_seed(sid, 5)
     assert ledger._seeds[sid].mentions == 2
-    
+
     ledger.resolve_seed(sid, 10, "done")
     assert ledger._seeds[sid].status == SeedStatus.RESOLVED
     print("✓ test_pure_in_memory_mode")

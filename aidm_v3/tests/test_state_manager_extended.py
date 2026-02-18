@@ -5,15 +5,15 @@ with coverage for the mixin methods added in Phase 5.
 """
 
 import os
+
 import pytest
 
 os.environ.setdefault("DATABASE_URL", "sqlite:///:memory:")
 os.environ.setdefault("ANTHROPIC_API_KEY", "test-key")
 
-from src.db.state_manager import StateManager, GameContext
-from src.db.session import init_db, get_engine
 from src.db.models import Base
-
+from src.db.session import get_engine, init_db
+from src.db.state_manager import GameContext, StateManager
 
 # ---------------------------------------------------------------------------
 # Fixtures (self-contained, don't rely on conftest for DB isolation)

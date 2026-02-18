@@ -7,14 +7,13 @@ Per Module 12: 9 narrative scales for different power situations.
 Replaces hardcoded tier threshold logic with LLM-informed selection.
 """
 
-from typing import Optional, List, Literal, Dict, Any
-from pydantic import BaseModel, Field
+import logging
 from enum import Enum
+from typing import Any
+
+from pydantic import BaseModel, Field
 
 from .base import BaseAgent
-
-
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -82,15 +81,15 @@ SCALE_COMPATIBILITY = {
 
 class ScaleOutput(BaseModel):
     """Output from the Scale Selector Agent."""
-    
+
     primary_scale: NarrativeScale = Field(
         description="The main narrative scale to use"
     )
-    secondary_scale: Optional[NarrativeScale] = Field(
+    secondary_scale: NarrativeScale | None = Field(
         default=None,
         description="Optional secondary scale for hybrid moments"
     )
-    
+
     # Power analysis
     power_imbalance: float = Field(
         default=0.0,
@@ -100,7 +99,7 @@ class ScaleOutput(BaseModel):
         default=0,
         description="Tier difference between combatants (positive = player stronger)"
     )
-    
+
     # Context flags
     is_climactic: bool = Field(
         default=False,
@@ -110,9 +109,9 @@ class ScaleOutput(BaseModel):
         default=False,
         description="Is this a training/growth moment?"
     )
-    
+
     # Narrative guidance
-    recommended_techniques: List[str] = Field(
+    recommended_techniques: list[str] = Field(
         default_factory=list,
         description="Specific techniques for this scale"
     )
@@ -120,7 +119,7 @@ class ScaleOutput(BaseModel):
         default="",
         description="Where tension comes from at this scale"
     )
-    
+
     # Justification
     reasoning: str = Field(
         default="",
@@ -134,7 +133,7 @@ class PowerImbalanceOutput(BaseModel):
     
     Per Module 12: Effective Imbalance = (PC Raw × Context) ÷ Threat Raw
     """
-    
+
     # Raw calculation
     raw_imbalance: float = Field(
         description="Raw power ratio (PC tier ÷ threat tier)"
@@ -142,9 +141,9 @@ class PowerImbalanceOutput(BaseModel):
     effective_imbalance: float = Field(
         description="After context modifiers applied"
     )
-    
+
     # Context modifiers detected (Module 12)
-    context_modifiers: List[str] = Field(
+    context_modifiers: list[str] = Field(
         default_factory=list,
         description="Active modifiers: environmental, secret_id, self_limiter, mentor, political, genre"
     )
@@ -152,16 +151,16 @@ class PowerImbalanceOutput(BaseModel):
         default=1.0,
         description="Combined modifier multiplier (0.1 to 1.0)"
     )
-    
+
     # Threshold result (Module 12)
     threshold: str = Field(
         description="balanced (0.5-1.5), moderate (1.5-3), significant (3-10), overwhelming (10+)"
     )
-    recommended_scale_shift: Optional[str] = Field(
+    recommended_scale_shift: str | None = Field(
         default=None,
         description="Recommended scale if threshold crossed"
     )
-    
+
     # Trigger flags
     triggers_op_mode: bool = Field(
         default=False,
@@ -171,7 +170,7 @@ class PowerImbalanceOutput(BaseModel):
         default=False,
         description="True if imbalance > 3 (shift to non-combat tension)"
     )
-    
+
     # Reasoning
     reasoning: str = Field(
         default="",
@@ -188,17 +187,17 @@ class ScaleSelectorAgent(BaseAgent):
     - Where tension comes from (physical danger vs existential)
     - Which techniques apply (teamwork vs solo spotlight)
     """
-    
+
     agent_name = "scale_selector"
-    
+
     @property
     def system_prompt(self):
         return self._load_prompt_file("scale_selector.md", "You are the Narrative Scale Selector for an anime JRPG.")
-    
+
     async def select_scale(
         self,
         player_tier: str,
-        opponent_tier: Optional[str],
+        opponent_tier: str | None,
         situation: str,
         profile_combat_style: str,
         arc_phase: str,
@@ -224,7 +223,7 @@ class ScaleSelectorAgent(BaseAgent):
             player_num = self._tier_to_num(player_tier)
             opponent_num = self._tier_to_num(opponent_tier)
             tier_gap = opponent_num - player_num  # Positive = player stronger
-        
+
         # Build context
         context = f"""# Scale Selection Request
 
@@ -247,16 +246,16 @@ Consider: power dynamics, profile style, current arc phase.
 If this is a climactic moment, prioritize dramatic scales.
 If the player is significantly outmatched (2+ tiers below), consider UNDERDOG or HORROR.
 If the player is significantly stronger (2+ tiers above), consider SPECTACLE or COMEDY (OP mode)."""
-        
+
         result = await self.call(context)
-        
+
         # Ensure tier_gap is set
         if isinstance(result, ScaleOutput):
             result.tier_gap = tier_gap
             result.power_imbalance = max(-1.0, min(1.0, tier_gap / 5.0))
-        
+
         return result
-    
+
     def _tier_to_num(self, tier: str) -> int:
         """Convert tier string to number (T10=0, T1=9)."""
         try:
@@ -265,14 +264,14 @@ If the player is significantly stronger (2+ tiers above), consider SPECTACLE or 
             return 10 - num  # T10 → 0, T1 → 9
         except:
             return 0  # Default to lowest power
-    
+
     async def calculate_power_imbalance(
         self,
         player_tier: str,
         threat_tier: str,
         situation: str,
-        op_preset: Optional[str] = None,
-        op_tension_source: Optional[str] = None,
+        op_preset: str | None = None,
+        op_tension_source: str | None = None,
         location: str = "",
         has_allies: bool = False
     ) -> PowerImbalanceOutput:
@@ -307,18 +306,18 @@ If the player is significantly stronger (2+ tiers above), consider SPECTACLE or 
         # Calculate raw imbalance (higher = player stronger)
         player_num = self._tier_to_num(player_tier)
         threat_num = self._tier_to_num(threat_tier)
-        
+
         # Raw ratio: T5 vs T10 = 9/0 → clamped | T10 vs T5 = 0/9 → 0
         if threat_num == 0:
             raw_imbalance = player_num * 2  # High advantage
         else:
             raw_imbalance = player_num / max(1, threat_num)
-        
+
         # OPTIMIZATION: Skip LLM only for SAME-TIER fights
         # Any tier difference warrants modifier detection (tiers are planet-scale differences)
         # raw_imbalance == 1.0 means exact same tier (player_num / threat_num == 1)
         if raw_imbalance == 1.0:
-            logger.warning(f"Same tier fight, skipping modifier detection")
+            logger.warning("Same tier fight, skipping modifier detection")
             return PowerImbalanceOutput(
                 raw_imbalance=raw_imbalance,
                 effective_imbalance=raw_imbalance,
@@ -330,7 +329,7 @@ If the player is significantly stronger (2+ tiers above), consider SPECTACLE or 
                 triggers_tension_shift=False,
                 reasoning="Same tier fight - no modifier detection needed"
             )
-        
+
         # Build prompt for context modifier detection
         context = f"""# Power Imbalance Context Analysis
 
@@ -363,12 +362,12 @@ Return which modifiers apply and the combined multiplier."""
 
         # LLM call to detect modifiers (judgment = API call)
         result = await self._detect_context_modifiers(context, raw_imbalance, player_tier, threat_tier)
-        
+
         return result
-    
+
     async def _detect_context_modifiers(
-        self, 
-        context: str, 
+        self,
+        context: str,
         raw_imbalance: float,
         player_tier: str,
         threat_tier: str
@@ -376,12 +375,13 @@ Return which modifiers apply and the combined multiplier."""
         """
         Use LLM to detect context modifiers from situation.
         """
-        from pydantic import BaseModel as PydanticModel, Field as PydanticField
-        from typing import List as TypingList
-        
+
+        from pydantic import BaseModel as PydanticModel
+        from pydantic import Field as PydanticField
+
         class ModifierDetection(PydanticModel):
             """Context modifier detection."""
-            detected_modifiers: TypingList[str] = PydanticField(
+            detected_modifiers: list[str] = PydanticField(
                 description="List of active modifiers: environmental, secret_id, self_limiter, mentor, political, genre"
             )
             modifier_values: dict = PydanticField(
@@ -391,16 +391,16 @@ Return which modifiers apply and the combined multiplier."""
             reasoning: str = PydanticField(
                 description="Why these modifiers were detected"
             )
-        
+
         # Store original schema, use modifier detection
         original_schema = self._output_schema_override
         self._output_schema_override = ModifierDetection
-        
+
         try:
             detection = await self.call(context)
         finally:
             self._output_schema_override = original_schema
-        
+
         # Calculate total modifier
         if not isinstance(detection, ModifierDetection):
             # Fallback if LLM fails
@@ -409,15 +409,15 @@ Return which modifiers apply and the combined multiplier."""
                 modifier_values={},
                 reasoning="Fallback: no modifiers detected"
             )
-        
+
         total_modifier = 1.0
         for mod, value in detection.modifier_values.items():
             if isinstance(value, (int, float)) and 0.1 <= value <= 1.0:
                 total_modifier *= value
-        
+
         # Calculate effective imbalance
         effective_imbalance = raw_imbalance * total_modifier
-        
+
         # Determine threshold (Module 12)
         if effective_imbalance <= 1.5:
             threshold = "balanced"
@@ -431,7 +431,7 @@ Return which modifiers apply and the combined multiplier."""
         else:
             threshold = "overwhelming"
             recommended_shift = "spectacle/concept/op_mode"
-        
+
         return PowerImbalanceOutput(
             raw_imbalance=raw_imbalance,
             effective_imbalance=effective_imbalance,
@@ -443,16 +443,16 @@ Return which modifiers apply and the combined multiplier."""
             triggers_tension_shift=effective_imbalance > 3,
             reasoning=detection.reasoning
         )
-    
+
     _output_schema_override = None
-    
+
     @property
     def output_schema(self):
         if self._output_schema_override:
             return self._output_schema_override
         return ScaleOutput
-    
-    def get_scale_techniques(self, scale: NarrativeScale) -> List[str]:
+
+    def get_scale_techniques(self, scale: NarrativeScale) -> list[str]:
         """Get recommended narration techniques for a scale."""
         techniques = {
             NarrativeScale.TACTICAL: [
@@ -520,7 +520,7 @@ Return which modifiers apply and the combined multiplier."""
             ]
         }
         return techniques.get(scale, [])
-    
+
     def get_tension_source(self, scale: NarrativeScale) -> str:
         """Get the tension source for a scale."""
         sources = {
@@ -535,14 +535,14 @@ Return which modifiers apply and the combined multiplier."""
             NarrativeScale.COMEDY: "What absurdity comes next?"
         }
         return sources.get(scale, "Narrative tension")
-    
+
     def _tier_to_range(self, tier: str) -> str:
         """Convert tier to tier range for compatibility lookup."""
         try:
             tier_num = int(tier.replace("T", "").strip())
         except:
             return "human"
-        
+
         if tier_num >= 10:
             return "human"
         elif tier_num == 9:
@@ -557,7 +557,7 @@ Return which modifiers apply and the combined multiplier."""
             return "cosmic"
         else:
             return "boundless"
-    
+
     def check_scale_compatibility(self, scale: NarrativeScale, tier: str) -> str:
         """
         Check if a scale is compatible with a power tier.
@@ -571,11 +571,11 @@ Return which modifiers apply and the combined multiplier."""
         """
         tier_range = self._tier_to_range(tier)
         scale_name = scale.value if isinstance(scale, NarrativeScale) else scale
-        
+
         compatibility = SCALE_COMPATIBILITY.get(tier_range, {})
         return compatibility.get(scale_name, "ACCEPTABLE")
-    
-    def validate_scale(self, scale: NarrativeScale, tier: str) -> Dict[str, Any]:
+
+    def validate_scale(self, scale: NarrativeScale, tier: str) -> dict[str, Any]:
         """
         Validate a scale choice and suggest alternatives if forbidden.
         
@@ -588,7 +588,7 @@ Return which modifiers apply and the combined multiplier."""
         """
         compatibility = self.check_scale_compatibility(scale, tier)
         tier_range = self._tier_to_range(tier)
-        
+
         result = {
             "is_valid": compatibility != "FORBIDDEN",
             "compatibility": compatibility,
@@ -598,7 +598,7 @@ Return which modifiers apply and the combined multiplier."""
             "alternative": None,
             "warning": None
         }
-        
+
         if compatibility == "FORBIDDEN":
             # Find best alternative
             alternatives = SCALE_COMPATIBILITY.get(tier_range, {})
@@ -608,15 +608,15 @@ Return which modifiers apply and the combined multiplier."""
             result["warning"] = f"{scale} is FORBIDDEN at {tier}. Consider: {', '.join(ok_scales[:3])}"
         elif compatibility == "DISCOURAGED":
             result["warning"] = f"{scale} is DISCOURAGED at {tier}. Proceed with caution."
-        
+
         return result
-    
+
     async def suggest_op_preset(
         self,
-        behavior_history: List[str],
+        behavior_history: list[str],
         character_tier: str,
         high_imbalance_count: int
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """
         Suggest an OP preset based on observed player behavior.
         
@@ -633,15 +633,15 @@ Return which modifiers apply and the combined multiplier."""
         # Need 3+ high-imbalance encounters to suggest
         if high_imbalance_count < 3:
             return None
-        
+
         # Need to be at least T7 (building level)
         tier_num = self._tier_to_num(character_tier)
         if tier_num < 3:  # T7 or lower
             return None
-        
+
         # Behavior patterns that suggest presets
         behavior_text = "\n".join(behavior_history[-20:])  # Last 20 actions
-        
+
         context = f"""# OP Preset Suggestion
 
 ## Player Behavior Analysis
@@ -668,8 +668,9 @@ Based on observed behavior, suggest the most appropriate OP Protagonist preset:
 
 Analyze the behavior patterns and recommend the best fit."""
 
-        from pydantic import BaseModel as PydanticModel, Field as PydanticField
-        
+        from pydantic import BaseModel as PydanticModel
+        from pydantic import Field as PydanticField
+
         class PresetSuggestion(PydanticModel):
             suggested_preset: str = PydanticField(
                 description="One of: bored_god, restrainer, hidden_ruler, burden_bearer, muscle_wizard, etc."
@@ -689,15 +690,15 @@ Analyze the behavior patterns and recommend the best fit."""
             reasoning: str = PydanticField(
                 description="Why this preset fits the observed behavior"
             )
-        
+
         original_schema = self._output_schema_override
         self._output_schema_override = PresetSuggestion
-        
+
         try:
             suggestion = await self.call(context)
         finally:
             self._output_schema_override = original_schema
-        
+
         if isinstance(suggestion, PresetSuggestion):
             return {
                 "preset": suggestion.suggested_preset,
@@ -708,7 +709,7 @@ Analyze the behavior patterns and recommend the best fit."""
                 "reasoning": suggestion.reasoning,
                 "should_prompt": suggestion.confidence >= 0.7
             }
-        
+
         return None
 
 

@@ -1,14 +1,16 @@
 """FastAPI main application for AIDM v3."""
 
+import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from pathlib import Path
-import logging
 
-from .routes import settings, game, research
 from src.logging_config import setup_logging
+
+from .routes import game, research, settings
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +60,7 @@ async def health_check():
 async def list_providers():
     """List available LLM providers."""
     from src.llm import get_llm_manager
-    
+
     manager = get_llm_manager()
     return {
         "available": manager.list_available_providers(),

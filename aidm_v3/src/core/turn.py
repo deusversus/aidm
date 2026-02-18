@@ -1,7 +1,7 @@
 """Turn dataclass for representing a completed turn."""
 
 from dataclasses import dataclass
-from typing import Optional, Dict, Any
+from typing import Any
 
 from ..agents.intent_classifier import IntentOutput
 from ..agents.outcome_judge import OutcomeOutput
@@ -11,21 +11,21 @@ from ..agents.outcome_judge import OutcomeOutput
 class Turn:
     """Working object for a turn in progress."""
     input_text: str
-    intent: Optional[IntentOutput] = None
-    outcome: Optional[OutcomeOutput] = None
-    narrative: Optional[str] = None
+    intent: IntentOutput | None = None
+    outcome: OutcomeOutput | None = None
+    narrative: str | None = None
 
 
 @dataclass
 class TurnResult:
     """Result of processing a single turn."""
-    
+
     narrative: str
     intent: IntentOutput
     outcome: OutcomeOutput
     latency_ms: int
-    cost_usd: Optional[float] = None
-    state_changes: Optional[Dict[str, Any]] = None
-    portrait_map: Optional[Dict[str, str]] = None  # {"NPC Name": "/api/game/media/..."}
-    turn_number: Optional[int] = None
-    campaign_id: Optional[int] = None
+    cost_usd: float | None = None
+    state_changes: dict[str, Any] | None = None
+    portrait_map: dict[str, str] | None = None  # {"NPC Name": "/api/game/media/..."}
+    turn_number: int | None = None
+    campaign_id: int | None = None

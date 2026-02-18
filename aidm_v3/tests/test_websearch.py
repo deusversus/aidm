@@ -1,14 +1,16 @@
 """Test Anthropic web search directly."""
 import asyncio
 import os
+
 import anthropic
+
 
 async def test():
     client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
-    
+
     print("Testing web search with correct format...")
     print("=" * 60)
-    
+
     try:
         response = client.messages.create(
             model="claude-sonnet-4-6",

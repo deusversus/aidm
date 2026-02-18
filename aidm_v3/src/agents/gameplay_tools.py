@@ -11,11 +11,10 @@ Usage:
     response = await provider.complete_with_tools(messages, tools, ...)
 """
 
-import json
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-from ..llm.tools import ToolDefinition, ToolParam, ToolRegistry
 from ..enums import ArcPhase, NPCIntelligenceStage
+from ..llm.tools import ToolDefinition, ToolParam, ToolRegistry
 
 
 def build_gameplay_tools(
@@ -38,11 +37,11 @@ def build_gameplay_tools(
         ToolRegistry populated with gameplay tools
     """
     registry = ToolRegistry()
-    
+
     # -----------------------------------------------------------------
     # MEMORY TOOLS
     # -----------------------------------------------------------------
-    
+
     registry.register(ToolDefinition(
         name="search_memory",
         description=(
@@ -68,7 +67,7 @@ def build_gameplay_tools(
             memory, query, limit, memory_type, keyword
         )
     ))
-    
+
     registry.register(ToolDefinition(
         name="get_critical_memories",
         description=(
@@ -80,7 +79,7 @@ def build_gameplay_tools(
         parameters=[],
         handler=lambda: _get_critical_memories(memory)
     ))
-    
+
     registry.register(ToolDefinition(
         name="get_recent_episodes",
         description=(
@@ -92,11 +91,11 @@ def build_gameplay_tools(
         ],
         handler=lambda count=5: _get_recent_episodes(memory, count)
     ))
-    
+
     # -----------------------------------------------------------------
-    # NPC TOOLS  
+    # NPC TOOLS
     # -----------------------------------------------------------------
-    
+
     registry.register(ToolDefinition(
         name="get_npc_details",
         description=(
@@ -109,7 +108,7 @@ def build_gameplay_tools(
         ],
         handler=lambda name: _get_npc_details(state, name)
     ))
-    
+
     registry.register(ToolDefinition(
         name="list_known_npcs",
         description=(
@@ -119,11 +118,11 @@ def build_gameplay_tools(
         parameters=[],
         handler=lambda: _list_known_npcs(state)
     ))
-    
+
     # -----------------------------------------------------------------
     # TRANSCRIPT TOOLS
     # -----------------------------------------------------------------
-    
+
     registry.register(ToolDefinition(
         name="search_transcript",
         description=(
@@ -136,11 +135,11 @@ def build_gameplay_tools(
         ],
         handler=lambda query: _search_transcript(session_transcript, query)
     ))
-    
+
     # -----------------------------------------------------------------
     # WORLD STATE TOOLS
     # -----------------------------------------------------------------
-    
+
     registry.register(ToolDefinition(
         name="get_world_state",
         description=(
@@ -150,7 +149,7 @@ def build_gameplay_tools(
         parameters=[],
         handler=lambda: _get_world_state(state)
     ))
-    
+
     registry.register(ToolDefinition(
         name="get_character_sheet",
         description=(
@@ -160,11 +159,11 @@ def build_gameplay_tools(
         parameters=[],
         handler=lambda: _get_character_sheet(state)
     ))
-    
+
     # -----------------------------------------------------------------
     # LORE TOOLS (IP canon knowledge)
     # -----------------------------------------------------------------
-    
+
     if profile_library and profile_id:
         registry.register(ToolDefinition(
             name="search_lore",
@@ -186,11 +185,11 @@ def build_gameplay_tools(
                 profile_library, profile_id, query, page_type, limit
             )
         ))
-    
+
     # -----------------------------------------------------------------
     # FACTION TOOLS
     # -----------------------------------------------------------------
-    
+
     registry.register(ToolDefinition(
         name="get_faction_details",
         description=(
@@ -203,7 +202,7 @@ def build_gameplay_tools(
         ],
         handler=lambda name: _get_faction_details(state, name)
     ))
-    
+
     registry.register(ToolDefinition(
         name="list_factions",
         description=(
@@ -213,11 +212,11 @@ def build_gameplay_tools(
         parameters=[],
         handler=lambda: _list_factions(state)
     ))
-    
+
     # -----------------------------------------------------------------
     # DEEP RECALL TOOLS (#30)
     # -----------------------------------------------------------------
-    
+
     registry.register(ToolDefinition(
         name="recall_scene",
         description=(
@@ -240,7 +239,7 @@ def build_gameplay_tools(
             state, query, npc, turn_range
         )
     ))
-    
+
     return registry
 
 
@@ -251,7 +250,7 @@ def build_gameplay_tools(
 def _search_memory(
     memory, query: str, limit: int = 5,
     memory_type: str = None, keyword: str = None,
-) -> List[Dict]:
+) -> list[dict]:
     """Search ChromaDB for memories matching the query."""
     # Use hybrid search if keyword is provided for best results
     if keyword:
@@ -278,7 +277,7 @@ def _search_memory(
     ]
 
 
-def _get_critical_memories(memory) -> List[Dict]:
+def _get_critical_memories(memory) -> list[dict]:
     """Get all memories with plot_critical or session_zero flags."""
     try:
         all_results = memory.collection.get(
@@ -286,15 +285,15 @@ def _get_critical_memories(memory) -> List[Dict]:
         )
     except Exception:
         return [{"error": "Could not access memory store"}]
-    
+
     if not all_results["ids"]:
         return []
-    
+
     critical = []
     for i, mem_id in enumerate(all_results["ids"]):
         metadata = all_results["metadatas"][i]
         flags_str = metadata.get("flags", "")
-        
+
         if "plot_critical" in flags_str or "session_zero" in flags_str:
             critical.append({
                 "content": all_results["documents"][i],
@@ -302,11 +301,11 @@ def _get_critical_memories(memory) -> List[Dict]:
                 "flags": flags_str,
                 "turn": metadata.get("turn", "?"),
             })
-    
+
     return critical
 
 
-def _get_recent_episodes(memory, count: int = 5) -> List[Dict]:
+def _get_recent_episodes(memory, count: int = 5) -> list[dict]:
     """Get the N most recent episodic memories."""
     try:
         all_results = memory.collection.get(
@@ -314,10 +313,10 @@ def _get_recent_episodes(memory, count: int = 5) -> List[Dict]:
         )
     except Exception:
         return [{"error": "Could not access memory store"}]
-    
+
     if not all_results["ids"]:
         return []
-    
+
     episodes = []
     for i, mem_id in enumerate(all_results["ids"]):
         metadata = all_results["metadatas"][i]
@@ -328,18 +327,18 @@ def _get_recent_episodes(memory, count: int = 5) -> List[Dict]:
                 "turn": turn,
                 "location": metadata.get("location", "unknown"),
             })
-    
+
     # Sort by turn number descending (most recent first)
     episodes.sort(key=lambda e: e["turn"], reverse=True)
     return episodes[:count]
 
 
-def _get_npc_details(state, name: str) -> Dict:
+def _get_npc_details(state, name: str) -> dict:
     """Get full NPC card as a dict."""
     npc = state.get_npc_by_name(name)
     if not npc:
         return {"error": f"No NPC found matching '{name}'"}
-    
+
     # Disposition label
     disp = npc.disposition or 0
     if disp >= 90: disp_label = "devoted"
@@ -348,7 +347,7 @@ def _get_npc_details(state, name: str) -> Dict:
     elif disp >= -20: disp_label = "neutral"
     elif disp >= -60: disp_label = "unfriendly"
     else: disp_label = "hostile"
-    
+
     return {
         "name": npc.name,
         "role": npc.role or "unknown",
@@ -370,19 +369,19 @@ def _get_npc_details(state, name: str) -> Dict:
     }
 
 
-def _list_known_npcs(state) -> List[Dict]:
+def _list_known_npcs(state) -> list[dict]:
     """List all NPCs with basic info."""
     npcs = state.get_all_npcs()
     if not npcs:
         return [{"info": "No NPCs in campaign yet"}]
-    
+
     result = []
     for npc in npcs:
         disp = npc.disposition or 0
         if disp >= 60: disp_label = "positive"
-        elif disp >= -20: disp_label = "neutral" 
+        elif disp >= -20: disp_label = "neutral"
         else: disp_label = "negative"
-        
+
         result.append({
             "name": npc.name,
             "role": npc.role or "unknown",
@@ -392,15 +391,15 @@ def _list_known_npcs(state) -> List[Dict]:
             "last_appeared": npc.last_appeared,
             "intelligence": npc.intelligence_stage or NPCIntelligenceStage.REACTIVE,
         })
-    
+
     return result
 
 
-def _search_transcript(transcript: list, query: str) -> List[Dict]:
+def _search_transcript(transcript: list, query: str) -> list[dict]:
     """Simple keyword search on the session transcript."""
     if not transcript:
         return [{"info": "No transcript available for this session"}]
-    
+
     query_lower = query.lower()
     matches = []
     for msg in transcript:
@@ -411,19 +410,19 @@ def _search_transcript(transcript: list, query: str) -> List[Dict]:
                 "speaker": role,
                 "excerpt": content[:500],
             })
-    
+
     if not matches:
         return [{"info": f"No transcript matches for '{query}'"}]
-    
+
     return matches[:10]  # Cap at 10 results
 
 
-def _get_world_state(state) -> Dict:
+def _get_world_state(state) -> dict:
     """Get current world state as a dict."""
     ws = state.get_world_state()
     if not ws:
         return {"error": "No world state found"}
-    
+
     return {
         "location": ws.location or "Unknown",
         "time_of_day": ws.time_of_day or "Unknown",
@@ -437,12 +436,12 @@ def _get_world_state(state) -> Dict:
     }
 
 
-def _get_character_sheet(state) -> Dict:
+def _get_character_sheet(state) -> dict:
     """Get player character sheet as a dict."""
     char = state.get_character()
     if not char:
         return {"error": "No player character found"}
-    
+
     return {
         "name": char.name,
         "level": char.level,
@@ -476,7 +475,7 @@ def _get_character_sheet(state) -> Dict:
 def _search_lore(
     profile_library, profile_id: str, query: str,
     page_type: str = None, limit: int = 3,
-) -> List[Dict]:
+) -> list[dict]:
     """Search the canonical lore library for IP-accurate content."""
     try:
         results = profile_library.search_lore(
@@ -493,12 +492,12 @@ def _search_lore(
         return [{"error": f"Lore search failed: {e}"}]
 
 
-def _get_faction_details(state, name: str) -> Dict:
+def _get_faction_details(state, name: str) -> dict:
     """Get full faction card as a dict."""
     faction = state.get_faction_by_name(name)
     if not faction:
         return {"error": f"No faction found matching '{name}'"}
-    
+
     return {
         "name": faction.name,
         "description": faction.description or "Unknown",
@@ -517,12 +516,12 @@ def _get_faction_details(state, name: str) -> Dict:
     }
 
 
-def _list_factions(state) -> List[Dict]:
+def _list_factions(state) -> list[dict]:
     """List all factions with summary info."""
     factions = state.get_all_factions()
     if not factions:
         return [{"info": "No factions in campaign yet"}]
-    
+
     return [
         {
             "name": f.name,
@@ -546,11 +545,11 @@ def _recall_scene(state, query: str, npc: str = None, turn_range: str = None):
                 tr = (int(parts[0]), int(parts[1]))
             except ValueError:
                 pass
-    
+
     results = state.search_turn_narratives(query, npc=npc, turn_range=tr)
     if not results:
         return "No matching scenes found."
-    
+
     lines = []
     for r in results:
         player_ctx = f" (Player: {r['player_input']})" if r.get("player_input") else ""

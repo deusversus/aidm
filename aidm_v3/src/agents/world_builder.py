@@ -1,28 +1,28 @@
 """World Builder Agent - Extract and validate player world-building assertions."""
 
-from pydantic import BaseModel, Field
-from typing import Literal, Optional, List, Dict, Any
-from .base import BaseAgent
-
-
 import logging
+from typing import Any, Literal
+
+from pydantic import BaseModel, Field
+
+from .base import BaseAgent
 
 logger = logging.getLogger(__name__)
 
 class WorldBuildingEntity(BaseModel):
     """A single entity being asserted by the player."""
-    
+
     entity_type: Literal["npc", "item", "location", "faction", "event", "ability", "relationship"] = Field(
         description="Type of entity being created or referenced"
     )
     name: str = Field(
         description="Name of the entity"
     )
-    details: Dict[str, Any] = Field(
+    details: dict[str, Any] = Field(
         default_factory=dict,
         description="Additional details about the entity (role, description, properties, etc.)"
     )
-    implied_backstory: Optional[str] = Field(
+    implied_backstory: str | None = Field(
         default=None,
         description="Any backstory or history implied by this assertion"
     )
@@ -34,19 +34,19 @@ class WorldBuildingEntity(BaseModel):
 
 class WorldBuildingOutput(BaseModel):
     """Output from world building validation."""
-    
-    entities: List[WorldBuildingEntity] = Field(
+
+    entities: list[WorldBuildingEntity] = Field(
         default_factory=list,
         description="List of entities extracted from the player's assertion"
     )
     validation_status: Literal["accepted", "needs_clarification", "rejected"] = Field(
         description="Whether the assertion is valid"
     )
-    rejection_reason: Optional[str] = Field(
+    rejection_reason: str | None = Field(
         default=None,
         description="If rejected, why (in-character explanation)"
     )
-    clarification_question: Optional[str] = Field(
+    clarification_question: str | None = Field(
         default=None,
         description="If needs_clarification, what to ask the player"
     )
@@ -58,7 +58,7 @@ class WorldBuildingOutput(BaseModel):
         default=False,
         description="True if the assertion conflicts with established canon"
     )
-    narrative_integration: Optional[str] = Field(
+    narrative_integration: str | None = Field(
         default=None,
         description="How to naturally integrate this into the narrative"
     )
@@ -73,26 +73,26 @@ class WorldBuilderAgent(BaseAgent):
     2. Validates against canon mode, power tier, and consistency
     3. Decides to accept, reject, or request clarification
     """
-    
+
     agent_name = "world_builder"
-    
+
     @property
     def output_schema(self):
         return WorldBuildingOutput
-    
+
     @property
     def system_prompt(self) -> str:
         return self._load_prompt_file("world_builder.md", "You are a world-building validator.")
-    
+
     async def call(
         self,
         player_input: str,
         character_context: str = "",
-        canonicality: Dict[str, str] = None,
+        canonicality: dict[str, str] = None,
         power_tier: str = "T10",
         established_facts: str = "",
         mode: Literal["validate", "extract_only"] = "validate",
-        profile_id: Optional[str] = None,
+        profile_id: str | None = None,
         **kwargs
     ) -> WorldBuildingOutput:
         """Call the world builder with context.
@@ -107,7 +107,7 @@ class WorldBuilderAgent(BaseAgent):
             profile_id: Optional profile ID for wiki-grounded canon lookup
         """
         canonicality = canonicality or {}
-        
+
         if mode == "extract_only":
             # EXTRACT ONLY: DM narrative mining, no validation needed
             context_message = f"""## DM NARRATIVE (Extract Only)
@@ -142,7 +142,7 @@ If no named entities are found, return an empty entities list."""
             canon_reference = ""
             if profile_id:
                 canon_reference = self._query_wiki_canon(profile_id, player_input)
-            
+
             context_message = f"""## Player Action
 {player_input}
 
@@ -163,9 +163,9 @@ If no named entities are found, return an empty entities list."""
 ---
 
 Extract and validate any world-building assertions in this player action."""
-        
+
         return await super().call(context_message)
-    
+
     def _query_wiki_canon(self, profile_id: str, player_input: str) -> str:
         """Query ProfileLibrary for wiki content relevant to the player's assertion.
         
@@ -173,16 +173,16 @@ Extract and validate any world-building assertions in this player action."""
         Returns formatted text to inject into the LLM context, or empty string.
         """
         from ..context.profile_library import get_profile_library
-        
+
         try:
             lib = get_profile_library()
-            
+
             # Broad search for anything matching the player's input
             results = lib.search_lore(profile_id, player_input, limit=3)
-            
+
             if not results:
                 return ""
-            
+
             # Format as canon reference block
             chunks_text = "\n\n".join(f"- {chunk}" for chunk in results)
             return f"""

@@ -1,22 +1,22 @@
 """RelationshipAnalyzer Agent - Detect NPC relationship changes after each turn."""
 
-from pydantic import BaseModel, Field
-from typing import Optional, Literal, List
-from .base import BaseAgent
-
-
 import logging
+from typing import Literal, Optional
+
+from pydantic import BaseModel, Field
+
+from .base import BaseAgent
 
 logger = logging.getLogger(__name__)
 
 class RelationshipOutput(BaseModel):
     """Structured output for relationship analysis."""
-    
+
     npc_name: str = Field(
         description="Name of the NPC being analyzed"
     )
     affinity_delta: int = Field(
-        ge=-10, 
+        ge=-10,
         le=10,
         description="Change in affinity this turn (-10 to +10). 0 = neutral interaction."
     )
@@ -39,7 +39,7 @@ class RelationshipOutput(BaseModel):
 
 class BatchRelationshipOutput(BaseModel):
     """Batch output for analyzing multiple NPCs in one call."""
-    results: List[RelationshipOutput] = Field(
+    results: list[RelationshipOutput] = Field(
         description="List of relationship analysis results, one per NPC"
     )
 
@@ -54,24 +54,24 @@ class RelationshipAnalyzer(BaseAgent):
     Supports both single-NPC and batch-NPC analysis.
     Uses fast model tier - DO NOT add to EXTENDED_THINKING_AGENTS.
     """
-    
+
     agent_name = "relationship_analyzer"
-    
+
     @property
     def output_schema(self):
         return RelationshipOutput
-    
+
     @property
     def system_prompt(self) -> str:
         return self._load_prompt_file("relationship_analyzer.md", "You are an NPC relationship analyzer.")
 
     async def analyze_batch(
         self,
-        npc_names: List[str],
+        npc_names: list[str],
         action: str,
         outcome: str,
         narrative_excerpt: str
-    ) -> List[RelationshipOutput]:
+    ) -> list[RelationshipOutput]:
         """Analyze relationship changes for multiple NPCs in a single LLM call.
         
         Args:
@@ -85,10 +85,10 @@ class RelationshipAnalyzer(BaseAgent):
         """
         if not npc_names:
             return []
-        
+
         # Build NPC list for prompt
         npc_list = "\n".join([f"- {name}" for name in npc_names])
-        
+
         prompt = f"""Analyze the following interaction for EACH NPC present.
 
 PLAYER ACTION: {action}
@@ -102,7 +102,7 @@ NPCS PRESENT:
 
 For EACH NPC listed above, determine their affinity change and any emotional milestone.
 Return a result for every NPC, even if the delta is 0."""
-        
+
         try:
             # Use batch schema
             provider, model = self._get_provider_and_model()

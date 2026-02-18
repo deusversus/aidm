@@ -1,15 +1,11 @@
 """Session Store - SQLite persistence for game sessions."""
 
 import json
+import logging
 import sqlite3
 from pathlib import Path
-from typing import Optional, List
-from datetime import datetime
 
 from ..core.session import Session
-
-
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +15,7 @@ class SessionStore:
     Sessions are stored as JSON blobs in a `sessions` table,
     allowing them to survive server restarts.
     """
-    
+
     def __init__(self, db_path: str = "./data/sessions.db"):
         """Initialize the session store.
         
@@ -29,7 +25,7 @@ class SessionStore:
         self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._init_db()
-    
+
     def _init_db(self):
         """Create the sessions table if it doesn't exist."""
         with sqlite3.connect(self.db_path) as conn:
@@ -42,7 +38,7 @@ class SessionStore:
                 )
             """)
             conn.commit()
-    
+
     def save(self, session: Session) -> None:
         """Save or update a session.
         
@@ -50,7 +46,7 @@ class SessionStore:
             session: The Session object to persist
         """
         data = json.dumps(session.to_dict())
-        
+
         with sqlite3.connect(self.db_path) as conn:
             conn.execute("""
                 INSERT OR REPLACE INTO sessions 
@@ -63,8 +59,8 @@ class SessionStore:
                 session.last_activity.isoformat()
             ))
             conn.commit()
-    
-    def load(self, session_id: str) -> Optional[Session]:
+
+    def load(self, session_id: str) -> Session | None:
         """Load a session by ID.
         
         Args:
@@ -79,13 +75,13 @@ class SessionStore:
                 (session_id,)
             )
             row = cursor.fetchone()
-            
+
             if row:
                 data = json.loads(row[0])
                 return Session.from_dict(data)
-        
+
         return None
-    
+
     def delete(self, session_id: str) -> bool:
         """Delete a session.
         
@@ -102,7 +98,7 @@ class SessionStore:
             )
             conn.commit()
             return cursor.rowcount > 0
-    
+
     def clear_all(self) -> int:
         """Delete all sessions.
         
@@ -118,8 +114,8 @@ class SessionStore:
             if count > 0:
                 logger.info(f"Cleared {count} session(s)")
             return count
-    
-    def list_sessions(self) -> List[dict]:
+
+    def list_sessions(self) -> list[dict]:
         """List all sessions with basic info.
         
         Returns:
@@ -139,8 +135,8 @@ class SessionStore:
                 }
                 for row in cursor.fetchall()
             ]
-    
-    def get_latest_session_id(self) -> Optional[str]:
+
+    def get_latest_session_id(self) -> str | None:
         """Get the most recently active session ID.
         
         Returns:
@@ -157,7 +153,7 @@ class SessionStore:
 
 
 # Singleton instance
-_session_store: Optional[SessionStore] = None
+_session_store: SessionStore | None = None
 
 
 def get_session_store() -> SessionStore:

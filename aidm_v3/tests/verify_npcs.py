@@ -1,9 +1,12 @@
 """Quick verification: Check SQLite NPCs/Factions and detect_npcs_in_text works."""
-import sys, os
+import os
+import sys
+
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from src.db.session import init_db, get_session
-from src.db.models import NPC, Faction, Campaign
+from src.db.models import NPC, Campaign, Faction
+from src.db.session import get_session, init_db
+
 init_db()
 
 db = get_session().__enter__()
@@ -30,16 +33,17 @@ for f in factions:
 
 # Test detect_npcs_in_text
 from src.db.state_manager import StateManager
+
 sm = StateManager(cid)
 test_text = "Mori screamed as Goro pulled Reika to safety."
 detected = sm.detect_npcs_in_text(test_text)
-print(f"\n=== detect_npcs_in_text Test ===")
+print("\n=== detect_npcs_in_text Test ===")
 print(f"  Input: '{test_text}'")
 print(f"  Detected: {detected}")
 
 # Test NPC cards
 cards = sm.get_present_npc_cards(detected)
-print(f"\n=== NPC Cards ===")
+print("\n=== NPC Cards ===")
 print(cards)
 
 print("\n=== ALL CHECKS PASSED ===")

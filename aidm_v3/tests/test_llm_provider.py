@@ -5,15 +5,13 @@ retry logic, and manager provider resolution.
 """
 
 import os
-import pytest
-from unittest.mock import MagicMock, patch, AsyncMock
+from unittest.mock import MagicMock
 
 os.environ.setdefault("DATABASE_URL", "sqlite:///:memory:")
 os.environ.setdefault("ANTHROPIC_API_KEY", "test-key")
 
+from src.llm.manager import LLMManager, get_llm_manager, reset_llm_manager
 from src.llm.provider import LLMProvider, LLMResponse
-from src.llm.manager import LLMManager, reset_llm_manager, get_llm_manager
-
 
 # ---------------------------------------------------------------------------
 # Tests: LLMResponse

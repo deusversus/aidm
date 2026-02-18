@@ -11,8 +11,8 @@ All downstream code can continue to ``from src.db.state_manager import StateMana
 without any change — the public API surface is identical.
 """
 
-from ._core import CoreMixin, GameContext          # noqa: F401  (re-export GameContext)
 from ._character import CharacterMixin
+from ._core import CoreMixin, GameContext  # noqa: F401  (re-export GameContext)
 from ._npc import NPCMixin
 from ._world import WorldMixin
 

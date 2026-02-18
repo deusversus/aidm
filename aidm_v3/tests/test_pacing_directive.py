@@ -4,11 +4,10 @@ Covers Pydantic validation, system prompt content,
 and PacingAgent.check() behavior with mocked LLM.
 """
 
+
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 
 from src.agents.pacing_agent import PacingAgent, PacingDirective
-
 
 # ---------------------------------------------------------------------------
 # Tests: PacingDirective model validation

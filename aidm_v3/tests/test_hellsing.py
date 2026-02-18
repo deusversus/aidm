@@ -2,6 +2,7 @@
 import asyncio
 import sys
 
+
 # Suppress most print output during research
 class QuietPrint:
     def __init__(self):
@@ -15,25 +16,26 @@ class QuietPrint:
 
 from src.agents.anime_research import AnimeResearchAgent
 
+
 async def test_hellsing():
     print("Starting Hellsing research (this takes ~2 minutes)...\n")
-    
+
     agent = AnimeResearchAgent()
     result = await agent.research_anime("Hellsing")
-    
+
     print(f"\n{'='*60}")
-    print(f"HELLSING TEST RESULTS")
+    print("HELLSING TEST RESULTS")
     print(f"{'='*60}")
     print(f"Title: {result.title}")
     print(f"Confidence: {result.confidence}%")
     print(f"Research Method: {result.research_method}")
     print(f"Research Passes: {result.research_passes}")
-    
-    print(f"\n--- Power System ---")
+
+    print("\n--- Power System ---")
     if result.power_system:
         print(f"  Name: {result.power_system.get('name', 'N/A')}")
-    
-    print(f"\n--- DNA Scales ---")
+
+    print("\n--- DNA Scales ---")
     non_default_count = 0
     for k, v in result.dna_scales.items():
         indicator = ""
@@ -43,23 +45,23 @@ async def test_hellsing():
             non_default_count += 1
         print(f"  {k}: {v}{indicator}")
     print(f"  --> {non_default_count}/11 non-default values")
-    
-    print(f"\n--- Tone ---")
+
+    print("\n--- Tone ---")
     for k, v in result.tone.items():
         indicator = "" if v != 5 else " (default)"
         print(f"  {k}: {v}{indicator}")
-    
-    print(f"\n--- Tropes (TRUE only) ---")
+
+    print("\n--- Tropes (TRUE only) ---")
     true_tropes = [k for k, v in result.storytelling_tropes.items() if v]
     if true_tropes:
         for t in true_tropes:
             print(f"  - {t}")
     else:
-        print(f"  NONE - all defaulted to False")
-    
-    print(f"\n--- Combat Style ---")
+        print("  NONE - all defaulted to False")
+
+    print("\n--- Combat Style ---")
     print(f"  {result.combat_style}")
-    
+
     print(f"\n--- Raw Content: {len(result.raw_content or '')} chars ---")
     print(f"{'='*60}")
 

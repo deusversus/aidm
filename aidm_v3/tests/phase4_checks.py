@@ -1,17 +1,16 @@
 
-import sys
-import os
 import asyncio
-from datetime import datetime
+import os
+import sys
 
 # Add src to path
 sys.path.append(os.path.join(os.getcwd(), "aidm_v3", "src"))
 sys.path.append(os.path.join(os.getcwd(), "aidm_v3"))
 
 try:
-    from src.db.models import CampaignBible, Campaign
     from src.agents.director import DirectorAgent
     from src.core.orchestrator import Orchestrator
+    from src.db.models import Campaign, CampaignBible
     from src.db.state_manager import StateManager
 except ImportError:
     import traceback
@@ -22,7 +21,7 @@ async def verify_director():
     print("Initializing DirectorAgent...")
     director = DirectorAgent()
     print(f"✅ Director initialized. Name: {director.agent_name}")
-    
+
     if director.output_schema.__name__ != "DirectorOutput":
         print(f"❌ Schema mismatch: {director.output_schema.__name__}")
         sys.exit(1)
