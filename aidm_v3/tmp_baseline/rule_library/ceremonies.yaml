@@ -1,0 +1,175 @@
+# Rule Library - Power Tier Ceremonies
+# Extracted from Module 12: Narrative Scaling
+# Purpose: Narrative prose for tier transition moments
+
+---
+# Tier 11→10 (Below Average → Average Human)
+- id: "ceremony_t11_t10"
+  category: "ceremony"
+  source_module: "module_12"
+  tags: ["ceremony", "tier_shift", "T11", "T10", "early_growth"]
+  retrieve_conditions: ["tier_change == true", "old_tier == 11", "new_tier == 10"]
+  content: |
+    TIER 11→10 (Below Average → Average Human):
+    "Training pays off. You're no longer the weakest in the room.
+    Small victory, but yours. The foundation is set."
+    
+    Focus: Personal milestone, first real progress.
+
+---
+# Tier 10→9 (Average → Athletic Human)
+- id: "ceremony_t10_t9"
+  category: "ceremony"
+  source_module: "module_12"
+  tags: ["ceremony", "tier_shift", "T10", "T9", "athletic"]
+  retrieve_conditions: ["tier_change == true", "old_tier == 10", "new_tier == 9"]
+  content: |
+    TIER 10→9 (Average → Athletic Human):
+    "Your body responds faster. Movements sharper.
+    You've crossed into athlete territory.
+    Those who underestimated you will learn."
+    
+    Focus: Physical capability, respect earned.
+
+---
+# Tier 9→8 (Athletic → Wall Level)
+- id: "ceremony_t9_t8"
+  category: "ceremony"
+  source_module: "module_12"
+  tags: ["ceremony", "tier_shift", "T9", "T8", "superhuman"]
+  retrieve_conditions: ["tier_change == true", "old_tier == 9", "new_tier == 8"]
+  content: |
+    TIER 9→8 (Athletic → Wall Level):
+    "Fist meets wall. **Cracks.** Not broken knuckles—broken concrete.
+    You stare at your hand. When did you get this strong?
+    Normal no longer applies to you."
+    
+    Focus: First superhuman moment, wonder/fear.
+
+---
+# Tier 8→7 (Wall → Building Level)
+- id: "ceremony_t8_t7"
+  category: "ceremony"
+  source_module: "module_12"
+  tags: ["ceremony", "tier_shift", "T8", "T7", "building"]
+  retrieve_conditions: ["tier_change == true", "old_tier == 8", "new_tier == 7"]
+  content: |
+    TIER 8→7 (Wall → Building Level):
+    "The earth cracks beneath your stance.
+    Power flows through every cell, barely contained.
+    You've transcended mortal limits.
+    Buildings are obstacles, not barriers."
+    
+    Focus: Power as presence, world feels fragile.
+
+---
+# Tier 7→6 (Building → Mountain/Island Level)
+- id: "ceremony_t7_t6"
+  category: "ceremony"
+  source_module: "module_12"
+  tags: ["ceremony", "tier_shift", "T7", "T6", "mountain"]
+  retrieve_conditions: ["tier_change == true", "old_tier == 7", "new_tier == 6"]
+  content: |
+    TIER 7→6 (Building → Mountain/Island Level):
+    "Your power draws attention across nations.
+    Governments take notice. Intelligence agencies open files.
+    You are now a strategic asset—or threat.
+    Geography bends to your will."
+    
+    Focus: Geopolitical implications, being watched.
+
+---
+# Tier 6→5 (Mountain → Planetary Level)
+- id: "ceremony_t6_t5"
+  category: "ceremony"
+  source_module: "module_12"
+  tags: ["ceremony", "tier_shift", "T6", "T5", "planetary"]
+  retrieve_conditions: ["tier_change == true", "old_tier == 6", "new_tier == 5"]
+  content: |
+    TIER 6→5 (Mountain → Planetary Level):
+    "Reality bends around you. Physical laws are now suggestions.
+    The world itself feels... fragile. Breakable.
+    You must learn restraint, or there won't be a world to protect.
+    You've become myth made manifest."
+    
+    Focus: Cosmic responsibility, restraint critical.
+
+---
+# Tier 5→4 (Planet → Star Level)
+- id: "ceremony_t5_t4"
+  category: "ceremony"
+  source_module: "module_12"
+  tags: ["ceremony", "tier_shift", "T5", "T4", "stellar"]
+  retrieve_conditions: ["tier_change == true", "old_tier == 5", "new_tier == 4"]
+  content: |
+    TIER 5→4 (Planet → Star Level):
+    "You hold stellar forces within.
+    Moons orbit your will. Stars dim in your presence.
+    The distance between you and others grows incomprehensible.
+    You've become myth made manifest."
+    
+    Focus: Isolation, cosmic scale, finding meaning.
+
+---
+# Tier 4→3 (Star → Galaxy Level)
+- id: "ceremony_t4_t3"
+  category: "ceremony"
+  source_module: "module_12"
+  tags: ["ceremony", "tier_shift", "T4", "T3", "galactic"]
+  retrieve_conditions: ["tier_change == true", "old_tier == 4", "new_tier == 3"]
+  content: |
+    TIER 4→3 (Star → Galaxy Level):
+    "Galaxies dim in your presence.
+    Time stutters, uncertain around you.
+    You comprehend infinity—and infinity comprehends you.
+    What connects you to the mortals you once were?"
+    
+    Focus: Existential scale, connection to humanity.
+
+---
+# Tier 3→2 (Galaxy → Multiverse Level)
+- id: "ceremony_t3_t2"
+  category: "ceremony"
+  source_module: "module_12"
+  tags: ["ceremony", "tier_shift", "T3", "T2", "multiversal"]
+  retrieve_conditions: ["tier_change == true", "old_tier == 3", "new_tier == 2"]
+  content: |
+    TIER 3→2 (Galaxy → Multiverse Level):
+    "You perceive infinite timelines simultaneously.
+    Causality is clay in your hands.
+    You are beyond 'powerful'—you author reality.
+    The question is no longer 'can you?' but 'should you?'"
+    
+    Focus: Godhood, moral philosophy, purpose.
+
+---
+# Tier 2→1 (Multiverse → Higher Infinite)
+- id: "ceremony_t2_t1"
+  category: "ceremony"
+  source_module: "module_12"
+  tags: ["ceremony", "tier_shift", "T2", "T1", "infinite"]
+  retrieve_conditions: ["tier_change == true", "old_tier == 2", "new_tier == 1"]
+  content: |
+    TIER 2→1 (Multiverse → Higher Infinite):
+    "Infinity became finite in your perception.
+    You transcend the concept of transcendence.
+    There are no words for what you've become.
+    Only beings like yourself can perceive you."
+    
+    Focus: Beyond comprehension, meta-existence.
+
+---
+# Tier 1→0 (Higher Infinite → Boundless)
+- id: "ceremony_t1_t0"
+  category: "ceremony"
+  source_module: "module_12"
+  tags: ["ceremony", "tier_shift", "T1", "T0", "boundless"]
+  retrieve_conditions: ["tier_change == true", "old_tier == 1", "new_tier == 0"]
+  content: |
+    TIER 1→0 (Higher Infinite → Boundless):
+    "There is no tier. There is no limit. There is no you.
+    There is only what was always there.
+    The game was a dream. You are the dreamer.
+    What now?"
+    
+    Focus: Narrative conclusion, retirement, or metafiction.

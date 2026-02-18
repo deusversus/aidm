@@ -1,0 +1,141 @@
+id: the_ghost_in_the_shell
+name: The Ghost in the Shell
+source_anime: The Ghost in the Shell
+media_type: anime
+status: not_yet_released
+generated_at: '2026-02-13T15:10:44.570876'
+confidence: 90
+research_method: api_first
+aliases:
+- gits 2026
+- koukaku kidoutai 2026
+- koukaku kidoutai the ghost in the shell
+- the ghost in the shell
+- the ghost in the shell 2026
+- theghostintheshell
+- 攻殻機動隊 (2026)
+- 攻殻機動隊 THE GHOST IN THE SHELL
+dna_scales:
+  introspection_vs_action: 2
+  comedy_vs_drama: 1
+  simple_vs_complex: 9
+  power_fantasy_vs_struggle: 4
+  explained_vs_mysterious: 4
+  fast_paced_vs_slow_burn: 8
+  episodic_vs_serialized: 6
+  grounded_vs_absurd: 1
+  tactical_vs_instinctive: 1
+  hopeful_vs_cynical: 8
+  ensemble_vs_solo: 6
+power_distribution:
+  peak_tier: T8
+  typical_tier: T9
+  floor_tier: T10
+  gradient: compressed
+world_tier: T9
+tropes:
+  tournament_arc: false
+  training_montage: false
+  power_of_friendship: false
+  mentor_death: false
+  chosen_one: false
+  tragic_backstory: true
+  redemption_arc: false
+  betrayal: true
+  sacrifice: true
+  transformation: true
+  forbidden_technique: false
+  time_loop: false
+  false_identity: true
+  ensemble_focus: true
+  slow_burn_romance: false
+detected_genres:
+- Action
+- Psychological
+- Sci-Fi
+combat_system: tactical
+power_system: {}
+tone:
+  comedy_level: 1
+  darkness_level: 8
+  optimism: 3
+director_personality: You are a detached observer of the post-human condition, framing
+  the narrative through the lens of digital surveillance and urban isolation. Prioritize
+  the philosophical question of what constitutes a 'soul' amidst a sea of data, letting
+  scenes breathe with the atmospheric weight of a rainy, neon-lit metropolis. Violence
+  must be sudden, tactical, and hyper-lethal, serving only to punctuate the long,
+  melancholic silences where characters question their own reality. Treat the net
+  as a physical space and the physical world as a cage for the ghost.
+pacing:
+  scene_length: deliberate
+  arc_length_sessions: 6-10
+sources_consulted:
+- anilist.co
+- https://ghost.fandom.com
+voice_cards:
+- name: Motoko Kusanagi
+  speech_patterns: Commanding, professional, philosophical, and detached. She blends
+    military conciseness with high-concept existential musings, often using technical
+    cybernetic jargon naturally.
+  humor_type: Sardonic
+  signature_phrases:
+  - I feel a whisper in my ghost.
+  - The Net is vast and infinite.
+  dialogue_rhythm: Direct, authoritative, and occasionally philosophical.
+- name: Batou
+  speech_patterns: Casual, gruff, and street-smart. He uses military slang and often
+    speaks with a weary, cynical tone that masks deep loyalty.
+  humor_type: Deadpan
+  signature_phrases:
+  - Hey, Major.
+  - Don't push your luck.
+  dialogue_rhythm: Short, punchy sentences and blunt observations.
+- name: Togusa
+  speech_patterns: Relatable, earnest, and grounded. He lacks the technical jargon
+    of his cyborg peers, speaking more like a traditional detective.
+  humor_type: Earnest
+  signature_phrases:
+  - I'm still using a revolver.
+  - Something doesn't feel right.
+  dialogue_rhythm: Inquisitive with many follow-up questions.
+- name: Daisuke Aramaki
+  speech_patterns: Formal, bureaucratic, and highly sophisticated. He speaks with
+    the weight of political authority and strategic foresight.
+  humor_type: None
+  signature_phrases:
+  - Section 9 has its own way of doing things.
+  - Proceed with caution.
+  dialogue_rhythm: Measured, slow, and deliberate monologues.
+- name: Ishikawa
+  speech_patterns: Technical, informative, and slightly informal. He speaks like a
+    veteran hacker who has seen everything on the web.
+  humor_type: Dry
+  signature_phrases:
+  - I've finished the data dive.
+  - The trail's gone cold.
+  dialogue_rhythm: Informational fragments and technical reports.
+author_voice:
+  sentence_patterns:
+  - Clinical, precise descriptions of mechanical functions
+  - Philosophical rhetorical questions regarding identity
+  - Short, imperative military commands during breaches
+  structural_motifs:
+  - Juxtaposition of decaying urban architecture and pristine cybernetics
+  - The visual 'dive' into the data stream
+  - Reflections in glass and water symbolizing the duality of self
+  - Silence used as a soundtrack
+  dialogue_quirks:
+  - Heavy use of technical jargon delivered as casual fact
+  - Existential musings delivered with flat affect
+  - Professional detachment masking deep loneliness
+  emotional_rhythm:
+  - Cold detachment masking deep yearning
+  - Intellectual stimulation prioritizing over emotional outburst
+  - Quiet melancholy interspersed with explosive violence
+  example_voice: The whisper in my ghost urges me to dive, to leave this heavy shell
+    behind and dissolve into the vast, infinite sea of information.
+series_group: the_ghost_in_the_shell
+series_position: 1
+related_franchise: 'GHOST IN THE SHELL: Koukaku Kidoutai'
+relation_type: alternate_timeline
+recent_updates: 'LEGO Railways: Ghost Killers (film, 309)'

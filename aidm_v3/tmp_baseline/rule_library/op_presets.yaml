@@ -1,0 +1,257 @@
+# OP Mode - Presets (Starter Kits)
+# Named compositions for ease of use, with anime as examples not identities
+
+presets:
+  # 1. The Bored God (Saitama-style)
+  - id: "bored_god"
+    name: "The Bored God"
+    description: "Victory is instant and empty. The real struggle is finding meaning."
+    tension_source: "existential"
+    power_expression: "instantaneous"
+    narrative_focus: "internal"
+    examples: 
+      - "One Punch Man (Saitama)"
+      - "Superman (when bored)"
+      - "Saiki K (partially)"
+    suggestion_triggers:
+      concept_keywords: ["invincible", "unstoppable", "bored", "too strong", "one punch", "nothing challenges"]
+      dna_scales:
+        power_fantasy_vs_struggle: ">1.5"
+    techniques:
+      - existential_focus
+      - instant_resolution
+      - aftermath_emphasis
+      - mundane_stakes
+
+  # 2. The Restrainer (Mob-style)
+  - id: "restrainer"
+    name: "The Restrainer"
+    description: "Godlike power deliberately suppressed. Emotional growth over combat."
+    tension_source: "control"
+    power_expression: "sealed"
+    narrative_focus: "ensemble"
+    examples:
+      - "Mob Psycho 100 (Mob)"
+      - "Hulk (control stories)"
+      - "Tokyo Ghoul (Kaneki - early)"
+    suggestion_triggers:
+      concept_keywords: ["restraint", "control", "suppress", "???%", "hold back", "afraid of power"]
+      dna_scales:
+        grounded_vs_absurd: "<0.5"
+    techniques:
+      - self_limitation
+      - emotional_triggers
+      - ensemble_safety_net
+      - seal_crack_tension
+
+  # 3. The Hidden Ruler (Overlord-style)
+  - id: "hidden_ruler"
+    name: "The Hidden Ruler"
+    description: "Command through subordinates, manage consequences, maintain facade."
+    tension_source: "consequence"
+    power_expression: "derivative"
+    narrative_focus: "faction"
+    examples:
+      - "Overlord (Ainz)"
+      - "Code Geass (Lelouch)"
+      - "Saga of Tanya the Evil"
+    suggestion_triggers:
+      concept_keywords: ["mastermind", "commander", "army", "subordinates", "villain", "evil boss", "roleplay"]
+      dna_scales:
+        power_fantasy_vs_struggle: ">1.0"
+    techniques:
+      - faction_management
+      - subordinate_pov
+      - reputation_gap
+      - reverse_ensemble_arcs
+
+  # 4. The Burden Bearer (Saiki K-style)
+  - id: "burden_bearer"
+    name: "The Burden Bearer"
+    description: "Power is a curse, not a gift. Protecting normalcy is the goal."
+    tension_source: "burden"
+    power_expression: "hidden"
+    narrative_focus: "mundane"
+    examples:
+      - "Saiki K (Kusuo)"
+      - "The Daily Life of the Immortal King (Wang Ling)"
+      - "Mob Psycho 100 (partially)"
+    suggestion_triggers:
+      concept_keywords: ["burden", "curse", "want normal life", "hiding power", "secret", "cost"]
+      dna_scales:
+        grounded_vs_absurd: ">0.5"
+    techniques:
+      - power_as_burden
+      - secret_identity
+      - mundane_priority
+      - comedic_intrusion
+
+  # 5. The Muscle Wizard (Mashle-style)
+  - id: "muscle_wizard"
+    name: "The Muscle Wizard"
+    description: "Physical absurdity triumphs. Earnest simplicity in a complex world."
+    tension_source: "moral"
+    power_expression: "instantaneous"
+    narrative_focus: "competition"
+    examples:
+      - "Mashle (Mash)"
+      - "One Punch Man (partially)"
+      - "Scissor Seven"
+    suggestion_triggers:
+      concept_keywords: ["muscles", "punch", "physical", "absurd", "simple", "earnest"]
+      dna_scales:
+        grounded_vs_absurd: ">1.5"
+    techniques:
+      - comedic_oblivious
+      - physical_superiority
+      - tournament_format
+      - earnest_reactions
+
+  # 6. The Sealed Apocalypse (Wang Ling-style)
+  - id: "sealed_apocalypse"
+    name: "The Sealed Apocalypse"
+    description: "World-ending power locked away for a normal school life."
+    tension_source: "control"
+    power_expression: "sealed"
+    narrative_focus: "mundane"
+    examples:
+      - "The Daily Life of the Immortal King (Wang Ling)"
+      - "Mob Psycho 100 (partially)"
+      - "Jujutsu Kaisen (Gojo - when holding back)"
+    suggestion_triggers:
+      concept_keywords: ["seal", "school", "normal life", "apocalypse", "contain", "suppress"]
+      dna_scales: {}
+    techniques:
+      - seal_maintenance
+      - school_life_focus
+      - leak_tension
+      - mundane_protection
+
+  # 7. The Wandering Legend (Vampire D-style)
+  - id: "wandering_legend"
+    name: "The Wandering Legend"
+    description: "Mythical wanderer. Each arc new people, legend grows."
+    tension_source: "relational"
+    power_expression: "passive"
+    narrative_focus: "episodic"
+    examples:
+      - "Vampire Hunter D"
+      - "Kino's Journey (power version)"
+      - "Mushi-shi (if Ginko was OP)"
+    suggestion_triggers:
+      concept_keywords: ["wanderer", "legend", "mythical", "traveler", "mysterious", "ancient"]
+      dna_scales:
+        episodic_vs_serialized: ">0.5"
+    techniques:
+      - gradual_reveal
+      - episodic_structure
+      - legendary_aura
+      - poetic_melancholy
+
+  # 8. The Nation Builder (Rimuru-style)
+  - id: "nation_builder"
+    name: "The Nation Builder"
+    description: "Power enables building. Combat quick, management deep."
+    tension_source: "consequence"
+    power_expression: "derivative"
+    narrative_focus: "faction"
+    examples:
+      - "That Time I Got Reincarnated as a Slime (Rimuru)"
+      - "Overlord (partially)"
+      - "Release That Witch"
+    suggestion_triggers:
+      concept_keywords: ["nation", "build", "collect", "recruit", "kingdom", "slime", "tempest"]
+      dna_scales: {}
+    techniques:
+      - nation_building
+      - found_family
+      - delegation
+      - diplomatic_stakes
+
+  # 9. The Disguised God (Deus-style)
+  - id: "disguised_god"
+    name: "The Disguised God"
+    description: "Cosmic power at F-rank. Coffee dates and secret identity."
+    tension_source: "relational"
+    power_expression: "hidden"
+    narrative_focus: "mundane"
+    examples:
+      - "Awaken the God"
+      - "The Beginning After the End (King Grey)"
+      - "Solo Leveling (early)"
+    suggestion_triggers:
+      concept_keywords: ["god", "disguised", "f-rank", "weak appearance", "hidden god", "coffee"]
+      dna_scales: {}
+    techniques:
+      - secret_identity
+      - power_leaks
+      - romantic_comedy
+      - dramatic_irony
+
+  # 10. The Time Looper (Re:Zero-style)
+  - id: "time_looper"
+    name: "The Time Looper"
+    description: "Information through iteration. Learning what matters the hard way."
+    tension_source: "information"
+    power_expression: "conditional"
+    narrative_focus: "internal"
+    examples:
+      - "Re:Zero (Subaru)"
+      - "Steins;Gate (Okabe)"
+      - "Edge of Tomorrow"
+    suggestion_triggers:
+      concept_keywords: ["time loop", "restart", "death", "repeat", "learn", "perfect run"]
+      dna_scales: {}
+    techniques:
+      - iteration_learning
+      - death_as_reset
+      - information_gathering
+      - timeline_optimization
+
+  # 11. The Immortal (Ajin-style)
+  - id: "immortal"
+    name: "The Immortal"
+    description: "Can't die but life isn't easy. Immortality as burden."
+    tension_source: "burden"
+    power_expression: "passive"
+    narrative_focus: "internal"
+    examples:
+      - "Ajin"
+      - "Highlander"
+      - "Baccano (immortal characters)"
+    suggestion_triggers:
+      concept_keywords: ["immortal", "undying", "can't die", "eternal", "outlive"]
+      dna_scales: {}
+    techniques:
+      - immortal_horror
+      - watching_mortality
+      - accumulated_trauma
+      - burden_of_forever
+
+# Axis Reference (for validation)
+valid_axes:
+  tension_source:
+    - existential
+    - relational
+    - moral
+    - burden
+    - information
+    - consequence
+    - control
+  power_expression:
+    - instantaneous
+    - overwhelming
+    - sealed
+    - hidden
+    - conditional
+    - derivative
+    - passive
+  narrative_focus:
+    - internal
+    - ensemble
+    - reverse_ensemble
+    - episodic
+    - faction
+    - mundane
+    - competition
+    - legacy

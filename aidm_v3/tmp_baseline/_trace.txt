@@ -1,0 +1,19 @@
+226:         n_results=limit,
+227:         where=where
+228:     )
+229:   File "C:\Users\admin\Downloads\animerpg\aidm_v3\venv313\Lib\site-packages\chromadb\api\models\Collection.py", line 229, in query
+230:     query_results = self._client._query(
+231:         collection_id=self.id,
+232:     ...<7 lines>...
+233:         database=self.database,
+234:     )
+235:   File "C:\Users\admin\Downloads\animerpg\aidm_v3\venv313\Lib\site-packages\chromadb\api\rust.py", line 539, in _query
+236:     rust_response = self.bindings.query(
+237:         str(collection_id),
+238:     ...<7 lines>...
+239:         database,
+240:     )
+241: chromadb.errors.InternalError: Error executing plan: Internal error: Error creating hnsw segment reader: Nothing found on disk
+242: [Compaction] Appended micro-summary (23 tokens, buffer: 11 entries, 249 total tokens)
+243: [GameAPI] Working memory: 20 recent messages
+244: [GameAPI] Processing turn: '"I'm Deus" I offer enthusiastically; as if introdu...'

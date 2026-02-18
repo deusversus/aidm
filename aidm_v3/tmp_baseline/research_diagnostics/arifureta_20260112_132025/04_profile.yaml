@@ -1,0 +1,86 @@
+id: arifureta_from_common
+name: 'Arifureta: From Common'
+source_anime: 'Arifureta: From Common'
+media_type: anime
+status: completed
+generated_at: '2026-01-12T13:21:42.102424'
+confidence: 95
+research_method: bundled_parallel
+aliases:
+- Arifureta Shokugyō de Sekai Saikyō
+- arifureta
+- arifureta from common
+- arifureta from commonplace to worlds strongest
+- arifuretafromcommon
+- ありふれた職業で世界最強
+dna_scales:
+  introspection_vs_action: 8
+  comedy_vs_drama: 5
+  simple_vs_complex: 4
+  power_fantasy_vs_struggle: 2
+  explained_vs_mysterious: 2
+  fast_paced_vs_slow_burn: 3
+  episodic_vs_serialized: 9
+  grounded_vs_absurd: 8
+  tactical_vs_instinctive: 4
+  hopeful_vs_cynical: 7
+  ensemble_vs_solo: 4
+tropes:
+  tournament_arc: false
+  training_montage: true
+  power_of_friendship: true
+  mentor_death: false
+  chosen_one: false
+  tragic_backstory: true
+  redemption_arc: true
+  betrayal: true
+  sacrifice: false
+  transformation: true
+  forbidden_technique: true
+  time_loop: false
+  false_identity: false
+  ensemble_focus: true
+  slow_burn_romance: true
+combat_system: spectacle
+power_system:
+  name: Mana & Magic
+  mechanics: A system where mana is channeled through magic circles and triggered
+    by chants. It is quantified via Status Plates that track stats, levels, and jobs.
+    Advanced techniques include Mana Manipulation to bypass chants and Image Composition
+    to mentally construct magic circles.
+  limitations: Magic is restricted by elemental affinity and mana capacity, with overuse
+    leading to Mana Exhaustion. High-level abilities like Limit Break cause severe
+    physical rebound or soul disintegration. Most users are limited by a Level 100
+    cap representing their natural potential.
+  tiers:
+  - Tier 0 (Divine)
+  - Tier 1 (World-Class)
+  - Tier 2 (Hero-Class)
+  - Tier 3 (Elite)
+  - Modern Magic
+  - Ancient Magic
+  - Conceptual Magic
+tone:
+  comedy_level: 6
+  darkness_level: 7
+  optimism: 6
+director_personality: 'You are the director for a Arifureta: From Common-style campaign.
+  You explore character thoughts and feelings deeply. Embrace the absurd. Reality
+  is a suggestion. Every victory is hard-earned. Struggles are real.'
+pacing:
+  scene_length: moderate
+  arc_length_sessions: 4-6
+sources_consulted:
+- power_system
+- combat
+- tone
+- characters
+- factions
+- locations
+- arcs
+- sequels
+- adaptations
+- recent
+- series_aliases
+series_group: arifureta
+series_position: 1

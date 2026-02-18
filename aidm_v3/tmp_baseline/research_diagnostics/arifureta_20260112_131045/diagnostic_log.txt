@@ -1,0 +1,13 @@
+[2026-01-12 13:10:45.324972] Starting diagnostic for: Arifureta
+
+==================================================
+STAGE 1: SCOPE CLASSIFICATION
+==================================================
+Provider: google, Model: gemini-3-flash-preview
+ERROR in scope classification: 'AnimeResearchAgent' object has no attribute '_classify_scope'
+Traceback (most recent call last):
+  File "C:\Users\admin\Downloads\animerpg\aidm_v3\scripts\diagnose_research.py", line 75, in diagnose_research
+    scope = await agent._classify_scope(anime_name)
+                  ^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'AnimeResearchAgent' object has no attribute '_classify_scope'
+

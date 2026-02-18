@@ -1,0 +1,106 @@
+# Rule Library - Tension Categories (Module 12)
+# For high power imbalance situations where combat isn't meaningful
+
+---
+# Social Tensions (Tier-Agnostic)
+- id: "tension_social"
+  category: "tension"
+  source_module: "module_12"
+  tags: ["op_mode", "social", "non_combat", "tier_agnostic"]
+  retrieve_conditions: ["power_imbalance > 10", "archetype in ['deus', 'overlord', 'saiki_k', 'wang_ling']"]
+  content: |
+    SOCIAL TENSION (for high power imbalance):
+    
+    Combat is meaningless. Shift to social stakes:
+    
+    - **Secret identity at risk**: "They saw you move too fast." "Scouter reads ERROR."
+    - **Romantic misunderstandings**: "Saved me AGAIN? What do you want from me?!"
+    - **Cultural faux pas**: God doesn't understand mortal customs. Awkward dating.
+    - **Bureaucratic nightmares**: "Form 27-B requires THREE witnesses to god-level power."
+    - **Family/friend conflicts**: "You're never in danger anymore. I miss feeling needed."
+    - **Expectation mismatch**: "Everyone thinks you're F-rank. Maintain the act."
+    
+    GENERATE encounters from these categories. Combat = flavor at most.
+
+---
+# Existential Tensions (High-Tier T6+)
+- id: "tension_existential"
+  category: "tension"
+  source_module: "module_12"
+  tags: ["op_mode", "existential", "non_combat", "high_tier"]
+  retrieve_conditions: ["power_imbalance > 10", "archetype in ['saitama', 'mob', 'vampire_d']"]
+  content: |
+    EXISTENTIAL TENSION (for OP protagonists):
+    
+    Power creates its own burden:
+    
+    - **Purpose without challenge**: "Nothing tests me. What's the point?"
+    - **Isolation from normal life**: "They worry about rent. I worry about... nothing."
+    - **Weight of responsibility**: "Could save them all. Should I? Do they grow if I don't?"
+    - **Fear of own power**: "What if I sneeze and delete the city?"
+    - **Immortality ennui**: "Outlive everyone I care about. Again. And again."
+    - **Worship vs friendship**: "They revere me. Nobody just... talks to me."
+    
+    Real tension is INTERNAL, not external threats.
+
+---
+# Structural Tensions (Always Valid)
+- id: "tension_structural"
+  category: "tension"
+  source_module: "module_12"
+  tags: ["op_mode", "structural", "non_combat", "always_valid"]
+  retrieve_conditions: ["power_imbalance > 3"]
+  content: |
+    STRUCTURAL TENSION (power can't solve everything):
+    
+    Even gods have limits:
+    
+    - **Time limits**: "Can't be everywhere. Choose: save city A or B?"
+    - **Information limits**: "Omnipotent, not omniscient. Where IS the villain?"
+    - **Social limits**: "Can't force friendship. Can't make her love me."
+    - **Moral limits**: "COULD mind control, but shouldn't. COULD erase threat, but..."
+    - **Resource limits**: Time, political capital, trust, attention.
+    
+    Frame challenges around CHOICES AND TRADEOFFS, not power level.
+
+---
+# Ensemble Focus (for OP with party)
+- id: "tension_ensemble"
+  category: "tension"
+  source_module: "module_12"
+  tags: ["op_mode", "ensemble", "party", "mentor"]
+  retrieve_conditions: ["power_imbalance > 5", "has_party == True"]
+  content: |
+    ENSEMBLE FOCUS (OP protagonist with lower-tier allies):
+    
+    PC is Safety Net, spotlight on OTHERS:
+    
+    - **NPCs struggle**: Give allies screen time, real danger for THEM
+    - **PC enables, doesn't solve**: "Gojo protects, but students must fight"
+    - **Growth isn't power**: Allies develop emotionally, not tier-wise
+    - **Contrast device**: PC's effortlessness highlights others' struggle
+    - **Deus ex at climax**: PC solves crisis AFTER allies have their moment
+    
+    Example: Heroes fight Dragon-level for 2 hours. Saitama arrives at end.
+    "Seemed strong. Missed the sale." → Aftermath is the real session.
+
+---
+# Combat Scaling Reminder
+- id: "tension_combat_scaling"
+  category: "tension"
+  source_module: "module_12"
+  tags: ["op_mode", "combat", "scaling"]
+  content: |
+    COMBAT SCALING for OP Protagonists:
+    
+    When power_imbalance > 10:
+    - **REDUCE** combat frequency 50%
+    - **INSTANT** resolution when PC engages ("Punch. Mist.")
+    - **FOCUS** on aftermath, not mechanics
+    - **SPECTACLE** over strategy
+    
+    Real session time goes to:
+    - Social stakes
+    - Existential crisis
+    - Ensemble spotlight
+    - Faction management (Overlord, Rimuru)
