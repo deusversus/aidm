@@ -62,7 +62,7 @@ async def process_turn(request: TurnRequest):
     # The sliding window is 15 messages. When total messages exceeds 15,
     # the oldest messages fall off. We compact them into narrative beats.
     # =====================================================================
-    WINDOW_SIZE = 20  # #5: Increased from 15 → 20 (~10 exchanges)
+    WINDOW_SIZE = 30  # Match Session Zero's conversation history depth
     COMPACTION_MAX_TOKENS = 10_000
 
     compaction_text = ""

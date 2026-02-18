@@ -1,0 +1,161 @@
+﻿
+  server.log:602:[api
+.main] AIDM v3 
+starting up
+  
+server.log:603:INFO: 
+    Application 
+startup complete.
+> server.log:604:ERRO
+R:    Traceback 
+(most recent call 
+last):
+  server.log:605:  
+File "C:\Python313\Li
+b\asyncio\runners.py"
+, line 118, in run
+  server.log:606:    
+return self._loop.run
+_until_complete(task)
+  server.log:609:    
+return 
+future.result()
+  server.log:610:    
+       
+~~~~~~~~~~~~~^^
+> server.log:611:asyn
+cio.exceptions.Cancel
+ledError
+  server.log:612:
+> server.log:613:Duri
+ng handling of the 
+above exception, 
+another exception 
+occurred:
+  server.log:614:
+> server.log:615:Trac
+eback (most recent 
+call last):
+  server.log:616:  
+File "C:\Python313\Li
+b\asyncio\runners.py"
+, line 195, in run
+  server.log:617:    
+return 
+runner.run(main)
+  server.log:621:Keyb
+oardInterrupt
+  server.log:622:
+> server.log:623:Duri
+ng handling of the 
+above exception, 
+another exception 
+occurred:
+  server.log:624:
+> server.log:625:Trac
+eback (most recent 
+call last):
+  server.log:626:  
+File "C:\Users\admin\
+Downloads\animerpg\ai
+dm_v3\venv313\Lib\sit
+e-packages\starlette\
+routing.py", line 
+701, in lifespan
+  server.log:627:    
+await receive()
+  server.log:631:  
+File "C:\Python313\Li
+b\asyncio\queues.py",
+ line 186, in get
+  server.log:632:    
+await getter
+> server.log:633:asyn
+cio.exceptions.Cancel
+ledError
+  server.log:634:
+  
+server.log:635:INFO: 
+    Started server 
+process [25132]
+  server.log:649:[api
+.main] AIDM v3 
+starting up
+  
+server.log:650:INFO: 
+    Application 
+startup complete.
+> server.log:651:ERRO
+R:    Traceback 
+(most recent call 
+last):
+  server.log:652:  
+File "C:\Python313\Li
+b\asyncio\runners.py"
+, line 118, in run
+  server.log:653:    
+return self._loop.run
+_until_complete(task)
+  server.log:656:    
+return 
+future.result()
+  server.log:657:    
+       
+~~~~~~~~~~~~~^^
+> server.log:658:asyn
+cio.exceptions.Cancel
+ledError
+  server.log:659:
+> server.log:660:Duri
+ng handling of the 
+above exception, 
+another exception 
+occurred:
+  server.log:661:
+> server.log:662:Trac
+eback (most recent 
+call last):
+  server.log:663:  
+File "C:\Python313\Li
+b\asyncio\runners.py"
+, line 195, in run
+  server.log:664:    
+return 
+runner.run(main)
+  server.log:668:Keyb
+oardInterrupt
+  server.log:669:
+> server.log:670:Duri
+ng handling of the 
+above exception, 
+another exception 
+occurred:
+  server.log:671:
+> server.log:672:Trac
+eback (most recent 
+call last):
+  server.log:673:  
+File "C:\Users\admin\
+Downloads\animerpg\ai
+dm_v3\venv313\Lib\sit
+e-packages\starlette\
+routing.py", line 
+701, in lifespan
+  server.log:674:    
+await receive()
+  server.log:678:  
+File "C:\Python313\Li
+b\asyncio\queues.py",
+ line 186, in get
+  server.log:679:    
+await getter
+> server.log:680:asyn
+cio.exceptions.Cancel
+ledError
+  server.log:681:
+  
+server.log:682:INFO: 
+    Started server 
+process [38904]
+
+
