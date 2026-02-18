@@ -1,15 +1,15 @@
 """Pydantic models for user settings."""
 
-from typing import Literal, Optional
-from pydantic import BaseModel, Field
+from typing import Literal
 
+from pydantic import BaseModel, Field
 
 ProviderType = Literal["google", "anthropic", "openai"]
 
 
 class ModelConfig(BaseModel):
     """Configuration for a single model selection."""
-    
+
     provider: ProviderType = Field(
         description="The LLM provider (google, anthropic, or openai)"
     )
@@ -35,126 +35,126 @@ class AgentSettings(BaseModel):
     The 'base_fast', 'base_thinking', and 'base_creative' fields serve as 
     fallbacks when an agent is not explicitly configured.
     """
-    
+
     # === BASE DEFAULTS (Fallback for unconfigured agents) ===
-    base_fast: Optional[ModelConfig] = Field(
+    base_fast: ModelConfig | None = Field(
         default=None,
         description="Default model for fast-tier agents when not explicitly configured"
     )
-    base_thinking: Optional[ModelConfig] = Field(
+    base_thinking: ModelConfig | None = Field(
         default=None,
         description="Default model for thinking-tier agents (director, research)"
     )
-    base_creative: Optional[ModelConfig] = Field(
+    base_creative: ModelConfig | None = Field(
         default=None,
         description="Default model for creative-tier agents (key_animator) - prose generation"
     )
-    
+
     # === CORE AGENTS (Phase 1) ===
-    intent_classifier: Optional[ModelConfig] = Field(
+    intent_classifier: ModelConfig | None = Field(
         default=None,
         description="Model for parsing player actions (fast model preferred)"
     )
-    outcome_judge: Optional[ModelConfig] = Field(
+    outcome_judge: ModelConfig | None = Field(
         default=None,
         description="Model for determining success/failure (fast model preferred)"
     )
-    key_animator: Optional[ModelConfig] = Field(
+    key_animator: ModelConfig | None = Field(
         default=None,
         description="Model for narrative generation (creative model preferred)"
     )
-    
+
     # === VALIDATION & MEMORY (Phase 2) ===
-    validator: Optional[ModelConfig] = Field(
+    validator: ModelConfig | None = Field(
         default=None,
         description="Model for output validation and error handling (fast model preferred)"
     )
-    memory_ranker: Optional[ModelConfig] = Field(
+    memory_ranker: ModelConfig | None = Field(
         default=None,
         description="Model for memory relevance scoring (fast model preferred)"
     )
-    context_selector: Optional[ModelConfig] = Field(
+    context_selector: ModelConfig | None = Field(
         default=None,
         description="RESERVED: ContextSelector is not a BaseAgent and does not use this field"
     )
-    
+
     # === JUDGMENT AGENTS (Phase 3) ===
-    combat: Optional[ModelConfig] = Field(
+    combat: ModelConfig | None = Field(
         default=None,
         description="Model for combat resolution (balanced model preferred)"
     )
-    progression: Optional[ModelConfig] = Field(
+    progression: ModelConfig | None = Field(
         default=None,
         description="Model for XP/leveling decisions (balanced model preferred)"
     )
-    scale_selector: Optional[ModelConfig] = Field(
+    scale_selector: ModelConfig | None = Field(
         default=None,
         description="Model for narrative scale selection (fast model preferred)"
     )
     # === MEMORY & COMPRESSION ===
-    compactor: Optional[ModelConfig] = Field(
+    compactor: ModelConfig | None = Field(
         default=None,
         description="Model for memory compaction (fast model preferred)"
     )
-    
+
     # === RESEARCH SUPPORT ===
-    scope: Optional[ModelConfig] = Field(
+    scope: ModelConfig | None = Field(
         default=None,
         description="Model for series scope/complexity detection (fast model preferred)"
     )
-    profile_merge: Optional[ModelConfig] = Field(
+    profile_merge: ModelConfig | None = Field(
         default=None,
         description="Model for multi-source profile merging (thinking model preferred)"
     )
-    
+
     # === DIRECTOR LAYER (Phase 4) ===
-    director: Optional[ModelConfig] = Field(
+    director: ModelConfig | None = Field(
         default=None,
         description="Model for campaign planning (creative model, extended thinking)"
     )
-    
+
     # === RESEARCH (Phase 4.5) ===
-    research: Optional[ModelConfig] = Field(
+    research: ModelConfig | None = Field(
         default=None,
         description="Model for anime research with web search (uses native search grounding)"
     )
-    
+
     # === NPC INTELLIGENCE (Phase 5) ===
-    relationship_analyzer: Optional[ModelConfig] = Field(
+    relationship_analyzer: ModelConfig | None = Field(
         default=None,
         description="Model for NPC relationship analysis (fast model preferred)"
     )
-    
+
     # === SESSION ZERO (Character Creation) ===
-    session_zero: Optional[ModelConfig] = Field(
+    session_zero: ModelConfig | None = Field(
         default=None,
         description="Model for character creation dialogue (fast model preferred)"
     )
-    
+
     # === WORLD BUILDING (Entity Extraction & Validation) ===
-    world_builder: Optional[ModelConfig] = Field(
+    world_builder: ModelConfig | None = Field(
         default=None,
         description="Model for validating player world-building assertions (fast model preferred)"
     )
 
     # === NARRATIVE PACING ===
-    pacing: Optional[ModelConfig] = Field(
+    pacing: ModelConfig | None = Field(
         default=None,
         description="Model for arc pacing micro-checks (fast model preferred)"
     )
-    recap: Optional[ModelConfig] = Field(
+    recap: ModelConfig | None = Field(
         default=None,
         description="Model for 'Previously On' recap generation (fast model preferred)"
     )
 
     # === WIKI SCRAPING ===
-    wiki_scout: Optional[ModelConfig] = Field(
+    wiki_scout: ModelConfig | None = Field(
         default=None,
         description="Model for wiki category classification (fast model preferred)"
     )
 
     # === POST-NARRATIVE PRODUCTION ===
-    production: Optional[ModelConfig] = Field(
+    production: ModelConfig | None = Field(
         default=None,
         description="Model for post-narrative quest tracking and location discovery (fast model preferred)"
     )
@@ -165,7 +165,7 @@ class APIKeySettings(BaseModel):
     
     Keys are stored encrypted in settings.json.
     """
-    
+
     google_api_key: str = Field(
         default="",
         description="Google Gemini API key (stored encrypted)"
@@ -182,48 +182,48 @@ class APIKeySettings(BaseModel):
 
 class UserSettings(BaseModel):
     """Complete user settings for AIDM v3."""
-    
+
     # Model configuration per agent
     agent_models: AgentSettings = Field(
         description="Model selection for each agent"
     )
-    
+
     # API keys (stored encrypted)
     api_keys: APIKeySettings = Field(
         default_factory=APIKeySettings,
         description="API keys for LLM providers"
     )
-    
+
     # UI preferences
     debug_mode: bool = Field(
         default=True,
         description="Show agent decisions and timing in the UI"
     )
-    
+
     # Active campaign (for persistence)
-    active_campaign_id: Optional[str] = Field(
+    active_campaign_id: str | None = Field(
         default=None,
         description="Currently active campaign ID (matches profile_id for now)"
     )
-    
-    active_profile_id: Optional[str] = Field(
+
+    active_profile_id: str | None = Field(
         default=None,
         description="Currently active narrative profile. Null means not set - triggers Session Zero recovery."
     )
-    
-    active_session_id: Optional[str] = Field(
+
+    active_session_id: str | None = Field(
         default=None,
         description="Currently active session ID for memory isolation. Set at Session Zero handoff."
     )
-    
+
     # Extended thinking mode
     extended_thinking: bool = Field(
         default=False,
         description="Enable deeper reasoning for complex agents (increases latency and token usage)"
     )
-    
+
     # Media generation
-    media_provider: Optional[str] = Field(
+    media_provider: str | None = Field(
         default="google",
         description="Provider for image/video generation (currently only 'google')"
     )
@@ -251,7 +251,7 @@ class UserSettings(BaseModel):
         default=True,
         description="Auto-play generated cutscene videos (muted)"
     )
-    
+
     class Config:
         """Pydantic config."""
         json_schema_extra = {
@@ -262,7 +262,7 @@ class UserSettings(BaseModel):
                         "model": "gemini-3-flash-preview"
                     },
                     "outcome_judge": {
-                        "provider": "google", 
+                        "provider": "google",
                         "model": "gemini-3-flash-preview"
                     },
                     "key_animator": {

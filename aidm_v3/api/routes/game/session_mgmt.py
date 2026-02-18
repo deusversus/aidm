@@ -1,29 +1,23 @@
 """Session management routes: start, resume, delete, latest, orchestrator cache."""
 
-from fastapi import APIRouter, HTTPException
-from typing import Optional, Dict, Any
-import uuid
 import logging
+import uuid
 
+from fastapi import APIRouter, HTTPException
+
+from src.agents.session_zero import SessionZeroAgent
 from src.core.orchestrator import Orchestrator
 from src.core.session import (
-    get_session_manager, 
-    Session, 
-    SessionPhase,
-    SessionManager,
-    get_missing_requirements,
-    get_current_phase_for_draft,
-    is_ready_for_gameplay,
+    get_session_manager,
 )
-from src.agents.session_zero import SessionZeroAgent
-from src.settings import get_settings_store
 from src.db.session import init_db
 from src.db.session_store import get_session_store
+from src.settings import get_settings_store
 
 from .models import (
+    ResumeSessionResponse,
     StartSessionRequest,
     StartSessionResponse,
-    ResumeSessionResponse,
 )
 
 logger = logging.getLogger(__name__)
@@ -31,41 +25,41 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 # Cache orchestrator instance
-_orchestrator: Optional[Orchestrator] = None
-_session_zero_agent: Optional[SessionZeroAgent] = None
+_orchestrator: Orchestrator | None = None
+_session_zero_agent: SessionZeroAgent | None = None
 
 
 def get_orchestrator() -> Orchestrator:
     """Get or create the orchestrator instance."""
     global _orchestrator
-    
+
     if _orchestrator is None:
         # Initialize database
         init_db()
-        
+
         # Get active profile from settings
         # Use reload() to force fresh read from disk - crucial after Session Zero handoff
         store = get_settings_store()
         settings = store.reload()
-        
+
         profile_id = settings.active_profile_id
-        
+
         # DEBUG: Log what we loaded
         logger.info(f"[get_orchestrator] Loaded settings: active_profile_id='{profile_id}', active_campaign_id='{settings.active_campaign_id}'")
-        
+
         # Handle missing profile - requires Session Zero to set it
         if not profile_id:  # Empty string means not configured
-            logger.error(f"[get_orchestrator] ERROR: No profile set! Settings file may not be synced.")
+            logger.error("[get_orchestrator] ERROR: No profile set! Settings file may not be synced.")
             raise HTTPException(
                 status_code=400,
                 detail="No active profile set. Please complete Session Zero first."
             )
-        
+
         # Orchestrator now resolves profile_id -> campaign_id internally
         # Pass session_id for memory collection isolation
         session_id = settings.active_session_id or profile_id  # Fallback to profile_id for backward compatibility
         _orchestrator = Orchestrator(profile_id=profile_id, session_id=session_id)
-    
+
     return _orchestrator
 
 
@@ -110,10 +104,10 @@ async def start_session(request: StartSessionRequest = None):
     """
     manager = get_session_manager()
     store = get_session_store()
-    
+
     # Generate or use provided session ID
     session_id = (request.session_id if request else None) or str(uuid.uuid4())
-    
+
     # FIX #4: Validate settings on new session - clear stale data
     # If there's a stale session_id that doesn't match, reset settings
     settings_store = get_settings_store()
@@ -124,23 +118,23 @@ async def start_session(request: StartSessionRequest = None):
         current_settings.active_session_id = ""
         current_settings.active_campaign_id = None
         settings_store.save(current_settings)
-    
+
     # Create new session
     session = manager.create_session(session_id)
-    
+
     # Get the Session Zero agent
     agent = get_session_zero_agent()
-    
+
     # Generate opening message
     try:
         opening = await agent.get_opening_message(session)
-        
+
         # Store the opening in message history
         session.add_message("assistant", opening)
-        
+
         # Save to persistent store
         store.save(session)
-        
+
         return StartSessionResponse(
             session_id=session_id,
             phase=session.phase.value,
@@ -158,13 +152,13 @@ async def resume_session(session_id: str):
     """
     store = get_session_store()
     manager = get_session_manager()
-    
+
     # Try to load from persistent store
     session = store.load(session_id)
-    
+
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
-    
+
     # Put it back into the session manager
     manager._sessions[session_id] = session
 
@@ -231,7 +225,7 @@ async def resume_session(session_id: str):
             db.close()
         except Exception:
             pass
-    
+
     return ResumeSessionResponse(
         session_id=session_id,
         phase=session.phase.value,
@@ -252,15 +246,15 @@ async def get_latest_session():
     """
     store = get_session_store()
     session_id = store.get_latest_session_id()
-    
+
     if not session_id:
         raise HTTPException(status_code=404, detail="No sessions found")
-    
+
     # Load and return session info
     session = store.load(session_id)
     if not session:
         raise HTTPException(status_code=404, detail="Session data corrupted")
-    
+
     return {
         "session_id": session_id,
         "phase": session.phase.value,
@@ -277,40 +271,38 @@ async def delete_session(session_id: str):
     """
     store = get_session_store()
     manager = get_session_manager()
-    
+
     # Remove from memory
     if session_id in manager._sessions:
         del manager._sessions[session_id]
-    
+
     # Remove from persistent store
     deleted = store.delete(session_id)
-    
+
     # Clean up custom profile (if any)
-    from src.context.custom_profile_library import (
-        get_custom_profile_library, 
-        delete_custom_profile
-    )
+    from src.context.custom_profile_library import delete_custom_profile, get_custom_profile_library
     custom_lib = get_custom_profile_library()
     lore_deleted = custom_lib.delete_session_lore(session_id)
     folder_deleted = delete_custom_profile(session_id)
-    
+
     # Clear campaign memory (ChromaDB collection)
     # Now uses session_id for proper isolation
     memory_deleted = False
     try:
         import chromadb
+
         from src.settings import get_settings_store
         settings_store = get_settings_store()
         settings = settings_store.load()
-        
+
         # Use active_session_id for session-based memory isolation
         # Fallback to active_profile_id for backward compatibility
         session_collection_id = settings.active_session_id or settings.active_profile_id
-        
+
         if session_collection_id:
             client = chromadb.PersistentClient(path="./data/chroma")
             collection_name = f"campaign_{session_collection_id}"
-            
+
             # Check if collection exists before deleting
             existing = [c.name for c in client.list_collections()]
             if collection_name in existing:
@@ -319,9 +311,9 @@ async def delete_session(session_id: str):
                 logger.info(f"Deleted memory collection: {collection_name}")
     except Exception as e:
         logger.error(f"Memory cleanup error: {e}")
-    
+
     return {
-        "deleted": deleted, 
+        "deleted": deleted,
         "session_id": session_id,
         "custom_lore_deleted": lore_deleted,
         "custom_folder_deleted": folder_deleted,
@@ -336,7 +328,7 @@ def _build_session_zero_summary(session, draft) -> str:
     highlights from the Session Zero session and character draft.
     """
     parts = []
-    
+
     # Character identity
     parts.append("### Character")
     if draft.name:
@@ -356,14 +348,14 @@ def _build_session_zero_summary(session, draft) -> str:
         parts.append(f"- Quirks: {', '.join(draft.quirks)}")
     if draft.goals:
         parts.append(f"- Goals: {draft.goals}")
-    
+
     # World context
     parts.append("\n### World Context")
     if draft.media_reference:
         parts.append(f"- IP: {draft.media_reference}")
     if draft.starting_location:
         parts.append(f"- Starting Location: {draft.starting_location}")
-    
+
     # Canonicality
     timeline = getattr(draft, 'timeline_mode', None)
     canon_cast = getattr(draft, 'canon_cast_mode', None)
@@ -376,7 +368,7 @@ def _build_session_zero_summary(session, draft) -> str:
             parts.append(f"- Canon Cast: {canon_cast}")
         if event_fidelity:
             parts.append(f"- Event Fidelity: {event_fidelity}")
-    
+
     # OP Mode
     if draft.op_protagonist_enabled:
         parts.append("\n### OP Mode: ACTIVE")
@@ -388,7 +380,7 @@ def _build_session_zero_summary(session, draft) -> str:
             parts.append(f"- Power Expression: {draft.op_power_expression}")
         if draft.op_narrative_focus:
             parts.append(f"- Narrative Focus: {draft.op_narrative_focus}")
-    
+
     # Key conversation highlights (last few exchanges)
     if session.messages:
         parts.append("\n### Key Conversation Highlights")
@@ -400,7 +392,7 @@ def _build_session_zero_summary(session, draft) -> str:
             if len(content) > 300:
                 content = content[:300] + "..."
             parts.append(f"[{role}]: {content}")
-    
+
     return "\n".join(parts)
 
 
@@ -415,18 +407,18 @@ async def _generate_handoff_character_media(
     Non-blocking — runs as background task so it doesn't delay the handoff response.
     """
     try:
-        from src.media.generator import MediaGenerator
-        from src.db.session import create_session
         from src.db.models import Character
+        from src.db.session import create_session
+        from src.media.generator import MediaGenerator
         from src.settings import get_settings_store
-        
+
         settings = get_settings_store().load()
         if not settings.media_enabled:
-            logger.warning(f"[Handoff→Media] Media disabled, skipping character media gen")
+            logger.warning("[Handoff→Media] Media disabled, skipping character media gen")
             return
-        
+
         style_context = settings.active_profile_id or "anime"
-        
+
         gen = MediaGenerator()
         result = await gen.generate_full_character_media(
             visual_tags=visual_tags or [],
@@ -435,7 +427,7 @@ async def _generate_handoff_character_media(
             campaign_id=campaign_id,
             entity_name=character_name,
         )
-        
+
         # Update Character record with generated URLs
         if result.get("portrait") or result.get("model_sheet"):
             db = create_session()
@@ -454,6 +446,6 @@ async def _generate_handoff_character_media(
                     logger.info(f"[Handoff→Media] Player model sheet saved: {char.model_sheet_url}")
                 db.commit()
             db.close()
-            
+
     except Exception as e:
         logger.error(f"[Handoff→Media] Character media gen failed (non-critical): {e}")

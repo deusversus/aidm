@@ -1,16 +1,13 @@
 """Settings persistence store with encrypted API key support."""
 
 import json
+import logging
 import os
 from pathlib import Path
-from typing import Optional, Tuple, Dict
 
-from .models import UserSettings, APIKeySettings
+from .crypto import decrypt_api_key, encrypt_api_key, is_key_configured, mask_api_key
 from .defaults import DEFAULT_SETTINGS
-from .crypto import encrypt_api_key, decrypt_api_key, mask_api_key, is_key_configured
-
-
-import logging
+from .models import UserSettings
 
 logger = logging.getLogger(__name__)
 
@@ -20,8 +17,8 @@ class SettingsStore:
     Settings are stored in the project root as 'settings.json'.
     API keys are encrypted before storage and decrypted on load.
     """
-    
-    def __init__(self, settings_path: Optional[Path] = None):
+
+    def __init__(self, settings_path: Path | None = None):
         """Initialize the settings store.
         
         Args:
@@ -32,9 +29,9 @@ class SettingsStore:
         else:
             # Default to project root
             self._path = Path(__file__).parent.parent.parent / "settings.json"
-        
-        self._settings: Optional[UserSettings] = None
-    
+
+        self._settings: UserSettings | None = None
+
     def load(self) -> UserSettings:
         """Load settings from file, or return defaults.
         
@@ -43,10 +40,10 @@ class SettingsStore:
         """
         if self._settings is not None:
             return self._settings
-        
+
         if self._path.exists():
             try:
-                with open(self._path, 'r', encoding='utf-8') as f:
+                with open(self._path, encoding='utf-8') as f:
                     data = json.load(f)
                 self._settings = UserSettings.model_validate(data)
             except (json.JSONDecodeError, Exception) as e:
@@ -54,9 +51,9 @@ class SettingsStore:
                 self._settings = DEFAULT_SETTINGS.model_copy()
         else:
             self._settings = DEFAULT_SETTINGS.model_copy()
-        
+
         return self._settings
-    
+
     def reload(self) -> UserSettings:
         """Force reload settings from disk, bypassing the cache.
         
@@ -68,8 +65,8 @@ class SettingsStore:
         """
         self._settings = None  # Clear cache
         return self.load()     # Re-read from disk
-    
-    def save(self, settings: Optional[UserSettings] = None) -> None:
+
+    def save(self, settings: UserSettings | None = None) -> None:
         """Save settings to file.
         
         Args:
@@ -77,13 +74,13 @@ class SettingsStore:
         """
         if settings:
             self._settings = settings
-        
+
         if self._settings is None:
             self._settings = DEFAULT_SETTINGS.model_copy()
-        
+
         with open(self._path, 'w', encoding='utf-8') as f:
             json.dump(self._settings.model_dump(), f, indent=2)
-    
+
     def update(self, **kwargs) -> UserSettings:
         """Update specific settings fields.
         
@@ -95,15 +92,15 @@ class SettingsStore:
         """
         current = self.load()
         updated_data = current.model_dump()
-        
+
         for key, value in kwargs.items():
             if key in updated_data:
                 updated_data[key] = value
-        
+
         self._settings = UserSettings.model_validate(updated_data)
         self.save()
         return self._settings
-    
+
     def reset(self) -> UserSettings:
         """Reset model settings to defaults, preserving API keys and campaign state.
         
@@ -115,16 +112,15 @@ class SettingsStore:
         """
         # Use reload() to get fresh settings from disk
         current = self.reload()
-        
+
         # Preserve these fields
         preserved_api_keys = current.api_keys
         preserved_profile_id = current.active_profile_id
         preserved_campaign_id = current.active_campaign_id
-        
+
         # Reset agent models to defaults (Google Flash for all base configs)
-        from .defaults import DEFAULT_SETTINGS
         from .models import AgentSettings, ModelConfig
-        
+
         # Create fresh agent settings with Google Flash for all 3 base configs
         default_flash = ModelConfig(provider="google", model="gemini-3-flash-preview")
         fresh_agent_models = AgentSettings(
@@ -133,7 +129,7 @@ class SettingsStore:
             base_creative=default_flash,
             # All per-agent configs reset to None (use base defaults)
         )
-        
+
         # Apply reset with preserved fields
         self._settings = current.model_copy(update={
             "agent_models": fresh_agent_models,
@@ -144,8 +140,8 @@ class SettingsStore:
         })
         self.save()
         return self._settings
-    
-    def get_agent_model(self, agent_name: str) -> Tuple[str, str]:
+
+    def get_agent_model(self, agent_name: str) -> tuple[str, str]:
         """Get the provider and model for a specific agent.
         
         Uses 3-tier fallback:
@@ -161,12 +157,12 @@ class SettingsStore:
         """
         settings = self.load()
         agent_models = settings.agent_models
-        
+
         # Try agent-specific config first
         config = getattr(agent_models, agent_name, None)
         if config:
             return config.provider, config.model
-        
+
         # Determine agent tier for fallback
         fast_tier_agents = {
             "intent_classifier", "outcome_judge", "validator", "memory_ranker",
@@ -177,7 +173,7 @@ class SettingsStore:
         }
         creative_tier_agents = {"key_animator"}  # Prose generation
         thinking_tier_agents = {"director", "research", "profile_merge"}  # Reasoning/planning
-        
+
         if agent_name in fast_tier_agents:
             base_config = getattr(agent_models, "base_fast", None)
         elif agent_name in creative_tier_agents:
@@ -187,15 +183,15 @@ class SettingsStore:
         else:
             # Unknown agent - fall back to thinking tier as safest default
             base_config = getattr(agent_models, "base_thinking", None)
-        
+
         if base_config:
             return base_config.provider, base_config.model
-        
+
         # Last resort fallback
         return "google", "gemini-3-flash-preview"
-    
+
     # API Key Management
-    
+
     def set_api_key(self, provider: str, key: str) -> None:
         """Set an API key for a provider (will be encrypted).
         
@@ -204,10 +200,10 @@ class SettingsStore:
             key: The plain API key
         """
         settings = self.load()
-        
+
         # Encrypt the key before storage
         encrypted = encrypt_api_key(key) if key else ""
-        
+
         # Update the appropriate key
         if provider == "google":
             settings.api_keys.google_api_key = encrypted
@@ -217,11 +213,11 @@ class SettingsStore:
             settings.api_keys.openai_api_key = encrypted
         else:
             raise ValueError(f"Unknown provider: {provider}")
-        
+
         self.save()
         # Clear cache so LLM manager reloads
         self._settings = None
-    
+
     def get_api_key(self, provider: str) -> str:
         """Get a decrypted API key for a provider.
         
@@ -232,7 +228,7 @@ class SettingsStore:
             Decrypted API key or empty string
         """
         settings = self.load()
-        
+
         encrypted = ""
         if provider == "google":
             encrypted = settings.api_keys.google_api_key
@@ -240,39 +236,39 @@ class SettingsStore:
             encrypted = settings.api_keys.anthropic_api_key
         elif provider == "openai":
             encrypted = settings.api_keys.openai_api_key
-        
+
         if not encrypted:
             # Fallback to environment variable
             env_var = f"{provider.upper()}_API_KEY"
             return os.getenv(env_var, "")
-        
+
         try:
             return decrypt_api_key(encrypted)
         except Exception:
             return ""
-    
-    def get_masked_keys(self) -> Dict[str, str]:
+
+    def get_masked_keys(self) -> dict[str, str]:
         """Get masked versions of all API keys for display.
         
         Returns:
             Dict of provider -> masked key
         """
         settings = self.load()
-        
+
         return {
             "google": mask_api_key(settings.api_keys.google_api_key),
             "anthropic": mask_api_key(settings.api_keys.anthropic_api_key),
             "openai": mask_api_key(settings.api_keys.openai_api_key),
         }
-    
-    def get_configured_providers(self) -> Dict[str, bool]:
+
+    def get_configured_providers(self) -> dict[str, bool]:
         """Check which providers have API keys configured.
         
         Returns:
             Dict of provider -> is_configured
         """
         settings = self.load()
-        
+
         return {
             "google": is_key_configured(settings.api_keys.google_api_key) or bool(os.getenv("GOOGLE_API_KEY")),
             "anthropic": is_key_configured(settings.api_keys.anthropic_api_key) or bool(os.getenv("ANTHROPIC_API_KEY")),
@@ -281,7 +277,7 @@ class SettingsStore:
 
 
 # Global store instance
-_store: Optional[SettingsStore] = None
+_store: SettingsStore | None = None
 
 
 def get_settings_store() -> SettingsStore:

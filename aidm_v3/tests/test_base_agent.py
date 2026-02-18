@@ -4,15 +4,12 @@ Covers message building, prompt loading, LLM call routing,
 and tool integration — all with MockLLMProvider.
 """
 
-import pytest
-from unittest.mock import MagicMock, patch, AsyncMock
 from pathlib import Path
 
-from src.agents.base import BaseAgent, AgenticAgent
-from src.llm.tools import ToolRegistry, ToolDefinition, ToolParam
-from src.llm.provider import LLMResponse
 from pydantic import BaseModel, Field
 
+from src.agents.base import AgenticAgent, BaseAgent
+from src.llm.tools import ToolDefinition, ToolRegistry
 
 # ---------------------------------------------------------------------------
 # Concrete subclasses for testing

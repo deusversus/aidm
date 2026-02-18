@@ -5,13 +5,11 @@ Contains the full AIDM turn flow: intent → outcome → narrative.
 """
 
 import asyncio
-import time
-from typing import Optional
-
-from ..enums import NarrativeWeight, ArcPhase, IntentType
-from ..utils.tasks import safe_create_task
-
 import logging
+import time
+
+from ..enums import NarrativeWeight
+from ..utils.tasks import safe_create_task
 
 logger = logging.getLogger(__name__)
 
@@ -36,20 +34,20 @@ class TurnPipelineMixin:
         """
         from .turn import TurnResult
         start = time.time()
-        
+
         # Wait for previous turn's background processing to finish
         # (almost never blocks — users take ~5-10s between turns)
         if self._bg_lock.locked():
-            logger.info(f"Waiting for previous turn's background processing...")
+            logger.info("Waiting for previous turn's background processing...")
             async with self._bg_lock:
                 pass  # Just wait for release
-        
+
         # 1. Get current DB context (fast, sync)
         db_context = self.state.get_context()
-        
+
         # #17: Expire old consequences at turn start
         self.state.expire_consequences(db_context.turn_number)
-        
+
         # =====================================================================
         # PHASE 1a: Intent Classification (fast, ~1s)
         # Run first to determine memory tier for RAG
@@ -60,7 +58,7 @@ class TurnPipelineMixin:
             character_state=db_context.character_summary,
             location=db_context.location
         )
-        
+
         # =====================================================================
         # HANDLE META/OVERRIDE COMMANDS (early exit - skip normal turn flow)
         # =====================================================================
@@ -78,7 +76,7 @@ class TurnPipelineMixin:
                 latency_ms=int((time.time() - start) * 1000),
                 cost_usd=0.0
             )
-        
+
         if intent.intent == "OVERRIDE_COMMAND":
             # Handle special override subcommands
             action_lower = intent.action.lower()
@@ -108,7 +106,7 @@ class TurnPipelineMixin:
                     target=intent.target
                 )
                 message = result["message"]
-            
+
             return TurnResult(
                 narrative=message,
                 intent=intent,
@@ -117,13 +115,13 @@ class TurnPipelineMixin:
                 latency_ms=int((time.time() - start) * 1000),
                 cost_usd=0.0
             )
-        
+
         if intent.intent == "OP_COMMAND":
             action_lower = intent.action.lower()
             if action_lower.startswith("accept"):
                 # Extract preset from action or target
                 preset = intent.target or action_lower.replace("accept", "").strip()
-                
+
                 # Preset mapping to 3-axis system
                 preset_mapping = {
                     "bored_god": ("existential", "instantaneous", "internal"),
@@ -147,7 +145,7 @@ class TurnPipelineMixin:
                     "vampire_d": ("relational", "passive", "episodic"),
                     "rimuru": ("consequence", "derivative", "faction"),
                 }
-                
+
                 if preset and preset.lower() in preset_mapping:
                     tension, expression, focus = preset_mapping[preset.lower()]
                     # Enable OP mode with this preset
@@ -158,7 +156,7 @@ class TurnPipelineMixin:
                     db_context.op_preset = preset.lower()
                     db_context.pending_op_suggestion = None
                     self.state.update_op_mode(
-                        enabled=True, 
+                        enabled=True,
                         tension_source=tension,
                         power_expression=expression,
                         narrative_focus=focus,
@@ -168,7 +166,7 @@ class TurnPipelineMixin:
                 else:
                     valid_presets = "bored_god, restrainer, hidden_ruler, burden_bearer, muscle_wizard, sealed_apocalypse, wandering_legend, nation_builder, disguised_god, time_looper, immortal"
                     message = f"⚠️ Unknown preset: {preset or 'none specified'}\n\nValid presets: {valid_presets}"
-                    
+
             elif action_lower == "dismiss":
                 db_context.op_suggestion_dismissed = True
                 db_context.pending_op_suggestion = None
@@ -176,7 +174,7 @@ class TurnPipelineMixin:
                 message = "👋 OP mode suggestion dismissed. We won't ask again (unless you reset)."
             else:
                 message = f"⚠️ Unknown /op command: {intent.action}\n\nUsage:\n  `/op accept [preset]` - Enable OP mode\n  `/op dismiss` - Dismiss suggestion"
-            
+
             return TurnResult(
                 narrative=message,
                 intent=intent,
@@ -185,7 +183,7 @@ class TurnPipelineMixin:
                 latency_ms=int((time.time() - start) * 1000),
                 cost_usd=0.0
             )
-        
+
         # =====================================================================
         # PHASE 1a.5: WORLD_BUILDING Detection and Validation
         # When players assert facts about NPCs, items, locations, etc.
@@ -194,7 +192,7 @@ class TurnPipelineMixin:
         if intent.intent == "WORLD_BUILDING":
             from ..agents.world_builder import WorldBuilderAgent
             world_builder = WorldBuilderAgent()
-            
+
             # Get established facts from memory for consistency checking
             established_facts = ""
             try:
@@ -207,7 +205,7 @@ class TurnPipelineMixin:
                     established_facts = "\n".join([m["content"] for m in fact_memories])
             except Exception:
                 pass
-            
+
             wb_result = await world_builder.call(
                 player_input=player_input,
                 character_context=db_context.character_summary,
@@ -220,9 +218,9 @@ class TurnPipelineMixin:
                 established_facts=established_facts,
                 profile_id=self.profile_id
             )
-            
+
             logger.info(f"WORLD_BUILDING: {len(wb_result.entities)} entities, status={wb_result.validation_status}")
-            
+
             if wb_result.validation_status == "rejected":
                 # Return a natural rejection narrative
                 return TurnResult(
@@ -233,7 +231,7 @@ class TurnPipelineMixin:
                     latency_ms=int((time.time() - start) * 1000),
                     cost_usd=0.0
                 )
-            
+
             if wb_result.validation_status == "needs_clarification":
                 # Ask the player to clarify
                 return TurnResult(
@@ -244,21 +242,21 @@ class TurnPipelineMixin:
                     latency_ms=int((time.time() - start) * 1000),
                     cost_usd=0.0
                 )
-            
+
             # Apply accepted entities
             for entity in wb_result.entities:
                 if entity.is_new:
                     await self._apply_world_building_entity(entity, db_context.turn_number)
-            
+
             # Build context for KeyAnimator
             if wb_result.entities:
                 entity_descs = []
                 for e in wb_result.entities:
                     entity_descs.append(f"- {e.entity_type.upper()}: {e.name}")
-                world_building_context = f"[World Building] Player established:\n" + "\n".join(entity_descs)
+                world_building_context = "[World Building] Player established:\n" + "\n".join(entity_descs)
                 if wb_result.narrative_integration:
                     world_building_context += f"\nIntegration note: {wb_result.narrative_integration}"
-        
+
         # =====================================================================
         # PHASE 1b: RAG Base Retrieval (uses intent for dynamic memory tiering)
         # Tier 1 (mundane): 3 candidates, Tier 2 (normal): 6, Tier 3 (epic): 9
@@ -270,11 +268,11 @@ class TurnPipelineMixin:
             profile_id=self.profile_id,
             intent=intent  # Pass intent for tiered memory retrieval
         )
-        
+
         # Initialize Turn object
         from .turn import Turn
         current_turn = Turn(input_text=player_input, intent=intent)
-        
+
         # =====================================================================
         # PHASE 2: Run Outcome Judgment and Memory Ranking in PARALLEL
         # - Outcome needs Intent (available from Phase 1)
@@ -282,14 +280,14 @@ class TurnPipelineMixin:
         # - TIER 0 FAST-PATH: Skip for trivial actions
         # =====================================================================
         from ..agents.pacing_agent import PacingDirective
-        
+
         # Check for Tier 0 (trivial action) fast-path
         is_trivial = self.context_selector.is_trivial_action(intent)
-        
+
         if is_trivial:
             # TIER 0 FAST-PATH: Skip OutcomeJudge, memory ranking, and pacing
-            logger.warning(f"TIER 0 fast-path: trivial action, skipping Outcome/Memory/Pacing")
-            
+            logger.warning("TIER 0 fast-path: trivial action, skipping Outcome/Memory/Pacing")
+
             # Synthetic auto-success outcome for trivial actions
             from ..agents.outcome_judge import OutcomeOutput
             outcome = OutcomeOutput(
@@ -313,7 +311,7 @@ class TurnPipelineMixin:
             if db_context.op_protagonist_enabled:
                 power_context += "OP MODE IS ACTIVE — this character is intentionally overpowered. Routine power use should be trivial (DC 5, no cost, no consequence). "
             power_context += f"World Tier: {self.profile.world_tier or 'T8'}."
-            
+
             outcome_task = asyncio.create_task(
                 self.outcome_judge.call(
                     f"Action: {intent.action}\nTarget: {intent.target or 'N/A'}",
@@ -325,7 +323,7 @@ class TurnPipelineMixin:
                     power_context=power_context
                 )
             )
-            
+
             memory_rank_task = asyncio.create_task(
                 self.context_selector.rank_memories(
                     rag_base["raw_memories"],
@@ -333,7 +331,7 @@ class TurnPipelineMixin:
                     intent=intent  # Pass intent for conditional skip
                 )
             )
-            
+
             # Pre-turn pacing micro-check (#1) — runs in parallel
             pacing_task = asyncio.create_task(
                 self.pacing_agent.check(
@@ -347,17 +345,17 @@ class TurnPipelineMixin:
                     turns_in_phase=db_context.turns_in_phase,  # #3: pacing gates
                 )
             )
-            
+
             # Wait for all three to complete (parallel execution)
             recap_task = None
-            
+
             # #18: Session recap on first gameplay turn (non-blocking)
             if not self._recap_generated and db_context.turn_number <= 2:
                 bible = self.state.get_campaign_bible()
                 arc_history = []
                 if bible and bible.planning_data:
                     arc_history = bible.planning_data.get('arc_history', [])
-                
+
                 # Only generate recap if we have story to recap
                 if arc_history or db_context.director_notes:
                     # Get top narrative_beat memories
@@ -372,7 +370,7 @@ class TurnPipelineMixin:
                         beat_mems = [m['content'] for m in beat_results] if beat_results else []
                     except Exception:
                         pass
-                    
+
                     recap_task = asyncio.create_task(
                         self.recap_agent.generate_recap(
                             arc_history=arc_history,
@@ -383,21 +381,21 @@ class TurnPipelineMixin:
                             arc_phase=db_context.arc_phase,
                         )
                     )
-            
+
             tasks_to_gather = [outcome_task, memory_rank_task, pacing_task]
             if recap_task:
                 tasks_to_gather.append(recap_task)
-            
+
             phase2_results = await asyncio.gather(
                 *tasks_to_gather,
                 return_exceptions=True
             )
-            
+
             # Handle potential exceptions
             outcome = phase2_results[0]
             ranked_memories = phase2_results[1]
             pacing_directive = phase2_results[2]
-            
+
             if isinstance(outcome, Exception):
                 raise RuntimeError(f"Outcome judgment failed: {outcome}")
             if isinstance(ranked_memories, Exception):
@@ -408,7 +406,7 @@ class TurnPipelineMixin:
                 pacing_directive = None
             elif pacing_directive:
                 logger.info(f"Beat: {pacing_directive.arc_beat}, Tone: {pacing_directive.tone}, Escalation: {pacing_directive.escalation_target:.0%}")
-            
+
             # #18: Extract recap result (index 3, if present)
             recap_result = None
             if recap_task and len(phase2_results) > 3:
@@ -418,9 +416,9 @@ class TurnPipelineMixin:
                     recap_result = None
                 elif recap_result:
                     logger.info(f"Recap generated: {len(recap_result.recap_text)} chars")
-        
+
         current_turn.outcome = outcome
-        
+
         # =====================================================================
         # #23: PRE-NARRATIVE COMBAT RESOLUTION
         # Combat MUST resolve before KeyAnimator so narrative reflects actual
@@ -434,13 +432,13 @@ class TurnPipelineMixin:
             combat_action = self.combat.parse_combat_action(intent, player_input)
             character = self.state.get_character()
             target = self.state.get_target(combat_action.target)
-            
+
             if character and target:
                 # Pre-validate resource costs via StateTransaction
                 if combat_action.action_type in ("spell", "skill"):
                     resource_path = "resources.mp.current" if combat_action.action_type == "spell" else "resources.sp.current"
                     resource_cost = 20 if combat_action.action_type == "spell" else 15
-                    
+
                     with self.state.begin_transaction(f"{combat_action.action_type.title()} resource cost") as txn:
                         txn.subtract(resource_path, resource_cost, reason=f"{combat_action.action_type.title()} cost")
                         validation = txn.validate()
@@ -450,7 +448,7 @@ class TurnPipelineMixin:
                                 logger.error(f"Pre-validation failed: {err.message}")
                             txn.rollback()
                         # If valid, txn auto-commits on exit
-                
+
                 if combat_occurred:
                     combat_result = await self.combat.resolve_action(
                         action=combat_action,
@@ -460,28 +458,28 @@ class TurnPipelineMixin:
                         profile=self.profile
                     )
                     logger.info(f"Pre-narrative resolution: {combat_result.damage_dealt} damage, hit={combat_result.hit}")
-        
+
         # Store for _post_narrative_processing bookkeeping
         self._last_combat_occurred = combat_occurred
         self._last_combat_result = combat_result
-        
+
         # Assemble final RAG context
         rag_context = {
             "memories": ranked_memories,
             "rules": rag_base["rules"],
             "short_term": rag_base["short_term"]
         }
-        
+
         # Inject pacing directive if available (#1)
         if pacing_directive and isinstance(pacing_directive, PacingDirective):
             rag_context["pacing_directive"] = pacing_directive
-        
+
         # Calculate power imbalance with context modifiers (Module 12)
         target_tier = getattr(outcome, 'target_tier', None)
         if intent.intent == "COMBAT" and target_tier:
             character = self.state.get_character()
             player_tier = character.power_tier if character else "T10"
-            
+
             power_result = await self.scale_selector.calculate_power_imbalance(
                 player_tier=player_tier,
                 threat_tier=target_tier,
@@ -491,15 +489,15 @@ class TurnPipelineMixin:
                 location=db_context.location,
                 has_allies=len(db_context.present_npcs) > 0
             )
-            
+
             # Update context with calculated imbalance
             db_context.power_imbalance = power_result.effective_imbalance
-            
+
             # Log modifiers
             if power_result.context_modifiers:
                 logger.info(f"Power imbalance: {power_result.raw_imbalance:.1f} → {power_result.effective_imbalance:.1f}")
                 logger.info(f"Context modifiers: {', '.join(power_result.context_modifiers)}")
-            
+
             # =====================================================================
             # PROGRESSIVE OP MODE: Track high-imbalance encounters
             # If player consistently dominates (imbalance > 10), suggest OP Mode
@@ -508,27 +506,27 @@ class TurnPipelineMixin:
                 # Increment counter
                 count = self.state.increment_high_imbalance_count()
                 logger.info(f"High-imbalance encounter #{count}")
-                
+
                 # Check for suggestion trigger
-                if (count >= 3 
-                    and not db_context.op_suggestion_dismissed 
+                if (count >= 3
+                    and not db_context.op_suggestion_dismissed
                     and not db_context.pending_op_suggestion):
-                    
+
                     # Get recent actions for behavior analysis
                     recent_memories = self.memory.search("player action", limit=20, min_heat=0)
                     behavior_history = [m["content"] for m in recent_memories]
-                    
+
                     # Call preset suggestion LLM
                     suggestion = await self.scale_selector.suggest_op_preset(
                         behavior_history=behavior_history,
                         character_tier=player_tier,
                         high_imbalance_count=count
                     )
-                    
+
                     if suggestion and suggestion.get("should_prompt"):
                         db_context.pending_op_suggestion = suggestion
                         logger.info(f"Suggesting preset: {suggestion.get('preset', 'unknown')} (confidence: {suggestion.get('confidence', 0):.0%})")
-            
+
             # Add to RAG context for Key Animator
             if power_result.triggers_tension_shift:
                 rag_context["power_analysis"] = (
@@ -536,7 +534,7 @@ class TurnPipelineMixin:
                     f"Modifiers: {', '.join(power_result.context_modifiers) or 'None'}\n"
                     f"Recommendation: {power_result.recommended_scale_shift or 'Continue current scale'}"
                 )
-        
+
         # Inject OP Mode guidance if enabled (uses 3-axis system)
         # #28 Cache Economics: OP axis guidance is session-stable → Block 1 via set_static_rule_guidance()
         if db_context.op_protagonist_enabled and db_context.op_tension_source:
@@ -558,7 +556,7 @@ class TurnPipelineMixin:
                     self.key_animator.set_static_rule_guidance("\n\n".join(static_parts))
                     logger.info(f"[OP Mode] Set static 3-axis guidance in Block 1 (cache-stable): "
                           f"{db_context.op_tension_source}/{db_context.op_power_expression}/{db_context.op_narrative_focus}")
-        
+
         # =====================================================================
         # OP MODE COMPOSITION REQUIREMENT: Auto-suggest if missing axes
         # OP Mode should never be on without composition selected
@@ -568,19 +566,19 @@ class TurnPipelineMixin:
             if not db_context.pending_op_suggestion:
                 character = self.state.get_character()
                 character_concept = character.backstory if character else ""
-                
+
                 # Use LLM to suggest preset based on character
                 suggestion = await self.scale_selector.suggest_op_preset(
-                    behavior_history=[f"Character concept: {character_concept}", 
+                    behavior_history=[f"Character concept: {character_concept}",
                                      f"Character name: {db_context.character_name}"],
                     character_tier="T7",  # Assume mid-tier for OP
                     high_imbalance_count=3  # Force suggestion threshold
                 )
-                
+
                 if suggestion:
                     db_context.pending_op_suggestion = suggestion
                     logger.warning(f"Missing composition! Suggesting: {suggestion.get('preset', 'unknown')}")
-            
+
             # Inject tension guidance for high power imbalance
             power_imbalance = db_context.power_imbalance
             if power_imbalance > 3:
@@ -588,7 +586,7 @@ class TurnPipelineMixin:
                 if tension_guidance:
                     rag_context["tension_guidance"] = tension_guidance
                     logger.info(f"Injected tension guidance (imbalance: {power_imbalance:.1f})")
-        
+
         # Inject NPC behavior context for present NPCs
         if db_context.present_npcs:
             npc_contexts = []
@@ -596,35 +594,35 @@ class TurnPipelineMixin:
                 npc = self.state.get_npc_by_name(npc_name)
                 if npc:
                     npc_context = self.state.get_npc_behavior_context(
-                        npc.id, 
+                        npc.id,
                         db_context.situation,
                         db_context.narrative_scale
                     )
                     if npc_context:
                         npc_contexts.append(npc_context)
-            
+
             if npc_contexts:
                 rag_context["npc_guidance"] = "\n\n---\n\n".join(npc_contexts)
-        
+
         # Inject player overrides (hard constraints)
         override_context = self.override_handler.format_overrides_for_context(self.campaign_id)
         if override_context:
             rag_context["player_overrides"] = override_context
             logger.info(f"Injected {len(self.override_handler.get_active_overrides(self.campaign_id))} active overrides")
-        
+
         # Inject faction context for faction-focused OP modes
         if db_context.op_narrative_focus == "faction":
             faction_context = self.state.get_faction_context_for_op_mode(
-                db_context.op_narrative_focus, 
+                db_context.op_narrative_focus,
                 db_context.op_preset
             )
             if faction_context:
                 rag_context["faction_guidance"] = faction_context
-        
+
         # =====================================================================
         # #13: RULE LIBRARY WIRING — Structural guidance from dead methods
         # =====================================================================
-        
+
         # 1. DNA Narration Guidance + 2. Genre Guidance
         # #28 Cache Economics: profile-derived guidance is session-stable → Block 1
         # Compute once on first turn, append to KeyAnimator's static rule guidance.
@@ -673,7 +671,7 @@ class TurnPipelineMixin:
                 existing = self.key_animator._static_rule_guidance or ""
                 combined = existing + ("\n\n" if existing else "") + "\n\n".join(static_rule_parts)
                 self.key_animator.set_static_rule_guidance(combined)
-        
+
         # 3. Scale Guidance: narrative scale for current story scope
         if db_context.narrative_scale:
             scale_guidance = self.rules.get_scale_guidance(db_context.narrative_scale)
@@ -683,7 +681,7 @@ class TurnPipelineMixin:
                     f"{scale_guidance}"
                 )
                 logger.info(f"Injected scale guidance: {db_context.narrative_scale}")
-        
+
         # 4. Compatibility Guidance: tier×scale combo guidance for Director-aware narration
         power_tier_str = db_context.power_tier or self.profile.world_tier or "T8"
         try:
@@ -698,7 +696,7 @@ class TurnPipelineMixin:
                     f"{compat_guidance}"
                 )
                 logger.info(f"Injected compatibility guidance: T{tier_num} × {db_context.narrative_scale}")
-        
+
         # #17: Inject active consequences for narrative awareness
         active_consequences = self.state.get_active_consequences(limit=8)
         if active_consequences:
@@ -714,7 +712,7 @@ class TurnPipelineMixin:
                 + "\n".join(consequence_lines)
             )
             logger.info(f"Injected {len(active_consequences)} active consequences into context")
-        
+
         # #23: Inject pre-resolved combat result for KeyAnimator
         if combat_result:
             combat_text = (
@@ -725,13 +723,13 @@ class TurnPipelineMixin:
             if hasattr(combat_result, 'damage_type') and combat_result.damage_type:
                 combat_text += f"**Damage Type:** {combat_result.damage_type}\n"
             if hasattr(combat_result, 'critical') and combat_result.critical:
-                combat_text += f"**CRITICAL HIT!**\n"
+                combat_text += "**CRITICAL HIT!**\n"
             if hasattr(combat_result, 'description') and combat_result.description:
                 combat_text += f"**Mechanical Detail:** {combat_result.description}\n"
             combat_text += "\n*Narrate the above mechanical result. Do NOT contradict these numbers.*"
             rag_context["combat_result"] = combat_text
-            logger.info(f"Injected combat result into KeyAnimator context")
-        
+            logger.info("Injected combat result into KeyAnimator context")
+
         # 3b. Validation Loop
         # Check if the outcome makes sense. If not, retry outcome generation with feedback.
         # Limit retries to avoid infinite loops.
@@ -746,10 +744,10 @@ class TurnPipelineMixin:
                      "character_state": db_context.character_summary
                  }
             )
-            
+
             if validation.is_valid:
                 break
-                
+
             # If invalid, regenerate outcome with correction
             logger.error(f"Validation failed: {validation.correction}. Retrying...")
             outcome = await self.outcome_judge.call(
@@ -774,9 +772,9 @@ class TurnPipelineMixin:
         elif any(cond in intent.special_conditions for cond in ("named_attack", "first_time_power")):
             use_sakuga = True
             logger.info(f"Auto-sakuga triggered by special condition: {intent.special_conditions}")
-        
+
         # Single narrative path - KeyAnimator handles both normal and sakuga modes
-        
+
         # === UNIFIED POWER DIFFERENTIAL: Calculate effective composition ===
         # Blends profile composition with character OP settings based on power tier gap
         # #15: Per-scene recalculation — pass current threat tier when available
@@ -800,7 +798,7 @@ class TurnPipelineMixin:
         if prev_mode != new_mode:
             logger.info(f"Mode transition: {prev_mode} → {new_mode} (threat: {current_threat or 'world baseline'})")
         logger.info(f"Power Differential: {effective_comp.get('differential', 0)} tiers, mode={new_mode}")
-        
+
         # === NPC CONTEXT CARDS (Module 04) ===
         # Build structured NPC relationship data for disposition-aware narration
         npc_context = ""
@@ -816,7 +814,7 @@ class TurnPipelineMixin:
                 if underserved:
                     npc_context += f"\n\n[Spotlight Hint] These NPCs need more screen time: {', '.join(underserved)}"
             logger.info(f"NPC context: {len(pre_narr_npcs)} NPCs present")
-        
+
         # === FORESHADOWING CALLBACKS (#9) ===
         # Surface seeds that are ready for payoff to the KeyAnimator
         callback_seeds = self.foreshadowing.get_callback_opportunities(db_context.turn_number)
@@ -835,7 +833,7 @@ class TurnPipelineMixin:
                 + "\n".join(callbacks)
             )
             logger.info(f"Injected {len(callbacks)} callback opportunities for KeyAnimator")
-        
+
         # === AGENTIC RESEARCH TOOLS (Module 2) ===
         # Build gameplay tools for KeyAnimator's optional research phase
         from ..agents.gameplay_tools import build_gameplay_tools
@@ -847,7 +845,7 @@ class TurnPipelineMixin:
             profile_library=get_profile_library(),
             profile_id=self.profile_id,
         )
-        
+
         narrative = await self.key_animator.generate(
             player_input=player_input,
             intent=intent,
@@ -860,15 +858,15 @@ class TurnPipelineMixin:
             tools=gameplay_tools,
             compaction_text=compaction_text
         )
-        
+
         # DEBUG: Log narrative generation
-        logger.info(f"Narrative generated:")
+        logger.info("Narrative generated:")
         logger.info(f"- type: {type(narrative)}")
         logger.info(f"- length: {len(narrative) if narrative else 0}")
         logger.info(f"- empty: {not narrative or narrative.strip() == ''}")
-        
+
         current_turn.narrative = narrative
-        
+
         # =====================================================================
         # #18: Prepend session recap on first gameplay turn
         # =====================================================================
@@ -884,14 +882,14 @@ class TurnPipelineMixin:
             recap_text += "---\n\n"
             narrative = recap_text + narrative
             logger.info(f"Recap prepended ({len(recap_text)} chars)")
-        
+
         # =====================================================================
         # CRITICAL PATH: OP suggestion display (mutates narrative before return)
         # =====================================================================
         if db_context.pending_op_suggestion:
             suggestion = db_context.pending_op_suggestion
             preset = suggestion.get('preset', suggestion.get('archetype', 'unknown'))
-            
+
             if db_context.op_protagonist_enabled and not db_context.op_tension_source:
                 suggestion_text = (
                     f"\n\n---\n"
@@ -916,11 +914,11 @@ class TurnPipelineMixin:
                     f"---"
                 )
             narrative = narrative + suggestion_text
-        
+
         # Measure latency NOW (before background work)
         latency = int((time.time() - start) * 1000)
         logger.info(f"FINAL narrative length: {len(narrative) if narrative else 0} (latency: {latency}ms)")
-        
+
         # =====================================================================
         # FIRE-AND-FORGET: All post-narrative processing runs in background
         # The user gets the narrative immediately while bookkeeping continues
@@ -949,7 +947,7 @@ class TurnPipelineMixin:
             narrative, portrait_map = resolve_portraits(narrative, self.campaign_id)
         except Exception as e:
             logger.error(f"Portrait resolution failed (non-fatal): {e}")
-        
+
         return TurnResult(
             narrative=narrative,
             intent=intent,

@@ -4,9 +4,9 @@ Tests the tool handler functions directly using mocked MemoryStore,
 StateManager, and ProfileLibrary instances.
 """
 
-import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
+import pytest
 
 # ---------------------------------------------------------------------------
 # Fixtures: mock MemoryStore, StateManager, ProfileLibrary
@@ -54,7 +54,7 @@ def mock_memory():
 def mock_state():
     """Mock StateManager with faction methods."""
     state = MagicMock()
-    
+
     # Mock faction
     faction = MagicMock()
     faction.name = "Shadow Organization"
@@ -71,14 +71,14 @@ def mock_state():
     faction.faction_goals = ["World domination"]
     faction.secrets = ["The leader is an ancient demon"]
     faction.current_events = ["Recruiting in the western provinces"]
-    
+
     state.get_faction_by_name.return_value = faction
     state.get_all_factions.return_value = [faction]
-    
+
     # Mock NPC for get_npc_by_name
     state.get_npc_by_name.return_value = None
     state.get_all_npcs.return_value = []
-    
+
     return state
 
 
@@ -101,7 +101,7 @@ class TestSearchMemory:
     def test_basic_search_no_keyword(self, mock_memory):
         from src.agents.gameplay_tools import _search_memory
         results = _search_memory(mock_memory, "Blade of Ashura", limit=5)
-        
+
         mock_memory.search.assert_called_once_with(
             query="Blade of Ashura", limit=5, boost_on_access=False,
             memory_type=None,
@@ -116,7 +116,7 @@ class TestSearchMemory:
             mock_memory, "weapon details", limit=5,
             keyword="Ashura",
         )
-        
+
         mock_memory.search_hybrid.assert_called_once_with(
             query="weapon details", keyword="Ashura", limit=5,
             boost_on_access=False, memory_type=None,
@@ -128,7 +128,7 @@ class TestSearchMemory:
     def test_memory_type_filter_forwarded(self, mock_memory):
         from src.agents.gameplay_tools import _search_memory
         _search_memory(mock_memory, "quest details", memory_type="quest")
-        
+
         mock_memory.search.assert_called_once_with(
             query="quest details", limit=5, boost_on_access=False,
             memory_type="quest",
@@ -140,7 +140,7 @@ class TestSearchMemory:
             mock_memory, "details", limit=3,
             memory_type="relationship", keyword="Mentor",
         )
-        
+
         mock_memory.search_hybrid.assert_called_once_with(
             query="details", keyword="Mentor", limit=3,
             boost_on_access=False, memory_type="relationship",
@@ -155,7 +155,7 @@ class TestSearchLore:
     def test_basic_lore_search(self, mock_profile_library):
         from src.agents.gameplay_tools import _search_lore
         results = _search_lore(mock_profile_library, "profile_123", "Blade of Ashura")
-        
+
         mock_profile_library.search_lore.assert_called_once_with(
             profile_id="profile_123",
             query="Blade of Ashura",
@@ -171,7 +171,7 @@ class TestSearchLore:
             mock_profile_library, "profile_123", "Mt. Fury",
             page_type="locations", limit=2,
         )
-        
+
         mock_profile_library.search_lore.assert_called_once_with(
             profile_id="profile_123",
             query="Mt. Fury",
@@ -183,7 +183,7 @@ class TestSearchLore:
         mock_profile_library.search_lore.return_value = []
         from src.agents.gameplay_tools import _search_lore
         results = _search_lore(mock_profile_library, "profile_123", "nonexistent")
-        
+
         assert len(results) == 1
         assert "info" in results[0]
 
@@ -191,7 +191,7 @@ class TestSearchLore:
         mock_profile_library.search_lore.side_effect = RuntimeError("DB error")
         from src.agents.gameplay_tools import _search_lore
         results = _search_lore(mock_profile_library, "profile_123", "test")
-        
+
         assert len(results) == 1
         assert "error" in results[0]
 
@@ -204,7 +204,7 @@ class TestFactionTools:
     def test_get_faction_details(self, mock_state):
         from src.agents.gameplay_tools import _get_faction_details
         result = _get_faction_details(mock_state, "Shadow Organization")
-        
+
         mock_state.get_faction_by_name.assert_called_once_with("Shadow Organization")
         assert result["name"] == "Shadow Organization"
         assert result["alignment"] == "chaotic_evil"
@@ -217,13 +217,13 @@ class TestFactionTools:
         mock_state.get_faction_by_name.return_value = None
         from src.agents.gameplay_tools import _get_faction_details
         result = _get_faction_details(mock_state, "Nonexistent")
-        
+
         assert "error" in result
 
     def test_list_factions(self, mock_state):
         from src.agents.gameplay_tools import _list_factions
         results = _list_factions(mock_state)
-        
+
         mock_state.get_all_factions.assert_called_once()
         assert len(results) == 1
         assert results[0]["name"] == "Shadow Organization"
@@ -233,7 +233,7 @@ class TestFactionTools:
         mock_state.get_all_factions.return_value = []
         from src.agents.gameplay_tools import _list_factions
         results = _list_factions(mock_state)
-        
+
         assert len(results) == 1
         assert "info" in results[0]
 
@@ -251,7 +251,7 @@ class TestBuildGameplayTools:
             profile_library=mock_profile_library,
             profile_id="test_profile",
         )
-        
+
         tool_names = [t.name for t in registry.all_tools()]
         assert "search_memory" in tool_names
         assert "search_lore" in tool_names
@@ -265,7 +265,7 @@ class TestBuildGameplayTools:
             state=mock_state,
             # No profile_library / profile_id
         )
-        
+
         tool_names = [t.name for t in registry.all_tools()]
         assert "search_lore" not in tool_names
         # But faction tools should still be there
@@ -280,7 +280,7 @@ class TestBuildDirectorTools:
     def test_director_includes_lore_tool(self, mock_memory, mock_state, mock_profile_library):
         from src.agents.director_tools import build_director_tools
         foreshadowing = MagicMock()
-        
+
         registry = build_director_tools(
             memory=mock_memory,
             state=mock_state,
@@ -289,7 +289,7 @@ class TestBuildDirectorTools:
             profile_library=mock_profile_library,
             profile_id="test_profile",
         )
-        
+
         tool_names = [t.name for t in registry.all_tools()]
         assert "search_lore" in tool_names
         assert "get_faction_details" in tool_names
@@ -299,11 +299,11 @@ class TestBuildDirectorTools:
     def test_search_memory_params_in_definition(self, mock_memory, mock_state):
         from src.agents.gameplay_tools import build_gameplay_tools
         registry = build_gameplay_tools(memory=mock_memory, state=mock_state)
-        
+
         # Find search_memory definition
         defns = registry.all_tools()
         search_mem = next(d for d in defns if d.name == "search_memory")
-        
+
         param_names = [p.name for p in search_mem.parameters]
         assert "memory_type" in param_names
         assert "keyword" in param_names

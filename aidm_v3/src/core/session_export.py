@@ -4,20 +4,27 @@ Session Export/Import for AIDM v3.
 Enables saving and loading complete session state to/from a portable file.
 """
 
-import json
-import zipfile
 import io
-import shutil
+import json
+import logging
+import zipfile
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, Dict, Any, List
 
-from ..db.session import create_session
 from ..db.models import (
-    Campaign, Character, WorldState, NPC, Faction, 
-    CampaignBible, Session, Turn, MediaAsset, Quest, Location
+    NPC,
+    Campaign,
+    CampaignBible,
+    Character,
+    Faction,
+    Location,
+    MediaAsset,
+    Quest,
+    Session,
+    Turn,
+    WorldState,
 )
-import logging
+from ..db.session import create_session
 
 logger = logging.getLogger(__name__)
 
@@ -35,16 +42,16 @@ def export_session(campaign_id: int) -> bytes:
         ZIP file as bytes (ready for download)
     """
     db = create_session()
-    
+
     try:
         # Get campaign
         campaign = db.query(Campaign).filter(Campaign.id == campaign_id).first()
         if not campaign:
             raise ValueError(f"Campaign {campaign_id} not found")
-        
+
         # Prepare export data
         export_data = {}
-        
+
         # Manifest
         export_data["manifest"] = {
             "version": EXPORT_VERSION,
@@ -53,14 +60,14 @@ def export_session(campaign_id: int) -> bytes:
             "exported_at": datetime.now().isoformat(),
             "campaign_id": campaign_id
         }
-        
+
         # Campaign
         export_data["campaign"] = {
             "name": campaign.name,
             "profile_id": campaign.profile_id,
             "created_at": campaign.created_at.isoformat() if campaign.created_at else None
         }
-        
+
         # Character
         character = db.query(Character).filter(Character.campaign_id == campaign_id).first()
         if character:
@@ -107,7 +114,7 @@ def export_session(campaign_id: int) -> bytes:
                 "portrait_url": character.portrait_url,
                 "model_sheet_url": character.model_sheet_url,
             }
-        
+
         # WorldState
         world_state = db.query(WorldState).filter(WorldState.campaign_id == campaign_id).first()
         if world_state:
@@ -119,7 +126,7 @@ def export_session(campaign_id: int) -> bytes:
                 "tension_level": world_state.tension_level,
                 "metadata": world_state.metadata
             }
-        
+
         # NPCs
         npcs = db.query(NPC).filter(NPC.campaign_id == campaign_id).all()
         export_data["npcs"] = [
@@ -148,7 +155,7 @@ def export_session(campaign_id: int) -> bytes:
             }
             for npc in npcs
         ]
-        
+
         # Factions
         factions = db.query(Faction).filter(Faction.campaign_id == campaign_id).all()
         export_data["factions"] = [
@@ -165,7 +172,7 @@ def export_session(campaign_id: int) -> bytes:
             }
             for faction in factions
         ]
-        
+
         # CampaignBible
         bible = db.query(CampaignBible).filter(CampaignBible.campaign_id == campaign_id).first()
         if bible:
@@ -173,7 +180,7 @@ def export_session(campaign_id: int) -> bytes:
                 "planning_data": bible.planning_data,
                 "last_updated_turn": bible.last_updated_turn
             }
-        
+
         # Sessions and Turns
         sessions = db.query(Session).filter(Session.campaign_id == campaign_id).all()
         export_data["sessions"] = []
@@ -196,13 +203,13 @@ def export_session(campaign_id: int) -> bytes:
                     for turn in turns
                 ]
             })
-        
+
         # Campaign Memories from ChromaDB
         try:
             import chromadb
             client = chromadb.PersistentClient(path="./data/chroma")
             collection_name = f"campaign_{campaign_id}"
-            
+
             try:
                 collection = client.get_collection(collection_name)
                 results = collection.get(include=["documents", "metadatas"])
@@ -216,7 +223,7 @@ def export_session(campaign_id: int) -> bytes:
         except Exception as e:
             logger.warning(f"Warning: Could not export memories: {e}")
             export_data["memories"] = {"ids": [], "documents": [], "metadatas": []}
-        
+
         # Settings
         from ..settings import get_settings_store
         store = get_settings_store()
@@ -225,26 +232,26 @@ def export_session(campaign_id: int) -> bytes:
             "active_profile_id": settings.active_profile_id,
             "active_campaign_id": settings.active_campaign_id
         }
-        
+
         # Session Zero state (for mid-session saves)
         try:
             from ..db.session_store import get_session_store
             session_store = get_session_store()
             all_sessions = session_store.list_sessions()
             session_zero_data = []
-            
+
             for sess_info in all_sessions:
                 sess = session_store.load(sess_info["session_id"])
                 if sess:
                     session_zero_data.append(sess.to_dict())
-            
+
             export_data["session_zero"] = session_zero_data
             if session_zero_data:
                 logger.info(f"Included {len(session_zero_data)} Session Zero state(s)")
         except Exception as e:
             logger.warning(f"Warning: Could not export Session Zero state: {e}")
             export_data["session_zero"] = []
-        
+
         # Quests
         quests = db.query(Quest).filter(Quest.campaign_id == campaign_id).all()
         export_data["quests"] = [
@@ -312,7 +319,7 @@ def export_session(campaign_id: int) -> bytes:
 
     finally:
         db.close()
-    
+
     # Collect media files for inclusion
     media_files = {}
     media_dir = Path(f"./data/media/{campaign_id}")
@@ -328,7 +335,7 @@ def export_session(campaign_id: int) -> bytes:
         # Write JSON files
         for key, data in export_data.items():
             zf.writestr(f"{key}.json", json.dumps(data, indent=2, default=str))
-        
+
         # Include media files
         for arcname, fpath in media_files.items():
             zf.write(fpath, arcname)
@@ -345,7 +352,7 @@ def export_session(campaign_id: int) -> bytes:
                     for file in session_dir.glob("*"):
                         arcname = f"custom_profile/{session_dir.name}/{file.name}"
                         zf.write(file, arcname)
-    
+
     zip_buffer.seek(0)
     return zip_buffer.getvalue()
 
@@ -361,16 +368,16 @@ def import_session(zip_bytes: bytes) -> int:
     Returns:
         New campaign_id after import
     """
-    from ..db.state_manager import StateManager
     from ..context.custom_profile_library import get_custom_profile_library
+    from ..db.state_manager import StateManager
     from ..settings import get_settings_store, reset_settings_store
-    
+
     # Parse ZIP
     zip_buffer = io.BytesIO(zip_bytes)
     export_data = {}
     custom_profile_files = {}
     media_file_entries = {}
-    
+
     with zipfile.ZipFile(zip_buffer, 'r') as zf:
         for name in zf.namelist():
             if name.endswith('.json'):
@@ -380,16 +387,16 @@ def import_session(zip_bytes: bytes) -> int:
                 custom_profile_files[name] = zf.read(name)
             elif name.startswith('media/'):
                 media_file_entries[name] = zf.read(name)
-    
+
     # Validate manifest
     manifest = export_data.get("manifest", {})
     if not manifest:
         raise ValueError("Invalid export file: missing manifest")
-    
+
     profile_id = manifest.get("profile_id")
     if not profile_id:
         raise ValueError("Invalid export file: missing profile_id")
-    
+
     # Check profile exists (unless it's a hybrid/custom or test)
     if not profile_id.startswith(("hybrid_", "custom_", "test")):
         try:
@@ -399,15 +406,15 @@ def import_session(zip_bytes: bytes) -> int:
                 logger.warning(f"Warning: Profile '{profile_id}' not found locally. You may want to regenerate it via Session Zero.")
         except Exception as e:
             logger.warning(f"Warning: Could not check profile: {e}")
-    
+
     # Full reset first
     StateManager.full_reset()
     custom_lib = get_custom_profile_library()
     custom_lib.clear_all()
-    
+
     # Import to database
     db = create_session()
-    
+
     try:
         # Campaign
         campaign_data = export_data.get("campaign", {})
@@ -419,7 +426,7 @@ def import_session(zip_bytes: bytes) -> int:
         db.commit()
         db.refresh(campaign)
         new_campaign_id = campaign.id
-        
+
         # Character
         char_data = export_data.get("character")
         if char_data:
@@ -468,7 +475,7 @@ def import_session(zip_bytes: bytes) -> int:
                 model_sheet_url=char_data.get("model_sheet_url"),
             )
             db.add(character)
-        
+
         # WorldState
         world_data = export_data.get("world_state")
         if world_data:
@@ -482,7 +489,7 @@ def import_session(zip_bytes: bytes) -> int:
                 metadata=world_data.get("metadata")
             )
             db.add(world_state)
-        
+
         # NPCs
         for npc_data in export_data.get("npcs", []):
             npc = NPC(
@@ -510,7 +517,7 @@ def import_session(zip_bytes: bytes) -> int:
                 emotional_milestones=npc_data.get("emotional_milestones"),
             )
             db.add(npc)
-        
+
         # Factions
         for faction_data in export_data.get("factions", []):
             faction = Faction(
@@ -526,7 +533,7 @@ def import_session(zip_bytes: bytes) -> int:
                 current_events=faction_data.get("current_events")
             )
             db.add(faction)
-        
+
         # Quests
         for q_data in export_data.get("quests", []):
             quest = Quest(
@@ -568,7 +575,7 @@ def import_session(zip_bytes: bytes) -> int:
                 known_npcs=loc_data.get("known_npcs"),
             )
             db.add(location)
-        
+
         # CampaignBible
         bible_data = export_data.get("campaign_bible")
         if bible_data:
@@ -578,7 +585,7 @@ def import_session(zip_bytes: bytes) -> int:
                 last_updated_turn=bible_data.get("last_updated_turn")
             )
             db.add(bible)
-        
+
         # Sessions and Turns
         for session_data in export_data.get("sessions", []):
             session = Session(
@@ -588,7 +595,7 @@ def import_session(zip_bytes: bytes) -> int:
             db.add(session)
             db.commit()
             db.refresh(session)
-            
+
             for turn_data in session_data.get("turns", []):
                 turn = Turn(
                     session_id=session.id,
@@ -601,9 +608,9 @@ def import_session(zip_bytes: bytes) -> int:
                     cost_usd=turn_data.get("cost_usd")
                 )
                 db.add(turn)
-        
+
         db.commit()
-        
+
         # Media Assets
         for ma_data in export_data.get("media_assets", []):
             # Remap file paths from old campaign_id to new
@@ -623,12 +630,12 @@ def import_session(zip_bytes: bytes) -> int:
                 status=ma_data.get("status", "complete"),
             )
             db.add(ma)
-        
+
         db.commit()
-        
+
     finally:
         db.close()
-    
+
     # Import memories to ChromaDB
     memories_data = export_data.get("memories", {})
     if memories_data.get("ids"):
@@ -647,7 +654,7 @@ def import_session(zip_bytes: bytes) -> int:
             logger.info(f"Restored {len(memories_data['ids'])} memories")
         except Exception as e:
             logger.warning(f"Warning: Could not restore memories: {e}")
-    
+
     # Restore custom profile files
     if custom_profile_files:
         for arcname, content in custom_profile_files.items():
@@ -655,8 +662,8 @@ def import_session(zip_bytes: bytes) -> int:
             target_path = Path("./data") / arcname.replace("custom_profile/", "custom_profiles/")
             target_path.parent.mkdir(parents=True, exist_ok=True)
             target_path.write_bytes(content)
-        logger.info(f"Restored custom profile files")
-    
+        logger.info("Restored custom profile files")
+
     # Restore media files
     if media_file_entries:
         media_dir = Path(f"./data/media/{new_campaign_id}")
@@ -667,7 +674,7 @@ def import_session(zip_bytes: bytes) -> int:
             target_path.parent.mkdir(parents=True, exist_ok=True)
             target_path.write_bytes(content)
         logger.info(f"Restored {len(media_file_entries)} media file(s)")
-    
+
     # Update settings
     settings_data = export_data.get("settings", {})
     store = get_settings_store()
@@ -676,7 +683,7 @@ def import_session(zip_bytes: bytes) -> int:
     settings.active_campaign_id = profile_id  # Use profile_id, orchestrator will resolve
     store.save(settings)
     reset_settings_store()
-    
+
     # Restore Session Zero state (for mid-session resume)
     session_zero_data = export_data.get("session_zero", [])
     if session_zero_data:
@@ -684,20 +691,20 @@ def import_session(zip_bytes: bytes) -> int:
             from ..db.session_store import get_session_store
             from .session import Session
             session_store = get_session_store()
-            
+
             # Clear existing sessions first
             existing = session_store.list_sessions()
             for sess_info in existing:
                 session_store.delete(sess_info["session_id"])
-            
+
             # Restore sessions
             for sess_dict in session_zero_data:
                 sess = Session.from_dict(sess_dict)
                 session_store.save(sess)
-            
+
             logger.info(f"Restored {len(session_zero_data)} Session Zero state(s)")
         except Exception as e:
             logger.warning(f"Warning: Could not restore Session Zero state: {e}")
-    
+
     logger.info(f"Session imported successfully as campaign {new_campaign_id}")
     return new_campaign_id

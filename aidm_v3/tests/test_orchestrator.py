@@ -6,16 +6,17 @@ import asyncio
 import sys
 import time
 
+
 async def test_turn(action: str):
     """Test a single turn through the orchestrator."""
     from src.core.orchestrator import Orchestrator
     from src.profiles.loader import load_profile
     from src.settings import get_settings_store
-    
+
     # Load settings and profile
     settings = get_settings_store().load()
     profile_id = settings.active_profile_id or "hellsing"
-    
+
     print(f"[Test] Loading profile: {profile_id}")
     try:
         profile = load_profile(profile_id)
@@ -30,20 +31,20 @@ async def test_turn(action: str):
         else:
             print("[Test] ERROR: No profiles available!")
             return
-    
+
     print(f"[Test] Profile loaded: {profile.name}")
     print(f"[Test] Processing action: '{action}'")
     print("-" * 60)
-    
+
     # Create orchestrator (uses profile_id, not profile object)
     orchestrator = Orchestrator(campaign_id=1, profile_id=profile_id)
-    
+
     # Process turn
     start = time.time()
     try:
         result = await orchestrator.process_turn(action)
         elapsed = time.time() - start
-        
+
         print(f"\n[RESULT] Latency: {elapsed:.1f}s ({result.latency_ms}ms internal)")
         print(f"[RESULT] Intent: {result.intent.intent} - {result.intent.action}")
         print(f"[RESULT] Outcome: {result.outcome.success_level} ({result.outcome.narrative_weight})")
@@ -52,11 +53,11 @@ async def test_turn(action: str):
         print("NARRATIVE:")
         print(result.narrative if result.narrative else "[EMPTY NARRATIVE!]")
         print("-" * 60)
-        
+
         if not result.narrative:
             print("\n⚠️  EMPTY NARRATIVE DETECTED!")
             print("This is the bug we're tracking.")
-            
+
     except Exception as e:
         import traceback
         print(f"\n[ERROR] {e}")

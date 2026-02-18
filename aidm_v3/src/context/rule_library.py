@@ -8,15 +8,13 @@ Chunks are stored as YAML files in aidm_v3/rule_library/ and indexed
 in ChromaDB for semantic retrieval.
 """
 
+import logging
+from pathlib import Path
+from typing import Any
+
 import chromadb
 import yaml
-import os
-from pathlib import Path
-from typing import List, Dict, Any, Optional
 from pydantic import BaseModel
-
-
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -25,8 +23,8 @@ class RuleChunk(BaseModel):
     id: str
     category: str  # scale, archetype, ceremony, dna, genre, example
     source_module: str  # module_12 or module_13
-    tags: List[str]
-    retrieve_conditions: List[str] = []
+    tags: list[str]
+    retrieve_conditions: list[str] = []
     content: str
 
 
@@ -37,44 +35,44 @@ class RuleLibrary:
     Loads YAML chunks from rule_library/ directory and indexes them
     in ChromaDB for semantic retrieval.
     """
-    
+
     def __init__(
-        self, 
+        self,
         persist_dir: str = "./data/chroma",
-        library_dir: Optional[str] = None
+        library_dir: str | None = None
     ):
         self.client = chromadb.PersistentClient(path=persist_dir)
-        
+
         # Find library directory
         if library_dir:
             self.library_dir = Path(library_dir)
         else:
             # Try relative to this file
             self.library_dir = Path(__file__).parent.parent.parent / "rule_library"
-        
+
         # Collection for rule chunks
         self.collection = self.client.get_or_create_collection(
             name="rule_library_v2",
             metadata={"hnsw:space": "cosine"}
         )
-        
+
         # Track loaded chunks
-        self._chunks: Dict[str, RuleChunk] = {}
-        
+        self._chunks: dict[str, RuleChunk] = {}
+
         # Initialize if empty
         if self.collection.count() == 0:
             self.initialize()
-    
+
     def initialize(self):
         """Load all YAML chunks from library directory and index them."""
         if not self.library_dir.exists():
             logger.warning(f"Warning: Rule library directory not found at {self.library_dir}")
             return
-        
+
         logger.info(f"Initializing Rule Library from {self.library_dir}...")
-        
+
         chunks_loaded = 0
-        
+
         # Load all YAML files
         for yaml_file in self.library_dir.glob("**/*.yaml"):
             try:
@@ -82,20 +80,20 @@ class RuleLibrary:
                 chunks_loaded += len(chunks)
             except Exception as e:
                 logger.error(f"Error loading {yaml_file}: {e}")
-        
+
         logger.info(f"Loaded {chunks_loaded} chunks into Rule Library.")
-    
-    def _load_yaml_file(self, file_path: Path) -> List[RuleChunk]:
+
+    def _load_yaml_file(self, file_path: Path) -> list[RuleChunk]:
         """Load chunks from a YAML file."""
-        with open(file_path, 'r', encoding='utf-8') as f:
+        with open(file_path, encoding='utf-8') as f:
             content = f.read()
-        
+
         # YAML files contain multiple documents separated by ---
         chunks = []
         for doc in yaml.safe_load_all(content):
             if doc is None:
                 continue
-            
+
             # Handle both single chunk and list of chunks
             if isinstance(doc, list):
                 for item in doc:
@@ -108,14 +106,14 @@ class RuleLibrary:
                 if chunk:
                     chunks.append(chunk)
                     self._index_chunk(chunk)
-        
+
         return chunks
-    
-    def _parse_chunk(self, data: Dict) -> Optional[RuleChunk]:
+
+    def _parse_chunk(self, data: dict) -> RuleChunk | None:
         """Parse a dict into a RuleChunk."""
         if not data or 'id' not in data or 'content' not in data:
             return None
-        
+
         return RuleChunk(
             id=data['id'],
             category=data.get('category', 'unknown'),
@@ -124,11 +122,11 @@ class RuleLibrary:
             retrieve_conditions=data.get('retrieve_conditions', []),
             content=data['content']
         )
-    
+
     def _index_chunk(self, chunk: RuleChunk):
         """Index a chunk in ChromaDB."""
         self._chunks[chunk.id] = chunk
-        
+
         # Prepare metadata
         metadata = {
             "category": chunk.category,
@@ -136,21 +134,21 @@ class RuleLibrary:
             "tags": ",".join(chunk.tags),
             "conditions": ",".join(chunk.retrieve_conditions)
         }
-        
+
         # Add to collection
         self.collection.upsert(
             ids=[chunk.id],
             documents=[chunk.content],
             metadatas=[metadata]
         )
-    
+
     def retrieve(
-        self, 
-        query: str, 
+        self,
+        query: str,
         limit: int = 5,
-        category: Optional[str] = None,
-        tags: Optional[List[str]] = None
-    ) -> List[Dict[str, Any]]:
+        category: str | None = None,
+        tags: list[str] | None = None
+    ) -> list[dict[str, Any]]:
         """
         Retrieve relevant chunks based on semantic search.
         
@@ -167,7 +165,7 @@ class RuleLibrary:
         where = None
         if category:
             where = {"category": category}
-        
+
         try:
             results = self.collection.query(
                 query_texts=[query],
@@ -192,21 +190,21 @@ class RuleLibrary:
                 )
             else:
                 raise
-        
+
         chunks = []
         if results["ids"]:
             ids = results["ids"][0]
             documents = results["documents"][0]
             metadatas = results["metadatas"][0]
             distances = results["distances"][0] if results.get("distances") else [0] * len(ids)
-            
+
             for i, chunk_id in enumerate(ids):
                 # Optional tag filtering (post-query)
                 if tags:
                     chunk_tags = metadatas[i].get("tags", "").split(",")
                     if not any(t in chunk_tags for t in tags):
                         continue
-                
+
                 chunks.append({
                     "id": chunk_id,
                     "content": documents[i],
@@ -214,34 +212,34 @@ class RuleLibrary:
                     "tags": metadatas[i].get("tags", "").split(","),
                     "score": 1.0 - distances[i]
                 })
-        
+
         return chunks
-    
+
     def get_relevant_rules(self, query: str, limit: int = 5) -> str:
         """
         Retrieve relevant rules as a formatted string context.
         (Backwards compatible with old interface)
         """
         chunks = self.retrieve(query, limit=limit)
-        
+
         context_parts = []
         for chunk in chunks:
             category = chunk.get("category", "unknown")
             context_parts.append(
                 f"--- {category.upper()} Guidance ---\n{chunk['content']}"
             )
-        
+
         return "\n\n".join(context_parts)
-    
-    def get_by_category(self, category: str, limit: int = 10) -> List[Dict[str, Any]]:
+
+    def get_by_category(self, category: str, limit: int = 10) -> list[dict[str, Any]]:
         """Get all chunks of a specific category."""
         return self.retrieve(
             query=f"{category} guidance",
             limit=limit,
             category=category
         )
-    
-    def get_scale_guidance(self, scale_name: str) -> Optional[str]:
+
+    def get_scale_guidance(self, scale_name: str) -> str | None:
         """Get guidance for a specific narrative scale."""
         chunks = self.retrieve(
             query=f"{scale_name} narrative scale",
@@ -249,8 +247,8 @@ class RuleLibrary:
             category="scale"
         )
         return chunks[0]["content"] if chunks else None
-    
-    def get_archetype_guidance(self, archetype: str) -> Optional[str]:
+
+    def get_archetype_guidance(self, archetype: str) -> str | None:
         """Get guidance for a specific OP archetype (legacy - use get_op_axis_guidance for 3-axis)."""
         chunks = self.retrieve(
             query=f"{archetype} archetype techniques",
@@ -258,8 +256,8 @@ class RuleLibrary:
             category="archetype"
         )
         return chunks[0]["content"] if chunks else None
-    
-    def get_op_axis_guidance(self, axis: str, value: str) -> Optional[str]:
+
+    def get_op_axis_guidance(self, axis: str, value: str) -> str | None:
         """
         Get guidance for a specific OP mode axis value.
         
@@ -272,26 +270,26 @@ class RuleLibrary:
         """
         if not value:
             return None
-            
+
         # Map axis to category
         category_map = {
             "tension": "op_tension",
-            "expression": "op_expression", 
+            "expression": "op_expression",
             "focus": "op_focus"
         }
-        
+
         category = category_map.get(axis)
         if not category:
             return None
-        
+
         chunks = self.retrieve(
             query=f"{value} {axis} OP protagonist mode",
             limit=1,
             category=category
         )
         return chunks[0]["content"] if chunks else None
-    
-    def get_by_id(self, doc_id: str) -> Optional[str]:
+
+    def get_by_id(self, doc_id: str) -> str | None:
         """
         Get a document by its exact ID.
         
@@ -308,8 +306,8 @@ class RuleLibrary:
         except Exception:
             pass
         return None
-    
-    def get_ceremony_text(self, old_tier: int, new_tier: int) -> Optional[str]:
+
+    def get_ceremony_text(self, old_tier: int, new_tier: int) -> str | None:
         """
         Get tier transition ceremony text by exact ID lookup.
         
@@ -320,8 +318,8 @@ class RuleLibrary:
         # Direct ID lookup - ceremonies use format "ceremony_t8_t7"
         doc_id = f"ceremony_t{old_tier}_t{new_tier}"
         return self.get_by_id(doc_id)
-    
-    def get_compatibility_guidance(self, tier: int, scale: str) -> Optional[str]:
+
+    def get_compatibility_guidance(self, tier: int, scale: str) -> str | None:
         """
         Get Director guidance for tier×scale combinations.
         
@@ -343,15 +341,15 @@ class RuleLibrary:
             tier_label = "mid tier"
         else:
             tier_label = "high tier"
-            
+
         chunks = self.retrieve(
             query=f"{tier_label} tier {tier} {scale} scale compatibility guidance",
             limit=1,
             category="compatibility"
         )
         return chunks[0]["content"] if chunks else None
-    
-    def get_power_tier_guidance(self, tier: int) -> Optional[str]:
+
+    def get_power_tier_guidance(self, tier: int) -> str | None:
         """
         Get full power tier definition + narrative guidance.
         
@@ -371,8 +369,8 @@ class RuleLibrary:
             category="power_tier"
         )
         return chunks[0]["content"] if chunks else None
-    
-    def get_genre_guidance(self, genre: str, topic: str = "") -> Optional[str]:
+
+    def get_genre_guidance(self, genre: str, topic: str = "") -> str | None:
         """
         Get structural guidance for a genre.
         
@@ -386,15 +384,15 @@ class RuleLibrary:
         query = f"{genre} genre"
         if topic:
             query += f" {topic}"
-        
+
         chunks = self.retrieve(
             query=query,
             limit=1,
             category="genre"
         )
         return chunks[0]["content"] if chunks else None
-    
-    def get_dna_guidance(self, scale_name: str, value: int) -> Optional[str]:
+
+    def get_dna_guidance(self, scale_name: str, value: int) -> str | None:
         """Get narration guidance for a DNA scale value."""
         # Determine if low (0-3), mid (4-6), or high (7-10)
         if value <= 3:
@@ -403,15 +401,15 @@ class RuleLibrary:
             level = "high"
         else:
             level = "mid"
-        
+
         chunks = self.retrieve(
             query=f"{scale_name} {level} DNA narration style",
             limit=1,
             category="dna"
         )
         return chunks[0]["content"] if chunks else None
-    
-    def get_tension_guidance(self, archetype: str, power_imbalance: float) -> Optional[str]:
+
+    def get_tension_guidance(self, archetype: str, power_imbalance: float) -> str | None:
         """
         Get appropriate tension guidance based on archetype and power imbalance.
         
@@ -426,10 +424,10 @@ class RuleLibrary:
         """
         if power_imbalance <= 3:
             return None  # Standard combat is fine
-        
+
         # Select tension type based on archetype
         tension_type = "structural"  # Default
-        
+
         archetype_tensions = {
             "saitama": "existential",
             "mob": "existential",
@@ -441,23 +439,23 @@ class RuleLibrary:
             "rimuru": "ensemble",
             "mashle": "structural"
         }
-        
+
         if archetype and archetype.lower() in archetype_tensions:
             tension_type = archetype_tensions[archetype.lower()]
-        
+
         # Retrieve from RAG
         chunks = self.retrieve(
             query=f"{tension_type} tension OP protagonist",
             limit=1,
             category="tension"
         )
-        
+
         return chunks[0]["content"] if chunks else None
-    
+
     def count(self) -> int:
         """Get total number of indexed chunks."""
         return self.collection.count()
-    
+
     def close(self):
         """Cleanup if needed."""
         pass

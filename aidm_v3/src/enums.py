@@ -8,7 +8,6 @@ needed for database columns, JSON payloads, or LLM schemas.
 
 from enum import StrEnum
 
-
 # ── Intent Classification ──────────────────────────────────────────────
 
 class IntentType(StrEnum):

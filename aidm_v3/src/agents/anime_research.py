@@ -12,125 +12,123 @@ Includes robust error handling:
 - Graceful fallback to training data if search fails
 """
 
-from typing import Optional, Dict, Any, List, Type
-from pydantic import BaseModel, Field
-from pathlib import Path
 import asyncio
-
-from .base import BaseAgent
-from .progress import ProgressTracker, ProgressPhase
-from ..settings import get_settings_store
-
-
 import logging
+from typing import Any, Optional
+
+from pydantic import BaseModel, Field
+
+from ..settings import get_settings_store
+from .base import BaseAgent
+from .progress import ProgressPhase, ProgressTracker
 
 logger = logging.getLogger(__name__)
 
 class AnimeResearchOutput(BaseModel):
     """Structured output from anime research."""
-    
+
     # Core identification
     title: str = Field(default="Unknown", description="Official title of the anime/manga")
-    alternate_titles: List[str] = Field(default_factory=list, description="Other names (native script, romanized, abbreviations)")
+    alternate_titles: list[str] = Field(default_factory=list, description="Other names (native script, romanized, abbreviations)")
     media_type: str = Field(default="anime", description="anime, manga, manhwa, donghua, light_novel")
     status: str = Field(default="completed", description="ongoing, completed, hiatus")
-    
+
     # Series detection
-    series_group: Optional[str] = Field(default=None, description="Franchise identifier in snake_case (canonical sequels share this)")
-    series_position: Optional[int] = Field(default=1, description="Chronological position in franchise")
-    related_franchise: Optional[str] = Field(default=None, description="Parent franchise for spinoffs/alternates")
-    relation_type: Optional[str] = Field(default="canonical", description="canonical, spinoff, alternate_timeline, parody")
-    
+    series_group: str | None = Field(default=None, description="Franchise identifier in snake_case (canonical sequels share this)")
+    series_position: int | None = Field(default=1, description="Chronological position in franchise")
+    related_franchise: str | None = Field(default=None, description="Parent franchise for spinoffs/alternates")
+    relation_type: str | None = Field(default="canonical", description="canonical, spinoff, alternate_timeline, parody")
+
     # Narrative DNA (0-10 scales)
-    dna_scales: Dict[str, int] = Field(
+    dna_scales: dict[str, int] = Field(
         default_factory=dict,
         description="11 narrative DNA scales from 0-10"
     )
-    
+
     # Power system
-    power_system: Dict[str, Any] = Field(
+    power_system: dict[str, Any] = Field(
         default_factory=dict,
         description="Name, mechanics, limitations, tiers"
     )
-    
+
     # World setting
-    world_setting: Dict[str, Any] = Field(
+    world_setting: dict[str, Any] = Field(
         default_factory=dict,
         description="Genre, locations, factions, time period"
     )
-    
+
     # Storytelling style
-    storytelling_tropes: Dict[str, bool] = Field(
+    storytelling_tropes: dict[str, bool] = Field(
         default_factory=dict,
         description="15 storytelling tropes (enabled/disabled)"
     )
-    
+
     # Genre detection (for arc templates)
-    detected_genres: List[str] = Field(
+    detected_genres: list[str] = Field(
         default_factory=list,
         description="Detected genres, e.g. ['isekai', 'fantasy', 'action', 'comedy']. Always populate with at least primary + secondary genre."
     )
-    
+
     # Character voice cards (for NPC differentiation)
-    voice_cards: List[Dict[str, Any]] = Field(
+    voice_cards: list[dict[str, Any]] = Field(
         default_factory=list,
         description="Voice cards for main cast: [{name, speech_patterns, humor_type, signature_phrases, dialogue_rhythm}]"
     )
-    
+
     # Author's voice (for IP authentic writing style)
-    author_voice: Dict[str, Any] = Field(
+    author_voice: dict[str, Any] = Field(
         default_factory=dict,
         description="Author's distinctive style: sentence_patterns, structural_motifs, dialogue_quirks, emotional_rhythm"
     )
-    
+
     # Combat style
     combat_style: str = Field(default="spectacle", description="tactical, spectacle, comedy, spirit, narrative")
-    
+
     # Tone
-    tone: Dict[str, Any] = Field(
+    tone: dict[str, Any] = Field(
         default_factory=dict,
         description="comedy_level, darkness_level, optimism"
     )
-    
+
     # Director personality (LLM-synthesized narrative directing prompt)
     director_personality: str = Field(
         default="",
         description="3-5 sentence directing style prompt, IP-specific"
     )
-    
+
     # Pacing style (LLM-synthesized)
     pacing_style: str = Field(
         default="moderate",
         description="Scene pacing: rapid, moderate, or deliberate"
     )
-    
+
     # Power Distribution (replaces single world_tier)
-    power_distribution: Dict[str, str] = Field(
+    power_distribution: dict[str, str] = Field(
         default_factory=lambda: {"peak_tier": "T6", "typical_tier": "T8", "floor_tier": "T9", "gradient": "flat"},
         description="Power distribution: peak_tier, typical_tier, floor_tier, gradient (spike/top_heavy/flat/compressed)"
     )
-    
+
     # Raw Content (for RAG)
-    raw_content: Optional[str] = Field(default=None, description="The full research text from Pass 1")
-    
+    raw_content: str | None = Field(default=None, description="The full research text from Pass 1")
+
     # Structured Fandom pages (for SQL lore storage)
     # List of dicts with keys: title, page_type, content
-    fandom_pages: List[Dict[str, Any]] = Field(default_factory=list, description="Individual wiki pages for structured storage")
+    fandom_pages: list[dict[str, Any]] = Field(default_factory=list, description="Individual wiki pages for structured storage")
     fandom_wiki_url: str = Field(default="", description="Source wiki URL for provenance")
-    
+
     # Recent updates (for ongoing series)
-    recent_updates: Optional[str] = Field(default=None, description="Latest arc/chapter info if ongoing")
-    
+    recent_updates: str | None = Field(default=None, description="Latest arc/chapter info if ongoing")
+
     # Research sources
-    sources_consulted: List[str] = Field(default_factory=list, description="URLs/sources used")
-    
+    sources_consulted: list[str] = Field(default_factory=list, description="URLs/sources used")
+
     # Confidence
     confidence: int = Field(default=80, description="0-100 confidence in research accuracy")
     research_method: str = Field(default="web_search", description="web_search, existing_profile, training_data_fallback")
-    
+
     # Research quality indicators (internal tracking)
     research_passes: int = Field(default=1, description="Number of research passes performed")
-    supplemental_searches: List[str] = Field(default_factory=list, description="Additional queries made")
+    supplemental_searches: list[str] = Field(default_factory=list, description="Additional queries made")
 
 
 # Critical fields that MUST be populated for a valid profile
@@ -296,26 +294,26 @@ class AnimeResearchAgent(BaseAgent):
     
     Includes retry logic for incomplete research.
     """
-    
+
     agent_name = "research"  # Maps to settings.agent_models.research
-    
+
     # Configuration
     MAX_SUPPLEMENTAL_SEARCHES = 3  # Max follow-up queries for missing data
     MIN_CONFIDENCE_THRESHOLD = 60  # Below this, try supplemental search
-    
-    def __init__(self, model_override: Optional[str] = None):
+
+    def __init__(self, model_override: str | None = None):
         super().__init__(model_override=model_override)
         self._system_prompt = ANIME_RESEARCH_PROMPT
-    
+
     @property
     def system_prompt(self) -> str:
         return self._system_prompt
-    
+
     @property
-    def output_schema(self) -> Type[BaseModel]:
+    def output_schema(self) -> type[BaseModel]:
         return AnimeResearchOutput
-    
-    async def _normalize_title(self, provider, model: str, anime_name: str) -> Optional[str]:
+
+    async def _normalize_title(self, provider, model: str, anime_name: str) -> str | None:
         """
         Resolve informal/abbreviated anime names to official titles.
         
@@ -350,14 +348,14 @@ Return ONLY the title.'''
                 model=model,
                 max_tokens=200,
             )
-            
+
             # Parse response - take first line only, clean up
             raw = response.content.strip()
             # Take first line only (LLM sometimes adds explanation)
             official = raw.split('\n')[0].strip().strip('"').strip("'").strip('.')
-            
+
             logger.info(f"Title normalization: '{official}'")
-            
+
             # Basic validation - should look like a title
             if official and len(official) < 150 and not official.startswith("I ") and "Let's" not in official:
                 return official
@@ -365,11 +363,11 @@ Return ONLY the title.'''
         except Exception as e:
             logger.error(f"Title normalization failed: {e}")
             return None
-    
+
     async def research_anime(
-        self, 
+        self,
         anime_name: str,
-        progress_tracker: Optional[ProgressTracker] = None
+        progress_tracker: ProgressTracker | None = None
     ) -> AnimeResearchOutput:
         """
         Research an anime/manga using bundle-based parallel research+extraction.
@@ -387,42 +385,42 @@ Return ONLY the title.'''
             AnimeResearchOutput with comprehensive series data
         """
         from ..llm import get_llm_manager
-        from .scope import ScopeAgent
         from .extraction_schemas import build_bundle_schema, get_extraction_prompt
-        
+        from .scope import ScopeAgent
+
         manager = get_llm_manager()
         provider, model = manager.get_provider_for_agent(self.agent_name)
-        
+
         settings = get_settings_store().load()
         use_extended_thinking = settings.extended_thinking
-        
+
         # ========== STEP 0: Title Normalization ==========
         # Resolve informal names to official titles (e.g., "Dragon Ball Kai" → "Dragon Ball Z Kai")
         if progress_tracker:
             await progress_tracker.emit(
-                ProgressPhase.SCOPE, 
-                f"Resolving title...", 
+                ProgressPhase.SCOPE,
+                "Resolving title...",
                 2
             )
-        
+
         official_title = await self._normalize_title(provider, model, anime_name)
         if official_title and official_title != anime_name:
             logger.info(f"Title normalized: '{anime_name}' → '{official_title}'")
             anime_name = official_title
-        
+
         # ========== STEP 1: Scope Classification ==========
         if progress_tracker:
             await progress_tracker.emit(
-                ProgressPhase.SCOPE, 
-                f"Classifying series scope...", 
+                ProgressPhase.SCOPE,
+                "Classifying series scope...",
                 5
             )
-        
+
         scope_agent = ScopeAgent()
         scope = await scope_agent.classify(anime_name)
-        
+
         logger.info(f"Scope: {scope.scope} ({len(scope.bundles)} bundles, {len(scope.topics)} topics)")
-        
+
         if progress_tracker:
             await progress_tracker.emit(
                 ProgressPhase.SCOPE,
@@ -430,24 +428,24 @@ Return ONLY the title.'''
                 10,
                 {"scope": scope.scope, "bundles": len(scope.bundles), "topics": scope.topics}
             )
-        
+
         # ========== STEP 2: Parallel Bundle Research + Extraction ==========
         # Get provider's concurrency limit
         max_concurrent = provider.get_max_concurrent_requests() if hasattr(provider, 'get_max_concurrent_requests') else 5
         max_retries = 3
-        
-        async def research_and_extract_bundle(bundle: List[str]) -> dict:
+
+        async def research_and_extract_bundle(bundle: list[str]) -> dict:
             """Research a bundle of topics, then immediately extract structured data."""
             bundle_name = "+".join(bundle)
-            
+
             # Build combined query for all topics in bundle
             queries = []
             for topic in bundle:
                 if topic in TOPIC_QUERY_TEMPLATES:
                     queries.append(TOPIC_QUERY_TEMPLATES[topic].format(anime_name=anime_name))
-            
+
             combined_query = f"Research {anime_name}:\n" + "\n".join(f"- {q}" for q in queries)
-            
+
             # Research the bundle with retry logic
             research_text = ""
             for attempt in range(max_retries):
@@ -481,14 +479,14 @@ Return ONLY the title.'''
                         logger.error(f"Bundle '{bundle_name}' error: {e}")
                         if attempt == max_retries - 1:
                             return {"bundle": bundle, "research": "", "extracted": None, "error": str(e)}
-            
+
             if not research_text:
                 return {"bundle": bundle, "research": "", "extracted": None, "error": "Empty research"}
-            
+
             # Build dynamic schema for this bundle
             bundle_schema = build_bundle_schema(bundle)
             extraction_prompt = get_extraction_prompt(bundle, anime_name) + research_text
-            
+
             # Extract structured data with retry
             extracted = None
             for attempt in range(max_retries):
@@ -503,52 +501,52 @@ Return ONLY the title.'''
                     break
                 except Exception as e:
                     if attempt < max_retries - 1:
-                        await asyncio.sleep((2 ** attempt))
+                        await asyncio.sleep(2 ** attempt)
                     else:
                         logger.error(f"Extraction failed for bundle '{bundle_name}': {e}")
-            
+
             # Log extraction status
             if extracted:
                 logger.info(f"Bundle '{bundle_name}' extracted: OK")
             else:
                 logger.error(f"Bundle '{bundle_name}' extraction: FAILED")
-            
+
             return {
                 "bundle": bundle,
                 "research": research_text,
                 "extracted": extracted,
                 "error": None
             }
-        
+
         # Process bundles with real-time progress
         bundle_results = []
         total_bundles = len(scope.bundles)
         completed_count = 0
-        
+
         logger.info(f"Running {total_bundles} bundles (max {max_concurrent} concurrent)...")
-        
+
         for i in range(0, total_bundles, max_concurrent):
             batch = scope.bundles[i:i + max_concurrent]
             batch_num = (i // max_concurrent) + 1
             total_batch_count = (total_bundles + max_concurrent - 1) // max_concurrent
-            
+
             if total_batch_count > 1:
                 logger.info(f"Batch {batch_num}/{total_batch_count}")
-            
+
             # Create tasks for this batch
             batch_tasks = {asyncio.create_task(research_and_extract_bundle(bundle)): bundle for bundle in batch}
-            
+
             # Process results as they complete (real-time progress)
             for coro in asyncio.as_completed(batch_tasks.keys()):
                 result = await coro
                 bundle_results.append(result)
                 completed_count += 1
-                
+
                 # Log warning for empty bundles to surface silent failures
                 if not result.get("research"):
                     bundle_name = "+".join(result.get("bundle", []))
                     logger.warning(f"WARNING: Bundle '{bundle_name}' returned empty research")
-                
+
                 # Emit progress immediately as each bundle completes
                 if progress_tracker and result.get("research"):
                     percent = 10 + int((completed_count / total_bundles) * 80)
@@ -559,16 +557,16 @@ Return ONLY the title.'''
                         percent,
                         {"bundle": result["bundle"], "completed": completed_count, "total": total_bundles}
                     )
-        
+
         # ========== STEP 3: Code Merge ==========
         if progress_tracker:
             await progress_tracker.emit(ProgressPhase.PARSING, "Merging extracted data...", 92)
-        
+
         result = self._merge_bundle_results(bundle_results, anime_name, scope)
-        
+
         # Confidence assessment
         result = self._assess_and_adjust_confidence(result)
-        
+
         # Emit completion
         if progress_tracker:
             await progress_tracker.emit(
@@ -577,12 +575,12 @@ Return ONLY the title.'''
                 100,
                 {"confidence": result.confidence, "title": result.title}
             )
-        
+
         return result
-    
+
     def _merge_bundle_results(
-        self, 
-        bundle_results: List[dict], 
+        self,
+        bundle_results: list[dict],
         anime_name: str,
         scope
     ) -> AnimeResearchOutput:
@@ -593,18 +591,18 @@ Return ONLY the title.'''
         """
         output = AnimeResearchOutput(title=anime_name)
         raw_sections = []
-        
+
         for result in bundle_results:
             # Collect raw research for RAG
             if result["research"]:
                 bundle_header = ", ".join(result["bundle"]).replace("_", " ").title()
                 raw_sections.append(f"## {bundle_header}\n{result['research']}")
-            
+
             # Merge extracted fields
             extracted = result.get("extracted")
             if not extracted:
                 continue
-            
+
             # Power system
             if hasattr(extracted, 'power_system') and extracted.power_system:
                 ps = extracted.power_system
@@ -614,11 +612,11 @@ Return ONLY the title.'''
                     "limitations": getattr(ps, 'limitations', ''),
                     "tiers": getattr(ps, 'tiers', [])
                 }
-            
+
             # Combat style
             if hasattr(extracted, 'combat') and extracted.combat:
                 output.combat_style = getattr(extracted.combat, 'style', 'spectacle')
-            
+
             # Tone
             if hasattr(extracted, 'tone') and extracted.tone:
                 t = extracted.tone
@@ -627,7 +625,7 @@ Return ONLY the title.'''
                     "darkness_level": getattr(t, 'darkness_level', 5),
                     "optimism": getattr(t, 'optimism', 5)
                 }
-            
+
             # Power Distribution (LLM-researched)
             if hasattr(extracted, 'power_distribution') and extracted.power_distribution:
                 pd = extracted.power_distribution
@@ -637,7 +635,7 @@ Return ONLY the title.'''
                     "floor_tier": getattr(pd, 'floor_tier', 'T9'),
                     "gradient": getattr(pd, 'gradient', 'flat'),
                 }
-            
+
             # DNA Scales
             if hasattr(extracted, 'dna_scales') and extracted.dna_scales:
                 ds = extracted.dna_scales
@@ -654,7 +652,7 @@ Return ONLY the title.'''
                     "hopeful_vs_cynical": getattr(ds, 'hopeful_vs_cynical', 5),
                     "ensemble_vs_solo": getattr(ds, 'ensemble_vs_solo', 5),
                 }
-            
+
             # Tropes
             if hasattr(extracted, 'tropes') and extracted.tropes:
                 tr = extracted.tropes
@@ -675,26 +673,26 @@ Return ONLY the title.'''
                     "ensemble_focus": getattr(tr, 'ensemble_focus', False),
                     "slow_burn_romance": getattr(tr, 'slow_burn_romance', False),
                 }
-            
+
             # World setting (from factions, locations)
             if hasattr(extracted, 'factions') and extracted.factions:
                 if 'factions' not in output.world_setting:
                     output.world_setting['factions'] = []
                 output.world_setting['factions'] = getattr(extracted.factions, 'factions', [])
-            
+
             if hasattr(extracted, 'locations') and extracted.locations:
                 loc = extracted.locations
                 output.world_setting['setting'] = getattr(loc, 'setting', '')
                 output.world_setting['locations'] = getattr(loc, 'key_locations', [])
                 output.world_setting['time_period'] = getattr(loc, 'time_period', '')
-            
+
             # Characters
             if hasattr(extracted, 'characters') and extracted.characters:
                 ch = extracted.characters
                 output.world_setting['protagonist'] = getattr(ch, 'protagonist', '')
                 output.world_setting['antagonist'] = getattr(ch, 'antagonist', '')
                 output.world_setting['key_characters'] = getattr(ch, 'key_characters', [])
-            
+
             # Series relationship and aliases
             if hasattr(extracted, 'series_aliases') and extracted.series_aliases:
                 sa = extracted.series_aliases
@@ -713,17 +711,17 @@ Return ONLY the title.'''
                 alt_titles.extend(getattr(sa, 'alternate_titles', []))
                 if alt_titles:
                     output.alternate_titles = list(set(alt_titles))  # Dedupe
-        
+
         # Set raw content from all research (explicit None if empty, not empty string)
         raw_text = "\n\n".join(raw_sections)
         output.raw_content = raw_text if raw_text.strip() else None
         output.research_method = "bundled_parallel"
         output.research_passes = len(bundle_results)
         output.sources_consulted = scope.topics
-        
+
         return output
 
-    
+
     async def _research_topic(
         self,
         provider,
@@ -751,29 +749,29 @@ Return ONLY the title.'''
             # Fallback to regular completion with training data
             response = await provider.complete(
                 messages=[{"role": "user", "content": f"Describe {anime_name}'s {topic} in detail."}],
-                system=f"Provide accurate information about anime/manga from your knowledge.",
+                system="Provide accurate information about anime/manga from your knowledge.",
                 model=model,
                 max_tokens=1024
             )
             return response.content
-    
+
     async def _pass1_web_search(
-        self, 
-        provider, 
-        model: str, 
+        self,
+        provider,
+        model: str,
         anime_name: str,
         existing_context: str,
         extended_thinking: bool = False
     ) -> str:
         """Pass 1: Use web search to gather raw research text."""
-        
+
         query = RESEARCH_QUERY_TEMPLATE.format(
             anime_name=anime_name,
             existing_context=existing_context
         )
-        
+
         logger.info(f"Pass 1: Web search via {provider.name}...")
-        
+
         try:
             if hasattr(provider, 'complete_with_search'):
                 response = await provider.complete_with_search(
@@ -786,12 +784,12 @@ Return ONLY the title.'''
                 )
                 return response.content
             else:
-                logger.warning(f"WARNING: Provider doesn't support search")
+                logger.warning("WARNING: Provider doesn't support search")
                 return ""
         except Exception as e:
             logger.error(f"ERROR in Pass 1: {e}")
             return ""
-    
+
     async def _pass2_parse_to_schema(
         self,
         provider,
@@ -801,11 +799,11 @@ Return ONLY the title.'''
         extended_thinking: bool = False
     ) -> AnimeResearchOutput:
         """Pass 2: Parse raw research text into structured schema."""
-        
+
         parse_prompt = PARSE_PROMPT.format(research_text=research_text)
-        
-        logger.info(f"Pass 2: Parsing to schema...")
-        
+
+        logger.info("Pass 2: Parsing to schema...")
+
         try:
             result = await provider.complete_with_schema(
                 messages=[{"role": "user", "content": parse_prompt}],
@@ -815,19 +813,19 @@ Return ONLY the title.'''
                 max_tokens=4096,
                 extended_thinking=extended_thinking
             )
-            
+
             # Ensure title is set
             if result.title == "Unknown" or not result.title:
                 result.title = anime_name
-            
+
             return result
-            
+
         except Exception as e:
             logger.error(f"ERROR in Pass 2: {e}")
-            
+
             # ATTEMPT REPAIR using Validator Agent
             try:
-                logger.info(f"Attempting repair via Validator...")
+                logger.info("Attempting repair via Validator...")
                 from .validator import ValidatorAgent
                 validator = ValidatorAgent()
                 repaired = await validator.repair_json(
@@ -836,20 +834,20 @@ Return ONLY the title.'''
                     error_msg=str(e)
                 )
                 if repaired:
-                    logger.info(f"Validator successfully extracted schema!")
+                    logger.info("Validator successfully extracted schema!")
                     if repaired.title == "Unknown" or not repaired.title:
                         repaired.title = anime_name
                     return repaired
             except Exception as repair_error:
                  logger.error(f"Repair failed validation: {repair_error}")
-            
+
             # Fallback if repair fails
             return AnimeResearchOutput(
                 title=anime_name,
                 confidence=30,
                 research_method="parse_failed"
             )
-    
+
     async def _supplemental_search(
         self,
         provider,
@@ -859,14 +857,14 @@ Return ONLY the title.'''
         extended_thinking: bool = False
     ) -> str:
         """Run a targeted supplemental search for a specific missing field."""
-        
+
         if field not in SUPPLEMENTAL_QUERY_TEMPLATES:
             return ""
-        
+
         query = SUPPLEMENTAL_QUERY_TEMPLATES[field].format(anime_name=anime_name)
-        
+
         logger.info(f"Supplemental search for: {field}")
-        
+
         try:
             if hasattr(provider, 'complete_with_search'):
                 response = await provider.complete_with_search(
@@ -882,7 +880,7 @@ Return ONLY the title.'''
         except Exception as e:
             logger.error(f"ERROR in supplemental search: {e}")
             return ""
-    
+
     async def _training_data_fallback(
         self,
         provider,
@@ -891,15 +889,15 @@ Return ONLY the title.'''
         extended_thinking: bool = False
     ) -> AnimeResearchOutput:
         """Fallback to LLM training data when search fails."""
-        
-        logger.warning(f"Using training data fallback...")
-        
+
+        logger.warning("Using training data fallback...")
+
         context = f"""# Research Request: {anime_name}
 
 Please provide comprehensive information about this anime/manga from your knowledge.
 Include: power system, narrative style, combat approach, key themes.
 """
-        
+
         try:
             result = await provider.complete_with_schema(
                 messages=[{"role": "user", "content": context}],
@@ -911,7 +909,7 @@ Include: power system, narrative style, combat approach, key themes.
             )
             result.research_method = "training_data_fallback"
             result.confidence = min(result.confidence, 75)  # Cap confidence
-            
+
             # Generate synthetic lore from the structured knowledge since we skipped text generation
             lore_parts = [
                 f"# {result.title} (Training Data Knowledge)",
@@ -920,7 +918,7 @@ Include: power system, narrative style, combat approach, key themes.
                 f"## Combat Style\n{result.combat_style}",
             ]
             result.raw_content = "\n\n".join(lore_parts)
-            
+
             return result
         except Exception as e:
             logger.error(f"ERROR in training fallback: {e}")
@@ -929,7 +927,7 @@ Include: power system, narrative style, combat approach, key themes.
                 confidence=20,
                 research_method="error_fallback"
             )
-    
+
     async def _supplement_with_training_data(
         self,
         provider,
@@ -939,26 +937,26 @@ Include: power system, narrative style, combat approach, key themes.
         extended_thinking: bool = False
     ) -> AnimeResearchOutput:
         """Supplement incomplete research with training data."""
-        
+
         # Identify what's still missing
         missing = []
         if not partial_result.power_system or not partial_result.power_system.get("name"):
             missing.append("power_system")
         if not partial_result.dna_scales:
             missing.append("dna_scales")
-        
+
         if not missing:
             return partial_result
-        
+
         logger.warning(f"Supplementing missing: {missing}")
-        
+
         # Get training data for missing fields
         supplement_query = f"""For the anime/manga "{anime_name}", provide information about:
 {', '.join(missing)}
 
 Use your training knowledge. Be specific and accurate.
 """
-        
+
         try:
             response = await provider.complete(
                 messages=[{"role": "user", "content": supplement_query}],
@@ -967,61 +965,61 @@ Use your training knowledge. Be specific and accurate.
                 max_tokens=1024,
                 extended_thinking=extended_thinking
             )
-            
+
             # Re-parse with supplemented data
             combined_text = f"""Original research: {partial_result.model_dump_json()}
 
 Supplemental knowledge: {response.content}
 """
             supplemented_result = await self._pass2_parse_to_schema(provider, model, combined_text, anime_name, extended_thinking=False)
-            
+
             # Preserve raw content from original result and append new knowledge
             if partial_result.raw_content:
                 supplemented_result.raw_content = partial_result.raw_content + f"\n\n## Supplemental Training Data\n{response.content}"
             else:
                  supplemented_result.raw_content = response.content
-                 
+
             return supplemented_result
-            
+
         except Exception as e:
             logger.error(f"ERROR in supplement: {e}")
             return partial_result
-    
-    def _identify_missing_fields(self, research_text: str) -> List[str]:
+
+    def _identify_missing_fields(self, research_text: str) -> list[str]:
         """Identify critical fields that appear to be missing from research text."""
-        
+
         text_lower = research_text.lower()
         missing = []
-        
+
         # Check for power system keywords
-        power_keywords = ["power system", "abilities", "powers", "techniques", "magic", 
+        power_keywords = ["power system", "abilities", "powers", "techniques", "magic",
                          "jutsu", "nen", "quirk", "breathing", "devil fruit"]
         if not any(kw in text_lower for kw in power_keywords):
             missing.append("power_system")
-        
+
         # Check for combat/style keywords
         combat_keywords = ["combat", "fight", "battle", "action", "tactical", "spectacle"]
         if not any(kw in text_lower for kw in combat_keywords):
             missing.append("combat_style")
-        
+
         # Check for tone/narrative keywords
         tone_keywords = ["tone", "comedy", "drama", "serious", "dark", "lighthearted", "pacing"]
         if not any(kw in text_lower for kw in tone_keywords):
             missing.append("dna_scales")
-        
+
         # Check for world/setting keywords
         world_keywords = ["world", "setting", "location", "faction", "organization", "era", "period"]
         if not any(kw in text_lower for kw in world_keywords):
             missing.append("world_setting")
-        
+
         return missing
-    
+
     def _assess_and_adjust_confidence(self, result: AnimeResearchOutput) -> AnimeResearchOutput:
         """Assess result completeness and adjust confidence accordingly."""
-        
+
         base_confidence = result.confidence
         penalties = 0
-        
+
         # Penalize missing critical fields
         if not result.power_system or not result.power_system.get("name"):
             penalties += 15
@@ -1033,7 +1031,7 @@ Supplemental knowledge: {response.content}
                 penalties += 5
         if not result.sources_consulted:
             penalties += 10
-        
+
         # Boost for completeness
         boosts = 0
         if result.power_system and result.power_system.get("mechanics"):
@@ -1042,14 +1040,14 @@ Supplemental knowledge: {response.content}
             boosts += 5
         if result.storytelling_tropes and len(result.storytelling_tropes) >= 5:
             boosts += 5
-        
+
         result.confidence = max(20, min(100, base_confidence - penalties + boosts))
         return result
-    
+
     # ====================================================================
     # API-First Research Pipeline (Phase 2)
     # ====================================================================
-    
+
     @staticmethod
     def _determine_scope_from_count(article_count: int) -> str:
         """Deterministic scope from Fandom article count. No LLM needed."""
@@ -1061,11 +1059,11 @@ Supplemental knowledge: {response.content}
             return "COMPLEX"
         else:
             return "EPIC"
-    
+
     async def research_anime_api(
         self,
         anime_name: str,
-        progress_tracker: Optional[ProgressTracker] = None
+        progress_tracker: ProgressTracker | None = None
     ) -> AnimeResearchOutput:
         """
         API-first research pipeline: AniList + Fandom + 2-3 LLM calls.
@@ -1077,15 +1075,15 @@ Supplemental knowledge: {response.content}
         
         Falls back to web-search pipeline if APIs fail.
         """
-        from ..scrapers.anilist import AniListClient
-        from ..scrapers.fandom import FandomClient, guess_wiki_url
-        from ..scrapers.cache import ScraperCache
         from ..llm import get_llm_manager
-        
+        from ..scrapers.anilist import AniListClient
+        from ..scrapers.cache import ScraperCache
+        from ..scrapers.fandom import FandomClient
+
         manager = get_llm_manager()
         provider, model = manager.get_provider_for_agent(self.agent_name)
         cache = ScraperCache()
-        
+
         # ========== STEP 1: AniList Metadata ==========
         if progress_tracker:
             await progress_tracker.emit(
@@ -1093,21 +1091,21 @@ Supplemental knowledge: {response.content}
                 "Fetching AniList metadata...",
                 5
             )
-        
+
         anilist_client = AniListClient()
         anilist = await anilist_client.search_with_fallback(anime_name)
-        
+
         if not anilist:
             logger.info(f"AniList returned nothing for '{anime_name}', falling back to web search")
             return await self.research_anime(anime_name, progress_tracker=progress_tracker)
-        
+
         # Merge all seasons of the same series (walks SEQUEL/PREQUEL relations)
         anilist = await anilist_client.fetch_full_series(anilist)
-        
+
         # Use the official title from AniList
         official_title = anilist.title_english or anilist.title_romaji
         logger.info(f"AniList: {official_title} ({anilist.status}, {anilist.format})")
-        
+
         if progress_tracker:
             await progress_tracker.emit(
                 ProgressPhase.SCOPE,
@@ -1115,7 +1113,7 @@ Supplemental knowledge: {response.content}
                 10,
                 {"source": "anilist", "title": official_title}
             )
-        
+
         # ========== STEP 2: Fandom Wiki Content ==========
         if progress_tracker:
             await progress_tracker.emit(
@@ -1123,7 +1121,7 @@ Supplemental knowledge: {response.content}
                 "Searching for Fandom wiki...",
                 15
             )
-        
+
         fandom_client = FandomClient()
         # Pass both English and romaji titles so wiki discovery can try all variants
         # (mirrors profile aliasing system that indexes multiple title forms)
@@ -1133,27 +1131,27 @@ Supplemental knowledge: {response.content}
         if anilist.title_romaji and anilist.title_romaji != official_title:
             alt_titles.append(anilist.title_romaji)
         wiki_url = await fandom_client.find_wiki_url(official_title, alt_titles=alt_titles or None)
-        
+
         fandom_result = None
         if wiki_url:
             scope = self._determine_scope_from_count(0)  # Will update after stats
-            
+
             if progress_tracker:
                 await progress_tracker.emit(
                     ProgressPhase.RESEARCH,
                     f"Scraping wiki: {wiki_url}...",
                     20
                 )
-            
+
             fandom_result = await fandom_client.scrape_wiki(
                 wiki_url,
                 anime_title=official_title,
             )
-            
+
             scope = self._determine_scope_from_count(fandom_result.article_count)
             logger.info(f"Fandom: {fandom_result.article_count} articles, scope={scope}")
             logger.info(f"Scraped: {fandom_result.get_total_page_count()} pages across {len(fandom_result.pages)} types")
-            
+
             # Thin-scrape fallback: if WikiScout only found 1-2 types,
             # supplement with legacy discover_categories for missing types
             if fandom_result.get_total_page_count() > 0 and len(fandom_result.pages) <= 2:
@@ -1183,7 +1181,7 @@ Supplemental knowledge: {response.content}
                     logger.warning(f"After fallback: {fandom_result.get_total_page_count()} pages across {len(fandom_result.pages)} types")
                 except Exception as e:
                     logger.error(f"Legacy fallback failed (non-fatal): {e}")
-            
+
             if progress_tracker:
                 await progress_tracker.emit(
                     ProgressPhase.RESEARCH,
@@ -1192,21 +1190,21 @@ Supplemental knowledge: {response.content}
                     {"wiki": wiki_url, "pages": fandom_result.get_total_page_count(), "scope": scope}
                 )
         else:
-            logger.info(f"No relevant Fandom wiki found, falling back to web-search pipeline")
-            
+            logger.info("No relevant Fandom wiki found, falling back to web-search pipeline")
+
             if progress_tracker:
                 await progress_tracker.emit(
                     ProgressPhase.RESEARCH,
                     "No relevant wiki found, falling back to web-search research...",
                     50
                 )
-            
+
             fallback_result = await self.research_anime(anime_name, progress_tracker=progress_tracker)
             # Carry AniList genres into the fallback if the legacy pipeline didn't populate them
             if not fallback_result.detected_genres and anilist and anilist.genres:
                 fallback_result.detected_genres = anilist.genres
             return fallback_result
-        
+
         # ========== STEP 3: Build Output from API Data (No LLM) ==========
         if progress_tracker:
             await progress_tracker.emit(
@@ -1214,7 +1212,7 @@ Supplemental knowledge: {response.content}
                 "Mapping API data to profile...",
                 55
             )
-        
+
         output = AnimeResearchOutput(
             title=official_title,
             alternate_titles=anilist.get_all_titles(),
@@ -1225,32 +1223,32 @@ Supplemental knowledge: {response.content}
             research_method="api_first",
             confidence=85,
         )
-        
+
         # Map AniList relations to series fields
         self._map_relations(output, anilist)
-        
+
         # Map characters from AniList
         if anilist.characters:
             main_chars = anilist.get_main_characters()
             output.world_setting["protagonist"] = main_chars[0].name if main_chars else ""
             output.world_setting["key_characters"] = [c.name for c in anilist.characters[:15]]
-        
+
         # Add description to raw content
         raw_sections = []
         if anilist.description:
             raw_sections.append(f"## Synopsis\n{anilist.description}")
-        
+
         # Add Fandom content
         if fandom_result and fandom_result.all_content:
             raw_sections.append(fandom_result.all_content)
             output.sources_consulted.append(wiki_url)
-            
+
             # Map fandom pages to world_setting
             if fandom_result.pages.get("locations"):
                 output.world_setting["locations"] = [p.title for p in fandom_result.pages["locations"]]
             if fandom_result.pages.get("factions"):
                 output.world_setting["factions"] = [
-                    {"name": p.title, "description": p.clean_text[:200]} 
+                    {"name": p.title, "description": p.clean_text[:200]}
                     for p in fandom_result.pages["factions"][:10]
                 ]
             if fandom_result.pages.get("arcs"):
@@ -1259,9 +1257,9 @@ Supplemental knowledge: {response.content}
                 real_arcs = [t for t in arc_titles if not t.lower().startswith("episode")]
                 if real_arcs:
                     output.recent_updates = ", ".join(real_arcs)
-        
+
         output.raw_content = "\n\n".join(raw_sections) if raw_sections else None
-        
+
         # Pass structured pages for SQL lore storage
         if fandom_result:
             output.fandom_wiki_url = wiki_url or ""
@@ -1272,7 +1270,7 @@ Supplemental knowledge: {response.content}
                         "page_type": page_type,
                         "content": page.clean_text,
                     })
-        
+
         # ========== STEP 4: LLM Interpretation (2-3 calls) ==========
         if progress_tracker:
             await progress_tracker.emit(
@@ -1280,15 +1278,15 @@ Supplemental knowledge: {response.content}
                 "LLM: Deriving DNA scales and power system...",
                 60
             )
-        
+
         # Build context string for LLM interpretation
         tag_context = "\n".join(
-            f"- {t.name}: {t.rank}%" 
+            f"- {t.name}: {t.rank}%"
             for t in anilist.get_non_spoiler_tags(20)
         )
         genre_context = ", ".join(anilist.genres)
         synopsis = anilist.description or "No synopsis available."
-        
+
         # Power system and technique context from wiki
         power_context = ""
         if fandom_result:
@@ -1297,7 +1295,7 @@ Supplemental knowledge: {response.content}
                 power_context = "\n\n".join(
                     f"### {p.title}\n{p.clean_text[:1000]}" for p in tech_pages[:5]
                 )
-        
+
         # --- LLM Call 1: DNA Scales + Tone + Combat + World Tier ---
         interpretation_prompt = f"""# Interpret Anime Profile: {official_title}
 
@@ -1333,21 +1331,21 @@ Based on the above data, provide:
    forbidden_technique, time_loop, false_identity, ensemble_focus, slow_burn_romance
 
 Respond with ONLY valid JSON, no markdown or explanation."""
-        
+
         try:
-            from .extraction_schemas import DNAScalesExtract, ToneExtract, CombatExtract, PowerDistributionExtract
-            
             # Use a combined schema for efficiency
             from pydantic import create_model
+
+            from .extraction_schemas import CombatExtract, DNAScalesExtract, PowerDistributionExtract, ToneExtract
             InterpretationSchema = create_model(
                 "InterpretationSchema",
                 dna_scales=(DNAScalesExtract, ...),
                 tone=(ToneExtract, ...),
                 combat=(CombatExtract, ...),
                 power_distribution=(PowerDistributionExtract, ...),
-                storytelling_tropes=(Dict[str, bool], {}),
+                storytelling_tropes=(dict[str, bool], {}),
             )
-            
+
             interp = await provider.complete_with_schema(
                 messages=[{"role": "user", "content": interpretation_prompt}],
                 schema=InterpretationSchema,
@@ -1355,7 +1353,7 @@ Respond with ONLY valid JSON, no markdown or explanation."""
                 model=model,
                 max_tokens=2048,
             )
-            
+
             # Apply interpretation results
             ds = interp.dna_scales
             output.dna_scales = {
@@ -1371,14 +1369,14 @@ Respond with ONLY valid JSON, no markdown or explanation."""
                 "hopeful_vs_cynical": getattr(ds, 'hopeful_vs_cynical', 5),
                 "ensemble_vs_solo": getattr(ds, 'ensemble_vs_solo', 5),
             }
-            
+
             t = interp.tone
             output.tone = {
                 "comedy_level": getattr(t, 'comedy_level', 5),
                 "darkness_level": getattr(t, 'darkness_level', 5),
                 "optimism": getattr(t, 'optimism', 5),
             }
-            
+
             output.combat_style = getattr(interp.combat, 'style', 'spectacle')
             pd = interp.power_distribution
             output.power_distribution = {
@@ -1388,15 +1386,15 @@ Respond with ONLY valid JSON, no markdown or explanation."""
                 "gradient": getattr(pd, 'gradient', 'flat'),
             }
             output.storytelling_tropes = interp.storytelling_tropes or {}
-            
+
             logger.info(f"LLM interpretation: DNA={len(output.dna_scales)} scales, combat={output.combat_style}, power={output.power_distribution}")
-            
+
         except Exception as e:
             import traceback
             logger.error(f"LLM interpretation failed: {e}")
             traceback.print_exc()
             output.confidence -= 20
-        
+
         # --- LLM Call 2: Power System Synthesis (only if wiki has content) ---
         if power_context:
             if progress_tracker:
@@ -1405,7 +1403,7 @@ Respond with ONLY valid JSON, no markdown or explanation."""
                     "LLM: Synthesizing power system from wiki...",
                     75
                 )
-            
+
             power_prompt = f"""# Synthesize Power System: {official_title}
 
 ## Wiki Technique/Ability Pages:
@@ -1419,10 +1417,10 @@ From the wiki pages above, extract the power system:
 - tiers: Power levels/ranks if applicable (list of strings)
 
 Respond with ONLY valid JSON."""
-            
+
             try:
                 from .extraction_schemas import PowerSystemExtract
-                
+
                 ps_result = await provider.complete_with_schema(
                     messages=[{"role": "user", "content": power_prompt}],
                     schema=PowerSystemExtract,
@@ -1430,7 +1428,7 @@ Respond with ONLY valid JSON."""
                     model=model,
                     max_tokens=1024,
                 )
-                
+
                 output.power_system = {
                     "name": ps_result.name,
                     "mechanics": ps_result.mechanics,
@@ -1438,30 +1436,30 @@ Respond with ONLY valid JSON."""
                     "tiers": ps_result.tiers,
                 }
                 logger.info(f"Power system: {ps_result.name}")
-                
+
             except Exception as e:
                 import traceback
                 logger.error(f"Power system synthesis failed: {e}")
                 traceback.print_exc()
-        
+
         # --- LLM Call 3: Voice Cards (only if character pages with quotes exist) ---
         char_pages_with_quotes = []
         if fandom_result:
             for p in fandom_result.get_pages_by_type("characters"):
                 if p.quotes:
                     char_pages_with_quotes.append(p)
-        
+
         # Build main character list from AniList for gap-filling
         main_char_names = []
         if anilist:
             for char in anilist.characters:
                 if char.role == "MAIN":
                     main_char_names.append(char.name)
-        
+
         # Identify which main characters are NOT covered by wiki voice cards
         wiki_covered_names = {p.title.lower() for p in char_pages_with_quotes}
         missing_main_chars = [n for n in main_char_names if n.lower() not in wiki_covered_names]
-        
+
         if char_pages_with_quotes or missing_main_chars:
             if progress_tracker:
                 await progress_tracker.emit(
@@ -1469,12 +1467,12 @@ Respond with ONLY valid JSON."""
                     "LLM: Extracting voice patterns...",
                     85
                 )
-            
+
             quote_context = ""
             for page in char_pages_with_quotes[:5]:
                 quotes_str = "\n".join(f'  "{q}"' for q in page.quotes[:5])
                 quote_context += f"\n### {page.title}\n{quotes_str}\n"
-            
+
             # Build gap-filling instruction for main characters without wiki quotes
             gap_instruction = ""
             if missing_main_chars:
@@ -1485,7 +1483,7 @@ The following main characters have no quotes on the wiki. Using your knowledge o
 generate voice cards for them based on how they speak in the series:
 {', '.join(missing_main_chars)}
 """
-            
+
             voice_prompt = f"""# Extract Character Voice Patterns: {official_title}
 
 ## Character Quotes from Wiki:
@@ -1500,10 +1498,10 @@ For each character (both wiki-quoted AND missing main characters listed above), 
 - dialogue_rhythm: Sentence structure patterns
 
 Return as a JSON object with key "voice_cards" containing a list of voice card objects."""
-            
+
             try:
                 from .extraction_schemas import CharacterVoiceCardsExtract
-                
+
                 vc_result = await provider.complete_with_schema(
                     messages=[{"role": "user", "content": voice_prompt}],
                     schema=CharacterVoiceCardsExtract,
@@ -1511,7 +1509,7 @@ Return as a JSON object with key "voice_cards" containing a list of voice card o
                     model=model,
                     max_tokens=2048,
                 )
-                
+
                 output.voice_cards = [
                     {
                         "name": vc.name,
@@ -1523,12 +1521,12 @@ Return as a JSON object with key "voice_cards" containing a list of voice card o
                     for vc in vc_result.voice_cards
                 ]
                 logger.info(f"Voice cards: {len(output.voice_cards)} characters")
-                
+
             except Exception as e:
                 import traceback
                 logger.error(f"Voice card extraction failed: {e}")
                 traceback.print_exc()
-        
+
         # --- LLM Call 4: Narrative Synthesis (director personality + author voice) ---
         # This runs LAST because it needs the full assembled profile context
         if progress_tracker:
@@ -1537,7 +1535,7 @@ Return as a JSON object with key "voice_cards" containing a list of voice card o
                 "LLM: Synthesizing narrative direction...",
                 90
             )
-        
+
         # Build full context from all previously computed fields
         dna_summary = ", ".join(f"{k}: {v}/10" for k, v in output.dna_scales.items()) if output.dna_scales else "Not computed"
         tone_summary = ", ".join(f"{k}: {v}" for k, v in (output.tone or {}).items()) if output.tone else "Not computed"
@@ -1546,7 +1544,7 @@ Return as a JSON object with key "voice_cards" containing a list of voice card o
         ps = output.power_system or {}
         power_summary = f"{ps.get('name', 'None')} — {ps.get('mechanics', 'N/A')}" if ps.get('name') else "No power system"
         genre_list = ", ".join(output.detected_genres) if output.detected_genres else "Unknown"
-        
+
         synthesis_prompt = f"""# Narrative Synthesis: {official_title}
 
 You are creating the narrative DNA for a tabletop RPG campaign set in this anime's world. 
@@ -1597,7 +1595,7 @@ Respond with ONLY valid JSON."""
 
         try:
             from .extraction_schemas import NarrativeSynthesisExtract
-            
+
             synth_result = await provider.complete_with_schema(
                 messages=[{"role": "user", "content": synthesis_prompt}],
                 schema=NarrativeSynthesisExtract,
@@ -1605,10 +1603,10 @@ Respond with ONLY valid JSON."""
                 model=model,
                 max_tokens=2048,
             )
-            
+
             output.director_personality = synth_result.director_personality
             output.pacing_style = synth_result.pacing_style
-            
+
             # Author voice
             av = synth_result.author_voice
             output.author_voice = {
@@ -1618,24 +1616,24 @@ Respond with ONLY valid JSON."""
                 "emotional_rhythm": av.emotional_rhythm,
                 "example_voice": av.example_voice,
             }
-            
+
             logger.info(f"Narrative synthesis: pacing={output.pacing_style}, director={output.director_personality[:80]}...")
             logger.info(f"Author voice: {len(av.sentence_patterns)} patterns, {len(av.structural_motifs)} motifs")
-            
+
         except Exception as e:
             import traceback
             logger.error(f"Narrative synthesis failed (non-fatal): {e}")
             traceback.print_exc()
-        
+
         # ========== STEP 5: Confidence Assessment ==========
         output = self._assess_and_adjust_confidence(output)
-        
+
         # Boost confidence for API-sourced data
         if anilist:
             output.confidence = min(100, output.confidence + 5)
         if fandom_result and fandom_result.get_total_page_count() > 0:
             output.confidence = min(100, output.confidence + 5)
-        
+
         if progress_tracker:
             await progress_tracker.emit(
                 ProgressPhase.COMPLETE,
@@ -1643,12 +1641,12 @@ Respond with ONLY valid JSON."""
                 100,
                 {"confidence": output.confidence, "title": output.title, "method": "api_first"}
             )
-        
+
         logger.info(f"Complete: {output.title}, confidence={output.confidence}%, method=api_first")
         return output
-    
+
     @staticmethod
-    def _map_format(anilist_format: Optional[str]) -> str:
+    def _map_format(anilist_format: str | None) -> str:
         """Map AniList format to our media_type field."""
         mapping = {
             "TV": "anime", "TV_SHORT": "anime", "MOVIE": "anime",
@@ -1657,13 +1655,13 @@ Respond with ONLY valid JSON."""
             "NOVEL": "light_novel",
         }
         return mapping.get(anilist_format or "", "anime")
-    
+
     @staticmethod
     def _map_relations(output: AnimeResearchOutput, anilist) -> None:
         """Map AniList relations to series_group/related_franchise fields."""
         if not anilist.relations:
             return
-        
+
         # Check for prequels/sequels to determine franchise
         for rel in anilist.relations:
             if rel.relation_type in ("PREQUEL", "SEQUEL"):
@@ -1673,7 +1671,7 @@ Respond with ONLY valid JSON."""
                 import re
                 output.series_group = re.sub(r'[^a-z0-9]+', '_', base_title).strip('_')
                 break
-        
+
         # Check for parent/side stories
         for rel in anilist.relations:
             if rel.relation_type == "PARENT":
@@ -1706,7 +1704,7 @@ async def research_anime_with_search(
         AnimeResearchOutput with research results
     """
     agent = AnimeResearchAgent()
-    
+
     if use_api:
         try:
             return await agent.research_anime_api(anime_name, progress_tracker=progress_tracker)

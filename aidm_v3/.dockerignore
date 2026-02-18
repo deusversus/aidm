@@ -1,0 +1,43 @@
+# Version control
+.git/
+.gitignore
+
+# Virtual environments
+venv*/
+
+# Data & databases
+data/
+*.db
+
+# Tests & dev tools
+tests/
+scripts/
+research_diagnostics/
+.pytest_cache/
+__pycache__/
+
+# IDE & OS
+.vscode/
+.idea/
+.agent/
+*.swp
+Thumbs.db
+
+# Logs & debug artifacts
+*.log
+server.log
+_audit.json
+_handoff_log.txt
+_trace.txt
+
+# Temp files
+*.txt
+!requirements.txt
+
+# Environment (secrets)
+.env
+
+# Build artifacts
+dist/
+build/
+*.egg-info/

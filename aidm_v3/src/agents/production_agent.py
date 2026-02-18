@@ -15,11 +15,9 @@ Design:
   - Output: free-form reasoning (discarded) + tool side-effects.
 """
 
-from typing import Optional
-from .base import AgenticAgent
-
-
 import logging
+
+from .base import AgenticAgent
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +51,7 @@ class ProductionAgent(AgenticAgent):
         pacing_note: str = "",
         situation: str = "",
         current_location: str = "",
-    ) -> Optional[str]:
+    ) -> str | None:
         """Run post-narrative reaction pass.
 
         Args:

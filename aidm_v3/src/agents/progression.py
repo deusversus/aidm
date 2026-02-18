@@ -8,14 +8,14 @@ XP/leveling system per Module 09 spec:
 - Profile-specific leveling curves
 """
 
-from typing import List, Dict, Any, Optional, Literal
+from typing import Any
+
 from pydantic import BaseModel, Field
 
-from .base import BaseAgent
+from ..context.rule_library import RuleLibrary
 from ..db.models import Character
 from ..profiles.loader import NarrativeProfile
-from ..context.rule_library import RuleLibrary
-
+from .base import BaseAgent
 
 # XP curves per growth model
 XP_CURVES = {
@@ -58,24 +58,24 @@ class XPAward(BaseModel):
 class ProgressionOutput(BaseModel):
     """Result of progression check."""
     xp_awarded: int = 0
-    xp_sources: List[XPAward] = Field(default_factory=list)
-    
+    xp_sources: list[XPAward] = Field(default_factory=list)
+
     # Level up
     level_up: bool = False
     old_level: int = 0
     new_level: int = 0
-    
+
     # Unlocks
-    abilities_unlocked: List[str] = Field(default_factory=list)
-    stats_increased: Dict[str, int] = Field(default_factory=dict)
-    
+    abilities_unlocked: list[str] = Field(default_factory=list)
+    stats_increased: dict[str, int] = Field(default_factory=dict)
+
     # Tier shift
     tier_changed: bool = False
-    old_tier: Optional[str] = None
-    new_tier: Optional[str] = None
-    tier_ceremony: Optional[str] = None
-    tier_change_memory: Optional[str] = None  # Memory content for POWER_TIER_CHANGE
-    
+    old_tier: str | None = None
+    new_tier: str | None = None
+    tier_ceremony: str | None = None
+    tier_change_memory: str | None = None  # Memory content for POWER_TIER_CHANGE
+
     # Narrative
     level_up_narrative: str = ""
     growth_moment: bool = False
@@ -89,26 +89,26 @@ class ProgressionAgent(BaseAgent):
     progression pacing. Per v3 philosophy: keeps power fantasy alive while
     respecting narrative style.
     """
-    
+
     agent_name = "progression"
-    
-    def __init__(self, model_override: Optional[str] = None):
+
+    def __init__(self, model_override: str | None = None):
         super().__init__(model_override=model_override)
-    
+
     @property
     def system_prompt(self):
         return self._load_prompt_file("progression.md", "You are the Progression system for an anime JRPG.")
-    
+
     @property
     def output_schema(self):
         return ProgressionOutput
-    
+
     async def calculate_progression(
         self,
         character: Character,
-        turn_result: Dict[str, Any],
+        turn_result: dict[str, Any],
         profile: NarrativeProfile,
-        session_context: Optional[Dict[str, Any]] = None
+        session_context: dict[str, Any] | None = None
     ) -> ProgressionOutput:
         """
         Calculate XP and check for level-ups.
@@ -124,48 +124,48 @@ class ProgressionAgent(BaseAgent):
         """
         # Get growth model from profile
         growth_model = self._get_growth_model(profile)
-        
+
         # Calculate XP from various sources
         xp_awards = self._calculate_xp_awards(turn_result, profile, growth_model)
         total_xp = sum(award.amount for award in xp_awards)
-        
+
         # Check for level up
         result = ProgressionOutput(
             xp_awarded=total_xp,
             xp_sources=xp_awards,
             old_level=character.level
         )
-        
+
         # Apply XP and check level
         new_xp = (character.xp_current or 0) + total_xp
         xp_to_next = self._get_xp_for_level(character.level + 1, growth_model)
-        
+
         if new_xp >= xp_to_next:
             result.level_up = True
             result.new_level = character.level + 1
             result = await self._handle_level_up(result, character, profile)
         else:
             result.new_level = character.level
-        
+
         return result
-    
+
     def _get_growth_model(self, profile: NarrativeProfile) -> str:
         """Determine growth model from profile DNA."""
         # Use Fast vs Slow DNA scale
         pacing = profile.dna.get("fast_vs_slow", 5)
-        
+
         if pacing <= 3:
             return "fast"
         elif pacing >= 7:
             return "slow"
         else:
             return "moderate"
-    
+
     def _get_xp_for_level(self, level: int, growth_model: str) -> int:
         """Get XP required for a level."""
         curve = XP_CURVES.get(growth_model, XP_CURVES["moderate"])
         xp_per_level = curve["xp_per_level"]
-        
+
         if level <= 0:
             return 0
         elif level <= len(xp_per_level):
@@ -174,21 +174,21 @@ class ProgressionAgent(BaseAgent):
             # Extrapolate for higher levels
             base = xp_per_level[-1]
             return base + (level - len(xp_per_level)) * 1000
-    
+
     def _calculate_xp_awards(
         self,
-        turn_result: Dict[str, Any],
+        turn_result: dict[str, Any],
         profile: NarrativeProfile,
         growth_model: str
-    ) -> List[XPAward]:
+    ) -> list[XPAward]:
         """Calculate XP from turn results."""
         awards = []
         base_xp = XP_CURVES[growth_model]["base_xp_per_session"] // 10  # Per turn
-        
+
         # Combat XP
         if turn_result.get("combat_occurred"):
             combat_xp = int(base_xp * XP_SOURCES["combat"])
-            
+
             # Boss bonus
             if turn_result.get("boss_fight"):
                 combat_xp = int(combat_xp * XP_SOURCES["boss"])
@@ -203,7 +203,7 @@ class ProgressionAgent(BaseAgent):
                     amount=combat_xp,
                     reason="Combat victory"
                 ))
-            
+
             # Sakuga bonus
             if turn_result.get("sakuga_moment"):
                 sakuga_xp = int(base_xp * XP_SOURCES["sakuga"])
@@ -212,7 +212,7 @@ class ProgressionAgent(BaseAgent):
                     amount=sakuga_xp,
                     reason="Epic moment!"
                 ))
-        
+
         # Quest XP
         if turn_result.get("quest_completed"):
             quest_xp = int(base_xp * XP_SOURCES["quest"])
@@ -221,7 +221,7 @@ class ProgressionAgent(BaseAgent):
                 amount=quest_xp,
                 reason=f"Completed: {turn_result.get('quest_name', 'quest')}"
             ))
-        
+
         # Roleplay XP
         if turn_result.get("significant_roleplay"):
             rp_xp = int(base_xp * XP_SOURCES["roleplay"])
@@ -230,7 +230,7 @@ class ProgressionAgent(BaseAgent):
                 amount=rp_xp,
                 reason="Character development"
             ))
-        
+
         # Failure XP (struggle profiles only)
         power_fantasy = profile.dna.get("power_fantasy_vs_struggle", 5)
         if turn_result.get("failed_significantly") and power_fantasy >= 7:
@@ -240,7 +240,7 @@ class ProgressionAgent(BaseAgent):
                 amount=fail_xp,
                 reason="Learned from failure"
             ))
-        
+
         # Discovery XP
         if turn_result.get("discovered_lore"):
             disc_xp = int(base_xp * XP_SOURCES["discovery"])
@@ -249,9 +249,9 @@ class ProgressionAgent(BaseAgent):
                 amount=disc_xp,
                 reason="Uncovered secrets"
             ))
-        
+
         return awards
-    
+
     async def _handle_level_up(
         self,
         result: ProgressionOutput,
@@ -280,36 +280,36 @@ Determine:
 4. Is this a tier change (every 5 levels)?
 
 Make it feel like anime growth - not just numbers!"""
-        
+
         # Call LLM for level-up details
         level_up_details = await self.call(level_context)
-        
+
         # Merge LLM response
         if isinstance(level_up_details, ProgressionOutput):
             result.abilities_unlocked = level_up_details.abilities_unlocked
             result.stats_increased = level_up_details.stats_increased
             result.level_up_narrative = level_up_details.level_up_narrative
             result.growth_moment = level_up_details.growth_moment
-        
+
         # Check tier change (every 5 levels)
         old_tier_num = (result.old_level - 1) // 5
         new_tier_num = (result.new_level - 1) // 5
-        
+
         if new_tier_num > old_tier_num:
             result.tier_changed = True
             result.old_tier = f"T{10 - old_tier_num}"
             result.new_tier = f"T{10 - new_tier_num}"
             result.tier_ceremony = self._get_tier_ceremony(result.new_tier)
-            
+
             # Create memory content for POWER_TIER_CHANGE
             result.tier_change_memory = (
                 f"POWER TIER ASCENSION: {result.old_tier} → {result.new_tier}. "
                 f"{character.name} has reached a new level of power. "
                 f"Context: {result.tier_ceremony}"
             )
-        
+
         return result
-    
+
     def _get_tier_ceremony(self, new_tier: str) -> str:
         """
         Get tier transition context for narrative generation via RAG.
@@ -323,33 +323,33 @@ Make it feel like anime growth - not just numbers!"""
             old_tier_num = tier_num + 1  # Previous tier (T8 -> T7 means old was T8)
         except (ValueError, AttributeError):
             return f"Power tier {new_tier}: Consult power_tier_reference for narrative guidance."
-        
+
         # Try to get ceremony text from RAG
         # Use T-format to match ceremony IDs like "ceremony_t8_t7"
         rules = RuleLibrary()
         ceremony_text = rules.get_ceremony_text(old_tier_num, tier_num)
-        
+
         # Also try direct power tier guidance as it has the same information
         if not ceremony_text:
             ceremony_text = rules.get_power_tier_guidance(tier_num)
-        
+
         if ceremony_text:
             return ceremony_text
-        
+
         # Fallback: Get general power tier guidance from RAG
         tier_guidance = rules.get_power_tier_guidance(tier_num)
         if tier_guidance:
             return tier_guidance
-        
+
         # Final fallback
         return f"Power tier {new_tier}: Consult power_tier_reference for narrative guidance."
-    
+
     def create_tier_change_memory(
         self,
         result: ProgressionOutput,
         session_number: int = 0,
         trigger: str = ""
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Create a POWER_TIER_CHANGE memory per Module 12.
         
@@ -371,7 +371,7 @@ Make it feel like anime growth - not just numbers!"""
             "ceremony_narration": result.tier_ceremony,
             "session_number": session_number,
         }
-        
+
         return {
             "summary": content["summary"],
             "category": "POWER_TIER_CHANGE",

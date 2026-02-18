@@ -5,14 +5,12 @@ Contains the Vibe Keeper template loading and the three main
 prompt-construction methods that assemble the static system blocks.
 """
 
+import logging
 from pathlib import Path
-from typing import Optional, Dict, Any
 
+from ..db.state_manager import GameContext
 from .intent_classifier import IntentOutput
 from .outcome_judge import OutcomeOutput
-from ..db.state_manager import GameContext
-
-import logging
 
 logger = logging.getLogger(__name__)
 

@@ -11,14 +11,11 @@ Architecture:
 """
 
 import asyncio
-import os
-import base64
-from pathlib import Path
-from typing import Optional, Dict, Any
-from datetime import datetime
-
-
 import logging
+import os
+from datetime import datetime
+from pathlib import Path
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -37,11 +34,11 @@ class MediaGenerator:
         portraits/ - Head-and-shoulders portraits (derived)
         cutscenes/ - Video cutscenes (future)
     """
-    
+
     IMAGE_MODEL = "gemini-3-pro-image-preview"
     VIDEO_MODEL = "veo-3.1-generate-preview"
-    
-    def __init__(self, api_key: Optional[str] = None):
+
+    def __init__(self, api_key: str | None = None):
         """Initialize MediaGenerator.
         
         Args:
@@ -57,38 +54,38 @@ class MediaGenerator:
         if not self._api_key:
             self._api_key = os.environ.get("GOOGLE_API_KEY")
         self._client = None
-    
+
     def _ensure_client(self):
         """Lazy-init the Google GenAI client."""
         if self._client is None:
             from google import genai
             self._client = genai.Client(api_key=self._api_key)
-    
+
     def _campaign_media_dir(self, campaign_id: int) -> Path:
         """Get the media directory for a campaign, creating it if needed."""
         base = MEDIA_BASE_DIR / str(campaign_id)
         base.mkdir(parents=True, exist_ok=True)
         return base
-    
+
     def _models_dir(self, campaign_id: int) -> Path:
         d = self._campaign_media_dir(campaign_id) / "models"
         d.mkdir(exist_ok=True)
         return d
-    
+
     def _portraits_dir(self, campaign_id: int) -> Path:
         d = self._campaign_media_dir(campaign_id) / "portraits"
         d.mkdir(exist_ok=True)
         return d
-    
+
     def _cutscenes_dir(self, campaign_id: int) -> Path:
         d = self._campaign_media_dir(campaign_id) / "cutscenes"
         d.mkdir(exist_ok=True)
         return d
-    
+
     def _sanitize_name(self, name: str) -> str:
         """Sanitize entity name for use as filename."""
         return name.lower().replace(" ", "_").replace("'", "").replace('"', '')[:50]
-    
+
     async def generate_model_sheet(
         self,
         visual_tags: list[str],
@@ -96,8 +93,8 @@ class MediaGenerator:
         style_context: str,
         campaign_id: int,
         entity_name: str,
-        template_path: Optional[Path] = None,
-    ) -> Optional[Path]:
+        template_path: Path | None = None,
+    ) -> Path | None:
         """Generate full-body character model sheet from description + optional template.
         
         Uses gemini-3-pro-image-preview with the template as reference image
@@ -115,14 +112,14 @@ class MediaGenerator:
             Path to the generated model sheet, or None on failure.
         """
         self._ensure_client()
-        
+
         safe_name = self._sanitize_name(entity_name)
         output_path = self._models_dir(campaign_id) / f"{safe_name}_model.png"
-        
+
         # Build the prompt
         tags_str = ", ".join(visual_tags) if visual_tags else "no specific tags"
         appearance_desc = self._format_appearance(appearance)
-        
+
         prompt = f"""Create a full-body character model sheet in detailed anime style.
 
 CHARACTER: {entity_name}
@@ -140,10 +137,10 @@ Requirements:
 
         try:
             loop = asyncio.get_running_loop()
-            
+
             # Build parts list
             parts = []
-            
+
             # If template provided, include it as reference
             if template_path and template_path.exists():
                 from google.genai import types
@@ -158,7 +155,7 @@ Requirements:
                 ))
             else:
                 parts.append(prompt)
-            
+
             def _generate():
                 from google.genai import types
                 response = self._client.models.generate_content(
@@ -169,9 +166,9 @@ Requirements:
                     ),
                 )
                 return response
-            
+
             response = await loop.run_in_executor(None, _generate)
-            
+
             # Extract image from response
             if response.candidates and response.candidates[0].content:
                 for part in response.candidates[0].content.parts:
@@ -180,20 +177,20 @@ Requirements:
                         output_path.write_bytes(image_bytes)
                         logger.info(f"Model sheet saved: {output_path}")
                         return output_path
-            
+
             logger.info(f"No image in response for {entity_name}")
             return None
-            
+
         except Exception as e:
             logger.error(f"Model sheet generation failed for {entity_name}: {e}")
             return None
-    
+
     async def derive_portrait(
         self,
         model_sheet_path: Path,
         campaign_id: int,
         entity_name: str,
-    ) -> Optional[Path]:
+    ) -> Path | None:
         """Derive a head-and-shoulders portrait from the model sheet.
         
         Uses the model sheet as reference to generate a focused portrait,
@@ -208,18 +205,18 @@ Requirements:
             Path to the portrait image, or None on failure.
         """
         self._ensure_client()
-        
+
         safe_name = self._sanitize_name(entity_name)
         output_path = self._portraits_dir(campaign_id) / f"{safe_name}_portrait.png"
-        
+
         if not model_sheet_path.exists():
             logger.warning(f"Model sheet not found: {model_sheet_path}")
             return None
-        
+
         try:
             loop = asyncio.get_running_loop()
             model_bytes = model_sheet_path.read_bytes()
-            
+
             def _generate():
                 from google.genai import types
                 response = self._client.models.generate_content(
@@ -235,9 +232,9 @@ Requirements:
                     ),
                 )
                 return response
-            
+
             response = await loop.run_in_executor(None, _generate)
-            
+
             # Extract image from response
             if response.candidates and response.candidates[0].content:
                 for part in response.candidates[0].content.parts:
@@ -246,14 +243,14 @@ Requirements:
                         output_path.write_bytes(image_bytes)
                         logger.info(f"Portrait saved: {output_path}")
                         return output_path
-            
+
             logger.info(f"No portrait image in response for {entity_name}")
             return None
-            
+
         except Exception as e:
             logger.error(f"Portrait generation failed for {entity_name}: {e}")
             return None
-    
+
     async def generate_location_visual(
         self,
         location_name: str,
@@ -262,19 +259,19 @@ Requirements:
         atmosphere: str,
         style_context: str,
         campaign_id: int,
-    ) -> Optional[Path]:
+    ) -> Path | None:
         """Generate a location visual for the map/locations page.
         
         Uses gemini-3-pro-image-preview to create an establishing shot.
         """
         self._ensure_client()
-        
+
         safe_name = self._sanitize_name(location_name)
         # Store location visuals alongside cutscene stills
         output_dir = self._campaign_media_dir(campaign_id) / "locations"
         output_dir.mkdir(exist_ok=True)
         output_path = output_dir / f"{safe_name}.png"
-        
+
         prompt = f"""Create a wide establishing shot of an anime location.
 
 LOCATION: {location_name}
@@ -289,10 +286,10 @@ Requirements:
 - Anime art style consistent with the specified IP
 - No characters in the scene
 - Cinematic composition, 16:9 aspect ratio feel"""
-        
+
         try:
             loop = asyncio.get_running_loop()
-            
+
             def _generate():
                 from google.genai import types
                 response = self._client.models.generate_content(
@@ -303,23 +300,23 @@ Requirements:
                     ),
                 )
                 return response
-            
+
             response = await loop.run_in_executor(None, _generate)
-            
+
             if response.candidates and response.candidates[0].content:
                 for part in response.candidates[0].content.parts:
                     if hasattr(part, 'inline_data') and part.inline_data:
                         output_path.write_bytes(part.inline_data.data)
                         logger.info(f"Location visual saved: {output_path}")
                         return output_path
-            
+
             logger.info(f"No image in response for location {location_name}")
             return None
-            
+
         except Exception as e:
             logger.error(f"Location visual failed for {location_name}: {e}")
             return None
-    
+
     async def generate_full_character_media(
         self,
         visual_tags: list[str],
@@ -327,8 +324,8 @@ Requirements:
         style_context: str,
         campaign_id: int,
         entity_name: str,
-        template_path: Optional[Path] = None,
-    ) -> Dict[str, Optional[Path]]:
+        template_path: Path | None = None,
+    ) -> dict[str, Path | None]:
         """Convenience method: generate model sheet + derive portrait in sequence.
         
         Returns:
@@ -342,7 +339,7 @@ Requirements:
             entity_name=entity_name,
             template_path=template_path,
         )
-        
+
         portrait = None
         if model_sheet:
             portrait = await self.derive_portrait(
@@ -350,23 +347,23 @@ Requirements:
                 campaign_id=campaign_id,
                 entity_name=entity_name,
             )
-        
+
         return {
             "model_sheet": model_sheet,
             "portrait": portrait,
         }
-    
+
     # =====================================================================
     # General-purpose image + video generation (cutscene pipeline)
     # =====================================================================
-    
+
     async def generate_image(
         self,
         prompt: str,
         campaign_id: int,
         filename: str = "cutscene",
         aspect_ratio: str = "16:9",
-    ) -> Optional[Path]:
+    ) -> Path | None:
         """Generate a still image via gemini-3-pro-image-preview.
         
         General-purpose image generation for cutscene stills, scene
@@ -382,17 +379,17 @@ Requirements:
             Path to saved PNG, or None on failure.
         """
         self._ensure_client()
-        
+
         safe_name = self._sanitize_name(filename)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         output_path = self._cutscenes_dir(campaign_id) / f"{safe_name}_{timestamp}.png"
-        
+
         # Add aspect ratio hint to prompt
         full_prompt = f"{prompt}\n\nAspect ratio: {aspect_ratio}. Cinematic framing."
-        
+
         try:
             loop = asyncio.get_running_loop()
-            
+
             def _generate():
                 from google.genai import types
                 response = self._client.models.generate_content(
@@ -403,30 +400,30 @@ Requirements:
                     ),
                 )
                 return response
-            
+
             response = await loop.run_in_executor(None, _generate)
-            
+
             if response.candidates and response.candidates[0].content:
                 for part in response.candidates[0].content.parts:
                     if hasattr(part, 'inline_data') and part.inline_data:
                         output_path.write_bytes(part.inline_data.data)
                         logger.info(f"Cutscene still saved: {output_path}")
                         return output_path
-            
+
             logger.info(f"No image in response for cutscene {filename}")
             return None
-            
+
         except Exception as e:
             logger.error(f"Image generation failed: {e}")
             return None
-    
+
     async def generate_video(
         self,
         image_path: Path,
         prompt: str,
         campaign_id: int,
         duration: int = 6,
-    ) -> Optional[Path]:
+    ) -> Path | None:
         """Generate a video from an image via veo-3.1-generate-preview.
         
         Uses image-to-video generation. Polls for completion since
@@ -442,18 +439,18 @@ Requirements:
             Path to saved MP4, or None on failure.
         """
         self._ensure_client()
-        
+
         if not image_path.exists():
             logger.warning(f"Source image not found: {image_path}")
             return None
-        
+
         output_path = image_path.with_suffix(".mp4")
-        
+
         try:
             from google.genai import types
             loop = asyncio.get_running_loop()
             image_bytes = image_path.read_bytes()
-            
+
             def _start_generation():
                 """Start the Veo generation job (returns an operation to poll)."""
                 image = types.Image.from_bytes(data=image_bytes, mime_type="image/png")
@@ -467,10 +464,10 @@ Requirements:
                     ),
                 )
                 return operation
-            
+
             logger.info(f"Starting Veo generation ({self.VIDEO_MODEL})...")
             operation = await loop.run_in_executor(None, _start_generation)
-            
+
             # Poll for completion (Veo is async, typically 15-60 seconds)
             def _poll():
                 """Poll until the operation completes."""
@@ -479,10 +476,10 @@ Requirements:
                     time.sleep(5)
                     operation.reload()
                 return operation.result
-            
-            logger.info(f"Polling for Veo completion...")
+
+            logger.info("Polling for Veo completion...")
             result = await loop.run_in_executor(None, _poll)
-            
+
             # Extract video from result
             if result and result.generated_videos:
                 video = result.generated_videos[0]
@@ -497,14 +494,14 @@ Requirements:
                         urllib.request.urlretrieve(video_data.uri, str(output_path))
                     logger.info(f"Video saved: {output_path}")
                     return output_path
-            
-            logger.info(f"No video in Veo response")
+
+            logger.info("No video in Veo response")
             return None
-            
+
         except Exception as e:
             logger.error(f"Video generation failed: {e}")
             return None
-    
+
     async def generate_cutscene(
         self,
         image_prompt: str,
@@ -512,7 +509,7 @@ Requirements:
         campaign_id: int,
         cutscene_type: str = "action_climax",
         filename: str = "cutscene",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Full cutscene pipeline: prompt → image → video.
         
         Orchestrates both generation steps. Returns result dict with
@@ -541,48 +538,48 @@ Requirements:
             "cost_usd": 0.0,
             "status": "failed",
         }
-        
+
         # Step 1: Generate still image
         image_path = await self.generate_image(
             prompt=image_prompt,
             campaign_id=campaign_id,
             filename=filename,
         )
-        
+
         if not image_path:
             return result
-        
+
         result["image_path"] = image_path
         result["cost_usd"] = 0.03  # Estimated image cost
         result["status"] = "partial"
-        
+
         # Step 2: Animate the image into video
         video_path = await self.generate_video(
             image_path=image_path,
             prompt=motion_prompt,
             campaign_id=campaign_id,
         )
-        
+
         if video_path:
             result["video_path"] = video_path
             result["cost_usd"] += 0.08  # Estimated video cost
             result["status"] = "complete"
-        
+
         logger.info(f"Cutscene {cutscene_type}: status={result['status']}, cost=${result['cost_usd']:.2f}")
         return result
-    
+
     def _format_appearance(self, appearance: dict) -> str:
         """Format appearance dict into readable description."""
         if not appearance:
             return "No specific appearance details"
-        
+
         parts = []
         for key, value in appearance.items():
             if value:
                 parts.append(f"{key}: {value}")
         return "; ".join(parts) if parts else "No specific appearance details"
-    
-    def get_template_path(self, body_type: str = "male_average") -> Optional[Path]:
+
+    def get_template_path(self, body_type: str = "male_average") -> Path | None:
         """Get path to a body template image.
         
         Args:
@@ -593,7 +590,7 @@ Requirements:
         """
         path = TEMPLATES_DIR / f"{body_type}.png"
         return path if path.exists() else None
-    
+
     def get_media_url(self, campaign_id: int, category: str, filename: str) -> str:
         """Build a relative URL for serving media via the API.
         

@@ -1,35 +1,34 @@
 """Status, tracker, media, and gallery endpoints."""
 
-from fastapi import APIRouter, HTTPException, Query
-from fastapi.responses import FileResponse
-from typing import Optional
 import logging
 import re
 
-from src.settings import get_settings_store
+from fastapi import APIRouter, HTTPException, Query
+from fastapi.responses import FileResponse
+
 from src.core.session import get_session_manager
-from src.db.session_store import get_session_store
+from src.settings import get_settings_store
 
 from .models import (
+    AbilitiesResponse,
+    AbilityInfo,
     CharacterStatusResponse,
-    NPCInfo,
-    NPCListResponse,
     FactionInfo,
     FactionListResponse,
-    QuestObjectiveInfo,
-    QuestDetailInfo,
-    QuestTrackerResponse,
+    GalleryResponse,
     InventoryItemInfo,
     InventoryResponse,
-    AbilityInfo,
-    AbilitiesResponse,
     JournalEntry,
     JournalResponse,
     LocationInfo,
     LocationsResponse,
     MediaAssetResponse,
-    GalleryResponse,
     MediaCostResponse,
+    NPCInfo,
+    NPCListResponse,
+    QuestDetailInfo,
+    QuestObjectiveInfo,
+    QuestTrackerResponse,
 )
 from .session_mgmt import get_orchestrator
 
@@ -43,10 +42,10 @@ async def get_session_status(session_id: str):
     """Get the current status of a session."""
     manager = get_session_manager()
     session = manager.get_session(session_id)
-    
+
     if session is None:
         raise HTTPException(status_code=404, detail=f"Session not found: {session_id}")
-    
+
     return {
         "session_id": session_id,
         "phase": session.phase.value,
@@ -65,11 +64,10 @@ async def get_research_status():
     Returns info about the configured research agent and available profiles.
     """
     from src.agents.profile_generator import list_available_profiles
-    from src.settings import get_settings_store
-    
+
     store = get_settings_store()
     settings = store.load()
-    
+
     # Get configured research model
     research_config = settings.agent_models.research
     if research_config:
@@ -78,11 +76,11 @@ async def get_research_status():
     else:
         provider_name = "google"
         model_name = "gemini-3-pro-preview"
-    
+
     # Check if provider has API key configured
     configured = store.get_configured_providers()
     provider_ready = configured.get(provider_name, False)
-    
+
     return {
         "native_search_available": True,  # All providers now support native search
         "configured_provider": provider_name,
@@ -107,12 +105,12 @@ async def get_character_status():
         orchestrator = get_orchestrator()
     except HTTPException:
         raise HTTPException(status_code=404, detail="No active campaign")
-    
+
     char = orchestrator.state.get_character()
-    
+
     if not char:
         raise HTTPException(status_code=404, detail="No character found")
-    
+
     return CharacterStatusResponse(
         name=char.name or "Unknown",
         level=char.level or 1,
@@ -140,9 +138,9 @@ async def get_npcs():
         orchestrator = get_orchestrator()
     except HTTPException:
         raise HTTPException(status_code=404, detail="No active campaign")
-    
+
     npcs = orchestrator.state.get_all_npcs()
-    
+
     # Filter out the player character from NPC list
     char = orchestrator.state.get_character()
     pc_name = (char.name or "").lower().strip() if char else ""
@@ -151,7 +149,7 @@ async def get_npcs():
         if (n.role or "").lower() != "protagonist"
         and (n.name or "").lower().strip() != pc_name
     ]
-    
+
     # Deduplicate NPCs by name similarity (keep highest interaction_count)
     deduped = {}
     for npc in npcs:
@@ -164,10 +162,10 @@ async def get_npcs():
         if existing is None or (npc.interaction_count or 0) > (existing.interaction_count or 0):
             deduped[normalized] = npc
     npcs = list(deduped.values())
-    
+
     # Sort by last_appeared DESC (recent interactions first)
     npcs_sorted = sorted(npcs, key=lambda n: n.last_appeared or 0, reverse=True)
-    
+
     return NPCListResponse(
         npcs=[
             NPCInfo(
@@ -192,16 +190,16 @@ async def get_factions():
         orchestrator = get_orchestrator()
     except HTTPException:
         raise HTTPException(status_code=404, detail="No active campaign")
-    
+
     factions = orchestrator.state.get_all_factions()
-    
+
     def get_relationship(rep):
         if rep >= 500: return "allied"
         if rep >= 100: return "friendly"
         if rep >= -100: return "neutral"
         if rep >= -500: return "unfriendly"
         return "hostile"
-    
+
     return FactionListResponse(
         factions=[
             FactionInfo(
@@ -228,17 +226,17 @@ async def get_quests():
         orchestrator = get_orchestrator()
     except HTTPException:
         raise HTTPException(status_code=404, detail="No active campaign")
-    
+
     current_arc = None
-    
+
     # Try DB-backed quests first
     db_quests = orchestrator.state.get_quests()
-    
+
     if db_quests:
         quests = []
         active_count = 0
         completed_count = 0
-        
+
         for q in db_quests:
             objectives = []
             for obj in (q.objectives or []):
@@ -248,7 +246,7 @@ async def get_quests():
                         completed=obj.get("completed", False),
                         turn_completed=obj.get("turn_completed"),
                     ))
-            
+
             quests.append(QuestDetailInfo(
                 id=q.id,
                 title=q.title,
@@ -262,12 +260,12 @@ async def get_quests():
                 related_npcs=q.related_npcs or [],
                 related_locations=q.related_locations or [],
             ))
-            
+
             if q.status == "active":
                 active_count += 1
             elif q.status in ("completed", "failed"):
                 completed_count += 1
-        
+
         # Get current arc from world state or bible
         bible = orchestrator.state.get_campaign_bible()
         if bible and bible.planning_data:
@@ -276,17 +274,17 @@ async def get_quests():
             world_state = orchestrator.state.get_world_state()
             if world_state:
                 current_arc = world_state.arc_name
-        
+
         return QuestTrackerResponse(
             quests=quests,
             current_arc=current_arc,
             total_active=active_count,
             total_completed=completed_count,
         )
-    
+
     # Legacy fallback: character goals + campaign bible
     quests = []
-    
+
     char = orchestrator.state.get_character()
     if char:
         if char.short_term_goal:
@@ -315,7 +313,7 @@ async def get_quests():
                     quest_type="main",
                     source="director",
                 ))
-    
+
     bible = orchestrator.state.get_campaign_bible()
     if bible and bible.planning_data:
         data = bible.planning_data
@@ -324,7 +322,7 @@ async def get_quests():
             if isinstance(data.get("current_arc"), dict)
             else data.get("current_arc")
         ) or current_arc
-        
+
         for goal in data.get("active_goals", []):
             quests.append(QuestDetailInfo(
                 id=0,
@@ -343,15 +341,15 @@ async def get_quests():
                 quest_type="main",
                 source="director",
             ))
-    
+
     if not current_arc:
         world_state = orchestrator.state.get_world_state()
         if world_state:
             current_arc = world_state.arc_name
-    
+
     active = sum(1 for q in quests if q.status == "active")
     completed = sum(1 for q in quests if q.status in ("completed", "failed"))
-    
+
     return QuestTrackerResponse(
         quests=quests,
         current_arc=current_arc,
@@ -369,11 +367,11 @@ async def get_inventory():
         orchestrator = get_orchestrator()
     except HTTPException:
         raise HTTPException(status_code=404, detail="No active campaign")
-    
+
     char = orchestrator.state.get_character()
     if not char:
         raise HTTPException(status_code=404, detail="No character found")
-    
+
     raw_inventory = char.inventory or []
     items = []
     for item in raw_inventory:
@@ -388,7 +386,7 @@ async def get_inventory():
             ))
         elif isinstance(item, str):
             items.append(InventoryItemInfo(name=item))
-    
+
     return InventoryResponse(items=items, total_items=len(items))
 
 
@@ -399,11 +397,11 @@ async def get_abilities():
         orchestrator = get_orchestrator()
     except HTTPException:
         raise HTTPException(status_code=404, detail="No active campaign")
-    
+
     char = orchestrator.state.get_character()
     if not char:
         raise HTTPException(status_code=404, detail="No character found")
-    
+
     raw_abilities = char.abilities or []
     abilities = []
     seen_names = set()
@@ -424,7 +422,7 @@ async def get_abilities():
                 continue
             seen_names.add(ability.lower())
             abilities.append(AbilityInfo(name=ability, type="passive"))
-    
+
     return AbilitiesResponse(abilities=abilities, total_abilities=len(abilities))
 
 
@@ -432,7 +430,7 @@ async def get_abilities():
 async def get_journal(
     page: int = Query(1, ge=1, description="Page number"),
     per_page: int = Query(20, ge=1, le=100, description="Items per page"),
-    expand_turn: Optional[int] = Query(None, description="Expand full narrative for a specific turn"),
+    expand_turn: int | None = Query(None, description="Expand full narrative for a specific turn"),
 ):
     """Get journal entries from compactor narrative beats.
     
@@ -446,10 +444,10 @@ async def get_journal(
         orchestrator = get_orchestrator()
     except HTTPException:
         raise HTTPException(status_code=404, detail="No active campaign")
-    
+
     entries = []
     expanded_turn_content = None
-    
+
     # Timeline mode: Get episode beats from memory store
     try:
         # Search for all episode memories (compactor-generated summaries)
@@ -480,18 +478,18 @@ async def get_journal(
                 raw_heat = result.get("heat", 0) or 0
                 # Normalize heat to 0.0-1.0 range
                 heat = min(float(raw_heat), 1.0) if raw_heat <= 1.0 else min(float(raw_heat) / 100.0, 1.0)
-                
+
                 # Clean up content — strip raw location/player/outcome prefixes
                 content = result["content"]
                 # Remove "[Turn N] Location: Player: ... Outcome: ---" wrapper
                 content = re.sub(r'^\[Turn \d+\]\s*[^:]+:\s*Player:.*?Outcome:\s*---\s*', '', content, flags=re.DOTALL).strip()
                 # Remove leading markdown headers from compactor output
                 content = re.sub(r'^#{1,4}\s*', '', content).strip()
-                
+
                 # Skip tiny stubs (character names, one-word entries)
                 if len(content) < 20:
                     continue
-                
+
                 all_beats.append(JournalEntry(
                     turn=turn_num,
                     content=content,
@@ -501,7 +499,7 @@ async def get_journal(
 
         # Fallback: if no ChromaDB memories yet, build journal from Turn narratives
         if not all_beats:
-            from src.db.models import Turn, Session
+            from src.db.models import Turn
             db = orchestrator.state._get_db()
             session_id = orchestrator.state.get_or_create_session()
             turns = (
@@ -531,7 +529,7 @@ async def get_journal(
     except Exception as e:
         logger.error(f"Error fetching episode memories: {e}")
         total = 0
-    
+
     # Full text expansion: Get the full narrative for a specific turn
     if expand_turn is not None:
         try:
@@ -545,7 +543,7 @@ async def get_journal(
                 ))
         except Exception as e:
             logger.error(f"Error expanding turn {expand_turn}: {e}")
-    
+
     return JournalResponse(
         entries=entries,
         total_entries=total,
@@ -564,10 +562,10 @@ async def get_locations():
         orchestrator = get_orchestrator()
     except HTTPException:
         raise HTTPException(status_code=404, detail="No active campaign")
-    
+
     db_locations = orchestrator.state.get_locations()
     current_location_name = None
-    
+
     locations = []
     for loc in db_locations:
         locations.append(LocationInfo(
@@ -588,13 +586,13 @@ async def get_locations():
         ))
         if loc.is_current:
             current_location_name = loc.name
-    
+
     # Fallback: use world state location if no DB locations marked as current
     if not current_location_name:
         world_state = orchestrator.state.get_world_state()
         if world_state:
             current_location_name = world_state.location
-    
+
     return LocationsResponse(
         locations=locations,
         current_location=current_location_name,
@@ -614,15 +612,15 @@ async def serve_media(file_path: str):
         {campaign_id}/cutscenes/{name}.mp4
     """
     from src.media.generator import MEDIA_BASE_DIR
-    
+
     # Resolve and validate path (prevent directory traversal)
     full_path = (MEDIA_BASE_DIR / file_path).resolve()
     if not str(full_path).startswith(str(MEDIA_BASE_DIR.resolve())):
         raise HTTPException(status_code=403, detail="Access denied")
-    
+
     if not full_path.exists() or not full_path.is_file():
         raise HTTPException(status_code=404, detail="Media not found")
-    
+
     # Determine MIME type
     suffix = full_path.suffix.lower()
     mime_types = {
@@ -634,7 +632,7 @@ async def serve_media(file_path: str):
         ".webm": "video/webm",
     }
     media_type = mime_types.get(suffix, "application/octet-stream")
-    
+
     return FileResponse(full_path, media_type=media_type)
 
 
@@ -643,7 +641,7 @@ async def serve_media(file_path: str):
 @router.get("/gallery/{campaign_id}")
 async def get_media_gallery(
     campaign_id: int,
-    asset_type: Optional[str] = None,
+    asset_type: str | None = None,
     limit: int = 50,
     offset: int = 0,
 ):
@@ -655,9 +653,10 @@ async def get_media_gallery(
         offset: pagination offset
     """
     try:
-        from src.db.state_manager import StateManager
-        from src.db.models import MediaAsset
         from sqlalchemy import func
+
+        from src.db.models import MediaAsset
+        from src.db.state_manager import StateManager
 
         sm = StateManager(campaign_id)
         db = sm._get_db()
@@ -708,8 +707,8 @@ async def get_turn_media(campaign_id: int, turn_number: int):
     The frontend polls this to check if cutscenes have finished generating.
     """
     try:
-        from src.db.state_manager import StateManager
         from src.db.models import MediaAsset
+        from src.db.state_manager import StateManager
 
         sm = StateManager(campaign_id)
         db = sm._get_db()
@@ -745,10 +744,11 @@ async def get_turn_media(campaign_id: int, turn_number: int):
 async def get_media_cost(campaign_id: int):
     """Get media generation cost summary for a campaign."""
     try:
-        from src.db.state_manager import StateManager
-        from src.db.models import MediaAsset
-        from src.settings.store import get_settings_store
         from sqlalchemy import func
+
+        from src.db.models import MediaAsset
+        from src.db.state_manager import StateManager
+        from src.settings.store import get_settings_store
 
         sm = StateManager(campaign_id)
         db = sm._get_db()

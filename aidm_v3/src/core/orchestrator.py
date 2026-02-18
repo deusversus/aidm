@@ -9,47 +9,39 @@ This file retains only initialization and lifecycle methods.
 """
 
 import asyncio
-import time
-from typing import Optional
+import logging
 
-from ..agents.intent_classifier import IntentClassifier
-from ..agents.outcome_judge import OutcomeJudge
-from ..agents.key_animator import KeyAnimator
-from ..db.state_manager import StateManager
-from ..profiles.loader import load_profile, NarrativeProfile
-from ..agents.director import DirectorAgent
-from .turn import TurnResult
-
-from ..context.memory import MemoryStore
-from ..context.rule_library import RuleLibrary
-from ..agents.validator import ValidatorAgent
-from ..agents.context_selector import ContextSelector
 from ..agents.combat import CombatAgent
-from ..agents.progression import ProgressionAgent
-from ..agents.scale_selector import ScaleSelectorAgent
-from ..agents.relationship_analyzer import RelationshipAnalyzer
-
-# Phase 4: Foreshadowing
-from .foreshadowing import ForeshadowingLedger
-
-# Phase 2: Pre-turn Pacing (#1)
-from ..agents.pacing_agent import PacingAgent, PacingDirective
-
-# Phase 3: Session recap (#18)
-from ..agents.recap_agent import RecapAgent
+from ..agents.context_selector import ContextSelector
+from ..agents.director import DirectorAgent
+from ..agents.intent_classifier import IntentClassifier
+from ..agents.key_animator import KeyAnimator
+from ..agents.outcome_judge import OutcomeJudge
 
 # Override Handler (META/OVERRIDE commands)
 from ..agents.override_handler import OverrideHandler
+
+# Phase 2: Pre-turn Pacing (#1)
+from ..agents.pacing_agent import PacingAgent
+from ..agents.progression import ProgressionAgent
+
+# Phase 3: Session recap (#18)
+from ..agents.recap_agent import RecapAgent
+from ..agents.relationship_analyzer import RelationshipAnalyzer
+from ..agents.scale_selector import ScaleSelectorAgent
+from ..agents.validator import ValidatorAgent
+from ..context.memory import MemoryStore
+from ..context.rule_library import RuleLibrary
 from ..db.session import create_session
-from ..enums import NarrativeWeight, ArcPhase, IntentType
-from ..utils.tasks import safe_create_task
+from ..db.state_manager import StateManager
+from ..profiles.loader import NarrativeProfile, load_profile
+from ._background import BackgroundMixin
 
 # Domain-specific mixins
 from ._turn_pipeline import TurnPipelineMixin
-from ._background import BackgroundMixin
 
-
-import logging
+# Phase 4: Foreshadowing
+from .foreshadowing import ForeshadowingLedger
 
 logger = logging.getLogger(__name__)
 
@@ -62,7 +54,7 @@ class Orchestrator(TurnPipelineMixin, BackgroundMixin):
     3. Narrative generation (tell the story)
     4. State updates (persist changes)
     """
-    
+
     def __init__(self, profile_id: str, session_id: str = None):
         """Initialize the orchestrator.
         
@@ -72,66 +64,66 @@ class Orchestrator(TurnPipelineMixin, BackgroundMixin):
         """
         self.profile_id = profile_id
         self.session_id = session_id or profile_id  # Fallback for backward compatibility
-        
+
         # Load profile first to get display name
         self.profile: NarrativeProfile = load_profile(profile_id)
-        
+
         # Resolve profile_id to integer campaign_id
         self.campaign_id = StateManager.get_or_create_campaign_by_profile(
             profile_id=profile_id,
             profile_name=f"{self.profile.name} Campaign"
         )
-        
+
         # Initialize state manager with resolved campaign_id
         self.state = StateManager(self.campaign_id)
         self.state.ensure_campaign_exists(
             name=f"{self.profile.name} Campaign",
             profile_id=profile_id
         )
-        
+
         # Initialize Context Layer - use session_id for memory isolation
         self.memory = MemoryStore(self.session_id)
         self.rules = RuleLibrary()
         self.context_selector = ContextSelector(self.memory, self.rules)
-        
+
         # Initialize agents
         self.intent_classifier = IntentClassifier()
         self.outcome_judge = OutcomeJudge()
         self.key_animator = KeyAnimator(self.profile)
         self.validator = ValidatorAgent()
-        
+
         # Phase 4: Director
         self.director = DirectorAgent()
-        
+
         # Phase 3: Combat & Progression
         self.combat = CombatAgent()
         self.progression = ProgressionAgent()
-        
+
         # Phase 4: Foreshadowing (DB-backed, #10)
         self.foreshadowing = ForeshadowingLedger(self.campaign_id, state_manager=self.state)
-        
+
         # Scale Selector (Module 12)
         self.scale_selector = ScaleSelectorAgent()
-        
+
         # Pre-turn Pacing micro-check (#1)
         self.pacing_agent = PacingAgent()
-        
+
         # Session recap (#18)
         self.recap_agent = RecapAgent()
         self._recap_generated = False  # True after first turn's recap
-        
+
         # Relationship Analyzer (NPC Intelligence, fast model)
         self.relationship_analyzer = RelationshipAnalyzer()
-        
+
         # Director hybrid trigger tracking
         self._accumulated_epicness = 0.0
         self._last_director_turn = 0
         self._arc_events_since_director = []  # Track arc-relevant events
-        
+
         # Override Handler (META/OVERRIDE commands)
         db = create_session()
         self.override_handler = OverrideHandler(db=db, memory_store=self.memory)
-        
+
         # Background processing lock — ensures previous turn's post-narrative
         # work completes before the next turn reads state
         self._bg_lock = asyncio.Lock()
@@ -154,7 +146,7 @@ class Orchestrator(TurnPipelineMixin, BackgroundMixin):
         except Exception as e:
             logger.warning("Orchestrator close — state close failed: %s", e)
         logger.info("Orchestrator for '%s' shut down", self.profile_id)
-    
+
     async def run_director_startup(
         self,
         session_zero_summary: str,
@@ -174,8 +166,8 @@ class Orchestrator(TurnPipelineMixin, BackgroundMixin):
         from Session Zero context + the narrative profile. Called once when
         Session Zero completes, before the first gameplay turn.
         """
-        logger.info(f"Beginning pilot episode planning...")
-        
+        logger.info("Beginning pilot episode planning...")
+
         # Run the Director's startup briefing
         director_output = await self.director.run_startup_briefing(
             session_zero_summary=session_zero_summary,
@@ -189,21 +181,21 @@ class Orchestrator(TurnPipelineMixin, BackgroundMixin):
             op_power_expression=op_power_expression,
             op_narrative_focus=op_narrative_focus,
         )
-        
+
         # Persist to Campaign Bible
         planning_data = director_output.model_dump()
         self.state.update_campaign_bible(planning_data, turn_number=0)
-        
+
         # Seed world state with Director's arc phase and tension
         self.state.update_world_state(
             arc_phase=director_output.arc_phase,
             tension_level=director_output.tension_level
         )
-        
+
         # Mark Director as having run at turn 0
         self._last_director_turn = 0
         self._arc_events_since_director = []
-        
+
         logger.info(f"[Director Startup] Opening arc: '{director_output.current_arc}' "
               f"(phase: {director_output.arc_phase}, tension: {director_output.tension_level:.1f})")
         logger.info(f"Director notes: {director_output.director_notes[:200]}...")
@@ -213,7 +205,7 @@ class Orchestrator(TurnPipelineMixin, BackgroundMixin):
     def get_profile(self) -> NarrativeProfile:
         """Get the current narrative profile."""
         return self.profile
-    
+
     def get_context_summary(self) -> str:
         """Get a summary of current game context."""
         context = self.state.get_context()

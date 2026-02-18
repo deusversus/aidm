@@ -11,18 +11,17 @@ phase transition signals.
 Design: ~1500 input tokens, ~250 output tokens → ~200ms on Haiku.
 """
 
-from typing import List, Optional
-from pydantic import BaseModel, Field
-from .base import BaseAgent
-
-
 import logging
+
+from pydantic import BaseModel, Field
+
+from .base import BaseAgent
 
 logger = logging.getLogger(__name__)
 
 class PacingDirective(BaseModel):
     """Structured pacing guidance for a single turn."""
-    
+
     arc_beat: str = Field(
         description=(
             "Where this turn sits in the arc: "
@@ -39,11 +38,11 @@ class PacingDirective(BaseModel):
             "'dramatic', 'comedic', 'introspective', 'action', 'quiet', 'tense', 'bittersweet'"
         )
     )
-    must_reference: List[str] = Field(
+    must_reference: list[str] = Field(
         default_factory=list,
         description="Elements the narrative MUST touch on (active threads, NPCs, promises)"
     )
-    avoid: List[str] = Field(
+    avoid: list[str] = Field(
         default_factory=list,
         description="Things to avoid this turn (premature reveals, tonal clashes)"
     )
@@ -55,7 +54,7 @@ class PacingDirective(BaseModel):
         default="",
         description="One-line guidance for the Key Animator"
     )
-    
+
     # #3: Arc pacing gates
     strength: str = Field(
         default="suggestion",
@@ -84,13 +83,13 @@ class PacingAgent(BaseAgent):
     #3: Also evaluates arc gate conditions and escalates directive
     strength when phases stall.
     """
-    
+
     agent_name = "pacing"
-    
+
     @property
     def output_schema(self):
         return PacingDirective
-    
+
     @property
     def system_prompt(self) -> str:
         return """You are a pacing analyst for an anime TTRPG narrative engine.
@@ -155,7 +154,7 @@ The player drives the story. Gates prevent STALLING, not player agency. If the p
         situation: str,
         recent_summary: str,
         turns_in_phase: int = 0,
-    ) -> Optional[PacingDirective]:
+    ) -> PacingDirective | None:
         """Run the pre-turn pacing micro-check.
         
         Args:

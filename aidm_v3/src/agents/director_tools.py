@@ -6,14 +6,12 @@ foreshadowing seeds, and story state before making arc decisions.
 Extends the shared gameplay tools with Director-only capabilities.
 """
 
-from typing import Any, Dict, List, Optional
-
-from ..llm.tools import ToolDefinition, ToolParam, ToolRegistry
-from ..enums import NPCIntelligenceStage
-from .gameplay_tools import build_gameplay_tools
-
-
 import logging
+from typing import Any
+
+from ..enums import NPCIntelligenceStage
+from ..llm.tools import ToolDefinition, ToolParam, ToolRegistry
+from .gameplay_tools import build_gameplay_tools
 
 logger = logging.getLogger(__name__)
 
@@ -53,11 +51,11 @@ def build_director_tools(
         profile_library=profile_library,
         profile_id=profile_id,
     )
-    
+
     # -----------------------------------------------------------------
     # FORESHADOWING TOOLS
     # -----------------------------------------------------------------
-    
+
     registry.register(ToolDefinition(
         name="get_active_foreshadowing",
         description=(
@@ -68,7 +66,7 @@ def build_director_tools(
         parameters=[],
         handler=lambda: _get_active_foreshadowing(foreshadowing, current_turn)
     ))
-    
+
     registry.register(ToolDefinition(
         name="get_overdue_seeds",
         description=(
@@ -78,7 +76,7 @@ def build_director_tools(
         parameters=[],
         handler=lambda: _get_overdue_seeds(foreshadowing, current_turn)
     ))
-    
+
     registry.register(ToolDefinition(
         name="plant_foreshadowing_seed",
         description=(
@@ -98,11 +96,11 @@ def build_director_tools(
         ],
         handler=lambda **kwargs: _plant_seed(foreshadowing, current_turn, session_number, **kwargs)
     ))
-    
+
     # -----------------------------------------------------------------
     # NPC TRAJECTORY TOOLS
     # -----------------------------------------------------------------
-    
+
     registry.register(ToolDefinition(
         name="get_spotlight_analysis",
         description=(
@@ -112,7 +110,7 @@ def build_director_tools(
         parameters=[],
         handler=lambda: _get_spotlight_analysis(state)
     ))
-    
+
     registry.register(ToolDefinition(
         name="get_npc_trajectory",
         description=(
@@ -125,7 +123,7 @@ def build_director_tools(
         ],
         handler=lambda name: _get_npc_trajectory(state, name)
     ))
-    
+
     # -----------------------------------------------------------------
     # MEMORY TOOLS
     # -----------------------------------------------------------------
@@ -148,7 +146,7 @@ def build_director_tools(
     # -----------------------------------------------------------------
     # ARC HISTORY
     # -----------------------------------------------------------------
-    
+
     registry.register(ToolDefinition(
         name="get_campaign_bible",
         description=(
@@ -159,11 +157,11 @@ def build_director_tools(
         parameters=[],
         handler=lambda: _get_campaign_bible(state)
     ))
-    
+
     # -----------------------------------------------------------------
     # QUEST MANAGEMENT TOOLS (Phase 2A)
     # -----------------------------------------------------------------
-    
+
     registry.register(ToolDefinition(
         name="create_quest",
         description=(
@@ -181,7 +179,7 @@ def build_director_tools(
         ],
         handler=lambda **kwargs: _create_quest(state, current_turn, **kwargs)
     ))
-    
+
     registry.register(ToolDefinition(
         name="update_quest_status",
         description=(
@@ -194,7 +192,7 @@ def build_director_tools(
         ],
         handler=lambda **kwargs: _update_quest_status(state, **kwargs)
     ))
-    
+
     registry.register(ToolDefinition(
         name="complete_quest_objective",
         description=(
@@ -207,7 +205,7 @@ def build_director_tools(
         ],
         handler=lambda **kwargs: _complete_quest_objective(state, **kwargs)
     ))
-    
+
     return registry
 
 
@@ -215,15 +213,15 @@ def build_director_tools(
 # Director Tool Handlers
 # =========================================================================
 
-def _get_active_foreshadowing(foreshadowing, current_turn: int) -> Dict:
+def _get_active_foreshadowing(foreshadowing, current_turn: int) -> dict:
     """Get active foreshadowing with status analysis."""
     active = foreshadowing.get_active_seeds()
     callback_ready = foreshadowing.get_callback_opportunities(current_turn)
     overdue = foreshadowing.get_overdue_seeds(current_turn)
-    
+
     if not active:
         return {"info": "No active foreshadowing seeds", "total": 0}
-    
+
     seeds = []
     for seed in active:
         status = "active"
@@ -231,7 +229,7 @@ def _get_active_foreshadowing(foreshadowing, current_turn: int) -> Dict:
             status = "OVERDUE"
         elif any(s.id == seed.id for s in callback_ready):
             status = "CALLBACK_READY"
-        
+
         seeds.append({
             "id": seed.id,
             "type": seed.seed_type.value if hasattr(seed.seed_type, 'value') else str(seed.seed_type),
@@ -242,7 +240,7 @@ def _get_active_foreshadowing(foreshadowing, current_turn: int) -> Dict:
             "mentions": seed.mention_count if hasattr(seed, 'mention_count') else 0,
             "related_npcs": seed.related_npcs or [],
         })
-    
+
     return {
         "total": len(seeds),
         "callback_ready": len(callback_ready),
@@ -251,12 +249,12 @@ def _get_active_foreshadowing(foreshadowing, current_turn: int) -> Dict:
     }
 
 
-def _get_overdue_seeds(foreshadowing, current_turn: int) -> List[Dict]:
+def _get_overdue_seeds(foreshadowing, current_turn: int) -> list[dict]:
     """Get specifically overdue seeds for urgent resolution."""
     overdue = foreshadowing.get_overdue_seeds(current_turn)
     if not overdue:
         return [{"info": "No overdue seeds — all foreshadowing is on schedule"}]
-    
+
     return [
         {
             "id": s.id,
@@ -270,25 +268,25 @@ def _get_overdue_seeds(foreshadowing, current_turn: int) -> List[Dict]:
     ]
 
 
-def _plant_seed(foreshadowing, current_turn: int, session_number: int, **kwargs) -> Dict:
+def _plant_seed(foreshadowing, current_turn: int, session_number: int, **kwargs) -> dict:
     """Plant a new foreshadowing seed via Director tool call."""
     from ..core.foreshadowing import SeedType
-    
+
     # Parse seed_type string to enum
     seed_type_str = kwargs.get("seed_type", "plot").lower().strip()
     try:
         seed_type = SeedType(seed_type_str)
     except ValueError:
         return {"error": f"Invalid seed_type '{seed_type_str}'. Valid: plot, character, mystery, threat, promise, chekhov, relationship"}
-    
+
     # Parse comma-separated lists
     tags = [t.strip() for t in kwargs.get("tags", "").split(",") if t.strip()] if kwargs.get("tags") else []
     related_npcs = [n.strip() for n in kwargs.get("related_npcs", "").split(",") if n.strip()] if kwargs.get("related_npcs") else []
-    
+
     # Parse payoff windows
     min_payoff = int(kwargs.get("min_payoff_turns", 5))
     max_payoff = int(kwargs.get("max_payoff_turns", 50))
-    
+
     seed_id = foreshadowing.plant_seed(
         seed_type=seed_type,
         description=kwargs["description"],
@@ -301,9 +299,9 @@ def _plant_seed(foreshadowing, current_turn: int, session_number: int, **kwargs)
         min_payoff=min_payoff,
         max_payoff=max_payoff,
     )
-    
+
     logger.info(f"Seed planted: {seed_id} ({seed_type_str}) — {kwargs['description'][:60]}")
-    
+
     return {
         "planted": True,
         "seed_id": seed_id,
@@ -313,7 +311,7 @@ def _plant_seed(foreshadowing, current_turn: int, session_number: int, **kwargs)
         "max_payoff_turns": max_payoff,
     }
 
-def _mark_memory_critical(memory, **kwargs) -> Dict:
+def _mark_memory_critical(memory, **kwargs) -> dict:
     """Mark a memory as plot-critical via search + flag."""
     query = kwargs.get("query", "")
     reason = kwargs.get("reason", "")
@@ -345,23 +343,23 @@ def _mark_memory_critical(memory, **kwargs) -> Dict:
         return {"error": f"Failed to mark memory: {str(e)}", "flagged": False}
 
 
-def _get_spotlight_analysis(state) -> Dict:
+def _get_spotlight_analysis(state) -> dict:
     """Combined spotlight debt and NPC relationship overview."""
     npcs = state.get_all_npcs()
     if not npcs:
         return {"info": "No NPCs in campaign", "total": 0}
-    
+
     spotlight_debt = state.compute_spotlight_debt()
-    
+
     npc_summaries = []
     for npc in npcs:
         disp = npc.disposition or 0
         if disp >= 60: disp_label = "positive"
         elif disp >= -20: disp_label = "neutral"
         else: disp_label = "negative"
-        
+
         debt = spotlight_debt.get(npc.name, 0)
-        
+
         npc_summaries.append({
             "name": npc.name,
             "role": npc.role or "unknown",
@@ -373,10 +371,10 @@ def _get_spotlight_analysis(state) -> Dict:
             "growth_stage": npc.growth_stage or "introduction",
             "intelligence": npc.intelligence_stage or NPCIntelligenceStage.REACTIVE,
         })
-    
+
     # Sort by spotlight debt (most underserved first)
     npc_summaries.sort(key=lambda n: n["spotlight_debt"], reverse=True)
-    
+
     return {
         "total_npcs": len(npc_summaries),
         "underserved": [n["name"] for n in npc_summaries if n["spotlight_debt"] > 2],
@@ -385,12 +383,12 @@ def _get_spotlight_analysis(state) -> Dict:
     }
 
 
-def _get_npc_trajectory(state, name: str) -> Dict:
+def _get_npc_trajectory(state, name: str) -> dict:
     """Full NPC trajectory for arc planning."""
     npc = state.get_npc_by_name(name)
     if not npc:
         return {"error": f"No NPC found matching '{name}'"}
-    
+
     return {
         "name": npc.name,
         "role": npc.role or "unknown",
@@ -442,12 +440,12 @@ def _next_intelligence(current: str, interactions: int) -> str:
     return "unknown"
 
 
-def _get_campaign_bible(state) -> Dict:
+def _get_campaign_bible(state) -> dict:
     """Get the campaign bible contents."""
     bible = state.get_campaign_bible()
     if not bible:
         return {"info": "No campaign bible yet — this is the first Director pass"}
-    
+
     planning = bible.planning_data or {}
     return {
         "last_updated_turn": bible.last_updated_turn,
@@ -465,12 +463,12 @@ def _get_campaign_bible(state) -> Dict:
 # Quest Tool Handlers (Phase 2A)
 # =========================================================================
 
-def _create_quest(state, current_turn: int, **kwargs) -> Dict:
+def _create_quest(state, current_turn: int, **kwargs) -> dict:
     """Create a new quest via Director tool call."""
     title = kwargs.get("title", "")
     if not title:
         return {"error": "title is required"}
-    
+
     # Parse pipe-separated objectives
     objectives = []
     if kwargs.get("objectives"):
@@ -478,11 +476,11 @@ def _create_quest(state, current_turn: int, **kwargs) -> Dict:
             desc = desc.strip()
             if desc:
                 objectives.append({"description": desc, "completed": False})
-    
+
     # Parse comma-separated lists
     related_npcs = [n.strip() for n in kwargs.get("related_npcs", "").split(",") if n.strip()] if kwargs.get("related_npcs") else []
     related_locations = [l.strip() for l in kwargs.get("related_locations", "").split(",") if l.strip()] if kwargs.get("related_locations") else []
-    
+
     quest = state.create_quest(
         title=title,
         description=kwargs.get("description", ""),
@@ -493,7 +491,7 @@ def _create_quest(state, current_turn: int, **kwargs) -> Dict:
         related_locations=related_locations,
         created_turn=current_turn,
     )
-    
+
     logger.info(f"Quest created: {quest.title} (ID {quest.id}, type={quest.quest_type})")
     return {
         "created": True,
@@ -503,35 +501,35 @@ def _create_quest(state, current_turn: int, **kwargs) -> Dict:
     }
 
 
-def _update_quest_status(state, **kwargs) -> Dict:
+def _update_quest_status(state, **kwargs) -> dict:
     """Update quest status via Director tool call."""
     quest_id = int(kwargs.get("quest_id", 0))
     status = kwargs.get("status", "")
-    
+
     if not quest_id or not status:
         return {"error": "quest_id and status are required"}
     if status not in ("active", "completed", "failed", "abandoned"):
         return {"error": f"Invalid status '{status}'. Valid: active, completed, failed, abandoned"}
-    
+
     quest = state.update_quest_status(quest_id, status)
     if not quest:
         return {"error": f"Quest {quest_id} not found"}
-    
+
     logger.info(f"Quest {quest_id} status → {status}: {quest.title}")
     return {"updated": True, "quest_id": quest_id, "status": status, "title": quest.title}
 
 
-def _complete_quest_objective(state, **kwargs) -> Dict:
+def _complete_quest_objective(state, **kwargs) -> dict:
     """Mark a quest objective as complete."""
     quest_id = int(kwargs.get("quest_id", 0))
     objective_index = int(kwargs.get("objective_index", 0))
-    
+
     if not quest_id:
         return {"error": "quest_id is required"}
-    
+
     quest = state.update_quest_objective(quest_id, objective_index)
     if not quest:
         return {"error": f"Quest {quest_id} not found or objective index out of range"}
-    
+
     logger.info(f"Quest {quest_id} objective {objective_index} completed")
     return {"completed": True, "quest_id": quest_id, "objective_index": objective_index}

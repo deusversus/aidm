@@ -5,11 +5,9 @@ Defines focused Pydantic schemas for each research topic,
 plus a dynamic schema builder for topic bundles.
 """
 
-from typing import List, Dict, Any, Optional, Type
-from pydantic import BaseModel, Field, create_model
-
-
 import logging
+
+from pydantic import BaseModel, Field, create_model
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +20,7 @@ class PowerSystemExtract(BaseModel):
     name: str = Field(default="", description="Name of the power system (e.g., Nen, Quirks, Breathing)")
     mechanics: str = Field(default="", description="How the power system works")
     limitations: str = Field(default="", description="Costs, restrictions, or drawbacks")
-    tiers: List[str] = Field(default_factory=list, description="Power levels or ranks if applicable")
+    tiers: list[str] = Field(default_factory=list, description="Power levels or ranks if applicable")
 
 
 class ToneExtract(BaseModel):
@@ -46,7 +44,7 @@ class PowerDistributionExtract(BaseModel):
         description="Power tier of the strongest characters (T10=human, T8=building, T6=city, T4=planet, T2=universal)"
     )
     typical_tier: str = Field(
-        default="T8", 
+        default="T8",
         description="Power tier where most encounters happen — mid-arc opponents, average combatants"
     )
     floor_tier: str = Field(
@@ -58,7 +56,7 @@ class PowerDistributionExtract(BaseModel):
         description="How power is distributed: 'spike' (one outlier), 'top_heavy' (handful of gods), 'flat' (many tiers populated), 'compressed' (narrow range)"
     )
     gradient_reasoning: str = Field(
-        default="", 
+        default="",
         description="Brief explanation of power distribution"
     )
 
@@ -81,7 +79,7 @@ class DNAScalesExtract(BaseModel):
 class CombatExtract(BaseModel):
     """Extracted combat style data."""
     style: str = Field(
-        default="spectacle", 
+        default="spectacle",
         description="Combat style: tactical, spectacle, comedy, spirit, or narrative"
     )
     description: str = Field(default="", description="Brief description of combat approach")
@@ -91,21 +89,21 @@ class CharactersExtract(BaseModel):
     """Extracted character data."""
     protagonist: str = Field(default="", description="Main protagonist name and brief role")
     antagonist: str = Field(default="", description="Main antagonist name and brief role")
-    key_characters: List[str] = Field(default_factory=list, description="Other important characters")
+    key_characters: list[str] = Field(default_factory=list, description="Other important characters")
 
 
 class CharacterVoiceCard(BaseModel):
     """Voice differentiation data for a single character."""
     name: str = Field(description="Character name")
     speech_patterns: str = Field(
-        default="", 
+        default="",
         description="How they speak: formal/casual, archaic/modern, verbose/terse, accent notes"
     )
     humor_type: str = Field(
-        default="", 
+        default="",
         description="How they express humor: sardonic, earnest, deadpan, none, slapstick"
     )
-    signature_phrases: List[str] = Field(
+    signature_phrases: list[str] = Field(
         default_factory=list,
         description="Iconic lines or catchphrases they use"
     )
@@ -121,7 +119,7 @@ class CharacterVoiceCard(BaseModel):
 
 class CharacterVoiceCardsExtract(BaseModel):
     """Extracted voice cards for main cast (5-7 characters max)."""
-    voice_cards: List[CharacterVoiceCard] = Field(
+    voice_cards: list[CharacterVoiceCard] = Field(
         default_factory=list,
         description="Voice differentiation data for main cast characters"
     )
@@ -129,8 +127,8 @@ class CharacterVoiceCardsExtract(BaseModel):
 
 class FactionsExtract(BaseModel):
     """Extracted faction/organization data."""
-    factions: List[Dict[str, str]] = Field(
-        default_factory=list, 
+    factions: list[dict[str, str]] = Field(
+        default_factory=list,
         description="List of {name, description, role} for major factions"
     )
 
@@ -138,13 +136,13 @@ class FactionsExtract(BaseModel):
 class LocationsExtract(BaseModel):
     """Extracted world/location data."""
     setting: str = Field(default="", description="General setting description")
-    key_locations: List[str] = Field(default_factory=list, description="Important places")
+    key_locations: list[str] = Field(default_factory=list, description="Important places")
     time_period: str = Field(default="", description="Era or time period if relevant")
 
 
 class ArcsExtract(BaseModel):
     """Extracted story arc data."""
-    arcs: List[Dict[str, str]] = Field(
+    arcs: list[dict[str, str]] = Field(
         default_factory=list,
         description="List of {name, summary} for major story arcs"
     )
@@ -152,9 +150,9 @@ class ArcsExtract(BaseModel):
 
 class SequelsExtract(BaseModel):
     """Extracted sequel/spinoff data."""
-    sequels: List[str] = Field(default_factory=list, description="Sequel series")
-    spinoffs: List[str] = Field(default_factory=list, description="Spinoff series")
-    prequels: List[str] = Field(default_factory=list, description="Prequel series")
+    sequels: list[str] = Field(default_factory=list, description="Sequel series")
+    spinoffs: list[str] = Field(default_factory=list, description="Spinoff series")
+    prequels: list[str] = Field(default_factory=list, description="Prequel series")
 
 
 class AdaptationsExtract(BaseModel):
@@ -193,12 +191,12 @@ class SeriesAliasesExtract(BaseModel):
     """Extracted series relationship and alias data."""
     series_group: str = Field(default="", description="Main franchise identifier in snake_case (canonical sequels share this)")
     series_position: int = Field(default=1, description="Position in canonical series (1=first, 2=sequel, etc)")
-    related_franchise: Optional[str] = Field(default=None, description="Parent franchise if spinoff/alternate (null for canonical)")
+    related_franchise: str | None = Field(default=None, description="Parent franchise if spinoff/alternate (null for canonical)")
     relation_type: str = Field(default="canonical", description="canonical, spinoff, or alternate_timeline")
     native_title: str = Field(default="", description="Title in original script (Japanese/Korean/Chinese)")
     romanized_title: str = Field(default="", description="Romanized version of native title")
-    abbreviations: List[str] = Field(default_factory=list, description="Common abbreviations (DBZ, AOT, etc)")
-    alternate_titles: List[str] = Field(default_factory=list, description="Other known titles")
+    abbreviations: list[str] = Field(default_factory=list, description="Common abbreviations (DBZ, AOT, etc)")
+    alternate_titles: list[str] = Field(default_factory=list, description="Other known titles")
 
 
 class GenreDetectionExtract(BaseModel):
@@ -211,10 +209,10 @@ class GenreDetectionExtract(BaseModel):
     - comedy, magical_girl
     """
     primary_genre: str = Field(
-        default="shonen", 
+        default="shonen",
         description="Main genre: shonen, seinen, shoujo_romance, isekai, supernatural, mystery_thriller, horror, mecha, scifi, sports, music, historical, comedy, magical_girl, slice_of_life"
     )
-    secondary_genres: List[str] = Field(
+    secondary_genres: list[str] = Field(
         default_factory=list,
         description="1-2 secondary genres that blend with primary (e.g., supernatural + mystery_thriller)"
     )
@@ -233,19 +231,19 @@ class AuthorVoiceExtract(BaseModel):
     - Dialogue quirks: Distinctive ways characters speak
     - Emotional rhythm: How they pace emotional beats
     """
-    sentence_patterns: List[str] = Field(
+    sentence_patterns: list[str] = Field(
         default_factory=list,
         description="Characteristic sentence structures: 'Short declaratives during action', 'Compound sentences during introspection'"
     )
-    structural_motifs: List[str] = Field(
+    structural_motifs: list[str] = Field(
         default_factory=list,
         description="Narrative techniques: 'Cold open before title', 'Parallel callbacks', 'In media res'"
     )
-    dialogue_quirks: List[str] = Field(
+    dialogue_quirks: list[str] = Field(
         default_factory=list,
         description="How characters speak: 'Finish each other's sentences', 'Dramatic irony', 'Midsentence interruptions'"
     )
-    emotional_rhythm: List[str] = Field(
+    emotional_rhythm: list[str] = Field(
         default_factory=list,
         description="How emotions are paced: 'Slow build to catharsis', 'Joy undercut by tragedy', 'Silence before violence'"
     )
@@ -285,7 +283,7 @@ class NarrativeSynthesisExtract(BaseModel):
 # TOPIC-TO-SCHEMA MAPPING
 # =============================================================================
 
-TOPIC_SCHEMAS: Dict[str, Type[BaseModel]] = {
+TOPIC_SCHEMAS: dict[str, type[BaseModel]] = {
     "power_system": PowerSystemExtract,
     "tone": ToneExtract,
     "combat": CombatExtract,
@@ -313,7 +311,7 @@ DERIVED_SCHEMAS = {
 # DYNAMIC BUNDLE SCHEMA BUILDER
 # =============================================================================
 
-def build_bundle_schema(topics: List[str]) -> Type[BaseModel]:
+def build_bundle_schema(topics: list[str]) -> type[BaseModel]:
     """
     Dynamically create a Pydantic schema for a topic bundle.
     
@@ -328,7 +326,7 @@ def build_bundle_schema(topics: List[str]) -> Type[BaseModel]:
         # Creates a model with power_system and combat fields
     """
     fields = {}
-    
+
     for topic in topics:
         if topic in TOPIC_SCHEMAS:
             schema_class = TOPIC_SCHEMAS[topic]
@@ -337,17 +335,17 @@ def build_bundle_schema(topics: List[str]) -> Type[BaseModel]:
             fields[topic] = (schema_class, Field(default_factory=schema_class))
         else:
             logger.warning(f"Warning: Unknown topic '{topic}'")
-    
+
     # Also include DNA scales, tropes, and power_distribution when tone is in the bundle
     if "tone" in topics:
         fields["dna_scales"] = (DNAScalesExtract, Field(default_factory=DNAScalesExtract))
         fields["tropes"] = (StorytellingTropesExtract, Field(default_factory=StorytellingTropesExtract))
         fields["power_distribution"] = (PowerDistributionExtract, Field(default_factory=PowerDistributionExtract))
-    
+
     return create_model("BundleExtract", **fields)
 
 
-def get_extraction_prompt(topics: List[str], anime_name: str) -> str:
+def get_extraction_prompt(topics: list[str], anime_name: str) -> str:
     """
     Generate an extraction prompt for a topic bundle.
     
@@ -359,7 +357,7 @@ def get_extraction_prompt(topics: List[str], anime_name: str) -> str:
         Prompt string for extraction
     """
     topic_instructions = []
-    
+
     for topic in topics:
         if topic == "power_system":
             topic_instructions.append("""- **power_system**: Extract:
@@ -367,7 +365,7 @@ def get_extraction_prompt(topics: List[str], anime_name: str) -> str:
   - mechanics: How powers work in this world
   - limitations: Costs, restrictions, or drawbacks of using powers
   - tiers: List of power levels or ranks if they exist""")
-        
+
         elif topic == "tone":
             topic_instructions.append("""- **tone**: Assess the overall mood (0=minimum, 10=maximum):
   - comedy_level: How comedic is the series? (0=dead serious like Monster, 10=pure comedy like Gintama)
@@ -423,7 +421,7 @@ def get_extraction_prompt(topics: List[str], anime_name: str) -> str:
   - false_identity: Hidden identity reveals
   - ensemble_focus: Large cast shares spotlight
   - slow_burn_romance: Gradual romantic development (including implicit/unspoken romance — e.g. deep emotional bonds, partners who don't confess, or relationships that develop across years/decades)""")
-        
+
         elif topic == "combat":
             topic_instructions.append("""- **combat**: Identify the primary combat style:
   - "tactical": Strategy and planning dominate (Death Note, Code Geass)
@@ -431,7 +429,7 @@ def get_extraction_prompt(topics: List[str], anime_name: str) -> str:
   - "comedy": Combat primarily for laughs (One Punch Man, Konosuba)
   - "spirit": Willpower/emotions determine outcomes (Gurren Lagann, Fairy Tail)
   - "narrative": Combat serves story over mechanics (Monster, Steins;Gate)""")
-        
+
         elif topic == "characters":
             topic_instructions.append("- **characters**: Extract protagonist name/role, antagonist name/role, and list of key supporting characters")
         elif topic == "factions":
@@ -461,9 +459,9 @@ def get_extraction_prompt(topics: List[str], anime_name: str) -> str:
   - native_title: Japanese/Korean/Chinese title in original script
   - romanized_title: Romanized version
   - abbreviations: Common abbreviations (DBZ, AOT, HxH)""")
-    
+
     instructions = "\n".join(topic_instructions)
-    
+
     return f"""# Extract Structured Data for {anime_name}
 
 Analyze the research text and extract structured data. DO NOT use default values - assess each field based on the actual content.

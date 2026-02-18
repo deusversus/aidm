@@ -8,8 +8,8 @@ Covers:
 """
 
 import pytest
-from src.llm.tools import ToolRegistry, ToolDefinition, ToolParam, ToolResult
 
+from src.llm.tools import ToolDefinition, ToolParam, ToolRegistry, ToolResult
 
 # ---------------------------------------------------------------------------
 # Helpers

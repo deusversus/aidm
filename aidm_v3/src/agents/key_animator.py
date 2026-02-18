@@ -8,24 +8,21 @@ injected into the Vibe Keeper template alongside the existing RAG context.
 Prompt-building helpers live in _key_animator_prompt.py (PromptBuilderMixin).
 """
 
+import logging
 import random
 import re
 from collections import Counter
-from typing import Optional, Tuple, List, Dict, Any
-from pathlib import Path
+from typing import Any
 
-from ..llm import get_llm_manager, LLMProvider
+from ..db.state_manager import GameContext
+from ..enums import NarrativeWeight
+from ..llm import LLMProvider, get_llm_manager
 from ..llm.tools import ToolRegistry
+from ..profiles.loader import NarrativeProfile
 from ..settings import get_settings_store
+from ._key_animator_prompt import PromptBuilderMixin
 from .intent_classifier import IntentOutput
 from .outcome_judge import OutcomeOutput
-from ..db.state_manager import GameContext
-from ..profiles.loader import NarrativeProfile
-from ..enums import NarrativeWeight
-from ._key_animator_prompt import PromptBuilderMixin
-
-
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -38,33 +35,33 @@ class KeyAnimator(PromptBuilderMixin):
     
     Uses 'key_animator' settings from the settings store.
     """
-    
+
     agent_name = "key_animator"
-    
-    def _get_provider_and_model(self) -> Tuple[LLMProvider, str]:
+
+    def _get_provider_and_model(self) -> tuple[LLMProvider, str]:
         """Get the provider and model from settings."""
         if self._model_override:
             manager = get_llm_manager()
             return manager.get_provider(), self._model_override
-        
+
         if self._cached_provider is None:
             manager = get_llm_manager()
             self._cached_provider, self._cached_model = manager.get_provider_for_agent(self.agent_name)
-        
+
         return self._cached_provider, self._cached_model
-    
+
     @property
     def provider(self) -> LLMProvider:
         """Get the LLM provider for this agent."""
         provider, _ = self._get_provider_and_model()
         return provider
-    
+
     @property
     def model(self) -> str:
         """Get the model to use."""
         _, model = self._get_provider_and_model()
         return model
-    
+
     # ===================================================================
     # NARRATIVE DIVERSITY SYSTEM
     #
@@ -130,7 +127,7 @@ class KeyAnimator(PromptBuilderMixin):
         ("training_payoff",     "montage"),
     ]
 
-    def __init__(self, profile: NarrativeProfile, model_override: Optional[str] = None):
+    def __init__(self, profile: NarrativeProfile, model_override: str | None = None):
         """Initialize the Key Animator.
         
         Args:
@@ -139,13 +136,13 @@ class KeyAnimator(PromptBuilderMixin):
         """
         self.profile = profile
         self._model_override = model_override
-        self._cached_provider: Optional[LLMProvider] = None
-        self._cached_model: Optional[str] = None
-        self._vibe_keeper_template: Optional[str] = None
+        self._cached_provider: LLMProvider | None = None
+        self._cached_model: str | None = None
+        self._vibe_keeper_template: str | None = None
         self._npc_context = None
-        self._static_rule_guidance: Optional[str] = None
+        self._static_rule_guidance: str | None = None
         # Shuffle-bag for style drift directives
-        self._directive_bag: List[Dict[str, Any]] = []
+        self._directive_bag: list[dict[str, Any]] = []
         self._last_directive_text: str = ""
         # Jargon whitelist built from profile
         self._jargon_whitelist = self._build_jargon_whitelist()
@@ -223,7 +220,7 @@ class KeyAnimator(PromptBuilderMixin):
                             dm_openings.append("description")
                         else:
                             dm_openings.append("action")
-            
+
             # If last 3 DM messages show variety (no 2+ of same type), skip directive
             if len(dm_openings) >= 2:
                 opening_counts = Counter(dm_openings[-3:])
@@ -245,35 +242,35 @@ class KeyAnimator(PromptBuilderMixin):
         skipped = []
         while self._directive_bag:
             candidate = self._directive_bag.pop(0)
-            
+
             # Filter: intent exclusion
             if intent.intent in candidate.get("exclude_intents", []):
                 skipped.append(candidate)
                 continue
-            
+
             # Filter: narrative weight
             max_weight = candidate.get("max_weight", "climactic")
             max_weight_level = self.WEIGHT_HIERARCHY.get(max_weight, 2)
             if current_weight_level > max_weight_level:
                 skipped.append(candidate)
                 continue
-            
+
             # Filter: don't repeat last directive
             if candidate["text"] == self._last_directive_text:
                 skipped.append(candidate)
                 continue
-            
+
             selected = candidate
             break
-        
+
         # Return skipped items to bag (they'll be available next turn)
         self._directive_bag.extend(skipped)
-        
+
         if not selected:
             return ""
-        
+
         self._last_directive_text = selected["text"]
-        
+
         return f"""## Style Suggestion (Secondary Layer)
 The Profile DNA and Director Notes are your PRIMARY voice authority.
 The following is a SECONDARY variation suggestion — apply it lightly,
@@ -293,45 +290,45 @@ only where it doesn't conflict with the established tone:
         """
         if not recent_messages:
             return ""
-        
+
         # Collect DM content only
         dm_text = "\n".join(
             msg.get("content", "")
             for msg in recent_messages
             if msg.get("role") == "assistant"
         )
-        
+
         if len(dm_text) < 200:  # Not enough text to analyze
             return ""
-        
+
         # Extract construction-level patterns
-        found_constructions: List[str] = []
-        
+        found_constructions: list[str] = []
+
         # Simile constructions
         for pattern in self.SIMILE_PATTERNS:
             matches = pattern.findall(dm_text)
             found_constructions.extend(m.strip().lower() for m in matches)
-        
+
         # Personification patterns
         for pattern in self.PERSONIFICATION_PATTERNS:
             matches = pattern.findall(dm_text)
             found_constructions.extend(m.strip().lower() for m in matches)
-        
+
         # Negation triples
         matches = self.NEGATION_PATTERN.findall(dm_text)
         found_constructions.extend(m.strip().lower() for m in matches)
-        
+
         if not found_constructions:
             return ""
-        
+
         # Count and filter to 3+ threshold
         counts = Counter(found_constructions)
         repeated = [(phrase, count) for phrase, count in counts.most_common(8)
                      if count >= self.FRESHNESS_THRESHOLD]
-        
+
         if not repeated:
             return ""
-        
+
         # Apply jargon whitelist (Layer 3: proper noun immunity handled here too)
         filtered = []
         for phrase, count in repeated:
@@ -343,20 +340,20 @@ only where it doesn't conflict with the established tone:
                 any(w[0].isupper() for w in match.split() if len(w) > 1)
                 for match in original_matches
             ) if original_matches else False
-            
+
             if has_proper_noun:
                 continue
-            
+
             # Layer 1+2: Check against jargon whitelist
             phrase_words = set(phrase.split())
             if phrase_words & self._jargon_whitelist:
                 continue
-            
+
             filtered.append((phrase, count))
-        
+
         if not filtered:
             return ""
-        
+
         # Build advisory
         lines = [
             "## Vocabulary Freshness",
@@ -365,7 +362,7 @@ only where it doesn't conflict with the established tone:
         ]
         for phrase, count in filtered[:5]:  # Cap at 5 suggestions
             lines.append(f"- \"{phrase}\" (×{count})")
-        
+
         return "\n".join(lines) + "\n"
 
     def _build_sakuga_injection(self, intent: IntentOutput = None, outcome: OutcomeOutput = None) -> str:
@@ -380,7 +377,7 @@ only where it doesn't conflict with the established tone:
         """
         # --- RESOLVE SUB-MODE ---
         sub_mode = "choreographic"  # Default fallback
-        
+
         if intent and intent.special_conditions:
             conditions = set(intent.special_conditions)
             for condition, mode in self.SAKUGA_PRIORITY:
@@ -394,9 +391,9 @@ only where it doesn't conflict with the established tone:
                 if intent.intent == "SOCIAL":
                     sub_mode = "frozen_moment"
                 # else stays choreographic
-        
+
         logger.info(f"Sakuga sub-mode: {sub_mode}")
-        
+
         # --- BUILD INJECTION ---
         if sub_mode == "choreographic":
             return """
@@ -509,7 +506,7 @@ Time compresses. Multiple scenes, one momentum:
 - End with arrival: they're ready. Or they think they are
 
 """
-    
+
     async def _research_phase(
         self,
         player_input: str,
@@ -571,7 +568,7 @@ Time compresses. Multiple scenes, one momentum:
                 "4. get_recent_episodes — Was this item recently acquired or mentioned?"
             ),
         }
-        
+
         # Default strategy for OTHER, WORLD_BUILDING, META_FEEDBACK, etc.
         default_strategy = (
             "GENERAL RESEARCH PRIORITY:\n"
@@ -580,14 +577,14 @@ Time compresses. Multiple scenes, one momentum:
             "3. search_memory — Anything relevant to what the player is doing?\n"
             "4. get_world_state — Current location, situation, arc context"
         )
-        
+
         strategy = intent_strategies.get(intent.intent, default_strategy)
-        
+
         # Build present NPC names if available
         npc_hint = ""
         if context.present_npcs:
             npc_hint = f"\nNPCs currently present in scene: {', '.join(context.present_npcs)}"
-        
+
         research_prompt = f"""You are a narrative researcher preparing context for an anime RPG scene.
 Your job: gather ONLY the facts that matter for THIS specific moment, then summarize.
 
@@ -616,7 +613,7 @@ After investigating, provide a TIGHT summary:
 - **TACTICAL NOTE**: Any specific detail the narrative writer NEEDS to know (ability limits, environmental factors, unresolved threads)
 
 Omit any section that has nothing useful. Brevity over completeness."""
-        
+
         # Use fast model directly — KeyAnimator doesn't extend AgenticAgent,
         # so we call the provider without the base class wrapper.
         try:
@@ -624,7 +621,7 @@ Omit any section that has nothing useful. Brevity over completeness."""
             manager = get_llm_manager()
             fast_provider = manager.fast_provider
             fast_model = manager.get_fast_model()
-            
+
             response = await fast_provider.complete_with_tools(
                 messages=[{"role": "user", "content": research_prompt}],
                 tools=tools,
@@ -633,7 +630,7 @@ Omit any section that has nothing useful. Brevity over completeness."""
                 max_tokens=2048,
                 max_tool_rounds=3,
             )
-            
+
             findings = response.content.strip()
             if findings:
                 call_log = tools.call_log
@@ -641,24 +638,24 @@ Omit any section that has nothing useful. Brevity over completeness."""
                 logger.info(f"Research phase: {len(call_log)} tool calls ({', '.join(tool_names)})")
                 logger.info(f"Research findings: {len(findings)} chars")
                 return findings
-                
+
         except Exception as e:
             logger.error(f"Research phase failed (non-fatal): {e}")
-        
+
         return ""
 
-    
+
     async def generate(
         self,
         player_input: str,
         intent: IntentOutput,
         outcome: OutcomeOutput,
         context: GameContext,
-        retrieved_context: Optional[dict] = None,
+        retrieved_context: dict | None = None,
         recent_messages: list = None,
         sakuga_mode: bool = False,
-        npc_context: Optional[str] = None,
-        tools: Optional[ToolRegistry] = None,
+        npc_context: str | None = None,
+        tools: ToolRegistry | None = None,
         compaction_text: str = ""
     ) -> str:
         """Generate narrative prose for this turn.
@@ -685,10 +682,10 @@ Omit any section that has nothing useful. Brevity over completeness."""
                 context=context,
                 tools=tools,
             )
-        
+
         # ===================================================================
         # CACHE-AWARE BLOCK CONSTRUCTION
-        # 
+        #
         # Split the system prompt into 4 blocks for optimal prefix caching:
         #   Block 1 (STATIC — cached): Template + Profile DNA
         #     Changes: never (loaded once per session)
@@ -701,7 +698,7 @@ Omit any section that has nothing useful. Brevity over completeness."""
         #
         # Ordering matters for prefix caching — static content first.
         # ===================================================================
-        
+
         # --- BLOCK 1: Static template + Profile DNA (cache=True) ---
         static_prompt = self.vibe_keeper_template
         static_prompt = static_prompt.replace("{{PROFILE_DNA_INJECTION}}", self._build_profile_dna())
@@ -712,7 +709,7 @@ Omit any section that has nothing useful. Brevity over completeness."""
         static_prompt = static_prompt.replace("{{LORE_INJECTION}}", "")
         static_prompt = static_prompt.replace("{{MEMORIES_INJECTION}}", "")
         static_prompt = static_prompt.replace("{{RETRIEVED_CHUNKS_INJECTION}}", "")
-        
+
         # --- BLOCK 2: Compaction buffer (cache=True) ---
         compaction_block = ""
         if compaction_text:
@@ -726,7 +723,7 @@ in the verbatim working memory below. Use for voice matching and continuity.
 === END COMPACTED HISTORY ===
 """
             logger.info(f"Injecting compaction buffer ({len(compaction_text)} chars)")
-        
+
         # --- BLOCK 3: Working memory transcript (cache=True) ---
         working_memory_text = ""
         if recent_messages:
@@ -735,7 +732,7 @@ in the verbatim working memory below. Use for voice matching and continuity.
                 role = "PLAYER" if msg.get("role") == "user" else "DM"
                 content = msg.get("content", "")
                 transcript_lines.append(f"[{role}]: {content}")
-            
+
             transcript_text = "\n\n".join(transcript_lines)
             working_memory_text = f"""
 === RECENT CONVERSATION (Working Memory) ===
@@ -747,18 +744,18 @@ MATCH the established voice, humor, and style from these exchanges.
 === CONTINUE THE STORY ===
 """
             logger.info(f"Injecting working memory ({len(recent_messages)} messages, {len(transcript_text)} chars)")
-        
+
         # --- BLOCK 4: Dynamic per-turn context (cache=False) ---
         dynamic_parts = []
-        
+
         # NPC relationship context (set before building scene context)
         self._npc_context = npc_context
-        
+
         # Scene Context (includes outcome + NPC cards)
         scene_context = self._build_scene_context(context)
         scene_context += "\n\n" + self._build_outcome_section(intent, outcome)
         dynamic_parts.append(f"## Scene Context\n\n{scene_context}")
-        
+
         # Pacing Directive — pre-turn micro-check (#1)
         pacing = retrieved_context.get("pacing_directive") if retrieved_context else None
         if pacing:
@@ -783,29 +780,29 @@ MATCH the established voice, humor, and style from these exchanges.
             if pacing.pacing_note:
                 pacing_text += f"\n{pacing.pacing_note}\n"
             dynamic_parts.append(pacing_text)
-        
+
         # Director Notes
         director_notes = getattr(context, "director_notes", None) or "(No specific guidance this turn)"
         dynamic_parts.append(f"## Director Notes\n\n{director_notes}")
-        
+
         # NARRATIVE DIVERSITY: Style Drift Directive (Approach A)
         style_directive = self._build_style_drift_directive(intent, outcome, recent_messages)
         if style_directive:
             dynamic_parts.append(style_directive)
             logger.info("Style drift directive injected")
-        
+
         # NARRATIVE DIVERSITY: Vocabulary Freshness (Approach B)
         freshness_check = self._build_freshness_check(recent_messages)
         if freshness_check:
             dynamic_parts.append(freshness_check)
-            logger.info(f"Vocabulary freshness advisory injected")
-        
+            logger.info("Vocabulary freshness advisory injected")
+
         # SAKUGA MODE: Inject variant-aware high-intensity guidance (Approach C)
         if sakuga_mode:
             sakuga_injection = self._build_sakuga_injection(intent, outcome)
             dynamic_parts.append(sakuga_injection)
             logger.info("SAKUGA MODE ACTIVE - injecting high-intensity guidance")
-        
+
         # RAG context (granular)
         memories_text = ""
         chunks_text = ""
@@ -844,12 +841,12 @@ MATCH the established voice, humor, and style from these exchanges.
             # #23: Pre-resolved combat result
             if retrieved_context.get("combat_result"):
                 faction_text += f"\n\n{retrieved_context['combat_result']}"
-        
+
         # Foreshadowing callback opportunities (#9)
         foreshadowing_text = ""
         if retrieved_context and retrieved_context.get("foreshadowing_callbacks"):
             foreshadowing_text = f"\n\n{retrieved_context['foreshadowing_callbacks']}"
-        
+
         # Lore from profile research (canon reference)
         lore_text = ""
         if retrieved_context and retrieved_context.get("lore"):
@@ -858,18 +855,18 @@ MATCH the established voice, humor, and style from these exchanges.
 {retrieved_context['lore']}
 
 **Use this to ground your narrative:** correct terminology, power system rules, known locations."""
-        
+
         # Research findings from agentic research phase
         if research_findings:
             memories_text = f"## Agentic Research Findings\n\n{research_findings}\n\n" + (memories_text or "")
-        
+
         if lore_text:
             dynamic_parts.append(lore_text)
         dynamic_parts.append(f"## Retrieved Memories\n\n{memories_text or '(No relevant memories)'}")
         dynamic_parts.append(f"## Additional Guidance\n\n{chunks_text + archetype_text + tension_text + npc_text + faction_text + foreshadowing_text or '(No additional guidance)'}")
-        
+
         dynamic_text = "\n\n".join(dynamic_parts)
-        
+
         # --- Build cache-aware system blocks ---
         system_blocks = [
             (static_prompt, True),         # Block 1: template + Profile DNA (cached)
@@ -879,24 +876,24 @@ MATCH the established voice, humor, and style from these exchanges.
         ]
         # Filter out empty blocks
         system_blocks = [(text, cache) for text, cache in system_blocks if text.strip()]
-        
+
         logger.info(f"[KeyAnimator] System blocks: {len(system_blocks)} blocks, "
               f"cached={sum(1 for _, c in system_blocks if c)}, "
               f"total={sum(len(t) for t, _ in system_blocks)} chars")
-        
+
         # Add the player action
         user_message = f"## Player Action\n\n{player_input}\n\n## Write the scene."
-        
+
         # Generate response using provider
         messages = [{"role": "user", "content": user_message}]
-        
+
         # Extended thinking check
         settings = get_settings_store().load()
         use_extended_thinking = settings.extended_thinking
-        
+
         # Adjust temperature for sakuga mode (higher for more creative flair)
         temperature = 0.85 if sakuga_mode else 0.7
-        
+
         response = await self.provider.complete(
             messages=messages,
             system=system_blocks,
@@ -905,9 +902,9 @@ MATCH the established voice, humor, and style from these exchanges.
             temperature=temperature,
             extended_thinking=use_extended_thinking
         )
-        
+
         # Normalize escaped newlines - LLM sometimes outputs literal \n instead of actual newlines
         content = response.content.strip()
         content = content.replace('\\n', '\n')  # Convert escaped newlines to real newlines
-        
+
         return content

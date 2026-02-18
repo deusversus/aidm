@@ -1,14 +1,15 @@
 """Database session management and initialization."""
 
+import logging
 import os
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, Session as SQLAlchemySession
+from collections.abc import Generator
 from contextlib import contextmanager
-from typing import Generator
+
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session as SQLAlchemySession
+from sqlalchemy.orm import sessionmaker
 
 from .models import Base
-
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +28,7 @@ def get_engine():
     global _engine
     if _engine is None:
         database_url = get_database_url()
-        
+
         # SQLite needs special handling for check_same_thread
         if database_url.startswith("sqlite"):
             _engine = create_engine(
@@ -40,7 +41,7 @@ def get_engine():
                 database_url,
                 echo=os.getenv("DEBUG", "false").lower() == "true"
             )
-    
+
     return _engine
 
 
@@ -60,7 +61,7 @@ def init_db():
     """Initialize the database by creating all tables."""
     engine = get_engine()
     Base.metadata.create_all(bind=engine)
-    
+
     # Inline migrations for existing databases
     with engine.connect() as conn:
         from sqlalchemy import text
@@ -72,7 +73,7 @@ def init_db():
                 conn.execute(text("ALTER TABLE campaign_bible ADD COLUMN bible_version INTEGER DEFAULT 0"))
                 conn.commit()
                 logger.info("Added bible_version column to campaign_bible")
-            
+
             # #3: turns_in_phase on world_state
             result = conn.execute(text("PRAGMA table_info(world_state)"))
             columns = [row[1] for row in result]
@@ -80,7 +81,7 @@ def init_db():
                 conn.execute(text("ALTER TABLE world_state ADD COLUMN turns_in_phase INTEGER DEFAULT 0"))
                 conn.commit()
                 logger.info("Added turns_in_phase column to world_state")
-            
+
             # #5: pinned_messages on world_state
             result = conn.execute(text("PRAGMA table_info(world_state)"))
             columns = [row[1] for row in result]
@@ -90,7 +91,7 @@ def init_db():
                 logger.info("Added pinned_messages column to world_state")
         except Exception as e:
             logger.warning(f"Column check skipped: {e}")
-    
+
     logger.info(f"Database initialized: {get_database_url()}")
 
 

@@ -4,15 +4,15 @@ Verifies that check_wiki_relevance correctly accepts relevant wikis
 and rejects irrelevant ones that happen to share a URL slug word.
 """
 import asyncio
-import pytest
-import sys
 import os
-from unittest.mock import patch, MagicMock
+import sys
+from unittest.mock import MagicMock
+
+import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from src.scrapers.fandom import FandomClient, guess_wiki_url_candidates
-
 
 # ─── Helper ──────────────────────────────────────────────────────────────────
 

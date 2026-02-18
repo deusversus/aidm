@@ -6,13 +6,12 @@ Per Phase 5 spec: save/load campaigns, session summaries, "Previously on..." gen
 """
 
 import json
-from typing import Dict, Any, Optional, List
-from pathlib import Path
-from datetime import datetime
-from pydantic import BaseModel
-
-
 import logging
+from datetime import datetime
+from pathlib import Path
+from typing import Any
+
+from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 
@@ -20,39 +19,39 @@ class SessionExport(BaseModel):
     """Exported session data."""
     session_id: int
     started_at: str
-    ended_at: Optional[str]
+    ended_at: str | None
     turn_count: int
-    summary: Optional[str]
-    turns: List[Dict[str, Any]]
+    summary: str | None
+    turns: list[dict[str, Any]]
 
 
 class CampaignExport(BaseModel):
     """Full campaign export for save/load."""
     version: str = "1.0"
     exported_at: str
-    
+
     # Campaign info
     campaign_id: int
     campaign_name: str
     profile_id: str
-    
+
     # Character
-    character: Dict[str, Any]
-    
+    character: dict[str, Any]
+
     # NPCs
-    npcs: List[Dict[str, Any]]
-    
+    npcs: list[dict[str, Any]]
+
     # World state
-    world_state: Dict[str, Any]
-    
+    world_state: dict[str, Any]
+
     # Campaign bible (Director plans)
-    campaign_bible: Dict[str, Any]
-    
+    campaign_bible: dict[str, Any]
+
     # Foreshadowing seeds
-    foreshadowing: Dict[str, Any]
-    
+    foreshadowing: dict[str, Any]
+
     # Sessions
-    sessions: List[SessionExport]
+    sessions: list[SessionExport]
 
 
 class SessionManager:
@@ -65,7 +64,7 @@ class SessionManager:
     - Generate session summaries
     - Generate "Previously on..." text
     """
-    
+
     def __init__(self, state_manager, foreshadowing_ledger=None):
         """
         Initialize with a StateManager instance.
@@ -76,8 +75,8 @@ class SessionManager:
         """
         self.state = state_manager
         self.foreshadowing = foreshadowing_ledger
-    
-    def export_campaign(self, save_path: Optional[Path] = None) -> CampaignExport:
+
+    def export_campaign(self, save_path: Path | None = None) -> CampaignExport:
         """
         Export the campaign to a CampaignExport object.
         
@@ -87,16 +86,16 @@ class SessionManager:
         Returns:
             CampaignExport with all campaign data
         """
-        from ..db.models import Campaign, Session, Turn, Character, NPC, WorldState, CampaignBible
-        
+        from ..db.models import NPC, Campaign, Session, Turn, WorldState
+
         db = self.state._get_db()
         campaign_id = self.state.campaign_id
-        
+
         # Get campaign
         campaign = db.query(Campaign).filter(Campaign.id == campaign_id).first()
         if not campaign:
             raise ValueError(f"Campaign {campaign_id} not found")
-        
+
         # Get character
         character = self.state.get_character()
         character_data = {}
@@ -119,7 +118,7 @@ class SessionManager:
                 "narrative_goals": character.narrative_goals or [],
                 "story_flags": character.story_flags or {}
             }
-        
+
         # Get NPCs
         npcs = db.query(NPC).filter(NPC.campaign_id == campaign_id).all()
         npcs_data = [
@@ -136,7 +135,7 @@ class SessionManager:
             }
             for npc in npcs
         ]
-        
+
         # Get world state
         world = db.query(WorldState).filter(WorldState.campaign_id == campaign_id).first()
         world_data = {}
@@ -150,7 +149,7 @@ class SessionManager:
                 "tension_level": world.tension_level,
                 "foreshadowing": world.foreshadowing or []
             }
-        
+
         # Get campaign bible
         bible = self.state.get_campaign_bible()
         bible_data = {}
@@ -159,12 +158,12 @@ class SessionManager:
                 "planning_data": bible.planning_data or {},
                 "last_updated_turn": bible.last_updated_turn
             }
-        
+
         # Get foreshadowing
         foreshadowing_data = {}
         if self.foreshadowing:
             foreshadowing_data = self.foreshadowing.to_dict()
-        
+
         # Get sessions
         sessions = db.query(Session).filter(Session.campaign_id == campaign_id).all()
         sessions_data = []
@@ -182,7 +181,7 @@ class SessionManager:
                 }
                 for turn in turns
             ]
-            
+
             sessions_data.append(SessionExport(
                 session_id=session.id,
                 started_at=session.started_at.isoformat() if session.started_at else "",
@@ -191,7 +190,7 @@ class SessionManager:
                 summary=session.summary,
                 turns=turns_data
             ))
-        
+
         # Build export
         export = CampaignExport(
             exported_at=datetime.utcnow().isoformat(),
@@ -205,16 +204,16 @@ class SessionManager:
             foreshadowing=foreshadowing_data,
             sessions=sessions_data
         )
-        
+
         # Save to file if path provided
         if save_path:
             save_path = Path(save_path)
             save_path.parent.mkdir(parents=True, exist_ok=True)
             with open(save_path, 'w', encoding='utf-8') as f:
                 json.dump(export.model_dump(), f, indent=2, ensure_ascii=False)
-        
+
         return export
-    
+
     def import_campaign(self, load_path: Path) -> int:
         """
         Import a campaign from JSON file.
@@ -225,15 +224,14 @@ class SessionManager:
         Returns:
             Campaign ID of the imported campaign
         """
-        from ..db.models import Campaign, Session, Turn, Character, NPC, WorldState, CampaignBible
-        from .foreshadowing import ForeshadowingLedger
-        
-        with open(load_path, 'r', encoding='utf-8') as f:
+        from ..db.models import NPC, Campaign, CampaignBible, Character, WorldState
+
+        with open(load_path, encoding='utf-8') as f:
             data = json.load(f)
-        
+
         export = CampaignExport(**data)
         db = self.state._get_db()
-        
+
         # Create campaign
         campaign = Campaign(
             name=export.campaign_name,
@@ -241,9 +239,9 @@ class SessionManager:
         )
         db.add(campaign)
         db.commit()
-        
+
         campaign_id = campaign.id
-        
+
         # Create character
         if export.character:
             char_data = export.character
@@ -271,7 +269,7 @@ class SessionManager:
                 character.sp_current = char_data.get("sp_current", 50)
                 character.sp_max = char_data.get("sp_max", 50)
             db.add(character)
-        
+
         # Create NPCs
         for npc_data in export.npcs:
             npc = NPC(
@@ -287,7 +285,7 @@ class SessionManager:
                 last_appeared=npc_data.get("last_appeared")
             )
             db.add(npc)
-        
+
         # Create world state
         if export.world_state:
             ws = export.world_state
@@ -302,7 +300,7 @@ class SessionManager:
                 foreshadowing=ws.get("foreshadowing", [])
             )
             db.add(world)
-        
+
         # Create campaign bible
         if export.campaign_bible:
             bible = CampaignBible(
@@ -311,9 +309,9 @@ class SessionManager:
                 last_updated_turn=export.campaign_bible.get("last_updated_turn", 0)
             )
             db.add(bible)
-        
+
         db.commit()
-        
+
         # Restore foreshadowing (writes through to DB via #10)
         if export.foreshadowing and self.foreshadowing:
             self.foreshadowing._seeds = {}
@@ -323,9 +321,9 @@ class SessionManager:
                 self.foreshadowing._seeds[sid] = seed
                 self.foreshadowing._persist_seed(seed)  # Write-through (#10)
             self.foreshadowing._next_id = export.foreshadowing.get("next_id", 1)
-        
+
         return campaign_id
-    
+
     def generate_previously_on(self, num_turns: int = 10) -> str:
         """
         Generate a "Previously on..." summary for session start.
@@ -336,10 +334,10 @@ class SessionManager:
         Returns:
             Narrative summary text
         """
-        from ..db.models import Turn, Session
-        
+        from ..db.models import Session, Turn
+
         db = self.state._get_db()
-        
+
         # Get recent turns
         recent_turns = (
             db.query(Turn)
@@ -349,13 +347,13 @@ class SessionManager:
             .limit(num_turns)
             .all()
         )
-        
+
         if not recent_turns:
             return "A new adventure begins..."
-        
+
         # Build summary
         lines = ["**Previously on your adventure...**\n"]
-        
+
         # Reverse to chronological order
         for turn in reversed(recent_turns):
             if turn.narrative:
@@ -364,15 +362,15 @@ class SessionManager:
                 if len(turn.narrative) > 200:
                     narrative_preview += "..."
                 lines.append(f"- {narrative_preview}")
-        
+
         # Add current state
         context = self.state.get_context()
         lines.append(f"\n**Current Location:** {context.location}")
         lines.append(f"**Situation:** {context.situation}")
-        
+
         return "\n".join(lines)
-    
-    def end_session(self, summary: Optional[str] = None) -> None:
+
+    def end_session(self, summary: str | None = None) -> None:
         """
         End the current session and optionally add a summary.
         
@@ -380,10 +378,10 @@ class SessionManager:
             summary: Optional session summary
         """
         from ..db.models import Session
-        
+
         db = self.state._get_db()
         session_id = self.state._session_id
-        
+
         if session_id:
             session = db.query(Session).filter(Session.id == session_id).first()
             if session:
@@ -391,8 +389,8 @@ class SessionManager:
                 if summary:
                     session.summary = summary
                 db.commit()
-    
-    async def run_session_end_review(self, profile) -> Optional[Dict[str, Any]]:
+
+    async def run_session_end_review(self, profile) -> dict[str, Any] | None:
         """
         Run Director review at session end for long-campaign planning.
         
@@ -404,20 +402,20 @@ class SessionManager:
         """
         from ..agents.director import DirectorAgent
         from ..db.models import Session
-        
+
         db = self.state._get_db()
         session_id = self.state._session_id
-        
+
         if not session_id:
             return None
-        
+
         session = db.query(Session).filter(Session.id == session_id).first()
         bible = self.state.get_campaign_bible()
         world_state = self.state.get_world_state()
-        
+
         if not session or not bible:
             return None
-        
+
         # Run Director analysis
         director = DirectorAgent()
         director_output = await director.run_session_review(
@@ -426,22 +424,22 @@ class SessionManager:
             profile=profile,
             world_state=world_state
         )
-        
+
         # Inject spotlight debt from tracking
         spotlight_debt = self.state.compute_spotlight_debt()
         planning_data = director_output.model_dump()
         planning_data["spotlight_debt"] = spotlight_debt
-        
+
         # Update Campaign Bible
         turn_number = session.turn_count or 0
         self.state.update_campaign_bible(planning_data, turn_number)
-        
+
         # Persist arc phase and tension to WorldState
         self.state.update_world_state(
             arc_phase=director_output.arc_phase,
             tension_level=director_output.tension_level
         )
-        
+
         logger.info(f"Session-end review: {director_output.arc_phase} (tension: {director_output.tension_level:.1f})")
-        
+
         return planning_data

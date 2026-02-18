@@ -6,41 +6,42 @@ trajectories, foreshadowing status, and spotlight balance before making
 arc decisions.
 """
 
-from typing import List, Dict, Any, Optional
+from typing import Any
+
 from pydantic import BaseModel, Field
 
-from .base import AgenticAgent
-from ..llm import get_llm_manager
+from ..db.models import CampaignBible, Session, WorldState
 from ..llm.tools import ToolRegistry
-from ..db.models import Session, CampaignBible, WorldState
 from ..profiles.loader import NarrativeProfile
+from .base import AgenticAgent
+
 
 class DirectorOutput(BaseModel):
     """Structured output from the Director's planning session."""
-    
+
     current_arc: str = Field(description="Name of the current story arc")
     arc_phase: str = Field(description="Current phase (Setup, Rising Action, Climax, Resolution)")
     tension_level: float = Field(description="Current narrative tension (0.0 to 1.0)")
-    
-    active_foreshadowing: List[Dict[str, Any]] = Field(
+
+    active_foreshadowing: list[dict[str, Any]] = Field(
         default_factory=list,
         description="List of active foreshadowing seeds and their status"
     )
-    
-    spotlight_debt: Dict[str, int] = Field(
-        default_factory=dict, 
+
+    spotlight_debt: dict[str, int] = Field(
+        default_factory=dict,
         description="Map of Character/NPC names to spotlight score (negative = needs screen time)"
     )
-    
+
     director_notes: str = Field(
         description="High-level guidance for the Key Animator for the next session/segment"
     )
-    
+
     voice_patterns: str = Field(
         default="",
         description="Key voice traits to maintain: humor style (sarcastic/earnest), sentence rhythm (punchy/flowing), narrator distance (intimate/cinematic)"
     )
-    
+
     analysis: str = Field(description="Reasoning behind these decisions")
 
 
@@ -49,12 +50,12 @@ class DirectorAgent(AgenticAgent):
     The Showrunner. Plans arcs, tracks foreshadowing, and manages pacing.
     Runs asynchronously at session boundaries or intervals.
     """
-    
+
     agent_name = "director"
-    
-    def __init__(self, model_override: Optional[str] = None):
+
+    def __init__(self, model_override: str | None = None):
         super().__init__(model_override=model_override)
-        
+
         # Load the base system prompt via shared helper
         self._base_prompt = self._load_prompt_file(
             "director.md", "You are the Director. Plan the campaign flow."
@@ -64,7 +65,7 @@ class DirectorAgent(AgenticAgent):
     def system_prompt(self):
         """Default system prompt (can be overridden per-call)."""
         return self._base_prompt
-    
+
     @property
     def output_schema(self):
         return DirectorOutput
@@ -72,7 +73,7 @@ class DirectorAgent(AgenticAgent):
     async def _investigation_phase(
         self,
         session: Session,
-        world_state: Optional[WorldState],
+        world_state: WorldState | None,
         tools: ToolRegistry,
     ) -> str:
         """Run investigation using tool-calling before arc planning.
@@ -86,7 +87,7 @@ class DirectorAgent(AgenticAgent):
         location = world_state.location if world_state else "Unknown"
         situation = world_state.situation if world_state else "Unknown"
         session_summary = session.summary or "(No summary yet)"
-        
+
         investigation_prompt = f"""You are a narrative analyst investigating the current state 
 of an anime RPG campaign to help the Director plan the next arc.
 
@@ -107,7 +108,7 @@ Provide a CONCISE investigation report structured as:
 - NPC SPOTLIGHT: Who needs attention, who's overexposed
 - UNRESOLVED THREADS: Plot hooks that need addressing
 - RECOMMENDATION: What should the next arc beat focus on?"""
-        
+
         # Set tools and delegate to AgenticAgent.research_with_tools()
         self.set_tools(tools)
         return await self.research_with_tools(
@@ -115,17 +116,17 @@ Provide a CONCISE investigation report structured as:
             system="You are a narrative analyst. Use tools to gather data, then write a concise investigation report.",
             max_tool_rounds=4,
         )
-    
+
     async def run_session_review(
-        self, 
-        session: Session, 
+        self,
+        session: Session,
         bible: CampaignBible,
         profile: NarrativeProfile,
-        world_state: Optional[WorldState] = None,
-        op_preset: Optional[str] = None,
-        op_tension_source: Optional[str] = None,
-        op_mode_guidance: Optional[str] = None,
-        tools: Optional[ToolRegistry] = None,
+        world_state: WorldState | None = None,
+        op_preset: str | None = None,
+        op_tension_source: str | None = None,
+        op_mode_guidance: str | None = None,
+        tools: ToolRegistry | None = None,
         compaction_text: str = ""
     ) -> DirectorOutput:
         """
@@ -141,7 +142,7 @@ Provide a CONCISE investigation report structured as:
             op_mode_guidance: Optional RAG-retrieved 3-axis guidance
             tools: Optional ToolRegistry for investigation phase
         """
-        
+
         # === AGENTIC INVESTIGATION PHASE (optional) ===
         investigation_findings = ""
         if tools:
@@ -150,21 +151,21 @@ Provide a CONCISE investigation report structured as:
                 world_state=world_state,
                 tools=tools,
             )
-        
+
         # 1. Build Director Persona
         persona = profile.director_personality or "You are a thoughtful anime director."
         system_prompt = f"{persona}\n\n{self._base_prompt}"
-        
+
         # 2. Build Context (with investigation findings and compaction if available)
         context = self._build_review_context(
             session, bible, world_state, profile, op_preset, op_tension_source, op_mode_guidance,
             investigation_findings=investigation_findings,
             compaction_text=compaction_text
         )
-        
+
         # 3. Call LLM with dynamic system prompt override
         result = await self.call(context, system_prompt_override=system_prompt)
-        
+
         return result
 
     async def run_startup_briefing(
@@ -175,10 +176,10 @@ Provide a CONCISE investigation report structured as:
         character_concept: str = "",
         starting_location: str = "Unknown",
         op_mode: bool = False,
-        op_preset: Optional[str] = None,
-        op_tension_source: Optional[str] = None,
-        op_power_expression: Optional[str] = None,
-        op_narrative_focus: Optional[str] = None,
+        op_preset: str | None = None,
+        op_tension_source: str | None = None,
+        op_power_expression: str | None = None,
+        op_narrative_focus: str | None = None,
     ) -> DirectorOutput:
         """
         Create an initial storyboard at gameplay handoff (pilot episode planning).
@@ -203,18 +204,18 @@ Provide a CONCISE investigation report structured as:
             DirectorOutput with initial arc plan, foreshadowing seeds, and voice guidance
         """
         from pathlib import Path
-        
+
         # 1. Load startup-specific prompt
         startup_prompt_path = Path(__file__).parent.parent / "prompts" / "director_startup.md"
         try:
             startup_prompt = startup_prompt_path.read_text(encoding="utf-8")
         except FileNotFoundError:
             startup_prompt = "You are directing the pilot episode of a new anime series. Plan the opening arc."
-        
+
         # 2. Build Director persona from profile
         persona = profile.director_personality or "You are a thoughtful anime director."
         system_prompt = f"{persona}\n\n{startup_prompt}"
-        
+
         # 3. Build startup context
         context = self._build_startup_context(
             session_zero_summary=session_zero_summary,
@@ -228,13 +229,13 @@ Provide a CONCISE investigation report structured as:
             op_power_expression=op_power_expression,
             op_narrative_focus=op_narrative_focus,
         )
-        
+
         # 4. Replace {context} placeholder in prompt
         system_prompt = system_prompt.replace("{context}", "")
-        
+
         # 5. Call LLM
         result = await self.call(context, system_prompt_override=system_prompt)
-        
+
         return result
 
     def _build_startup_context(
@@ -245,22 +246,22 @@ Provide a CONCISE investigation report structured as:
         character_concept: str,
         starting_location: str,
         op_mode: bool,
-        op_preset: Optional[str],
-        op_tension_source: Optional[str],
-        op_power_expression: Optional[str],
-        op_narrative_focus: Optional[str],
+        op_preset: str | None,
+        op_tension_source: str | None,
+        op_power_expression: str | None,
+        op_narrative_focus: str | None,
     ) -> str:
         """Build context for the Director's startup briefing."""
-        
+
         lines = ["# Pilot Episode Planning — Director Startup Briefing"]
-        
+
         # === CHARACTER DOSSIER ===
         lines.append("\n## 🎭 Character Dossier")
         lines.append(f"**Name:** {character_name}")
         if character_concept:
             lines.append(f"**Concept:** {character_concept}")
         lines.append(f"**Starting Location:** {starting_location}")
-        
+
         # === OP MODE ===
         if op_mode:
             lines.append("\n## ⚡ OP Protagonist Mode: ACTIVE")
@@ -274,7 +275,7 @@ Provide a CONCISE investigation report structured as:
                 lines.append(f"**Narrative Focus:** {op_narrative_focus}")
             lines.append("\n*IMPORTANT: The protagonist is already powerful. Opening tension must come from")
             lines.append("the configured axes above, NOT from combat difficulty.*")
-        
+
         # === NARRATIVE PROFILE DNA ===
         if profile.dna:
             lines.append("\n## 🧬 Narrative DNA (IP Identity)")
@@ -282,18 +283,18 @@ Provide a CONCISE investigation report structured as:
             for key, value in dna.items():
                 label = key.replace('_', ' ').replace('vs', '↔').title()
                 lines.append(f"- {label}: {value}/10")
-        
+
         # === GENRE ===
         if hasattr(profile, 'detected_genres') and profile.detected_genres:
             lines.append(f"\n**Detected Genres:** {', '.join(profile.detected_genres)}")
-        
+
         # === TROPES ===
         if profile.tropes:
             active = [k.replace('_', ' ').title() for k, v in profile.tropes.items() if v]
             if active:
                 lines.append(f"\n## 📖 Active Tropes: {', '.join(active)}")
                 lines.append("*Consider planting seeds for these tropes in the opening arc.*")
-        
+
         # === VOICE / AUTHOR VOICE ===
         if hasattr(profile, 'author_voice') and profile.author_voice:
             lines.append("\n## ✍️ Author's Voice")
@@ -306,7 +307,7 @@ Provide a CONCISE investigation report structured as:
                         lines.append(f"**{label}:** {value}")
             else:
                 lines.append(str(profile.author_voice))
-        
+
         if hasattr(profile, 'voice_cards') and profile.voice_cards:
             lines.append("\n## 🗣️ Character Voice Cards")
             for card in profile.voice_cards[:3]:  # Top 3
@@ -314,16 +315,16 @@ Provide a CONCISE investigation report structured as:
                     name = card.get('name', 'Unknown')
                     voice = card.get('voice', card.get('description', ''))
                     lines.append(f"- **{name}:** {voice[:200]}")
-        
+
         # === SESSION ZERO TRANSCRIPT SUMMARY ===
         lines.append("\n## 📝 Session Zero Summary")
         lines.append("This is what happened during character creation:")
         lines.append(session_zero_summary)
-        
+
         # === CAMPAIGN BIBLE ===
         lines.append("\n## Campaign Bible")
         lines.append("(Empty — this is the first session. You are creating the initial plan.)")
-        
+
         # === INSTRUCTIONS ===
         lines.append("\n## Your Task")
         lines.append("Plan the OPENING ARC for this character in this world.")
@@ -337,31 +338,31 @@ Provide a CONCISE investigation report structured as:
         lines.append("   - Hook to draw the player in")
         lines.append("   - What to AVOID (generic tropes that don't fit this IP)")
         lines.append("6. Set voice_patterns matching this IP's tone")
-        
+
         return "\n".join(lines)
 
     def _build_review_context(
-        self, 
-        session: Session, 
+        self,
+        session: Session,
         bible: CampaignBible,
-        world_state: Optional[WorldState],
-        profile: Optional[NarrativeProfile] = None,
-        op_preset: Optional[str] = None,
-        op_tension_source: Optional[str] = None,
-        op_mode_guidance: Optional[str] = None,
+        world_state: WorldState | None,
+        profile: NarrativeProfile | None = None,
+        op_preset: str | None = None,
+        op_tension_source: str | None = None,
+        op_mode_guidance: str | None = None,
         investigation_findings: str = "",
         compaction_text: str = ""
     ) -> str:
         """Construct the context prompt for the Director."""
-        
+
         lines = ["# Campaign Status Review"]
-        
+
         # === INVESTIGATION FINDINGS (from agentic research) ===
         if investigation_findings:
             lines.append("\n## 🔍 Investigation Report (Tool-Based Research)")
             lines.append(investigation_findings)
             lines.append("")
-        
+
         # === NARRATIVE INTELLIGENCE (from compaction buffer) ===
         if compaction_text:
             lines.append("\n## 📜 Narrative Intelligence (Compacted History)")
@@ -369,38 +370,38 @@ Provide a CONCISE investigation report structured as:
             lines.append("in verbatim memory. Use for arc awareness, emotional trajectory, and continuity.")
             lines.append(compaction_text)
             lines.append("")
-        
+
         # =====================================================================
         # Narrative DNA (Calibrate Arc Pacing)
         # =====================================================================
         if profile and profile.dna:
             lines.append("\n## 🎭 Narrative DNA (Guide Your Arc Decisions)")
             dna = profile.dna
-            
+
             # Key scales for Director decisions
             comedy_drama = dna.get('comedy_vs_drama', 5)
             fast_slow = dna.get('fast_paced_vs_slow_burn', 5)
             hopeful_cynical = dna.get('hopeful_vs_cynical', 5)
             ensemble = dna.get('ensemble_vs_solo', 5)
-            
+
             lines.append(f"- Comedy/Drama: {comedy_drama}/10 {'(serious, minimal humor)' if comedy_drama <= 3 else '(comedic, lighthearted)' if comedy_drama >= 7 else ''}")
             lines.append(f"- Pacing: {fast_slow}/10 {'(FAST - short arcs, rapid escalation)' if fast_slow <= 3 else '(SLOW - long arcs, gradual build)' if fast_slow >= 7 else ''}")
             lines.append(f"- Hopeful/Cynical: {hopeful_cynical}/10 {'(optimistic resolutions)' if hopeful_cynical <= 3 else '(pyrrhic victories, dark endings)' if hopeful_cynical >= 7 else ''}")
             lines.append(f"- Ensemble/Solo: {ensemble}/10 {'(team-focused, share spotlight)' if ensemble <= 3 else '(single protagonist focus)' if ensemble >= 7 else ''}")
-            
+
             # Interpretation guidance
             if fast_slow >= 7:
                 lines.append("\n*PACING: This IP uses SLOW BURN. Plan 4-6 session arcs. Plant seeds early. Payoffs should feel earned.*")
             elif fast_slow <= 3:
                 lines.append("\n*PACING: This IP is FAST. Plan 2-3 session arcs. Escalate quickly. Don't linger.*")
-        
+
         # =====================================================================
         # Active Tropes (Arc Planning Hooks)
         # =====================================================================
         if profile and profile.tropes:
             active = [k for k, v in profile.tropes.items() if v]
             inactive = [k for k, v in profile.tropes.items() if not v]
-            
+
             if active:
                 lines.append("\n## 📖 Active Tropes (Plan These Into Arcs)")
                 for trope in active:
@@ -420,10 +421,10 @@ Provide a CONCISE investigation report structured as:
                         lines.append(f"- **{trope_name}**: Someone may sacrifice themselves. Build relationships first.")
                     else:
                         lines.append(f"- {trope_name}")
-                
+
             if inactive and 'power_of_friendship' in inactive:
                 lines.append("\n*NOTE: `power_of_friendship` is OFF. Victories come from skill, not bonds. Teamwork is tactical, not magical.*")
-        
+
         # =====================================================================
         # Genre-Specific Arc Templates (IP Authenticity)
         # =====================================================================
@@ -516,16 +517,16 @@ Provide a CONCISE investigation report structured as:
                     "**Confession Dodge**: Building feelings→Confession attempt→Interruption→Progress anyway"
                 ]
             }
-            
+
             for genre in profile.detected_genres[:2]:  # Primary + 1 secondary
                 genre_key = genre.lower().replace(" ", "_").replace("-", "_")
                 if genre_key in genre_arc_templates:
                     lines.append(f"\n**{genre.title()} Templates:**")
                     for template in genre_arc_templates[genre_key]:
                         lines.append(f"  {template}")
-            
+
             lines.append("\n*Use these templates as arc structure guides. Adapt to current story.*")
-        
+
         # OP Mode context (if active)
         if op_preset and op_mode_guidance:
             lines.append("\n## ⚡ OP Protagonist Mode Active")
@@ -535,7 +536,7 @@ Provide a CONCISE investigation report structured as:
             lines.append(op_mode_guidance)
             lines.append("\n*IMPORTANT: Adjust arc planning for this composition. Reduce combat focus, "
                         "increase stakes matching the tension source.*")
-        
+
         # Previous Plans
         if bible.planning_data:
             lines.append("\n## Current Campaign Bible (Previous)")
@@ -543,18 +544,18 @@ Provide a CONCISE investigation report structured as:
         else:
             lines.append("\n## Current Campaign Bible")
             lines.append("(No data yet - Initial Planning)")
-            
+
         # Recent Events
         lines.append(f"\n## Session Summary (ID: {session.id})")
         lines.append(session.summary or "(Session just finished, summary pending parsing)")
-        
+
         # World Context
         if world_state:
             lines.append("\n## World State")
             lines.append(f"Location: {world_state.location}")
             if world_state.situation:
                 lines.append(f"Situation: {world_state.situation}")
-        
+
         lines.append("\n## Instructions")
         lines.append("Analyze the session events. Specific focus on:")
         lines.append("1. Did we advance the current arc?")
@@ -563,5 +564,5 @@ Provide a CONCISE investigation report structured as:
         if op_preset:
             lines.append(f"4. Are we honoring the {op_preset.replace('_', ' ').title()} composition? (tension from right sources?)")
         lines.append("Update the Bible accordingly.")
-        
+
         return "\n".join(lines)

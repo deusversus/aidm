@@ -17,7 +17,6 @@ Rate limit: 90 requests per minute (no auth required).
 import asyncio
 import logging
 from dataclasses import dataclass, field
-from typing import Optional
 
 import requests
 
@@ -277,9 +276,9 @@ query ($id: Int) {
 class AniListCharacter:
     """A character from AniList."""
     name: str
-    native_name: Optional[str] = None
+    native_name: str | None = None
     role: str = "SUPPORTING"  # MAIN, SUPPORTING, BACKGROUND
-    voice_actor: Optional[str] = None
+    voice_actor: str | None = None
 
 
 @dataclass
@@ -287,10 +286,10 @@ class AniListRelation:
     """A related media entry from AniList."""
     id: int
     title_romaji: str
-    title_english: Optional[str] = None
-    format: Optional[str] = None  # TV, MOVIE, OVA, SPECIAL, ONA, MANGA, etc.
-    status: Optional[str] = None
-    media_type: Optional[str] = None  # ANIME, MANGA
+    title_english: str | None = None
+    format: str | None = None  # TV, MOVIE, OVA, SPECIAL, ONA, MANGA, etc.
+    status: str | None = None
+    media_type: str | None = None  # ANIME, MANGA
     relation_type: str = "SEQUEL"  # SEQUEL, PREQUEL, SIDE_STORY, PARENT, etc.
 
 
@@ -305,45 +304,45 @@ class AniListTag:
 @dataclass
 class AniListResult:
     """Complete structured result from AniList API."""
-    
+
     # Identity
     id: int = 0
     title_romaji: str = ""
-    title_english: Optional[str] = None
-    title_native: Optional[str] = None
+    title_english: str | None = None
+    title_native: str | None = None
     synonyms: list[str] = field(default_factory=list)
-    
+
     # Metadata
-    format: Optional[str] = None  # TV, MOVIE, OVA, MANGA, etc.
+    format: str | None = None  # TV, MOVIE, OVA, MANGA, etc.
     status: str = "FINISHED"  # FINISHED, RELEASING, NOT_YET_RELEASED, CANCELLED, HIATUS
-    episodes: Optional[int] = None
-    chapters: Optional[int] = None
-    description: Optional[str] = None
-    country_of_origin: Optional[str] = None
-    source: Optional[str] = None  # MANGA, LIGHT_NOVEL, ORIGINAL, etc.
+    episodes: int | None = None
+    chapters: int | None = None
+    description: str | None = None
+    country_of_origin: str | None = None
+    source: str | None = None  # MANGA, LIGHT_NOVEL, ORIGINAL, etc.
     is_adult: bool = False
-    
+
     # Dates
-    start_year: Optional[int] = None
-    season: Optional[str] = None
-    
+    start_year: int | None = None
+    season: str | None = None
+
     # Scores
-    average_score: Optional[int] = None
-    popularity: Optional[int] = None
-    
+    average_score: int | None = None
+    popularity: int | None = None
+
     # Genres & Tags (critical for DNA derivation)
     genres: list[str] = field(default_factory=list)
     tags: list[AniListTag] = field(default_factory=list)
-    
+
     # Characters (sorted by favourites)
     characters: list[AniListCharacter] = field(default_factory=list)
-    
+
     # Relations (for franchise/disambiguation)
     relations: list[AniListRelation] = field(default_factory=list)
-    
+
     # Studio
-    studio: Optional[str] = None
-    
+    studio: str | None = None
+
     def get_all_titles(self) -> list[str]:
         """Get all known titles for this media."""
         titles = []
@@ -355,11 +354,11 @@ class AniListResult:
             titles.append(self.title_native)
         titles.extend(self.synonyms)
         return titles
-    
+
     def get_non_spoiler_tags(self, min_rank: int = 0) -> list[AniListTag]:
         """Get tags filtered by minimum rank and excluding spoilers."""
         return [t for t in self.tags if not t.is_spoiler and t.rank >= min_rank]
-    
+
     def get_main_characters(self) -> list[AniListCharacter]:
         """Get only MAIN role characters."""
         return [c for c in self.characters if c.role == "MAIN"]
@@ -374,14 +373,14 @@ RATE_LIMIT_SLEEP = 2.0  # seconds to wait on rate limit
 
 class AniListClient:
     """Async-compatible AniList GraphQL client."""
-    
+
     def __init__(self):
         self._session = requests.Session()
         self._session.headers.update({
             "Content-Type": "application/json",
             "Accept": "application/json",
         })
-    
+
     def _execute_query(self, query: str, variables: dict) -> dict:
         """Execute a GraphQL query against AniList."""
         for attempt in range(MAX_RETRIES):
@@ -391,7 +390,7 @@ class AniListClient:
                     json={"query": query, "variables": variables},
                     timeout=15,
                 )
-                
+
                 if response.status_code == 429:
                     # Rate limited — back off
                     retry_after = int(response.headers.get("Retry-After", RATE_LIMIT_SLEEP))
@@ -399,28 +398,28 @@ class AniListClient:
                     import time
                     time.sleep(retry_after)
                     continue
-                
+
                 response.raise_for_status()
                 data = response.json()
-                
+
                 if "errors" in data:
                     logger.warning(f"AniList GraphQL errors: {data['errors']}")
                     return {}
-                
+
                 return data.get("data", {})
-                
+
             except requests.RequestException as e:
                 logger.error(f"AniList request failed (attempt {attempt+1}): {e}")
                 if attempt < MAX_RETRIES - 1:
                     import time
                     time.sleep(2 ** attempt)
-        
+
         return {}
-    
+
     # Format priority for disambiguation: users almost always mean the main series
     FORMAT_PRIORITY = {'TV': 0, 'TV_SHORT': 1, 'MOVIE': 2, 'OVA': 3, 'ONA': 4, 'SPECIAL': 5, 'MUSIC': 6}
-    
-    async def search(self, title: str, media_type: str = "ANIME") -> Optional[AniListResult]:
+
+    async def search(self, title: str, media_type: str = "ANIME") -> AniListResult | None:
         """
         Search AniList for an anime/manga by title.
         
@@ -435,7 +434,7 @@ class AniListClient:
             AniListResult or None if not found
         """
         loop = asyncio.get_event_loop()
-        
+
         if media_type == "ANIME":
             data = await loop.run_in_executor(
                 None, self._execute_query, SEARCH_QUERY, {"search": title}
@@ -445,7 +444,7 @@ class AniListClient:
             if not media_list:
                 logger.info(f"AniList: No results for '{title}' (type={media_type})")
                 return None
-            
+
             best = self._pick_best_match(media_list, title)
             return self._parse_media(best)
         else:
@@ -458,7 +457,7 @@ class AniListClient:
                 logger.info(f"AniList: No results for '{title}' (type={media_type})")
                 return None
             return self._parse_media(media)
-    
+
     def _pick_best_match(self, media_list: list, search_title: str) -> dict:
         """
         Pick the best match from multiple AniList results.
@@ -470,37 +469,37 @@ class AniListClient:
         """
         if len(media_list) == 1:
             return media_list[0]
-        
+
         # Log all candidates for debugging
         for m in media_list:
             title = m.get('title', {}).get('english') or m.get('title', {}).get('romaji', '?')
             fmt = m.get('format', '?')
             pop = m.get('popularity', 0)
             logger.info(f"AniList candidate: {title} ({fmt}, pop={pop})")
-        
+
         def score(media):
             fmt = media.get('format', 'SPECIAL')
             format_score = self.FORMAT_PRIORITY.get(fmt, 5)
             # Invert popularity so higher = better (lower score)
             pop_score = -(media.get('popularity', 0) or 0)
             return (format_score, pop_score)
-        
+
         best = min(media_list, key=score)
         chosen_title = best.get('title', {}).get('english') or best.get('title', {}).get('romaji', '?')
         chosen_fmt = best.get('format', '?')
         logger.info(f"Disambiguated: chose '{chosen_title}' ({chosen_fmt}) from {len(media_list)} candidates")
         return best
-    
-    async def search_with_fallback(self, title: str) -> Optional[AniListResult]:
+
+    async def search_with_fallback(self, title: str) -> AniListResult | None:
         """
         Search AniList, trying ANIME first then MANGA if not found.
         """
         result = await self.search(title, "ANIME")
         if not result:
-            logger.info(f"AniList: No anime result, falling back to MANGA search")
+            logger.info("AniList: No anime result, falling back to MANGA search")
             result = await self.search(title, "MANGA")
         return result
-    
+
     async def fetch_full_series(self, primary: AniListResult) -> AniListResult:
         """
         Walk the relations graph (BFS) to merge ALL seasons of the same series.
@@ -520,32 +519,32 @@ class AniListClient:
             Enriched AniListResult with all seasons merged
         """
         MAX_DEPTH = 10  # Safety cap to prevent infinite traversal
-        
+
         loop = asyncio.get_event_loop()
         visited: set[int] = {primary.id}
         queue: list[int] = []
         related_results: list[AniListResult] = []
-        
+
         # Seed queue from primary's direct relations
         for rel in primary.relations:
             if rel.relation_type in ("SEQUEL", "PREQUEL") and rel.format == primary.format:
                 if rel.id not in visited:
                     queue.append(rel.id)
                     visited.add(rel.id)
-        
+
         if not queue:
-            logger.info(f"No related seasons found for merging")
+            logger.info("No related seasons found for merging")
             return primary
-        
+
         depth = 0
-        logger.info(f"Walking relations graph (BFS) for season merging...")
-        
+        logger.info("Walking relations graph (BFS) for season merging...")
+
         # BFS: fetch each season, then check ITS relations for more seasons
         while queue and depth < MAX_DEPTH:
             depth += 1
             current_batch = list(queue)
             queue.clear()
-            
+
             for rel_id in current_batch:
                 data = await loop.run_in_executor(
                     None, self._execute_query, FETCH_BY_ID_QUERY, {"id": rel_id}
@@ -553,10 +552,10 @@ class AniListClient:
                 media = data.get("Media")
                 if not media:
                     continue
-                
+
                 entry = self._parse_media(media)
                 related_results.append(entry)
-                
+
                 # Discover new seasons from this entry's relations
                 for rel in entry.relations:
                     if (rel.relation_type in ("SEQUEL", "PREQUEL")
@@ -564,13 +563,13 @@ class AniListClient:
                             and rel.id not in visited):
                         queue.append(rel.id)
                         visited.add(rel.id)
-        
+
         if not related_results:
             return primary
-        
+
         # Merge into primary
         all_entries = [primary] + related_results
-        
+
         # Tags: union, keep highest rank for duplicates
         tag_map: dict[str, AniListTag] = {}
         for entry in all_entries:
@@ -578,7 +577,7 @@ class AniListClient:
                 if tag.name not in tag_map or tag.rank > tag_map[tag.name].rank:
                     tag_map[tag.name] = tag
         primary.tags = list(tag_map.values())
-        
+
         # Characters: union, deduplicate by name
         seen_chars: set[str] = set()
         merged_chars: list[AniListCharacter] = []
@@ -588,24 +587,24 @@ class AniListClient:
                     seen_chars.add(char.name)
                     merged_chars.append(char)
         primary.characters = merged_chars
-        
+
         # Genres: union
         all_genres = set()
         for entry in all_entries:
             all_genres.update(entry.genres)
         primary.genres = sorted(all_genres)
-        
+
         # Episodes: sum across seasons
         total_eps = sum(e.episodes or 0 for e in all_entries)
         if total_eps > 0:
             primary.episodes = total_eps
-        
-        # Synonyms: union 
+
+        # Synonyms: union
         all_synonyms = set(primary.synonyms)
         for entry in related_results:
             all_synonyms.update(entry.synonyms)
         primary.synonyms = list(all_synonyms)
-        
+
         # Status: use latest season's status (prefer RELEASING > NOT_YET_RELEASED > FINISHED)
         STATUS_PRIORITY = {"RELEASING": 0, "NOT_YET_RELEASED": 1, "HIATUS": 2, "FINISHED": 3, "CANCELLED": 4}
         latest_status = min(
@@ -613,7 +612,7 @@ class AniListClient:
             key=lambda e: STATUS_PRIORITY.get(e.status, 5)
         ).status
         primary.status = latest_status
-        
+
         # Relations: union from all entries (for downstream franchise detection)
         seen_rel_ids = {r.id for r in primary.relations}
         for entry in related_results:
@@ -621,14 +620,14 @@ class AniListClient:
                 if rel.id not in seen_rel_ids and rel.id != primary.id:
                     seen_rel_ids.add(rel.id)
                     primary.relations.append(rel)
-        
+
         seasons = len(all_entries)
         logger.info(f"[AniList] Merged {seasons} seasons (depth={depth}): {total_eps} episodes, "
               f"{len(primary.characters)} characters, {len(primary.tags)} tags, "
               f"status={primary.status}")
-        
+
         return primary
-    
+
     async def get_franchise_entries(self, title: str) -> list[dict]:
         """
         Discover distinct franchise entries for disambiguation.
@@ -650,16 +649,16 @@ class AniListClient:
             Empty list if single continuity or not found.
         """
         import re
-        
+
         primary = await self.search(title)
         if not primary:
             return []
-        
+
         SEASON_RELATIONS = {"SEQUEL", "PREQUEL"}
         # CHARACTER excluded: crossover cameos (Goku in ONE PIECE) aren't franchise entries
         DISTINCT_RELATIONS = {"SPIN_OFF", "SIDE_STORY", "ALTERNATIVE", "PARENT"}
         SERIES_FORMATS = {"TV", "ONA", "TV_SHORT", None}
-        
+
         # Pattern to detect season variants (same show, different season number)
         SEASON_VARIANT_RE = re.compile(
             r'\s*(?:'
@@ -673,11 +672,11 @@ class AniListClient:
             r'(?:\s*[:：\-–—]\s*.+)?$',
             re.IGNORECASE
         )
-        
+
         loop = asyncio.get_event_loop()
         primary_title = primary.title_english or primary.title_romaji
         primary_base = SEASON_VARIANT_RE.sub('', primary_title).strip().lower()
-        
+
         # Results: each entry is a continuity group
         # Primary gets its own group
         groups: list[dict] = [{
@@ -686,16 +685,16 @@ class AniListClient:
             "relation": "primary",
             "season_count": 1,
         }]
-        
+
         visited: set[int] = {primary.id}
         sequel_queue: list[int] = []
-        
+
         # Read direct relations from primary
         for rel in primary.relations:
             if rel.id in visited:
                 continue
             visited.add(rel.id)
-            
+
             if rel.relation_type in SEASON_RELATIONS and rel.format in SERIES_FORMATS:
                 sequel_queue.append(rel.id)
             elif rel.relation_type in DISTINCT_RELATIONS and rel.format in SERIES_FORMATS:
@@ -706,19 +705,19 @@ class AniListClient:
                     "relation": rel.relation_type.lower(),
                     "season_count": 1,
                 })
-        
+
         # Walk sequel/prequel chain
         # Key: if a sequel has a genuinely different title (not a season variant
         # of the current group's base), start a new group for it
         current_group_idx = 0  # index into groups[] for the primary
         depth = 0
         MAX_DEPTH = 10
-        
+
         while sequel_queue and depth < MAX_DEPTH:
             depth += 1
             current_batch = list(sequel_queue)
             sequel_queue.clear()
-            
+
             for seq_id in current_batch:
                 try:
                     data = await loop.run_in_executor(
@@ -727,16 +726,16 @@ class AniListClient:
                     media = data.get("Media")
                     if not media:
                         continue
-                    
+
                     entry = self._parse_media(media)
                     entry_title = entry.title_english or entry.title_romaji
                     entry_base = SEASON_VARIANT_RE.sub('', entry_title).strip().lower()
-                    
+
                     # Check if this sequel has a genuinely different title
                     current_base = SEASON_VARIANT_RE.sub(
                         '', groups[current_group_idx]["title"]
                     ).strip().lower()
-                    
+
                     if entry_base != current_base:
                         # Distinct continuation (e.g., Naruto → Shippuden, Shippuden → Boruto)
                         current_group_idx = len(groups)
@@ -749,13 +748,13 @@ class AniListClient:
                     else:
                         # Same show, different season — merge into current group
                         groups[current_group_idx]["season_count"] += 1
-                    
+
                     # Continue following sequel/prequel + discover distinct relations
                     for sub_rel in entry.relations:
                         if sub_rel.id in visited:
                             continue
                         visited.add(sub_rel.id)
-                        
+
                         if sub_rel.relation_type in SEASON_RELATIONS and sub_rel.format in SERIES_FORMATS:
                             sequel_queue.append(sub_rel.id)
                         elif sub_rel.relation_type in DISTINCT_RELATIONS and sub_rel.format in SERIES_FORMATS:
@@ -769,12 +768,12 @@ class AniListClient:
                 except Exception as e:
                     logger.error(f"Error fetching sequel {seq_id}: {e}")
                     continue
-        
+
         if len(groups) <= 1:
             logger.info(f"[AniList] Franchise '{title}': single continuity "
                   f"({groups[0]['season_count']} seasons), no disambiguation needed")
             return []
-        
+
         # Deduplicate by title (different paths can discover the same entry)
         seen_titles: set[str] = set()
         unique_groups: list[dict] = []
@@ -782,14 +781,14 @@ class AniListClient:
             if g["title"] not in seen_titles:
                 seen_titles.add(g["title"])
                 unique_groups.append(g)
-        
+
         logger.info(f"Franchise '{title}': {len(unique_groups)} distinct entries")
         for r in unique_groups:
             seasons = f" ({r['season_count']} seasons)" if r['season_count'] > 1 else ""
             logger.info(f"  - {r['title']} [{r['relation']}]{seasons}")
-        
+
         return unique_groups
-    
+
     def _parse_media(self, media: dict) -> AniListResult:
         """Parse raw AniList media JSON into an AniListResult."""
         result = AniListResult(
@@ -813,7 +812,7 @@ class AniListClient:
             genres=media.get("genres", []),
             studio=None,
         )
-        
+
         # Parse tags
         for tag in media.get("tags", []):
             result.tags.append(AniListTag(
@@ -821,22 +820,22 @@ class AniListClient:
                 rank=tag.get("rank", 0),
                 is_spoiler=tag.get("isMediaSpoiler", False),
             ))
-        
+
         # Parse characters from edges (has role info)
         for edge in media.get("characters", {}).get("edges", []):
             node = edge.get("node", {})
             name_data = node.get("name", {})
-            
+
             va_list = edge.get("voiceActors", [])
             va_name = va_list[0]["name"]["full"] if va_list else None
-            
+
             result.characters.append(AniListCharacter(
                 name=name_data.get("full", ""),
                 native_name=name_data.get("native"),
                 role=edge.get("role", "SUPPORTING"),
                 voice_actor=va_name,
             ))
-        
+
         # Parse relations
         for edge in media.get("relations", {}).get("edges", []):
             node = edge.get("node", {})
@@ -849,10 +848,10 @@ class AniListClient:
                 media_type=node.get("type"),
                 relation_type=edge.get("relationType", "OTHER"),
             ))
-        
+
         # Parse studio
         studios = media.get("studios", {}).get("nodes", [])
         if studios:
             result.studio = studios[0].get("name")
-        
+
         return result

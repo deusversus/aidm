@@ -1,14 +1,13 @@
 """Anthropic Claude LLM provider."""
 
 import json
+import logging
 import os
-from typing import Any, Dict, List, Optional, Type
+from typing import Any
+
 from pydantic import BaseModel
 
 from .provider import LLMProvider, LLMResponse
-
-
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -24,41 +23,41 @@ class AnthropicProvider(LLMProvider):
 
     Also supports web search via the Anthropic API (May 2025+).
     """
-    
+
     @property
     def name(self) -> str:
         return "anthropic"
-    
+
     def get_default_model(self) -> str:
         return "claude-sonnet-4-6"
-    
+
     def get_fast_model(self) -> str:
         return "claude-haiku-4-5"
-    
+
     def get_creative_model(self) -> str:
         """Get creative model - defaults to Sonnet, can be set to Opus via env var."""
         preference = os.getenv("ANTHROPIC_CREATIVE_MODEL", "sonnet").lower()
         if preference == "opus":
             return "claude-opus-4-6"
         return "claude-sonnet-4-6"
-    
+
     def get_opus_model(self) -> str:
         """Get Opus model explicitly."""
         return "claude-opus-4-6"
-    
+
     def get_research_model(self) -> str:
         """Model optimized for research with web search."""
         return "claude-sonnet-4-6"
-    
+
     def get_max_concurrent_requests(self) -> int:
         """Anthropic Tier 2+ can handle more concurrent requests."""
         return 10
-    
+
     def _init_client(self):
         """Initialize the Anthropic client."""
         import anthropic
         self._client = anthropic.Anthropic(api_key=self.api_key)
-    
+
     @staticmethod
     def _build_system_blocks(system) -> list:
         """Convert system prompt to Anthropic cache-aware content blocks.
@@ -74,11 +73,11 @@ class AnthropicProvider(LLMProvider):
         """
         if not system:
             return ""
-        
+
         # Plain string — no caching, backward compatible
         if isinstance(system, str):
             return system
-        
+
         # List of (text, should_cache) tuples — build content blocks
         blocks = []
         for text, should_cache in system:
@@ -88,23 +87,23 @@ class AnthropicProvider(LLMProvider):
             if should_cache:
                 block["cache_control"] = {"type": "ephemeral"}
             blocks.append(block)
-        
+
         return blocks if blocks else ""
-    
+
     async def complete(
         self,
-        messages: List[Dict[str, str]],
-        system: Optional[str] = None,
-        model: Optional[str] = None,
+        messages: list[dict[str, str]],
+        system: str | None = None,
+        model: str | None = None,
         max_tokens: int = 1024,
         temperature: float = 0.7,
         extended_thinking: bool = False,
     ) -> LLMResponse:
         """Generate a text completion using Claude."""
         self._ensure_client()
-        
+
         model_name = model or self.default_model
-        
+
         # Prepare request args
         kwargs = {
             "model": model_name,
@@ -113,7 +112,7 @@ class AnthropicProvider(LLMProvider):
             "system": self._build_system_blocks(system),
             "messages": messages
         }
-        
+
         # Extended thinking
         if extended_thinking:
             # Claude requires: budget_tokens < max_tokens
@@ -126,7 +125,7 @@ class AnthropicProvider(LLMProvider):
             kwargs["temperature"] = 1.0
             # Ensure max_tokens > budget_tokens
             kwargs["max_tokens"] = max(max_tokens, 8192)
-            
+
         # Use streaming to prevent truncation issues with long responses
         def _stream_and_collect():
             full_text = ""
@@ -136,9 +135,9 @@ class AnthropicProvider(LLMProvider):
                     full_text += text
                 final_message = stream.get_final_message()
             return full_text, final_message
-        
+
         full_text, final_message = await self._run_with_retry(_stream_and_collect)
-        
+
         # Extract usage (including cache hits) from final message
         usage = {}
         if final_message and hasattr(final_message, 'usage'):
@@ -147,25 +146,25 @@ class AnthropicProvider(LLMProvider):
                 "completion_tokens": final_message.usage.output_tokens,
                 "total_tokens": final_message.usage.input_tokens + final_message.usage.output_tokens,
             }
-            
+
             # Check for cache hits (Anthropic prompt caching)
             cached_tokens = getattr(final_message.usage, 'cache_read_input_tokens', 0)
             if cached_tokens and cached_tokens > 0:
                 usage["cached_tokens"] = cached_tokens
                 logger.info(f"{cached_tokens} tokens cached ({cached_tokens/usage.get('prompt_tokens', 1)*100:.0f}% of prompt)")
-        
+
         return LLMResponse(
             content=full_text,
             model=model_name,
             usage=usage,
             raw_response=final_message
         )
-    
+
     async def complete_with_search(
         self,
-        messages: List[Dict[str, str]],
-        system: Optional[str] = None,
-        model: Optional[str] = None,
+        messages: list[dict[str, str]],
+        system: str | None = None,
+        model: str | None = None,
         max_tokens: int = 4096,
         temperature: float = 0.5,
         extended_thinking: bool = False,
@@ -176,16 +175,16 @@ class AnthropicProvider(LLMProvider):
         and synthesize results with citations.
         """
         self._ensure_client()
-        
+
         model_name = model or self.get_research_model()
-        
+
         # Enable web search tool - use web_search_20250305 type per Anthropic docs
         tools = [{
             "type": "web_search_20250305",
             "name": "web_search",
             "max_uses": 5
         }]
-        
+
         kwargs = {
             "model": model_name,
             "max_tokens": max_tokens,
@@ -194,7 +193,7 @@ class AnthropicProvider(LLMProvider):
             "messages": messages,
             "tools": tools,
         }
-        
+
         if extended_thinking:
             kwargs["thinking"] = {
                 "type": "enabled",
@@ -202,19 +201,19 @@ class AnthropicProvider(LLMProvider):
             }
             kwargs["temperature"] = 1.0
             kwargs["max_tokens"] = max(max_tokens, 8192)
-        
+
         # Use streaming to prevent truncation with long responses
         def _stream_and_collect():
             content = ""
             search_results = []
             citations = []
             final_message = None
-            
+
             with self._client.messages.stream(**kwargs) as stream:
                 for text in stream.text_stream:
                     content += text
                 final_message = stream.get_final_message()
-            
+
             # Extract search metadata from final message
             if final_message:
                 for block in final_message.content:
@@ -223,11 +222,11 @@ class AnthropicProvider(LLMProvider):
                     if hasattr(block, 'type'):
                         if block.type == "server_tool_use" and getattr(block, 'name', '') == "web_search":
                             search_results.append(getattr(block, 'input', {}))
-            
+
             return content, search_results, citations, final_message
-        
+
         content, search_results, citations, final_message = await self._run_with_retry(_stream_and_collect)
-        
+
         # Extract usage from final message
         usage = {}
         if final_message and hasattr(final_message, 'usage'):
@@ -236,7 +235,7 @@ class AnthropicProvider(LLMProvider):
                 "completion_tokens": final_message.usage.output_tokens,
                 "total_tokens": final_message.usage.input_tokens + final_message.usage.output_tokens,
             }
-        
+
         return LLMResponse(
             content=content,
             model=model_name,
@@ -248,31 +247,31 @@ class AnthropicProvider(LLMProvider):
                 "citations": citations
             }
         )
-    
+
     async def complete_with_schema(
         self,
-        messages: List[Dict[str, str]],
-        schema: Type[BaseModel],
-        system: Optional[str] = None,
-        model: Optional[str] = None,
+        messages: list[dict[str, str]],
+        schema: type[BaseModel],
+        system: str | None = None,
+        model: str | None = None,
         max_tokens: int = 1024,
         extended_thinking: bool = False,
     ) -> BaseModel:
         """Generate a structured completion using tool use."""
         self._ensure_client()
-        
+
         model_name = model or self.default_model
-        
+
         # Get JSON schema from Pydantic model
         json_schema = schema.model_json_schema()
-        
+
         # Create tool for structured output
         tools = [{
             "name": "respond",
             "description": f"Provide your response as a {schema.__name__}",
             "input_schema": json_schema
         }]
-        
+
         kwargs = {
             "model": model_name,
             "max_tokens": max_tokens,
@@ -291,7 +290,7 @@ class AnthropicProvider(LLMProvider):
             }
             kwargs["temperature"] = 1.0
             kwargs["max_tokens"] = max(max_tokens, 8192)
-            
+
             # For extended thinking, append instruction to the system prompt
             # Handle both plain string and cache block formats
             extra = "\n\nIMPORTANT: You must respond by calling the 'respond' tool to provide the structured output."
@@ -308,22 +307,22 @@ class AnthropicProvider(LLMProvider):
         def _stream_and_collect():
             text_content = ""
             final_message = None
-            
+
             with self._client.messages.stream(**kwargs) as stream:
                 for text in stream.text_stream:
                     text_content += text
                 final_message = stream.get_final_message()
-            
+
             return text_content, final_message
-        
+
         text_content, final_message = await self._run_with_retry(_stream_and_collect)
-        
+
         # Extract tool use response from final message
         if final_message:
             for block in final_message.content:
                 if hasattr(block, 'type') and block.type == "thinking":
                     continue
-                
+
                 if hasattr(block, 'type') and block.type == "tool_use":
                     input_data = block.input
                     if isinstance(input_data, str):
@@ -331,7 +330,7 @@ class AnthropicProvider(LLMProvider):
                             input_data = json.loads(input_data)
                         except json.JSONDecodeError:
                             pass
-                    
+
                     try:
                         return schema.model_validate(input_data)
                     except Exception as e:
@@ -348,7 +347,7 @@ class AnthropicProvider(LLMProvider):
                                 return repaired
                         except Exception as repair_error:
                             logger.error(f"Validator repair failed: {repair_error}")
-        
+
         # Fallback: try to parse text content as JSON
         if text_content:
             try:
@@ -356,7 +355,7 @@ class AnthropicProvider(LLMProvider):
                 return schema.model_validate(data)
             except (json.JSONDecodeError, Exception):
                 pass
-            
+
             # Last resort: validator repair
             try:
                 from ..agents.validator import get_validator
@@ -370,15 +369,15 @@ class AnthropicProvider(LLMProvider):
                     return repaired
             except Exception as repair_error:
                 logger.error(f"Validator repair failed: {repair_error}")
-        
-        raise ValueError(f"Could not parse structured response from Claude")
-    
+
+        raise ValueError("Could not parse structured response from Claude")
+
     async def complete_with_schema_and_search(
         self,
-        messages: List[Dict[str, str]],
-        schema: Type[BaseModel],
-        system: Optional[str] = None,
-        model: Optional[str] = None,
+        messages: list[dict[str, str]],
+        schema: type[BaseModel],
+        system: str | None = None,
+        model: str | None = None,
         max_tokens: int = 4096,
         extended_thinking: bool = False,
     ) -> BaseModel:
@@ -387,11 +386,11 @@ class AnthropicProvider(LLMProvider):
         Claude will search the web, then provide a structured response.
         """
         self._ensure_client()
-        
+
         model_name = model or self.get_research_model()
-        
+
         json_schema = schema.model_json_schema()
-        
+
         # Combined tools: web search + structured output
         tools = [
             {
@@ -405,14 +404,14 @@ class AnthropicProvider(LLMProvider):
                 "input_schema": json_schema
             }
         ]
-        
+
         # Add schema instructions to system prompt
-        schema_instruction = f"""
+        schema_instruction = """
 After researching using web search, provide your final response using the 'respond' tool.
 Your response must match the required JSON schema.
 """
         full_system = f"{system}\n\n{schema_instruction}" if system else schema_instruction
-        
+
         kwargs = {
             "model": model_name,
             "max_tokens": max_tokens,
@@ -420,7 +419,7 @@ Your response must match the required JSON schema.
             "messages": messages,
             "tools": tools,
         }
-        
+
         if extended_thinking:
             kwargs["thinking"] = {
                 "type": "enabled",
@@ -429,17 +428,17 @@ Your response must match the required JSON schema.
             # CRITICAL: Anthropic requires temperature=1 when thinking is enabled
             kwargs["temperature"] = 1.0
             kwargs["max_tokens"] = max(max_tokens, 8192)
-        
+
         # Regular messages endpoint - no beta needed for web search
         response = await self._run_with_retry(
             lambda: self._client.messages.create(**kwargs)
         )
-        
+
         # Extract structured response from tool use
         for block in response.content:
             if block.type == "tool_use" and block.name == "respond":
                 return schema.model_validate(block.input)
-        
+
         # Fallback: try to parse text content
         for block in response.content:
             if hasattr(block, 'text'):
@@ -448,15 +447,15 @@ Your response must match the required JSON schema.
                     return schema.model_validate(data)
                 except (json.JSONDecodeError, Exception):
                     pass
-        
-        raise ValueError(f"Could not parse structured response from Claude")
-    
+
+        raise ValueError("Could not parse structured response from Claude")
+
     async def complete_with_tools(
         self,
-        messages: List[Dict[str, str]],
+        messages: list[dict[str, str]],
         tools: Any,  # ToolRegistry
-        system: Optional[str] = None,
-        model: Optional[str] = None,
+        system: str | None = None,
+        model: str | None = None,
         max_tokens: int = 4096,
         max_tool_rounds: int = 5,
     ) -> LLMResponse:
@@ -474,10 +473,9 @@ Your response must match the required JSON schema.
         Requires: code_execution_20250825 server tool
         """
         self._ensure_client()
-        import asyncio
-        
+
         model_name = model or self.get_fast_model()
-        
+
         # Try programmatic tool calling first, fall back to standard
         try:
             return await self._complete_with_tools_programmatic(
@@ -488,12 +486,12 @@ Your response must match the required JSON schema.
             return await self._complete_with_tools_standard(
                 messages, tools, system, model_name, max_tokens, max_tool_rounds
             )
-    
+
     async def _complete_with_tools_programmatic(
         self,
-        messages: List[Dict[str, str]],
+        messages: list[dict[str, str]],
         tools: Any,  # ToolRegistry
-        system: Optional[str],
+        system: str | None,
         model_name: str,
         max_tokens: int,
         max_tool_rounds: int,
@@ -504,22 +502,21 @@ Your response must match the required JSON schema.
         sandbox. The API pauses on each tool_use block and we provide results.
         Intermediate results stay in the sandbox, not in Claude's context.
         """
-        import asyncio
-        
+
         # Convert tools with allowed_callers for programmatic calling
         anthropic_tools = tools.to_anthropic_format(programmatic=True)
-        
+
         # Prepend the code execution server tool
         anthropic_tools.insert(0, {
             "type": "code_execution_20250825",
             "name": "code_execution",
         })
-        
+
         conversation = list(messages)
         all_tool_calls = []
         total_usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
         container_id = None  # Reuse container across rounds
-        
+
         for round_num in range(max_tool_rounds):
             kwargs = {
                 "model": model_name,
@@ -531,16 +528,16 @@ Your response must match the required JSON schema.
             }
             if container_id:
                 kwargs["container"] = container_id
-            
+
             response = await self._run_with_retry(
                 lambda kwargs=kwargs: self._client.beta.messages.create(**kwargs)
             )
-            
+
             # Track container for reuse
             if hasattr(response, 'container') and response.container:
                 ctr = response.container
                 container_id = ctr.id if hasattr(ctr, 'id') else (ctr.get('id') if isinstance(ctr, dict) else None)
-            
+
             # Accumulate usage
             if hasattr(response, 'usage'):
                 total_usage["prompt_tokens"] += response.usage.input_tokens
@@ -548,19 +545,19 @@ Your response must match the required JSON schema.
                 total_usage["total_tokens"] += (
                     response.usage.input_tokens + response.usage.output_tokens
                 )
-            
+
             # Classify response blocks
             text_parts = []
             tool_use_blocks = []       # Client tool calls we need to execute
             assistant_content = []      # Full content for conversation history
-            
+
             for block in response.content:
                 block_type = getattr(block, 'type', None)
-                
+
                 if block_type == "text":
                     text_parts.append(block.text)
                     assistant_content.append({"type": "text", "text": block.text})
-                    
+
                 elif block_type == "tool_use":
                     # Client tool call -- we execute this
                     tool_use_blocks.append(block)
@@ -579,7 +576,7 @@ Your response must match the required JSON schema.
                         elif isinstance(caller, dict):
                             entry["caller"] = caller
                     assistant_content.append(entry)
-                    
+
                 elif block_type == "server_tool_use":
                     # Code execution block -- pass through as-is
                     assistant_content.append({
@@ -588,7 +585,7 @@ Your response must match the required JSON schema.
                         "name": block.name,
                         "input": block.input if hasattr(block, 'input') else {},
                     })
-                    
+
                 elif block_type == "code_execution_tool_result":
                     # Code execution result -- pass through
                     assistant_content.append({
@@ -596,7 +593,7 @@ Your response must match the required JSON schema.
                         "tool_use_id": block.tool_use_id if hasattr(block, 'tool_use_id') else "",
                         "content": block.content if hasattr(block, 'content') else {},
                     })
-            
+
             # If no tool_use blocks, we are done
             if not tool_use_blocks:
                 final_text = "\n".join(text_parts)
@@ -614,7 +611,7 @@ Your response must match the required JSON schema.
                         "container_id": container_id,
                     }
                 )
-            
+
             # Execute tool calls
             is_programmatic = any(
                 hasattr(b, 'caller') and b.caller and
@@ -623,20 +620,20 @@ Your response must match the required JSON schema.
             )
             mode_label = "programmatic" if is_programmatic else "direct"
             logger.info(f"Round {round_num+1}: {len(tool_use_blocks)} tool call(s) [{mode_label}]")
-            
+
             conversation.append({"role": "assistant", "content": assistant_content})
-            
+
             tool_results = []
             for block in tool_use_blocks:
                 tool_name = block.name
                 tool_args = block.input if isinstance(block.input, dict) else {}
                 tool_id = block.id
-                
+
                 logger.info(f"  [Tool] {tool_name}({tool_args})")
-                
+
                 result = tools.execute(tool_name, tool_args, round_number=round_num)
                 result_str = result.to_string()
-                
+
                 all_tool_calls.append({
                     "name": tool_name,
                     "arguments": tool_args,
@@ -644,24 +641,24 @@ Your response must match the required JSON schema.
                     "round": round_num + 1,
                     "programmatic": is_programmatic,
                 })
-                
+
                 tool_results.append({
                     "type": "tool_result",
                     "tool_use_id": tool_id,
                     "content": result_str,
                 })
-            
+
             # For programmatic calls: tool_result-only (no text allowed)
             conversation.append({"role": "user", "content": tool_results})
-        
+
         # Hit max_tool_rounds
         logger.info(f"Hit max rounds ({max_tool_rounds}), forcing final response [programmatic]")
-        
+
         conversation.append({
             "role": "user",
             "content": "You've completed your research. Now produce your final response based on everything you've found."
         })
-        
+
         final_response = await self._run_with_retry(
             lambda: self._client.beta.messages.create(
                 model=model_name,
@@ -671,12 +668,12 @@ Your response must match the required JSON schema.
                 messages=conversation,
             )
         )
-        
+
         final_text = ""
         for block in final_response.content:
             if hasattr(block, 'text'):
                 final_text += block.text
-        
+
         return LLMResponse(
             content=final_text,
             tool_calls=all_tool_calls,
@@ -690,12 +687,12 @@ Your response must match the required JSON schema.
                 "container_id": container_id,
             }
         )
-    
+
     async def _complete_with_tools_standard(
         self,
-        messages: List[Dict[str, str]],
+        messages: list[dict[str, str]],
         tools: Any,  # ToolRegistry
-        system: Optional[str],
+        system: str | None,
         model_name: str,
         max_tokens: int,
         max_tool_rounds: int,
@@ -705,13 +702,12 @@ Your response must match the required JSON schema.
         Uses standard messages.create with tool_use blocks. Each tool call
         is a separate round-trip through the model.
         """
-        import asyncio
-        
+
         anthropic_tools = tools.to_anthropic_format()
         conversation = list(messages)
         all_tool_calls = []
         total_usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
-        
+
         for round_num in range(max_tool_rounds):
             kwargs = {
                 "model": model_name,
@@ -720,18 +716,18 @@ Your response must match the required JSON schema.
                 "messages": conversation,
                 "tools": anthropic_tools,
             }
-            
+
             response = await self._run_with_retry(
                 lambda kwargs=kwargs: self._client.messages.create(**kwargs)
             )
-            
+
             if hasattr(response, 'usage'):
                 total_usage["prompt_tokens"] += response.usage.input_tokens
                 total_usage["completion_tokens"] += response.usage.output_tokens
                 total_usage["total_tokens"] += (
                     response.usage.input_tokens + response.usage.output_tokens
                 )
-            
+
             text_parts = []
             tool_use_blocks = []
             for block in response.content:
@@ -740,7 +736,7 @@ Your response must match the required JSON schema.
                         text_parts.append(block.text)
                     elif block.type == "tool_use":
                         tool_use_blocks.append(block)
-            
+
             if not tool_use_blocks:
                 final_text = "\n".join(text_parts)
                 logger.info(f"Round {round_num+1}: Final text ({len(final_text)} chars) [standard]")
@@ -752,9 +748,9 @@ Your response must match the required JSON schema.
                     raw_response=response,
                     metadata={"tool_rounds": round_num + 1, "programmatic": False}
                 )
-            
+
             logger.info(f"Round {round_num+1}: {len(tool_use_blocks)} tool call(s) [standard]")
-            
+
             conversation.append({
                 "role": "assistant",
                 "content": [
@@ -765,40 +761,40 @@ Your response must match the required JSON schema.
                     if hasattr(b, 'type') and b.type in ("text", "tool_use")
                 ]
             })
-            
+
             tool_results = []
             for block in tool_use_blocks:
                 tool_name = block.name
                 tool_args = block.input if isinstance(block.input, dict) else {}
                 tool_id = block.id
-                
+
                 logger.info(f"  [Tool] {tool_name}({tool_args})")
-                
+
                 result = tools.execute(tool_name, tool_args, round_number=round_num)
                 result_str = result.to_string()
-                
+
                 all_tool_calls.append({
                     "name": tool_name,
                     "arguments": tool_args,
                     "result_preview": result_str[:200],
                     "round": round_num + 1,
                 })
-                
+
                 tool_results.append({
                     "type": "tool_result",
                     "tool_use_id": tool_id,
                     "content": result_str,
                 })
-            
+
             conversation.append({"role": "user", "content": tool_results})
-        
+
         logger.info(f"Hit max rounds ({max_tool_rounds}), forcing final response [standard]")
-        
+
         conversation.append({
             "role": "user",
             "content": "You've completed your research. Now produce your final response based on everything you've found."
         })
-        
+
         final_response = await self._run_with_retry(
             lambda: self._client.messages.create(
                 model=model_name,
@@ -807,12 +803,12 @@ Your response must match the required JSON schema.
                 messages=conversation,
             )
         )
-        
+
         final_text = ""
         for block in final_response.content:
             if hasattr(block, 'text'):
                 final_text += block.text
-        
+
         return LLMResponse(
             content=final_text,
             tool_calls=all_tool_calls,

@@ -4,14 +4,10 @@ Tests the template loading, profile DNA rendering, scene context
 construction, and outcome formatting — all with mock profile data.
 """
 
-import pytest
-from unittest.mock import MagicMock, PropertyMock, patch
 from dataclasses import dataclass
+from unittest.mock import MagicMock
 
 from src.agents._key_animator_prompt import PromptBuilderMixin
-from src.agents.intent_classifier import IntentOutput
-from src.agents.outcome_judge import OutcomeOutput
-
 
 # ---------------------------------------------------------------------------
 # Helpers

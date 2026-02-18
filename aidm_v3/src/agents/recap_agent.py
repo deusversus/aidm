@@ -11,18 +11,17 @@ or when the gap between sessions exceeds a threshold.
 Design: ~800 input tokens, ~200 output tokens → ~150ms on Haiku.
 """
 
-from typing import Optional
-from pydantic import BaseModel, Field
-from .base import BaseAgent
-
-
 import logging
+
+from pydantic import BaseModel, Field
+
+from .base import BaseAgent
 
 logger = logging.getLogger(__name__)
 
 class RecapOutput(BaseModel):
     """Structured recap for session opening."""
-    
+
     recap_text: str = Field(
         description=(
             "3-5 sentence anime-style 'Previously On...' recap. "
@@ -43,13 +42,13 @@ class RecapAgent(BaseAgent):
     player up on the story so far. Uses arc_history (Campaign Bible)
     and narrative_beat memories for source material.
     """
-    
+
     agent_name = "recap"
-    
+
     @property
     def output_schema(self):
         return RecapOutput
-    
+
     @property
     def system_prompt(self) -> str:
         return """You are a recap narrator for an anime TTRPG narrative engine.
@@ -80,7 +79,7 @@ Do NOT be generic. Be SPECIFIC to the events provided."""
         current_situation: str,
         character_name: str,
         arc_phase: str,
-    ) -> Optional[RecapOutput]:
+    ) -> RecapOutput | None:
         """Generate a session-opening recap.
         
         Args:
@@ -102,13 +101,13 @@ Do NOT be generic. Be SPECIFIC to the events provided."""
                     history_text += f"Arc Event {i+1}: {entry.get('summary', str(entry))}\n"
                 else:
                     history_text += f"Arc Event {i+1}: {entry}\n"
-        
+
         # Build context from narrative beats
         beats_text = ""
         if narrative_beats:
             for i, beat in enumerate(narrative_beats[:5]):  # Top 5
                 beats_text += f"Beat {i+1}: {beat}\n"
-        
+
         try:
             result = await self.call(
                 f"Generate a recap for {character_name}'s story so far.",

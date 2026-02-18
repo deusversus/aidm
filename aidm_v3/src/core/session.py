@@ -5,10 +5,10 @@ Tracks whether we're in Session Zero (character creation) or Gameplay,
 and manages the multi-phase Session Zero protocol from V2.
 """
 
-from enum import Enum
 from dataclasses import dataclass, field
-from typing import Optional, Dict, Any, List
 from datetime import datetime
+from enum import Enum
+from typing import Any
 
 
 class SessionPhase(Enum):
@@ -28,7 +28,7 @@ class SessionPhase(Enum):
     MECHANICAL_BUILD = "build"                # Phase 3: Stats, skills, equipment
     WORLD_INTEGRATION = "integration"         # Phase 4: How they fit the world
     OPENING_SCENE = "opening"                 # Phase 5: First narrative moment
-    
+
     # Post-Session Zero
     GAMEPLAY = "gameplay"                     # Normal gameplay loop
 
@@ -53,51 +53,51 @@ PHASE_ORDER = [
 HARD_REQUIREMENTS = {
     # Phase 0: World
     "media_reference": "What anime/IP inspires this world",
-    
+
     # Phase 1: Concept
     "concept": "1-2 sentence character summary",
-    
+
     # Phase 2: Identity
     "name": "Player character's name",
     "backstory": "Character's backstory/history",
-    
+
     # Phase 3: Mechanics
     "attributes": "Character stats (STR, DEX, etc.)",
-    
+
     # Phase 4: World Integration
     "starting_location": "Where the story begins",
 }
 
 
-def get_missing_requirements(draft: "CharacterDraft") -> List[str]:
+def get_missing_requirements(draft: "CharacterDraft") -> list[str]:
     """Return list of hard requirements that are still missing.
     
     Session Zero MUST NOT hand off until all of these are filled.
     """
     missing = []
-    
+
     # World
     if draft.media_reference is None:
         missing.append("media_reference")
-    
+
     # Concept
     if draft.concept is None:
         missing.append("concept")
-    
+
     # Identity
     if draft.name is None:
         missing.append("name")
     if draft.backstory is None:
         missing.append("backstory")
-    
+
     # Mechanics - need at least some attributes
     if not draft.attributes:
         missing.append("attributes")
-    
+
     # World integration
     if draft.starting_location is None:
         missing.append("starting_location")
-    
+
     return missing
 
 
@@ -136,58 +136,58 @@ class CharacterDraft:
     Starts empty and fills in as the player answers questions.
     """
     # Phase 0: Media reference
-    media_reference: Optional[str] = None
+    media_reference: str | None = None
     media_researched: bool = False
-    
+
     # Phase 0.5: Narrative calibration (None = not asked, True = confirmed)
-    narrative_calibrated: Optional[bool] = None
-    narrative_profile: Optional[str] = None  # e.g., "hunter_x_hunter"
-    tone_preferences: Dict[str, Any] = field(default_factory=dict)
-    
+    narrative_calibrated: bool | None = None
+    narrative_profile: str | None = None  # e.g., "hunter_x_hunter"
+    tone_preferences: dict[str, Any] = field(default_factory=dict)
+
     # Phase 0.5: Canonicality (how the story relates to source material)
-    timeline_mode: Optional[str] = None       # "canon_adjacent", "alternate", "inspired"
-    canon_cast_mode: Optional[str] = None     # "full_cast", "replaced_protagonist", "npcs_only"
-    event_fidelity: Optional[str] = None      # "observable", "influenceable", "background"
-    
+    timeline_mode: str | None = None       # "canon_adjacent", "alternate", "inspired"
+    canon_cast_mode: str | None = None     # "full_cast", "replaced_protagonist", "npcs_only"
+    event_fidelity: str | None = None      # "observable", "influenceable", "background"
+
     # Phase 0.6: OP mode (None = not yet asked, False = declined, True = enabled)
-    op_protagonist_enabled: Optional[bool] = None
-    op_tension_source: Optional[str] = None      # existential, relational, moral, burden, information, consequence, control
-    op_power_expression: Optional[str] = None    # instantaneous, overwhelming, sealed, hidden, conditional, derivative, passive
-    op_narrative_focus: Optional[str] = None     # internal, ensemble, reverse_ensemble, episodic, faction, mundane, competition, legacy
-    op_preset: Optional[str] = None              # Optional preset name (bored_god, hidden_ruler, etc.)
-    
+    op_protagonist_enabled: bool | None = None
+    op_tension_source: str | None = None      # existential, relational, moral, burden, information, consequence, control
+    op_power_expression: str | None = None    # instantaneous, overwhelming, sealed, hidden, conditional, derivative, passive
+    op_narrative_focus: str | None = None     # internal, ensemble, reverse_ensemble, episodic, faction, mundane, competition, legacy
+    op_preset: str | None = None              # Optional preset name (bored_god, hidden_ruler, etc.)
+
     # Power Tier (from OP mode or profile)
-    power_tier: Optional[str] = None             # e.g., "T3", "T6" - defaults based on OP mode/world
-    
+    power_tier: str | None = None             # e.g., "T3", "T6" - defaults based on OP mode/world
+
     # Phase 1: Concept
-    concept: Optional[str] = None  # The "big idea" tagline
-    
+    concept: str | None = None  # The "big idea" tagline
+
     # Phase 2: Identity
-    name: Optional[str] = None
-    age: Optional[int] = None
-    appearance: Dict[str, str] = field(default_factory=dict)
-    visual_tags: List[str] = field(default_factory=list)  # ["blue_hair", "scar_left_eye", "tall"]
-    personality_traits: List[str] = field(default_factory=list)
-    values: List[str] = field(default_factory=list)
-    fears: List[str] = field(default_factory=list)
-    backstory: Optional[str] = None
-    goals: Dict[str, str] = field(default_factory=dict)  # short_term, long_term
-    quirks: List[str] = field(default_factory=list)
-    
+    name: str | None = None
+    age: int | None = None
+    appearance: dict[str, str] = field(default_factory=dict)
+    visual_tags: list[str] = field(default_factory=list)  # ["blue_hair", "scar_left_eye", "tall"]
+    personality_traits: list[str] = field(default_factory=list)
+    values: list[str] = field(default_factory=list)
+    fears: list[str] = field(default_factory=list)
+    backstory: str | None = None
+    goals: dict[str, str] = field(default_factory=dict)  # short_term, long_term
+    quirks: list[str] = field(default_factory=list)
+
     # Phase 3: Mechanical build
-    attributes: Dict[str, int] = field(default_factory=dict)  # STR, DEX, etc.
-    resources: Dict[str, int] = field(default_factory=dict)   # HP, MP, SP
-    unique_ability: Optional[Dict[str, Any]] = None
-    skills: List[str] = field(default_factory=list)
-    inventory: List[Dict[str, Any]] = field(default_factory=list)
+    attributes: dict[str, int] = field(default_factory=dict)  # STR, DEX, etc.
+    resources: dict[str, int] = field(default_factory=dict)   # HP, MP, SP
+    unique_ability: dict[str, Any] | None = None
+    skills: list[str] = field(default_factory=list)
+    inventory: list[dict[str, Any]] = field(default_factory=list)
     starting_gold: int = 0
-    
+
     # Phase 4: World integration
-    starting_location: Optional[str] = None
-    faction_affiliations: List[str] = field(default_factory=list)
-    known_npcs: List[str] = field(default_factory=list)
-    
-    def to_dict(self) -> Dict[str, Any]:
+    starting_location: str | None = None
+    faction_affiliations: list[str] = field(default_factory=list)
+    known_npcs: list[str] = field(default_factory=list)
+
+    def to_dict(self) -> dict[str, Any]:
         """Serialize to dictionary for persistence."""
         return {
             "media_reference": self.media_reference,
@@ -224,9 +224,9 @@ class CharacterDraft:
             "faction_affiliations": self.faction_affiliations,
             "known_npcs": self.known_npcs,
         }
-    
+
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "CharacterDraft":
+    def from_dict(cls, data: dict[str, Any]) -> "CharacterDraft":
         """Deserialize from dictionary."""
         return cls(
             media_reference=data.get("media_reference"),
@@ -273,25 +273,25 @@ class Session:
     session_id: str
     phase: SessionPhase = SessionPhase.MEDIA_DETECTION
     character_draft: CharacterDraft = field(default_factory=CharacterDraft)
-    
+
     # Conversation history for this session
-    messages: List[Dict[str, str]] = field(default_factory=list)
-    
+    messages: list[dict[str, str]] = field(default_factory=list)
+
     # Compaction buffer: micro-summaries of messages that fell off the sliding window
     # Each entry: {"turn": int, "summary": str, "tokens_est": int}
-    compaction_buffer: List[Dict[str, Any]] = field(default_factory=list)
-    
+    compaction_buffer: list[dict[str, Any]] = field(default_factory=list)
+
     # Metadata
     created_at: datetime = field(default_factory=datetime.now)
     last_activity: datetime = field(default_factory=datetime.now)
-    
+
     # Phase-specific state (for multi-turn phases)
-    phase_state: Dict[str, Any] = field(default_factory=dict)
-    
+    phase_state: dict[str, Any] = field(default_factory=dict)
+
     def is_session_zero(self) -> bool:
         """Check if we're still in Session Zero."""
         return self.phase != SessionPhase.GAMEPLAY
-    
+
     def advance_phase(self) -> bool:
         """
         Move to the next phase.
@@ -299,7 +299,7 @@ class Session:
         """
         if self.phase == SessionPhase.GAMEPLAY:
             return False
-        
+
         current_idx = PHASE_ORDER.index(self.phase)
         if current_idx < len(PHASE_ORDER) - 1:
             self.phase = PHASE_ORDER[current_idx + 1]
@@ -307,7 +307,7 @@ class Session:
             self.last_activity = datetime.now()
             return True
         return False
-    
+
     def skip_to_phase(self, target: SessionPhase) -> bool:
         """
         Skip directly to a target phase (for Spartan Mode or corrections).
@@ -318,7 +318,7 @@ class Session:
             self.last_activity = datetime.now()
             return True
         return False
-    
+
     def add_message(self, role: str, content: str):
         """Add a message to the conversation history."""
         self.messages.append({
@@ -328,8 +328,8 @@ class Session:
             "phase": self.phase.value
         })
         self.last_activity = datetime.now()
-    
-    def to_dict(self) -> Dict[str, Any]:
+
+    def to_dict(self) -> dict[str, Any]:
         """Serialize to dictionary for persistence."""
         return {
             "session_id": self.session_id,
@@ -341,9 +341,9 @@ class Session:
             "last_activity": self.last_activity.isoformat(),
             "phase_state": self.phase_state,
         }
-    
+
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "Session":
+    def from_dict(cls, data: dict[str, Any]) -> "Session":
         """Deserialize from dictionary."""
         session = cls(
             session_id=data["session_id"],
@@ -367,20 +367,20 @@ class SessionManager:
     In a real deployment, this would be backed by a database.
     For now, we use in-memory storage.
     """
-    
+
     def __init__(self):
-        self._sessions: Dict[str, Session] = {}
-    
+        self._sessions: dict[str, Session] = {}
+
     def create_session(self, session_id: str) -> Session:
         """Create a new session starting at Session Zero."""
         session = Session(session_id=session_id)
         self._sessions[session_id] = session
         return session
-    
-    def get_session(self, session_id: str) -> Optional[Session]:
+
+    def get_session(self, session_id: str) -> Session | None:
         """Get an existing session."""
         return self._sessions.get(session_id)
-    
+
     def get_or_create_session(self, session_id: str) -> Session:
         """Get existing session or create new one."""
         if session_id not in self._sessions:
@@ -389,7 +389,7 @@ class SessionManager:
 
 
 # Singleton instance
-_session_manager: Optional[SessionManager] = None
+_session_manager: SessionManager | None = None
 
 
 def get_session_manager() -> SessionManager:

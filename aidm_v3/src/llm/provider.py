@@ -1,12 +1,13 @@
 """Abstract LLM provider interface."""
 
 import asyncio
-from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Tuple, Type, TypeVar, Union
-from pydantic import BaseModel
-
 import logging
+from abc import ABC, abstractmethod
+from collections.abc import Callable
+from dataclasses import dataclass, field
+from typing import Any, TypeVar, Union
+
+from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 
@@ -18,29 +19,29 @@ T = TypeVar("T")
 #                                Providers that support explicit caching (Anthropic)
 #                                will add cache_control breakpoints on marked blocks.
 #                                Others (Google) flatten to a single string.
-SystemPrompt = Union[str, List[Tuple[str, bool]]]
+SystemPrompt = Union[str, list[tuple[str, bool]]]
 
 
 @dataclass
 class LLMResponse:
     """Standard response from any LLM provider."""
-    
+
     content: str
     """The text content of the response."""
-    
-    tool_calls: List[Dict[str, Any]] = field(default_factory=list)
+
+    tool_calls: list[dict[str, Any]] = field(default_factory=list)
     """Tool/function calls if any (for structured output)."""
-    
+
     model: str = ""
     """The model that generated this response."""
-    
-    usage: Dict[str, int] = field(default_factory=dict)
+
+    usage: dict[str, int] = field(default_factory=dict)
     """Token usage: {prompt_tokens, completion_tokens, total_tokens}."""
-    
+
     raw_response: Any = None
     """The raw response object from the provider."""
-    
-    metadata: Dict[str, Any] = field(default_factory=dict)
+
+    metadata: dict[str, Any] = field(default_factory=dict)
     """Additional metadata (e.g., search grounding info, citations)."""
 
 
@@ -52,8 +53,8 @@ class LLMProvider(ABC):
     - Structured output via tool/function calling
     - System prompts
     """
-    
-    def __init__(self, api_key: str, default_model: Optional[str] = None):
+
+    def __init__(self, api_key: str, default_model: str | None = None):
         """Initialize the provider.
         
         Args:
@@ -63,28 +64,28 @@ class LLMProvider(ABC):
         self.api_key = api_key
         self.default_model = default_model or self.get_default_model()
         self._client = None
-    
+
     @property
     @abstractmethod
     def name(self) -> str:
         """Provider name (e.g., 'anthropic', 'google', 'openai')."""
         pass
-    
+
     @abstractmethod
     def get_default_model(self) -> str:
         """Get the default model for this provider."""
         pass
-    
+
     @abstractmethod
     def get_fast_model(self) -> str:
         """Get the fast/cheap model for this provider."""
         pass
-    
+
     @abstractmethod
     def get_creative_model(self) -> str:
         """Get the creative/quality model for this provider."""
         pass
-    
+
     def get_max_concurrent_requests(self) -> int:
         """Get the maximum concurrent requests allowed for this provider.
         
@@ -92,13 +93,13 @@ class LLMProvider(ABC):
         Default is 5, which is conservative for most providers.
         """
         return 5
-    
+
     @abstractmethod
     async def complete(
         self,
-        messages: List[Dict[str, str]],
-        system: Optional[str] = None,
-        model: Optional[str] = None,
+        messages: list[dict[str, str]],
+        system: str | None = None,
+        model: str | None = None,
         max_tokens: int = 1024,
         temperature: float = 0.7,
         extended_thinking: bool = False,
@@ -116,14 +117,14 @@ class LLMProvider(ABC):
             LLMResponse with the completion
         """
         pass
-    
+
     @abstractmethod
     async def complete_with_schema(
         self,
-        messages: List[Dict[str, str]],
-        schema: Type[BaseModel],
-        system: Optional[str] = None,
-        model: Optional[str] = None,
+        messages: list[dict[str, str]],
+        schema: type[BaseModel],
+        system: str | None = None,
+        model: str | None = None,
         max_tokens: int = 1024,
         extended_thinking: bool = False,
     ) -> BaseModel:
@@ -140,13 +141,13 @@ class LLMProvider(ABC):
             Parsed Pydantic model instance
         """
         pass
-    
+
     async def complete_with_tools(
         self,
-        messages: List[Dict[str, str]],
+        messages: list[dict[str, str]],
         tools: Any,  # ToolRegistry — imported lazily to avoid circular deps
-        system: Optional[str] = None,
-        model: Optional[str] = None,
+        system: str | None = None,
+        model: str | None = None,
         max_tokens: int = 4096,
         max_tool_rounds: int = 5,
     ) -> 'LLMResponse':
@@ -173,7 +174,7 @@ class LLMProvider(ABC):
             f"{self.name} provider does not support tool-calling yet. "
             f"Implement complete_with_tools() in the provider subclass."
         )
-    
+
     # ── Retry helper ──────────────────────────────────────────────
 
     @staticmethod
@@ -185,23 +186,23 @@ class LLMProvider(ABC):
         either SDK.
         """
         cls_name = type(exc).__name__
-        
+
         # Direct rate-limit / overloaded exception classes
         if cls_name in ("OverloadedError", "RateLimitError"):
             return True
-        
+
         # HTTP-level status errors (both SDKs expose .status_code)
         status = getattr(exc, "status_code", None)
         if status in (429, 529):
             return True
-        
+
         # Anthropic wraps errors as dict-like messages
         err_body = getattr(exc, "body", None)
         if isinstance(err_body, dict):
             err_type = err_body.get("error", {}).get("type", "")
             if err_type in ("overloaded_error", "rate_limit_error"):
                 return True
-        
+
         return False
 
     async def _call_with_retry(
@@ -268,7 +269,7 @@ class LLMProvider(ABC):
         """Ensure the client is initialized (lazy loading)."""
         if self._client is None:
             self._init_client()
-    
+
     @abstractmethod
     def _init_client(self):
         """Initialize the provider's client."""

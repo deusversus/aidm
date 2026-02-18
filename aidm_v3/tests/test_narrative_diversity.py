@@ -4,10 +4,10 @@ Tests the three injection layers added to KeyAnimator to prevent
 structural ossification and vocabulary collapse over long sessions.
 """
 
-import pytest
-from unittest.mock import MagicMock, PropertyMock
-from src.agents.key_animator import KeyAnimator
+from unittest.mock import MagicMock
+
 from src.agents.intent_classifier import IntentOutput
+from src.agents.key_animator import KeyAnimator
 from src.agents.outcome_judge import OutcomeOutput
 
 
@@ -93,7 +93,7 @@ class TestStyleDriftDirective:
         ka = KeyAnimator(_make_profile())
         intent = _make_intent(intent="EXPLORATION")
         outcome = _make_outcome()
-        
+
         seen_texts = []
         for _ in range(len(ka.DIRECTIVE_POOL)):
             result = ka._build_style_drift_directive(intent, outcome)
@@ -102,7 +102,7 @@ class TestStyleDriftDirective:
                 for line in result.split("\n"):
                     if "💡" in line:
                         seen_texts.append(line.strip())
-        
+
         # No duplicates within one full cycle
         assert len(seen_texts) == len(set(seen_texts)), "Shuffle-bag produced duplicates within one cycle"
 
@@ -111,13 +111,13 @@ class TestStyleDriftDirective:
         ka = KeyAnimator(_make_profile())
         combat_intent = _make_intent(intent="COMBAT")
         outcome = _make_outcome()
-        
+
         # Run many times to drain the bag
         results = []
         for _ in range(20):
             result = ka._build_style_drift_directive(combat_intent, outcome)
             results.append(result)
-        
+
         # "environmental POV" and "levity" directives should never appear for COMBAT
         all_text = " ".join(results)
         assert "environmental POV" not in all_text, "Environmental POV should be excluded for COMBAT"
@@ -128,12 +128,12 @@ class TestStyleDriftDirective:
         ka = KeyAnimator(_make_profile())
         intent = _make_intent(intent="SOCIAL")
         climactic = _make_outcome(weight="climactic")
-        
+
         results = []
         for _ in range(20):
             result = ka._build_style_drift_directive(intent, climactic)
             results.append(result)
-        
+
         all_text = " ".join(results)
         # "cold open" has max_weight="minor" — should never appear for climactic
         assert "cold open" not in all_text, "Cold open should be excluded for climactic weight"
@@ -143,7 +143,7 @@ class TestStyleDriftDirective:
         ka = KeyAnimator(_make_profile())
         intent = _make_intent()
         outcome = _make_outcome()
-        
+
         # Simulate varied recent messages (dialogue, action, description)
         recent = [
             {"role": "assistant", "content": '"Hello," she said, stepping forward.'},

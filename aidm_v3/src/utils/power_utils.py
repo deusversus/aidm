@@ -5,7 +5,6 @@ Handles power tier conversions and differential calculations
 for the Unified Power Differential narrative system.
 """
 
-from typing import Optional
 
 
 def tier_to_number(tier: str) -> int:
@@ -22,12 +21,12 @@ def tier_to_number(tier: str) -> int:
     """
     if not tier:
         return 8  # Default to T8 (street level)
-    
+
     # Handle various formats
     tier_clean = tier.upper().strip()
     if tier_clean.startswith("T"):
         tier_clean = tier_clean[1:]
-    
+
     try:
         return int(tier_clean)
     except ValueError:
@@ -37,7 +36,7 @@ def tier_to_number(tier: str) -> int:
 def calculate_power_differential(
     world_tier: str,
     character_tier: str,
-    threat_tier: Optional[str] = None
+    threat_tier: str | None = None
 ) -> int:
     """
     Calculate power differential between character and world/threat.
@@ -58,10 +57,10 @@ def calculate_power_differential(
         T6 character vs T4 threat = 4 - 6 = -2 (underdog)
     """
     comparison = threat_tier or world_tier
-    
+
     world_num = tier_to_number(comparison)
     char_num = tier_to_number(character_tier)
-    
+
     return world_num - char_num
 
 

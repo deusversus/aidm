@@ -1,13 +1,13 @@
 """Settings API routes."""
 
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from typing import Dict, List, Optional
 
 from src.settings import (
-    UserSettings,
     AgentSettings,
     ModelConfig,
+    UserSettings,
     get_settings_store,
 )
 from src.settings.defaults import get_available_models
@@ -25,7 +25,7 @@ class ModelInfo(BaseModel):
 
 class ModelsResponse(BaseModel):
     """Response for available models endpoint."""
-    models: Dict[str, List[ModelInfo]]
+    models: dict[str, list[ModelInfo]]
 
 
 class APIKeyRequest(BaseModel):
@@ -64,10 +64,10 @@ async def update_settings(settings: UserSettings):
     have empty/default keys (since frontend doesn't send actual keys).
     """
     store = get_settings_store()
-    
+
     # Load current settings to preserve API keys
     current = store.load()
-    
+
     # If incoming API keys are empty/default, preserve the existing ones
     if not settings.api_keys.google_api_key:
         settings.api_keys.google_api_key = current.api_keys.google_api_key
@@ -75,7 +75,7 @@ async def update_settings(settings: UserSettings):
         settings.api_keys.anthropic_api_key = current.api_keys.anthropic_api_key
     if not settings.api_keys.openai_api_key:
         settings.api_keys.openai_api_key = current.api_keys.openai_api_key
-    
+
     # Preserve active session state — these are set by Session Zero / gameplay,
     # not by the settings UI. Without this, saving model config overwrites the
     # active profile with whatever the frontend sends (or null).
@@ -85,18 +85,18 @@ async def update_settings(settings: UserSettings):
         settings.active_session_id = current.active_session_id
     if current.active_campaign_id and not settings.active_campaign_id:
         settings.active_campaign_id = current.active_campaign_id
-    
+
     store.save(settings)
-    
+
     # Reset LLM manager and cached agents to pick up new provider settings
     from src.llm import reset_llm_manager
     reset_llm_manager()
-    
+
     # Clear cached agent instances (they cache their providers)
-    from api.routes.game import reset_session_zero_agent, reset_orchestrator
+    from api.routes.game import reset_orchestrator, reset_session_zero_agent
     reset_session_zero_agent()
     reset_orchestrator()
-    
+
     return settings
 
 
@@ -135,15 +135,15 @@ async def update_agent_model(agent_name: str, config: ModelConfig):
             status_code=400,
             detail=f"Invalid agent name. Must be one of: {valid_agents}"
         )
-    
+
     store = get_settings_store()
     current = store.load()
-    
+
     # Update the specific agent
     agent_models_dict = current.agent_models.model_dump()
     agent_models_dict[agent_name] = config.model_dump()
     current.agent_models = AgentSettings.model_validate(agent_models_dict)
-    
+
     store.save(current)
     return {"status": "ok", "agent": agent_name, "config": config}
 
@@ -156,15 +156,15 @@ async def reset_settings():
 
 
 @router.get("/models", response_model=ModelsResponse)
-async def get_models(provider: Optional[str] = None):
+async def get_models(provider: str | None = None):
     """Get available models, optionally filtered by provider."""
     models_data = get_available_models(provider)
-    
+
     # Convert to response format
     result = {}
     for prov, model_list in models_data.items():
         result[prov] = [ModelInfo(**m) for m in model_list]
-    
+
     return ModelsResponse(models=result)
 
 
@@ -174,10 +174,10 @@ async def get_models(provider: Optional[str] = None):
 async def get_api_keys():
     """Get API key status (masked, not plaintext)."""
     store = get_settings_store()
-    
+
     masked = store.get_masked_keys()
     configured = store.get_configured_providers()
-    
+
     return APIKeysResponse(
         google=APIKeyStatus(configured=configured["google"], masked=masked["google"]),
         anthropic=APIKeyStatus(configured=configured["anthropic"], masked=masked["anthropic"]),
@@ -199,19 +199,19 @@ async def set_api_key(provider: str, request: APIKeyRequest):
             status_code=400,
             detail=f"Invalid provider. Must be one of: {valid_providers}"
         )
-    
+
     store = get_settings_store()
     store.set_api_key(provider, request.key)
-    
+
     # Reset ALL cached providers to pick up new keys
     from src.llm import reset_llm_manager
     reset_llm_manager()
-    
+
     # Also reset agents that cache their own providers
-    from api.routes.game import reset_session_zero_agent, reset_orchestrator
+    from api.routes.game import reset_orchestrator, reset_session_zero_agent
     reset_session_zero_agent()
     reset_orchestrator()
-    
+
     return {"status": "ok", "provider": provider}
 
 
@@ -228,10 +228,10 @@ async def delete_api_key(provider: str):
             status_code=400,
             detail=f"Invalid provider. Must be one of: {valid_providers}"
         )
-    
+
     store = get_settings_store()
     store.set_api_key(provider, "")  # Clear the key
-    
+
     return {"status": "ok", "provider": provider}
 
 
@@ -249,8 +249,8 @@ class ProviderWarning(BaseModel):
 
 class ValidationResponse(BaseModel):
     """Response from validation endpoint."""
-    warnings: List[ProviderWarning]
-    configured_providers: Dict[str, bool]
+    warnings: list[ProviderWarning]
+    configured_providers: dict[str, bool]
 
 
 @router.get("/validate", response_model=ValidationResponse)
@@ -262,24 +262,24 @@ async def validate_settings():
     store = get_settings_store()
     settings = store.load()
     configured = store.get_configured_providers()
-    
+
     warnings = []
-    
+
     # Determine fallback provider (first one with a key)
     fallback_provider = None
     for prov in ["google", "anthropic", "openai"]:
         if configured.get(prov):
             fallback_provider = prov
             break
-    
+
     # Check each base tier config
     tiers = ["base_fast", "base_thinking", "base_creative"]
     tier_display = {
         "base_fast": "Fast Tier",
-        "base_thinking": "Thinking Tier", 
+        "base_thinking": "Thinking Tier",
         "base_creative": "Creative Tier"
     }
-    
+
     for tier in tiers:
         config = getattr(settings.agent_models, tier, None)
         if config and not configured.get(config.provider):
@@ -292,7 +292,7 @@ async def validate_settings():
                     "openai": "gpt-5.2-chat-latest"
                 }
                 fallback_model = fallback_models.get(fallback_provider, "unknown")
-                
+
                 warnings.append(ProviderWarning(
                     tier=tier,
                     selected_provider=config.provider,
@@ -311,7 +311,7 @@ async def validate_settings():
                     fallback_model="none",
                     message=f"{tier_display[tier]} is set to {config.provider.title()} but no API key is configured. No fallback available - please configure at least one API key."
                 ))
-    
+
     return ValidationResponse(
         warnings=warnings,
         configured_providers=configured
