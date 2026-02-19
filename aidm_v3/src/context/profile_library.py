@@ -215,6 +215,76 @@ class ProfileLibrary:
             return results["documents"][0]
         return []
 
+    def search_lore_multi(
+        self,
+        profile_ids: list[str],
+        query: str,
+        limit: int = 5,
+        page_type: str | None = None,
+    ) -> list[str]:
+        """Search lore across multiple profiles, returning merged ranked results.
+
+        Each profile's results are searched independently and then interleaved
+        by relevance distance. This ensures all linked profiles contribute to
+        RAG retrieval (N+1 composition support).
+
+        Args:
+            profile_ids: List of profile IDs to search within
+            query: Semantic search query
+            limit: Max total results to return
+            page_type: Optional filter (e.g., "techniques", "characters")
+        """
+        if not profile_ids:
+            return []
+
+        # Fast path: single profile
+        if len(profile_ids) == 1:
+            return self.search_lore(profile_ids[0], query, limit, page_type)
+
+        # Multi-profile: query each independently, merge by distance
+        all_results: list[tuple[float, str]] = []  # (distance, text)
+
+        for pid in profile_ids:
+            if page_type:
+                where = {"$and": [
+                    {"profile_id": pid},
+                    {"page_type": page_type},
+                ]}
+            else:
+                where = {"profile_id": pid}
+
+            try:
+                results = self.collection.query(
+                    query_texts=[query],
+                    n_results=limit,  # get limit per profile, merge later
+                    where=where,
+                    include=["documents", "distances"],
+                )
+
+                if results["documents"] and results["documents"][0]:
+                    distances = results["distances"][0] if results.get("distances") else [0.0] * len(results["documents"][0])
+                    for doc, dist in zip(results["documents"][0], distances):
+                        all_results.append((dist, doc))
+            except Exception as e:
+                logger.warning(f"Lore search failed for profile '{pid}': {e}")
+
+        if not all_results:
+            return []
+
+        # Sort by distance (lower = more relevant) and deduplicate
+        all_results.sort(key=lambda x: x[0])
+        seen = set()
+        merged = []
+        for dist, doc in all_results:
+            if doc not in seen:
+                seen.add(doc)
+                merged.append(doc)
+                if len(merged) >= limit:
+                    break
+
+        return merged
+
+
 # Singleton instance
 _profile_library: ProfileLibrary | None = None
 

@@ -313,7 +313,7 @@ class BackgroundMixin:
                                 session_number=db_context.session_id,
                                 session_transcript=recent_messages,
                                 profile_library=get_profile_library(),
-                                profile_id=self.profile_id,
+                                profile_ids=[self.profile_id] if self.profile_id else None,
                             )
 
                             director_output = await self.director.run_session_review(
