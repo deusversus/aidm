@@ -620,7 +620,7 @@ async function loadSettings() {
 
         // Default configs (for base defaults when not configured)
         const FAST_DEFAULT = { provider: 'google', model: 'gemini-3-flash-preview' };
-        const CREATIVE_DEFAULT = { provider: 'google', model: 'gemini-3-pro-preview' };
+        const CREATIVE_DEFAULT = { provider: 'google', model: 'gemini-3.1-pro-preview' };
 
         // === SETTINGS ===
         // Base defaults (these MUST have a value - default to Google if not set)
