@@ -21,6 +21,7 @@ import logging
 import re
 import time
 from dataclasses import dataclass, field
+from pathlib import Path
 
 import requests
 
@@ -58,6 +59,7 @@ class WikiPage:
     raw_html_length: int = 0
     clean_text_length: int = 0
     quotes: list[str] = field(default_factory=list)
+    image_url: str | None = None  # primary infobox/page image URL
 
 
 @dataclass
@@ -455,6 +457,30 @@ class FandomClient:
         })
         return [m["title"] for m in result.get("query", {}).get("categorymembers", [])]
 
+    def _get_page_image(self, base_url: str, title: str) -> str | None:
+        """Get the primary (infobox) image URL for a page via pageimages API.
+
+        Returns the original-resolution image URL, or None if no image exists.
+        """
+        result = self._api_query(base_url, {
+            "action": "query",
+            "titles": title,
+            "prop": "pageimages",
+            "piprop": "original",
+            "redirects": "true",
+        })
+        pages = result.get("query", {}).get("pages", {})
+        for page_data in pages.values():
+            original = page_data.get("original", {})
+            src = original.get("source")
+            if src:
+                # Skip tiny images (icons, badges) — want at least 200px
+                width = original.get("width", 0)
+                if width and width < 200:
+                    return None
+                return src
+        return None
+
     def _get_page_parsed(self, base_url: str, title: str) -> dict:
         """
         Get page via action=parse (parsed HTML).
@@ -494,6 +520,16 @@ class FandomClient:
         categories = [c["*"] for c in parsed.get("categories", [])]
         quotes = extract_quotes(clean_text) if page_type == "characters" else []
 
+        # Fetch primary image for character pages (infobox portrait)
+        image_url = None
+        if page_type == "characters":
+            try:
+                image_url = self._get_page_image(base_url, title)
+                if image_url:
+                    logger.debug(f"Found image for {title}: {image_url}")
+            except Exception as e:
+                logger.debug(f"Image fetch failed for {title}: {e}")
+
         return WikiPage(
             title=title,
             clean_text=clean_text,
@@ -503,6 +539,7 @@ class FandomClient:
             raw_html_length=len(raw_html),
             clean_text_length=len(clean_text),
             quotes=quotes,
+            image_url=image_url,
         )
 
     # ─── Main Scrape Method ──────────────────────────────────────────────
@@ -757,6 +794,78 @@ class FandomClient:
         )
 
         return result
+
+    def download_reference_images(
+        self,
+        fandom_result: "FandomResult",
+        target_dir: Path,
+        max_images: int = 30,
+    ) -> list[Path]:
+        """Download character reference images from scraped wiki pages.
+
+        Saves each character's infobox image to target_dir/{safe_name}.{ext}.
+        Skips pages without images. Rate-limited via existing _rate_limit().
+
+        Args:
+            fandom_result: Completed scrape result with image URLs populated.
+            target_dir: Directory to save images into (created if needed).
+            max_images: Max images to download (default 30).
+
+        Returns:
+            List of Paths to downloaded images.
+        """
+        char_pages = fandom_result.get_pages_by_type("characters")
+        pages_with_images = [p for p in char_pages if p.image_url]
+
+        if not pages_with_images:
+            logger.info("[Fandom] No character images to download")
+            return []
+
+        target_dir.mkdir(parents=True, exist_ok=True)
+        downloaded = []
+
+        for page in pages_with_images[:max_images]:
+            try:
+                # Sanitize filename from character title
+                safe_name = re.sub(r'[^\w\s-]', '', page.title).strip().replace(' ', '_')
+                if not safe_name:
+                    continue
+
+                # Determine extension from URL
+                url_lower = page.image_url.lower()
+                if '.png' in url_lower:
+                    ext = 'png'
+                elif '.webp' in url_lower:
+                    ext = 'webp'
+                else:
+                    ext = 'jpg'  # default
+
+                out_path = target_dir / f"{safe_name}.{ext}"
+
+                # Skip if already downloaded
+                if out_path.exists() and out_path.stat().st_size > 1000:
+                    downloaded.append(out_path)
+                    continue
+
+                self._rate_limit()
+                resp = self._session.get(page.image_url, timeout=REQUEST_TIMEOUT)
+                resp.raise_for_status()
+
+                # Validate: must be an image and reasonably sized
+                content_type = resp.headers.get('content-type', '')
+                if 'image' not in content_type:
+                    logger.debug(f"Skipping non-image for {page.title}: {content_type}")
+                    continue
+
+                out_path.write_bytes(resp.content)
+                downloaded.append(out_path)
+                logger.info(f"[Fandom] Downloaded reference: {page.title} → {out_path.name}")
+
+            except Exception as e:
+                logger.warning(f"[Fandom] Image download failed for {page.title}: {e}")
+
+        logger.info(f"[Fandom] Downloaded {len(downloaded)}/{len(pages_with_images)} reference images to {target_dir}")
+        return downloaded
 
     async def check_wiki_exists(self, wiki_url: str) -> bool:
         """Quick check if a Fandom wiki exists and has content."""

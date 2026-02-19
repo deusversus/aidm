@@ -13,6 +13,7 @@ Includes robust error handling:
 """
 
 import asyncio
+import re
 import logging
 from typing import Any, Optional
 
@@ -1187,6 +1188,22 @@ Supplemental knowledge: {response.content}
                     logger.warning(f"After fallback: {fandom_result.get_total_page_count()} pages across {len(fandom_result.pages)} types")
                 except Exception as e:
                     logger.error(f"Legacy fallback failed (non-fatal): {e}")
+
+            # Download character reference images for media generation
+            try:
+                from pathlib import Path
+                ref_dir = Path(__file__).parent.parent.parent / "data" / "media" / "references" / re.sub(r'[^\w\s-]', '', official_title).strip().replace(' ', '_').lower()
+                loop = asyncio.get_event_loop()
+                downloaded = await loop.run_in_executor(
+                    None,
+                    fandom_client.download_reference_images,
+                    fandom_result,
+                    ref_dir,
+                )
+                if downloaded:
+                    logger.info(f"Downloaded {len(downloaded)} reference images to {ref_dir}")
+            except Exception as e:
+                logger.error(f"Reference image download failed (non-fatal): {e}")
 
             if progress_tracker:
                 await progress_tracker.emit(

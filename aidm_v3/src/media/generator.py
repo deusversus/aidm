@@ -171,6 +171,31 @@ class MediaGenerator:
             return f"Style: {style_context} anime art style"
         return "Style: detailed anime art style"
 
+    @staticmethod
+    def find_reference_image(entity_name: str) -> Path | None:
+        """Search data/media/references/*/ for a reference image matching entity_name.
+
+        Uses fuzzy matching: sanitizes the name and checks all profile subdirs.
+        Returns the first match found, or None.
+        """
+        import re
+        refs_root = Path(__file__).parent.parent.parent / "data" / "media" / "references"
+        if not refs_root.exists():
+            return None
+
+        # Sanitize name the same way download_reference_images does
+        safe_name = re.sub(r'[^\w\s-]', '', entity_name).strip().replace(' ', '_')
+        safe_lower = safe_name.lower()
+
+        for profile_dir in refs_root.iterdir():
+            if not profile_dir.is_dir():
+                continue
+            for img_file in profile_dir.iterdir():
+                if img_file.is_file() and img_file.stem.lower() == safe_lower:
+                    if img_file.suffix.lower() in ('.jpg', '.jpeg', '.png', '.webp'):
+                        return img_file
+        return None
+
     async def generate_model_sheet(
         self,
         visual_tags: list[str],
@@ -179,6 +204,7 @@ class MediaGenerator:
         campaign_id: int,
         entity_name: str,
         template_path: Path | None = None,
+        reference_image_path: Path | None = None,
     ) -> Path | None:
         """Generate full-body character model sheet from description + optional template.
         
@@ -192,6 +218,7 @@ class MediaGenerator:
             campaign_id: Campaign ID for file organization
             entity_name: Character/NPC name
             template_path: Optional blank body template image
+            reference_image_path: Optional canonical character image from wiki
             
         Returns:
             Path to the generated model sheet, or None on failure.
@@ -229,10 +256,10 @@ Requirements:
 
             # Build parts list
             parts = []
+            from google.genai import types
 
             # If template provided, include it as reference with enhanced orthographic instructions
             if template_path and template_path.exists():
-                from google.genai import types
                 template_bytes = template_path.read_bytes()
                 mime = "image/jpeg" if template_path.suffix.lower() in (".jpg", ".jpeg") else "image/png"
                 parts.append(types.Part.from_bytes(
@@ -252,7 +279,27 @@ Requirements:
                         f"{prompt}"
                     )
                 ))
-            else:
+
+            # Add wiki reference image if available (style/appearance anchor)
+            # This works WITH or WITHOUT a template — independent concern
+            if reference_image_path and reference_image_path.exists():
+                ref_bytes = reference_image_path.read_bytes()
+                ref_mime = "image/jpeg" if reference_image_path.suffix.lower() in (".jpg", ".jpeg") else "image/png"
+                parts.append(types.Part.from_bytes(data=ref_bytes, mime_type=ref_mime))
+                ref_instruction = (
+                    "The above is a CANONICAL REFERENCE IMAGE of this character from the original source material. "
+                    "Match this character's facial features, hair style, hair color, eye color, outfit design, "
+                    "and overall art style as closely as possible."
+                )
+                # If no template was added, bundle the main prompt with the reference instruction
+                if not (template_path and template_path.exists()):
+                    parts.append(types.Part.from_text(text=f"{ref_instruction}\n\n{prompt}"))
+                else:
+                    parts.append(types.Part.from_text(text=ref_instruction))
+                logger.info(f"Using reference image: {reference_image_path.name}")
+
+            # Fallback: no template and no reference — just the text prompt
+            if not parts:
                 parts.append(prompt)
 
             def _generate():
@@ -431,11 +478,15 @@ Requirements:
         campaign_id: int,
         entity_name: str,
         template_path: Path | None = None,
+        reference_image_path: Path | None = None,
     ) -> dict[str, Path | None]:
         """Convenience method: generate model sheet + derive portrait in sequence.
         
         If no template_path is provided, auto-selects from data/media/templates/
         based on gender/body type inferred from appearance and visual tags.
+        
+        If no reference_image_path is provided, auto-discovers from
+        data/media/references/*/ by matching entity_name to filenames.
         
         Returns:
             Dict with 'model_sheet' and 'portrait' paths (either may be None on failure)
@@ -446,6 +497,12 @@ Requirements:
             if template_path:
                 logger.info(f"Auto-selected template: {template_path.name}")
 
+        # Auto-discover reference image if not explicitly provided
+        if reference_image_path is None:
+            reference_image_path = self.find_reference_image(entity_name)
+            if reference_image_path:
+                logger.info(f"Auto-discovered reference image: {reference_image_path}")
+
         model_sheet = await self.generate_model_sheet(
             visual_tags=visual_tags,
             appearance=appearance,
@@ -453,6 +510,7 @@ Requirements:
             campaign_id=campaign_id,
             entity_name=entity_name,
             template_path=template_path,
+            reference_image_path=reference_image_path,
         )
 
         portrait = None
