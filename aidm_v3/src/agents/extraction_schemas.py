@@ -168,6 +168,50 @@ class RecentExtract(BaseModel):
     status: str = Field(default="", description="ongoing, hiatus, or completed")
 
 
+class VisualStyleExtract(BaseModel):
+    """Extracted visual/art direction for IP-faithful media generation.
+    
+    Captures the distinctive visual identity of the anime/manga so that
+    generated images match the IP's look and feel.
+    """
+    art_style: str = Field(
+        default="",
+        description="Overall art style descriptor (e.g., 'dark gothic ink-heavy', 'bright saturated shonen', 'watercolor fantasy', 'gritty seinen realism')"
+    )
+    color_palette: str = Field(
+        default="",
+        description="Dominant color scheme (e.g., 'deep reds and blacks with crimson accents', 'pastel warm tones', 'neon cyberpunk blues and purples')"
+    )
+    line_work: str = Field(
+        default="",
+        description="Line art characteristics (e.g., 'thick bold outlines', 'thin precise lines', 'sketchy dynamic strokes', 'clean cel-shaded')"
+    )
+    shading: str = Field(
+        default="",
+        description="Shading technique (e.g., 'heavy cross-hatching', 'soft gradient shading', 'flat cel shading', 'dramatic chiaroscuro')"
+    )
+    character_rendering: str = Field(
+        default="",
+        description="How characters are drawn (e.g., 'elongated proportions, sharp angular features', 'round soft features, large expressive eyes', 'realistic proportions with detailed musculature')"
+    )
+    atmosphere: str = Field(
+        default="",
+        description="Visual mood and atmosphere (e.g., 'oppressive dark fog and rain', 'bright sunny optimistic', 'ethereal dreamlike glow')"
+    )
+    composition_style: str = Field(
+        default="",
+        description="Panel/shot composition tendencies (e.g., 'dramatic Dutch angles', 'wide cinematic shots', 'close-up emotion focus', 'dynamic action perspective')"
+    )
+    studio_reference: str = Field(
+        default="",
+        description="Animation studio and key animators known for this style (e.g., 'ufotable (Demon Slayer)', 'Madhouse (One Punch Man)', 'Wit Studio (Attack on Titan S1-3)')"
+    )
+    reference_descriptors: list[str] = Field(
+        default_factory=list,
+        description="3-5 concise visual descriptors for image generation prompts (e.g., ['gothic horror manga art', 'heavy ink shadows', 'blood splatter accents', 'baroque religious imagery'])"
+    )
+
+
 class StorytellingTropesExtract(BaseModel):
     """Extracted storytelling tropes (derived from tone/characters/arcs)."""
     tournament_arc: bool = Field(default=False)
@@ -295,6 +339,7 @@ TOPIC_SCHEMAS: dict[str, type[BaseModel]] = {
     "adaptations": AdaptationsExtract,
     "recent": RecentExtract,
     "series_aliases": SeriesAliasesExtract,
+    "visual_style": VisualStyleExtract,
 }
 
 # DNA scales, tropes, genres, and voice are extracted from research
@@ -336,11 +381,16 @@ def build_bundle_schema(topics: list[str]) -> type[BaseModel]:
         else:
             logger.warning(f"Warning: Unknown topic '{topic}'")
 
-    # Also include DNA scales, tropes, and power_distribution when tone is in the bundle
+    # Also include DNA scales, tropes, power_distribution, and visual_style when tone is in the bundle
     if "tone" in topics:
         fields["dna_scales"] = (DNAScalesExtract, Field(default_factory=DNAScalesExtract))
         fields["tropes"] = (StorytellingTropesExtract, Field(default_factory=StorytellingTropesExtract))
         fields["power_distribution"] = (PowerDistributionExtract, Field(default_factory=PowerDistributionExtract))
+
+    # Also include visual_style when visual_style topic is in the bundle
+    # (Also derivable from tone, so include when tone is present as a standalone topic)
+    if "visual_style" in topics or ("tone" in topics and "visual_style" not in fields):
+        fields["visual_style"] = (VisualStyleExtract, Field(default_factory=VisualStyleExtract))
 
     return create_model("BundleExtract", **fields)
 
@@ -459,6 +509,23 @@ def get_extraction_prompt(topics: list[str], anime_name: str) -> str:
   - native_title: Japanese/Korean/Chinese title in original script
   - romanized_title: Romanized version
   - abbreviations: Common abbreviations (DBZ, AOT, HxH)""")
+        elif topic == "visual_style":
+            topic_instructions.append("""- **visual_style**: Extract the IP's distinctive visual art direction for image generation:
+  - art_style: Overall style (e.g., 'dark gothic ink-heavy', 'bright saturated shonen', 'watercolor fantasy')
+  - color_palette: Dominant colors (e.g., 'deep reds and blacks with crimson accents', 'pastel warm tones')
+  - line_work: Line art style (e.g., 'thick bold outlines', 'thin precise lines', 'sketchy dynamic strokes')
+  - shading: Shading technique (e.g., 'heavy cross-hatching', 'flat cel shading', 'dramatic chiaroscuro')
+  - character_rendering: How characters look (e.g., 'elongated angular features', 'round soft large eyes')
+  - atmosphere: Visual mood (e.g., 'oppressive dark fog', 'bright sunny optimistic', 'ethereal glow')
+  - composition_style: Shot/panel style (e.g., 'dramatic Dutch angles', 'wide cinematic', 'dynamic action')
+  - studio_reference: Animation studio known for this look (e.g., 'ufotable', 'Madhouse', 'Wit Studio')
+  - reference_descriptors: 3-5 short visual tags for image prompts (e.g., ['gothic horror manga', 'heavy ink shadows', 'blood splatter accents'])
+  
+  Examples:
+  - Hellsing: art_style='dark gothic ink-heavy', color_palette='deep reds, blacks, gold ecclesiastical accents', shading='dramatic chiaroscuro with heavy blacks'
+  - Demon Slayer: art_style='vibrant fluid animation', color_palette='rich saturated colors with watercolor effects', studio_reference='ufotable'
+  - One Punch Man: art_style='dynamic action realism with comedic contrast', line_work='detailed precise during serious scenes, simplified for comedy'
+  - K-On: art_style='soft moe slice-of-life', color_palette='warm pastels and soft lighting', character_rendering='round soft features, large expressive eyes'""")
 
     instructions = "\n".join(topic_instructions)
 

@@ -290,6 +290,7 @@ TOPIC_QUERY_TEMPLATES = {
     "adaptations": "{anime_name} manga vs anime differences changes adaptations versions",
     "recent": "{anime_name} latest arc current events ongoing updates newest chapters episodes",
     "series_aliases": "{anime_name} sequel prequel spinoff alternate timeline canon non-canon Japanese title romanized abbreviation original series relationship",
+    "visual_style": "{anime_name} animation style art direction character design color palette studio visual aesthetic sakuga",
 }
 
 
@@ -718,6 +719,22 @@ Return ONLY the title.'''
                 alt_titles.extend(getattr(sa, 'alternate_titles', []))
                 if alt_titles:
                     output.alternate_titles = list(set(alt_titles))  # Dedupe
+
+            # Visual style (for IP-faithful media generation)
+            if hasattr(extracted, 'visual_style') and extracted.visual_style:
+                vs = extracted.visual_style
+                style_dict = {}
+                for field_name in ['art_style', 'color_palette', 'line_work', 'shading',
+                                   'character_rendering', 'atmosphere', 'composition_style',
+                                   'studio_reference']:
+                    val = getattr(vs, field_name, '')
+                    if val:
+                        style_dict[field_name] = val
+                ref_desc = getattr(vs, 'reference_descriptors', [])
+                if ref_desc:
+                    style_dict['reference_descriptors'] = ref_desc
+                if style_dict:
+                    output.visual_style = style_dict
 
         # Set raw content from all research (explicit None if empty, not empty string)
         raw_text = "\n\n".join(raw_sections)
@@ -1353,13 +1370,24 @@ Based on the above data, provide:
    tragic_backstory, redemption_arc, betrayal, sacrifice, transformation,
    forbidden_technique, time_loop, false_identity, ensemble_focus, slow_burn_romance
 
+6. **visual_style**: Art direction for image generation:
+   - art_style: Overall style descriptor (e.g., 'dark gothic ink-heavy', 'bright saturated shonen')
+   - color_palette: Dominant color scheme
+   - line_work: Line art characteristics
+   - shading: Shading technique
+   - character_rendering: How characters are drawn
+   - atmosphere: Visual mood
+   - composition_style: Panel/shot composition
+   - studio_reference: Animation studio known for this look
+   - reference_descriptors: 3-5 short visual tags for image prompts
+
 Respond with ONLY valid JSON, no markdown or explanation."""
 
         try:
             # Use a combined schema for efficiency
             from pydantic import create_model
 
-            from .extraction_schemas import CombatExtract, DNAScalesExtract, PowerDistributionExtract, ToneExtract
+            from .extraction_schemas import CombatExtract, DNAScalesExtract, PowerDistributionExtract, ToneExtract, VisualStyleExtract
             InterpretationSchema = create_model(
                 "InterpretationSchema",
                 dna_scales=(DNAScalesExtract, ...),
@@ -1367,6 +1395,7 @@ Respond with ONLY valid JSON, no markdown or explanation."""
                 combat=(CombatExtract, ...),
                 power_distribution=(PowerDistributionExtract, ...),
                 storytelling_tropes=(dict[str, bool], {}),
+                visual_style=(VisualStyleExtract, VisualStyleExtract()),
             )
 
             interp = await provider.complete_with_schema(
@@ -1410,7 +1439,23 @@ Respond with ONLY valid JSON, no markdown or explanation."""
             }
             output.storytelling_tropes = interp.storytelling_tropes or {}
 
-            logger.info(f"LLM interpretation: DNA={len(output.dna_scales)} scales, combat={output.combat_style}, power={output.power_distribution}")
+            # Visual style
+            if hasattr(interp, 'visual_style') and interp.visual_style:
+                vs = interp.visual_style
+                style_dict = {}
+                for field_name in ['art_style', 'color_palette', 'line_work', 'shading',
+                                   'character_rendering', 'atmosphere', 'composition_style',
+                                   'studio_reference']:
+                    val = getattr(vs, field_name, '')
+                    if val:
+                        style_dict[field_name] = val
+                ref_desc = getattr(vs, 'reference_descriptors', [])
+                if ref_desc:
+                    style_dict['reference_descriptors'] = ref_desc
+                if style_dict:
+                    output.visual_style = style_dict
+
+            logger.info(f"LLM interpretation: DNA={len(output.dna_scales)} scales, combat={output.combat_style}, power={output.power_distribution}, visual_style={'yes' if output.visual_style else 'no'}")
 
         except Exception as e:
             import traceback
