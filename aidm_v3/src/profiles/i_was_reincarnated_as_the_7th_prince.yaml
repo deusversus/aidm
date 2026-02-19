@@ -10,8 +10,8 @@ aliases:
 - 7th prince
 - dainana ouji
 - i was reincarnated as the 7th prince
-- i was reincarnated as the 7th prince so i can take my time perfecting my magical
-  ability
+- i was reincarnated as the 7th prince so i can take my time perfecting my 
+  magical ability
 - iwasreincarnatedasthe7thprince
 - tensei shitara dainana ouji datta node kimama ni majutsu wo kiwamemasu
 - 転生したら第七王子だったので、気ままに魔術を極めます
@@ -57,16 +57,17 @@ detected_genres:
 combat_system: spectacle
 power_system:
   name: Magic & Qi
-  mechanics: A hard magic system fueled by Mana (for magic) or Life Force (for Qi).
-    Magic relies on Chanting (Magic Language), Visualization (mental imagery), and
-    Mana Control. Proficiency is boosted by scientific understanding to optimize visualization.
-    Sub-systems include Modern Magic (elements), Ancient Magic (Lost/Djinn), Holy
-    Magic (contracts/rituals), and Blighted (innate abilities). Qi utilizes Breathing
-    Techniques for physical reinforcement and sensory perception.
-  limitations: Mana capacity is fixed at birth based on lineage (the 'bucket' size).
-    Standard casting requires time-consuming chants. Double casting is physically
-    impossible for normal humans due to processing limits. Holy Magic typically requires
-    elaborate ceremonies. Qi consumes the user's life force.
+  mechanics: A hard magic system fueled by Mana (for magic) or Life Force (for 
+    Qi). Magic relies on Chanting (Magic Language), Visualization (mental 
+    imagery), and Mana Control. Proficiency is boosted by scientific 
+    understanding to optimize visualization. Sub-systems include Modern Magic 
+    (elements), Ancient Magic (Lost/Djinn), Holy Magic (contracts/rituals), and 
+    Blighted (innate abilities). Qi utilizes Breathing Techniques for physical 
+    reinforcement and sensory perception.
+  limitations: Mana capacity is fixed at birth based on lineage (the 'bucket' 
+    size). Standard casting requires time-consuming chants. Double casting is 
+    physically impossible for normal humans due to processing limits. Holy Magic
+    typically requires elaborate ceremonies. Qi consumes the user's life force.
   tiers:
   - Spell Tiers (Beginner, Intermediate, Advanced, Forbidden)
   - Adventurer Ranks (Iron, Silver, Gold)
@@ -76,10 +77,10 @@ tone:
   comedy_level: 9
   darkness_level: 4
   optimism: 8
-director_personality: You are the director for a I Was Reincarnated as the 7th Prince-style
-  campaign. You inject humor even in tense moments. You keep the pace relentless.
-  Every scene escalates. Hope is real in this world. Earned optimism, not naivety.
-  You explain strategies and tactics in detail.
+director_personality: You are the director for a I Was Reincarnated as the 7th 
+  Prince-style campaign. You inject humor even in tense moments. You keep the 
+  pace relentless. Every scene escalates. Hope is real in this world. Earned 
+  optimism, not naivety. You explain strategies and tactics in detail.
 pacing:
   scene_length: moderate
   arc_length_sessions: 4-6
@@ -97,3 +98,5 @@ sources_consulted:
 - series_aliases
 series_group: dainana_ouji
 series_position: 1
+anilist_id: 156415
+mal_id: 53516

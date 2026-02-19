@@ -1,8 +1,9 @@
-id: i_was_reincarnated_as_the_7th_prince_so_i_can_take_my_time_perfecting_my_magical_ability
-name: I Was Reincarnated as the 7th Prince so I Can Take My Time Perfecting My Magical
-  Ability
-source_anime: I Was Reincarnated as the 7th Prince so I Can Take My Time Perfecting
-  My Magical Ability
+id: 
+  i_was_reincarnated_as_the_7th_prince_so_i_can_take_my_time_perfecting_my_magical_ability
+name: I Was Reincarnated as the 7th Prince so I Can Take My Time Perfecting My 
+  Magical Ability
+source_anime: I Was Reincarnated as the 7th Prince so I Can Take My Time 
+  Perfecting My Magical Ability
 media_type: anime
 status: completed
 generated_at: '2026-02-16T13:17:39.657695'
@@ -12,8 +13,8 @@ aliases:
 - 7th prince
 - Tensei Shitara Dai Nana Ōji Datta no de, Kimama ni Majutsu o Kiwamemasu
 - dainanaoji
-- i was reincarnated as the 7th prince so i can take my time perfecting my magical
-  ability
+- i was reincarnated as the 7th prince so i can take my time perfecting my 
+  magical ability
 - iwasreincarnatedasthe7thprincesoicantakemytimeperfectingmymagicalability
 - seventh prince
 - 転生したら第七王子だったので、気ままに魔術を極めます
@@ -59,13 +60,14 @@ detected_genres:
 combat_system: spectacle
 power_system:
   name: Magic and Ki
-  mechanics: Magic is fueled by Mana and constructed using 'verses' (chants) and visualization;
-    the more verses, the stronger the spell. Lloyd utilizes 'Constraint Magic' to
-    bypass chants and 'Dual Casting' to fire multiple spells instantly. A separate
-    system, 'Ki', uses life force for physical enhancement and presence detection.
-  limitations: Mana capacity is typically fixed at birth by bloodline; powerful spells
-    require long, time-consuming chants; Holy Magic usually requires an angelic contract;
-    enchanted items are limited to one spell per ingot.
+  mechanics: Magic is fueled by Mana and constructed using 'verses' (chants) and
+    visualization; the more verses, the stronger the spell. Lloyd utilizes 
+    'Constraint Magic' to bypass chants and 'Dual Casting' to fire multiple 
+    spells instantly. A separate system, 'Ki', uses life force for physical 
+    enhancement and presence detection.
+  limitations: Mana capacity is typically fixed at birth by bloodline; powerful 
+    spells require long, time-consuming chants; Holy Magic usually requires an 
+    angelic contract; enchanted items are limited to one spell per ingot.
   tiers:
   - Adventurer Rank (S, A, B, C)
   - Majin Rank (10 to 1)
@@ -74,10 +76,10 @@ tone:
   comedy_level: 8
   darkness_level: 4
   optimism: 9
-director_personality: You are the director for a I Was Reincarnated as the 7th Prince
-  so I Can Take My Time Perfecting My Magical Ability-style campaign. You inject humor
-  even in tense moments. Hope is real in this world. Earned optimism, not naivety.
-  You explain strategies and tactics in detail.
+director_personality: You are the director for a I Was Reincarnated as the 7th 
+  Prince so I Can Take My Time Perfecting My Magical Ability-style campaign. You
+  inject humor even in tense moments. Hope is real in this world. Earned 
+  optimism, not naivety. You explain strategies and tactics in detail.
 pacing:
   scene_length: moderate
   arc_length_sessions: 4-6
@@ -95,3 +97,5 @@ sources_consulted:
 - series_aliases
 series_group: dainanaoji
 series_position: 1
+anilist_id: 156415
+mal_id: 53516
