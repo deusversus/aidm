@@ -21,13 +21,16 @@ from .session_zero import router as _session_zero_router
 from .status import router as _status_router
 
 # Merge everything under a single router for backward compatibility.
-# ``api.main`` does ``from .routes import game`` and uses ``game.router``.
+# ``api.main`` does ``from .routes import game`` and uses ``game.router``
+# IMPORTANT: _media_router MUST come before _status_router because
+# status.py has a catch-all /media/{file_path:path} route. The more
+# specific template routes in media.py need to match first.
 router = APIRouter()
 router.include_router(_session_mgmt_router)
 router.include_router(_session_zero_router)
 router.include_router(_gameplay_router)
-router.include_router(_status_router)
 router.include_router(_media_router)
+router.include_router(_status_router)
 
 # ---------------------------------------------------------------------------
 # Re-exports  (used by api/main.py, api/routes/settings.py, tests/*)

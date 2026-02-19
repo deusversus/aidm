@@ -13,6 +13,9 @@ Architecture:
 import asyncio
 import logging
 import os
+import random
+import time
+from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -60,6 +63,53 @@ class MediaGenerator:
         if self._client is None:
             from google import genai
             self._client = genai.Client(api_key=self._api_key)
+
+    # ── Retry with exponential back-off ──────────────────────────────
+    _RETRYABLE_STATUS_CODES = {503, 429}
+
+    async def _retry_generate(
+        self,
+        fn: Callable[[], Any],
+        label: str,
+        *,
+        max_retries: int = 3,
+        base_delay: float = 2.0,
+    ) -> Any:
+        """Run *fn* in a thread executor with exponential back-off retry.
+
+        Retries on HTTP 503 (overloaded) and 429 (rate-limit) responses
+        from the Gemini / Veo APIs.  Other exceptions propagate immediately.
+
+        Delay schedule (default):  ~2 s → ~4 s → ~8 s  (+ random jitter).
+        """
+        loop = asyncio.get_running_loop()
+        last_exc: Exception | None = None
+
+        for attempt in range(max_retries + 1):  # 0 … max_retries
+            try:
+                return await loop.run_in_executor(None, fn)
+            except Exception as exc:
+                # Check if the error is retryable
+                exc_str = str(exc)
+                is_retryable = any(
+                    str(code) in exc_str
+                    for code in self._RETRYABLE_STATUS_CODES
+                )
+                if not is_retryable or attempt == max_retries:
+                    raise  # non-retryable or exhausted retries
+
+                last_exc = exc
+                delay = base_delay * (2 ** attempt) + random.uniform(0, 1)
+                logger.warning(
+                    "%s: attempt %d/%d failed (%s). "
+                    "Retrying in %.1f s…",
+                    label, attempt + 1, max_retries + 1,
+                    exc_str[:120], delay,
+                )
+                await asyncio.sleep(delay)
+
+        # Should never reach here, but just in case
+        raise last_exc  # type: ignore[misc]
 
     def _campaign_media_dir(self, campaign_id: int) -> Path:
         """Get the media directory for a campaign, creating it if needed."""
@@ -180,17 +230,27 @@ Requirements:
             # Build parts list
             parts = []
 
-            # If template provided, include it as reference
+            # If template provided, include it as reference with enhanced orthographic instructions
             if template_path and template_path.exists():
                 from google.genai import types
                 template_bytes = template_path.read_bytes()
+                mime = "image/jpeg" if template_path.suffix.lower() in (".jpg", ".jpeg") else "image/png"
                 parts.append(types.Part.from_bytes(
                     data=template_bytes,
-                    mime_type="image/png"
+                    mime_type=mime,
                 ))
                 parts.append(types.Part.from_text(
-                    text=f"Using the attached body reference as a structural template, "
-                         f"create a character model sheet with the following details:\n\n{prompt}"
+                    text=(
+                        f"Using the attached blank body reference as a STRUCTURAL template, "
+                        f"create a character model sheet. CRITICAL RULES:\n"
+                        f"- Match the template's EXACT pose, proportions, and camera angle\n"
+                        f"- Overlay character details (hair, face, clothing, accessories) onto the body form\n"
+                        f"- Maintain strict orthographic projection — NO perspective distortion\n"
+                        f"- Produce FRONT VIEW and THREE-QUARTER VIEW side by side\n"
+                        f"- Keep the same clean white/light-grey background as the template\n"
+                        f"- The template is a blank mannequin — dress and detail it as the character\n\n"
+                        f"{prompt}"
+                    )
                 ))
             else:
                 parts.append(prompt)
@@ -206,7 +266,7 @@ Requirements:
                 )
                 return response
 
-            response = await loop.run_in_executor(None, _generate)
+            response = await self._retry_generate(_generate, f"model_sheet:{entity_name}")
 
             # Extract image from response
             if response.candidates and response.candidates[0].content:
@@ -274,7 +334,7 @@ Requirements:
                 )
                 return response
 
-            response = await loop.run_in_executor(None, _generate)
+            response = await self._retry_generate(_generate, f"portrait:{entity_name}")
 
             # Extract image from response
             if response.candidates and response.candidates[0].content:
@@ -347,7 +407,7 @@ Requirements:
                 )
                 return response
 
-            response = await loop.run_in_executor(None, _generate)
+            response = await self._retry_generate(_generate, f"location:{location_name}")
 
             if response.candidates and response.candidates[0].content:
                 for part in response.candidates[0].content.parts:
@@ -414,6 +474,10 @@ Requirements:
         Checks for gender/body type keywords in appearance dict and visual tags,
         then looks for the matching template file in TEMPLATES_DIR.
         
+        Available templates (static turnaround sheets):
+          male_average, male_muscle, male_petite,
+          female_average, female_busty, female_muscle, female_petite
+        
         Returns:
             Path to template image, or None if no suitable template found.
         """
@@ -422,35 +486,239 @@ Requirements:
             str(v).lower() for v in appearance.values() if v
         ] + [t.lower() for t in visual_tags])
         
-        # Determine body type from keywords
+        # Also check appearance dict for explicit gender field
+        gender = str(appearance.get("gender", "")).lower()
+        
+        # --- Determine gender ---
         female_keywords = ["female", "woman", "girl", "feminine", "she", "her"]
         male_keywords = ["male", "man", "boy", "masculine", "he", "him"]
         
-        body_type = "neutral"
-        if any(kw in search_str for kw in female_keywords):
-            body_type = "female_average"
-        elif any(kw in search_str for kw in male_keywords):
+        is_female = (
+            gender in ("female", "f", "woman", "girl")
+            or any(kw in search_str for kw in female_keywords)
+        )
+        is_male = (
+            gender in ("male", "m", "man", "boy")
+            or any(kw in search_str for kw in male_keywords)
+        )
+        
+        # --- Determine build ---
+        muscle_keywords = ["muscular", "buff", "athletic", "bulky", "strong", "brawny", "jacked", "fighter"]
+        petite_keywords = ["petite", "slim", "slender", "thin", "small", "lean", "lithe", "young", "child"]
+        busty_keywords = ["busty", "voluptuous", "curvy", "hourglass"]
+        
+        is_muscle = any(kw in search_str for kw in muscle_keywords)
+        is_petite = any(kw in search_str for kw in petite_keywords)
+        is_busty = any(kw in search_str for kw in busty_keywords)
+        
+        # --- Resolve body type ---
+        if is_female:
+            if is_busty:
+                body_type = "female_busty"
+            elif is_muscle:
+                body_type = "female_muscle"
+            elif is_petite:
+                body_type = "female_petite"
+            else:
+                body_type = "female_average"
+        elif is_male:
+            if is_muscle:
+                body_type = "male_muscle"
+            elif is_petite:
+                body_type = "male_petite"
+            else:
+                body_type = "male_average"
+        else:
+            # Gender-ambiguous: default to male_average
             body_type = "male_average"
         
-        # Also check appearance dict for explicit gender field
-        gender = str(appearance.get("gender", "")).lower()
-        if gender in ("female", "f", "woman", "girl"):
-            body_type = "female_average"
-        elif gender in ("male", "m", "man", "boy"):
-            body_type = "male_average"
+        logger.debug(f"Template auto-select: '{body_type}' from gender={gender}, build cues in tags")
         
-        # Try exact match first, then fallback to any available template
+        # Try exact match first, then fallback chain
         template = self.get_template_path(body_type)
         if template:
             return template
         
-        # Fallback: try neutral, then any template that exists
-        for fallback in ["neutral", "male_average", "female_average"]:
+        # Fallback: try gender-average, then any template that exists
+        gender_prefix = "female" if is_female else "male"
+        for fallback in [f"{gender_prefix}_average", "male_average", "female_average"]:
             template = self.get_template_path(fallback)
             if template:
                 return template
         
         return None
+
+    # =====================================================================
+    # Template generation — blank orthographic body references
+    # =====================================================================
+
+    # All 7 available static turnaround sheet templates (anime cel-shaded,
+    # 6-view rotation with proportion guide lines).  These are pre-supplied
+    # assets — NOT AI-generated at runtime.
+    TEMPLATE_BODY_TYPES: dict[str, str] = {
+        "male_average":   "adult male, average athletic build",
+        "male_muscle":    "adult male, muscular / fighter build",
+        "male_petite":    "male, slim / lean / youthful build",
+        "female_average": "adult female, average build",
+        "female_busty":   "adult female, voluptuous / curvy build",
+        "female_muscle":  "adult female, muscular / athletic build",
+        "female_petite":  "female, slim / petite / youthful build",
+    }
+
+    async def generate_template(
+        self,
+        body_type: str = "male_average",
+        force: bool = False,
+    ) -> Path | None:
+        """Generate a blank orthographic body reference template.
+        
+        Creates an anime-style character turnaround sheet with 6 rotation
+        views (front, ¾ front, side, ¾ back, back, rear ¾) as a structural
+        reference for character model sheet generation. Uses horizontal
+        proportion guide lines and clean cel-shaded linework.
+        
+        Args:
+            body_type: One of 'male_average', 'female_average', 'neutral'
+            force: If True, regenerate even if the template already exists
+            
+        Returns:
+            Path to the generated template PNG, or None on failure.
+        """
+        self._ensure_client()
+
+        TEMPLATES_DIR.mkdir(parents=True, exist_ok=True)
+        output_path = TEMPLATES_DIR / f"{body_type}.png"
+
+        # Skip if already exists and not forcing
+        if output_path.exists() and not force:
+            logger.info(f"Template already exists: {output_path}")
+            return output_path
+
+        body_desc = self.TEMPLATE_BODY_TYPES.get(
+            body_type,
+            self.TEMPLATE_BODY_TYPES["neutral"]
+        )
+
+        prompt = f"""Create an ANIME CHARACTER TURNAROUND REFERENCE SHEET — a blank body template used in anime/game production.
+
+BODY TYPE: {body_desc}
+
+LAYOUT — 6 views arranged in a single horizontal row, evenly spaced:
+1. FRONT view (facing viewer directly)
+2. FRONT THREE-QUARTER view (turned ~45° to the right)
+3. SIDE/PROFILE view (facing right)
+4. BACK THREE-QUARTER view (turned ~135°, showing mostly the back)
+5. FULL BACK view (facing away from viewer)
+6. REAR THREE-QUARTER view (turned ~225°, the opposite ¾ angle)
+
+FIGURE REQUIREMENTS:
+- Featureless anime-style mannequin — bald head, no face details, no hair, no clothing
+- Relaxed standing pose: arms hanging naturally at the sides, legs together, weight evenly distributed
+- Filled with a uniform MEDIUM GREY flat colour
+- Clean dark outlines (anime cel-style line art) defining the silhouette and body contours
+- Subtle shading using slightly darker grey to indicate form (chest, shoulders, limbs) — NOT 3D rendered, keep it flat/cel-shaded
+- Head proportions should follow anime conventions (~7-8 heads tall)
+- All 6 views must show the SAME figure at the EXACT SAME scale and height
+
+BACKGROUND AND GUIDES:
+- Off-white or very light grey background
+- HORIZONTAL PROPORTION GUIDE LINES spanning the full width behind all 6 figures
+- Guide lines at key anatomical landmarks: top of head, chin, shoulders, chest, waist, hips, mid-thigh, knees, mid-calf, floor
+- Guide lines should be thin, light grey, evenly spaced
+
+STYLE:
+- Clean, professional anime production art style (like a studio model sheet)
+- Flat 2D rendering — NOT photorealistic, NOT 3D mannequin
+- NO text, NO labels, NO annotations, NO watermarks
+- NO perspective distortion — strict orthographic projection for all views"""
+
+        try:
+            loop = asyncio.get_running_loop()
+
+            def _generate():
+                from google.genai import types
+
+                parts = []
+
+                # Load reference image if available to guide style
+                ref_path = self.TEMPLATE_REFERENCE_DIR / f"{body_type}_ref.png"
+                if not ref_path.exists():
+                    # Try generic reference
+                    ref_path = self.TEMPLATE_REFERENCE_DIR / "turnaround_ref.png"
+
+                if ref_path.exists():
+                    ref_bytes = ref_path.read_bytes()
+                    parts.append(types.Part.from_bytes(
+                        data=ref_bytes,
+                        mime_type="image/png",
+                    ))
+                    parts.append(types.Part.from_text(
+                        text=(
+                            "Use the attached image as a STYLE REFERENCE for the overall look, "
+                            "layout, and line quality. Match the anime cel-shaded turnaround sheet "
+                            "format, proportion guide lines, and flat grey fill style. "
+                            "Generate a NEW original template following these instructions:\n\n"
+                            + prompt
+                        )
+                    ))
+                else:
+                    parts.append(prompt)
+
+                response = self._client.models.generate_content(
+                    model=self.IMAGE_MODEL,
+                    contents=parts,
+                    config=types.GenerateContentConfig(
+                        response_modalities=["image", "text"],
+                    ),
+                )
+                return response
+
+            logger.info(f"Generating template: {body_type}...")
+            response = await self._retry_generate(_generate, f"template:{body_type}")
+
+            if response.candidates and response.candidates[0].content:
+                for part in response.candidates[0].content.parts:
+                    if hasattr(part, 'inline_data') and part.inline_data:
+                        image_bytes = part.inline_data.data
+                        output_path.write_bytes(image_bytes)
+                        logger.info(f"Template saved: {output_path} ({len(image_bytes)} bytes)")
+                        return output_path
+
+            logger.warning(f"No image in template response for {body_type}")
+            return None
+
+        except Exception as e:
+            logger.error(f"Template generation failed for {body_type}: {e}")
+            return None
+
+    async def ensure_templates(self, force: bool = False) -> dict[str, Path | None]:
+        """Check that all body type template images are present on disk.
+        
+        Templates are pre-supplied static assets (anime cel-shaded turnaround
+        sheets).  This method only *verifies* their existence — it does NOT
+        generate them.  If ``force`` is True the method will still attempt to
+        regenerate missing templates via ``generate_template()``, but this
+        is a fallback and quality will not match the hand-curated originals.
+        
+        Returns:
+            Dict mapping body_type -> Path (or None if missing)
+        """
+        results: dict[str, Path | None] = {}
+        for body_type in self.TEMPLATE_BODY_TYPES:
+            path = self.get_template_path(body_type)
+            if path:
+                results[body_type] = path
+            elif force:
+                # Fallback: try AI generation (lower quality)
+                results[body_type] = await self.generate_template(
+                    body_type=body_type, force=True,
+                )
+            else:
+                results[body_type] = None
+        
+        ready = sum(1 for v in results.values() if v is not None)
+        logger.info(f"Template check: {ready}/{len(results)} templates present")
+        return results
 
     # =====================================================================
     # General-purpose image + video generation (cutscene pipeline)
@@ -500,7 +768,7 @@ Requirements:
                 )
                 return response
 
-            response = await loop.run_in_executor(None, _generate)
+            response = await self._retry_generate(_generate, f"image:{filename}")
 
             if response.candidates and response.candidates[0].content:
                 for part in response.candidates[0].content.parts:
@@ -565,7 +833,7 @@ Requirements:
                 return operation
 
             logger.info(f"Starting Veo generation ({self.VIDEO_MODEL})...")
-            operation = await loop.run_in_executor(None, _start_generation)
+            operation = await self._retry_generate(_start_generation, "veo_start")
 
             # Poll for completion (Veo is async, typically 15-60 seconds)
             def _poll():
@@ -681,14 +949,19 @@ Requirements:
     def get_template_path(self, body_type: str = "male_average") -> Path | None:
         """Get path to a body template image.
         
+        Checks for .jpg then .png extensions.
+        
         Args:
-            body_type: Template name (e.g. 'male_average', 'female_average')
+            body_type: Template name (e.g. 'male_average', 'female_busty')
             
         Returns:
             Path to template image, or None if not found.
         """
-        path = TEMPLATES_DIR / f"{body_type}.png"
-        return path if path.exists() else None
+        for ext in (".jpg", ".png"):
+            path = TEMPLATES_DIR / f"{body_type}{ext}"
+            if path.exists():
+                return path
+        return None
 
     def get_media_url(self, campaign_id: int, category: str, filename: str) -> str:
         """Build a relative URL for serving media via the API.

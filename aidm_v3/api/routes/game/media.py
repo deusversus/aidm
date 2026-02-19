@@ -1,6 +1,8 @@
 """Media file serving routes.
 
 Serves generated images and videos from data/media/{campaign_id}/.
+Template routes are registered FIRST to prevent FastAPI from matching
+'/media/templates' as '/media/{campaign_id}/...' (int parse failure).
 """
 
 import logging
@@ -15,6 +17,7 @@ router = APIRouter()
 
 # Base media directory
 MEDIA_BASE_DIR = Path(__file__).parent.parent.parent.parent / "data" / "media"
+TEMPLATES_DIR = MEDIA_BASE_DIR / "templates"
 
 # Allowed subdirectories (prevent path traversal)
 ALLOWED_CATEGORIES = {"portraits", "models", "cutscenes", "locations"}
@@ -29,6 +32,95 @@ MIME_MAP = {
     ".webm": "video/webm",
 }
 
+
+# =====================================================================
+# Template management — MUST be registered before parameterized routes
+# =====================================================================
+
+@router.get("/media/templates")
+async def list_templates():
+    """List existing body reference templates and their status.
+    
+    Returns which templates exist and which are missing.
+    """
+    from src.media.generator import MediaGenerator
+
+    gen = MediaGenerator()
+    body_types = list(MediaGenerator.TEMPLATE_BODY_TYPES.keys())
+    templates = []
+    for bt in body_types:
+        path = gen.get_template_path(bt)
+        templates.append({
+            "body_type": bt,
+            "exists": path is not None,
+            "size_bytes": path.stat().st_size if path else 0,
+            "filename": path.name if path else None,
+            "url": f"/api/game/media/templates/{path.name}" if path else None,
+        })
+
+    ready = sum(1 for t in templates if t["exists"])
+    return {"templates": templates, "ready": ready, "total": len(templates)}
+
+
+@router.post("/media/templates/generate")
+async def generate_templates(force: bool = False):
+    """Check (and optionally regenerate) body reference templates.
+    
+    Templates are pre-supplied static assets (anime turnaround sheets).
+    Without force=True, this only verifies which templates are present.
+    With force=True, attempts AI generation for any missing templates.
+    """
+    from src.media.generator import MediaGenerator
+
+    gen = MediaGenerator()
+    results = await gen.ensure_templates(force=force)
+
+    output = {}
+    for body_type, path in results.items():
+        output[body_type] = {
+            "success": path is not None,
+            "path": str(path) if path else None,
+            "size_bytes": path.stat().st_size if path else 0,
+        }
+
+    generated = sum(1 for v in output.values() if v["success"])
+    return {
+        "results": output,
+        "generated": generated,
+        "total": len(output),
+        "status": "complete" if generated == len(output) else "partial",
+    }
+
+
+@router.get("/media/templates/{filename}")
+async def serve_template(filename: str):
+    """Serve a template file from the templates directory."""
+    file_path = TEMPLATES_DIR / filename
+
+    # Prevent path traversal
+    try:
+        resolved = file_path.resolve()
+        if not str(resolved).startswith(str(TEMPLATES_DIR.resolve())):
+            raise HTTPException(status_code=403, detail="Access denied")
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid path")
+
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="Template not found")
+
+    suffix = file_path.suffix.lower()
+    media_type = MIME_MAP.get(suffix, "application/octet-stream")
+
+    return FileResponse(
+        path=str(file_path),
+        media_type=media_type,
+        headers={"Cache-Control": "public, max-age=604800"},  # 7 days — templates are stable
+    )
+
+
+# =====================================================================
+# Campaign media serving — parameterized routes AFTER static routes
+# =====================================================================
 
 @router.get("/media/{campaign_id}/{category}/{filename}")
 async def serve_media(campaign_id: int, category: str, filename: str):
@@ -133,4 +225,3 @@ async def get_turn_media(campaign_id: int, turn_number: int):
                     })
 
     return {"assets": assets}
-
