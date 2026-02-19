@@ -23,7 +23,7 @@ def build_director_tools(
     session_number: int = 1,
     session_transcript: list = None,
     profile_library: Any = None,  # ProfileLibrary (for lore search)
-    profile_id: str = None,       # Active profile ID (for lore search)
+    profile_ids: list[str] = None, # Active profile IDs (for lore search)
 ) -> ToolRegistry:
     """Build tools for Director investigation phase.
     
@@ -38,7 +38,7 @@ def build_director_tools(
         session_number: Current session number (for seed planting)
         session_transcript: Recent messages
         profile_library: ProfileLibrary instance for lore search (optional)
-        profile_id: Active profile ID for scoping lore search (optional)
+        profile_ids: Active profile ID(s) for scoping lore search (optional, list)
         
     Returns:
         ToolRegistry with gameplay + director tools
@@ -49,7 +49,7 @@ def build_director_tools(
         state=state,
         session_transcript=session_transcript,
         profile_library=profile_library,
-        profile_id=profile_id,
+        profile_ids=profile_ids,
     )
 
     # -----------------------------------------------------------------

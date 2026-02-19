@@ -874,7 +874,7 @@ class TurnPipelineMixin:
             state=self.state,
             session_transcript=recent_messages,
             profile_library=get_profile_library(),
-            profile_id=self.profile_id,
+            profile_ids=[self.profile_id] if self.profile_id else None,
         )
 
         narrative = await self.key_animator.generate(

@@ -22,7 +22,7 @@ def build_gameplay_tools(
     state: Any,          # StateManager
     session_transcript: list = None,
     profile_library: Any = None,  # ProfileLibrary (for lore search)
-    profile_id: str = None,       # Active profile ID (for lore search)
+    profile_ids: list[str] = None, # Active profile IDs (for lore search, N+1 composition)
 ) -> ToolRegistry:
     """Build the standard tool registry for gameplay agents.
     
@@ -31,7 +31,7 @@ def build_gameplay_tools(
         state: StateManager instance (SQLite)
         session_transcript: Recent messages for transcript search
         profile_library: ProfileLibrary instance for lore search (optional)
-        profile_id: Active profile ID for scoping lore search (optional)
+        profile_ids: Active profile ID(s) for scoping lore search (optional, list)
         
     Returns:
         ToolRegistry populated with gameplay tools
@@ -184,7 +184,7 @@ def build_gameplay_tools(
     # LORE TOOLS (IP canon knowledge)
     # -----------------------------------------------------------------
 
-    if profile_library and profile_id:
+    if profile_library and profile_ids:
         registry.register(ToolDefinition(
             name="search_lore",
             description=(
@@ -202,7 +202,7 @@ def build_gameplay_tools(
                 ToolParam("limit", "int", "Max results (default 3)", required=False),
             ],
             handler=lambda query, page_type=None, limit=3: _search_lore(
-                profile_library, profile_id, query, page_type, limit
+                profile_library, profile_ids, query, page_type, limit
             )
         ))
 
@@ -506,13 +506,17 @@ def _get_character_sheet(state) -> dict:
 
 
 def _search_lore(
-    profile_library, profile_id: str, query: str,
+    profile_library, profile_ids: list[str], query: str,
     page_type: str = None, limit: int = 3,
 ) -> list[dict]:
-    """Search the canonical lore library for IP-accurate content."""
+    """Search the canonical lore library for IP-accurate content.
+
+    Supports multi-profile search (N+1 composition). Results from all
+    linked profiles are merged and ranked by relevance.
+    """
     try:
-        results = profile_library.search_lore(
-            profile_id=profile_id,
+        results = profile_library.search_lore_multi(
+            profile_ids=profile_ids,
             query=query,
             limit=limit,
             page_type=page_type,
