@@ -127,6 +127,48 @@ class ToolRegistry:
         """Get the log of all tool calls made via execute()."""
         return self._call_log
 
+    def _prepare_args(self, tool: 'ToolDefinition', arguments: dict[str, Any]) -> dict[str, Any]:
+        """Filter arguments to only those the handler accepts.
+        
+        Prevents unknown-param errors when LLMs send extra arguments.
+        Handles **kwargs handlers by passing all arguments through.
+        """
+        sig = inspect.signature(tool.handler)
+        has_var_keyword = any(
+            p.kind == inspect.Parameter.VAR_KEYWORD
+            for p in sig.parameters.values()
+        )
+
+        if has_var_keyword:
+            # Handler accepts **kwargs — pass ALL LLM-provided arguments through
+            return dict(arguments)
+
+        valid_args = {}
+        for param_name, param in sig.parameters.items():
+            if param_name in arguments:
+                valid_args[param_name] = arguments[param_name]
+            elif param.default is not inspect.Parameter.empty:
+                pass  # Use the function's default
+            elif param_name in [p.name for p in tool.parameters if not p.required]:
+                pass  # Optional tool param, not provided
+        return valid_args
+
+    def _unknown_tool_result(self, tool_name: str, arguments: dict[str, Any], round_number: int) -> ToolResult:
+        """Create error result for unknown tool and log it."""
+        result = ToolResult(
+            tool_name=tool_name,
+            arguments=arguments,
+            result=None,
+            error=f"Unknown tool: {tool_name}"
+        )
+        self._call_log.append(ToolCallLog(
+            tool_name=tool_name,
+            arguments=arguments,
+            result_preview=result.to_string()[:200],
+            round_number=round_number
+        ))
+        return result
+
     def execute(self, tool_name: str, arguments: dict[str, Any], round_number: int = 0) -> ToolResult:
         """Execute a tool by name with the given arguments.
         
@@ -135,42 +177,10 @@ class ToolRegistry:
         """
         tool = self._tools.get(tool_name)
         if not tool:
-            result = ToolResult(
-                tool_name=tool_name,
-                arguments=arguments,
-                result=None,
-                error=f"Unknown tool: {tool_name}"
-            )
-            self._call_log.append(ToolCallLog(
-                tool_name=tool_name,
-                arguments=arguments,
-                result_preview=result.to_string()[:200],
-                round_number=round_number
-            ))
-            return result
+            return self._unknown_tool_result(tool_name, arguments, round_number)
 
         try:
-            # Filter arguments to only those the handler accepts
-            sig = inspect.signature(tool.handler)
-            has_var_keyword = any(
-                p.kind == inspect.Parameter.VAR_KEYWORD
-                for p in sig.parameters.values()
-            )
-
-            if has_var_keyword:
-                # Handler accepts **kwargs (e.g. lambda **kw: _func(state, **kw))
-                # Pass ALL LLM-provided arguments through
-                valid_args = dict(arguments)
-            else:
-                valid_args = {}
-                for param_name, param in sig.parameters.items():
-                    if param_name in arguments:
-                        valid_args[param_name] = arguments[param_name]
-                    elif param.default is not inspect.Parameter.empty:
-                        pass  # Use the function's default
-                    elif param_name in [p.name for p in tool.parameters if not p.required]:
-                        pass  # Optional tool param, not provided
-
+            valid_args = self._prepare_args(tool, arguments)
             output = tool.handler(**valid_args)
             result = ToolResult(
                 tool_name=tool_name,
@@ -206,40 +216,10 @@ class ToolRegistry:
         """
         tool = self._tools.get(tool_name)
         if not tool:
-            result = ToolResult(
-                tool_name=tool_name,
-                arguments=arguments,
-                result=None,
-                error=f"Unknown tool: {tool_name}"
-            )
-            self._call_log.append(ToolCallLog(
-                tool_name=tool_name,
-                arguments=arguments,
-                result_preview=result.to_string()[:200],
-                round_number=round_number
-            ))
-            return result
+            return self._unknown_tool_result(tool_name, arguments, round_number)
 
         try:
-            # Filter arguments to only those the handler accepts
-            sig = inspect.signature(tool.handler)
-            has_var_keyword = any(
-                p.kind == inspect.Parameter.VAR_KEYWORD
-                for p in sig.parameters.values()
-            )
-
-            if has_var_keyword:
-                valid_args = dict(arguments)
-            else:
-                valid_args = {}
-                for param_name, param in sig.parameters.items():
-                    if param_name in arguments:
-                        valid_args[param_name] = arguments[param_name]
-                    elif param.default is not inspect.Parameter.empty:
-                        pass
-                    elif param_name in [p.name for p in tool.parameters if not p.required]:
-                        pass
-
+            valid_args = self._prepare_args(tool, arguments)
             output = tool.handler(**valid_args)
             # Await if handler returned a coroutine (async handler)
             if inspect.isawaitable(output):

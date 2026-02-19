@@ -140,8 +140,16 @@ def build_intent_resolution_tools(
     """
     from ..scrapers.anilist import AniListClient
 
-    if anilist_client is None:
-        anilist_client = AniListClient()
+    # Module-level singleton: reuse the same AniListClient (and its
+    # underlying requests.Session) across successive tool-registry builds
+    # so HTTP connection pooling is maintained.
+    global _anilist_client
+    if anilist_client is not None:
+        _anilist_client = anilist_client
+    elif '_anilist_client' not in globals() or _anilist_client is None:
+        _anilist_client = AniListClient()
+
+    anilist_client = _anilist_client
 
     if profiles_dir is None:
         profiles_dir = Path(__file__).parent.parent / "profiles"
