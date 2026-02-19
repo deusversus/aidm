@@ -81,6 +81,12 @@ class AnimeResearchOutput(BaseModel):
         description="Author's distinctive style: sentence_patterns, structural_motifs, dialogue_quirks, emotional_rhythm"
     )
 
+    # Visual style (for IP-faithful image generation)
+    visual_style: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Art direction for media generation: art_style, color_palette, line_work, shading, composition, atmosphere, character_rendering, reference_descriptors"
+    )
+
     # Combat style
     combat_style: str = Field(default="spectacle", description="tactical, spectacle, comedy, spirit, narrative")
 

@@ -4,6 +4,21 @@ source_anime: Hellsing
 media_type: anime
 status: finished
 generated_at: '2026-02-18T17:50:11.542491'
+visual_style:
+  art_style: "Kouta Hirano's Hellsing manga/OVA style — dark, gothic, hyper-stylized horror anime"
+  color_palette: "High-contrast desaturated palette: deep crimsons, midnight blacks, muted golds, and deathly pale skin tones. Shadows are pure black voids. Blood is vivid and saturated against the dark backdrop. Moonlight is cold blue-white."
+  line_work: "Bold angular linework with heavy inking. Sharp jawlines, pointed features, exaggerated proportions for dramatic effect. Fine cross-hatching on dark fabrics and leather. Thick outlines on characters, thin detail lines on textures."
+  shading: "Extreme high-contrast noir lighting. Deep cast shadows, dramatic uplighting, rim lighting on silhouettes. Minimal midtones — inky darkness or stark highlights. Cell-shaded with subtle gradient on skin."
+  composition: "Gothic horror framing — low angles, dutch angles, dramatic foreshortening. Characters emerge from black shadow. Architectural elements are baroque/gothic European. Negative space used for menace."
+  atmosphere: "Victorian Gothic meets modern military horror. Grand manor houses, London fog, moonlit battlefields, cathedral interiors. Rain and blood are recurring visual motifs. Night scenes dominate."
+  character_rendering: "Exaggerated features — impossibly wide grins, glowing red/orange eyes piercing darkness, elongated limbs during action. Military uniforms are period-accurate with meticulous detail. Vampiric features are monstrous and terrifying, never pretty or bishounen."
+  reference_descriptors:
+    - "Kouta Hirano manga art style"
+    - "Hellsing Ultimate OVA animation quality"
+    - "Gothic horror anime aesthetic"
+    - "High contrast noir anime"
+    - "Dark Victorian London atmosphere"
+    - "Castlevania Netflix visual quality"
 confidence: 100
 research_method: api_first
 aliases:

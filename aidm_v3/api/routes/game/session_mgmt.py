@@ -312,12 +312,38 @@ async def delete_session(session_id: str):
     except Exception as e:
         logger.error(f"Memory cleanup error: {e}")
 
+    # Clean up generated media files (portraits, model sheets, cutscenes, locations)
+    media_deleted = False
+    try:
+        from pathlib import Path
+
+        from src.db._core import get_db
+        from src.db.models import Campaign
+        from src.settings import get_settings_store
+
+        settings_for_media = get_settings_store().load()
+        profile_id = settings_for_media.active_profile_id
+
+        if profile_id:
+            db = next(get_db())
+            campaign = db.query(Campaign).filter(Campaign.profile_id == profile_id).first()
+            if campaign:
+                media_dir = Path(__file__).parent.parent.parent.parent / "data" / "media" / str(campaign.id)
+                if media_dir.exists():
+                    import shutil
+                    shutil.rmtree(media_dir)
+                    media_deleted = True
+                    logger.info(f"Deleted media directory: {media_dir}")
+    except Exception as e:
+        logger.error(f"Media cleanup error: {e}")
+
     return {
         "deleted": deleted,
         "session_id": session_id,
         "custom_lore_deleted": lore_deleted,
         "custom_folder_deleted": folder_deleted,
-        "memory_deleted": memory_deleted
+        "memory_deleted": memory_deleted,
+        "media_deleted": media_deleted
     }
 
 
@@ -418,6 +444,19 @@ async def _generate_handoff_character_media(
             return
 
         style_context = settings.active_profile_id or "anime"
+        # Load rich visual_style from profile YAML if available
+        try:
+            import yaml
+            from pathlib import Path
+            profile_path = Path(__file__).parent.parent.parent / "src" / "profiles" / f"{settings.active_profile_id}.yaml"
+            if profile_path.exists():
+                with open(profile_path, 'r', encoding='utf-8') as f:
+                    profile_data = yaml.safe_load(f)
+                vs = profile_data.get('visual_style')
+                if isinstance(vs, dict) and vs:
+                    style_context = vs
+        except Exception:
+            pass  # Fall back to string style_context
 
         gen = MediaGenerator()
         result = await gen.generate_full_character_media(

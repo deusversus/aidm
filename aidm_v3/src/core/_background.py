@@ -432,8 +432,12 @@ class BackgroundMixin:
                     except Exception:
                         media_budget_remaining = budget_cap  # Fall back to full budget
 
-                # Style context from campaign profile
-                style_context = getattr(self.profile, 'art_style', '') or getattr(self.profile, 'name', '') or ''
+                # Style context from campaign profile — prefer rich visual_style dict
+                visual_style = getattr(self.profile, 'visual_style', None)
+                if isinstance(visual_style, dict) and visual_style:
+                    style_context = visual_style
+                else:
+                    style_context = getattr(self.profile, 'art_style', '') or getattr(self.profile, 'name', '') or ''
 
                 # Diagnostic logging for media pipeline
                 if not media_enabled:

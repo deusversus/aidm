@@ -11,6 +11,7 @@ continue to work unchanged.
 from fastapi import APIRouter
 
 from .gameplay import router as _gameplay_router
+from .media import router as _media_router
 
 # ---------------------------------------------------------------------------
 # Sub-module routers
@@ -26,6 +27,7 @@ router.include_router(_session_mgmt_router)
 router.include_router(_session_zero_router)
 router.include_router(_gameplay_router)
 router.include_router(_status_router)
+router.include_router(_media_router)
 
 # ---------------------------------------------------------------------------
 # Re-exports  (used by api/main.py, api/routes/settings.py, tests/*)

@@ -86,6 +86,41 @@ class MediaGenerator:
         """Sanitize entity name for use as filename."""
         return name.lower().replace(" ", "_").replace("'", "").replace('"', '')[:50]
 
+    def _build_style_prompt(self, style_context: str | dict) -> str:
+        """Build a rich art direction block from style_context.
+        
+        Args:
+            style_context: Either a visual_style dict (from profile YAML) or
+                          a fallback string like 'hellsing' or 'anime'.
+        Returns:
+            Multi-line art direction string for image prompts.
+        """
+        if isinstance(style_context, dict):
+            lines = []
+            if style_context.get('art_style'):
+                lines.append(f"Style: {style_context['art_style']}")
+            if style_context.get('color_palette'):
+                lines.append(f"Color Palette: {style_context['color_palette']}")
+            if style_context.get('line_work'):
+                lines.append(f"Line Work: {style_context['line_work']}")
+            if style_context.get('shading'):
+                lines.append(f"Shading: {style_context['shading']}")
+            if style_context.get('composition'):
+                lines.append(f"Composition: {style_context['composition']}")
+            if style_context.get('atmosphere'):
+                lines.append(f"Atmosphere: {style_context['atmosphere']}")
+            if style_context.get('character_rendering'):
+                lines.append(f"Character Rendering: {style_context['character_rendering']}")
+            refs = style_context.get('reference_descriptors', [])
+            if refs:
+                lines.append(f"Visual References: {', '.join(refs)}")
+            if lines:
+                return "\n".join(lines)
+        # Fallback: bare string
+        if style_context:
+            return f"Style: {style_context} anime art style"
+        return "Style: detailed anime art style"
+
     async def generate_model_sheet(
         self,
         visual_tags: list[str],
@@ -120,18 +155,22 @@ class MediaGenerator:
         tags_str = ", ".join(visual_tags) if visual_tags else "no specific tags"
         appearance_desc = self._format_appearance(appearance)
 
-        prompt = f"""Create a full-body character model sheet in detailed anime style.
+        style_block = self._build_style_prompt(style_context)
+
+        prompt = f"""Create a full-body character model sheet.
 
 CHARACTER: {entity_name}
 VISUAL TAGS: {tags_str}
 APPEARANCE: {appearance_desc}
-ART STYLE: {style_context}
+
+ART DIRECTION:
+{style_block}
 
 Requirements:
-- Full-body front view, standing pose
+- Full-body front view and upper-body close-up side by side
 - Clean white/light background for reference use
 - High detail on face, hair, outfit, accessories
-- Anime art style consistent with the specified IP
+- Art style MUST match the art direction above — this is critical
 - Character model sheet format suitable as canonical visual reference
 - No text labels or annotations on the image"""
 
@@ -224,8 +263,10 @@ Requirements:
                     contents=[
                         types.Part.from_bytes(data=model_bytes, mime_type="image/png"),
                         "Based on this character model sheet, create a close-up head-and-shoulders portrait. "
-                        "Same character, same style, same details. Focus on the face and upper body. "
-                        "Clean background suitable for a character profile card.",
+                        "Same character, same art style, same details. Focus on the face and upper body. "
+                        "Maintain the exact same art style and color palette as the reference. "
+                        "Clean dark or neutral background suitable for a character profile card. "
+                        "Dramatic lighting that matches the tone of the source material.",
                     ],
                     config=types.GenerateContentConfig(
                         response_modalities=["image", "text"],
@@ -272,20 +313,25 @@ Requirements:
         output_dir.mkdir(exist_ok=True)
         output_path = output_dir / f"{safe_name}.png"
 
-        prompt = f"""Create a wide establishing shot of an anime location.
+        style_block = self._build_style_prompt(style_context)
+
+        prompt = f"""Create a wide establishing shot of a location.
 
 LOCATION: {location_name}
 TYPE: {location_type}
 DESCRIPTION: {description}
 ATMOSPHERE: {atmosphere}
-ART STYLE: {style_context}
+
+ART DIRECTION:
+{style_block}
 
 Requirements:
-- Wide angle shot suitable for a location card
+- Wide angle establishing shot suitable for a location card
 - Rich atmospheric detail (lighting, weather, mood)
-- Anime art style consistent with the specified IP
+- Art style MUST match the art direction above — this is critical
 - No characters in the scene
-- Cinematic composition, 16:9 aspect ratio feel"""
+- Cinematic composition, 16:9 aspect ratio feel
+- Location name displayed as a title card in the bottom-left corner"""
 
         try:
             loop = asyncio.get_running_loop()
@@ -328,9 +374,18 @@ Requirements:
     ) -> dict[str, Path | None]:
         """Convenience method: generate model sheet + derive portrait in sequence.
         
+        If no template_path is provided, auto-selects from data/media/templates/
+        based on gender/body type inferred from appearance and visual tags.
+        
         Returns:
             Dict with 'model_sheet' and 'portrait' paths (either may be None on failure)
         """
+        # Auto-select template if not explicitly provided
+        if template_path is None:
+            template_path = self._auto_select_template(appearance, visual_tags)
+            if template_path:
+                logger.info(f"Auto-selected template: {template_path.name}")
+
         model_sheet = await self.generate_model_sheet(
             visual_tags=visual_tags,
             appearance=appearance,
@@ -352,6 +407,50 @@ Requirements:
             "model_sheet": model_sheet,
             "portrait": portrait,
         }
+
+    def _auto_select_template(self, appearance: dict, visual_tags: list[str]) -> Path | None:
+        """Infer the best body template from appearance data and visual tags.
+        
+        Checks for gender/body type keywords in appearance dict and visual tags,
+        then looks for the matching template file in TEMPLATES_DIR.
+        
+        Returns:
+            Path to template image, or None if no suitable template found.
+        """
+        # Build a searchable string from all appearance data
+        search_str = " ".join([
+            str(v).lower() for v in appearance.values() if v
+        ] + [t.lower() for t in visual_tags])
+        
+        # Determine body type from keywords
+        female_keywords = ["female", "woman", "girl", "feminine", "she", "her"]
+        male_keywords = ["male", "man", "boy", "masculine", "he", "him"]
+        
+        body_type = "neutral"
+        if any(kw in search_str for kw in female_keywords):
+            body_type = "female_average"
+        elif any(kw in search_str for kw in male_keywords):
+            body_type = "male_average"
+        
+        # Also check appearance dict for explicit gender field
+        gender = str(appearance.get("gender", "")).lower()
+        if gender in ("female", "f", "woman", "girl"):
+            body_type = "female_average"
+        elif gender in ("male", "m", "man", "boy"):
+            body_type = "male_average"
+        
+        # Try exact match first, then fallback to any available template
+        template = self.get_template_path(body_type)
+        if template:
+            return template
+        
+        # Fallback: try neutral, then any template that exists
+        for fallback in ["neutral", "male_average", "female_average"]:
+            template = self.get_template_path(fallback)
+            if template:
+                return template
+        
+        return None
 
     # =====================================================================
     # General-purpose image + video generation (cutscene pipeline)
@@ -385,7 +484,7 @@ Requirements:
         output_path = self._cutscenes_dir(campaign_id) / f"{safe_name}_{timestamp}.png"
 
         # Add aspect ratio hint to prompt
-        full_prompt = f"{prompt}\n\nAspect ratio: {aspect_ratio}. Cinematic framing."
+        full_prompt = f"{prompt}\n\nAspect ratio: {aspect_ratio}. Cinematic framing. Ensure the art style is consistent with the series aesthetic."
 
         try:
             loop = asyncio.get_running_loop()
@@ -453,7 +552,7 @@ Requirements:
 
             def _start_generation():
                 """Start the Veo generation job (returns an operation to poll)."""
-                image = types.Image.from_bytes(data=image_bytes, mime_type="image/png")
+                image = types.Part.from_bytes(data=image_bytes, mime_type="image/png")
                 operation = self._client.models.generate_videos(
                     model=self.VIDEO_MODEL,
                     prompt=prompt,
