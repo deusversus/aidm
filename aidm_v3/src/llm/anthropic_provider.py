@@ -631,7 +631,7 @@ Your response must match the required JSON schema.
 
                 logger.info(f"  [Tool] {tool_name}({tool_args})")
 
-                result = tools.execute(tool_name, tool_args, round_number=round_num)
+                result = await tools.async_execute(tool_name, tool_args, round_number=round_num)
                 result_str = result.to_string()
 
                 all_tool_calls.append({
@@ -770,7 +770,7 @@ Your response must match the required JSON schema.
 
                 logger.info(f"  [Tool] {tool_name}({tool_args})")
 
-                result = tools.execute(tool_name, tool_args, round_number=round_num)
+                result = await tools.async_execute(tool_name, tool_args, round_number=round_num)
                 result_str = result.to_string()
 
                 all_tool_calls.append({
