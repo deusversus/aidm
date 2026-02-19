@@ -31,6 +31,7 @@ query ($search: String) {
   Page(page: 1, perPage: 5) {
     media(search: $search, type: ANIME, sort: SEARCH_MATCH) {
       id
+      idMal
       title {
         romaji
         english
@@ -119,6 +120,7 @@ SEARCH_QUERY_TYPED = """
 query ($search: String, $type: MediaType) {
   Media(search: $search, type: $type) {
     id
+    idMal
     title {
       romaji
       english
@@ -207,6 +209,7 @@ FETCH_BY_ID_QUERY = """
 query ($id: Int) {
   Media(id: $id) {
     id
+    idMal
     title {
       romaji
       english
@@ -307,6 +310,7 @@ class AniListResult:
 
     # Identity
     id: int = 0
+    mal_id: int | None = None  # MyAnimeList cross-reference (from idMal)
     title_romaji: str = ""
     title_english: str | None = None
     title_native: str | None = None
@@ -489,6 +493,238 @@ class AniListClient:
         chosen_fmt = best.get('format', '?')
         logger.info(f"Disambiguated: chose '{chosen_title}' ({chosen_fmt}) from {len(media_list)} candidates")
         return best
+
+    # ──────────────────────────────────────────────────────────────────────
+    # Intent Resolution Agent tools
+    # ──────────────────────────────────────────────────────────────────────
+
+    async def fetch_by_id(self, anilist_id: int) -> AniListResult | None:
+        """
+        Fetch a single media entry by its AniList ID.
+
+        Used by the Intent Resolution Agent to verify a candidate after search,
+        ensuring the canonical title and metadata are correct.
+
+        Args:
+            anilist_id: AniList media ID (e.g., 21 for One Piece)
+
+        Returns:
+            AniListResult or None if not found
+        """
+        loop = asyncio.get_event_loop()
+        data = await loop.run_in_executor(
+            None, self._execute_query, FETCH_BY_ID_QUERY, {"id": anilist_id}
+        )
+        media = data.get("Media")
+        if not media:
+            logger.info(f"AniList: No result for ID {anilist_id}")
+            return None
+        return self._parse_media(media)
+
+    async def search_multi(
+        self,
+        title: str,
+        media_type: str = "ANIME",
+        limit: int = 10,
+    ) -> list[AniListResult]:
+        """
+        Search AniList and return ALL candidates (not just the best match).
+
+        The Intent Resolution Agent needs to see all candidates so it can
+        reason about which one the user actually meant, rather than having
+        the client auto-pick.
+
+        Args:
+            title: Search term (anime/manga name)
+            media_type: "ANIME" or "MANGA"
+            limit: Max results to return (capped by AniList's page size)
+
+        Returns:
+            List of AniListResult, sorted by AniList relevance then format priority.
+            Empty list if nothing found.
+        """
+        loop = asyncio.get_event_loop()
+
+        if media_type == "ANIME":
+            data = await loop.run_in_executor(
+                None, self._execute_query, SEARCH_QUERY, {"search": title}
+            )
+            media_list = data.get("Page", {}).get("media", [])
+        else:
+            # For MANGA, use the typed query (returns single result)
+            # Wrap in list for uniform return type
+            data = await loop.run_in_executor(
+                None, self._execute_query, SEARCH_QUERY_TYPED,
+                {"search": title, "type": media_type}
+            )
+            media = data.get("Media")
+            media_list = [media] if media else []
+
+        if not media_list:
+            return []
+
+        results = [self._parse_media(m) for m in media_list[:limit]]
+
+        # Log candidates for debugging
+        for r in results:
+            display = r.title_english or r.title_romaji
+            logger.info(f"AniList candidate: {display} (id={r.id}, fmt={r.format}, pop={r.popularity})")
+
+        return results
+
+    async def get_franchise_graph_by_id(self, anilist_id: int) -> list[dict]:
+        """
+        Build franchise graph starting from an AniList ID (not a title search).
+
+        This is the ID-based counterpart to get_franchise_entries(title).
+        The Intent Resolution Agent uses this after it has already identified
+        a specific AniList entry, to discover all related franchise entries
+        without the ambiguity of a title search.
+
+        Args:
+            anilist_id: AniList media ID of the root entry
+
+        Returns:
+            List of distinct franchise entries (same format as get_franchise_entries).
+            Each entry has: title, id, relation, season_count.
+            Empty list if single continuity or not found.
+        """
+        import re
+
+        primary = await self.fetch_by_id(anilist_id)
+        if not primary:
+            return []
+
+        SEASON_RELATIONS = {"SEQUEL", "PREQUEL"}
+        DISTINCT_RELATIONS = {"SPIN_OFF", "SIDE_STORY", "ALTERNATIVE", "PARENT"}
+        SERIES_FORMATS = {"TV", "ONA", "TV_SHORT", None}
+
+        SEASON_VARIANT_RE = re.compile(
+            r'\s*(?:'
+            r'Season\s+\d+'
+            r'|S\d+'
+            r'|\d+(?:st|nd|rd|th)\s+Season'
+            r'|Part\s+\d+'
+            r'|Cour\s+\d+'
+            r'|(?:Part|Season)\s+(?:One|Two|Three|Four|Five)'
+            r')'
+            r'(?:\s*[:：\-–—]\s*.+)?$',
+            re.IGNORECASE
+        )
+
+        loop = asyncio.get_event_loop()
+        primary_title = primary.title_english or primary.title_romaji
+
+        groups: list[dict] = [{
+            "title": primary_title,
+            "id": primary.id,
+            "anilist_id": primary.id,
+            "relation": "primary",
+            "format": primary.format,
+            "year": primary.start_year,
+            "season_count": 1,
+        }]
+
+        visited: set[int] = {primary.id}
+        sequel_queue: list[int] = []
+
+        # Read direct relations from primary
+        for rel in primary.relations:
+            if rel.id in visited:
+                continue
+            visited.add(rel.id)
+
+            if rel.relation_type in SEASON_RELATIONS and rel.format in SERIES_FORMATS:
+                sequel_queue.append(rel.id)
+            elif rel.relation_type in DISTINCT_RELATIONS and rel.format in SERIES_FORMATS:
+                rel_title = rel.title_english or rel.title_romaji
+                groups.append({
+                    "title": rel_title,
+                    "id": rel.id,
+                    "anilist_id": rel.id,
+                    "relation": rel.relation_type.lower(),
+                    "format": rel.format,
+                    "year": None,  # Not available from relation edge
+                    "season_count": 1,
+                })
+
+        # Walk sequel/prequel chain
+        current_group_idx = 0
+        depth = 0
+        MAX_DEPTH = 10
+
+        while sequel_queue and depth < MAX_DEPTH:
+            depth += 1
+            current_batch = list(sequel_queue)
+            sequel_queue.clear()
+
+            for seq_id in current_batch:
+                try:
+                    data = await loop.run_in_executor(
+                        None, self._execute_query, FETCH_BY_ID_QUERY, {"id": seq_id}
+                    )
+                    media = data.get("Media")
+                    if not media:
+                        continue
+
+                    entry = self._parse_media(media)
+                    entry_title = entry.title_english or entry.title_romaji
+                    entry_base = SEASON_VARIANT_RE.sub('', entry_title).strip().lower()
+
+                    current_base = SEASON_VARIANT_RE.sub(
+                        '', groups[current_group_idx]["title"]
+                    ).strip().lower()
+
+                    if entry_base != current_base:
+                        current_group_idx = len(groups)
+                        groups.append({
+                            "title": entry_title,
+                            "id": entry.id,
+                            "anilist_id": entry.id,
+                            "relation": "sequel",
+                            "format": entry.format,
+                            "year": entry.start_year,
+                            "season_count": 1,
+                        })
+                    else:
+                        groups[current_group_idx]["season_count"] += 1
+
+                    for sub_rel in entry.relations:
+                        if sub_rel.id in visited:
+                            continue
+                        visited.add(sub_rel.id)
+
+                        if sub_rel.relation_type in SEASON_RELATIONS and sub_rel.format in SERIES_FORMATS:
+                            sequel_queue.append(sub_rel.id)
+                        elif sub_rel.relation_type in DISTINCT_RELATIONS and sub_rel.format in SERIES_FORMATS:
+                            rel_title = sub_rel.title_english or sub_rel.title_romaji
+                            groups.append({
+                                "title": rel_title,
+                                "id": sub_rel.id,
+                                "anilist_id": sub_rel.id,
+                                "relation": sub_rel.relation_type.lower(),
+                                "format": sub_rel.format,
+                                "year": None,
+                                "season_count": 1,
+                            })
+                except Exception as e:
+                    logger.error(f"Error fetching sequel {seq_id}: {e}")
+                    continue
+
+        # Deduplicate by AniList ID (different paths can discover the same entry)
+        seen_ids: set[int] = set()
+        unique_groups: list[dict] = []
+        for g in groups:
+            if g["id"] not in seen_ids:
+                seen_ids.add(g["id"])
+                unique_groups.append(g)
+
+        logger.info(f"Franchise graph (id={anilist_id}): {len(unique_groups)} entries")
+        for r in unique_groups:
+            seasons = f" ({r['season_count']} seasons)" if r['season_count'] > 1 else ""
+            logger.info(f"  - {r['title']} [{r['relation']}]{seasons}")
+
+        return unique_groups
 
     async def search_with_fallback(self, title: str) -> AniListResult | None:
         """
@@ -793,6 +1029,7 @@ class AniListClient:
         """Parse raw AniList media JSON into an AniListResult."""
         result = AniListResult(
             id=media.get("id", 0),
+            mal_id=media.get("idMal"),
             title_romaji=media.get("title", {}).get("romaji", ""),
             title_english=media.get("title", {}).get("english"),
             title_native=media.get("title", {}).get("native"),
