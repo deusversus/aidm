@@ -395,7 +395,14 @@ def _trigger_cutscene(
             return budget_error
 
         # Enrich prompts with style context
-        full_image_prompt = f"{image_prompt}\n\nArt style: {style_context}" if style_context else image_prompt
+        if isinstance(style_context, dict):
+            from ..media.generator import MediaGenerator
+            style_block = MediaGenerator._build_style_prompt(None, style_context)
+            full_image_prompt = f"{image_prompt}\n\nART DIRECTION:\n{style_block}"
+        elif style_context:
+            full_image_prompt = f"{image_prompt}\n\nArt style: {style_context}"
+        else:
+            full_image_prompt = image_prompt
 
         async def _generate():
             try:

@@ -2065,10 +2065,108 @@ body {
 }
 
 @keyframes spin {
-    to { transform: rotate(360deg); }
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 @keyframes fadeInPulse {
-    from { opacity: 0.6; }
-    to { opacity: 1; }
+    from {
+        opacity: 0.6;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+/* === Media: NPC Portrait Chips === */
+
+.npc-portrait-chip {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    object-fit: cover;
+    vertical-align: middle;
+    margin-right: 0.4rem;
+    border: 2px solid var(--accent-primary);
+    box-shadow: 0 0 8px var(--accent-glow);
+    transition: transform var(--transition-fast);
+}
+
+.npc-portrait-chip:hover {
+    transform: scale(1.3);
+    z-index: 10;
+}
+
+/* === Media: Cutscene Container === */
+
+.cutscene-container {
+    position: relative;
+    width: 100%;
+    max-width: 720px;
+    aspect-ratio: 16 / 9;
+    margin: var(--spacing-lg) auto;
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    border: 1px solid var(--accent-primary);
+    box-shadow: 0 0 20px var(--accent-glow), 0 4px 24px rgba(0, 0, 0, 0.5);
+    cursor: pointer;
+    background: var(--bg-secondary);
+}
+
+.cutscene-container img,
+.cutscene-container video {
+    display: block;
+}
+
+.cutscene-badge {
+    position: absolute;
+    top: var(--spacing-sm);
+    right: var(--spacing-sm);
+    background: rgba(10, 10, 15, 0.75);
+    color: var(--accent-primary);
+    padding: 0.2rem 0.6rem;
+    border-radius: 999px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    backdrop-filter: blur(4px);
+    border: 1px solid var(--accent-glow);
+}
+
+/* === Media: Fullscreen Overlay === */
+
+.cutscene-fullscreen-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.92);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    cursor: pointer;
+    animation: fadeIn 0.2s ease;
+}
+
+.cutscene-fullscreen-overlay img,
+.cutscene-fullscreen-overlay video {
+    max-width: 90vw;
+    max-height: 90vh;
+    border-radius: var(--radius-lg);
+    box-shadow: 0 0 40px var(--accent-glow);
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
 }

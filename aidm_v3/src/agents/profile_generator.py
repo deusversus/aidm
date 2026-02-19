@@ -157,6 +157,10 @@ def generate_compact_profile(research: AnimeResearchOutput) -> dict[str, Any]:
     if research.author_voice:
         profile["author_voice"] = research.author_voice
 
+    # Add visual style for IP-faithful media generation (if extracted)
+    if research.visual_style:
+        profile["visual_style"] = research.visual_style
+
     # Add series detection fields
     profile["series_group"] = research.series_group or profile_id
     profile["series_position"] = research.series_position or 1

@@ -677,8 +677,23 @@ async def _generate_session_zero_npc_portrait(
             logger.warning(f"[SessionZero→Media] Media disabled, skipping portrait for {npc_name}")
             return
 
-        # Get style context from profile
-        style_context = settings.active_profile_id or "anime"
+        # Get style context from profile — prefer rich visual_style dict
+        profile_id = settings.active_profile_id or "anime"
+        style_context = profile_id  # fallback
+        try:
+            from ..context.profile_library import get_profile_library
+            import yaml
+            from pathlib import Path
+            # Load profile YAML to get visual_style
+            profile_path = Path(__file__).parent.parent / "profiles" / f"{profile_id}.yaml"
+            if profile_path.exists():
+                with open(profile_path, 'r', encoding='utf-8') as f:
+                    profile_data = yaml.safe_load(f)
+                vs = profile_data.get('visual_style')
+                if isinstance(vs, dict) and vs:
+                    style_context = vs
+        except Exception as e:
+            logger.debug(f"Could not load visual_style for {profile_id}: {e}")
 
         gen = MediaGenerator()
         result = await gen.generate_full_character_media(
