@@ -572,28 +572,20 @@ class AniListClient:
 
         return results
 
-    async def get_franchise_graph_by_id(self, anilist_id: int) -> list[dict]:
-        """
-        Build franchise graph starting from an AniList ID (not a title search).
-
-        This is the ID-based counterpart to get_franchise_entries(title).
-        The Intent Resolution Agent uses this after it has already identified
-        a specific AniList entry, to discover all related franchise entries
-        without the ambiguity of a title search.
-
+    async def _walk_franchise_graph(self, primary: 'AniListResult') -> list[dict]:
+        """Shared BFS core for franchise traversal.
+        
+        Walks the SEQUEL/PREQUEL chain from a primary entry, grouping season
+        variants together and discovering distinct franchise entries.
+        
         Args:
-            anilist_id: AniList media ID of the root entry
-
+            primary: The root AniListResult to start traversal from.
+            
         Returns:
-            List of distinct franchise entries (same format as get_franchise_entries).
-            Each entry has: title, id, relation, season_count.
-            Empty list if single continuity or not found.
+            List of group dicts with keys: title, id, anilist_id, relation,
+            format, year, season_count. Deduplicated by AniList ID.
         """
         import re
-
-        primary = await self.fetch_by_id(anilist_id)
-        if not primary:
-            return []
 
         SEASON_RELATIONS = {"SEQUEL", "PREQUEL"}
         DISTINCT_RELATIONS = {"SPIN_OFF", "SIDE_STORY", "ALTERNATIVE", "PARENT"}
@@ -718,6 +710,24 @@ class AniListClient:
             if g["id"] not in seen_ids:
                 seen_ids.add(g["id"])
                 unique_groups.append(g)
+
+        return unique_groups
+
+    async def get_franchise_graph_by_id(self, anilist_id: int) -> list[dict]:
+        """Build franchise graph starting from an AniList ID.
+
+        The Intent Resolution Agent uses this after identifying a specific
+        AniList entry, to discover all related franchise entries.
+
+        Returns:
+            List of franchise entries with: title, id, anilist_id, relation,
+            format, year, season_count. Empty list if not found.
+        """
+        primary = await self.fetch_by_id(anilist_id)
+        if not primary:
+            return []
+
+        unique_groups = await self._walk_franchise_graph(primary)
 
         logger.info(f"Franchise graph (id={anilist_id}): {len(unique_groups)} entries")
         for r in unique_groups:
@@ -868,12 +878,9 @@ class AniListClient:
         """
         Discover distinct franchise entries for disambiguation.
         
-        Strategy (optimized for API rate limits):
-        1. Search for the primary entry
-        2. Walk its SEQUEL/PREQUEL chain — if a sequel has a genuinely
-           different title (not a season variant), treat it as a distinct entry
-        3. Read SPIN_OFF/SIDE_STORY/ALTERNATIVE from relation metadata
-           (no extra API calls needed for these)
+        Searches by title, then walks the franchise graph to find
+        distinct continuity groups (sequels with different titles,
+        spinoffs, alternate timelines).
         
         Only TV/ONA format entries are included (no movies/OVAs/specials).
         
@@ -884,139 +891,22 @@ class AniListClient:
             List of distinct franchise entries for disambiguation.
             Empty list if single continuity or not found.
         """
-        import re
-
         primary = await self.search(title)
         if not primary:
             return []
 
-        SEASON_RELATIONS = {"SEQUEL", "PREQUEL"}
-        # CHARACTER excluded: crossover cameos (Goku in ONE PIECE) aren't franchise entries
-        DISTINCT_RELATIONS = {"SPIN_OFF", "SIDE_STORY", "ALTERNATIVE", "PARENT"}
-        SERIES_FORMATS = {"TV", "ONA", "TV_SHORT", None}
+        unique_groups = await self._walk_franchise_graph(primary)
 
-        # Pattern to detect season variants (same show, different season number)
-        SEASON_VARIANT_RE = re.compile(
-            r'\s*(?:'
-            r'Season\s+\d+'
-            r'|S\d+'
-            r'|\d+(?:st|nd|rd|th)\s+Season'
-            r'|Part\s+\d+'
-            r'|Cour\s+\d+'
-            r'|(?:Part|Season)\s+(?:One|Two|Three|Four|Five)'
-            r')'
-            r'(?:\s*[:：\-–—]\s*.+)?$',
-            re.IGNORECASE
-        )
-
-        loop = asyncio.get_event_loop()
-        primary_title = primary.title_english or primary.title_romaji
-        primary_base = SEASON_VARIANT_RE.sub('', primary_title).strip().lower()
-
-        # Results: each entry is a continuity group
-        # Primary gets its own group
-        groups: list[dict] = [{
-            "title": primary_title,
-            "id": primary.id,
-            "relation": "primary",
-            "season_count": 1,
-        }]
-
-        visited: set[int] = {primary.id}
-        sequel_queue: list[int] = []
-
-        # Read direct relations from primary
-        for rel in primary.relations:
-            if rel.id in visited:
-                continue
-            visited.add(rel.id)
-
-            if rel.relation_type in SEASON_RELATIONS and rel.format in SERIES_FORMATS:
-                sequel_queue.append(rel.id)
-            elif rel.relation_type in DISTINCT_RELATIONS and rel.format in SERIES_FORMATS:
-                rel_title = rel.title_english or rel.title_romaji
-                groups.append({
-                    "title": rel_title,
-                    "id": rel.id,
-                    "relation": rel.relation_type.lower(),
-                    "season_count": 1,
-                })
-
-        # Walk sequel/prequel chain
-        # Key: if a sequel has a genuinely different title (not a season variant
-        # of the current group's base), start a new group for it
-        current_group_idx = 0  # index into groups[] for the primary
-        depth = 0
-        MAX_DEPTH = 10
-
-        while sequel_queue and depth < MAX_DEPTH:
-            depth += 1
-            current_batch = list(sequel_queue)
-            sequel_queue.clear()
-
-            for seq_id in current_batch:
-                try:
-                    data = await loop.run_in_executor(
-                        None, self._execute_query, FETCH_BY_ID_QUERY, {"id": seq_id}
-                    )
-                    media = data.get("Media")
-                    if not media:
-                        continue
-
-                    entry = self._parse_media(media)
-                    entry_title = entry.title_english or entry.title_romaji
-                    entry_base = SEASON_VARIANT_RE.sub('', entry_title).strip().lower()
-
-                    # Check if this sequel has a genuinely different title
-                    current_base = SEASON_VARIANT_RE.sub(
-                        '', groups[current_group_idx]["title"]
-                    ).strip().lower()
-
-                    if entry_base != current_base:
-                        # Distinct continuation (e.g., Naruto → Shippuden, Shippuden → Boruto)
-                        current_group_idx = len(groups)
-                        groups.append({
-                            "title": entry_title,
-                            "id": entry.id,
-                            "relation": "sequel",
-                            "season_count": 1,
-                        })
-                    else:
-                        # Same show, different season — merge into current group
-                        groups[current_group_idx]["season_count"] += 1
-
-                    # Continue following sequel/prequel + discover distinct relations
-                    for sub_rel in entry.relations:
-                        if sub_rel.id in visited:
-                            continue
-                        visited.add(sub_rel.id)
-
-                        if sub_rel.relation_type in SEASON_RELATIONS and sub_rel.format in SERIES_FORMATS:
-                            sequel_queue.append(sub_rel.id)
-                        elif sub_rel.relation_type in DISTINCT_RELATIONS and sub_rel.format in SERIES_FORMATS:
-                            rel_title = sub_rel.title_english or sub_rel.title_romaji
-                            groups.append({
-                                "title": rel_title,
-                                "id": sub_rel.id,
-                                "relation": sub_rel.relation_type.lower(),
-                                "season_count": 1,
-                            })
-                except Exception as e:
-                    logger.error(f"Error fetching sequel {seq_id}: {e}")
-                    continue
-
-        if len(groups) <= 1:
+        if len(unique_groups) <= 1:
             logger.info(f"[AniList] Franchise '{title}': single continuity "
-                  f"({groups[0]['season_count']} seasons), no disambiguation needed")
+                  f"({unique_groups[0]['season_count']} seasons), no disambiguation needed")
             return []
 
-        # Deduplicate by title (different paths can discover the same entry)
-        seen_titles: set[str] = set()
-        unique_groups: list[dict] = []
-        for g in groups:
-            if g["title"] not in seen_titles:
-                seen_titles.add(g["title"])
-                unique_groups.append(g)
+        # Strip fields that get_franchise_entries callers don't expect
+        for g in unique_groups:
+            g.pop("anilist_id", None)
+            g.pop("format", None)
+            g.pop("year", None)
 
         logger.info(f"Franchise '{title}': {len(unique_groups)} distinct entries")
         for r in unique_groups:
