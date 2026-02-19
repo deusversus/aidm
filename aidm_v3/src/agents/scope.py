@@ -61,7 +61,8 @@ class ScopeOutput(BaseModel):
 # All 11 research topics (never excluded, only bundled differently)
 ALL_TOPICS = [
     "power_system", "combat", "tone", "characters", "factions",
-    "locations", "arcs", "sequels", "adaptations", "recent", "series_aliases"
+    "locations", "arcs", "sequels", "adaptations", "recent", "series_aliases",
+    "visual_style"
 ]
 
 # Bundle definitions by scope level
@@ -69,12 +70,12 @@ ALL_TOPICS = [
 # Larger scopes = fewer topics per bundle (more depth per topic)
 MICRO_BUNDLES = [
     ["power_system", "combat"],
-    ["tone", "characters"],
+    ["tone", "characters", "visual_style"],
     ["factions", "locations", "arcs", "sequels", "adaptations", "recent", "series_aliases"]
 ]
 STANDARD_BUNDLES = [
     ["power_system", "combat"],
-    ["tone"],
+    ["tone", "visual_style"],
     ["characters", "factions"],
     ["locations", "arcs"],
     ["sequels", "adaptations", "recent", "series_aliases"]
@@ -82,7 +83,7 @@ STANDARD_BUNDLES = [
 COMPLEX_BUNDLES = [
     ["power_system"],
     ["combat"],
-    ["tone"],
+    ["tone", "visual_style"],
     ["characters"],
     ["factions"],
     ["locations"],
@@ -91,7 +92,7 @@ COMPLEX_BUNDLES = [
 EPIC_BUNDLES = [
     ["power_system"],
     ["combat"],
-    ["tone"],
+    ["tone", "visual_style"],
     ["characters"],
     ["factions"],
     ["locations"],
