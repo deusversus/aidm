@@ -7,9 +7,9 @@ from fastapi import APIRouter, HTTPException
 from src.agents.progress import ProgressPhase, ProgressTracker
 from src.agents.session_zero import (
     apply_detected_info,
-    get_disambiguation_options,
     process_session_zero_state,
 )
+from src.agents.intent_resolution_handler import resolve_media_intent
 from src.core.session import (
     SessionPhase,
     get_current_phase_for_draft,
@@ -142,412 +142,75 @@ async def session_zero_turn(session_id: str, request: TurnRequest):
                 # Note: We include CONCEPT because hybrid flow may need to run research there
                 logger.debug(f"DEBUG: Triggering research logic for '{media_ref}' (Phase: {session.phase})")
 
-                # Check if this is "original" (custom world) vs canonical anime
-                is_original = media_ref.lower().strip() in ["original", "custom", "new", "fresh"]
-
-                # Check for hybrid/blend (multiple anime mentioned)
-                # STRICTER CHECK: Must have a secondary reference to be a hybrid
-                is_hybrid = (secondary_ref is not None and str(secondary_ref).strip() != "")
-
-                # ======== DISAMBIGUATION CHECK ========
-                # Before loading/generating, check if this anime needs disambiguation
-                # FIX: Check multiple conditions to prevent re-triggering
-                is_disambiguation_response = result.detected_info.get("disambiguation_selection", False)
-
-                # If user just made a disambiguation selection, mark it complete
-                if is_disambiguation_response:
-                    session.phase_state['disambiguation_complete'] = True
-                    logger.debug("DEBUG: Disambiguation selection made - marking complete")
-
-                # Check if disambiguation already completed OR was shown this session
-                disambiguation_already_done = session.phase_state.get('disambiguation_complete', False)
-                disambiguation_shown = session.phase_state.get('disambiguation_shown', False)
-
-                # Also skip if user gave a SPECIFIC title that matches an existing profile
-                # (e.g., "Naruto Shippuden" instead of just "Naruto")
-                from src.agents.profile_generator import load_existing_profile
-                specific_profile_exists = load_existing_profile(media_ref) is not None
-
-                logger.info(f"Flags: done={disambiguation_already_done}, shown={disambiguation_shown}, specific_exists={specific_profile_exists}")
-
-                # Only run single-title disambiguation if:
-                # - NOT a hybrid (hybrids have their own disambiguation)
-                # - NOT already completed or shown
-                # - NOT a specific profile that already exists
-                should_disambiguate = (
-                    not is_disambiguation_response and
-                    not is_hybrid and
-                    not disambiguation_already_done and
-                    not disambiguation_shown and
-                    not specific_profile_exists
+                # ======== INTENT RESOLUTION (replaces disambiguation + research routing) ========
+                intent_result = await resolve_media_intent(
+                    session=session,
+                    media_ref=media_ref,
+                    secondary_ref=secondary_ref,
+                    detected_info=result.detected_info,
                 )
 
-                if should_disambiguate:
-                    # This is NOT a disambiguation selection - check if we need to offer options
-                    disambiguation = await get_disambiguation_options(media_ref)
+                # Apply metadata updates to detected_info
+                result.detected_info.update(intent_result.detected_info_updates)
 
-                    if disambiguation.get('needs_disambiguation'):
-                        # Mark that we SHOWED disambiguation (prevents re-trigger)
-                        session.phase_state['disambiguation_shown'] = True
-                        session.phase_state['disambiguation_for'] = media_ref
-
-                        # Return disambiguation options to user
-                        logger.info(f"Disambiguation needed for '{media_ref}' - returning {len(disambiguation['options'])} options")
-
-                        # Build a styled response matching Session Zero formatting
-                        options_text = "\n".join([
-                            f"**{i+1}.** {opt.get('name', opt)}"
-                            for i, opt in enumerate(disambiguation['options'])  # Show all
-                        ])
-
-                        disambiguation_response = f"""## 🔍 Multiple Series Found
-
-I found several entries in the **{media_ref}** franchise:
-
-{options_text}
-
----
-
-**Which one would you like to explore?** Just tell me the number or name!"""
-
-                        # Store original and return with disambiguation
-                        session.add_message("assistant", disambiguation_response)
-                        store = get_session_store()
-                        store.save(session)
-
-                        return SessionZeroResponse(
-                            response=disambiguation_response,
-                            phase=session.phase.value,
-                            phase_complete=False,
-                            character_draft={
-                                "name": session.character_draft.name,
-                                "concept": session.character_draft.concept,
-                                "media_reference": media_ref,
-                                "narrative_profile": session.character_draft.narrative_profile,
-                            },
-                            session_id=session_id,
-                            missing_requirements=["media_reference"],
-                            ready_for_gameplay=False,
-                            disambiguation_options=disambiguation['options'],
-                            awaiting_disambiguation=True
-                        )
-
-                if is_original:
-                    # CUSTOM/ORIGINAL PROFILE: Quick template for "Original" worlds
+                if intent_result.action == "custom":
+                    # CUSTOM/ORIGINAL PROFILE
                     try:
                         from src.agents.session_zero import generate_custom_profile
-                        custom_result = await generate_custom_profile(session)
-                        result.detected_info["research_status"] = "custom_profile_created"
-                        result.detected_info["profile_type"] = "custom"
+                        await generate_custom_profile(session)
                     except Exception as custom_error:
                         logger.error(f"Custom profile generation failed: {custom_error}")
 
-                elif is_hybrid:
-                    # HYBRID PROFILE: Two-phase flow
-                    # Phase 1: Calibration dialogue (this turn) - agent proposes blend options
-                    # Phase 2: Research triggers ONLY after player confirms preferences
+                elif intent_result.action == "disambiguation":
+                    # Agent needs user clarification — return options
+                    session.add_message("assistant", intent_result.response_text)
+                    store = get_session_store()
+                    store.save(session)
 
-                    # Check if preferences already confirmed (skip disambiguation)
-                    hybrid_confirmed = result.detected_info.get("hybrid_preferences_confirmed", False)
-
-                    # ======== HYBRID DISAMBIGUATION ========
-                    # Check if either title needs disambiguation before proceeding
-                    # Skip if preferences already confirmed OR this is a disambiguation selection
-                    # OR disambiguation has already been completed/shown
-                    # OR both specific profiles already exist
-                    prof_a_exists = load_existing_profile(media_ref) is not None
-                    prof_b_exists = load_existing_profile(secondary_ref) is not None
-                    both_specific = prof_a_exists and prof_b_exists
-
-                    should_hybrid_disambiguate = (
-                        not is_disambiguation_response and
-                        not hybrid_confirmed and
-                        not disambiguation_already_done and
-                        not disambiguation_shown and
-                        not both_specific
+                    return SessionZeroResponse(
+                        response=intent_result.response_text,
+                        phase=session.phase.value,
+                        phase_complete=False,
+                        character_draft={
+                            "name": session.character_draft.name,
+                            "concept": session.character_draft.concept,
+                            "media_reference": media_ref,
+                            "narrative_profile": session.character_draft.narrative_profile,
+                        },
+                        session_id=session_id,
+                        missing_requirements=["media_reference"],
+                        ready_for_gameplay=False,
+                        disambiguation_options=intent_result.disambiguation_options,
+                        awaiting_disambiguation=True,
                     )
 
-                    if should_hybrid_disambiguate:
-                        import asyncio  # Local import to avoid scope conflicts
-                        disambig_a, disambig_b = await asyncio.gather(
-                            get_disambiguation_options(media_ref),
-                            get_disambiguation_options(secondary_ref)
-                        )
-
-                        needs_any = disambig_a.get('needs_disambiguation') or disambig_b.get('needs_disambiguation')
-
-                        if needs_any:
-                            # Mark that we SHOWED disambiguation (prevents re-trigger)
-                            session.phase_state['disambiguation_shown'] = True
-                            session.phase_state['disambiguation_for'] = f"{media_ref} × {secondary_ref}"
-
-                            # DEBUG: Log actual option counts
-                            logger.debug(f"disambig_a options: {len(disambig_a.get('options', []))}")
-                            logger.debug(f"disambig_b options: {len(disambig_b.get('options', []))}")
-
-                            # Build a combined disambiguation response for both titles
-                            response_parts = ["## 🔍 Multiple Series Found\n"]
-                            all_options = []
-
-                            if disambig_a.get('needs_disambiguation'):
-                                response_parts.append(f"### {media_ref} Franchise:\n")
-                                for i, opt in enumerate(disambig_a['options']):
-                                    response_parts.append(f"**{i+1}.** {opt.get('name', opt)}\n")
-                                    all_options.append({'name': opt.get('name', opt), 'source': 'primary', 'index': i+1})
-                                response_parts.append("\n")
-
-                            if disambig_b.get('needs_disambiguation'):
-                                response_parts.append(f"### {secondary_ref} Franchise:\n")
-                                for i, opt in enumerate(disambig_b['options']):
-                                    response_parts.append(f"**{i+1}.** {opt.get('name', opt)}\n")
-                                    all_options.append({'name': opt.get('name', opt), 'source': 'secondary', 'index': i+1})
-                                response_parts.append("\n")
-
-                            response_parts.append("---\n\n")
-                            response_parts.append("**Which specific titles would you like to blend?** Tell me the numbers (e.g., '2 and 7') or names!")
-
-                            disambiguation_response = "".join(response_parts)
-
-                            session.add_message("assistant", disambiguation_response)
-                            store = get_session_store()
-                            store.save(session)
-
-                            return SessionZeroResponse(
-                                response=disambiguation_response,
-                                phase=session.phase.value,
-                                phase_complete=False,
-                                character_draft={
-                                    "name": session.character_draft.name,
-                                    "concept": session.character_draft.concept,
-                                    "media_reference": media_ref,
-                                    "narrative_profile": session.character_draft.narrative_profile,
-                                },
-                                session_id=session_id,
-                                missing_requirements=["media_reference"],
-                                ready_for_gameplay=False,
-                                disambiguation_options=all_options,
-                                awaiting_disambiguation=True
-                            )
-
-                    # Check if this is the confirmation turn (player gave preferences)
-                    # (hybrid_confirmed is already defined at the start of the hybrid block)
-
-                    if not hybrid_confirmed:
-                        # PHASE 1: Just mark that we're awaiting preferences
-                        # The agent will generate blend prompts in its response
-                        logger.info(f"Hybrid detected: {media_ref} × {secondary_ref} - awaiting preferences")
-
-                        # OPTIMIZATION: Check if we even need to research
-                        from src.agents.profile_generator import load_existing_profile
-                        prof_a = load_existing_profile(media_ref)
-                        prof_b = load_existing_profile(secondary_ref)
-
-                        if prof_a and prof_b:
-                            logger.warning(f"Both profiles cached: {media_ref} & {secondary_ref}. Skipping background preload.")
-                            # Mark that sources are ready - no tracker needed
-                            result.detected_info["research_status"] = "sources_cached"
-                            result.detected_info["profile_id"] = f"{media_ref} × {secondary_ref}"
-                            # Also update session so frontend sees combined name
-                            session.character_draft.media_reference = f"{media_ref} × {secondary_ref}"
-                        else:
-                            # OPTIMIZATION: Trigger background research NOW for prerequisites
-                            # This ensures single-profile parity (immediate progress bar)
-                            try:
-                                import asyncio
-
-                                from src.agents.session_zero import ensure_hybrid_prerequisites
-
-                                # Create tracker for immediate feedback
-                                progress_tracker = ProgressTracker(total_steps=10)
-                                result.detected_info["research_task_id"] = progress_tracker.task_id
-
-                                # Define background task
-                                async def run_hybrid_preload():
-                                    try:
-                                        await ensure_hybrid_prerequisites(
-                                            session,
-                                            media_ref,
-                                            secondary_ref,
-                                            progress_tracker=progress_tracker
-                                        )
-                                    except Exception as e:
-                                        logger.error(f"Hybrid preload failed: {e}")
-                                        await progress_tracker.complete() # Close stream on error
-
-                                # Start background task
-                                safe_create_task(run_hybrid_preload(), name="hybrid_preload")
-                                logger.info(f"Started hybrid preload (task_id: {progress_tracker.task_id})")
-
-                            except Exception as preload_error:
-                                logger.error(f"Preload setup failed: {preload_error}")
-
-                        result.detected_info["awaiting_hybrid_preferences"] = True
-                        result.detected_info["profile_type"] = "hybrid"
-                        result.detected_info["blend_sources"] = [media_ref, secondary_ref]
-
-                        # CRITICAL: Set media_reference synchronously so frontend sees correct label
-                        # This must happen before response returns, not in background task
-                        session.character_draft.media_reference = f"{media_ref} × {secondary_ref}"
-                    else:
-                        # PHASE 2: User confirmed preferences - now research with caching
-                        # First check if both profiles are already cached (fast path)
-                        from src.agents.profile_generator import load_existing_profile
-                        prof_a = load_existing_profile(media_ref)
-                        prof_b = load_existing_profile(secondary_ref)
-
-                        if prof_a and prof_b:
-                            # Both cached - run merge synchronously (no tracker needed)
-                            logger.info("Both profiles cached for Phase 2. Running fast merge.")
-                            try:
-                                import asyncio
-
-                                from src.agents.session_zero import research_hybrid_profile_cached
-
-                                power_choice = result.detected_info.get("power_system_choice", "coexist")
-
-                                # Run without tracker since it will complete instantly
-                                safe_create_task(research_hybrid_profile_cached(
-                                    session,
-                                    media_ref,
-                                    secondary_ref,
-                                    user_preferences={"power_system": power_choice},
-                                    progress_tracker=None  # No tracker for instant operations
-                                ), name="hybrid_profile_cached")
-
-                                result.detected_info["research_status"] = "fast_merge"
-                                result.detected_info["profile_type"] = "hybrid"
-                            except Exception as fast_merge_error:
-                                logger.error(f"Fast merge failed: {fast_merge_error}")
-                        else:
-                            # Need to research - use progress tracker
-                            try:
-                                import asyncio
-
-                                from src.agents.session_zero import research_hybrid_profile_cached
-
-                                # Get user's power system preference
-                                power_choice = result.detected_info.get("power_system_choice", "coexist")
-
-                                # Create progress tracker for SSE streaming
-                                progress_tracker = ProgressTracker(total_steps=10)
-                                result.detected_info["research_task_id"] = progress_tracker.task_id
-                                result.detected_info["research_status"] = "in_progress"
-
-                                # Define background task
-                                async def run_hybrid_research_background():
-                                    try:
-                                        hybrid_result = await research_hybrid_profile_cached(
-                                            session,
-                                            media_ref,
-                                            secondary_ref,
-                                            user_preferences={"power_system": power_choice},
-                                            progress_tracker=progress_tracker
-                                        )
-                                        # Save session with updated profile
-                                        store = get_session_store()
-                                        store.save(session)
-                                        logger.info(f"Hybrid research completed: {media_ref} × {secondary_ref}")
-                                    except Exception as bg_error:
-                                        logger.error(f"Hybrid research failed: {bg_error}")
-                                        import traceback
-                                        traceback.print_exc()
-                                        await progress_tracker.complete()
-
-                                # Start research in background - don't await!
-                                safe_create_task(run_hybrid_research_background(), name="hybrid_research_bg")
-                                logger.info(f"Started cached hybrid research (task_id: {progress_tracker.task_id})")
-
-                            except Exception as hybrid_error:
-                                logger.error(f"Hybrid research setup failed: {hybrid_error}")
-                else:
-                    # CANONICAL ANIME: Research and save to permanent storage
-                    # First check if profile already exists
-                    from src.agents.profile_generator import load_existing_profile
-                    existing = load_existing_profile(media_ref)
-
-                    if existing:
-                        # Profile exists - just apply it, no progress bar needed
-                        logger.info(f"Found existing profile for '{media_ref}'")
-                        profile_id = existing.get("id")
-                        session.character_draft.narrative_profile = profile_id
+                elif intent_result.action == "ready":
+                    # Profile(s) already exist — link and continue
+                    profile_id = intent_result.profile_id
+                    session.character_draft.narrative_profile = profile_id
+                    if not session.character_draft.media_reference:
                         session.character_draft.media_reference = media_ref
-                        result.detected_info["research_status"] = "existing_profile"
-                        result.detected_info["profile_type"] = "canonical"
-                        result.detected_info["profile_id"] = profile_id
-                        result.detected_info["confidence"] = existing.get("confidence", 100)
 
-                        # EARLY SETTINGS SYNC: Update settings immediately on profile selection
-                        # This prevents wrong profile loading if server restarts before handoff
-                        settings_store = get_settings_store()
-                        current_settings = settings_store.load()
-                        if current_settings.active_profile_id != profile_id:
-                            logger.info(f"Early sync: {current_settings.active_profile_id} -> {profile_id}")
-                            current_settings.active_profile_id = profile_id
-                            current_settings.active_session_id = session.session_id
-                            settings_store.save(current_settings)
-                    else:
-                        logger.debug(f"DEBUG: Entering Single Profile Logic for '{media_ref}'")
-                        # No existing profile - run research as BACKGROUND TASK
-                        try:
-                            import asyncio
+                    # EARLY SETTINGS SYNC
+                    settings_store = get_settings_store()
+                    current_settings = settings_store.load()
+                    if profile_id and current_settings.active_profile_id != profile_id:
+                        logger.info(f"Early sync: {current_settings.active_profile_id} -> {profile_id}")
+                        current_settings.active_profile_id = profile_id
+                        current_settings.active_session_id = session.session_id
+                        settings_store.save(current_settings)
 
-                            from src.agents.session_zero import research_and_apply_profile
-
-                            # Create progress tracker for SSE streaming
-                            progress_tracker = ProgressTracker(total_steps=10)
-                            logger.debug(f"DEBUG: Outputting Task ID {progress_tracker.task_id}")
-
-                            # EMIT IMMEDIATE START to verify connection
-                            import asyncio
-                            safe_create_task(progress_tracker.emit(
-                                ProgressPhase.INITIALIZING,
-                                f"Initializing research for {media_ref}...",
-                                1
-                            ), name="progress_emit_init")
-                            result.detected_info["research_task_id"] = progress_tracker.task_id
-                            result.detected_info["research_status"] = "in_progress"
-                            result.detected_info["profile_type"] = "canonical"
-
-                            # Define background task
-                            async def run_research_background():
-                                try:
-                                    # research_and_apply_profile sets:
-                                    # - session.character_draft.narrative_profile
-                                    # - session.character_draft.media_reference
-                                    # - session.phase_state["profile_data"]
-                                    research_result = await research_and_apply_profile(
-                                        session, media_ref, progress_tracker=progress_tracker
-                                    )
-
-                                    # Store additional metadata
-                                    session.character_draft.attributes["research_status"] = research_result.get("status", "completed")
-                                    session.character_draft.attributes["research_confidence"] = research_result.get("confidence")
-
-                                    profile_id = session.character_draft.narrative_profile
-                                    logger.info(f"narrative_profile set to: '{profile_id}'")
-
-                                    # Save session with linked profile
-                                    store = get_session_store()
-                                    store.save(session)
-                                    logger.info(f"Session saved to DB with profile '{profile_id}'")
-
-                                    # Also update the in-memory session manager to stay in sync
-                                    manager = get_session_manager()
-                                    manager._sessions[session.session_id] = session
-                                    logger.info("In-memory session updated")
-
-                                except Exception as bg_error:
-                                    logger.error(f"Background research failed: {bg_error}")
-                                    import traceback
-                                    traceback.print_exc()
-                                    await progress_tracker.complete()
-
-                            # Start research in background - don't await!
-                            safe_create_task(run_research_background(), name="research_bg")
-                            logger.info(f"Started background research for '{media_ref}' (task_id: {progress_tracker.task_id})")
-
-                        except Exception as research_error:
-                            logger.error(f"Research setup failed: {research_error}")
+                elif intent_result.action == "research":
+                    # Needs background research — launch task
+                    if intent_result.background_coro:
+                        safe_create_task(
+                            intent_result.background_coro(),
+                            name="intent_research_bg",
+                        )
+                        logger.info(
+                            f"Started intent research "
+                            f"(task_id: {intent_result.progress_tracker.task_id if intent_result.progress_tracker else 'none'})"
+                        )
 
         # COMPLETENESS-DRIVEN PHASE TRACKING
         # Sync phase to actual data completeness (allows multi-phase skip)
