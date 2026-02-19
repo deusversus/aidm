@@ -131,6 +131,7 @@ class ToolRegistry:
         """Execute a tool by name with the given arguments.
         
         Returns ToolResult (never raises — errors are captured in result).
+        NOTE: For async tool handlers, use async_execute() instead.
         """
         tool = self._tools.get(tool_name)
         if not tool:
@@ -171,6 +172,79 @@ class ToolRegistry:
                         pass  # Optional tool param, not provided
 
             output = tool.handler(**valid_args)
+            result = ToolResult(
+                tool_name=tool_name,
+                arguments=arguments,
+                result=output
+            )
+            logger.info(f"[Tool] {tool_name}({arguments}) → {str(output)[:100]}")
+
+        except Exception as e:
+            result = ToolResult(
+                tool_name=tool_name,
+                arguments=arguments,
+                result=None,
+                error=f"{type(e).__name__}: {e}"
+            )
+            logger.warning(f"[Tool] {tool_name} failed: {e}")
+
+        self._call_log.append(ToolCallLog(
+            tool_name=tool_name,
+            arguments=arguments,
+            result_preview=result.to_string()[:200],
+            round_number=round_number
+        ))
+        return result
+
+    async def async_execute(self, tool_name: str, arguments: dict[str, Any], round_number: int = 0) -> ToolResult:
+        """Execute a tool by name, supporting both sync and async handlers.
+        
+        Async-aware version of execute(). If the handler is async (returns a
+        coroutine), it will be awaited. Sync handlers work unchanged.
+        
+        Use this from async contexts (e.g., provider complete_with_tools loops).
+        """
+        tool = self._tools.get(tool_name)
+        if not tool:
+            result = ToolResult(
+                tool_name=tool_name,
+                arguments=arguments,
+                result=None,
+                error=f"Unknown tool: {tool_name}"
+            )
+            self._call_log.append(ToolCallLog(
+                tool_name=tool_name,
+                arguments=arguments,
+                result_preview=result.to_string()[:200],
+                round_number=round_number
+            ))
+            return result
+
+        try:
+            # Filter arguments to only those the handler accepts
+            sig = inspect.signature(tool.handler)
+            has_var_keyword = any(
+                p.kind == inspect.Parameter.VAR_KEYWORD
+                for p in sig.parameters.values()
+            )
+
+            if has_var_keyword:
+                valid_args = dict(arguments)
+            else:
+                valid_args = {}
+                for param_name, param in sig.parameters.items():
+                    if param_name in arguments:
+                        valid_args[param_name] = arguments[param_name]
+                    elif param.default is not inspect.Parameter.empty:
+                        pass
+                    elif param_name in [p.name for p in tool.parameters if not p.required]:
+                        pass
+
+            output = tool.handler(**valid_args)
+            # Await if handler returned a coroutine (async handler)
+            if inspect.isawaitable(output):
+                output = await output
+
             result = ToolResult(
                 tool_name=tool_name,
                 arguments=arguments,

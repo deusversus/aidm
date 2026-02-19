@@ -575,7 +575,7 @@ Respond ONLY with the JSON object, no markdown formatting.
                 logger.info(f"  [Tool] {tool_name}({tool_args})")
 
                 # Execute via ToolRegistry
-                result = tools.execute(tool_name, tool_args, round_number=round_num)
+                result = await tools.async_execute(tool_name, tool_args, round_number=round_num)
                 result_str = result.to_string()
 
                 # Log for return value

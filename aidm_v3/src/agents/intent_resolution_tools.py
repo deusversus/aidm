@@ -16,7 +16,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from ..llm.tools import ToolDefinition, ToolParam, ToolRegistry, ToolResult
+from ..llm.tools import ToolDefinition, ToolParam, ToolRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -149,9 +149,8 @@ def build_intent_resolution_tools(
     registry = ToolRegistry()
 
     # ── search_anilist ──
-    async def search_anilist_handler(title: str, media_type: str = "ANIME") -> ToolResult:
-        results = await _search_anilist(anilist_client, title, media_type)
-        return ToolResult(data=results)
+    async def search_anilist_handler(title: str, media_type: str = "ANIME"):
+        return await _search_anilist(anilist_client, title, media_type)
 
     registry.register(ToolDefinition(
         name="search_anilist",
@@ -160,7 +159,7 @@ def build_intent_resolution_tools(
             "(not just best match) so you can reason about which entry the user means. "
             "Use this as your FIRST tool when resolving a user's anime/manga reference."
         ),
-        params=[
+        parameters=[
             ToolParam(name="title", type="string", description="Search query (anime/manga title)", required=True),
             ToolParam(name="media_type", type="string", description="'ANIME' or 'MANGA' (default: ANIME)", required=False),
         ],
@@ -168,9 +167,8 @@ def build_intent_resolution_tools(
     ))
 
     # ── fetch_anilist_by_id ──
-    async def fetch_by_id_handler(anilist_id: int) -> ToolResult:
-        result = await _fetch_anilist_by_id(anilist_client, int(anilist_id))
-        return ToolResult(data=result)
+    async def fetch_by_id_handler(anilist_id: int):
+        return await _fetch_anilist_by_id(anilist_client, int(anilist_id))
 
     registry.register(ToolDefinition(
         name="fetch_anilist_by_id",
@@ -180,16 +178,15 @@ def build_intent_resolution_tools(
             "an entry whose ID you already know. Returns canonical title, genres, "
             "relations, description, and more."
         ),
-        params=[
+        parameters=[
             ToolParam(name="anilist_id", type="integer", description="AniList media ID", required=True),
         ],
         handler=fetch_by_id_handler,
     ))
 
     # ── get_franchise_graph ──
-    async def franchise_graph_handler(anilist_id: int) -> ToolResult:
-        entries = await _get_franchise_graph(anilist_client, int(anilist_id))
-        return ToolResult(data=entries)
+    async def franchise_graph_handler(anilist_id: int):
+        return await _get_franchise_graph(anilist_client, int(anilist_id))
 
     registry.register(ToolDefinition(
         name="get_franchise_graph",
@@ -199,16 +196,15 @@ def build_intent_resolution_tools(
             "Use this to understand franchise structure when the user mentions an IP "
             "that could span multiple series (e.g., 'Dragon Ball', 'Naruto', 'Gundam')."
         ),
-        params=[
+        parameters=[
             ToolParam(name="anilist_id", type="integer", description="AniList media ID to start from", required=True),
         ],
         handler=franchise_graph_handler,
     ))
 
     # ── search_local_profiles ──
-    def search_local_handler(query: str) -> ToolResult:
-        results = _search_local_profiles(profiles_dir, query)
-        return ToolResult(data=results)
+    def search_local_handler(query: str):
+        return _search_local_profiles(profiles_dir, query)
 
     registry.register(ToolDefinition(
         name="search_local_profiles",
@@ -218,7 +214,7 @@ def build_intent_resolution_tools(
             "new research/generation. Returns profile ID, name, AniList ID, "
             "and match confidence."
         ),
-        params=[
+        parameters=[
             ToolParam(name="query", type="string", description="Title to search for in local profiles", required=True),
         ],
         handler=search_local_handler,
