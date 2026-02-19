@@ -27,6 +27,11 @@ class NarrativeProfile:
     name: str
     source: str
 
+    # Canonical AniList ID (for deduplication and franchise resolution)
+    anilist_id: int | None = None
+    # MyAnimeList cross-reference (consensus with AniList)
+    mal_id: int | None = None
+
     # DNA scales (0-10 each)
     dna: dict[str, int] = field(default_factory=dict)
 
@@ -368,6 +373,8 @@ def load_profile(profile_id: str, fallback: bool = True) -> NarrativeProfile:
         id=data.get('id', profile_id),
         name=data.get('name', profile_id.title()),
         source=data.get('source', 'Unknown'),
+        anilist_id=data.get('anilist_id'),
+        mal_id=data.get('mal_id'),
         dna=dna,
         tropes=tropes,
         combat_system=data.get('combat_system') or data.get('combat', {}).get('system', 'tactical'),

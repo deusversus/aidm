@@ -334,6 +334,29 @@ class Session:
         })
         self.last_activity = datetime.now()
 
+    def get_active_profile_ids(self) -> list[str]:
+        """Get all profile IDs from the session composition.
+
+        Used by gameplay tools for multi-profile lore search.
+        Falls back to single profile_id for backward compatibility.
+        """
+        composition_ids = self.phase_state.get('active_profile_ids', [])
+        if composition_ids:
+            return composition_ids
+        # Backward compat: single profile from character draft
+        draft_profile = self.character_draft.narrative_profile
+        if draft_profile:
+            return [draft_profile]
+        return []
+
+    def get_primary_profile_id(self) -> str | None:
+        """Get the primary (highest-weight) profile ID.
+
+        Used where a single ID is still needed (e.g., media generation style lookup).
+        """
+        ids = self.get_active_profile_ids()
+        return ids[0] if ids else None
+
     def to_dict(self) -> dict[str, Any]:
         """Serialize to dictionary for persistence."""
         return {
