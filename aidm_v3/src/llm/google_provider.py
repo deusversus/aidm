@@ -36,11 +36,11 @@ class GoogleProvider(LLMProvider):
         return "gemini-3-flash-preview"
 
     def get_creative_model(self) -> str:
-        return "gemini-3-pro-preview"
+        return "gemini-3.1-pro-preview"
 
     def get_research_model(self) -> str:
         """Model optimized for research with web search."""
-        return "gemini-3-pro-preview"
+        return "gemini-3.1-pro-preview"
 
     def get_max_concurrent_requests(self) -> int:
         """Max concurrent requests - Google has generous rate limits."""

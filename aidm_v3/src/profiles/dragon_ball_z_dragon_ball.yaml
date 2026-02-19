@@ -1,0 +1,42 @@
+id: dragon_ball_z_dragon_ball
+name: Dragon Ball Z, Dragon Ball
+source_anime: Dragon Ball Z, Dragon Ball
+media_type: anime
+status: completed
+generated_at: '2026-02-19T11:41:05.946628'
+confidence: 45
+research_method: bundled_parallel
+aliases:
+- dragon ball z dragon ball
+- dragonballzdragonball
+dna_scales: {}
+power_distribution:
+  peak_tier: T6
+  typical_tier: T8
+  floor_tier: T9
+  gradient: flat
+world_tier: T8
+tropes: {}
+detected_genres: []
+combat_system: spectacle
+power_system: {}
+tone: {}
+director_personality: 'You are the director for a Dragon Ball Z, Dragon Ball-style
+  campaign. '
+pacing:
+  scene_length: moderate
+  arc_length_sessions: 4-6
+sources_consulted:
+- power_system
+- combat
+- tone
+- characters
+- factions
+- locations
+- arcs
+- sequels
+- series_aliases
+- adaptations
+- recent
+series_group: dragon_ball_z_dragon_ball
+series_position: 1

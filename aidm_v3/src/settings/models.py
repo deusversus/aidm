@@ -271,11 +271,11 @@ class UserSettings(BaseModel):
                     },
                     "director": {
                         "provider": "google",
-                        "model": "gemini-3-pro-preview"
+                        "model": "gemini-3.1-pro-preview"
                     },
                     "research": {
                         "provider": "google",
-                        "model": "gemini-3-pro-preview"
+                        "model": "gemini-3.1-pro-preview"
                     }
                 },
                 "api_keys": {

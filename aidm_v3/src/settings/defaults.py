@@ -8,6 +8,7 @@ AVAILABLE_MODELS: dict[str, list[dict[str, str]]] = {
     "google": [
         {"id": "gemini-3-flash-preview", "name": "Gemini 3 Flash", "tier": "fast", "description": "Fast, affordable for structured tasks"},
         {"id": "gemini-3-pro-preview", "name": "Gemini 3 Pro", "tier": "creative", "description": "High quality reasoning and generation"},
+        {"id": "gemini-3.1-pro-preview", "name": "Gemini 3.1 Pro", "tier": "creative", "description": "Latest Gemini Pro — improved reasoning and generation"},
     ],
     "anthropic": [
         {"id": "claude-haiku-4-5", "name": "Claude Haiku 4.5", "tier": "fast", "description": "Fast, affordable for structured tasks"},
@@ -69,11 +70,11 @@ DEFAULT_SETTINGS = UserSettings(
         ),
         base_thinking=ModelConfig(
             provider="google",
-            model="gemini-3-pro-preview"
+            model="gemini-3.1-pro-preview"
         ),
         base_creative=ModelConfig(
             provider="google",
-            model="gemini-3-pro-preview"  # Prose generation - same as thinking by default
+            model="gemini-3.1-pro-preview"  # Prose generation - same as thinking by default
         ),
         # All individual agents default to None (use base defaults)
     ),

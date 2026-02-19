@@ -75,7 +75,7 @@ async def get_research_status():
         model_name = research_config.model
     else:
         provider_name = "google"
-        model_name = "gemini-3-pro-preview"
+        model_name = "gemini-3.1-pro-preview"
 
     # Check if provider has API key configured
     configured = store.get_configured_providers()
