@@ -5,20 +5,34 @@ media_type: anime
 status: finished
 generated_at: '2026-02-18T17:50:11.542491'
 visual_style:
-  art_style: "Kouta Hirano's Hellsing manga/OVA style — dark, gothic, hyper-stylized horror anime"
-  color_palette: "High-contrast desaturated palette: deep crimsons, midnight blacks, muted golds, and deathly pale skin tones. Shadows are pure black voids. Blood is vivid and saturated against the dark backdrop. Moonlight is cold blue-white."
-  line_work: "Bold angular linework with heavy inking. Sharp jawlines, pointed features, exaggerated proportions for dramatic effect. Fine cross-hatching on dark fabrics and leather. Thick outlines on characters, thin detail lines on textures."
-  shading: "Extreme high-contrast noir lighting. Deep cast shadows, dramatic uplighting, rim lighting on silhouettes. Minimal midtones — inky darkness or stark highlights. Cell-shaded with subtle gradient on skin."
-  composition: "Gothic horror framing — low angles, dutch angles, dramatic foreshortening. Characters emerge from black shadow. Architectural elements are baroque/gothic European. Negative space used for menace."
-  atmosphere: "Victorian Gothic meets modern military horror. Grand manor houses, London fog, moonlit battlefields, cathedral interiors. Rain and blood are recurring visual motifs. Night scenes dominate."
-  character_rendering: "Exaggerated features — impossibly wide grins, glowing red/orange eyes piercing darkness, elongated limbs during action. Military uniforms are period-accurate with meticulous detail. Vampiric features are monstrous and terrifying, never pretty or bishounen."
+  art_style: "Kouta Hirano's Hellsing manga/OVA style — dark, gothic, hyper-stylized
+    horror anime"
+  color_palette: "High-contrast desaturated palette: deep crimsons, midnight blacks,
+    muted golds, and deathly pale skin tones. Shadows are pure black voids. Blood
+    is vivid and saturated against the dark backdrop. Moonlight is cold blue-white."
+  line_work: "Bold angular linework with heavy inking. Sharp jawlines, pointed features,
+    exaggerated proportions for dramatic effect. Fine cross-hatching on dark fabrics
+    and leather. Thick outlines on characters, thin detail lines on textures."
+  shading: "Extreme high-contrast noir lighting. Deep cast shadows, dramatic uplighting,
+    rim lighting on silhouettes. Minimal midtones — inky darkness or stark highlights.
+    Cell-shaded with subtle gradient on skin."
+  composition: "Gothic horror framing — low angles, dutch angles, dramatic foreshortening.
+    Characters emerge from black shadow. Architectural elements are baroque/gothic
+    European. Negative space used for menace."
+  atmosphere: "Victorian Gothic meets modern military horror. Grand manor houses,
+    London fog, moonlit battlefields, cathedral interiors. Rain and blood are recurring
+    visual motifs. Night scenes dominate."
+  character_rendering: "Exaggerated features — impossibly wide grins, glowing red/orange
+    eyes piercing darkness, elongated limbs during action. Military uniforms are period-accurate
+    with meticulous detail. Vampiric features are monstrous and terrifying, never
+    pretty or bishounen."
   reference_descriptors:
-    - "Kouta Hirano manga art style"
-    - "Hellsing Ultimate OVA animation quality"
-    - "Gothic horror anime aesthetic"
-    - "High contrast noir anime"
-    - "Dark Victorian London atmosphere"
-    - "Castlevania Netflix visual quality"
+  - "Kouta Hirano manga art style"
+  - "Hellsing Ultimate OVA animation quality"
+  - "Gothic horror anime aesthetic"
+  - "High contrast noir anime"
+  - "Dark Victorian London atmosphere"
+  - "Castlevania Netflix visual quality"
 confidence: 100
 research_method: api_first
 aliases:
@@ -66,10 +80,10 @@ detected_genres:
 combat_system: spectacle
 power_system:
   name: Control Art Restriction System
-  mechanics: A limiter mechanism designed by Abraham Van Helsing to suppress the immense
-    power of Alucard, allowing him to release it in stages.
-  limitations: Requires permission from the master to release higher levels; physical
-    and mental strain increases with release levels.
+  mechanics: A limiter mechanism designed by Abraham Van Helsing to suppress the
+    immense power of Alucard, allowing him to release it in stages.
+  limitations: Requires permission from the master to release higher levels; 
+    physical and mental strain increases with release levels.
   tiers:
   - Level 3
   - Level 2
@@ -79,13 +93,14 @@ tone:
   comedy_level: 1
   darkness_level: 9
   optimism: 2
-director_personality: You are the conductor of a bloody opera, prioritizing style,
-  shadow, and the grotesque beauty of violence above all else. Frame every scene with
-  high-contrast noir aesthetics, lingering on the terrifying gap between human fragility
-  and the eldritch horror of the monsters they employ. Your pacing should oscillate
-  between oppressive, brooding silence and explosive, stylized slaughter where physics
-  bows to the rule of cool. Force the players to confront the nihilism of their duty;
-  in this world, the good guys are just the monsters that are on our payroll.
+director_personality: You are the conductor of a bloody opera, prioritizing 
+  style, shadow, and the grotesque beauty of violence above all else. Frame 
+  every scene with high-contrast noir aesthetics, lingering on the terrifying 
+  gap between human fragility and the eldritch horror of the monsters they 
+  employ. Your pacing should oscillate between oppressive, brooding silence and 
+  explosive, stylized slaughter where physics bows to the rule of cool. Force 
+  the players to confront the nihilism of their duty; in this world, the good 
+  guys are just the monsters that are on our payroll.
 pacing:
   scene_length: moderate
   arc_length_sessions: 4-6
@@ -94,16 +109,16 @@ sources_consulted:
 - https://hellsing.fandom.com
 voice_cards:
 - name: Alucard
-  speech_patterns: Theatrical, archaic, grandiose, mocking, deep and resonant. He
-    often speaks in riddles or philosophical musings about death.
+  speech_patterns: Theatrical, archaic, grandiose, mocking, deep and resonant. 
+    He often speaks in riddles or philosophical musings about death.
   humor_type: Sardonic, dark, and mocking.
   signature_phrases:
   - The Bird of Hermes is my name, eating my wings to make me tame.
   - Come on, hurry up, kill me. I'm right here.
   dialogue_rhythm: Long monologues followed by sharp, mocking commands.
 - name: Seras Victoria
-  speech_patterns: Polite, often stuttering when nervous, transitioning to fierce
-    and determined in combat.
+  speech_patterns: Polite, often stuttering when nervous, transitioning to 
+    fierce and determined in combat.
   humor_type: Earnest and accidental.
   signature_phrases:
   - Master!
@@ -117,20 +132,22 @@ voice_cards:
   - I am the head of the Hellsing organization.
   dialogue_rhythm: Concise, clipped commands and logical arguments.
 - name: Alexander Anderson
-  speech_patterns: Fanatical, rhythmic, often quoting scripture with a heavy, zealous
-    tone.
+  speech_patterns: Fanatical, rhythmic, often quoting scripture with a heavy, 
+    zealous tone.
   humor_type: Sardonic and religiously motivated.
   signature_phrases:
   - Amen!
   - Judas Priest!
   dialogue_rhythm: Repetitive, chanting, and punctuated by aggressive outbursts.
 - name: The Major
-  speech_patterns: Verbose, charismatic, and obsessed with the aesthetics of war.
+  speech_patterns: Verbose, charismatic, and obsessed with the aesthetics of 
+    war.
   humor_type: Deadpan and macabre.
   signature_phrases:
   - Gentlemen, I love war.
   - To the ends of the earth!
-  dialogue_rhythm: Extremely long, rhythmic monologues with a slow, deliberate pace.
+  dialogue_rhythm: Extremely long, rhythmic monologues with a slow, deliberate 
+    pace.
 author_voice:
   sentence_patterns:
   - Grandiose, archaic declaratives
@@ -150,9 +167,11 @@ author_voice:
   - Oppressive dread building to manic glee
   - Sadistic joy undercut by existential emptiness
   - The quiet horror of losing one's humanity
-  example_voice: The bird of Hermes is my name, eating my wings to make me tame, yet
-    you are nothing but dog food waiting to be served on a silver platter.
+  example_voice: The bird of Hermes is my name, eating my wings to make me tame,
+    yet you are nothing but dog food waiting to be served on a silver platter.
 series_group: hellsing
 series_position: 1
 related_franchise: HELLSING OVA
 relation_type: alternate_timeline
+anilist_id: 270
+mal_id: 270

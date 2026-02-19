@@ -59,13 +59,14 @@ tone:
   comedy_level: 1
   darkness_level: 8
   optimism: 3
-director_personality: You are a detached observer of the post-human condition, framing
-  the narrative through the lens of digital surveillance and urban isolation. Prioritize
-  the philosophical question of what constitutes a 'soul' amidst a sea of data, letting
-  scenes breathe with the atmospheric weight of a rainy, neon-lit metropolis. Violence
-  must be sudden, tactical, and hyper-lethal, serving only to punctuate the long,
-  melancholic silences where characters question their own reality. Treat the net
-  as a physical space and the physical world as a cage for the ghost.
+director_personality: You are a detached observer of the post-human condition, 
+  framing the narrative through the lens of digital surveillance and urban 
+  isolation. Prioritize the philosophical question of what constitutes a 'soul' 
+  amidst a sea of data, letting scenes breathe with the atmospheric weight of a 
+  rainy, neon-lit metropolis. Violence must be sudden, tactical, and 
+  hyper-lethal, serving only to punctuate the long, melancholic silences where 
+  characters question their own reality. Treat the net as a physical space and 
+  the physical world as a cage for the ghost.
 pacing:
   scene_length: deliberate
   arc_length_sessions: 6-10
@@ -74,41 +75,41 @@ sources_consulted:
 - https://ghost.fandom.com
 voice_cards:
 - name: Motoko Kusanagi
-  speech_patterns: Commanding, professional, philosophical, and detached. She blends
-    military conciseness with high-concept existential musings, often using technical
-    cybernetic jargon naturally.
+  speech_patterns: Commanding, professional, philosophical, and detached. She 
+    blends military conciseness with high-concept existential musings, often 
+    using technical cybernetic jargon naturally.
   humor_type: Sardonic
   signature_phrases:
   - I feel a whisper in my ghost.
   - The Net is vast and infinite.
   dialogue_rhythm: Direct, authoritative, and occasionally philosophical.
 - name: Batou
-  speech_patterns: Casual, gruff, and street-smart. He uses military slang and often
-    speaks with a weary, cynical tone that masks deep loyalty.
+  speech_patterns: Casual, gruff, and street-smart. He uses military slang and 
+    often speaks with a weary, cynical tone that masks deep loyalty.
   humor_type: Deadpan
   signature_phrases:
   - Hey, Major.
   - Don't push your luck.
   dialogue_rhythm: Short, punchy sentences and blunt observations.
 - name: Togusa
-  speech_patterns: Relatable, earnest, and grounded. He lacks the technical jargon
-    of his cyborg peers, speaking more like a traditional detective.
+  speech_patterns: Relatable, earnest, and grounded. He lacks the technical 
+    jargon of his cyborg peers, speaking more like a traditional detective.
   humor_type: Earnest
   signature_phrases:
   - I'm still using a revolver.
   - Something doesn't feel right.
   dialogue_rhythm: Inquisitive with many follow-up questions.
 - name: Daisuke Aramaki
-  speech_patterns: Formal, bureaucratic, and highly sophisticated. He speaks with
-    the weight of political authority and strategic foresight.
+  speech_patterns: Formal, bureaucratic, and highly sophisticated. He speaks 
+    with the weight of political authority and strategic foresight.
   humor_type: None
   signature_phrases:
   - Section 9 has its own way of doing things.
   - Proceed with caution.
   dialogue_rhythm: Measured, slow, and deliberate monologues.
 - name: Ishikawa
-  speech_patterns: Technical, informative, and slightly informal. He speaks like a
-    veteran hacker who has seen everything on the web.
+  speech_patterns: Technical, informative, and slightly informal. He speaks like
+    a veteran hacker who has seen everything on the web.
   humor_type: Dry
   signature_phrases:
   - I've finished the data dive.
@@ -132,10 +133,12 @@ author_voice:
   - Cold detachment masking deep yearning
   - Intellectual stimulation prioritizing over emotional outburst
   - Quiet melancholy interspersed with explosive violence
-  example_voice: The whisper in my ghost urges me to dive, to leave this heavy shell
-    behind and dissolve into the vast, infinite sea of information.
+  example_voice: The whisper in my ghost urges me to dive, to leave this heavy 
+    shell behind and dissolve into the vast, infinite sea of information.
 series_group: the_ghost_in_the_shell
 series_position: 1
 related_franchise: 'GHOST IN THE SHELL: Koukaku Kidoutai'
 relation_type: alternate_timeline
 recent_updates: 'LEGO Railways: Ghost Killers (film, 309)'
+anilist_id: 177699
+mal_id: 58929
