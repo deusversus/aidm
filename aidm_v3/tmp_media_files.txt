@@ -1,0 +1,11 @@
+﻿726311 C:\Users\admin\Downloads\animerpg\aidm_v3\data\media\1\cutscenes\turn0_character_intro_20260218_193158.png
+757718 C:\Users\admin\Downloads\animerpg\aidm_v3\data\media\1\cutscenes\turn13_power_awakening_20260217_161816.png
+682315 C:\Users\admin\Downloads\animerpg\aidm_v3\data\media\1\cutscenes\turn14_power_awakening_20260217_170940.png
+796545 C:\Users\admin\Downloads\animerpg\aidm_v3\data\media\1\cutscenes\turn15_power_awakening_20260218_144001.png
+713723 C:\Users\admin\Downloads\animerpg\aidm_v3\data\media\1\locations\archaeon_penthouse.png
+667785 C:\Users\admin\Downloads\animerpg\aidm_v3\data\media\1\locations\smugglers_chute.png
+698011 C:\Users\admin\Downloads\animerpg\aidm_v3\data\media\1\locations\the_eternal_alley.png
+681828 C:\Users\admin\Downloads\animerpg\aidm_v3\data\media\1\locations\the_wireframe_cathedral.png
+634484 C:\Users\admin\Downloads\animerpg\aidm_v3\data\media\1\models\adam_archaeon_model.png
+666759 C:\Users\admin\Downloads\animerpg\aidm_v3\data\media\1\portraits\adam_archaeon_portrait.png
+0 C:\Users\admin\Downloads\animerpg\aidm_v3\data\media\templates\.gitkeep
