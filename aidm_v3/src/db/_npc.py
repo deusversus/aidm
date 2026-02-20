@@ -313,8 +313,6 @@ class NPCMixin:
         interaction_count = self.get_npc_interaction_count(npc.id)
         self.evolve_npc_intelligence(npc.id, interaction_count)
 
-        self._maybe_commit()
-
         if affinity_delta != 0:
             logger.info(f"{npc.name}: affinity {affinity_delta:+d} → {npc.affinity} (disposition: {npc.disposition})")
 
@@ -355,7 +353,6 @@ class NPCMixin:
         if new_stage != current_stage:
             db = self._get_db()
             npc.intelligence_stage = new_stage
-            self._maybe_commit()
             logger.info(f"{npc.name}: {current_stage} → {new_stage}")
 
     def get_present_npc_cards(self, npc_names: list[str]) -> str:
@@ -503,7 +500,6 @@ class NPCMixin:
         if npc:
             npc.scene_count = (npc.scene_count or 0) + 1
             npc.last_appeared = turn_number
-            self._maybe_commit()
 
     def check_npc_knowledge(self, npc_id: int, topic: str) -> dict[str, Any]:
         """
@@ -691,7 +687,6 @@ class NPCMixin:
         # Check for threshold crossing
         milestone = self._check_disposition_milestone(old_disposition, new_disposition, npc.name)
 
-        self._maybe_commit()
         logger.info(f"{npc.name} affinity: {old_affinity} → {new_affinity} ({reason})")
 
         return milestone  # Returns event dict or None
@@ -839,7 +834,6 @@ class NPCMixin:
             "turn": self._turn_number
         }
         npc.emotional_milestones = milestones
-        self._maybe_commit()
 
         logger.info(f"{npc.name}: {milestone_type} - {context[:50]}...")
 
@@ -898,7 +892,6 @@ class NPCMixin:
 
         db = self._get_db()
         npc.interaction_count = (npc.interaction_count or 0) + 1
-        self._maybe_commit()
 
         return npc.interaction_count
 

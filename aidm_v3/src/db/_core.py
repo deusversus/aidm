@@ -569,7 +569,6 @@ class CoreMixin:
         if session:
             session.turn_count = self._turn_number
 
-        self._maybe_commit()
         return turn
 
     def search_turn_narratives(
@@ -680,8 +679,6 @@ class CoreMixin:
             )
             db.add(row)
 
-        self._maybe_commit()
-
     def load_foreshadowing_seeds(self) -> list:
         """Load all foreshadowing seeds for this campaign.
         
@@ -737,7 +734,6 @@ class CoreMixin:
             for key, value in fields.items():
                 if hasattr(row, key):
                     setattr(row, key, value)
-            self._maybe_commit()
 
     def get_max_seed_sequence(self) -> int:
         """Get the next available seed sequence number for this campaign.

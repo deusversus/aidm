@@ -386,8 +386,6 @@ class WorldMixin:
                     else:
                         character.sp_max = int(value)
 
-            self._maybe_commit()
-
         # Character fields
         elif parts[0] == "character":
             character = db.query(Character).filter(
@@ -405,8 +403,6 @@ class WorldMixin:
                 character.current_xp = int(value)
             elif field == "power_tier":
                 character.power_tier = value
-
-            self._maybe_commit()
 
         # World state
         elif parts[0] == "world":
@@ -427,8 +423,6 @@ class WorldMixin:
                 world.tension_level = float(value)
             elif field == "arc_phase":
                 world.arc_phase = value
-
-            self._maybe_commit()
 
     # -----------------------------------------------------------------
     # QUEST CRUD (Phase 2A)
@@ -463,7 +457,6 @@ class WorldMixin:
             created_turn=created_turn or self._turn_number,
         )
         db.add(quest)
-        self._maybe_commit()
         return quest
 
     def get_quests(self, status: str = None) -> list:
@@ -488,7 +481,6 @@ class WorldMixin:
             quest.status = status
             if status in ("completed", "failed"):
                 quest.completed_turn = self._turn_number
-            self._maybe_commit()
         return quest
 
     def update_quest_objective(
@@ -511,7 +503,6 @@ class WorldMixin:
                 "turn_completed": self._turn_number if completed else None,
             }
             quest.objectives = objectives
-            self._maybe_commit()
         return quest
 
     # -----------------------------------------------------------------
@@ -592,7 +583,6 @@ class WorldMixin:
             )
             db.add(location)
 
-        self._maybe_commit()
         return location
 
     def get_locations(self) -> list:
@@ -634,7 +624,6 @@ class WorldMixin:
             location.is_current = True
             location.times_visited = (location.times_visited or 0) + 1
             location.last_visited_turn = self._turn_number
-            self._maybe_commit()
         return location
 
     # ── Media Asset CRUD ──────────────────────────────────────────────
@@ -689,7 +678,7 @@ class WorldMixin:
             completed_at=datetime.utcnow() if status == "complete" else None,
         )
         db.add(asset)
-        self._maybe_commit()
+        db.commit()  # Explicit commit required before db.refresh() to get auto-generated PK
         db.refresh(asset)
         return asset
 
