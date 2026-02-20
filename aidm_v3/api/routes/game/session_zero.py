@@ -242,11 +242,11 @@ async def _handle_gameplay_handoff(session, session_id: str, result, agent) -> t
             character_name=draft.name or "Unknown",
             character_concept=draft.concept or "",
             starting_location=draft.starting_location or "Unknown",
-            op_mode=draft.op_protagonist_enabled,
-            op_preset=draft.op_preset,
-            op_tension_source=draft.op_tension_source,
-            op_power_expression=draft.op_power_expression,
-            op_narrative_focus=draft.op_narrative_focus,
+            power_tier=draft.power_tier,
+            tension_source=draft.tension_source or draft.op_tension_source,
+            power_expression=draft.power_expression or draft.op_power_expression,
+            narrative_focus=draft.narrative_focus or draft.op_narrative_focus,
+            composition_name=draft.composition_name or draft.op_preset,
         )
         logger.info("Director startup complete — initial storyboard created")
     except Exception as dir_err:

@@ -294,15 +294,6 @@ class BackgroundMixin:
                         world_state = self.state.get_world_state()
 
                         if session and bible:
-                            op_preset = db_context.op_preset
-                            op_mode_guidance = None
-                            if db_context.op_tension_source:
-                                tension_guidance = self.rules.get_op_axis_guidance("tension", db_context.op_tension_source)
-                                expression_guidance = self.rules.get_op_axis_guidance("expression", db_context.op_power_expression)
-                                focus_guidance = self.rules.get_op_axis_guidance("focus", db_context.op_narrative_focus)
-                                parts = [g for g in [tension_guidance, expression_guidance, focus_guidance] if g]
-                                op_mode_guidance = "\n\n".join(parts) if parts else None
-
                             from ..agents.director_tools import build_director_tools
                             from ..context.profile_library import get_profile_library
                             director_tools = build_director_tools(
@@ -321,9 +312,6 @@ class BackgroundMixin:
                                 bible=bible,
                                 profile=self.profile,
                                 world_state=world_state,
-                                op_preset=op_preset,
-                                op_tension_source=db_context.op_tension_source,
-                                op_mode_guidance=op_mode_guidance,
                                 tools=director_tools,
                                 compaction_text=compaction_text
                             )

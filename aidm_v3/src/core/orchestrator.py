@@ -156,11 +156,11 @@ class Orchestrator(TurnPipelineMixin, BackgroundMixin):
         character_name: str = "Unknown",
         character_concept: str = "",
         starting_location: str = "Unknown",
-        op_mode: bool = False,
-        op_preset: str = None,
-        op_tension_source: str = None,
-        op_power_expression: str = None,
-        op_narrative_focus: str = None,
+        power_tier: str | None = None,
+        tension_source: str | None = None,
+        power_expression: str | None = None,
+        narrative_focus: str | None = None,
+        composition_name: str | None = None,
     ):
         """
         Run the Director's startup briefing at gameplay handoff.
@@ -178,11 +178,11 @@ class Orchestrator(TurnPipelineMixin, BackgroundMixin):
             character_name=character_name,
             character_concept=character_concept,
             starting_location=starting_location,
-            op_mode=op_mode,
-            op_preset=op_preset,
-            op_tension_source=op_tension_source,
-            op_power_expression=op_power_expression,
-            op_narrative_focus=op_narrative_focus,
+            power_tier=power_tier,
+            tension_source=tension_source,
+            power_expression=power_expression,
+            narrative_focus=narrative_focus,
+            composition_name=composition_name,
         )
 
         # Persist to Campaign Bible
