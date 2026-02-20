@@ -147,73 +147,6 @@ class TurnPipelineMixin:
                 cost_usd=0.0
             )
 
-        if intent.intent == "OP_COMMAND":
-            action_lower = intent.action.lower()
-            if action_lower.startswith("accept"):
-                # Extract preset from action or target
-                preset = intent.target or action_lower.replace("accept", "").strip()
-
-                # Preset mapping to 3-axis system
-                preset_mapping = {
-                    "bored_god": ("existential", "instantaneous", "internal"),
-                    "restrainer": ("control", "sealed", "ensemble"),
-                    "hidden_ruler": ("consequence", "derivative", "faction"),
-                    "burden_bearer": ("burden", "hidden", "mundane"),
-                    "muscle_wizard": ("moral", "instantaneous", "competition"),
-                    "sealed_apocalypse": ("control", "sealed", "mundane"),
-                    "wandering_legend": ("relational", "passive", "episodic"),
-                    "nation_builder": ("consequence", "derivative", "faction"),
-                    "disguised_god": ("relational", "hidden", "mundane"),
-                    "time_looper": ("information", "conditional", "internal"),
-                    "immortal": ("burden", "passive", "internal"),
-                    # Legacy aliases for migration
-                    "saitama": ("existential", "instantaneous", "internal"),
-                    "mob": ("control", "sealed", "ensemble"),
-                    "overlord": ("consequence", "derivative", "faction"),
-                    "saiki": ("burden", "hidden", "mundane"),
-                    "mashle": ("moral", "instantaneous", "competition"),
-                    "wang_ling": ("control", "sealed", "mundane"),
-                    "vampire_d": ("relational", "passive", "episodic"),
-                    "rimuru": ("consequence", "derivative", "faction"),
-                }
-
-                if preset and preset.lower() in preset_mapping:
-                    tension, expression, focus = preset_mapping[preset.lower()]
-                    # Enable OP mode with this preset
-                    db_context.op_protagonist_enabled = True
-                    db_context.op_tension_source = tension
-                    db_context.op_power_expression = expression
-                    db_context.op_narrative_focus = focus
-                    db_context.op_preset = preset.lower()
-                    db_context.pending_op_suggestion = None
-                    self.state.update_op_mode(
-                        enabled=True,
-                        tension_source=tension,
-                        power_expression=expression,
-                        narrative_focus=focus,
-                        preset=preset.lower()
-                    )
-                    message = f"✨ **OP Protagonist Mode Activated!**\n\n**Preset**: {preset.replace('_', ' ').title()}\n- Tension: {tension}\n- Expression: {expression}\n- Focus: {focus}\n\nYour adventure style will now be tuned for overwhelming power done right."
-                else:
-                    valid_presets = "bored_god, restrainer, hidden_ruler, burden_bearer, muscle_wizard, sealed_apocalypse, wandering_legend, nation_builder, disguised_god, time_looper, immortal"
-                    message = f"⚠️ Unknown preset: {preset or 'none specified'}\n\nValid presets: {valid_presets}"
-
-            elif action_lower == "dismiss":
-                db_context.op_suggestion_dismissed = True
-                db_context.pending_op_suggestion = None
-                self.state.update_op_suggestion_dismissed(True)
-                message = "👋 OP mode suggestion dismissed. We won't ask again (unless you reset)."
-            else:
-                message = f"⚠️ Unknown /op command: {intent.action}\n\nUsage:\n  `/op accept [preset]` - Enable OP mode\n  `/op dismiss` - Dismiss suggestion"
-
-            return TurnResult(
-                narrative=message,
-                intent=intent,
-                outcome=None,
-                state_changes={},
-                latency_ms=int((time.time() - start) * 1000),
-                cost_usd=0.0
-            )
 
         # =====================================================================
         # PHASE 1a.5: WORLD_BUILDING Detection and Validation
@@ -339,9 +272,16 @@ class TurnPipelineMixin:
             # Normal path: parallel OutcomeJudge and MemoryRanker
             # Build power context for the Outcome Judge
             power_context = f"Character Power Tier: {db_context.power_tier or 'T10'}. "
-            if db_context.op_protagonist_enabled:
-                power_context += "OP MODE IS ACTIVE — this character is intentionally overpowered. Routine power use should be trivial (DC 5, no cost, no consequence). "
-            power_context += f"World Tier: {self.profile.world_tier or 'T8'}."
+            world_tier = self.profile.world_tier or "T8"
+            try:
+                char_num = int((db_context.power_tier or 'T10').replace('T', '').replace('t', ''))
+                world_num = int(world_tier.replace('T', '').replace('t', ''))
+                differential = world_num - char_num  # Higher world_num = weaker; lower char_num = stronger
+                if differential >= 3:
+                    power_context += f"Character is {differential} tiers above world baseline — routine power use should be trivial (DC 5, no cost). "
+            except (ValueError, AttributeError):
+                pass
+            power_context += f"World Tier: {world_tier}."
 
             outcome_task = asyncio.create_task(
                 self.outcome_judge.call(
@@ -529,34 +469,6 @@ class TurnPipelineMixin:
                 logger.info(f"Power imbalance: {power_result.raw_imbalance:.1f} → {power_result.effective_imbalance:.1f}")
                 logger.info(f"Context modifiers: {', '.join(power_result.context_modifiers)}")
 
-            # =====================================================================
-            # PROGRESSIVE OP MODE: Track high-imbalance encounters
-            # If player consistently dominates (imbalance > 10), suggest OP Mode
-            # =====================================================================
-            if power_result.effective_imbalance > 10 and not db_context.op_protagonist_enabled:
-                # Increment counter
-                count = self.state.increment_high_imbalance_count()
-                logger.info(f"High-imbalance encounter #{count}")
-
-                # Check for suggestion trigger
-                if (count >= 3
-                    and not db_context.op_suggestion_dismissed
-                    and not db_context.pending_op_suggestion):
-
-                    # Get recent actions for behavior analysis
-                    recent_memories = self.memory.search("player action", limit=20, min_heat=0)
-                    behavior_history = [m["content"] for m in recent_memories]
-
-                    # Call preset suggestion LLM
-                    suggestion = await self.scale_selector.suggest_op_preset(
-                        behavior_history=behavior_history,
-                        character_tier=player_tier,
-                        high_imbalance_count=count
-                    )
-
-                    if suggestion and suggestion.get("should_prompt"):
-                        db_context.pending_op_suggestion = suggestion
-                        logger.info(f"Suggesting preset: {suggestion.get('preset', 'unknown')} (confidence: {suggestion.get('confidence', 0):.0%})")
 
             # Add to RAG context for Key Animator
             if power_result.triggers_tension_shift:
@@ -566,57 +478,31 @@ class TurnPipelineMixin:
                     f"Recommendation: {power_result.recommended_scale_shift or 'Continue current scale'}"
                 )
 
-        # Inject OP Mode guidance if enabled (uses 3-axis system)
-        # #28 Cache Economics: OP axis guidance is session-stable → Block 1 via set_static_rule_guidance()
-        if db_context.op_protagonist_enabled and db_context.op_tension_source:
-            if not self.key_animator._static_rule_guidance:
-                # First turn: compute once, store on KeyAnimator for Block 1 injection
-                tension_guidance = self.rules.get_op_axis_guidance("tension", db_context.op_tension_source)
-                expression_guidance = self.rules.get_op_axis_guidance("expression", db_context.op_power_expression)
-                focus_guidance = self.rules.get_op_axis_guidance("focus", db_context.op_narrative_focus)
-
-                static_parts = []
+        # Inject composition axis guidance (unconditional — applies to ALL stories)
+        # #28 Cache Economics: axis guidance is session-stable → Block 1 via set_static_rule_guidance()
+        composition = self.profile.composition or {}
+        tension = composition.get("tension_source")
+        expression = composition.get("power_expression")
+        focus = composition.get("narrative_focus")
+        if (tension or expression or focus) and not self.key_animator._static_rule_guidance:
+            # First turn: compute once, store on KeyAnimator for Block 1 injection
+            static_parts = []
+            if tension:
+                tension_guidance = self.rules.get_op_axis_guidance("tension", tension)
                 if tension_guidance:
-                    static_parts.append(f"## Tension Source: {db_context.op_tension_source.upper()}\n{tension_guidance}")
+                    static_parts.append(f"## Tension Source: {tension.upper()}\n{tension_guidance}")
+            if expression:
+                expression_guidance = self.rules.get_op_axis_guidance("expression", expression)
                 if expression_guidance:
-                    static_parts.append(f"## Power Expression: {db_context.op_power_expression.upper()}\n{expression_guidance}")
+                    static_parts.append(f"## Power Expression: {expression.upper()}\n{expression_guidance}")
+            if focus:
+                focus_guidance = self.rules.get_op_axis_guidance("focus", focus)
                 if focus_guidance:
-                    static_parts.append(f"## Narrative Focus: {db_context.op_narrative_focus.upper()}\n{focus_guidance}")
-
-                if static_parts:
-                    self.key_animator.set_static_rule_guidance("\n\n".join(static_parts))
-                    logger.info(f"[OP Mode] Set static 3-axis guidance in Block 1 (cache-stable): "
-                          f"{db_context.op_tension_source}/{db_context.op_power_expression}/{db_context.op_narrative_focus}")
-
-        # =====================================================================
-        # OP MODE COMPOSITION REQUIREMENT: Auto-suggest if missing axes
-        # OP Mode should never be on without composition selected
-        # =====================================================================
-        elif db_context.op_protagonist_enabled and not db_context.op_tension_source:
-            # Need to suggest an OP composition based on character concept
-            if not db_context.pending_op_suggestion:
-                character = self.state.get_character()
-                character_concept = character.backstory if character else ""
-
-                # Use LLM to suggest preset based on character
-                suggestion = await self.scale_selector.suggest_op_preset(
-                    behavior_history=[f"Character concept: {character_concept}",
-                                     f"Character name: {db_context.character_name}"],
-                    character_tier="T7",  # Assume mid-tier for OP
-                    high_imbalance_count=3  # Force suggestion threshold
-                )
-
-                if suggestion:
-                    db_context.pending_op_suggestion = suggestion
-                    logger.warning(f"Missing composition! Suggesting: {suggestion.get('preset', 'unknown')}")
-
-            # Inject tension guidance for high power imbalance
-            power_imbalance = db_context.power_imbalance
-            if power_imbalance > 3:
-                tension_guidance = self.rules.get_op_axis_guidance("tension", db_context.op_tension_source or "existential")
-                if tension_guidance:
-                    rag_context["tension_guidance"] = tension_guidance
-                    logger.info(f"Injected tension guidance (imbalance: {power_imbalance:.1f})")
+                    static_parts.append(f"## Narrative Focus: {focus.upper()}\n{focus_guidance}")
+            if static_parts:
+                self.key_animator.set_static_rule_guidance("\n\n".join(static_parts))
+                logger.info(f"Set 3-axis guidance in Block 1 (cache-stable): "
+                      f"{tension}/{expression}/{focus}")
 
         # Inject NPC behavior context for present NPCs
         if db_context.present_npcs:
@@ -641,11 +527,11 @@ class TurnPipelineMixin:
             rag_context["player_overrides"] = override_context
             logger.info(f"Injected {len(self.override_handler.get_active_overrides(self.campaign_id))} active overrides")
 
-        # Inject faction context for faction-focused OP modes
-        if db_context.op_narrative_focus == "faction":
+        # Inject faction context for faction-focused narrative arcs
+        if composition.get("narrative_focus") == "faction":
             faction_context = self.state.get_faction_context_for_op_mode(
-                db_context.op_narrative_focus,
-                db_context.op_preset
+                composition.get("narrative_focus"),
+                None  # No longer tied to OP preset
             )
             if faction_context:
                 rag_context["faction_guidance"] = faction_context
@@ -807,7 +693,7 @@ class TurnPipelineMixin:
         # Single narrative path - KeyAnimator handles both normal and sakuga modes
 
         # === UNIFIED POWER DIFFERENTIAL: Calculate effective composition ===
-        # Blends profile composition with character OP settings based on power tier gap
+        # Blends profile composition with character power tier based on gap
         # #15: Per-scene recalculation — pass current threat tier when available
         from ..profiles.loader import get_effective_composition
         current_threat = getattr(outcome, 'target_tier', None)
@@ -816,10 +702,10 @@ class TurnPipelineMixin:
             profile_composition=self.profile.composition or {},
             world_tier=self.profile.world_tier or "T8",
             character_tier=db_context.power_tier or "T10",
-            character_op_enabled=db_context.op_protagonist_enabled,
-            character_op_tension=db_context.op_tension_source,
-            character_op_expression=db_context.op_power_expression,
-            character_op_focus=db_context.op_narrative_focus,
+            character_op_enabled=False,  # OP mode retired — differential drives composition
+            character_op_tension=None,
+            character_op_expression=None,
+            character_op_focus=None,
             current_threat_tier=current_threat  # #15: encounter-responsive composition
         )
         # Inject effective composition into profile for KeyAnimator
@@ -914,37 +800,6 @@ class TurnPipelineMixin:
             narrative = recap_text + narrative
             logger.info(f"Recap prepended ({len(recap_text)} chars)")
 
-        # =====================================================================
-        # CRITICAL PATH: OP suggestion display (mutates narrative before return)
-        # =====================================================================
-        if db_context.pending_op_suggestion:
-            suggestion = db_context.pending_op_suggestion
-            preset = suggestion.get('preset', suggestion.get('archetype', 'unknown'))
-
-            if db_context.op_protagonist_enabled and not db_context.op_tension_source:
-                suggestion_text = (
-                    f"\n\n---\n"
-                    f"**⚠️ OP MODE COMPOSITION REQUIRED ⚠️**\n\n"
-                    f"You have **OP Protagonist Mode** enabled, but no composition selected!\n\n"
-                    f"Suggested Preset: **{preset.replace('_', ' ').title()}** "
-                    f"(confidence: {suggestion.get('confidence', 0.7):.0%})\n\n"
-                    f"*\"{suggestion.get('reasoning', 'Based on your character concept')}\"*\n\n"
-                    f"Type `/op accept {preset}` to confirm, or choose another:\n"
-                    f"`bored_god` | `restrainer` | `hidden_ruler` | `burden_bearer` | `muscle_wizard` | `nation_builder`\n"
-                    f"---"
-                )
-            else:
-                suggestion_text = (
-                    f"\n\n---\n"
-                    f"**🌟 OP MODE SUGGESTION 🌟**\n\n"
-                    f"Based on your recent commanding victories, you might enjoy **OP Protagonist Mode!**\n\n"
-                    f"Suggested Preset: **{preset.replace('_', ' ').title()}** "
-                    f"(confidence: {suggestion.get('confidence', 0.7):.0%})\n\n"
-                    f"*\"{suggestion.get('reasoning', 'Your playstyle fits this power fantasy')}\"*\n\n"
-                    f"Type `/op accept {preset}` to enable, or `/op dismiss` to ignore.\n"
-                    f"---"
-                )
-            narrative = narrative + suggestion_text
 
         # Measure latency NOW (before background work)
         latency = int((time.time() - start) * 1000)
@@ -1091,12 +946,6 @@ class TurnPipelineMixin:
                 lines.append(f"**Character:** {db_context.character_name}")
             if db_context.character_summary:
                 lines.append(f"**Character State:** {db_context.character_summary[:200]}")
-
-            # OP Mode
-            if hasattr(db_context, 'op_mode') and db_context.op_mode:
-                lines.append("\n**OP Mode:** Active")
-                if hasattr(db_context, 'op_preset') and db_context.op_preset:
-                    lines.append(f"**OP Preset:** {db_context.op_preset}")
 
             # Profile DNA
             if self.profile and self.profile.dna:
