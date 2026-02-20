@@ -422,6 +422,107 @@ def _build_session_zero_summary(session, draft) -> str:
     return "\n".join(parts)
 
 
+async def prepare_working_memory(session, orchestrator) -> tuple[list, str]:
+    """Prepare the working-memory window and compaction text for a gameplay turn.
+
+    Encapsulates:
+      - Sliding-window truncation (WINDOW_SIZE messages kept)
+      - CompactorAgent micro-summary for messages that fell off the window
+      - COMPACTION_MAX_TOKENS ceiling with FIFO eviction
+      - Pinned-message prepend (always in working memory)
+
+    Args:
+        session:      The active Session object (may be None — safe).
+        orchestrator: The live Orchestrator instance (used for pinned messages).
+
+    Returns:
+        (recent_messages, compaction_text) — both safe to pass directly to
+        orchestrator.process_turn().
+    """
+    WINDOW_SIZE = 30
+    COMPACTION_MAX_TOKENS = 10_000
+
+    compaction_text = ""
+
+    if session and hasattr(session, 'messages') and len(session.messages) > WINDOW_SIZE:
+        dropped_start = max(0, len(session.messages) - WINDOW_SIZE - 2)
+        dropped_end = len(session.messages) - WINDOW_SIZE
+
+        if dropped_end > dropped_start and dropped_end > 0:
+            dropped_messages = session.messages[dropped_start:dropped_end]
+
+            if dropped_messages:
+                try:
+                    from src.agents.compactor import CompactorAgent
+                    compactor = CompactorAgent()
+
+                    prior_context = ""
+                    if hasattr(session, 'compaction_buffer') and session.compaction_buffer:
+                        recent_entries = session.compaction_buffer[-2:]
+                        prior_context = "\n\n".join(e["summary"] for e in recent_entries)
+
+                    micro_summary = await compactor.compact(
+                        dropped_messages=dropped_messages,
+                        prior_context=prior_context
+                    )
+
+                    if micro_summary:
+                        tokens_est = int(len(micro_summary.split()) * 1.3)
+
+                        if not hasattr(session, 'compaction_buffer'):
+                            session.compaction_buffer = []
+                        session.compaction_buffer.append({
+                            "turn": len(session.messages) // 2,
+                            "summary": micro_summary,
+                            "tokens_est": tokens_est
+                        })
+
+                        # Enforce 10k token ceiling (FIFO eviction)
+                        total_tokens = sum(e["tokens_est"] for e in session.compaction_buffer)
+                        while total_tokens > COMPACTION_MAX_TOKENS and len(session.compaction_buffer) > 1:
+                            evicted = session.compaction_buffer.pop(0)
+                            total_tokens -= evicted["tokens_est"]
+                            logger.info(f"Evicted oldest compaction entry (turn {evicted['turn']}, {evicted['tokens_est']} tokens)")
+
+                        logger.info(
+                            f"Appended micro-summary ({tokens_est} tokens, "
+                            f"buffer: {len(session.compaction_buffer)} entries, {total_tokens} total tokens)"
+                        )
+                except Exception as e:
+                    logger.error(f"Compaction failed (non-fatal): {e}")
+
+    # Build compaction injection string from buffer
+    if session and hasattr(session, 'compaction_buffer') and session.compaction_buffer:
+        compaction_text = "\n\n".join(
+            f"**[Beat {e['turn']}]** {e['summary']}" for e in session.compaction_buffer
+        )
+
+    # Sliding window
+    recent_messages = session.messages[-WINDOW_SIZE:] if session and hasattr(session, 'messages') else []
+
+    # Prepend pinned messages (always in working memory regardless of window position)
+    if session and recent_messages:
+        try:
+            db_context = orchestrator.state.get_context()
+            pinned = getattr(db_context, 'pinned_messages', []) or []
+            if pinned:
+                window_contents = {msg.get('content', '')[:100] for msg in recent_messages}
+                unique_pinned = [
+                    p for p in pinned
+                    if p.get('content', '')[:100] not in window_contents
+                ]
+                if unique_pinned:
+                    recent_messages = unique_pinned + recent_messages
+                    logger.info(f"Pinned {len(unique_pinned)} messages prepended to working memory")
+        except Exception as e:
+            logger.error(f"Pinned messages failed (non-fatal): {e}")
+
+    if recent_messages:
+        logger.info(f"Working memory: {len(recent_messages)} messages")
+
+    return recent_messages, compaction_text
+
+
 async def _generate_handoff_character_media(
     campaign_id: int,
     character_name: str,

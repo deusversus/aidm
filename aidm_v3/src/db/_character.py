@@ -96,7 +96,6 @@ class CharacterMixin:
         if world_state:
             world_state.situation = f"{world_state.situation}\n{consequence}"
 
-        self._maybe_commit()
         logger.info(f"Stored: [{category}/{severity}] {consequence[:80]}..." if len(consequence) > 80 else f"[Consequence] Stored: [{category}/{severity}] {consequence}")
 
     def get_active_consequences(self, limit: int = 10) -> list:
@@ -150,7 +149,6 @@ class CharacterMixin:
         for c in expired:
             c.active = False
         if expired:
-            self._maybe_commit()
             logger.info(f"Expired {len(expired)} consequences at turn {current_turn}")
         return len(expired)
 
@@ -198,7 +196,6 @@ class CharacterMixin:
                 world_state.canon_cast_mode = canon_cast_mode
             if event_fidelity is not None:
                 world_state.event_fidelity = event_fidelity
-            self._maybe_commit()
 
     def get_character(self) -> Character | None:
         """Get the player character."""
@@ -368,7 +365,6 @@ class CharacterMixin:
             bible.planning_data = merged
             bible.bible_version = (bible.bible_version or 0) + 1
             bible.last_updated_turn = turn_number
-            self._maybe_commit()
 
             logger.info(f"v{bible.bible_version}: {arc_entry.get('arc_phase')} @ turn {turn_number} ({len(arc_history)} history entries)")
 
@@ -399,8 +395,6 @@ class CharacterMixin:
             if hasattr(combat_result.resources_consumed, 'sp') and combat_result.resources_consumed.sp > 0:
                 if hasattr(character, 'sp_current'):
                     character.sp_current = max(0, character.sp_current - combat_result.resources_consumed.sp)
-
-        self._maybe_commit()
 
     def apply_progression(self, progression_result: Any):
         """Apply progression results (XP, level-up, abilities)."""
@@ -439,8 +433,6 @@ class CharacterMixin:
             # Apply tier change
             if progression_result.tier_changed and progression_result.new_tier:
                 character.power_tier = progression_result.new_tier
-
-        self._maybe_commit()
 
     def update_op_mode(
         self,

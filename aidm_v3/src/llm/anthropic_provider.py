@@ -56,7 +56,7 @@ class AnthropicProvider(LLMProvider):
     def _init_client(self):
         """Initialize the Anthropic client."""
         import anthropic
-        self._client = anthropic.Anthropic(api_key=self.api_key)
+        self._client = anthropic.AsyncAnthropic(api_key=self.api_key)
 
     @staticmethod
     def _build_system_blocks(system) -> list:
@@ -127,16 +127,16 @@ class AnthropicProvider(LLMProvider):
             kwargs["max_tokens"] = max(max_tokens, 8192)
 
         # Use streaming to prevent truncation issues with long responses
-        def _stream_and_collect():
+        async def _stream_and_collect():
             full_text = ""
             final_message = None
-            with self._client.messages.stream(**kwargs) as stream:
-                for text in stream.text_stream:
+            async with self._client.messages.stream(**kwargs) as stream:
+                async for text in stream.text_stream:
                     full_text += text
-                final_message = stream.get_final_message()
+                final_message = await stream.get_final_message()
             return full_text, final_message
 
-        full_text, final_message = await self._run_with_retry(_stream_and_collect)
+        full_text, final_message = await self._call_with_retry(_stream_and_collect)
 
         # Extract usage (including cache hits) from final message
         usage = {}
@@ -203,16 +203,16 @@ class AnthropicProvider(LLMProvider):
             kwargs["max_tokens"] = max(max_tokens, 8192)
 
         # Use streaming to prevent truncation with long responses
-        def _stream_and_collect():
+        async def _stream_and_collect():
             content = ""
             search_results = []
             citations = []
             final_message = None
 
-            with self._client.messages.stream(**kwargs) as stream:
-                for text in stream.text_stream:
+            async with self._client.messages.stream(**kwargs) as stream:
+                async for text in stream.text_stream:
                     content += text
-                final_message = stream.get_final_message()
+                final_message = await stream.get_final_message()
 
             # Extract search metadata from final message
             if final_message:
@@ -225,7 +225,7 @@ class AnthropicProvider(LLMProvider):
 
             return content, search_results, citations, final_message
 
-        content, search_results, citations, final_message = await self._run_with_retry(_stream_and_collect)
+        content, search_results, citations, final_message = await self._call_with_retry(_stream_and_collect)
 
         # Extract usage from final message
         usage = {}
@@ -304,18 +304,18 @@ class AnthropicProvider(LLMProvider):
             kwargs["tool_choice"] = {"type": "tool", "name": "respond"}
 
         # Use streaming to prevent truncation with long responses
-        def _stream_and_collect():
+        async def _stream_and_collect():
             text_content = ""
             final_message = None
 
-            with self._client.messages.stream(**kwargs) as stream:
-                for text in stream.text_stream:
+            async with self._client.messages.stream(**kwargs) as stream:
+                async for text in stream.text_stream:
                     text_content += text
-                final_message = stream.get_final_message()
+                final_message = await stream.get_final_message()
 
             return text_content, final_message
 
-        text_content, final_message = await self._run_with_retry(_stream_and_collect)
+        text_content, final_message = await self._call_with_retry(_stream_and_collect)
 
         # Extract tool use response from final message
         if final_message:
@@ -430,8 +430,9 @@ Your response must match the required JSON schema.
             kwargs["max_tokens"] = max(max_tokens, 8192)
 
         # Regular messages endpoint - no beta needed for web search
-        response = await self._run_with_retry(
-            lambda: self._client.messages.create(**kwargs)
+        response = await self._call_with_retry(
+            self._client.messages.create,
+            **kwargs
         )
 
         # Extract structured response from tool use
@@ -529,8 +530,9 @@ Your response must match the required JSON schema.
             if container_id:
                 kwargs["container"] = container_id
 
-            response = await self._run_with_retry(
-                lambda kwargs=kwargs: self._client.beta.messages.create(**kwargs)
+            response = await self._call_with_retry(
+                self._client.beta.messages.create,
+                **kwargs
             )
 
             # Track container for reuse
@@ -659,14 +661,13 @@ Your response must match the required JSON schema.
             "content": "You've completed your research. Now produce your final response based on everything you've found."
         })
 
-        final_response = await self._run_with_retry(
-            lambda: self._client.beta.messages.create(
-                model=model_name,
-                betas=["advanced-tool-use-2025-11-20"],
-                max_tokens=max_tokens,
-                system=system or "",
-                messages=conversation,
-            )
+        final_response = await self._call_with_retry(
+            self._client.beta.messages.create,
+            model=model_name,
+            betas=["advanced-tool-use-2025-11-20"],
+            max_tokens=max_tokens,
+            system=system or "",
+            messages=conversation,
         )
 
         final_text = ""
@@ -717,8 +718,9 @@ Your response must match the required JSON schema.
                 "tools": anthropic_tools,
             }
 
-            response = await self._run_with_retry(
-                lambda kwargs=kwargs: self._client.messages.create(**kwargs)
+            response = await self._call_with_retry(
+                self._client.messages.create,
+                **kwargs
             )
 
             if hasattr(response, 'usage'):
@@ -795,13 +797,12 @@ Your response must match the required JSON schema.
             "content": "You've completed your research. Now produce your final response based on everything you've found."
         })
 
-        final_response = await self._run_with_retry(
-            lambda: self._client.messages.create(
-                model=model_name,
-                max_tokens=max_tokens,
-                system=system or "",
-                messages=conversation,
-            )
+        final_response = await self._call_with_retry(
+            self._client.messages.create,
+            model=model_name,
+            max_tokens=max_tokens,
+            system=system or "",
+            messages=conversation,
         )
 
         final_text = ""
