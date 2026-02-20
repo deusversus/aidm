@@ -152,8 +152,14 @@ class CharacterDraft:
     op_narrative_focus: str | None = None
     op_preset: str | None = None
 
-    # Power Tier (from OP mode or profile)
-    power_tier: str | None = None             # e.g., "T3", "T6" - defaults based on OP mode/world
+    # Narrative Composition (replaces OP mode — unconditional for all stories)
+    tension_source: str | None = None       # existential, relational, moral, burden, etc.
+    power_expression: str | None = None     # instantaneous, overwhelming, sealed, hidden, flashy, etc.
+    narrative_focus: str | None = None      # internal, ensemble, party, faction, etc.
+    composition_name: str | None = None     # Creative name for the composition config
+
+    # Power Tier (from tier selection or profile)
+    power_tier: str | None = None             # e.g., "T3", "T6" - defaults based on world_tier gap
 
     # Phase 1: Concept
     concept: str | None = None  # The "big idea" tagline
@@ -198,6 +204,10 @@ class CharacterDraft:
             "op_power_expression": self.op_power_expression,
             "op_narrative_focus": self.op_narrative_focus,
             "op_preset": self.op_preset,
+            "tension_source": self.tension_source,
+            "power_expression": self.power_expression,
+            "narrative_focus": self.narrative_focus,
+            "composition_name": self.composition_name,
             "power_tier": self.power_tier,
             "concept": self.concept,
             "name": self.name,
@@ -237,6 +247,10 @@ class CharacterDraft:
             op_power_expression=data.get("op_power_expression"),
             op_narrative_focus=data.get("op_narrative_focus"),
             op_preset=data.get("op_preset") or data.get("op_archetype"),  # Migration: use archetype as preset
+            tension_source=data.get("tension_source"),
+            power_expression=data.get("power_expression"),
+            narrative_focus=data.get("narrative_focus"),
+            composition_name=data.get("composition_name"),
             power_tier=data.get("power_tier"),
             concept=data.get("concept"),
             name=data.get("name"),
