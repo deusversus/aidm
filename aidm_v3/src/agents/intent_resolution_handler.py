@@ -72,6 +72,7 @@ async def resolve_media_intent(
     media_ref: str,
     secondary_ref: str | None = None,
     detected_info: dict | None = None,
+    media_refs: list[str] | None = None,
 ) -> IntentResult:
     """Resolve a user's anime/manga reference into actionable intent.
 
@@ -115,8 +116,11 @@ async def resolve_media_intent(
     # ── Resolve via Intent Agent ──
     agent = IntentResolutionAgent()
 
-    if secondary_ref:
-        # Hybrid/blend request
+    if media_refs and len(media_refs) >= 2:
+        # Multi-title array (franchise-entry detection)
+        resolution = await agent.resolve_hybrid(media_refs)
+    elif secondary_ref:
+        # Hybrid/blend request (2 titles)
         resolution = await agent.resolve_hybrid([media_ref, secondary_ref])
     else:
         # Single title
