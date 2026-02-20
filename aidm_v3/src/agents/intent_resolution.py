@@ -234,6 +234,46 @@ class IntentResolutionAgent(AgenticAgent):
             if json_start >= 0 and json_end > json_start:
                 json_str = findings[json_start:json_end]
                 data = json.loads(json_str)
+
+                # --- Coerce mixed-type LLM output before Pydantic validates ---
+
+                # resolved_titles: LLM sometimes returns plain strings instead of dicts
+                raw_titles = data.get("resolved_titles", [])
+                coerced_titles = []
+                for rt in raw_titles:
+                    if isinstance(rt, str):
+                        # Plain string → minimal ResolvedTitle dict
+                        coerced_titles.append({
+                            "profile_id": rt.lower().replace(" ", "_"),
+                            "canonical_title": rt,
+                            "already_exists": True,
+                        })
+                    elif isinstance(rt, dict):
+                        coerced_titles.append(rt)
+                if raw_titles:
+                    data["resolved_titles"] = coerced_titles
+
+                # needs_research: LLM sometimes returns dicts instead of strings
+                raw_research = data.get("needs_research", [])
+                coerced_research = []
+                for nr in raw_research:
+                    if isinstance(nr, dict):
+                        # Extract title string from common keys
+                        title_str = (
+                            nr.get("title")
+                            or nr.get("canonical_title")
+                            or nr.get("profile_id")
+                            or original_input
+                        )
+                        coerced_research.append(str(title_str))
+                    elif isinstance(nr, str):
+                        coerced_research.append(nr)
+                data["needs_research"] = coerced_research
+
+                # disambiguation_question: LLM sometimes returns None
+                if data.get("disambiguation_question") is None:
+                    data["disambiguation_question"] = ""
+
                 return IntentResolution(**data)
         except (json.JSONDecodeError, ValueError, TypeError) as e:
             logger.warning(f"Failed to parse resolution JSON: {e}")
@@ -262,6 +302,26 @@ class IntentResolutionAgent(AgenticAgent):
                 needs_research=[original_input],
                 confidence=0.5,
                 reasoning=f"Title not found in AniList, may need direct research: {findings[:200]}",
+            )
+
+        # Check for profile-found signals — agent found it but couldn't format JSON correctly
+        if any(sig in findings_lower for word in ["profile_id", "already_exists", "profile found",
+                                                   "local profile", "existing profile", "found in profiles"]
+               for sig in [word]):
+            # Build a best-effort resolved title from the input
+            profile_id = original_input.lower().replace(" ", "_")[:80]
+            logger.info(f"Fallback: profile-found signal detected, treating as resolved: {profile_id}")
+            return IntentResolution(
+                resolved_titles=[
+                    ResolvedTitle(
+                        profile_id=profile_id,
+                        canonical_title=original_input,
+                        already_exists=True,
+                    )
+                ],
+                composition_type="single",
+                confidence=0.6,
+                reasoning=f"Fallback: profile-found signal in agent text; {findings[:200]}",
             )
 
         # Default: assume single title, needs research
