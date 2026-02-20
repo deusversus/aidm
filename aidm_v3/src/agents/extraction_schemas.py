@@ -323,6 +323,52 @@ class NarrativeSynthesisExtract(BaseModel):
     )
 
 
+class NarrativeConstraintsExtract(BaseModel):
+    """IP-level narrative composition constraints.
+
+    Captures what composition axes are *appropriate* for this IP and which
+    are *antithetical*.  Used by Session Zero (power-tier flow) and the
+    Director (arc planning) to keep generated configurations IP-faithful.
+    """
+    preferred_tension_sources: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Tension sources that fit this IP's identity. "
+            "Values: existential, relational, moral, consequence, control, information, burden"
+        )
+    )
+    avoided_tension_sources: list[str] = Field(
+        default_factory=list,
+        description="Tension sources that would feel wrong for this IP"
+    )
+    preferred_power_expressions: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Power expression styles that fit this IP. "
+            "Values: instantaneous, overwhelming, sealed, hidden, conditional, derivative, passive, flashy, balanced"
+        )
+    )
+    avoided_power_expressions: list[str] = Field(
+        default_factory=list,
+        description="Power expression styles that would clash with the IP"
+    )
+    preferred_narrative_foci: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Narrative focus modes that fit this IP. "
+            "Values: internal, ensemble, reverse_ensemble, adversary_ensemble, episodic, faction, mundane, competition, legacy, party"
+        )
+    )
+    avoided_narrative_foci: list[str] = Field(
+        default_factory=list,
+        description="Narrative focus modes that would feel wrong for this IP"
+    )
+    composition_notes: str = Field(
+        default="",
+        description="Brief free-text note on why certain axes are preferred/avoided for this IP"
+    )
+
+
 # =============================================================================
 # TOPIC-TO-SCHEMA MAPPING
 # =============================================================================
@@ -349,6 +395,7 @@ DERIVED_SCHEMAS = {
     "genres": GenreDetectionExtract,
     "voice_cards": CharacterVoiceCardsExtract,
     "author_voice": AuthorVoiceExtract,
+    "narrative_constraints": NarrativeConstraintsExtract,
 }
 
 

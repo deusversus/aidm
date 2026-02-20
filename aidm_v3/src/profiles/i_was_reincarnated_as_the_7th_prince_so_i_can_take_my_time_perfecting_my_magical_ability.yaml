@@ -127,3 +127,23 @@ visual_style:
   - warm European medieval setting
   - expressive chibi-capable shonen style
   - ornate royal regalia and magical insignia
+narrative_constraints:
+  preferred_tension_sources:
+  - existential
+  - relational
+  preferred_power_expressions:
+  - instantaneous
+  - overwhelming
+  - flashy
+  avoided_power_expressions:
+  - passive
+  - hidden
+  preferred_narrative_foci:
+  - ensemble
+  - mundane
+  - competition
+  avoided_narrative_foci:
+  - adversary_ensemble
+  - faction
+  composition_notes: "7th Prince is pure power fantasy — tension from existential wonder\
+    \ and found-family bonds, not struggle. Magic is the fun, not the cost."

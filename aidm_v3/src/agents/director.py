@@ -140,9 +140,6 @@ Provide a CONCISE investigation report structured as:
         bible: CampaignBible,
         profile: NarrativeProfile,
         world_state: WorldState | None = None,
-        op_preset: str | None = None,
-        op_tension_source: str | None = None,
-        op_mode_guidance: str | None = None,
         tools: ToolRegistry | None = None,
         compaction_text: str = ""
     ) -> DirectorOutput:
@@ -152,11 +149,8 @@ Provide a CONCISE investigation report structured as:
         Args:
             session: The completed session with summary
             bible: Current planning state
-            profile: The narrative profile (for persona)
+            profile: The narrative profile (for persona and composition)
             world_state: Current logical state of the world
-            op_preset: Optional OP preset (e.g., "bored_god", "hidden_ruler")
-            op_tension_source: Optional OP tension source axis
-            op_mode_guidance: Optional RAG-retrieved 3-axis guidance
             tools: Optional ToolRegistry for investigation phase
         """
 
@@ -175,7 +169,7 @@ Provide a CONCISE investigation report structured as:
 
         # 2. Build Context (with investigation findings and compaction if available)
         context = self._build_review_context(
-            session, bible, world_state, profile, op_preset, op_tension_source, op_mode_guidance,
+            session, bible, world_state, profile,
             investigation_findings=investigation_findings,
             compaction_text=compaction_text
         )
@@ -192,11 +186,11 @@ Provide a CONCISE investigation report structured as:
         character_name: str = "Unknown",
         character_concept: str = "",
         starting_location: str = "Unknown",
-        op_mode: bool = False,
-        op_preset: str | None = None,
-        op_tension_source: str | None = None,
-        op_power_expression: str | None = None,
-        op_narrative_focus: str | None = None,
+        power_tier: str | None = None,
+        tension_source: str | None = None,
+        power_expression: str | None = None,
+        narrative_focus: str | None = None,
+        composition_name: str | None = None,
     ) -> DirectorOutput:
         """
         Create an initial storyboard at gameplay handoff (pilot episode planning).
@@ -240,11 +234,11 @@ Provide a CONCISE investigation report structured as:
             character_name=character_name,
             character_concept=character_concept,
             starting_location=starting_location,
-            op_mode=op_mode,
-            op_preset=op_preset,
-            op_tension_source=op_tension_source,
-            op_power_expression=op_power_expression,
-            op_narrative_focus=op_narrative_focus,
+            power_tier=power_tier,
+            tension_source=tension_source,
+            power_expression=power_expression,
+            narrative_focus=narrative_focus,
+            composition_name=composition_name,
         )
 
         # 4. Replace {context} placeholder in prompt
@@ -262,11 +256,11 @@ Provide a CONCISE investigation report structured as:
         character_name: str,
         character_concept: str,
         starting_location: str,
-        op_mode: bool,
-        op_preset: str | None,
-        op_tension_source: str | None,
-        op_power_expression: str | None,
-        op_narrative_focus: str | None,
+        power_tier: str | None,
+        tension_source: str | None,
+        power_expression: str | None,
+        narrative_focus: str | None,
+        composition_name: str | None,
     ) -> str:
         """Build context for the Director's startup briefing."""
 
@@ -278,20 +272,21 @@ Provide a CONCISE investigation report structured as:
         if character_concept:
             lines.append(f"**Concept:** {character_concept}")
         lines.append(f"**Starting Location:** {starting_location}")
+        if power_tier:
+            lines.append(f"**Power Tier:** {power_tier}")
 
-        # === OP MODE ===
-        if op_mode:
-            lines.append("\n## ⚡ OP Protagonist Mode: ACTIVE")
-            if op_preset:
-                lines.append(f"**Configuration:** {op_preset.replace('_', ' ').title()}")
-            if op_tension_source:
-                lines.append(f"**Tension Source:** {op_tension_source}")
-            if op_power_expression:
-                lines.append(f"**Power Expression:** {op_power_expression}")
-            if op_narrative_focus:
-                lines.append(f"**Narrative Focus:** {op_narrative_focus}")
-            lines.append("\n*IMPORTANT: The protagonist is already powerful. Opening tension must come from")
-            lines.append("the configured axes above, NOT from combat difficulty.*")
+        # === NARRATIVE COMPOSITION ===
+        if tension_source or power_expression or narrative_focus:
+            lines.append("\n## ✨ Narrative Composition")
+            if composition_name:
+                lines.append(f"**Configuration:** {composition_name}")
+            if tension_source:
+                lines.append(f"**Tension Source:** {tension_source}")
+            if power_expression:
+                lines.append(f"**Power Expression:** {power_expression}")
+            if narrative_focus:
+                lines.append(f"**Narrative Focus:** {narrative_focus}")
+            lines.append("\n*Opening tension and arc structure should follow these composition axes.*")
 
         # === NARRATIVE PROFILE DNA ===
         if profile.dna:
@@ -364,9 +359,6 @@ Provide a CONCISE investigation report structured as:
         bible: CampaignBible,
         world_state: WorldState | None,
         profile: NarrativeProfile | None = None,
-        op_preset: str | None = None,
-        op_tension_source: str | None = None,
-        op_mode_guidance: str | None = None,
         investigation_findings: str = "",
         compaction_text: str = ""
     ) -> str:
@@ -544,15 +536,24 @@ Provide a CONCISE investigation report structured as:
 
             lines.append("\n*Use these templates as arc structure guides. Adapt to current story.*")
 
-        # OP Mode context (if active)
-        if op_preset and op_mode_guidance:
-            lines.append("\n## ⚡ OP Protagonist Mode Active")
-            lines.append(f"**Preset:** {op_preset.replace('_', ' ').title()}")
-            if op_tension_source:
-                lines.append(f"**Tension Source:** {op_tension_source}")
-            lines.append(op_mode_guidance)
-            lines.append("\n*IMPORTANT: Adjust arc planning for this composition. Reduce combat focus, "
-                        "increase stakes matching the tension source.*")
+        # Narrative Composition context (replaces OP mode)
+        if profile and profile.composition:
+            comp = profile.composition
+            tension = comp.get('tension_source')
+            expression = comp.get('power_expression')
+            focus = comp.get('narrative_focus')
+            if tension or expression or focus:
+                lines.append("\n## \u2728 Narrative Composition")
+                if tension:
+                    lines.append(f"**Tension Source:** {tension}")
+                if expression:
+                    lines.append(f"**Power Expression:** {expression}")
+                if focus:
+                    lines.append(f"**Narrative Focus:** {focus}")
+                mode = comp.get('mode', 'standard')
+                if mode != 'standard':
+                    lines.append(f"**Mode:** {mode} (power differential is significant)")
+                lines.append("\n*Adjust arc planning to follow these composition axes.*")
 
         # Previous Plans
         if bible.planning_data:
