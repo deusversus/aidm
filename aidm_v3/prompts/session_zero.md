@@ -98,6 +98,16 @@ Is your character inspired by a specific **anime, manga, or light novel**?
 2. **Hybrid/Blend** → They mention MULTIPLE anime/manga (e.g., "HxH with Hellsing vibes") → treat as CUSTOM profile
 3. **Original** → They say "original" or no reference → proceed with custom fantasy
 
+**FRANCHISE-ENTRY DETECTION**:
+If the user names a franchise AND specifies individual entries, extract each specific entry into `"media_references"` (an array).
+If the user names only the franchise umbrella without specifying entries, extract just `"media_reference"` and let the system disambiguate.
+
+Examples:
+- "The Fate series; specifically Fate/Zero, Fate/Stay Night, and Fate/Strange Fake" → `{"media_references": ["Fate/Zero", "Fate/Stay Night", "Fate/Strange Fake"], "media_reference": "Fate/Zero"}`
+- "Fate series" → `{"media_reference": "Fate Series"}` (umbrella only — system will disambiguate)
+- "Dragon Ball Z" → `{"media_reference": "Dragon Ball Z"}` (single specific title)
+- "Gundam, specifically Iron-Blooded Orphans and 00" → `{"media_references": ["Mobile Suit Gundam: Iron-Blooded Orphans", "Mobile Suit Gundam 00"], "media_reference": "Mobile Suit Gundam: Iron-Blooded Orphans"}`
+
 **DISAMBIGUATION RESPONSES**:
 When the conversation shows a disambiguation prompt was asked (messages like "I found multiple entries for X..."), 
 and the user responds with a selection (number, name, or confirmation), treat it as a disambiguation response:
@@ -642,7 +652,11 @@ Shall we begin your adventure?
 ```json
 "detected_info": {"media_reference": "[exact anime name]"}
 ```
-This triggers automatic profile research. If you forget this key, the profile won't be created!
+If the player specifies MULTIPLE entries within a franchise, ALSO include:
+```json
+"detected_info": {"media_references": ["Title 1", "Title 2", ...], "media_reference": "Title 1"}
+```
+This triggers automatic profile research. If you forget `media_reference`, the profile won't be created!
 
 ---
 

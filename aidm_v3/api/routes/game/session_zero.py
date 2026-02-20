@@ -366,6 +366,15 @@ async def session_zero_turn(session_id: str, request: TurnRequest):
             # TRIGGER RESEARCH: If media reference detected in Phase 0
             media_ref = result.detected_info.get("media_reference") or result.detected_info.get("anime")
             secondary_ref = result.detected_info.get("secondary_reference") or result.detected_info.get("secondary_media_reference") or result.detected_info.get("blend_with")
+            media_refs_array = result.detected_info.get("media_references")  # Multi-title array
+
+            # MULTI-TITLE: If LLM extracted specific franchise entries, promote to hybrid
+            if isinstance(media_refs_array, list) and len(media_refs_array) >= 2:
+                # Override: use the array entries for hybrid flow
+                media_ref = media_refs_array[0]
+                secondary_ref = media_refs_array[1] if len(media_refs_array) == 2 else None
+                # For 3+, we'll pass the full array to resolve_hybrid below
+                logger.info(f"Multi-title array detected: {media_refs_array}")
 
             # STABILITY GUARD: If we already resolved a media reference on a previous turn,
             # prefer it over the LLM's potentially truncated version.
@@ -382,7 +391,7 @@ async def session_zero_turn(session_id: str, request: TurnRequest):
 
             # Only trigger research/disambiguation in early phases (MEDIA_DETECTION, CONCEPT)
             # Later phases (IDENTITY, WRAP_UP, etc.) should not re-run disambiguation
-            early_phases = [SessionPhase.MEDIA_DETECTION, SessionPhase.NARRATIVE_CALIBRATION, SessionPhase.OP_MODE_DETECTION, SessionPhase.CONCEPT]
+            early_phases = [SessionPhase.MEDIA_DETECTION, SessionPhase.NARRATIVE_CALIBRATION, SessionPhase.CONCEPT]
             if media_ref and session.phase in early_phases:
                 # Note: We include CONCEPT because hybrid flow may need to run research there
                 logger.debug(f"DEBUG: Triggering research logic for '{media_ref}' (Phase: {session.phase})")
@@ -393,6 +402,7 @@ async def session_zero_turn(session_id: str, request: TurnRequest):
                     media_ref=media_ref,
                     secondary_ref=secondary_ref,
                     detected_info=result.detected_info,
+                    media_refs=media_refs_array,
                 )
 
                 # Apply metadata updates to detected_info
