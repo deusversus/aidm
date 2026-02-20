@@ -212,7 +212,7 @@ Pick what feels right!
 ### CANONICALITY (Part of Phase 0.5)
 **Goal**: Determine how the player's story relates to canon.
 
-**IMPORTANT**: Ask these questions AFTER tone calibration, BEFORE OP Mode.
+**IMPORTANT**: Ask these questions AFTER tone calibration, BEFORE power tier selection.
 
 **Question 1: Timeline Mode**
 ```
@@ -292,9 +292,9 @@ How do major canon events factor into your story?
 - "npcs only", "background", "cameos" → `canon_cast_mode: "npcs_only"`
 
 
-### Understanding the 3-Axis OP System
+### Understanding the 3-Axis Composition System
 
-When generating OP configurations, you have THREE independent axes. Each axis can have MULTIPLE values (e.g., `relational + legacy`). All combinations are valid — generate what fits the anime.
+When calibrating narrative composition, you have THREE independent axes. Each axis can have MULTIPLE values (e.g., `relational + legacy`). All combinations are valid — generate what fits the anime.
 
 **AXIS 1: Tension Source** (where dramatic stakes come from)
 | Value | Meaning |
@@ -317,6 +317,8 @@ When generating OP configurations, you have THREE independent axes. Each axis ca
 | `conditional` | Works only under specific rules/circumstances |
 | `derivative` | Power through minions, proxies, delegation |
 | `passive` | Accumulated mastery over centuries, not flashy |
+| `flashy` | Standard anime combat, stylish and impactful |
+| `balanced` | Standard pacing, neither overwhelming nor struggling |
 
 **AXIS 3: Narrative Focus** (what the story becomes "about")
 | Value | Meaning |
@@ -330,133 +332,101 @@ When generating OP configurations, you have THREE independent axes. Each axis ca
 | `mundane` | Slice-of-life despite cosmic power |
 | `competition` | Structured challenges, tournaments, ranking |
 | `legacy` | Impact on future generations, mentorship |
+| `party` | Standard adventure party, balanced team dynamics |
 
 ---
 
-### OP_MODE_DETECTION (Phase 0.6)
-**Goal**: Determine if player wants an overpowered protagonist, then GENERATE anime-specific configurations.
+### POWER_TIER_SELECTION (Part of Narrative Calibration)
+**Goal**: Let the player choose their starting power level. The system derives narrative weight from the gap between the chosen tier and the world baseline.
 
-**Initial Question:**
+**Tier Reference:**
+| Tier | Scale | Examples |
+|------|-------|----------|
+| T10 | Normal human | Background civilians |
+| T9 | Peak human | Trained soldier, real-world athlete |
+| T8 | Street-level | Early shonen protagonists |
+| T7 | Building-level | Mid-series shonen |
+| T6 | City-level | Upper-tier (Naruto, Bleach captains) |
+| T5 | Region-level | Kage-level, major antagonists |
+| T4 | Continental | Top-tier (Demon Kings, Hashirama) |
+| T3 | Planetary | Endgame threats (Kaguya, Meruem) |
+| T2 | Multiversal | Cosmic entities, reality warpers |
+| T1 | Omnipotent | True gods |
+
+**Ask this during or after canonicality.** Adapt the options to the anime's world_tier:
 ```
-One more calibration question - **Power Level**:
+## ⚡ Power Level
 
-1. **OP Protagonist** — Overwhelmingly powerful from the start
-   > Tension comes from meaning, relationships, consequences, or burden—not combat
+Where does your character start on the power scale?
 
-2. **Traditional Progression** — Start relatively grounded, grow through earned victories
-   > Classic hero's journey with meaningful power growth
+**For reference, [Anime]'s baseline is around T[X]** — [brief explanation].
+
+1. **Below Baseline** (T[X+1]–T[X+2]) — The underdog. Every victory is earned.
+2. **At Baseline** (T[X]) — You fit right in. Standard challenge.
+3. **Above Baseline** (T[X-1]–T[X-2]) — Notably powerful. Some fights are easy.
+4. **Far Above** (T[X-3]+) — Among the strongest. Tension comes from elsewhere.
 
 ---
 
-**Which resonates with your vision?**
+**Pick a tier, describe a power level, or just tell me your vision!**
 ```
 
-**If player says YES to OP, GENERATE custom configurations:**
+**After player selects:**
 
-Based on your knowledge of [anime] from the profile and research, propose 2-3 OP configurations that fit how THIS WORLD handles power fantasy. Do NOT use pre-made templates. Analyze the anime's actual storytelling patterns.
+If **gap ≤ 1** (at or below baseline): Set `power_tier` directly, use standard composition. Move to CONCEPT.
 
-**POWER TIER ASSIGNMENT:**
-- Each configuration MUST include a suggested tier (T1-T10)
-- OP protagonists are typically 2-4 tiers above world baseline
-- T10=human, T8=street-level, T6=city-level, T4=planetary, T2=multiversal
-
-**Format each configuration as:**
+If **gap ≥ 2** (above baseline): Set `power_tier`, then present 2–3 composition configurations:
 ```
-## ⚡ OP Configurations for [Anime]
+## 🎬 Narrative Composition for [Anime] at T[tier]
 
-Based on how [Anime] handles overpowered protagonists...
+At T[tier], you're [X] tiers above baseline. Here's how the story shifts:
 
-**1. "[Creative Name]"** (T[tier])
-- **Tension:** `[values]` — [why this fits the anime's themes]
-- **Expression:** `[values]` — [how the anime portrays power]
-- **Focus:** `[values]` — [what stories the anime tells]
-> *Power: [one-line description of power scale]*
+**1. "[Creative Name]"**
+- **Tension:** `[values]` — [why this fits]
+- **Expression:** `[values]` — [how power manifests]
+- **Focus:** `[values]` — [what the story becomes]
+> *[one-line gameplay feel]*
 
-**2. "[Creative Name]"** (T[tier])
+**2. "[Creative Name]"**
 - **Tension:** `[values]` — [explanation]
 - **Expression:** `[values]` — [explanation]
 - **Focus:** `[values]` — [explanation]
-> *Power: [one-line description]*
+> *[one-line description]*
 
 ---
 
-### 🎨 Or Describe Your Vision (+ Power Level)
-
-Don't see your perfect fit? Tell me about your ideal OP protagonist in your own words, and I'll piece together the right configuration!
-
-> *Example: "I want to be an ancient mage who could level kingdoms (around T4) but prefers finding the perfect tea-brewing spell."*
-
----
-
-**Which configuration resonates with you, or would you like to describe your own?**
+### 🎨 Or Describe Your Vision
+Tell me about your ideal protagonist in your own words!
 ```
 
-**Example for Frieren:**
-```
-## ⚡ OP Configurations for Frieren
-
-Based on how Frieren handles overpowered protagonists...
-
-**1. "The Thousand-Year Perspective"** (T3)
-- **Tension:** `legacy + burden` — Outliving everyone you love, carrying Himmel's memory
-- **Expression:** `passive + hidden` — Centuries of accumulated mastery, understated
-- **Focus:** `ensemble + episodic` — Fern/Stark growth arcs, vignette structure
-> *Power: Near-godlike mastery from millennia of experience*
-
-**2. "The Foregone Conclusion"** (T4)
-- **Tension:** `relational` — Party bonds across eras, found family
-- **Expression:** `hidden` — Frieren casually downplays her power level
-- **Focus:** `reverse_ensemble` — Others react to her legend, dramatic irony
-> *Power: Continental-scale threat, though rarely displayed*
-
----
-
-Which resonates with you? Or describe your own configuration (+ power level)!
-```
-
-**After player selects or describes their preference:**
-
-**If player chose a numbered configuration:** Extract the axis values AND the tier directly.
-
-**If player described their own vision:** Parse their description to extract axis values AND infer tier. Look for thematic cues:
+**Parsing player vision into axis values:**
 
 | Player Says | Likely Axis Values | Inferred Tier |
 |-------------|--------------------| --------------|
 | "retired master", "just wants peace" | `mundane` focus, `hidden` or `sealed` expression | T4-5 |
-| "remind demons who they're dealing with" | `instantaneous` or `overwhelming` expression | T3-4 |
-| "outlived everyone", "ancient", "since the dawn" | `burden` + `legacy` tension | T2-3 |
+| "outlived everyone", "ancient" | `burden` + `legacy` tension | T2-3 |
 | "found family", "protect my friends" | `relational` tension, `ensemble` focus | T5-6 |
 | "nobody knows my true power" | `hidden` expression | varies |
-| "mentor the next generation" | `legacy` focus | T4-5 |
-| "episodic adventures", "wandering" | `episodic` focus | varies |
 | "could destroy the world/kingdom" | high power statement | T3-4 |
-| "rival the gods", "multiversal" | extreme power statement | T1-2 |
-
-**If player states explicit tier (e.g., "around T4"):** Use their stated tier.
-**If player gives no tier hint:** Default to T4 (significant but not god-tier).
-
-**Example parse:** "I want to be like a retired master who just wants to find the perfect tea-brewing spell, but occasionally has to remind a demon why they should have stayed in the shadows."
-→ `tension: mundane + burden`, `expression: hidden + instantaneous`, `focus: episodic + mundane`, `power_tier: T4`
 
 Store in detected_info:
 ```json
 {
-  "op_mode": true,
-  "op_tension_source": "legacy + burden",
-  "op_power_expression": "passive + hidden",
-  "op_narrative_focus": "ensemble + episodic",
-  "op_config_name": "The Thousand-Year Perspective",
-  "power_tier": "T3"
+  "power_tier": "T3",
+  "tension_source": "legacy + burden",
+  "power_expression": "passive + hidden",
+  "narrative_focus": "ensemble + episodic",
+  "composition_name": "The Thousand-Year Perspective"
 }
 ```
 
-
-**Store in character_draft:**
-- `character_draft.op_mode` = true
-- `character_draft.op_tension_source` = axis values (comma-separated if multiple)
-- `character_draft.op_power_expression` = axis values
-- `character_draft.op_narrative_focus` = axis values
-- `character_draft.op_config_name` = the creative name (generate one if user described custom)
+If gap ≤ 1, store minimal:
+```json
+{
+  "power_tier": "T8",
+  "narrative_calibrated": true
+}
+```
 
 ### CONCEPT (Phase 1)
 **Goal**: Get the "big idea" for the character.
@@ -660,7 +630,8 @@ Shall we begin your adventure?
 | **MEDIA_DETECTION** | `"media_reference"` | `{"media_reference": "Hellsing"}` |
 | **MEDIA_DETECTION** (blend) | `"media_reference"` + `"secondary_media_reference"` | `{"media_reference": "HxH", "secondary_media_reference": "Hellsing"}` |
 | **NARRATIVE_CALIBRATION** | `"timeline_mode"`, `"canon_cast_mode"`, `"event_fidelity"` | `{"timeline_mode": "canon_adjacent", "canon_cast_mode": "full_cast"}` |
-| **OP_MODE_DETECTION** | `"op_mode"` + `"op_preset"` | `{"op_mode": true, "op_preset": "bored_god"}` |
+| **NARRATIVE_CALIBRATION** | `"timeline_mode"`, `"canon_cast_mode"`, `"event_fidelity"`, `"power_tier"` | `{"timeline_mode": "canon_adjacent", "power_tier": "T3"}` |
+| **NARRATIVE_CALIBRATION** | `"tension_source"`, `"power_expression"`, `"narrative_focus"` | `{"tension_source": "burden", "narrative_focus": "ensemble"}` (only if gap ≥ 2) |
 | **CONCEPT** | `"concept"` | `{"concept": "A vampire hunter seeking redemption"}` |
 | **IDENTITY** | `"name"`, `"age"`, `"traits"`, `"backstory"` | `{"name": "Alucard", "backstory": "Ancient vampire..."}` |
 | **MECHANICAL_BUILD** | `"attributes"`, `"abilities"` | `{"attributes": {"STR": 18}, "abilities": ["Regeneration"]}` |

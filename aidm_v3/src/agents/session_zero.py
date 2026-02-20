@@ -152,10 +152,13 @@ Based on the phase-specific instructions in the system prompt, generate an appro
             lines.append(f"- Appearance: {draft.appearance}")
         if draft.starting_location:
             lines.append(f"- Starting Location: {draft.starting_location}")
-        if draft.op_protagonist_enabled:
-            lines.append(f"- OP Mode: ENABLED (preset: {draft.op_preset or 'custom'})")
         if draft.power_tier:
             lines.append(f"- Power Tier: {draft.power_tier}")
+        # Show composition if set via profile or session zero
+        if hasattr(draft, 'tension_source') and draft.tension_source:
+            lines.append(f"- Composition: tension={draft.tension_source}, expression={draft.power_expression}, focus={draft.narrative_focus}")
+        elif draft.op_protagonist_enabled:  # Legacy: show deprecated OP fields if present
+            lines.append(f"- OP Mode (legacy): ENABLED (preset: {draft.op_preset or 'custom'})")
         return "\n".join(lines) if lines else "(empty)"
 
     async def get_opening_message(self, session: Session) -> str:
@@ -203,13 +206,18 @@ def apply_detected_info(session: Session, detected: dict[str, Any]) -> None:
         "timeline_mode": "timeline_mode",
         "canon_cast_mode": "canon_cast_mode",
         "event_fidelity": "event_fidelity",
-        # OP Mode
+        # OP Mode (legacy — still accepted for backward compat)
         "op_mode": "op_protagonist_enabled",
         "op_protagonist": "op_protagonist_enabled",
         "op_preset": "op_preset",
         "op_tension_source": "op_tension_source",
         "op_power_expression": "op_power_expression",
         "op_narrative_focus": "op_narrative_focus",
+        # New composition fields (preferred)
+        "tension_source": "tension_source",
+        "power_expression": "power_expression",
+        "narrative_focus": "narrative_focus",
+        "composition_name": "composition_name",
         # Character
         "concept": "concept",
         "name": "name",
@@ -458,20 +466,38 @@ async def process_session_zero_state(
         stats["memories_added"] += 1
         logger.info(f"[SessionZero→State] Event fidelity: {mode}")
 
-    # === OP MODE ===
+    # === COMPOSITION / POWER TIER ===
 
-    if "op_mode" in detected_info or "op_protagonist" in detected_info:
+    if "tension_source" in detected_info or "power_expression" in detected_info:
+        parts = []
+        if "tension_source" in detected_info:
+            parts.append(f"tension={detected_info['tension_source']}")
+        if "power_expression" in detected_info:
+            parts.append(f"expression={detected_info['power_expression']}")
+        if "narrative_focus" in detected_info:
+            parts.append(f"focus={detected_info['narrative_focus']}")
+        memory.add_memory(
+            content=f"Narrative composition: {', '.join(parts)}",
+            memory_type="core",
+            turn_number=0,
+            flags=["plot_critical", "session_zero"]
+        )
+        stats["memories_added"] += 1
+        logger.info(f"[SessionZero→State] Composition: {', '.join(parts)}")
+
+    # Legacy OP mode — still index if received from older prompts
+    elif "op_mode" in detected_info or "op_protagonist" in detected_info:
         op_enabled = detected_info.get("op_mode") or detected_info.get("op_protagonist")
         if op_enabled:
             preset = detected_info.get("op_preset", "custom")
             memory.add_memory(
-                content=f"OP Protagonist mode enabled. Preset: {preset}",
+                content=f"OP Protagonist mode enabled (legacy). Preset: {preset}",
                 memory_type="core",
                 turn_number=0,
                 flags=["plot_critical", "session_zero"]
             )
             stats["memories_added"] += 1
-            logger.info(f"[SessionZero→State] OP Mode enabled: {preset}")
+            logger.info(f"[SessionZero→State] OP Mode (legacy): {preset}")
 
     # === WORLD INTEGRATION ===
 
