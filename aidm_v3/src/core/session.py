@@ -21,8 +21,7 @@ class SessionPhase(Enum):
     # Session Zero phases
     MEDIA_DETECTION = "media_detection"       # Phase 0: Detect anime references
     NARRATIVE_CALIBRATION = "calibration"     # Phase 0.5: Tone/style calibration
-    OP_MODE_DETECTION = "op_mode"             # Phase 0.6: OP protagonist check
-    MECHANICAL_LOADING = "mechanical"         # Phase 0.7: Load mechanical systems
+    MECHANICAL_LOADING = "mechanical"         # Phase 0.7: Load mechanical systems + tier selection
     CONCEPT = "concept"                       # Phase 1: The big idea
     IDENTITY = "identity"                     # Phase 2: Name, appearance, backstory
     MECHANICAL_BUILD = "build"                # Phase 3: Stats, skills, equipment
@@ -38,7 +37,6 @@ class SessionPhase(Enum):
 PHASE_ORDER = [
     SessionPhase.MEDIA_DETECTION,
     SessionPhase.NARRATIVE_CALIBRATION,
-    SessionPhase.OP_MODE_DETECTION,
     SessionPhase.MECHANICAL_LOADING,
     SessionPhase.CONCEPT,
     SessionPhase.IDENTITY,
@@ -117,9 +115,6 @@ def get_current_phase_for_draft(draft: "CharacterDraft") -> "SessionPhase":
     # Check if narrative calibration has been confirmed
     if draft.narrative_calibrated is None:
         return SessionPhase.NARRATIVE_CALIBRATION
-    # Check if OP mode has been explicitly addressed
-    if draft.op_protagonist_enabled is None:
-        return SessionPhase.OP_MODE_DETECTION
     if draft.concept is None:
         return SessionPhase.CONCEPT
     if draft.name is None or draft.backstory is None:
@@ -150,12 +145,12 @@ class CharacterDraft:
     canon_cast_mode: str | None = None     # "full_cast", "replaced_protagonist", "npcs_only"
     event_fidelity: str | None = None      # "observable", "influenceable", "background"
 
-    # Phase 0.6: OP mode (None = not yet asked, False = declined, True = enabled)
+    # Phase 0.6: OP mode — DEPRECATED (kept for migration; OP status now derived from power_tier vs world_tier)
     op_protagonist_enabled: bool | None = None
-    op_tension_source: str | None = None      # existential, relational, moral, burden, information, consequence, control
-    op_power_expression: str | None = None    # instantaneous, overwhelming, sealed, hidden, conditional, derivative, passive
-    op_narrative_focus: str | None = None     # internal, ensemble, reverse_ensemble, episodic, faction, mundane, competition, legacy
-    op_preset: str | None = None              # Optional preset name (bored_god, hidden_ruler, etc.)
+    op_tension_source: str | None = None
+    op_power_expression: str | None = None
+    op_narrative_focus: str | None = None
+    op_preset: str | None = None
 
     # Power Tier (from OP mode or profile)
     power_tier: str | None = None             # e.g., "T3", "T6" - defaults based on OP mode/world
@@ -293,6 +288,12 @@ class Session:
     # Each entry: {"role": "player"|"director"|"key_animator", "content": str}
     meta_conversation_history: list[dict[str, str]] = field(default_factory=list)
 
+    # Arc-level narrative mode (Layer 2)
+    current_arc_mode: str = "main_arc"                # main_arc | ensemble_arc | adversary_ensemble_arc | ally_ensemble_arc | investigator_arc | faction_arc
+    arc_pov_protagonist: str | None = None             # NPC name/group when not main_arc
+    arc_committed_at_turn: int | None = None            # turn number when Director committed
+    arc_transition_signal: str | None = None            # narrative event that will close this arc
+
     def is_session_zero(self) -> bool:
         """Check if we're still in Session Zero."""
         return self.phase not in (SessionPhase.GAMEPLAY, SessionPhase.META_CONVERSATION)
@@ -368,14 +369,23 @@ class Session:
             "created_at": self.created_at.isoformat(),
             "last_activity": self.last_activity.isoformat(),
             "phase_state": self.phase_state,
+            # Arc-level narrative mode
+            "current_arc_mode": self.current_arc_mode,
+            "arc_pov_protagonist": self.arc_pov_protagonist,
+            "arc_committed_at_turn": self.arc_committed_at_turn,
+            "arc_transition_signal": self.arc_transition_signal,
         }
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "Session":
         """Deserialize from dictionary."""
+        # Handle legacy phase value "op_mode" → skip to next phase
+        phase_val = data.get("phase", "media_detection")
+        if phase_val == "op_mode":
+            phase_val = "mechanical"
         session = cls(
             session_id=data["session_id"],
-            phase=SessionPhase(data.get("phase", "media_detection")),
+            phase=SessionPhase(phase_val),
             character_draft=CharacterDraft.from_dict(data.get("character_draft", {})),
             messages=data.get("messages", []),
             compaction_buffer=data.get("compaction_buffer", []),
@@ -386,6 +396,11 @@ class Session:
             session.created_at = datetime.fromisoformat(data["created_at"])
         if data.get("last_activity"):
             session.last_activity = datetime.fromisoformat(data["last_activity"])
+        # Arc-level narrative mode
+        session.current_arc_mode = data.get("current_arc_mode", "main_arc")
+        session.arc_pov_protagonist = data.get("arc_pov_protagonist")
+        session.arc_committed_at_turn = data.get("arc_committed_at_turn")
+        session.arc_transition_signal = data.get("arc_transition_signal")
         return session
 
 

@@ -418,14 +418,40 @@ This triggers a portrait panel. Use sparingly — only for panel-worthy moments.
             lines.append("Use these notes to guide the narrative pacing and foreshadowing:")
             lines.append(context.director_notes)
 
-        # OP Mode: Suppress tier mismatch validation
-        if context.op_protagonist_enabled:
+        # Power differential context: when character tier >> world tier, frame it narratively
+        if hasattr(context, 'power_tier') and context.power_tier:
             lines.append("")
-            lines.append("### ⚡ OP MODE ACTIVE")
+            lines.append("### ⚡ Power Differential")
             lines.append("Power tier mismatches are EXPECTED and INTENTIONAL.")
-            lines.append("Do NOT flag tier contradictions as errors or calibration failures.")
-            lines.append("The protagonist's power level exceeding normal constraints IS the narrative premise.")
             lines.append("Use tier contrast for dramatic irony, comedy, or narrative weight—never as an error.")
+
+        # Arc-level narrative mode (Layer 2)
+        arc_mode = getattr(context, 'current_arc_mode', 'main_arc')
+        arc_pov = getattr(context, 'arc_pov_protagonist', None)
+        if arc_mode and arc_mode != "main_arc":
+            lines.append("")
+            arc_labels = {
+                "ensemble_arc": "🎭 ENSEMBLE ARC — Multiple POVs, equal weight",
+                "adversary_ensemble_arc": "🎭 ADVERSARY ENSEMBLE — Opponents carry the story",
+                "ally_ensemble_arc": "🎭 ALLY ENSEMBLE — PC's allies carry the story",
+                "investigator_arc": "🔍 INVESTIGATOR ARC — External observer POV",
+                "faction_arc": "🏛️ FACTION ARC — Institutional perspective",
+            }
+            lines.append(f"### {arc_labels.get(arc_mode, arc_mode.upper())}")
+            if arc_pov:
+                lines.append(f"**POV Protagonist:** {arc_pov}")
+            if arc_mode in ("adversary_ensemble_arc", "investigator_arc"):
+                lines.append("**PC INTERIORITY: SUPPRESSED.** The player character appears only as:")
+                lines.append("- A distant threat, rumor, or offscreen cause")
+                lines.append("- A force of nature observed from outside")
+                lines.append("- Never show PC's thoughts, feelings, or internal monologue")
+                lines.append(f"All emotional weight belongs to {arc_pov or 'the NPC cast'}.")
+            elif arc_mode == "ensemble_arc":
+                lines.append("Balance screen time across all POV characters.")
+                lines.append("The PC is ONE voice among many, not the center.")
+            elif arc_mode == "ally_ensemble_arc":
+                lines.append("PC's allies carry the narrative. PC is catalyst/anchor.")
+                lines.append("Show ally growth, struggles, and arcs in detail.")
 
         return "\n".join(lines)
 

@@ -26,6 +26,20 @@ class DirectorOutput(BaseModel):
     arc_phase: str = Field(description="Current phase (Setup, Rising Action, Climax, Resolution)")
     tension_level: float = Field(description="Current narrative tension (0.0 to 1.0)")
 
+    # Arc-level narrative mode (Layer 2)
+    arc_mode: str = Field(
+        default="main_arc",
+        description="Narrative framing mode: main_arc, ensemble_arc, adversary_ensemble_arc, ally_ensemble_arc, investigator_arc, faction_arc"
+    )
+    arc_pov_protagonist: str = Field(
+        default="",
+        description="NPC name/group carrying the POV when arc_mode is not main_arc. Empty string for main_arc."
+    )
+    arc_transition_signal: str = Field(
+        default="",
+        description="Narrative event that will close this arc mode and return to main_arc. Empty if no transition planned."
+    )
+
     active_foreshadowing: list[dict[str, Any]] = Field(
         default_factory=list,
         description="List of active foreshadowing seeds and their status"
