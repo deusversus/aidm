@@ -331,24 +331,14 @@ def load_profile(profile_id: str, fallback: bool = True) -> NarrativeProfile:
 
     if not profile_path.exists():
         if fallback:
-            # Try to find ANY profile as fallback
+            # List available profiles for the error message
             available = list_profiles()
-            if available:
-                fallback_id = available[0]
-                logger.warning(f"'{profile_id}' not found, falling back to '{fallback_id}'")
-                profile_path = profiles_dir / f"{fallback_id}.yaml"
-                profile_id = fallback_id
-            else:
-                # Create minimal default profile
-                logger.info("No profiles available, creating default")
-                return NarrativeProfile(
-                    id="default",
-                    name="Default Campaign",
-                    source="System Default",
-                    dna={"action": 5, "drama": 5, "comedy": 5},
-                    tropes={},
-                    combat_system="tactical"
-                )
+            available_str = ", ".join(available) if available else "(none)"
+            raise FileNotFoundError(
+                f"Profile not found: '{profile_id}'. "
+                f"Available profiles: {available_str}. "
+                f"The research pipeline may not have generated a profile for this title."
+            )
         else:
             raise FileNotFoundError(f"Profile not found: {profile_path}")
 
