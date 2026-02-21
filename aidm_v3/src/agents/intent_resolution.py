@@ -310,8 +310,7 @@ class IntentResolutionAgent(AgenticAgent):
         # Only trigger on explicit "found" language, not on field-name mentions in error text
         profile_found_phrases = ["profile found", "local profile", "existing profile", "found in profiles"]
         if any(phrase in findings_lower for phrase in profile_found_phrases):
-            # Verify the profile actually exists on disk
-            profile_id = original_input.lower().replace(" ", "_")[:80]
+            # Verify the profile actually exists on disk via title matching
             from ..profiles.loader import find_profile_by_title
             match = find_profile_by_title(original_input)
             if match:
@@ -329,7 +328,7 @@ class IntentResolutionAgent(AgenticAgent):
                     reasoning=f"Fallback: profile verified on disk; {findings[:200]}",
                 )
             # Profile not on disk despite agent claiming it exists — needs research
-            logger.info(f"Fallback: profile-found signal but not on disk, routing to research: {profile_id}")
+            logger.info(f"Fallback: profile-found signal but not on disk, routing to research: {original_input}")
 
         # Default: assume needs research
         # For multi-title inputs, split into individual titles

@@ -123,12 +123,13 @@ class MediaGenerator:
             from ..db.models import Campaign
             from ..db.session import create_session
             db = create_session()
-            campaign = db.query(Campaign).filter(Campaign.id == campaign_id).first()
-            if campaign and campaign.media_uuid:
-                self._media_uuid_cache[campaign_id] = campaign.media_uuid
+            try:
+                campaign = db.query(Campaign).filter(Campaign.id == campaign_id).first()
+                if campaign and campaign.media_uuid:
+                    self._media_uuid_cache[campaign_id] = campaign.media_uuid
+                    return campaign.media_uuid
+            finally:
                 db.close()
-                return campaign.media_uuid
-            db.close()
         except Exception as e:
             logger.warning(f"media_uuid lookup failed for campaign {campaign_id}: {e}")
 
