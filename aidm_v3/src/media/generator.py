@@ -234,7 +234,7 @@ class MediaGenerator:
 
         style_block = self._build_style_prompt(style_context)
 
-        prompt = f"""Create a full-body character model sheet.
+        prompt = f"""Create a full-body character turnaround model sheet.
 
 CHARACTER: {entity_name}
 VISUAL TAGS: {tags_str}
@@ -243,13 +243,20 @@ APPEARANCE: {appearance_desc}
 ART DIRECTION:
 {style_block}
 
+LAYOUT — Exactly 4 full-body views arranged in a single horizontal row, evenly spaced:
+1. FRONT VIEW (facing viewer directly) — the primary canonical reference
+2. THREE-QUARTER VIEW (turned ~45° to the right)
+3. SIDE / PROFILE VIEW (facing right)
+4. BACK VIEW (facing away from viewer)
+
 Requirements:
-- Full-body front view and upper-body close-up side by side
-- Clean white/light background for reference use
-- High detail on face, hair, outfit, accessories
+- ALL 4 views show the SAME character at the SAME scale and height
+- Strict orthographic projection — NO perspective distortion
+- Clean white or light-grey background
+- High detail on face, hair, outfit, accessories, and silhouette
 - Art style MUST match the art direction above — this is critical
 - Character model sheet format suitable as canonical visual reference
-- No text labels or annotations on the image"""
+- No text labels, annotations, or watermarks on the image"""
 
         try:
             loop = asyncio.get_running_loop()
@@ -269,11 +276,11 @@ Requirements:
                 parts.append(types.Part.from_text(
                     text=(
                         f"Using the attached blank body reference as a STRUCTURAL template, "
-                        f"create a character model sheet. CRITICAL RULES:\n"
-                        f"- Match the template's EXACT pose, proportions, and camera angle\n"
+                        f"create a character turnaround model sheet. CRITICAL RULES:\n"
+                        f"- Match the template's MULTI-VIEW LAYOUT — produce the same number of rotation views\n"
+                        f"- Match the template's EXACT pose, proportions, and camera angles per view\n"
                         f"- Overlay character details (hair, face, clothing, accessories) onto the body form\n"
                         f"- Maintain strict orthographic projection — NO perspective distortion\n"
-                        f"- Produce FRONT VIEW and THREE-QUARTER VIEW side by side\n"
                         f"- Keep the same clean white/light-grey background as the template\n"
                         f"- The template is a blank mannequin — dress and detail it as the character\n\n"
                         f"{prompt}"
@@ -788,6 +795,7 @@ STYLE:
         campaign_id: int,
         filename: str = "cutscene",
         aspect_ratio: str = "16:9",
+        reference_image_path: Path | None = None,
     ) -> Path | None:
         """Generate a still image via gemini-3-pro-image-preview.
         
@@ -799,6 +807,9 @@ STYLE:
             campaign_id: Campaign ID for file organization
             filename: Base filename (sanitized, no extension)
             aspect_ratio: Desired aspect ratio hint
+            reference_image_path: Optional model sheet or reference image.
+                When provided, the image is sent alongside the prompt so the
+                model maintains character visual consistency.
             
         Returns:
             Path to saved PNG, or None on failure.
@@ -815,11 +826,32 @@ STYLE:
         try:
             loop = asyncio.get_running_loop()
 
+            # Build parts list — include reference image when available
+            from google.genai import types
+            parts = []
+
+            if reference_image_path and reference_image_path.exists():
+                ref_bytes = reference_image_path.read_bytes()
+                ref_mime = "image/jpeg" if reference_image_path.suffix.lower() in (".jpg", ".jpeg") else "image/png"
+                parts.append(types.Part.from_bytes(data=ref_bytes, mime_type=ref_mime))
+                parts.append(types.Part.from_text(
+                    text=(
+                        "The above is the CHARACTER MODEL SHEET — the canonical visual reference. "
+                        "Any characters in the scene below MUST match this model sheet's face, "
+                        "hair, outfit, proportions, and art style EXACTLY. "
+                        "Do NOT invent a new design.\n\n"
+                        + full_prompt
+                    )
+                ))
+                logger.info(f"Using model sheet reference: {reference_image_path.name}")
+            else:
+                parts.append(full_prompt)
+
             def _generate():
                 from google.genai import types
                 response = self._client.models.generate_content(
                     model=self.IMAGE_MODEL,
-                    contents=[full_prompt],
+                    contents=parts,
                     config=types.GenerateContentConfig(
                         response_modalities=["image", "text"],
                     ),
@@ -934,6 +966,7 @@ STYLE:
         campaign_id: int,
         cutscene_type: str = "action_climax",
         filename: str = "cutscene",
+        reference_image_path: Path | None = None,
     ) -> dict[str, Any]:
         """Full cutscene pipeline: prompt → image → video.
         
@@ -946,6 +979,7 @@ STYLE:
             campaign_id: Campaign ID
             cutscene_type: Type classification
             filename: Base filename
+            reference_image_path: Optional model sheet to maintain character consistency
             
         Returns:
             {
@@ -964,11 +998,12 @@ STYLE:
             "status": "failed",
         }
 
-        # Step 1: Generate still image
+        # Step 1: Generate still image (with model sheet reference if available)
         image_path = await self.generate_image(
             prompt=image_prompt,
             campaign_id=campaign_id,
             filename=filename,
+            reference_image_path=reference_image_path,
         )
 
         if not image_path:

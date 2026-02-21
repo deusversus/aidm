@@ -406,14 +406,32 @@ def _trigger_cutscene(
 
         async def _generate():
             try:
-                from ..media.generator import MediaGenerator
+                from pathlib import Path as _Path
+
+                from ..media.generator import MEDIA_BASE_DIR, MediaGenerator
                 gen = MediaGenerator()
+
+                # Auto-discover PC model sheet for character consistency
+                model_sheet_path = None
+                models_dir = MEDIA_BASE_DIR / str(campaign_id) / "models"
+                if models_dir.exists():
+                    # Find the most recent model sheet (there may be multiple NPCs)
+                    model_sheets = sorted(
+                        models_dir.glob("*_model.png"),
+                        key=lambda p: p.stat().st_mtime,
+                        reverse=True,
+                    )
+                    if model_sheets:
+                        model_sheet_path = model_sheets[0]
+                        logger.info(f"Cutscene using model sheet: {model_sheet_path.name}")
+
                 result = await gen.generate_cutscene(
                     image_prompt=full_image_prompt,
                     motion_prompt=motion_prompt,
                     campaign_id=campaign_id,
                     cutscene_type=cutscene_type,
                     filename=f"turn{current_turn}_{cutscene_type}",
+                    reference_image_path=model_sheet_path,
                 )
 
                 # Save to MediaAsset table
