@@ -406,24 +406,31 @@ def _trigger_cutscene(
 
         async def _generate():
             try:
-                from pathlib import Path as _Path
-
                 from ..media.generator import MEDIA_BASE_DIR, MediaGenerator
                 gen = MediaGenerator()
 
-                # Auto-discover PC model sheet for character consistency
-                model_sheet_path = None
+                # Discover model sheets for characters mentioned in the prompt
+                reference_images = []
                 models_dir = MEDIA_BASE_DIR / str(campaign_id) / "models"
                 if models_dir.exists():
-                    # Find the most recent model sheet (there may be multiple NPCs)
-                    model_sheets = sorted(
-                        models_dir.glob("*_model.png"),
-                        key=lambda p: p.stat().st_mtime,
-                        reverse=True,
-                    )
-                    if model_sheets:
-                        model_sheet_path = model_sheets[0]
-                        logger.info(f"Cutscene using model sheet: {model_sheet_path.name}")
+                    prompt_lower = image_prompt.lower()
+                    for model_file in models_dir.glob("*_model.png"):
+                        # Extract character name from filename (e.g. lloyd_model.png → lloyd)
+                        char_name = model_file.stem.replace("_model", "").replace("_", " ")
+                        if char_name in prompt_lower:
+                            reference_images.append(model_file)
+                            logger.info(f"Cutscene ref matched '{char_name}': {model_file.name}")
+
+                    # Fallback: if no names matched but models exist, pass all of them
+                    # (better to have some reference than none)
+                    if not reference_images:
+                        reference_images = sorted(
+                            models_dir.glob("*_model.png"),
+                            key=lambda p: p.stat().st_mtime,
+                            reverse=True,
+                        )
+                        if reference_images:
+                            logger.info(f"Cutscene: no name match, using all {len(reference_images)} model sheets as reference")
 
                 result = await gen.generate_cutscene(
                     image_prompt=full_image_prompt,
@@ -431,7 +438,7 @@ def _trigger_cutscene(
                     campaign_id=campaign_id,
                     cutscene_type=cutscene_type,
                     filename=f"turn{current_turn}_{cutscene_type}",
-                    reference_image_path=model_sheet_path,
+                    reference_images=reference_images or None,
                 )
 
                 # Save to MediaAsset table

@@ -243,16 +243,18 @@ APPEARANCE: {appearance_desc}
 ART DIRECTION:
 {style_block}
 
-LAYOUT — Exactly 4 full-body views arranged in a single horizontal row, evenly spaced:
+LAYOUT — Exactly 6 full-body views arranged in a single horizontal row, evenly spaced:
 1. FRONT VIEW (facing viewer directly) — the primary canonical reference
-2. THREE-QUARTER VIEW (turned ~45° to the right)
+2. FRONT THREE-QUARTER VIEW (turned ~45° to the right)
 3. SIDE / PROFILE VIEW (facing right)
-4. BACK VIEW (facing away from viewer)
+4. BACK THREE-QUARTER VIEW (turned ~135°, showing mostly the back)
+5. FULL BACK VIEW (facing away from viewer)
+6. REAR THREE-QUARTER VIEW (turned ~225°, the opposite ¾ angle)
 
 Requirements:
-- ALL 4 views show the SAME character at the SAME scale and height
+- ALL 6 views show the SAME character at the SAME scale and height
 - Strict orthographic projection — NO perspective distortion
-- Clean white or light-grey background
+- Clean white or light-grey background with horizontal proportion guide lines
 - High detail on face, hair, outfit, accessories, and silhouette
 - Art style MUST match the art direction above — this is critical
 - Character model sheet format suitable as canonical visual reference
@@ -795,7 +797,7 @@ STYLE:
         campaign_id: int,
         filename: str = "cutscene",
         aspect_ratio: str = "16:9",
-        reference_image_path: Path | None = None,
+        reference_images: list[Path] | None = None,
     ) -> Path | None:
         """Generate a still image via gemini-3-pro-image-preview.
         
@@ -807,9 +809,9 @@ STYLE:
             campaign_id: Campaign ID for file organization
             filename: Base filename (sanitized, no extension)
             aspect_ratio: Desired aspect ratio hint
-            reference_image_path: Optional model sheet or reference image.
-                When provided, the image is sent alongside the prompt so the
-                model maintains character visual consistency.
+            reference_images: Optional list of model sheet / reference image
+                paths. Each is sent alongside the prompt so the model
+                maintains character visual consistency.
             
         Returns:
             Path to saved PNG, or None on failure.
@@ -826,24 +828,28 @@ STYLE:
         try:
             loop = asyncio.get_running_loop()
 
-            # Build parts list — include reference image when available
+            # Build parts list — include reference images when available
             from google.genai import types
             parts = []
 
-            if reference_image_path and reference_image_path.exists():
-                ref_bytes = reference_image_path.read_bytes()
-                ref_mime = "image/jpeg" if reference_image_path.suffix.lower() in (".jpg", ".jpeg") else "image/png"
-                parts.append(types.Part.from_bytes(data=ref_bytes, mime_type=ref_mime))
+            valid_refs = [p for p in (reference_images or []) if p and p.exists()]
+            if valid_refs:
+                for ref_path in valid_refs:
+                    ref_bytes = ref_path.read_bytes()
+                    ref_mime = "image/jpeg" if ref_path.suffix.lower() in (".jpg", ".jpeg") else "image/png"
+                    parts.append(types.Part.from_bytes(data=ref_bytes, mime_type=ref_mime))
+                    logger.info(f"Using model sheet reference: {ref_path.name}")
                 parts.append(types.Part.from_text(
                     text=(
-                        "The above is the CHARACTER MODEL SHEET — the canonical visual reference. "
-                        "Any characters in the scene below MUST match this model sheet's face, "
-                        "hair, outfit, proportions, and art style EXACTLY. "
-                        "Do NOT invent a new design.\n\n"
+                        f"The above {'images are' if len(valid_refs) > 1 else 'image is a'} "
+                        f"CHARACTER MODEL SHEET{'S' if len(valid_refs) > 1 else ''} — "
+                        f"canonical visual references. "
+                        f"Any characters in the scene below MUST match their model sheet's face, "
+                        f"hair, outfit, proportions, and art style EXACTLY. "
+                        f"Do NOT invent a new design.\n\n"
                         + full_prompt
                     )
                 ))
-                logger.info(f"Using model sheet reference: {reference_image_path.name}")
             else:
                 parts.append(full_prompt)
 
@@ -966,7 +972,7 @@ STYLE:
         campaign_id: int,
         cutscene_type: str = "action_climax",
         filename: str = "cutscene",
-        reference_image_path: Path | None = None,
+        reference_images: list[Path] | None = None,
     ) -> dict[str, Any]:
         """Full cutscene pipeline: prompt → image → video.
         
@@ -979,7 +985,7 @@ STYLE:
             campaign_id: Campaign ID
             cutscene_type: Type classification
             filename: Base filename
-            reference_image_path: Optional model sheet to maintain character consistency
+            reference_images: Optional list of model sheets for character consistency
             
         Returns:
             {
@@ -998,12 +1004,12 @@ STYLE:
             "status": "failed",
         }
 
-        # Step 1: Generate still image (with model sheet reference if available)
+        # Step 1: Generate still image (with model sheet references if available)
         image_path = await self.generate_image(
             prompt=image_prompt,
             campaign_id=campaign_id,
             filename=filename,
-            reference_image_path=reference_image_path,
+            reference_images=reference_images,
         )
 
         if not image_path:
