@@ -30,7 +30,8 @@ class BackgroundMixin:
         recent_messages: list,
         use_sakuga: bool,
         compaction_text: str,
-        latency_ms: int
+        latency_ms: int,
+        portrait_map: dict | None = None,
     ):
         """Background post-narrative processing. All bookkeeping that doesn't
         affect the current turn's response runs here.
@@ -141,7 +142,8 @@ class BackgroundMixin:
                         intent=intent.model_dump(),
                         outcome=outcome.model_dump() if outcome else None,
                         narrative=narrative,
-                        latency_ms=latency_ms
+                        latency_ms=latency_ms,
+                        portrait_map=portrait_map,
                     )
                     self.memory.add_memory(
                         content=f"Turn {db_context.turn_number}: Player input '{player_input}'. Result: {narrative[:500]}...",

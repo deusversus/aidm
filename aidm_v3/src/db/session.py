@@ -89,6 +89,14 @@ def init_db():
                 conn.execute(text("ALTER TABLE world_state ADD COLUMN pinned_messages TEXT DEFAULT '[]'"))
                 conn.commit()
                 logger.info("Added pinned_messages column to world_state")
+
+            # portrait_map on turns (media persistence)
+            result = conn.execute(text("PRAGMA table_info(turns)"))
+            columns = [row[1] for row in result]
+            if "portrait_map" not in columns:
+                conn.execute(text("ALTER TABLE turns ADD COLUMN portrait_map TEXT"))
+                conn.commit()
+                logger.info("Added portrait_map column to turns")
         except Exception as e:
             logger.warning(f"Column check skipped: {e}")
 
