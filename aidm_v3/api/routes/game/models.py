@@ -249,6 +249,7 @@ class ResumeSessionResponse(BaseModel):
     character_draft: dict[str, Any] | None = None
     recap: str | None = None  # "Previously On..." recap for session continuity
     turn_number: int = 0  # Current turn count (0 = no gameplay turns yet)
+    portrait_maps: dict[int, dict[str, str]] | None = None  # {turn_number: {"NPC Name": "/api/game/media/..."}}
 
 
 # === Phase 5: Media Gallery & Cost Models ===

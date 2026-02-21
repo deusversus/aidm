@@ -544,7 +544,8 @@ class CoreMixin:
         outcome: dict[str, Any],
         narrative: str,
         latency_ms: int,
-        cost_usd: float | None = None
+        cost_usd: float | None = None,
+        portrait_map: dict[str, str] | None = None,
     ) -> Turn:
         """Record a completed turn."""
         db = self._get_db()
@@ -560,7 +561,8 @@ class CoreMixin:
             outcome=outcome,
             narrative=narrative,
             latency_ms=latency_ms,
-            cost_usd=cost_usd
+            cost_usd=cost_usd,
+            portrait_map=portrait_map,
         )
         db.add(turn)
 

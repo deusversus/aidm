@@ -80,6 +80,7 @@ class Turn(Base):
     # Final output
     narrative = Column(Text, nullable=True)    # Key animator output
     state_changes = Column(JSON, nullable=True)
+    portrait_map = Column(JSON, nullable=True)  # {"NPC Name": "/api/game/media/..."}
 
     # Metadata
     created_at = Column(DateTime, default=datetime.utcnow)

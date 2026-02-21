@@ -819,7 +819,8 @@ class TurnPipelineMixin:
                 recent_messages=recent_messages,
                 use_sakuga=use_sakuga,
                 compaction_text=compaction_text,
-                latency_ms=latency
+                latency_ms=latency,
+                portrait_map=portrait_map or None,
             ),
             name="post_narrative_processing",
         )

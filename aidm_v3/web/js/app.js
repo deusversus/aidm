@@ -105,13 +105,20 @@ async function startSessionZero() {
             if (resumed && resumed.messages) {
                 isSessionZero = (resumed.phase || '').toLowerCase() !== 'gameplay';
 
-                // Restore conversation history
-                // Filter legacy [BEGIN] messages from old sessions
+                // Build portrait map for message replay
                 display.innerHTML = '';
+                // portrait_maps: {turn_number: {Name: url}, -1: {Name: url} (fallback)}
+                const pMaps = resumed.portrait_maps || {};
+                const fallbackMap = pMaps[-1] || null;  // Global fallback for older turns
+                let turnIdx = 0;  // Track which turn we're on
+
                 for (const msg of resumed.messages) {
                     if (msg.role === 'user' && msg.content?.trim() === '[BEGIN]') continue;
                     if (msg.role === 'user' && msg.content?.trim() === '[opening scene — the story begins]') continue;
-                    addNarrativeEntry(msg.content, msg.role === 'user');
+                    if (msg.role === 'user') turnIdx++;
+                    const isAssistant = msg.role !== 'user';
+                    const turnMap = isAssistant ? (pMaps[turnIdx] || fallbackMap) : null;
+                    addNarrativeEntry(msg.content, msg.role === 'user', turnMap);
                 }
 
                 // Update context panel

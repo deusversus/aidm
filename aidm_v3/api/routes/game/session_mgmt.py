@@ -214,17 +214,41 @@ async def resume_session(session_id: str):
 
     # Get current turn count from DB for gameplay detection
     current_turn = 0
+    portrait_maps = {}
     if session.phase.value == "GAMEPLAY" and session.campaign_id:
         try:
-            from src.db.models import Turn, get_db
-            db = next(get_db())
-            last_turn = db.query(Turn).filter(
-                Turn.campaign_id == session.campaign_id
-            ).order_by(Turn.turn_number.desc()).first()
-            current_turn = last_turn.turn_number if last_turn else 0
+            from src.db.models import Session as DBSession, Turn
+            from src.db.session import create_session as create_db_session
+            db = create_db_session()
+            turns = db.query(Turn).filter(
+                Turn.session_id.in_(
+                    db.query(DBSession.id).filter(DBSession.campaign_id == session.campaign_id)
+                )
+            ).order_by(Turn.turn_number.asc()).all()
+
+            if turns:
+                current_turn = turns[-1].turn_number
+
+            # Build portrait_maps from persisted Turn records
+            for t in turns:
+                if t.portrait_map:
+                    portrait_maps[t.turn_number] = t.portrait_map
+
+            # Fallback: re-resolve portraits for turns without saved maps
+            if turns and not portrait_maps:
+                try:
+                    from src.media.resolver import resolve_portraits
+                    # Build one combined map from current NPC/Character portraits
+                    _, combined_map = resolve_portraits("", session.campaign_id)
+                    if combined_map:
+                        # Apply to all assistant messages
+                        portrait_maps[-1] = combined_map  # -1 = "apply to all"
+                except Exception:
+                    pass
+
             db.close()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"Resume portrait_maps failed (non-fatal): {e}")
 
     return ResumeSessionResponse(
         session_id=session_id,
@@ -232,7 +256,8 @@ async def resume_session(session_id: str):
         messages=session.messages,
         character_draft=draft_dict,
         recap=recap_text,
-        turn_number=current_turn
+        turn_number=current_turn,
+        portrait_maps=portrait_maps or None,
     )
 
 
