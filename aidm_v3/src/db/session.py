@@ -97,6 +97,25 @@ def init_db():
                 conn.execute(text("ALTER TABLE turns ADD COLUMN portrait_map TEXT"))
                 conn.commit()
                 logger.info("Added portrait_map column to turns")
+
+            # media_uuid on campaigns (UUID-based media folders)
+            result = conn.execute(text("PRAGMA table_info(campaigns)"))
+            columns = [row[1] for row in result]
+            if "media_uuid" not in columns:
+                import uuid as _uuid
+                conn.execute(text("ALTER TABLE campaigns ADD COLUMN media_uuid TEXT"))
+                conn.commit()
+                # Backfill existing rows with generated UUIDs
+                rows = conn.execute(text("SELECT id FROM campaigns WHERE media_uuid IS NULL")).fetchall()
+                for row in rows:
+                    conn.execute(
+                        text("UPDATE campaigns SET media_uuid = :uuid WHERE id = :id"),
+                        {"uuid": str(_uuid.uuid4()), "id": row[0]}
+                    )
+                if rows:
+                    conn.commit()
+                    logger.info(f"Backfilled media_uuid for {len(rows)} existing campaigns")
+                logger.info("Added media_uuid column to campaigns")
         except Exception as e:
             logger.warning(f"Column check skipped: {e}")
 

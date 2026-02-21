@@ -353,7 +353,8 @@ async def delete_session(session_id: str):
             db = next(get_db())
             campaign = db.query(Campaign).filter(Campaign.profile_id == profile_id).first()
             if campaign:
-                media_dir = Path(__file__).parent.parent.parent.parent / "data" / "media" / str(campaign.id)
+                media_uuid = campaign.media_uuid if campaign.media_uuid else str(campaign.id)
+                media_dir = Path(__file__).parent.parent.parent.parent / "data" / "media" / media_uuid
                 if media_dir.exists():
                     import shutil
                     shutil.rmtree(media_dir)

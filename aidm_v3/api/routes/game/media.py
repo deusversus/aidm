@@ -1,8 +1,8 @@
 """Media file serving routes.
 
-Serves generated images and videos from data/media/{campaign_id}/.
+Serves generated images and videos from data/media/{media_uuid}/.
 Template routes are registered FIRST to prevent FastAPI from matching
-'/media/templates' as '/media/{campaign_id}/...' (int parse failure).
+'/media/templates' as '/media/{campaign_media_id}/...'.
 """
 
 import logging
@@ -122,19 +122,19 @@ async def serve_template(filename: str):
 # Campaign media serving — parameterized routes AFTER static routes
 # =====================================================================
 
-@router.get("/media/{campaign_id}/{category}/{filename}")
-async def serve_media(campaign_id: int, category: str, filename: str):
+@router.get("/media/{campaign_media_id}/{category}/{filename}")
+async def serve_media(campaign_media_id: str, category: str, filename: str):
     """Serve a media file from the campaign's media directory.
     
     URL pattern matches what MediaGenerator.get_media_url() produces:
-        /api/game/media/{campaign_id}/{category}/{filename}
+        /api/game/media/{media_uuid}/{category}/{filename}
     """
     # Validate category
     if category not in ALLOWED_CATEGORIES:
         raise HTTPException(status_code=400, detail=f"Invalid category: {category}")
 
     # Build path and prevent traversal
-    file_path = MEDIA_BASE_DIR / str(campaign_id) / category / filename
+    file_path = MEDIA_BASE_DIR / campaign_media_id / category / filename
     
     # Resolve to catch ../ tricks
     try:
@@ -160,14 +160,14 @@ async def serve_media(campaign_id: int, category: str, filename: str):
     )
 
 
-@router.get("/media/{campaign_id}/gallery")
-async def get_gallery(campaign_id: int):
+@router.get("/media/{campaign_media_id}/gallery")
+async def get_gallery(campaign_media_id: str):
     """List all media assets for a campaign.
     
     Returns a structured list of all generated media files,
     organized by category.
     """
-    campaign_dir = MEDIA_BASE_DIR / str(campaign_id)
+    campaign_dir = MEDIA_BASE_DIR / campaign_media_id
     
     if not campaign_dir.exists():
         return {"assets": [], "total": 0}
@@ -182,7 +182,7 @@ async def get_gallery(campaign_id: int):
                 assets.append({
                     "category": category,
                     "filename": file_path.name,
-                    "url": f"/api/game/media/{campaign_id}/{category}/{file_path.name}",
+                    "url": f"/api/game/media/{campaign_media_id}/{category}/{file_path.name}",
                     "size_bytes": file_path.stat().st_size,
                     "type": "video" if file_path.suffix.lower() in (".mp4", ".webm") else "image",
                 })
@@ -190,14 +190,14 @@ async def get_gallery(campaign_id: int):
     return {"assets": assets, "total": len(assets)}
 
 
-@router.get("/turn/{campaign_id}/{turn_number}/media")
-async def get_turn_media(campaign_id: int, turn_number: int):
+@router.get("/turn/{campaign_media_id}/{turn_number}/media")
+async def get_turn_media(campaign_media_id: str, turn_number: int):
     """Get media assets generated during a specific turn.
     
     Scans the filesystem for cutscene/location files matching the turn.
     Used by the frontend's pollForTurnMedia() to display background-generated media.
     """
-    campaign_dir = MEDIA_BASE_DIR / str(campaign_id)
+    campaign_dir = MEDIA_BASE_DIR / campaign_media_id
     if not campaign_dir.exists():
         return {"assets": []}
 
@@ -220,7 +220,7 @@ async def get_turn_media(campaign_id: int, turn_number: int):
                         "id": asset_id,
                         "asset_type": "video" if is_video else "image",
                         "cutscene_type": cutscene_type,
-                        "file_url": f"/api/game/media/{campaign_id}/cutscenes/{fp.name}",
+                        "file_url": f"/api/game/media/{campaign_media_id}/cutscenes/{fp.name}",
                         "status": "complete",
                     })
 

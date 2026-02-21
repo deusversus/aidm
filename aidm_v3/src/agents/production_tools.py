@@ -406,12 +406,12 @@ def _trigger_cutscene(
 
         async def _generate():
             try:
-                from ..media.generator import MEDIA_BASE_DIR, MediaGenerator
+                from ..media.generator import MediaGenerator
                 gen = MediaGenerator()
 
                 # Discover model sheets for characters mentioned in the prompt
                 reference_images = []
-                models_dir = MEDIA_BASE_DIR / str(campaign_id) / "models"
+                models_dir = gen._campaign_media_dir(campaign_id) / "models"
                 if models_dir.exists():
                     prompt_lower = image_prompt.lower()
                     for model_file in models_dir.glob("*_model.png"):
