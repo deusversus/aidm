@@ -806,6 +806,18 @@ class TurnPipelineMixin:
         logger.info(f"FINAL narrative length: {len(narrative) if narrative else 0} (latency: {latency}ms)")
 
         # =====================================================================
+        # PORTRAIT RESOLUTION: Replace {{Name}} markers with bold + portrait map
+        # Lightweight post-KA step — DB lookup only, no LLM
+        # Must run BEFORE background task launch so portrait_map is available
+        # =====================================================================
+        portrait_map = {}
+        try:
+            from src.media.resolver import resolve_portraits
+            narrative, portrait_map = resolve_portraits(narrative, self.campaign_id)
+        except Exception as e:
+            logger.error(f"Portrait resolution failed (non-fatal): {e}")
+
+        # =====================================================================
         # FIRE-AND-FORGET: All post-narrative processing runs in background
         # The user gets the narrative immediately while bookkeeping continues
         # =====================================================================
@@ -824,16 +836,6 @@ class TurnPipelineMixin:
             ),
             name="post_narrative_processing",
         )
-        # =====================================================================
-        # PORTRAIT RESOLUTION: Replace {{Name}} markers with bold + portrait map
-        # Lightweight post-KA step — DB lookup only, no LLM
-        # =====================================================================
-        portrait_map = {}
-        try:
-            from src.media.resolver import resolve_portraits
-            narrative, portrait_map = resolve_portraits(narrative, self.campaign_id)
-        except Exception as e:
-            logger.error(f"Portrait resolution failed (non-fatal): {e}")
 
         return TurnResult(
             narrative=narrative,

@@ -1,0 +1,174 @@
+id: dragon_ball_super_super_hero
+name: 'Dragon Ball Super: SUPER HERO'
+source_anime: 'Dragon Ball Super: SUPER HERO'
+media_type: anime
+status: finished
+generated_at: '2026-02-21T09:15:51.159470'
+confidence: 100
+research_method: api_first
+aliases:
+- Dragon Ball Super - Szuperhős
+- dragon ball super super hero
+- dragonballsupersuperhero
+- 'دراغون بول سوبر: البطل الخارق'
+- ドラゴンボール超 スーパーヒーロー
+dna_scales:
+  introspection_vs_action: 9
+  comedy_vs_drama: 7
+  simple_vs_complex: 2
+  power_fantasy_vs_struggle: 4
+  explained_vs_mysterious: 2
+  fast_paced_vs_slow_burn: 2
+  episodic_vs_serialized: 8
+  grounded_vs_absurd: 9
+  tactical_vs_instinctive: 8
+  hopeful_vs_cynical: 1
+  ensemble_vs_solo: 3
+power_distribution:
+  peak_tier: T2
+  typical_tier: T3
+  floor_tier: T10
+  gradient: top_heavy
+world_tier: T3
+tropes:
+  tournament_arc: false
+  training_montage: true
+  power_of_friendship: true
+  mentor_death: false
+  chosen_one: false
+  tragic_backstory: false
+  redemption_arc: true
+  betrayal: false
+  sacrifice: true
+  transformation: true
+  forbidden_technique: false
+  time_loop: false
+  false_identity: true
+  ensemble_focus: true
+  slow_burn_romance: false
+detected_genres:
+- Action
+- Adventure
+- Fantasy
+- Sci-Fi
+combat_system: spectacle
+power_system:
+  name: Ki and Saiyan Transformations
+  mechanics: Fighters utilize their extraordinary life force and martial arts mastery
+    to project energy, fly, and enhance physical attributes. Saiyans can undergo transformations
+    to multiply their power.
+  limitations: Consumes physical energy, requires intense focus, and transformations
+    can strain the body or cause loss of control.
+  tiers:
+  - Base
+  - Super Saiyan
+  - Super Saiyan 2
+  - Super Saiyan 3
+  - Super Saiyan God
+  - Super Saiyan Blue
+  - Ultra Instinct
+tone:
+  comedy_level: 7
+  darkness_level: 2
+  optimism: 9
+director_personality: You frame the world through a lens of vibrant, comic-book-inspired
+  spectacle mixed with lighthearted slice-of-life martial arts comedy. You balance
+  the mundane absurdity of demigods dealing with daily chores alongside earth-shattering,
+  kinetic combat sequences where every punch cracks the sound barrier. Focus heavily
+  on the master-student dynamic and the growth of the protagonist through trial and
+  error. Ensure the tone remains optimistic even when the stakes are high.
+pacing:
+  scene_length: moderate
+  arc_length_sessions: 4-6
+sources_consulted:
+- anilist.co
+- https://dragon-ball-super.fandom.com
+voice_cards:
+- name: Champa
+  speech_patterns: Loud, informal, bratty, and demanding. Often speaks with a whiny
+    or impatient tone.
+  humor_type: slapstick
+  signature_phrases:
+  - Vados!
+  - Beerus!
+  - Delicious!
+  dialogue_rhythm: Short questions, commands, and impatient outbursts.
+- name: Beerus
+  speech_patterns: Authoritative yet casual. Can flip from lazy to terrifyingly serious
+    instantly.
+  humor_type: deadpan
+  signature_phrases:
+  - Before creation comes destruction.
+  - Whis, where is the food?
+  - Don't get cocky.
+  dialogue_rhythm: Commands and short, dismissive statements.
+- name: Vados
+  speech_patterns: Extremely formal, polite, and calm. Uses honorifics and sophisticated
+    vocabulary.
+  humor_type: sardonic
+  signature_phrases:
+  - Oh my,
+  - Lord Champa, please behave.
+  - Shall we?
+  dialogue_rhythm: Long, measured sentences and polite corrections.
+- name: Whis
+  speech_patterns: Cheerful, formal, and melodic. Always polite even when delivering
+    threats.
+  humor_type: earnest
+  signature_phrases:
+  - Oh ho ho!
+  - My, my.
+  - It's time for your training.
+  dialogue_rhythm: Sing-song cadence with frequent use of exclamations.
+- name: Goku
+  speech_patterns: Simple, informal, and enthusiastic. Uses rural/casual Japanese-style
+    speech patterns.
+  humor_type: earnest
+  signature_phrases:
+  - I'm hungry!
+  - Let's fight!
+  - Hey, it's me, Goku!
+  dialogue_rhythm: Short, simple sentences and fragments.
+- name: Vegeta
+  speech_patterns: Formal, gruff, and arrogant. Often uses archaic or highly assertive
+    language.
+  humor_type: sardonic
+  signature_phrases:
+  - I am the Prince of all Saiyans!
+  - Kakarot!
+  - Final Flash!
+  dialogue_rhythm: Short, aggressive commands and declarations.
+author_voice:
+  sentence_patterns:
+  - Short declaratives during action
+  - Exclamatory dialogue
+  - Onomatopoeic descriptions
+  structural_motifs:
+  - Training montages
+  - Tournament arcs
+  - Mid-battle power-ups
+  dialogue_quirks:
+  - Shouting attack names
+  - Banter during combat
+  - Internal monologues about strategy
+  emotional_rhythm:
+  - Rapid shift from humor to intensity
+  - Triumphant catharsis
+  - Heartfelt mentorship moments
+  example_voice: With a roar that shook the heavens, he unleashed the Dragon's Breath,
+    turning the battlefield into a sea of gold!
+visual_style:
+  art_style: bright saturated shonen in full 3D CGI
+  color_palette: vibrant primary colors with neon energy glows
+  line_work: clean digital outlines
+  shading: dynamic cel-shading
+  character_rendering: muscular builds with iconic spiky hair
+  atmosphere: high-energy and cosmic
+  composition_style: dynamic cinematic camera angles
+  studio_reference: Toei Animation
+  reference_descriptors:
+  - 3D CGI anime
+  - vibrant energy blasts
+  - martial arts spectacle
+series_group: dragon_ball_super_super_hero
+series_position: 1
