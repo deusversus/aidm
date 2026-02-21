@@ -111,9 +111,34 @@ class MediaGenerator:
         # Should never reach here, but just in case
         raise last_exc  # type: ignore[misc]
 
+    # Cache campaign_id → media_uuid to avoid repeated DB lookups
+    _media_uuid_cache: dict[int, str] = {}
+
+    def _get_media_uuid(self, campaign_id: int) -> str:
+        """Resolve campaign_id to its media_uuid for folder naming."""
+        if campaign_id in self._media_uuid_cache:
+            return self._media_uuid_cache[campaign_id]
+
+        try:
+            from ..db.models import Campaign
+            from ..db.session import create_session
+            db = create_session()
+            campaign = db.query(Campaign).filter(Campaign.id == campaign_id).first()
+            if campaign and campaign.media_uuid:
+                self._media_uuid_cache[campaign_id] = campaign.media_uuid
+                db.close()
+                return campaign.media_uuid
+            db.close()
+        except Exception as e:
+            logger.warning(f"media_uuid lookup failed for campaign {campaign_id}: {e}")
+
+        # Fallback to str(campaign_id) for robustness
+        return str(campaign_id)
+
     def _campaign_media_dir(self, campaign_id: int) -> Path:
         """Get the media directory for a campaign, creating it if needed."""
-        base = MEDIA_BASE_DIR / str(campaign_id)
+        media_uuid = self._get_media_uuid(campaign_id)
+        base = MEDIA_BASE_DIR / media_uuid
         base.mkdir(parents=True, exist_ok=True)
         return base
 
@@ -1073,4 +1098,5 @@ STYLE:
         Returns:
             Relative URL path for the media endpoint
         """
-        return f"/api/game/media/{campaign_id}/{category}/{filename}"
+        media_uuid = self._get_media_uuid(campaign_id)
+        return f"/api/game/media/{media_uuid}/{category}/{filename}"

@@ -1,5 +1,6 @@
 """SQLAlchemy database models for AIDM v3."""
 
+import uuid
 from datetime import datetime
 
 from sqlalchemy import (
@@ -26,6 +27,7 @@ class Campaign(Base):
     __tablename__ = "campaigns"
 
     id = Column(Integer, primary_key=True)
+    media_uuid = Column(String(36), nullable=False, default=lambda: str(uuid.uuid4()))
     name = Column(String(255), nullable=False)
     profile_id = Column(String(100), nullable=False)  # e.g., "hunterxhunter"
     created_at = Column(DateTime, default=datetime.utcnow)

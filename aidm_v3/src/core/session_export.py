@@ -322,7 +322,8 @@ def export_session(campaign_id: int) -> bytes:
 
     # Collect media files for inclusion
     media_files = {}
-    media_dir = Path(f"./data/media/{campaign_id}")
+    media_uuid = campaign.media_uuid if campaign.media_uuid else str(campaign_id)
+    media_dir = Path(f"./data/media/{media_uuid}")
     if media_dir.exists():
         for fpath in media_dir.rglob("*"):
             if fpath.is_file():
@@ -666,7 +667,12 @@ def import_session(zip_bytes: bytes) -> int:
 
     # Restore media files
     if media_file_entries:
-        media_dir = Path(f"./data/media/{new_campaign_id}")
+        # Use the new campaign's media_uuid for the target folder
+        db2 = create_session()
+        new_campaign = db2.query(Campaign).filter(Campaign.id == new_campaign_id).first()
+        new_media_uuid = new_campaign.media_uuid if new_campaign and new_campaign.media_uuid else str(new_campaign_id)
+        db2.close()
+        media_dir = Path(f"./data/media/{new_media_uuid}")
         for arcname, content in media_file_entries.items():
             # arcname = "media/cutscenes/file.png" → data/media/{new_id}/cutscenes/file.png
             rel_path = arcname[len("media/"):]  # strip "media/" prefix
