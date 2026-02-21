@@ -1,0 +1,128 @@
+id: fatezero
+name: Fate/Zero
+source_anime: Fate/Zero
+media_type: anime
+status: completed
+generated_at: '2026-02-20T17:42:55.316791'
+confidence: 95
+research_method: bundled_parallel
+aliases:
+- fate zero
+- fatezero
+- feitozero
+- fz
+- フェイト/ゼロ
+dna_scales:
+  introspection_vs_action: 4
+  comedy_vs_drama: 0
+  simple_vs_complex: 8
+  power_fantasy_vs_struggle: 8
+  explained_vs_mysterious: 5
+  fast_paced_vs_slow_burn: 7
+  episodic_vs_serialized: 10
+  grounded_vs_absurd: 3
+  tactical_vs_instinctive: 2
+  hopeful_vs_cynical: 9
+  ensemble_vs_solo: 3
+power_distribution:
+  peak_tier: T2
+  typical_tier: T8
+  floor_tier: T10
+  gradient: top_heavy
+world_tier: T8
+tropes:
+  tournament_arc: true
+  training_montage: false
+  power_of_friendship: false
+  mentor_death: false
+  chosen_one: false
+  tragic_backstory: true
+  redemption_arc: false
+  betrayal: true
+  sacrifice: true
+  transformation: false
+  forbidden_technique: true
+  time_loop: false
+  false_identity: true
+  ensemble_focus: true
+  slow_burn_romance: false
+detected_genres:
+- Action
+- Drama
+- Fantasy
+- Romance
+- Supernatural
+combat_system: tactical
+power_system:
+  name: Magecraft and Servant System
+  mechanics: Powers are fueled by Magical Energy (Prana), which consists of environmental
+    Mana and internal life force (Od). This energy is processed through a Magus's
+    Magic Circuits to cast spells (Magecraft) or power Mystic Codes. In the Holy Grail
+    War, Magi act as Masters who summon and anchor Heroic Spirits (Servants) to the
+    physical world by supplying them with Prana. Servants utilize Class Skills, Personal
+    Skills, and Noble Phantasms (crystallized mysteries of their legends).
+  limitations: Magic Circuits are determined at birth and cannot be increased through
+    training. Maintaining a Servant drains massive amounts of mana, which can physically
+    rot or kill a weak Master. The 'Rule of Mystery' dictates that magic loses its
+    power if exposed to the general public. Masters are limited to exactly three Command
+    Spells to control their Servants. Servants are restricted by their summoned Class
+    Containers.
+  tiers:
+  - E Rank
+  - D Rank
+  - C Rank
+  - B Rank
+  - A Rank
+  - + Modifier
+  - EX Rank
+  - Anti-Unit Noble Phantasm
+  - Anti-Army Noble Phantasm
+  - Anti-Fortress Noble Phantasm
+  - Anti-World Noble Phantasm
+tone:
+  comedy_level: 0
+  darkness_level: 9
+  optimism: 1
+director_personality: You are the director for a Fate/Zero-style campaign. You maintain
+  dramatic weight; comedy is rare and earned. You let scenes breathe. Patience is
+  a virtue; payoffs are earned. Victories are pyrrhic. The world is harsh. You explain
+  strategies and tactics in detail.
+pacing:
+  scene_length: moderate
+  arc_length_sessions: 4-6
+sources_consulted:
+- power_system
+- combat
+- tone
+- visual_style
+- characters
+- factions
+- locations
+- arcs
+- sequels
+- adaptations
+- recent
+- series_aliases
+visual_style:
+  art_style: Cinematic dark fantasy realism
+  color_palette: Muted cold concrete grays and icy blues with highly saturated magical
+    accents like brilliant gold and blue-gold
+  line_work: Sharp, grounded, and mature outlines
+  shading: Dynamic lighting with heavy post-processing, deep shadows, and digital
+    compositing
+  character_rendering: Realistic proportions, mature adult features, dressed in sharp
+    suits, trench coats, and tactical gear
+  atmosphere: Somber, oppressive, tense, and steeped in dread
+  composition_style: Dramatic camera angles, cinematic depth of field, and kinetic,
+    weighty fight choreography
+  studio_reference: ufotable
+  reference_descriptors:
+  - cinematic dark fantasy anime
+  - muted urban backgrounds
+  - vibrant glowing magical effects
+  - sharp mature character designs
+  - dynamic lighting and particle effects
+series_group: fate_series
+series_position: 1
+related_franchise: Fate
+relation_type: canonical

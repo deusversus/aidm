@@ -165,6 +165,12 @@ async def resolve_media_intent(
     ]
     needs_research = resolution.needs_research
 
+    # Safety net: if LLM resolved titles but none exist locally and
+    # needs_research is empty, populate it from the non-existing titles
+    if not needs_research and not existing_profiles and resolution.resolved_titles:
+        needs_research = [rt.canonical_title for rt in resolution.resolved_titles]
+        logger.info(f"Safety net: populating needs_research from resolved titles: {needs_research}")
+
     if not needs_research and existing_profiles:
         # All profiles exist — link them and mark ready
         profile_ids = [rt.profile_id for rt in resolution.resolved_titles]
@@ -210,11 +216,43 @@ async def resolve_media_intent(
         """Background task: research all needed profiles, then save composition."""
         try:
             from ..agents._session_zero_research import research_and_apply_profile
+            from ..agents.progress import WeightedProgressGroup, ProgressPhase
 
-            for title in needs_research:
-                await research_and_apply_profile(
-                    session, title, progress_tracker=progress_tracker,
+            if len(needs_research) > 1:
+                # Multi-profile: use WeightedProgressGroup so each profile contributes
+                # proportionally and "complete 100%" per-profile doesn't close the bar
+                group = WeightedProgressGroup(progress_tracker)
+                sub_trackers = []
+                weight_per_profile = 1.0 / len(needs_research)
+
+                for title in needs_research:
+                    sub = group.create_sub_tracker(weight_per_profile, name=title)
+                    sub_trackers.append((title, sub))
+
+                for title, sub in sub_trackers:
+                    # Emit title switch on parent so frontend updates the progress bar header
+                    await progress_tracker.emit(
+                        ProgressPhase.RESEARCH,
+                        f"Researching {title}...",
+                        detail={"current_title": title},
+                    )
+                    await research_and_apply_profile(
+                        session, title, progress_tracker=sub,
+                    )
+
+                # All profiles done — fire the real complete on the parent
+                await progress_tracker.emit(
+                    ProgressPhase.COMPLETE,
+                    f"All {len(needs_research)} profiles generated!",
+                    100,
+                    {"titles": needs_research},
                 )
+            else:
+                # Single profile: use tracker directly (existing behavior)
+                for title in needs_research:
+                    await research_and_apply_profile(
+                        session, title, progress_tracker=progress_tracker,
+                    )
 
             # After all research, save the session composition
             _save_session_composition(session=session, resolution=resolution)

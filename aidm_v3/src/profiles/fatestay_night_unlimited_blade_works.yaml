@@ -1,0 +1,118 @@
+id: fatestay_night_unlimited_blade_works
+name: 'Fate/stay night: Unlimited Blade Works'
+source_anime: 'Fate/stay night: Unlimited Blade Works'
+media_type: anime
+status: finished
+generated_at: '2026-02-20T17:46:39.095512'
+confidence: 100
+research_method: api_first
+aliases:
+- fatestay night unlimited blade works
+- fatestaynightunlimitedbladeworks
+- fateubw
+- fz
+- Судьба/Начало
+- Судьба/Начало 2
+- Судьба/Ночь схватки
+- 'Судьба/Ночь схватки: Бесконечный мир клинков'
+- 'Судьба/Ночь схватки: Бесконечный мир клинков 2'
+- פייט/זירו
+- 'פייט/סטיי נייט: מלאכת חרבות אינסופית'
+- القدر/زيرو
+- フェイト/ステイナイト
+- フェイト/ステイナイト Unlimited Blade Works
+- フェイト/ステイナイト Unlimited Blade Works 2ndシーズン
+- フェイト/ゼロ
+- フェイト/ゼロ 2ndシーズン
+dna_scales:
+  introspection_vs_action: 6
+  comedy_vs_drama: 2
+  simple_vs_complex: 8
+  power_fantasy_vs_struggle: 8
+  explained_vs_mysterious: 4
+  fast_paced_vs_slow_burn: 6
+  episodic_vs_serialized: 9
+  grounded_vs_absurd: 7
+  tactical_vs_instinctive: 3
+  hopeful_vs_cynical: 6
+  ensemble_vs_solo: 2
+power_distribution:
+  peak_tier: T2
+  typical_tier: T7
+  floor_tier: T10
+  gradient: top_heavy
+world_tier: T7
+tropes: {}
+detected_genres:
+- Action
+- Drama
+- Fantasy
+- Romance
+- Supernatural
+combat_system: spectacle
+power_system:
+  name: Magecraft and Servant System
+  mechanics: Magi act as Masters who summon and command Servants, which are Heroic
+    Spirits brought forth from the Throne of Heroes using Magical Energy.
+  limitations: Requires high magical energy, Command Spells are limited, and Servants
+    are bound by their class and legend.
+  tiers:
+  - Saber
+  - Archer
+  - Lancer
+  - Rider
+  - Caster
+  - Assassin
+  - Berserker
+tone:
+  comedy_level: 2
+  darkness_level: 7
+  optimism: 5
+director_personality: You frame every conflict as a collision of irreconcilable ideals,
+  where the clash of steel is secondary to the clash of philosophies. You linger on
+  the physical and psychological toll of Magecraft, highlighting the agonizing heat
+  of magic circuits and the heavy weight of borrowed dreams. Contrast the quiet, domestic
+  moments of Fuyuki City with the apocalyptic, hyper-kinetic scale of Heroic Spirits
+  unleashing their Noble Phantasms. Treat the past and future as active participants
+  in the present, using combat to violently deconstruct a character's deeply held
+  convictions.
+pacing:
+  scene_length: deliberate
+  arc_length_sessions: 6-10
+sources_consulted:
+- anilist.co
+- https://fatestay-night.fandom.com
+voice_cards:
+- name: Archer
+  speech_patterns: Cynical, pragmatic, often condescending but highly articulate.
+    Uses modern phrasing mixed with philosophical musings.
+  humor_type: Sardonic, dry, mocking
+  signature_phrases:
+  - I am the bone of my sword.
+  - Trace on.
+  - You are a faker.
+  dialogue_rhythm: Calculated, medium-length sentences, often delivering harsh truths
+    or commands.
+author_voice:
+  sentence_patterns:
+  - Staccato bursts during the activation of magic circuits
+  - Lengthy, philosophical internal monologues dissecting the nature of heroism
+  - Repetitive, rhythmic phrasing to emphasize ideological stubbornness
+  structural_motifs:
+  - Juxtaposing mundane domestic life with hidden magical warfare
+  - Flashbacks to the origin of a Heroic Spirit's regret
+  - Chanting incantations as a pacing mechanism for escalating tension
+  dialogue_quirks:
+  - Debating utilitarianism and morality mid-battle
+  - Using highly specific magical jargon with absolute sincerity
+  - Calling out Noble Phantasms as definitive, battle-ending declarations
+  emotional_rhythm:
+  - Simmering ideological tension that erupts into blinding spectacle
+  - Catharsis achieved only through the shattering of a naive ideal
+  - Melancholic acceptance of one's inevitable, tragic fate
+  example_voice: The magic circuits in my body screamed as they converted nerves into
+    a makeshift gun barrel, a suicidal defiance against a legend born of myth.
+series_group: fate_stay_night_unlimited_blade_works
+series_position: 1
+related_franchise: Fate/stay night
+relation_type: alternate_timeline

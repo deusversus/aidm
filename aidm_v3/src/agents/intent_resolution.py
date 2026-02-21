@@ -243,10 +243,11 @@ class IntentResolutionAgent(AgenticAgent):
                 for rt in raw_titles:
                     if isinstance(rt, str):
                         # Plain string → minimal ResolvedTitle dict
+                        # Default already_exists=False — don't assume a local profile exists
                         coerced_titles.append({
                             "profile_id": rt.lower().replace(" ", "_"),
                             "canonical_title": rt,
-                            "already_exists": True,
+                            "already_exists": False,
                         })
                     elif isinstance(rt, dict):
                         coerced_titles.append(rt)
@@ -287,8 +288,9 @@ class IntentResolutionAgent(AgenticAgent):
         # The agent gave us text but not valid JSON — extract what we can
         findings_lower = findings.lower()
 
-        # Check for disambiguation signals
-        if any(word in findings_lower for word in ["ambiguous", "multiple", "which one", "clarify"]):
+        # Check for disambiguation signals (skip for multi-title inputs — user already specified)
+        is_multi_title = " × " in original_input
+        if not is_multi_title and any(word in findings_lower for word in ["ambiguous", "which one", "clarify"]):
             return IntentResolution(
                 disambiguation_needed=True,
                 disambiguation_question=f"Which version of '{original_input}' did you mean?",
@@ -305,28 +307,39 @@ class IntentResolutionAgent(AgenticAgent):
             )
 
         # Check for profile-found signals — agent found it but couldn't format JSON correctly
-        if any(sig in findings_lower for word in ["profile_id", "already_exists", "profile found",
-                                                   "local profile", "existing profile", "found in profiles"]
-               for sig in [word]):
-            # Build a best-effort resolved title from the input
+        # Only trigger on explicit "found" language, not on field-name mentions in error text
+        profile_found_phrases = ["profile found", "local profile", "existing profile", "found in profiles"]
+        if any(phrase in findings_lower for phrase in profile_found_phrases):
+            # Verify the profile actually exists on disk
             profile_id = original_input.lower().replace(" ", "_")[:80]
-            logger.info(f"Fallback: profile-found signal detected, treating as resolved: {profile_id}")
-            return IntentResolution(
-                resolved_titles=[
-                    ResolvedTitle(
-                        profile_id=profile_id,
-                        canonical_title=original_input,
-                        already_exists=True,
-                    )
-                ],
-                composition_type="single",
-                confidence=0.6,
-                reasoning=f"Fallback: profile-found signal in agent text; {findings[:200]}",
-            )
+            from ..profiles.loader import find_profile_by_title
+            match = find_profile_by_title(original_input)
+            if match:
+                logger.info(f"Fallback: profile verified on disk: {match[0]}")
+                return IntentResolution(
+                    resolved_titles=[
+                        ResolvedTitle(
+                            profile_id=match[0],
+                            canonical_title=original_input,
+                            already_exists=True,
+                        )
+                    ],
+                    composition_type="single",
+                    confidence=0.6,
+                    reasoning=f"Fallback: profile verified on disk; {findings[:200]}",
+                )
+            # Profile not on disk despite agent claiming it exists — needs research
+            logger.info(f"Fallback: profile-found signal but not on disk, routing to research: {profile_id}")
 
-        # Default: assume single title, needs research
+        # Default: assume needs research
+        # For multi-title inputs, split into individual titles
+        if " × " in original_input:
+            titles = [t.strip() for t in original_input.split(" × ")]
+        else:
+            titles = [original_input]
+
         return IntentResolution(
-            needs_research=[original_input],
+            needs_research=titles,
             confidence=0.5,
             reasoning=f"Could not extract structured resolution; defaulting to research: {findings[:200]}",
         )
