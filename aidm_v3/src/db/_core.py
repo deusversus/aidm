@@ -161,6 +161,20 @@ class CoreMixin:
         except Exception as e:
             logger.warning(f"Warning: Could not clear ChromaDB collections: {e}")
 
+        # Clear campaign media folders (preserve templates/ and references/)
+        try:
+            import shutil
+            from pathlib import Path
+            media_base = Path("./data/media")
+            if media_base.exists():
+                preserved = {"templates", "references"}
+                for child in media_base.iterdir():
+                    if child.is_dir() and child.name not in preserved:
+                        shutil.rmtree(child)
+                        logger.info(f"Deleted media folder: {child}")
+        except Exception as e:
+            logger.warning(f"Warning: Could not clear media folders: {e}")
+
     @staticmethod
     def get_or_create_campaign_by_profile(profile_id: str, profile_name: str = None) -> int:
         """Look up or create a campaign by profile_id, returning integer campaign_id.
