@@ -166,6 +166,52 @@ def jaccard_similarity(set_a: set, set_b: set) -> float:
     return intersection / union if union > 0 else 0.0
 
 
+def word_order_similarity(title_a: str, title_b: str) -> float:
+    """
+    Check whether two titles preserve word order, not just word overlap.
+    
+    Uses the longest common subsequence (LCS) of words to measure how much
+    of the sequential structure is preserved. This prevents false matches
+    between titles that share words but in different order:
+    
+        "Super Dragon Ball Heroes" vs "Dragon Ball Super Super Hero"
+        → Shared words: {dragon, ball, super}
+        → But word ORDER is completely different — these are different titles.
+    
+    Args:
+        title_a: First title (raw or normalized)
+        title_b: Second title (raw or normalized)
+        
+    Returns:
+        Float 0.0-1.0. High = words appear in same order. Low = reordered.
+        
+    Examples:
+        "dragon ball z" vs "dragon ball super" → ~0.67 (shared prefix)
+        "super dragon ball heroes" vs "dragon ball super super hero" → ~0.40
+        "naruto shippuden" vs "naruto shippuden" → 1.0
+    """
+    words_a = normalize_title(title_a).split()
+    words_b = normalize_title(title_b).split()
+    
+    if not words_a or not words_b:
+        return 0.0
+    
+    # LCS of word sequences (ordered, not set-based)
+    m, n = len(words_a), len(words_b)
+    dp = [[0] * (n + 1) for _ in range(m + 1)]
+    
+    for i in range(1, m + 1):
+        for j in range(1, n + 1):
+            if words_a[i - 1] == words_b[j - 1]:
+                dp[i][j] = dp[i - 1][j - 1] + 1
+            else:
+                dp[i][j] = max(dp[i - 1][j], dp[i][j - 1])
+    
+    lcs_len = dp[m][n]
+    # Normalize by the longer title's word count
+    return lcs_len / max(m, n)
+
+
 def token_subset_match(alias_tokens: set, query_tokens: set, min_alias_tokens: int = 1) -> bool:
     """
     Check if alias tokens form a subset of query tokens.
