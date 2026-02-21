@@ -14,6 +14,7 @@ from ..utils.title_utils import (
     normalized_levenshtein,
     token_subset_match,
     tokenize_title,
+    word_order_similarity,
 )
 
 logger = logging.getLogger(__name__)
@@ -481,6 +482,10 @@ def find_profile_by_title(
        This handles "Demon Slayer: Kimetsu no Yaiba" matching "kimetsu no yaiba"
     3. Fuzzy match - Levenshtein distance within threshold
     
+    All non-exact stages check WORD ORDER similarity to prevent false matches
+    between titles that share words in different order (e.g., "Super Dragon Ball 
+    Heroes" vs "Dragon Ball Super: Super Hero").
+    
     Args:
         title: The anime title to search for
         fuzzy_threshold: Max Levenshtein distance for fuzzy match (0 = exact only)
@@ -539,8 +544,17 @@ def find_profile_by_title(
 
     if best_token_match:
         profile_id, matched_alias, similarity = best_token_match
-        logger.info(f"Token match: '{title}' -> '{matched_alias}' (similarity={similarity:.2f}) -> {profile_id}")
-        return (profile_id, "token")
+        # WORD ORDER GATE: reject if words are rearranged into a different title
+        # "Super Dragon Ball Heroes" ≠ "Dragon Ball Super: Super Hero"
+        order_sim = word_order_similarity(title, matched_alias)
+        if order_sim < 0.6:
+            logger.warning(
+                f"Token match rejected (word order): '{title}' vs '{matched_alias}' "
+                f"(token_sim={similarity:.2f}, order_sim={order_sim:.2f})"
+            )
+        else:
+            logger.info(f"Token match: '{title}' -> '{matched_alias}' (similarity={similarity:.2f}, order={order_sim:.2f}) -> {profile_id}")
+            return (profile_id, "token")
 
 
     # Stage 3: Fuzzy match using normalized Levenshtein (percentage-based)
@@ -557,9 +571,17 @@ def find_profile_by_title(
                 best_fuzzy_similarity = similarity
 
         if best_fuzzy:
-            profile_id = index[best_fuzzy]
-            logger.info(f"Fuzzy match: '{title}' -> '{best_fuzzy}' (similarity={best_fuzzy_similarity:.2f}) -> {profile_id}")
-            return (profile_id, "fuzzy")
+            # WORD ORDER GATE: same check for fuzzy matches
+            order_sim = word_order_similarity(title, best_fuzzy)
+            if order_sim < 0.6:
+                logger.warning(
+                    f"Fuzzy match rejected (word order): '{title}' vs '{best_fuzzy}' "
+                    f"(fuzzy_sim={best_fuzzy_similarity:.2f}, order_sim={order_sim:.2f})"
+                )
+            else:
+                profile_id = index[best_fuzzy]
+                logger.info(f"Fuzzy match: '{title}' -> '{best_fuzzy}' (similarity={best_fuzzy_similarity:.2f}, order={order_sim:.2f}) -> {profile_id}")
+                return (profile_id, "fuzzy")
 
     return None
 
