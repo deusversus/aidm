@@ -381,7 +381,8 @@ async def session_zero_turn(session_id: str, request: TurnRequest):
             # e.g. LLM might return "I Was Reincarnated as the 7th Prince" on turn 3
             # when turn 1 correctly returned the full title. Without this guard,
             # the short title triggers a duplicate profile generation.
-            if media_ref and session.character_draft.media_reference and session.character_draft.narrative_profile:
+            # Exception: skip guard when multi-title array is present (user gave specific entries)
+            if media_ref and session.character_draft.media_reference and session.character_draft.narrative_profile and not media_refs_array:
                 established = session.character_draft.media_reference
                 if media_ref != established:
                     logger.info(f"Stability guard: LLM returned '{media_ref}' but we already have '{established}' — using established")

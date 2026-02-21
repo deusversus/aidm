@@ -41,7 +41,15 @@ class PowerDistributionExtract(BaseModel):
     """
     peak_tier: str = Field(
         default="T6",
-        description="Power tier of the strongest characters (T10=human, T8=building, T6=city, T4=planet, T2=universal)"
+        description=(
+            "Power tier of the strongest characters. "
+            "T10=baseline human, T9=street/peak-human, T8=building-level, "
+            "T7=city-block, T6=city, T5=island/country, T4=continental/planet-surface, "
+            "T3=planet-busting/stellar, T2=universal/reality-warping, T1=multiversal. "
+            "Calibration: Anti-World/reality-warping abilities → T2. "
+            "Country-destroying attacks → T5. City-destroying → T6. "
+            "Most supernatural battle series peak at T3-T5, not T6."
+        )
     )
     typical_tier: str = Field(
         default="T8",
@@ -471,7 +479,17 @@ def get_extraction_prompt(topics: list[str], anime_name: str) -> str:
 
 - **power_distribution**: Power gradient across the anime's world.
   
-  VS Battles tier scale: T10=human, T9=street, T8=building, T7=city block, T6=city, T5=island, T4=planet, T3=stellar, T2=universal
+  AIDM Tier Scale (calibrate carefully — most LLMs undertier supernatural shows!):
+    T10=baseline human  T9=street-level/peak-human  T8=building-level
+    T7=city-block  T6=city-level  T5=island/country  T4=continental/planet-surface
+    T3=planet-busting/stellar  T2=universal/reality-warping  T1=multiversal
+  
+  KEY CALIBRATION RULES:
+  - If the series has Anti-World, reality-warping, or dimensional abilities → peak is T2
+  - Country/continental destruction → T4-T5 (NOT T6)
+  - City-destroying attacks are ONLY T6; if characters go beyond cities, tier higher
+  - Noble Phantasms (Fate), Bankai (Bleach), Domain Expansions (JJK) often push to T3-T5
+  - Most supernatural battle anime peak at T3-T5, NOT T6-T8
   
   Provide:
   - **peak_tier**: Strongest characters (outliers, final bosses, god-tier beings)
@@ -484,10 +502,16 @@ def get_extraction_prompt(topics: list[str], anime_name: str) -> str:
     - "compressed": Narrow range, most characters near the same level (e.g., Death Note)
   
   Examples:
+  - Fate/Zero: peak=T2, typical=T7, floor=T10, gradient=top_heavy (Gilgamesh's Ea is Anti-World)
+  - Dragon Ball Z: peak=T3, typical=T6, floor=T10, gradient=top_heavy
+  - Bleach: peak=T3, typical=T7, floor=T10, gradient=top_heavy
+  - Naruto: peak=T4, typical=T7, floor=T9, gradient=flat
   - Frieren: peak=T4, typical=T8, floor=T9, gradient=top_heavy
   - JJK: peak=T4, typical=T7, floor=T9, gradient=flat
   - One Punch Man: peak=T2, typical=T7, floor=T9, gradient=spike
   - Death Note: peak=T10, typical=T10, floor=T10, gradient=compressed
+  - Hunter x Hunter: peak=T5, typical=T8, floor=T10, gradient=flat
+  - Demon Slayer: peak=T6, typical=T8, floor=T10, gradient=top_heavy
 
 - **dna_scales**: Rate each narrative dimension 0-10 based on the research:
   - introspection_vs_action: 0=internal monologue focus, 10=pure action sequences

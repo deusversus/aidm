@@ -262,8 +262,12 @@ async function handlePlayerAction() {
                 // Get anime name from character draft
                 let animeName = result.character_draft?.media_reference || 'anime';
 
+                // Check for multi-title array (franchise-entry detection)
+                if (result.detected_info?.media_references && result.detected_info.media_references.length > 1) {
+                    animeName = result.detected_info.media_references.join(', ');
+                }
                 // Check for hybrid blend (v3.2)
-                if (result.detected_info?.blend_sources && result.detected_info.blend_sources.length > 1) {
+                else if (result.detected_info?.blend_sources && result.detected_info.blend_sources.length > 1) {
                     const [sourceA, sourceB] = result.detected_info.blend_sources;
                     if (sourceA && sourceB) {
                         animeName = `${sourceA} & ${sourceB}`;

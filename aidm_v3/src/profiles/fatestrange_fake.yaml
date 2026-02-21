@@ -1,0 +1,122 @@
+id: fatestrange_fake
+name: Fate/strange Fake
+source_anime: Fate/strange Fake
+media_type: anime
+status: completed
+generated_at: '2026-02-20T17:48:40.764431'
+confidence: 95
+research_method: bundled_parallel
+aliases:
+- fakestates night
+- fatestrange fake
+- fatestrangefake
+- feitosutorenji feiku
+- fsf
+- フェイト/ストレンジフェイク
+dna_scales:
+  introspection_vs_action: 8
+  comedy_vs_drama: 4
+  simple_vs_complex: 8
+  power_fantasy_vs_struggle: 7
+  explained_vs_mysterious: 7
+  fast_paced_vs_slow_burn: 2
+  episodic_vs_serialized: 9
+  grounded_vs_absurd: 8
+  tactical_vs_instinctive: 7
+  hopeful_vs_cynical: 2
+  ensemble_vs_solo: 1
+power_distribution:
+  peak_tier: T2
+  typical_tier: T8
+  floor_tier: T10
+  gradient: top_heavy
+world_tier: T8
+tropes:
+  tournament_arc: true
+  training_montage: false
+  power_of_friendship: true
+  mentor_death: false
+  chosen_one: false
+  tragic_backstory: true
+  redemption_arc: false
+  betrayal: true
+  sacrifice: false
+  transformation: false
+  forbidden_technique: true
+  time_loop: false
+  false_identity: true
+  ensemble_focus: true
+  slow_burn_romance: true
+detected_genres:
+- Action
+- Adventure
+- Fantasy
+- Mystery
+- Supernatural
+combat_system: spectacle
+power_system:
+  name: Nasuverse Mechanics (Holy Grail War, Magecraft, Heroic Spirits, Noble Phantasms)
+  mechanics: A flawed Dual Holy Grail War system where magi (Masters) summon 13 True
+    and False Servants (Heroic Spirits, wraiths, divine beasts, and concepts). Masters
+    supply magical energy (mana), often plugging into massive artificial leylines,
+    and use Command Spells to issue absolute orders. Servants fight using powerful
+    abilities and weapons known as Noble Phantasms.
+  limitations: 'Top-tier Servants can instantly drain a Master''s life force if not
+    supported by external mana sources like leylines. Because the Snowfield Grail
+    is a counterfeit, standard rules are broken: Command Spells can be stolen or bypassed,
+    no Ruler-class Servant is summoned to arbitrate, and Servants can be forcefully
+    corrupted or altered using Grail Mud.'
+  tiers:
+  - EX-Tier (World-Breakers)
+  - S-Tier (Top-Class Combatants)
+  - A-Tier (Specialists & Assassins)
+tone:
+  comedy_level: 7
+  darkness_level: 6
+  optimism: 8
+director_personality: You are the director for a Fate/strange Fake-style campaign.
+  You favor action and momentum over lengthy contemplation. You keep the pace relentless.
+  Every scene escalates. Hope is real in this world. Earned optimism, not naivety.
+  Battles are won by willpower and instinct, not chess moves.
+pacing:
+  scene_length: moderate
+  arc_length_sessions: 4-6
+sources_consulted:
+- power_system
+- combat
+- tone
+- visual_style
+- characters
+- factions
+- locations
+- arcs
+- sequels
+- adaptations
+- recent
+- series_aliases
+visual_style:
+  art_style: Fluid, fast-paced webgen animation with a cinematic and slightly experimental
+    aesthetic
+  color_palette: Bold, high-contrast dark gritty blues and blacks with hyper-saturated,
+    radiant magical effects (gold, green, crimson)
+  line_work: Streamlined, dynamic lines optimized for fluid movement rather than rigid
+    detail
+  shading: Minimalist shading designed to enhance fluid, expressive, and kinetic animation
+    during massive set pieces
+  character_rendering: Distinct sharp eyes, expressive faces, and highly stylish modern
+    clothing, streamlined for dynamic action
+  atmosphere: Chaotic, fast-paced, and suspenseful 'Weird West' meets modern neon-lit
+    American metropolis
+  composition_style: Sweeping, dynamic camera angles with warped perspectives and
+    heavy digital compositing for massive shockwaves
+  studio_reference: A-1 Pictures (Shun Enokido and Takahito Sakazume)
+  reference_descriptors:
+  - fluid webgen action animation
+  - high-contrast neon and desert nights
+  - minimalist shading with glowing effects
+  - dynamic sweeping camera angles
+  - expressive sharp-eyed characters
+series_group: fate_strange_fake
+series_position: 1
+related_franchise: fate
+relation_type: alternate_timeline
