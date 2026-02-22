@@ -137,6 +137,10 @@ class BackgroundMixin:
                     # =============================================================
                     # 4. TURN RECORDING + EVENT MEMORY
                     # =============================================================
+                    # Capture prompt fingerprint from the key_animator
+                    _ka_fingerprint = getattr(self.key_animator, 'prompt_fingerprint', None)
+                    _ka_prompt_name = getattr(self.key_animator, '_get_prompt_name', lambda: 'key_animator')()
+
                     self.state.record_turn(
                         player_input=player_input,
                         intent=intent.model_dump(),
@@ -144,6 +148,8 @@ class BackgroundMixin:
                         narrative=narrative,
                         latency_ms=latency_ms,
                         portrait_map=portrait_map,
+                        prompt_fingerprint=_ka_fingerprint,
+                        prompt_name=_ka_prompt_name,
                     )
                     self.memory.add_memory(
                         content=f"Turn {db_context.turn_number}: Player input '{player_input}'. Result: {narrative[:500]}...",
