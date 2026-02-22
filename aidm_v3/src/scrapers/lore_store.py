@@ -21,7 +21,7 @@ from typing import Any
 from sqlalchemy import func
 
 from ..db.models import WikiPage
-from ..db.session import create_session
+from ..db.session import get_session
 
 logger = logging.getLogger(__name__)
 
@@ -56,51 +56,46 @@ class LoreStore:
         now = time.time()
         stored = 0
 
-        db = create_session()
         try:
-            for page in pages:
-                content = page.get("content", "")
-                word_count = len(content.split())
-                page_title = page.get("title", "Unknown")
+            with get_session() as db:
+                for page in pages:
+                    content = page.get("content", "")
+                    word_count = len(content.split())
+                    page_title = page.get("title", "Unknown")
 
-                # Upsert: check if exists, update or insert
-                existing = (
-                    db.query(WikiPage)
-                    .filter(
-                        WikiPage.profile_id == profile_id,
-                        WikiPage.page_title == page_title,
+                    # Upsert: check if exists, update or insert
+                    existing = (
+                        db.query(WikiPage)
+                        .filter(
+                            WikiPage.profile_id == profile_id,
+                            WikiPage.page_title == page_title,
+                        )
+                        .first()
                     )
-                    .first()
-                )
 
-                if existing:
-                    existing.page_type = page.get("page_type", "general")
-                    existing.content = content
-                    existing.word_count = word_count
-                    existing.source_wiki = source_wiki
-                    existing.scraped_at = now
-                else:
-                    entry = WikiPage(
-                        profile_id=profile_id,
-                        page_title=page_title,
-                        page_type=page.get("page_type", "general"),
-                        content=content,
-                        word_count=word_count,
-                        source_wiki=source_wiki,
-                        scraped_at=now,
-                    )
-                    db.add(entry)
+                    if existing:
+                        existing.page_type = page.get("page_type", "general")
+                        existing.content = content
+                        existing.word_count = word_count
+                        existing.source_wiki = source_wiki
+                        existing.scraped_at = now
+                    else:
+                        entry = WikiPage(
+                            profile_id=profile_id,
+                            page_title=page_title,
+                            page_type=page.get("page_type", "general"),
+                            content=content,
+                            word_count=word_count,
+                            source_wiki=source_wiki,
+                            scraped_at=now,
+                        )
+                        db.add(entry)
 
-                stored += 1
+                    stored += 1
 
-            db.commit()
-            logger.info(f"[LoreStore] Stored {stored} pages for '{profile_id}' from {source_wiki}")
-
+                logger.info(f"[LoreStore] Stored {stored} pages for '{profile_id}' from {source_wiki}")
         except Exception as e:
-            db.rollback()
             logger.error(f"[LoreStore] Error storing pages for '{profile_id}': {e}")
-        finally:
-            db.close()
 
         return stored
 
@@ -119,35 +114,32 @@ class LoreStore:
         Returns:
             List of page dicts with all fields
         """
-        db = create_session()
         try:
-            query = db.query(WikiPage).filter(WikiPage.profile_id == profile_id)
+            with get_session() as db:
+                query = db.query(WikiPage).filter(WikiPage.profile_id == profile_id)
 
-            if page_type:
-                query = query.filter(WikiPage.page_type == page_type)
+                if page_type:
+                    query = query.filter(WikiPage.page_type == page_type)
 
-            query = query.order_by(WikiPage.id)
-            rows = query.all()
+                query = query.order_by(WikiPage.id)
+                rows = query.all()
 
-            return [
-                {
-                    "id": row.id,
-                    "profile_id": row.profile_id,
-                    "page_title": row.page_title,
-                    "page_type": row.page_type,
-                    "content": row.content,
-                    "word_count": row.word_count,
-                    "source_wiki": row.source_wiki,
-                    "scraped_at": row.scraped_at,
-                }
-                for row in rows
-            ]
-
+                return [
+                    {
+                        "id": row.id,
+                        "profile_id": row.profile_id,
+                        "page_title": row.page_title,
+                        "page_type": row.page_type,
+                        "content": row.content,
+                        "word_count": row.word_count,
+                        "source_wiki": row.source_wiki,
+                        "scraped_at": row.scraped_at,
+                    }
+                    for row in rows
+                ]
         except Exception as e:
             logger.error(f"[LoreStore] Error reading pages for '{profile_id}': {e}")
             return []
-        finally:
-            db.close()
 
     def get_combined_content(self, profile_id: str) -> str:
         """
@@ -181,18 +173,16 @@ class LoreStore:
 
     def has_profile(self, profile_id: str) -> bool:
         """Check if any pages exist for a profile."""
-        db = create_session()
         try:
-            count = (
-                db.query(func.count(WikiPage.id))
-                .filter(WikiPage.profile_id == profile_id)
-                .scalar()
-            )
-            return count > 0
+            with get_session() as db:
+                count = (
+                    db.query(func.count(WikiPage.id))
+                    .filter(WikiPage.profile_id == profile_id)
+                    .scalar()
+                )
+                return count > 0
         except Exception:
             return False
-        finally:
-            db.close()
 
     def delete_profile(self, profile_id: str) -> int:
         """
@@ -204,23 +194,19 @@ class LoreStore:
         Returns:
             Number of pages deleted
         """
-        db = create_session()
         try:
-            count = (
-                db.query(WikiPage)
-                .filter(WikiPage.profile_id == profile_id)
-                .delete()
-            )
-            db.commit()
-            if count > 0:
-                logger.info(f"[LoreStore] Deleted {count} pages for '{profile_id}'")
-            return count
+            with get_session() as db:
+                count = (
+                    db.query(WikiPage)
+                    .filter(WikiPage.profile_id == profile_id)
+                    .delete()
+                )
+                if count > 0:
+                    logger.info(f"[LoreStore] Deleted {count} pages for '{profile_id}'")
+                return count
         except Exception as e:
-            db.rollback()
             logger.error(f"[LoreStore] Error deleting pages for '{profile_id}': {e}")
             return 0
-        finally:
-            db.close()
 
     def get_stats(self, profile_id: str | None = None) -> dict[str, Any]:
         """
@@ -232,80 +218,73 @@ class LoreStore:
         Returns:
             Dict with page counts, word counts, types breakdown
         """
-        db = create_session()
         try:
-            if profile_id:
-                total = (
-                    db.query(func.count(WikiPage.id))
-                    .filter(WikiPage.profile_id == profile_id)
-                    .scalar()
-                )
-
-                total_words = (
-                    db.query(func.coalesce(func.sum(WikiPage.word_count), 0))
-                    .filter(WikiPage.profile_id == profile_id)
-                    .scalar()
-                )
-
-                by_type = {}
-                type_rows = (
-                    db.query(
-                        WikiPage.page_type,
-                        func.count(WikiPage.id),
-                        func.sum(WikiPage.word_count),
+            with get_session() as db:
+                if profile_id:
+                    total = (
+                        db.query(func.count(WikiPage.id))
+                        .filter(WikiPage.profile_id == profile_id)
+                        .scalar()
                     )
-                    .filter(WikiPage.profile_id == profile_id)
-                    .group_by(WikiPage.page_type)
-                    .all()
-                )
-                for row in type_rows:
-                    by_type[row[0]] = {"pages": row[1], "words": row[2]}
 
-                scraped_at = (
-                    db.query(func.min(WikiPage.scraped_at))
-                    .filter(WikiPage.profile_id == profile_id)
-                    .scalar()
-                )
+                    total_words = (
+                        db.query(func.coalesce(func.sum(WikiPage.word_count), 0))
+                        .filter(WikiPage.profile_id == profile_id)
+                        .scalar()
+                    )
 
-                return {
-                    "profile_id": profile_id,
-                    "total_pages": total,
-                    "total_words": total_words,
-                    "by_type": by_type,
-                    "scraped_at": scraped_at,
-                }
-            else:
-                # Global stats
-                total = db.query(func.count(WikiPage.id)).scalar()
-                profiles = (
-                    db.query(WikiPage.profile_id)
-                    .distinct()
-                    .all()
-                )
+                    by_type = {}
+                    type_rows = (
+                        db.query(
+                            WikiPage.page_type,
+                            func.count(WikiPage.id),
+                            func.sum(WikiPage.word_count),
+                        )
+                        .filter(WikiPage.profile_id == profile_id)
+                        .group_by(WikiPage.page_type)
+                        .all()
+                    )
+                    for row in type_rows:
+                        by_type[row[0]] = {"pages": row[1], "words": row[2]}
 
-                return {
-                    "total_pages": total,
-                    "profiles": [r[0] for r in profiles],
-                    "profile_count": len(profiles),
-                }
+                    scraped_at = (
+                        db.query(func.min(WikiPage.scraped_at))
+                        .filter(WikiPage.profile_id == profile_id)
+                        .scalar()
+                    )
 
+                    return {
+                        "profile_id": profile_id,
+                        "total_pages": total,
+                        "total_words": total_words,
+                        "by_type": by_type,
+                        "scraped_at": scraped_at,
+                    }
+                else:
+                    # Global stats
+                    total = db.query(func.count(WikiPage.id)).scalar()
+                    profiles = (
+                        db.query(WikiPage.profile_id)
+                        .distinct()
+                        .all()
+                    )
+
+                    return {
+                        "total_pages": total,
+                        "profiles": [r[0] for r in profiles],
+                        "profile_count": len(profiles),
+                    }
         except Exception as e:
             return {"error": str(e)}
-        finally:
-            db.close()
 
     def clear_all(self):
         """Delete all stored pages."""
-        db = create_session()
         try:
-            db.query(WikiPage).delete()
-            db.commit()
-            logger.info("[LoreStore] Cleared all pages")
+            with get_session() as db:
+                db.query(WikiPage).delete()
+                logger.info("[LoreStore] Cleared all pages")
         except Exception as e:
-            db.rollback()
             logger.error(f"[LoreStore] Error clearing: {e}")
-        finally:
-            db.close()
 
 
 # ─── Singleton ───────────────────────────────────────────────────────────────
