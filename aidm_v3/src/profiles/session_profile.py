@@ -21,10 +21,8 @@ Composition types:
 
 import json
 import logging
-import sqlite3
 from dataclasses import dataclass, field
 from datetime import datetime
-from pathlib import Path
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -351,49 +349,45 @@ class SessionProfile:
 
 
 class SessionProfileStore:
-    """SQLite-backed storage for session profile compositions.
+    """SQLAlchemy-backed storage for session profile compositions.
 
     Stores composition metadata (what profiles are linked, with what
     roles/weights) separately from the base profiles themselves.
-    Uses the same data/ directory as SessionStore and LoreStore.
+    Uses the shared PostgreSQL database via SQLAlchemy.
     """
-
-    def __init__(self, db_path: str | None = None):
-        if db_path is None:
-            db_path = str(Path("./data/sessions.db"))
-        self.db_path = Path(db_path)
-        self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        self._ensure_db()
-
-    def _ensure_db(self):
-        """Create the session_profiles table if it doesn't exist."""
-        with sqlite3.connect(self.db_path) as conn:
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS session_profiles (
-                    session_id TEXT PRIMARY KEY,
-                    composition_type TEXT NOT NULL,
-                    data TEXT NOT NULL,
-                    created_at TEXT NOT NULL
-                )
-            """)
-            conn.commit()
 
     def save_composition(self, session_profile: SessionProfile) -> None:
         """Save or update a session composition."""
+        from ..db.models import SessionProfileComposition
+        from ..db.session import create_session as create_db_session
+
         data = json.dumps(session_profile.to_dict())
 
-        with sqlite3.connect(self.db_path) as conn:
-            conn.execute("""
-                INSERT OR REPLACE INTO session_profiles
-                (session_id, composition_type, data, created_at)
-                VALUES (?, ?, ?, ?)
-            """, (
-                session_profile.session_id,
-                session_profile.composition_type,
-                data,
-                session_profile.created_at,
-            ))
-            conn.commit()
+        db = create_db_session()
+        try:
+            existing = db.query(SessionProfileComposition).filter(
+                SessionProfileComposition.session_id == session_profile.session_id
+            ).first()
+
+            if existing:
+                existing.composition_type = session_profile.composition_type
+                existing.data = data
+                existing.created_at = session_profile.created_at
+            else:
+                entry = SessionProfileComposition(
+                    session_id=session_profile.session_id,
+                    composition_type=session_profile.composition_type,
+                    data=data,
+                    created_at=session_profile.created_at,
+                )
+                db.add(entry)
+
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
+        finally:
+            db.close()
 
         logger.info(
             f"Saved session composition: {session_profile.session_id} "
@@ -403,45 +397,63 @@ class SessionProfileStore:
 
     def load_composition(self, session_id: str) -> SessionProfile | None:
         """Load a session composition by session ID."""
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.execute(
-                "SELECT data FROM session_profiles WHERE session_id = ?",
-                (session_id,)
-            )
-            row = cursor.fetchone()
+        from ..db.models import SessionProfileComposition
+        from ..db.session import create_session as create_db_session
 
-            if row:
-                data = json.loads(row[0])
+        db = create_db_session()
+        try:
+            entry = db.query(SessionProfileComposition).filter(
+                SessionProfileComposition.session_id == session_id
+            ).first()
+
+            if entry:
+                data = json.loads(entry.data)
                 return SessionProfile.from_dict(data)
 
-        return None
+            return None
+        finally:
+            db.close()
 
     def delete_composition(self, session_id: str) -> bool:
         """Delete a session composition."""
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.execute(
-                "DELETE FROM session_profiles WHERE session_id = ?",
-                (session_id,)
-            )
-            conn.commit()
-            return cursor.rowcount > 0
+        from ..db.models import SessionProfileComposition
+        from ..db.session import create_session as create_db_session
+
+        db = create_db_session()
+        try:
+            count = db.query(SessionProfileComposition).filter(
+                SessionProfileComposition.session_id == session_id
+            ).delete()
+            db.commit()
+            return count > 0
+        except Exception:
+            db.rollback()
+            raise
+        finally:
+            db.close()
 
     def list_compositions(self) -> list[dict[str, Any]]:
         """List all session compositions with basic info."""
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.execute("""
-                SELECT session_id, composition_type, created_at
-                FROM session_profiles
-                ORDER BY created_at DESC
-            """)
+        from ..db.models import SessionProfileComposition
+        from ..db.session import create_session as create_db_session
+
+        db = create_db_session()
+        try:
+            entries = (
+                db.query(SessionProfileComposition)
+                .order_by(SessionProfileComposition.created_at.desc())
+                .all()
+            )
             return [
                 {
-                    "session_id": row[0],
-                    "composition_type": row[1],
-                    "created_at": row[2],
+                    "session_id": e.session_id,
+                    "composition_type": e.composition_type,
+                    "created_at": e.created_at,
                 }
-                for row in cursor.fetchall()
+                for e in entries
             ]
+        finally:
+            db.close()
 
 
 # ─── Singleton ───────────────────────────────────────────────────────────
@@ -456,3 +468,4 @@ def get_session_profile_store() -> SessionProfileStore:
     if _session_profile_store is None:
         _session_profile_store = SessionProfileStore()
     return _session_profile_store
+

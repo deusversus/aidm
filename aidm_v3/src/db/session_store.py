@@ -1,155 +1,164 @@
-"""Session Store - SQLite persistence for game sessions."""
+"""Session Store — SQLAlchemy persistence for Session Zero game sessions.
+
+Replaces the former standalone SQLite database (data/sessions.db)
+with the shared PostgreSQL database via SQLAlchemy.
+"""
 
 import json
 import logging
-import sqlite3
-from pathlib import Path
 
 from ..core.session import Session
+from ..db.models import SessionZeroState
+from ..db.session import create_session as create_db_session
 
 logger = logging.getLogger(__name__)
 
+
 class SessionStore:
-    """Persists Session objects to SQLite database.
-    
-    Sessions are stored as JSON blobs in a `sessions` table,
+    """Persists Session objects to the shared database.
+
+    Sessions are stored as JSON blobs in the `session_zero_states` table,
     allowing them to survive server restarts.
     """
 
-    def __init__(self, db_path: str = "./data/sessions.db"):
-        """Initialize the session store.
-        
-        Args:
-            db_path: Path to SQLite database file
-        """
-        self.db_path = Path(db_path)
-        self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        self._init_db()
-
-    def _init_db(self):
-        """Create the sessions table if it doesn't exist."""
-        with sqlite3.connect(self.db_path) as conn:
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS sessions (
-                    session_id TEXT PRIMARY KEY,
-                    data TEXT NOT NULL,
-                    created_at TEXT NOT NULL,
-                    last_activity TEXT NOT NULL
-                )
-            """)
-            conn.commit()
-
     def save(self, session: Session) -> None:
         """Save or update a session.
-        
+
         Args:
             session: The Session object to persist
         """
         data = json.dumps(session.to_dict())
+        db = create_db_session()
+        try:
+            existing = db.query(SessionZeroState).filter(
+                SessionZeroState.session_id == session.session_id
+            ).first()
 
-        with sqlite3.connect(self.db_path) as conn:
-            conn.execute("""
-                INSERT OR REPLACE INTO sessions 
-                (session_id, data, created_at, last_activity)
-                VALUES (?, ?, ?, ?)
-            """, (
-                session.session_id,
-                data,
-                session.created_at.isoformat(),
-                session.last_activity.isoformat()
-            ))
-            conn.commit()
+            if existing:
+                existing.data = data
+                existing.last_activity = session.last_activity.isoformat()
+            else:
+                entry = SessionZeroState(
+                    session_id=session.session_id,
+                    data=data,
+                    created_at=session.created_at.isoformat(),
+                    last_activity=session.last_activity.isoformat(),
+                )
+                db.add(entry)
+
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
+        finally:
+            db.close()
 
     def load(self, session_id: str) -> Session | None:
         """Load a session by ID.
-        
+
         Args:
             session_id: The session ID to load
-            
+
         Returns:
             Session object if found, None otherwise
         """
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.execute(
-                "SELECT data FROM sessions WHERE session_id = ?",
-                (session_id,)
-            )
-            row = cursor.fetchone()
+        db = create_db_session()
+        try:
+            entry = db.query(SessionZeroState).filter(
+                SessionZeroState.session_id == session_id
+            ).first()
 
-            if row:
-                data = json.loads(row[0])
+            if entry:
+                data = json.loads(entry.data)
                 return Session.from_dict(data)
 
-        return None
+            return None
+        finally:
+            db.close()
 
     def delete(self, session_id: str) -> bool:
         """Delete a session.
-        
+
         Args:
             session_id: The session ID to delete
-            
+
         Returns:
             True if deleted, False if not found
         """
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.execute(
-                "DELETE FROM sessions WHERE session_id = ?",
-                (session_id,)
-            )
-            conn.commit()
-            return cursor.rowcount > 0
+        db = create_db_session()
+        try:
+            count = db.query(SessionZeroState).filter(
+                SessionZeroState.session_id == session_id
+            ).delete()
+            db.commit()
+            return count > 0
+        except Exception:
+            db.rollback()
+            raise
+        finally:
+            db.close()
 
     def clear_all(self) -> int:
         """Delete all sessions.
-        
+
         Used during full reset.
-        
+
         Returns:
             Number of sessions deleted
         """
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.execute("DELETE FROM sessions")
-            conn.commit()
-            count = cursor.rowcount
+        db = create_db_session()
+        try:
+            count = db.query(SessionZeroState).delete()
+            db.commit()
             if count > 0:
                 logger.info(f"Cleared {count} session(s)")
             return count
+        except Exception:
+            db.rollback()
+            raise
+        finally:
+            db.close()
 
     def list_sessions(self) -> list[dict]:
         """List all sessions with basic info.
-        
+
         Returns:
             List of dicts with session_id, created_at, last_activity
         """
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.execute("""
-                SELECT session_id, created_at, last_activity 
-                FROM sessions 
-                ORDER BY last_activity DESC
-            """)
+        db = create_db_session()
+        try:
+            entries = (
+                db.query(SessionZeroState)
+                .order_by(SessionZeroState.last_activity.desc())
+                .all()
+            )
             return [
                 {
-                    "session_id": row[0],
-                    "created_at": row[1],
-                    "last_activity": row[2]
+                    "session_id": e.session_id,
+                    "created_at": e.created_at,
+                    "last_activity": e.last_activity,
                 }
-                for row in cursor.fetchall()
+                for e in entries
             ]
+        finally:
+            db.close()
 
     def get_latest_session_id(self) -> str | None:
         """Get the most recently active session ID.
-        
+
         Returns:
             Session ID if exists, None otherwise
         """
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.execute("""
-                SELECT session_id FROM sessions 
-                ORDER BY last_activity DESC 
-                LIMIT 1
-            """)
-            row = cursor.fetchone()
-            return row[0] if row else None
+        db = create_db_session()
+        try:
+            entry = (
+                db.query(SessionZeroState)
+                .order_by(SessionZeroState.last_activity.desc())
+                .first()
+            )
+            return entry.session_id if entry else None
+        finally:
+            db.close()
 
 
 # Singleton instance

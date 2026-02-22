@@ -1,9 +1,7 @@
 """
 SQL-backed Lore Store for AIDM v3.
 
-Replaces flat .txt lore dumps with structured per-page SQLite storage.
-Each wiki page is stored individually with metadata (page_type, title,
-word count, source wiki, scrape timestamp), enabling:
+Structured per-page storage for wiki lore data, enabling:
 - Queryable per-page access
 - Incremental updates (re-scrape one character)
 - Deduplication detection
@@ -11,13 +9,19 @@ word count, source wiki, scrape timestamp), enabling:
 
 ChromaDB remains the vector search layer — this is the structured
 source-of-truth that feeds it.
+
+Uses the shared PostgreSQL database via SQLAlchemy (replaces former
+standalone data/lore_store.db).
 """
 
 import logging
-import sqlite3
 import time
-from pathlib import Path
 from typing import Any
+
+from sqlalchemy import func
+
+from ..db.models import WikiPage
+from ..db.session import create_session
 
 logger = logging.getLogger(__name__)
 
@@ -25,49 +29,7 @@ logger = logging.getLogger(__name__)
 # ─── Store Implementation ────────────────────────────────────────────────────
 
 class LoreStore:
-    """SQLite-backed storage for structured wiki lore pages."""
-
-    def __init__(self, db_path: str | None = None):
-        """
-        Initialize the lore store.
-        
-        Args:
-            db_path: Path to SQLite database. Defaults to data/lore_store.db
-        """
-        if db_path is None:
-            db_path = str(Path(__file__).parent.parent.parent / "data" / "lore_store.db")
-
-        self._db_path = db_path
-        self._ensure_db()
-
-    def _ensure_db(self):
-        """Create the wiki_pages table if it doesn't exist."""
-        Path(self._db_path).parent.mkdir(parents=True, exist_ok=True)
-
-        with sqlite3.connect(self._db_path) as conn:
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS wiki_pages (
-                    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-                    profile_id  TEXT NOT NULL,
-                    page_title  TEXT NOT NULL,
-                    page_type   TEXT NOT NULL,
-                    content     TEXT NOT NULL,
-                    word_count  INTEGER DEFAULT 0,
-                    source_wiki TEXT DEFAULT '',
-                    scraped_at  REAL NOT NULL,
-                    
-                    UNIQUE(profile_id, page_title)
-                )
-            """)
-            conn.execute("""
-                CREATE INDEX IF NOT EXISTS idx_wp_profile 
-                ON wiki_pages(profile_id)
-            """)
-            conn.execute("""
-                CREATE INDEX IF NOT EXISTS idx_wp_type 
-                ON wiki_pages(profile_id, page_type)
-            """)
-            conn.commit()
+    """SQLAlchemy-backed storage for structured wiki lore pages."""
 
     def store_pages(
         self,
@@ -77,14 +39,14 @@ class LoreStore:
     ) -> int:
         """
         Bulk insert wiki pages for a profile.
-        
-        Uses INSERT OR REPLACE to handle re-scrapes cleanly.
-        
+
+        Uses upsert logic to handle re-scrapes cleanly.
+
         Args:
             profile_id: Profile identifier (e.g., "solo_leveling")
             pages: List of page dicts with keys: title, page_type, content
             source_wiki: Wiki URL for provenance tracking
-            
+
         Returns:
             Number of pages stored
         """
@@ -94,33 +56,51 @@ class LoreStore:
         now = time.time()
         stored = 0
 
+        db = create_session()
         try:
-            with sqlite3.connect(self._db_path) as conn:
-                for page in pages:
-                    content = page.get("content", "")
-                    word_count = len(content.split())
+            for page in pages:
+                content = page.get("content", "")
+                word_count = len(content.split())
+                page_title = page.get("title", "Unknown")
 
-                    conn.execute("""
-                        INSERT OR REPLACE INTO wiki_pages
-                        (profile_id, page_title, page_type, content, word_count, source_wiki, scraped_at)
-                        VALUES (?, ?, ?, ?, ?, ?, ?)
-                    """, (
-                        profile_id,
-                        page.get("title", "Unknown"),
-                        page.get("page_type", "general"),
-                        content,
-                        word_count,
-                        source_wiki,
-                        now,
-                    ))
-                    stored += 1
+                # Upsert: check if exists, update or insert
+                existing = (
+                    db.query(WikiPage)
+                    .filter(
+                        WikiPage.profile_id == profile_id,
+                        WikiPage.page_title == page_title,
+                    )
+                    .first()
+                )
 
-                conn.commit()
+                if existing:
+                    existing.page_type = page.get("page_type", "general")
+                    existing.content = content
+                    existing.word_count = word_count
+                    existing.source_wiki = source_wiki
+                    existing.scraped_at = now
+                else:
+                    entry = WikiPage(
+                        profile_id=profile_id,
+                        page_title=page_title,
+                        page_type=page.get("page_type", "general"),
+                        content=content,
+                        word_count=word_count,
+                        source_wiki=source_wiki,
+                        scraped_at=now,
+                    )
+                    db.add(entry)
 
+                stored += 1
+
+            db.commit()
             logger.info(f"[LoreStore] Stored {stored} pages for '{profile_id}' from {source_wiki}")
 
         except Exception as e:
+            db.rollback()
             logger.error(f"[LoreStore] Error storing pages for '{profile_id}': {e}")
+        finally:
+            db.close()
 
         return stored
 
@@ -131,48 +111,57 @@ class LoreStore:
     ) -> list[dict[str, Any]]:
         """
         Retrieve stored pages for a profile.
-        
+
         Args:
             profile_id: Profile identifier
             page_type: Optional filter by page type (e.g., "characters")
-            
+
         Returns:
             List of page dicts with all fields
         """
+        db = create_session()
         try:
-            with sqlite3.connect(self._db_path) as conn:
-                conn.row_factory = sqlite3.Row
+            query = db.query(WikiPage).filter(WikiPage.profile_id == profile_id)
 
-                if page_type:
-                    rows = conn.execute(
-                        "SELECT * FROM wiki_pages WHERE profile_id = ? AND page_type = ? ORDER BY id",
-                        (profile_id, page_type)
-                    ).fetchall()
-                else:
-                    rows = conn.execute(
-                        "SELECT * FROM wiki_pages WHERE profile_id = ? ORDER BY id",
-                        (profile_id,)
-                    ).fetchall()
+            if page_type:
+                query = query.filter(WikiPage.page_type == page_type)
 
-                return [dict(row) for row in rows]
+            query = query.order_by(WikiPage.id)
+            rows = query.all()
+
+            return [
+                {
+                    "id": row.id,
+                    "profile_id": row.profile_id,
+                    "page_title": row.page_title,
+                    "page_type": row.page_type,
+                    "content": row.content,
+                    "word_count": row.word_count,
+                    "source_wiki": row.source_wiki,
+                    "scraped_at": row.scraped_at,
+                }
+                for row in rows
+            ]
 
         except Exception as e:
             logger.error(f"[LoreStore] Error reading pages for '{profile_id}': {e}")
             return []
+        finally:
+            db.close()
 
     def get_combined_content(self, profile_id: str) -> str:
         """
         Reconstruct the combined lore content from stored pages.
-        
+
         Produces the same format as the old .txt dump:
         ## [TYPE] Title
         content...
-        
+
         This is used for LLM synthesis and backward compatibility.
-        
+
         Args:
             profile_id: Profile identifier
-            
+
         Returns:
             Combined text string, or empty string if no pages found
         """
@@ -192,110 +181,131 @@ class LoreStore:
 
     def has_profile(self, profile_id: str) -> bool:
         """Check if any pages exist for a profile."""
+        db = create_session()
         try:
-            with sqlite3.connect(self._db_path) as conn:
-                count = conn.execute(
-                    "SELECT COUNT(*) FROM wiki_pages WHERE profile_id = ?",
-                    (profile_id,)
-                ).fetchone()[0]
-                return count > 0
+            count = (
+                db.query(func.count(WikiPage.id))
+                .filter(WikiPage.profile_id == profile_id)
+                .scalar()
+            )
+            return count > 0
         except Exception:
             return False
+        finally:
+            db.close()
 
     def delete_profile(self, profile_id: str) -> int:
         """
         Delete all pages for a profile.
-        
+
         Args:
             profile_id: Profile identifier
-            
+
         Returns:
             Number of pages deleted
         """
+        db = create_session()
         try:
-            with sqlite3.connect(self._db_path) as conn:
-                cursor = conn.execute(
-                    "DELETE FROM wiki_pages WHERE profile_id = ?",
-                    (profile_id,)
-                )
-                conn.commit()
-                count = cursor.rowcount
-                if count > 0:
-                    logger.info(f"[LoreStore] Deleted {count} pages for '{profile_id}'")
-                return count
+            count = (
+                db.query(WikiPage)
+                .filter(WikiPage.profile_id == profile_id)
+                .delete()
+            )
+            db.commit()
+            if count > 0:
+                logger.info(f"[LoreStore] Deleted {count} pages for '{profile_id}'")
+            return count
         except Exception as e:
+            db.rollback()
             logger.error(f"[LoreStore] Error deleting pages for '{profile_id}': {e}")
             return 0
+        finally:
+            db.close()
 
     def get_stats(self, profile_id: str | None = None) -> dict[str, Any]:
         """
         Get storage statistics.
-        
+
         Args:
             profile_id: Optional — stats for specific profile, or all if None
-            
+
         Returns:
             Dict with page counts, word counts, types breakdown
         """
+        db = create_session()
         try:
-            with sqlite3.connect(self._db_path) as conn:
-                if profile_id:
-                    total = conn.execute(
-                        "SELECT COUNT(*) FROM wiki_pages WHERE profile_id = ?",
-                        (profile_id,)
-                    ).fetchone()[0]
+            if profile_id:
+                total = (
+                    db.query(func.count(WikiPage.id))
+                    .filter(WikiPage.profile_id == profile_id)
+                    .scalar()
+                )
 
-                    total_words = conn.execute(
-                        "SELECT COALESCE(SUM(word_count), 0) FROM wiki_pages WHERE profile_id = ?",
-                        (profile_id,)
-                    ).fetchone()[0]
+                total_words = (
+                    db.query(func.coalesce(func.sum(WikiPage.word_count), 0))
+                    .filter(WikiPage.profile_id == profile_id)
+                    .scalar()
+                )
 
-                    by_type = {}
-                    for row in conn.execute(
-                        "SELECT page_type, COUNT(*), SUM(word_count) FROM wiki_pages "
-                        "WHERE profile_id = ? GROUP BY page_type",
-                        (profile_id,)
-                    ):
-                        by_type[row[0]] = {"pages": row[1], "words": row[2]}
+                by_type = {}
+                type_rows = (
+                    db.query(
+                        WikiPage.page_type,
+                        func.count(WikiPage.id),
+                        func.sum(WikiPage.word_count),
+                    )
+                    .filter(WikiPage.profile_id == profile_id)
+                    .group_by(WikiPage.page_type)
+                    .all()
+                )
+                for row in type_rows:
+                    by_type[row[0]] = {"pages": row[1], "words": row[2]}
 
-                    scraped_at = conn.execute(
-                        "SELECT MIN(scraped_at) FROM wiki_pages WHERE profile_id = ?",
-                        (profile_id,)
-                    ).fetchone()[0]
+                scraped_at = (
+                    db.query(func.min(WikiPage.scraped_at))
+                    .filter(WikiPage.profile_id == profile_id)
+                    .scalar()
+                )
 
-                    return {
-                        "profile_id": profile_id,
-                        "total_pages": total,
-                        "total_words": total_words,
-                        "by_type": by_type,
-                        "scraped_at": scraped_at,
-                    }
-                else:
-                    # Global stats
-                    total = conn.execute("SELECT COUNT(*) FROM wiki_pages").fetchone()[0]
-                    profiles = conn.execute(
-                        "SELECT DISTINCT profile_id FROM wiki_pages"
-                    ).fetchall()
+                return {
+                    "profile_id": profile_id,
+                    "total_pages": total,
+                    "total_words": total_words,
+                    "by_type": by_type,
+                    "scraped_at": scraped_at,
+                }
+            else:
+                # Global stats
+                total = db.query(func.count(WikiPage.id)).scalar()
+                profiles = (
+                    db.query(WikiPage.profile_id)
+                    .distinct()
+                    .all()
+                )
 
-                    return {
-                        "total_pages": total,
-                        "profiles": [r[0] for r in profiles],
-                        "profile_count": len(profiles),
-                        "db_path": self._db_path,
-                    }
+                return {
+                    "total_pages": total,
+                    "profiles": [r[0] for r in profiles],
+                    "profile_count": len(profiles),
+                }
 
         except Exception as e:
             return {"error": str(e)}
+        finally:
+            db.close()
 
     def clear_all(self):
         """Delete all stored pages."""
+        db = create_session()
         try:
-            with sqlite3.connect(self._db_path) as conn:
-                conn.execute("DELETE FROM wiki_pages")
-                conn.commit()
+            db.query(WikiPage).delete()
+            db.commit()
             logger.info("[LoreStore] Cleared all pages")
         except Exception as e:
+            db.rollback()
             logger.error(f"[LoreStore] Error clearing: {e}")
+        finally:
+            db.close()
 
 
 # ─── Singleton ───────────────────────────────────────────────────────────────

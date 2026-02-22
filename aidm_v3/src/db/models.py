@@ -3,6 +3,7 @@
 import uuid
 from datetime import datetime
 
+import sqlalchemy as sa
 from sqlalchemy import (
     JSON,
     Boolean,
@@ -542,3 +543,85 @@ class MediaAsset(Base):
     completed_at = Column(DateTime, nullable=True)
 
     campaign = relationship("Campaign", back_populates="media_assets")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Consolidated stores (formerly separate SQLite databases)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class SessionZeroState(Base):
+    """Session Zero conversation state (replaces data/sessions.db).
+
+    Stores the full Session Zero conversation as a JSON blob,
+    allowing sessions to survive server restarts.
+    """
+
+    __tablename__ = "session_zero_states"
+
+    session_id = Column(String(64), primary_key=True)
+    data = Column(Text, nullable=False)  # JSON blob of Session.to_dict()
+    created_at = Column(String(50), nullable=False)  # ISO format
+    last_activity = Column(String(50), nullable=False)  # ISO format
+
+
+class WikiPage(Base):
+    """Structured wiki lore page (replaces data/lore_store.db).
+
+    Each wiki page is stored individually with metadata, enabling
+    queryable per-page access, incremental updates, and quality metrics.
+    ChromaDB remains the vector search layer — this is the structured
+    source-of-truth that feeds it.
+    """
+
+    __tablename__ = "wiki_pages"
+
+    id = Column(Integer, primary_key=True)
+    profile_id = Column(String(100), nullable=False, index=True)
+    page_title = Column(String(500), nullable=False)
+    page_type = Column(String(50), nullable=False)
+    content = Column(Text, nullable=False)
+    word_count = Column(Integer, default=0)
+    source_wiki = Column(String(200), default="")
+    scraped_at = Column(Float, nullable=False)  # Unix timestamp
+
+    __table_args__ = (
+        sa.UniqueConstraint("profile_id", "page_title", name="uq_wiki_profile_title"),
+        sa.Index("idx_wiki_profile_type", "profile_id", "page_type"),
+    )
+
+
+class ApiCacheEntry(Base):
+    """API response cache with TTL (replaces data/scraper_cache.db).
+
+    Status-aware TTL based on AniList series status:
+    - FINISHED: 90-day TTL
+    - RELEASING: 3-day TTL
+    - HIATUS: 14-day TTL
+    """
+
+    __tablename__ = "api_cache"
+
+    cache_key = Column(String(256), primary_key=True)
+    cache_type = Column(String(20), nullable=False, index=True)
+    data = Column(Text, nullable=False)  # JSON blob
+    series_status = Column(String(20), default="FINISHED")
+    created_at = Column(Float, nullable=False)  # Unix timestamp
+    expires_at = Column(Float, nullable=False, index=True)  # Unix timestamp
+    title = Column(String(500), default="")
+
+
+class SessionProfileComposition(Base):
+    """Session profile composition (replaces session_profiles table in data/sessions.db).
+
+    Stores composition metadata: what base profiles are linked,
+    with what roles/weights, and any session-layer overrides.
+    """
+
+    __tablename__ = "session_profiles"
+
+    session_id = Column(String(64), primary_key=True)
+    composition_type = Column(String(30), nullable=False)
+    data = Column(Text, nullable=False)  # JSON blob of SessionProfile.to_dict()
+    created_at = Column(String(50), nullable=False)  # ISO format
+

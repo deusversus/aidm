@@ -21,13 +21,15 @@ COPY api/ api/
 COPY prompts/ prompts/
 COPY rule_library/ rule_library/
 COPY web/ web/
+COPY alembic/ alembic/
+COPY alembic.ini .
 COPY pyproject.toml .
 COPY requirements.txt .
 COPY run_server.py .
 COPY settings.json .
 COPY .env.example .env.example
 
-# Create data directory for SQLite + ChromaDB
+# Create data directory for ChromaDB + media
 RUN mkdir -p data
 
 EXPOSE 8000

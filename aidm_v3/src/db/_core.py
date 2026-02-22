@@ -121,6 +121,7 @@ class CoreMixin:
         try:
             # Delete in order (respecting foreign key constraints)
             from .models import NPC, CampaignBible, Faction, Turn
+            from .models import SessionZeroState, WikiPage, ApiCacheEntry, SessionProfileComposition
 
             try:
                 db.query(MediaAsset).delete()
@@ -136,6 +137,11 @@ class CoreMixin:
                 db.query(WorldState).delete()
                 db.query(Character).delete()
                 db.query(Campaign).delete()
+                # Consolidated stores
+                db.query(SessionZeroState).delete()
+                db.query(WikiPage).delete()
+                db.query(ApiCacheEntry).delete()
+                db.query(SessionProfileComposition).delete()
                 db.commit()
                 logger.info("Full reset: cleared all campaign data from DB")
             except OperationalError as e:
