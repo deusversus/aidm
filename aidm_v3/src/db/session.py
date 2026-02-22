@@ -19,8 +19,8 @@ _SessionLocal = None
 
 
 def get_database_url() -> str:
-    """Get database URL from environment or use SQLite default."""
-    return os.getenv("DATABASE_URL", "sqlite:///./aidm_v3.db")
+    """Get database URL from environment or use PostgreSQL default."""
+    return os.getenv("DATABASE_URL", "postgresql://aidm:aidm@localhost:5432/aidm")
 
 
 def get_engine():
@@ -29,17 +29,21 @@ def get_engine():
     if _engine is None:
         database_url = get_database_url()
 
-        # SQLite needs special handling for check_same_thread
         if database_url.startswith("sqlite"):
+            # SQLite needs special handling for check_same_thread
             _engine = create_engine(
                 database_url,
                 connect_args={"check_same_thread": False},
-                echo=os.getenv("DEBUG", "false").lower() == "true"
+                echo=os.getenv("DEBUG", "false").lower() == "true",
             )
         else:
+            # PostgreSQL with connection pooling
             _engine = create_engine(
                 database_url,
-                echo=os.getenv("DEBUG", "false").lower() == "true"
+                pool_size=5,
+                max_overflow=10,
+                pool_pre_ping=True,
+                echo=os.getenv("DEBUG", "false").lower() == "true",
             )
 
     return _engine
@@ -52,74 +56,32 @@ def get_session_factory():
         _SessionLocal = sessionmaker(
             autocommit=False,
             autoflush=False,
-            bind=get_engine()
+            bind=get_engine(),
         )
     return _SessionLocal
 
 
 def init_db():
-    """Initialize the database by creating all tables."""
-    engine = get_engine()
-    Base.metadata.create_all(bind=engine)
+    """Initialize the database — run Alembic migrations to head.
 
-    # Inline migrations for existing databases
-    with engine.connect() as conn:
-        from sqlalchemy import text
-        try:
-            # #2: bible_version on campaign_bible
-            result = conn.execute(text("PRAGMA table_info(campaign_bible)"))
-            columns = [row[1] for row in result]
-            if "bible_version" not in columns:
-                conn.execute(text("ALTER TABLE campaign_bible ADD COLUMN bible_version INTEGER DEFAULT 0"))
-                conn.commit()
-                logger.info("Added bible_version column to campaign_bible")
+    This replaces the old create_all() + manual PRAGMA migrations.
+    Alembic handles both initial schema creation and incremental changes.
+    """
+    try:
+        from alembic import command
+        from alembic.config import Config
 
-            # #3: turns_in_phase on world_state
-            result = conn.execute(text("PRAGMA table_info(world_state)"))
-            columns = [row[1] for row in result]
-            if "turns_in_phase" not in columns:
-                conn.execute(text("ALTER TABLE world_state ADD COLUMN turns_in_phase INTEGER DEFAULT 0"))
-                conn.commit()
-                logger.info("Added turns_in_phase column to world_state")
-
-            # #5: pinned_messages on world_state
-            result = conn.execute(text("PRAGMA table_info(world_state)"))
-            columns = [row[1] for row in result]
-            if "pinned_messages" not in columns:
-                conn.execute(text("ALTER TABLE world_state ADD COLUMN pinned_messages TEXT DEFAULT '[]'"))
-                conn.commit()
-                logger.info("Added pinned_messages column to world_state")
-
-            # portrait_map on turns (media persistence)
-            result = conn.execute(text("PRAGMA table_info(turns)"))
-            columns = [row[1] for row in result]
-            if "portrait_map" not in columns:
-                conn.execute(text("ALTER TABLE turns ADD COLUMN portrait_map TEXT"))
-                conn.commit()
-                logger.info("Added portrait_map column to turns")
-
-            # media_uuid on campaigns (UUID-based media folders)
-            result = conn.execute(text("PRAGMA table_info(campaigns)"))
-            columns = [row[1] for row in result]
-            if "media_uuid" not in columns:
-                import uuid as _uuid
-                conn.execute(text("ALTER TABLE campaigns ADD COLUMN media_uuid TEXT"))
-                conn.commit()
-                # Backfill existing rows with generated UUIDs
-                rows = conn.execute(text("SELECT id FROM campaigns WHERE media_uuid IS NULL")).fetchall()
-                for row in rows:
-                    conn.execute(
-                        text("UPDATE campaigns SET media_uuid = :uuid WHERE id = :id"),
-                        {"uuid": str(_uuid.uuid4()), "id": row[0]}
-                    )
-                if rows:
-                    conn.commit()
-                    logger.info(f"Backfilled media_uuid for {len(rows)} existing campaigns")
-                logger.info("Added media_uuid column to campaigns")
-        except Exception as e:
-            logger.warning(f"Column check skipped: {e}")
-
-    logger.info(f"Database initialized: {get_database_url()}")
+        alembic_cfg = Config("alembic.ini")
+        # Override the URL with our environment-aware one
+        alembic_cfg.set_main_option("sqlalchemy.url", get_database_url())
+        command.upgrade(alembic_cfg, "head")
+        logger.info(f"Database initialized via Alembic: {get_database_url()}")
+    except Exception as e:
+        # Fallback to create_all for dev/testing if Alembic isn't set up yet
+        logger.warning(f"Alembic migration failed ({e}), falling back to create_all()")
+        engine = get_engine()
+        Base.metadata.create_all(bind=engine)
+        logger.info(f"Database initialized via create_all: {get_database_url()}")
 
 
 def drop_db():
@@ -132,7 +94,7 @@ def drop_db():
 @contextmanager
 def get_session() -> Generator[SQLAlchemySession, None, None]:
     """Context manager for database sessions.
-    
+
     Usage:
         with get_session() as session:
             session.query(...)
