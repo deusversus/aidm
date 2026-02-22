@@ -4,7 +4,6 @@
     "input": "Classify the scope of the anime/manga: Naruto",
     "context": {},
     "expected": {
-        "has_field": "scope",
         "has_field": "reasoning",
         "scope_in": [
             "COMPLEX",

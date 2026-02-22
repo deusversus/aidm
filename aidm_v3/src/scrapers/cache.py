@@ -21,7 +21,7 @@ from datetime import timedelta
 from typing import Any
 
 from ..db.models import ApiCacheEntry
-from ..db.session import create_session
+from ..db.session import get_session
 
 logger = logging.getLogger(__name__)
 
@@ -77,30 +77,26 @@ class ScraperCache:
         key = self._make_key(cache_type, identifier)
         now = time.time()
 
-        db = create_session()
         try:
-            entry = db.query(ApiCacheEntry).filter(
-                ApiCacheEntry.cache_key == key
-            ).first()
+            with get_session() as db:
+                entry = db.query(ApiCacheEntry).filter(
+                    ApiCacheEntry.cache_key == key
+                ).first()
 
-            if entry is None:
-                return None
+                if entry is None:
+                    return None
 
-            if now > entry.expires_at:
-                # Expired — delete and return miss
-                db.delete(entry)
-                db.commit()
-                logger.debug(f"Cache expired: {key}")
-                return None
+                if now > entry.expires_at:
+                    # Expired — delete and return miss
+                    db.delete(entry)
+                    logger.debug(f"Cache expired: {key}")
+                    return None
 
-            logger.debug(f"Cache hit: {key}")
-            return json.loads(entry.data)
-
+                logger.debug(f"Cache hit: {key}")
+                return json.loads(entry.data)
         except Exception as e:
             logger.warning(f"Cache read error: {e}")
             return None
-        finally:
-            db.close()
 
     def put(
         self,
@@ -135,124 +131,104 @@ class ScraperCache:
 
         expires_at = now + ttl.total_seconds()
 
-        db = create_session()
         try:
-            data_json = json.dumps(data, ensure_ascii=False, default=str)
+            with get_session() as db:
+                data_json = json.dumps(data, ensure_ascii=False, default=str)
 
-            existing = db.query(ApiCacheEntry).filter(
-                ApiCacheEntry.cache_key == key
-            ).first()
+                existing = db.query(ApiCacheEntry).filter(
+                    ApiCacheEntry.cache_key == key
+                ).first()
 
-            if existing:
-                existing.data = data_json
-                existing.series_status = series_status
-                existing.created_at = now
-                existing.expires_at = expires_at
-                existing.title = title
-            else:
-                entry = ApiCacheEntry(
-                    cache_key=key,
-                    cache_type=cache_type,
-                    data=data_json,
-                    series_status=series_status,
-                    created_at=now,
-                    expires_at=expires_at,
-                    title=title,
+                if existing:
+                    existing.data = data_json
+                    existing.series_status = series_status
+                    existing.created_at = now
+                    existing.expires_at = expires_at
+                    existing.title = title
+                else:
+                    entry = ApiCacheEntry(
+                        cache_key=key,
+                        cache_type=cache_type,
+                        data=data_json,
+                        series_status=series_status,
+                        created_at=now,
+                        expires_at=expires_at,
+                        title=title,
+                    )
+                    db.add(entry)
+
+                logger.debug(
+                    f"Cache put: {key} (status={series_status}, "
+                    f"ttl={ttl.days}d, title='{title}')"
                 )
-                db.add(entry)
-
-            db.commit()
-
-            logger.debug(
-                f"Cache put: {key} (status={series_status}, "
-                f"ttl={ttl.days}d, title='{title}')"
-            )
-
         except Exception as e:
-            db.rollback()
             logger.warning(f"Cache write error: {e}")
-        finally:
-            db.close()
 
     def invalidate(self, cache_type: str, identifier: str):
         """Remove a specific cache entry."""
         key = self._make_key(cache_type, identifier)
-        db = create_session()
         try:
-            db.query(ApiCacheEntry).filter(
-                ApiCacheEntry.cache_key == key
-            ).delete()
-            db.commit()
+            with get_session() as db:
+                db.query(ApiCacheEntry).filter(
+                    ApiCacheEntry.cache_key == key
+                ).delete()
         except Exception as e:
-            db.rollback()
             logger.warning(f"Cache invalidate error: {e}")
-        finally:
-            db.close()
 
     def clear_expired(self) -> int:
         """Remove all expired entries. Returns count of deleted rows."""
         now = time.time()
-        db = create_session()
         try:
-            count = db.query(ApiCacheEntry).filter(
-                ApiCacheEntry.expires_at < now
-            ).delete()
-            db.commit()
-            if count > 0:
-                logger.info(f"Cleared {count} expired cache entries")
-            return count
+            with get_session() as db:
+                count = db.query(ApiCacheEntry).filter(
+                    ApiCacheEntry.expires_at < now
+                ).delete()
+                if count > 0:
+                    logger.info(f"Cleared {count} expired cache entries")
+                return count
         except Exception as e:
-            db.rollback()
             logger.warning(f"Cache cleanup error: {e}")
             return 0
-        finally:
-            db.close()
 
     def clear_all(self):
         """Clear the entire cache."""
-        db = create_session()
         try:
-            db.query(ApiCacheEntry).delete()
-            db.commit()
-            logger.info("Cache cleared")
+            with get_session() as db:
+                db.query(ApiCacheEntry).delete()
+                logger.info("Cache cleared")
         except Exception as e:
-            db.rollback()
             logger.warning(f"Cache clear error: {e}")
-        finally:
-            db.close()
 
     def stats(self) -> dict:
         """Get cache statistics."""
         now = time.time()
-        db = create_session()
         try:
-            from sqlalchemy import func
+            with get_session() as db:
+                from sqlalchemy import func
 
-            total = db.query(func.count(ApiCacheEntry.cache_key)).scalar()
-            valid = (
-                db.query(func.count(ApiCacheEntry.cache_key))
-                .filter(ApiCacheEntry.expires_at > now)
-                .scalar()
-            )
-            expired = total - valid
+                total = db.query(func.count(ApiCacheEntry.cache_key)).scalar()
+                valid = (
+                    db.query(func.count(ApiCacheEntry.cache_key))
+                    .filter(ApiCacheEntry.expires_at > now)
+                    .scalar()
+                )
+                expired = total - valid
 
-            by_type = {}
-            type_rows = (
-                db.query(ApiCacheEntry.cache_type, func.count(ApiCacheEntry.cache_key))
-                .filter(ApiCacheEntry.expires_at > now)
-                .group_by(ApiCacheEntry.cache_type)
-                .all()
-            )
-            for row in type_rows:
-                by_type[row[0]] = row[1]
+                by_type = {}
+                type_rows = (
+                    db.query(ApiCacheEntry.cache_type, func.count(ApiCacheEntry.cache_key))
+                    .filter(ApiCacheEntry.expires_at > now)
+                    .group_by(ApiCacheEntry.cache_type)
+                    .all()
+                )
+                for row in type_rows:
+                    by_type[row[0]] = row[1]
 
-            return {
-                "total": total,
-                "valid": valid,
-                "expired": expired,
-                "by_type": by_type,
-            }
+                return {
+                    "total": total,
+                    "valid": valid,
+                    "expired": expired,
+                    "by_type": by_type,
+                }
         except Exception as e:
             return {"error": str(e)}
-        finally:
-            db.close()

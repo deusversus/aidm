@@ -9,7 +9,7 @@ import logging
 
 from ..core.session import Session
 from ..db.models import SessionZeroState
-from ..db.session import create_session as create_db_session
+from ..db.session import get_session
 
 logger = logging.getLogger(__name__)
 
@@ -28,8 +28,7 @@ class SessionStore:
             session: The Session object to persist
         """
         data = json.dumps(session.to_dict())
-        db = create_db_session()
-        try:
+        with get_session() as db:
             existing = db.query(SessionZeroState).filter(
                 SessionZeroState.session_id == session.session_id
             ).first()
@@ -46,13 +45,6 @@ class SessionStore:
                 )
                 db.add(entry)
 
-            db.commit()
-        except Exception:
-            db.rollback()
-            raise
-        finally:
-            db.close()
-
     def load(self, session_id: str) -> Session | None:
         """Load a session by ID.
 
@@ -62,8 +54,7 @@ class SessionStore:
         Returns:
             Session object if found, None otherwise
         """
-        db = create_db_session()
-        try:
+        with get_session() as db:
             entry = db.query(SessionZeroState).filter(
                 SessionZeroState.session_id == session_id
             ).first()
@@ -73,8 +64,6 @@ class SessionStore:
                 return Session.from_dict(data)
 
             return None
-        finally:
-            db.close()
 
     def delete(self, session_id: str) -> bool:
         """Delete a session.
@@ -85,18 +74,11 @@ class SessionStore:
         Returns:
             True if deleted, False if not found
         """
-        db = create_db_session()
-        try:
+        with get_session() as db:
             count = db.query(SessionZeroState).filter(
                 SessionZeroState.session_id == session_id
             ).delete()
-            db.commit()
             return count > 0
-        except Exception:
-            db.rollback()
-            raise
-        finally:
-            db.close()
 
     def clear_all(self) -> int:
         """Delete all sessions.
@@ -106,18 +88,11 @@ class SessionStore:
         Returns:
             Number of sessions deleted
         """
-        db = create_db_session()
-        try:
+        with get_session() as db:
             count = db.query(SessionZeroState).delete()
-            db.commit()
             if count > 0:
                 logger.info(f"Cleared {count} session(s)")
             return count
-        except Exception:
-            db.rollback()
-            raise
-        finally:
-            db.close()
 
     def list_sessions(self) -> list[dict]:
         """List all sessions with basic info.
@@ -125,8 +100,7 @@ class SessionStore:
         Returns:
             List of dicts with session_id, created_at, last_activity
         """
-        db = create_db_session()
-        try:
+        with get_session() as db:
             entries = (
                 db.query(SessionZeroState)
                 .order_by(SessionZeroState.last_activity.desc())
@@ -140,8 +114,6 @@ class SessionStore:
                 }
                 for e in entries
             ]
-        finally:
-            db.close()
 
     def get_latest_session_id(self) -> str | None:
         """Get the most recently active session ID.
@@ -149,16 +121,13 @@ class SessionStore:
         Returns:
             Session ID if exists, None otherwise
         """
-        db = create_db_session()
-        try:
+        with get_session() as db:
             entry = (
                 db.query(SessionZeroState)
                 .order_by(SessionZeroState.last_activity.desc())
                 .first()
             )
             return entry.session_id if entry else None
-        finally:
-            db.close()
 
 
 # Singleton instance

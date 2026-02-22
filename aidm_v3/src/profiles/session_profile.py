@@ -359,12 +359,11 @@ class SessionProfileStore:
     def save_composition(self, session_profile: SessionProfile) -> None:
         """Save or update a session composition."""
         from ..db.models import SessionProfileComposition
-        from ..db.session import create_session as create_db_session
+        from ..db.session import get_session
 
         data = json.dumps(session_profile.to_dict())
 
-        db = create_db_session()
-        try:
+        with get_session() as db:
             existing = db.query(SessionProfileComposition).filter(
                 SessionProfileComposition.session_id == session_profile.session_id
             ).first()
@@ -382,13 +381,6 @@ class SessionProfileStore:
                 )
                 db.add(entry)
 
-            db.commit()
-        except Exception:
-            db.rollback()
-            raise
-        finally:
-            db.close()
-
         logger.info(
             f"Saved session composition: {session_profile.session_id} "
             f"({session_profile.composition_type}, "
@@ -398,10 +390,9 @@ class SessionProfileStore:
     def load_composition(self, session_id: str) -> SessionProfile | None:
         """Load a session composition by session ID."""
         from ..db.models import SessionProfileComposition
-        from ..db.session import create_session as create_db_session
+        from ..db.session import get_session
 
-        db = create_db_session()
-        try:
+        with get_session() as db:
             entry = db.query(SessionProfileComposition).filter(
                 SessionProfileComposition.session_id == session_id
             ).first()
@@ -411,34 +402,24 @@ class SessionProfileStore:
                 return SessionProfile.from_dict(data)
 
             return None
-        finally:
-            db.close()
 
     def delete_composition(self, session_id: str) -> bool:
         """Delete a session composition."""
         from ..db.models import SessionProfileComposition
-        from ..db.session import create_session as create_db_session
+        from ..db.session import get_session
 
-        db = create_db_session()
-        try:
+        with get_session() as db:
             count = db.query(SessionProfileComposition).filter(
                 SessionProfileComposition.session_id == session_id
             ).delete()
-            db.commit()
             return count > 0
-        except Exception:
-            db.rollback()
-            raise
-        finally:
-            db.close()
 
     def list_compositions(self) -> list[dict[str, Any]]:
         """List all session compositions with basic info."""
         from ..db.models import SessionProfileComposition
-        from ..db.session import create_session as create_db_session
+        from ..db.session import get_session
 
-        db = create_db_session()
-        try:
+        with get_session() as db:
             entries = (
                 db.query(SessionProfileComposition)
                 .order_by(SessionProfileComposition.created_at.desc())
@@ -452,8 +433,6 @@ class SessionProfileStore:
                 }
                 for e in entries
             ]
-        finally:
-            db.close()
 
 
 # ─── Singleton ───────────────────────────────────────────────────────────

@@ -83,7 +83,7 @@ async def list_prompts():
             "name": name,
             "hash": pv.content_hash,
             "words": len(pv),
-            "path": str(pv.source_path) if pv.source_path else None,
+            "source": pv.source,
             "metadata": pv.metadata,
         })
     return {"count": len(prompts), "prompts": prompts}
@@ -105,7 +105,7 @@ async def get_prompt_detail(name: str):
         "words": len(pv),
         "content": pv.content,
         "metadata": pv.metadata,
-        "path": str(pv.source_path) if pv.source_path else None,
+        "source": pv.source,
     }
 
 
