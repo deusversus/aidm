@@ -31,6 +31,7 @@ class ProductionAgent(AgenticAgent):
     """
 
     agent_name = "production"
+    prompt_name = "production"
 
     @property
     def output_schema(self):
@@ -39,7 +40,7 @@ class ProductionAgent(AgenticAgent):
 
     @property
     def system_prompt(self) -> str:
-        return _SYSTEM_PROMPT
+        return self.get_prompt()
 
     async def react(
         self,

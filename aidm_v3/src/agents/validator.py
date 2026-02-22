@@ -271,15 +271,15 @@ class ValidatorAgent(BaseAgent):
     """
 
     agent_name = "validator"
+    prompt_name = "validator"
 
     def __init__(self, model_override: str | None = None):
         super().__init__(model_override=model_override)
-        self._system_prompt = VALIDATOR_SYSTEM_PROMPT
         self._error_log: list[ErrorReport] = []
 
     @property
     def system_prompt(self) -> str:
-        return self._system_prompt
+        return self.get_prompt()
 
     @property
     def output_schema(self) -> type[BaseModel]:
