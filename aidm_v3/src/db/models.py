@@ -90,6 +90,10 @@ class Turn(Base):
     latency_ms = Column(Integer, nullable=True)
     cost_usd = Column(Float, nullable=True)
 
+    # Prompt traceability
+    prompt_fingerprint = Column(String(64), nullable=True)  # SHA-256 of the prompt used
+    prompt_name = Column(String(50), nullable=True)          # Which prompt produced this turn
+
     session = relationship("Session", back_populates="turns")
 
 
