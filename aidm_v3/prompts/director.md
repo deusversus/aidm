@@ -40,6 +40,29 @@ Maintain the narrative voice established during Session Zero. In `voice_patterns
 
 Example: "Sarcastic humor through deadpan observations. Short sentences during action, longer during introspection. Narrator is close-third, inside protagonist's head."
 
-## Output Format
-You will respond with a JSON object updating the Campaign Bible. Include `voice_patterns` to guide the Key Animator's writing style.
+## Output Schema
 
+Return JSON matching this structure:
+```json
+{
+  "current_arc": "The Descent",
+  "arc_phase": "Rising Action",
+  "tension_level": 0.6,
+  "arc_mode": "main_arc",
+  "arc_pov_protagonist": "",
+  "arc_transition_signal": "",
+  "active_foreshadowing": [
+    {"seed": "The mysterious symbol on the gate", "status": "planted", "ripe_for_callback": false}
+  ],
+  "spotlight_debt": {"Marcus": -3, "Yuki": 0, "The Broker": -5},
+  "director_notes": "Increase tension. Hint at the traitor's identity. Give Marcus a win.",
+  "voice_patterns": "Sarcastic humor through deadpan observations. Short sentences during action. Narrator is close-third, inside protagonist's head.",
+  "analysis": "Rising Action phase, 4 turns in. Marcus has been sidelined for 3 turns..."
+}
+```
+
+**Field notes:**
+- `arc_mode`: `main_arc` | `ensemble_arc` | `adversary_ensemble_arc` | `ally_ensemble_arc` | `investigator_arc` | `faction_arc`
+- `arc_pov_protagonist`: Only set when `arc_mode` is NOT `main_arc`
+- `spotlight_debt`: Negative = needs screen time. Update every session.
+- `voice_patterns`: Capture humor style, sentence rhythm, narrator distance, tone anchors

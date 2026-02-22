@@ -180,14 +180,4 @@ This scale determines HOW MUCH you write. Enforce these rules strictly:
 
 ---
 
-## 🎬 OUTPUT FORMAT REMINDER
-
-**CRITICAL: Your response MUST follow the anime episode format above:**
-
-1. **Start with emoji header**: `### ⚔️ Scene Title` (REQUIRED - never skip this)
-2. **Short paragraphs** (2-3 sentences max) with blank lines between
-3. **Bold** for character names, abilities, dramatic moments
-4. **Blockquotes** for NPC dialogue: `> *"Quote"* The character said.`
-5. **End with decision prompt**: `### 🎯 What Do You Do?` with bullet options
-
-DO NOT write plain prose walls. Make it FEEL like an anime episode with clear visual structure.
+**CRITICAL: Follow the 🎬 REQUIRED Output Format specified above. Never write plain prose walls.**

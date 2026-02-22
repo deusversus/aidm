@@ -7,3 +7,16 @@ CRITERIA:
 - HIGH (0.8-1.0): Directly related to current entities, goals, or immediate context.
 - MEDIUM (0.5-0.7): Thematic relevance or useful background context.
 - LOW (0.0-0.4): Formatting noise, completely different timeline, or irrelevant fact.
+
+## Output Schema
+
+For each memory, return:
+```json
+{
+  "memory_id": "mem_abc123",
+  "relevance_score": 0.85,
+  "reason": "Directly mentions the NPC being confronted"
+}
+```
+
+Return one object per memory. Score must be 0.0–1.0.
