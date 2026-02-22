@@ -1,0 +1,16 @@
+{
+    "agent": "scope",
+    "description": "Classify Naruto as EPIC scope",
+    "input": "Classify the scope of the anime/manga: Naruto",
+    "context": {},
+    "expected": {
+        "has_field": "scope",
+        "has_field": "reasoning",
+        "scope_in": [
+            "COMPLEX",
+            "EPIC"
+        ],
+        "estimated_episodes_gte": 200,
+        "has_sequels_matches": true
+    }
+}

@@ -1,0 +1,13 @@
+{
+    "agent": "scope",
+    "description": "Classify Akira as MICRO scope",
+    "input": "Classify the scope of the anime/manga: Akira",
+    "context": {},
+    "expected": {
+        "has_field": "scope",
+        "scope_in": [
+            "MICRO",
+            "STANDARD"
+        ]
+    }
+}

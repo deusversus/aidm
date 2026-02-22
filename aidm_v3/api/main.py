@@ -68,6 +68,47 @@ async def list_providers():
     }
 
 
+# ── Admin: Prompt Registry ──────────────────────────────────────────
+
+@app.get("/api/admin/prompts", tags=["Admin"])
+async def list_prompts():
+    """List all registered prompts with fingerprints."""
+    from src.prompts import get_registry
+
+    registry = get_registry()
+    prompts = []
+    for name in registry.list_names():
+        pv = registry.get(name)
+        prompts.append({
+            "name": name,
+            "hash": pv.content_hash,
+            "words": len(pv),
+            "path": str(pv.source_path) if pv.source_path else None,
+            "metadata": pv.metadata,
+        })
+    return {"count": len(prompts), "prompts": prompts}
+
+
+@app.get("/api/admin/prompts/{name}", tags=["Admin"])
+async def get_prompt_detail(name: str):
+    """Get a specific prompt's content and metadata."""
+    from src.prompts import get_registry
+
+    registry = get_registry()
+    pv = registry.get(name)
+    if pv is None:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail=f"Prompt '{name}' not found")
+    return {
+        "name": name,
+        "hash": pv.content_hash,
+        "words": len(pv),
+        "content": pv.content,
+        "metadata": pv.metadata,
+        "path": str(pv.source_path) if pv.source_path else None,
+    }
+
+
 # Serve static web files if they exist (MUST be last - catch-all route)
 web_dir = Path(__file__).parent.parent / "web"
 if web_dir.exists():
