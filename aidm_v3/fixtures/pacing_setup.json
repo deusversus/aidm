@@ -1,0 +1,24 @@
+{
+    "agent": "pacing",
+    "description": "Setup phase pacing for first turn",
+    "input": "I look around the area, taking in my surroundings.",
+    "context": {
+        "intent_summary": "EXPLORATION: Observe environment",
+        "current_arc_state": "Phase: setup, Tension: 0.1, Turns in phase: 1",
+        "situation": "The character has just arrived in a new city.",
+        "director_notes": "Arc 1: Introduction to the setting and key NPCs.",
+        "recent_turns": "(First turns)"
+    },
+    "expected": {
+        "has_field": "arc_beat",
+        "has_field": "tone",
+        "has_field": "pacing_note",
+        "arc_beat_in": [
+            "setup",
+            "transition"
+        ],
+        "strength_in": [
+            "suggestion"
+        ]
+    }
+}
