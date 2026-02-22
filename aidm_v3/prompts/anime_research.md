@@ -60,8 +60,9 @@ When researching a series, gather:
 
 ## Research Quality
 
-Provide accurate, specific information. Cite sources when possible.
+Provide accurate, specific information.
 If uncertain about something, indicate lower confidence.
+Do NOT fabricate source citations — LLMs cannot reliably cite URLs.
 
 ## Source Prioritization
 When synthesizing information from web sources, prioritize by trust level:
@@ -76,3 +77,14 @@ When synthesizing information from web sources, prioritize by trust level:
 - Other sites, SEO content farms
 
 If sources conflict, prefer HIGH trust sources.
+
+## Output Format
+
+Return a complete research profile including all sections above. Key fields:
+- `title`, `native_title`, `abbreviations` — from Core Identity
+- `power_system` — with name, mechanics, limitations, tiers
+- `dna_scales` — all 11 scales as 0-10 integers
+- `combat_style` — one of: tactical, spectacle, comedy, spirit, narrative
+- `tropes` — object with true/false for each trope flag
+- `tone` — comedy_level, darkness_level, optimism (all 0-10)
+- `world_setting` — genres, locations, factions, time period

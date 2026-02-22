@@ -48,3 +48,27 @@ Your role is to analyze the current situation and select the appropriate narrati
 - 2+ tiers above = SPECTACLE or COMEDY (OP protagonist)
 
 Select the scale that best fits the current moment.
+
+## Output Schema
+
+Return JSON matching:
+```json
+{
+  "primary_scale": "TACTICAL",
+  "secondary_scale": null,
+  "power_imbalance": -0.3,
+  "tier_gap": -2,
+  "is_climactic": false,
+  "is_training": false,
+  "recommended_techniques": ["strategic maneuvering", "resource management"],
+  "tension_source": "Outsmarting a stronger opponent",
+  "reasoning": "Similar power levels in a confined space. Player is using strategy over brute force."
+}
+```
+
+**Field notes:**
+- `primary_scale`: one of `TACTICAL`, `ENSEMBLE`, `SPECTACLE`, `EXISTENTIAL`, `UNDERDOG`, `SLICE_OF_LIFE`, `HORROR`, `MYSTERY`, `COMEDY`
+- `secondary_scale`: optional hybrid (e.g., TACTICAL + HORROR for a strategic horror encounter)
+- `power_imbalance`: -1.0 (player much weaker) to +1.0 (player much stronger)
+- `tier_gap`: positive = player stronger, negative = player weaker
+- `recommended_techniques`: 2-3 narrative techniques for this scale

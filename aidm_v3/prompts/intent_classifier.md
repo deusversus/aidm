@@ -41,3 +41,25 @@ Flag these when detected:
 - If the player is TRYING to be dramatic, recognize and reward it
 - Context matters: the same action in different situations has different weight
 - When in doubt, lean toward the more dramatic interpretation
+
+## Output Schema
+
+Return JSON matching:
+```json
+{
+  "intent": "COMBAT",
+  "action": "Lunges at the demon with a flaming uppercut",
+  "target": "Shadow Demon",
+  "declared_epicness": 0.8,
+  "special_conditions": ["named_attack", "protective_rage"],
+  "confidence": 0.95,
+  "secondary_intent": null
+}
+```
+
+**Field notes:**
+- `intent`: one of `COMBAT`, `SOCIAL`, `EXPLORATION`, `ABILITY`, `OTHER`
+- `declared_epicness`: 0.0–1.0 (how dramatic the player INTENDS this to be)
+- `special_conditions`: array of trope flags from the list above (empty if none)
+- `confidence`: 1.0 = certain, <0.7 = ambiguous → also set `secondary_intent`
+- `secondary_intent`: next most likely intent if confidence < 0.7, null otherwise

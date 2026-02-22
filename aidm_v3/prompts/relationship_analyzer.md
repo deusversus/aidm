@@ -20,3 +20,20 @@ Analyze the interaction between the player and the NPC to determine:
 
 Only mark a milestone if it CLEARLY happened in this interaction.
 Be conservative - most interactions have no milestone.
+
+## Output Schema
+
+For each NPC, return:
+```json
+{
+  "npc_name": "Marcus",
+  "affinity_delta": 3,
+  "emotional_milestone": "first_humor",
+  "reasoning": "They laughed together over the failed cooking attempt — genuine, unguarded moment."
+}
+```
+
+**Field notes:**
+- `affinity_delta`: integer from -10 to +10 (0 = neutral, most turns are -2 to +2)
+- `emotional_milestone`: one of `first_humor`, `first_concern`, `first_disagreement`, `first_initiative`, `first_sacrifice`, `first_vulnerability`, `first_trust_test` — or `null` if none occurred
+- Return one result per NPC, even if delta is 0
