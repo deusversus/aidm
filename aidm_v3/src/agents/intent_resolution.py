@@ -162,6 +162,7 @@ class IntentResolutionAgent(AgenticAgent):
     """
 
     agent_name = "intent_resolution"
+    prompt_name = "intent_resolution"
 
     def __init__(self, profiles_dir: Path | None = None):
         super().__init__()
@@ -170,7 +171,7 @@ class IntentResolutionAgent(AgenticAgent):
 
     @property
     def system_prompt(self) -> str:
-        return INTENT_RESOLUTION_PROMPT
+        return self.get_prompt()
 
     @property
     def output_schema(self) -> type[BaseModel]:

@@ -304,6 +304,7 @@ class AnimeResearchAgent(BaseAgent):
     """
 
     agent_name = "research"  # Maps to settings.agent_models.research
+    prompt_name = "anime_research"
 
     # Configuration
     MAX_SUPPLEMENTAL_SEARCHES = 3  # Max follow-up queries for missing data
@@ -311,11 +312,10 @@ class AnimeResearchAgent(BaseAgent):
 
     def __init__(self, model_override: str | None = None):
         super().__init__(model_override=model_override)
-        self._system_prompt = ANIME_RESEARCH_PROMPT
 
     @property
     def system_prompt(self) -> str:
-        return self._system_prompt
+        return self.get_prompt()
 
     @property
     def output_schema(self) -> type[BaseModel]:

@@ -183,14 +183,11 @@ class ScopeAgent(BaseAgent):
     """
 
     agent_name = "scope"  # Defaults to base_fast in settings
-
-    def __init__(self):
-        super().__init__()
-        self._system_prompt = SCOPE_PROMPT
+    prompt_name = "scope"
 
     @property
     def system_prompt(self) -> str:
-        return self._system_prompt
+        return self.get_prompt()
 
     @property
     def output_schema(self) -> type[BaseModel]:

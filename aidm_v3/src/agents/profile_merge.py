@@ -86,14 +86,14 @@ class ProfileMergeAgent(BaseAgent):
     """
 
     agent_name = "profile_merge"
+    prompt_name = "profile_merge"
 
     def __init__(self, model_override: str | None = None):
         super().__init__(model_override=model_override)
-        self._system_prompt = MERGE_PROMPT
 
     @property
     def system_prompt(self) -> str:
-        return self._system_prompt
+        return self.get_prompt()
 
     @property
     def output_schema(self) -> type[BaseModel]:

@@ -2,18 +2,15 @@
 
 import logging
 from abc import ABC, abstractmethod
-from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel
 
 from ..llm import LLMProvider, get_llm_manager
+from ..prompts import get_registry
 from ..settings import get_settings_store
 
 logger = logging.getLogger(__name__)
-
-# Shared prompts directory (aidm_v3/prompts/)
-_PROMPTS_DIR = Path(__file__).parent.parent.parent / "prompts"
 
 
 class BaseAgent(ABC):
@@ -22,10 +19,17 @@ class BaseAgent(ABC):
     Provides structured output support using the LLM manager,
     which supports Google Gemini, Anthropic Claude, and OpenAI.
     Uses per-agent settings from the settings store.
+    
+    Prompts are loaded via the centralized PromptRegistry, which provides
+    content-hash versioning and traceability per turn.
     """
 
     # Subclasses should set this to their agent name
     agent_name: str = "unknown"
+
+    # Prompt name for registry lookup.
+    # Defaults to agent_name if not overridden.
+    prompt_name: str | None = None
 
     def __init__(self, model_override: str | None = None):
         """Initialize the agent.
@@ -35,18 +39,41 @@ class BaseAgent(ABC):
         """
         self._model_override = model_override
 
+    def _get_prompt_name(self) -> str:
+        """Get the effective prompt name for registry lookup."""
+        return self.prompt_name or self.agent_name
+
+    def get_prompt(self, name: str | None = None, fallback: str = "") -> str:
+        """Load a prompt from the registry.
+        
+        Args:
+            name: Prompt name (defaults to self._get_prompt_name())
+            fallback: Returned if prompt not found
+        """
+        prompt_key = name or self._get_prompt_name()
+        return get_registry().get_content(prompt_key, fallback=fallback)
+
+    @property
+    def prompt_fingerprint(self) -> str | None:
+        """Get the content hash of this agent's current system prompt.
+        
+        Returns the SHA-256 fingerprint for per-turn traceability.
+        Returns None if the prompt isn't registry-managed.
+        """
+        try:
+            return get_registry().get_hash(self._get_prompt_name())
+        except KeyError:
+            return None
+
     @staticmethod
     def _load_prompt_file(filename: str, fallback: str = "") -> str:
         """Load a system prompt from prompts/{filename}.
         
-        Args:
-            filename: e.g. 'compactor.md'
-            fallback: returned if file doesn't exist
+        DEPRECATED: Use self.get_prompt() or get_registry().get() instead.
+        Kept for backward compatibility during migration.
         """
-        path = _PROMPTS_DIR / filename
-        if path.exists():
-            return path.read_text(encoding="utf-8").strip()
-        return fallback
+        name = filename.replace(".md", "")
+        return get_registry().get_content(name, fallback=fallback)
 
     def _get_provider_and_model(self) -> tuple[LLMProvider, str]:
         """Get the provider and model for this agent from settings.
