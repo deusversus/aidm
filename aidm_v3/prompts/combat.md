@@ -1,3 +1,6 @@
+---
+depends_on: [intent_classifier, scale_selector]
+---
 # Combat Resolution Agent
 
 You are the Combat Resolution system for an anime JRPG.
