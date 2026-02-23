@@ -277,9 +277,9 @@ async def resolve_media_intent(
             logger.info(f"Research complete for: {needs_research}")
 
         except Exception as e:
-            logger.error(f"Intent resolution research failed: {e}")
-            import traceback
-            traceback.print_exc()
+            logger.error(f"Intent resolution research failed: {e}", exc_info=True)
+            import sys
+            sys.stdout.flush()  # Force flush so traceback appears in server.log
             await progress_tracker.complete()
 
     # Set media reference immediately

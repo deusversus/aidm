@@ -332,33 +332,46 @@ class AnimeResearchAgent(BaseAgent):
         
         Returns the official title, or None if no change needed.
         """
-        query = f'''What is the official English title for the anime "{anime_name}"?
+        query = f'''Verify the official English title for the anime/manga "{anime_name}".
 
 Rules:
-1. Keep variant names! "Dragon Ball Kai" is a SEPARATE anime from "Dragon Ball Z" - it's officially titled "Dragon Ball Z Kai"
-2. Fix abbreviations: "FMAB" → "Fullmetal Alchemist: Brotherhood"
-3. Add proper punctuation: "Naruto Shippuden" → "Naruto: Shippuden"
-4. If already official, return unchanged
+1. If the input is ALREADY the correct official title, return it UNCHANGED. Do NOT shorten or truncate it.
+2. Fix abbreviations: "FMAB" → "Fullmetal Alchemist: Brotherhood", "HxH" → "Hunter x Hunter"
+3. Fix informal names: "Mob Psycho" → "Mob Psycho 100"
+4. Keep variant names! "Dragon Ball Kai" is SEPARATE from "Dragon Ball Z" — it's "Dragon Ball Z Kai"
+5. NEVER truncate long titles. Light novel titles are intentionally long. Return all words.
+6. Add proper punctuation only if genuinely missing: "Naruto Shippuden" → "Naruto: Shippuden"
 
-Examples:
-- "Dragon Ball Kai" → "Dragon Ball Z Kai" (NOT "Dragon Ball Z" - Kai is its own show!)
-- "HxH" → "Hunter x Hunter"  
-- "Mob Psycho" → "Mob Psycho 100"
+IMPORTANT: Most inputs are already correct. When in doubt, return the input exactly as given.
 
-Return ONLY the title.'''
+Return ONLY the title, nothing else.'''
 
         try:
-            # Use regular completion - LLM training data knows anime titles
-            # Web search can confuse matters by providing too much context
-            response = await provider.complete(
-                messages=[{"role": "user", "content": query}],
-                system="Return only the official anime title. No explanation or extra text.",
-                model=model,
-                max_tokens=200,
-            )
+            # Try web search first — grounded in real data from MAL/AniList/Wikipedia
+            # This is more reliable than training data alone for less common titles
+            raw = None
+            if hasattr(provider, 'complete_with_search'):
+                try:
+                    response = await provider.complete_with_search(
+                        messages=[{"role": "user", "content": query}],
+                        system="Return only the official anime/manga title. No explanation or extra text. If the input title is already correct, return it exactly as given.",
+                        model=model,
+                        max_tokens=200,
+                    )
+                    raw = response.content.strip()
+                except Exception as e:
+                    logger.warning(f"Title normalization web search failed, trying without: {e}")
 
-            # Parse response - take first line only, clean up
-            raw = response.content.strip()
+            if not raw:
+                # Fallback to regular completion (training data only)
+                response = await provider.complete(
+                    messages=[{"role": "user", "content": query}],
+                    system="Return only the official anime/manga title. No explanation or extra text. If the input title is already correct, return it exactly as given.",
+                    model=model,
+                    max_tokens=200,
+                )
+                raw = response.content.strip()
+
             logger.info(f"Title normalization RAW ({len(raw)} chars): {repr(raw)}")
             # Take first line only (LLM sometimes adds explanation)
             official = raw.split('\n')[0].strip().strip('"').strip("'").strip('.')
@@ -367,6 +380,26 @@ Return ONLY the title.'''
 
             # Basic validation - should look like a title
             if official and len(official) < 150 and not official.startswith("I ") and "Let's" not in official:
+                # Truncation guard: if the LLM returned a title that drops significant
+                # words from the input while keeping the same prefix, it's likely a
+                # truncation error, not a legitimate normalization.
+                input_words = anime_name.lower().split()
+                output_words = official.lower().split()
+                if len(input_words) >= 4 and len(output_words) < len(input_words) * 0.7:
+                    # Check if it's a prefix (same first N words)
+                    shared_prefix = 0
+                    for iw, ow in zip(input_words, output_words):
+                        if iw == ow:
+                            shared_prefix += 1
+                        else:
+                            break
+                    if shared_prefix >= len(output_words) * 0.8:
+                        logger.warning(
+                            f"Title normalization rejected (truncation): "
+                            f"'{official}' is a prefix of '{anime_name}' "
+                            f"({len(output_words)}/{len(input_words)} words). Keeping original."
+                        )
+                        return anime_name
                 return official
             return None
         except Exception as e:
@@ -1240,7 +1273,9 @@ Supplemental knowledge: {response.content}
                     50
                 )
 
-            fallback_result = await self.research_anime(anime_name, progress_tracker=progress_tracker)
+            # Pass the AniList-resolved official_title (not raw anime_name)
+            # so _normalize_title doesn't re-resolve and potentially truncate it
+            fallback_result = await self.research_anime(official_title, progress_tracker=progress_tracker)
             # Carry AniList genres into the fallback if the legacy pipeline didn't populate them
             if not fallback_result.detected_genres and anilist and anilist.genres:
                 fallback_result.detected_genres = anilist.genres

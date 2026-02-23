@@ -440,6 +440,9 @@ async def generate_and_save_profile(
                 logger.warning("WARNING: power_system is empty — this IP may lack a power system, or wiki scrape may have missed technique pages")
 
             # --- ALL VALIDATION PASSED - NOW SAVE ATOMICALLY ---
+            logger.info(f"[ProfileGenerator] Validation passed for '{profile['id']}' — starting save...")
+            import sys
+            sys.stdout.flush()
 
             # 1. Store structured lore in SQL (replaces .txt dump)
             from ..scrapers.lore_store import get_lore_store
@@ -480,6 +483,8 @@ async def generate_and_save_profile(
                     logger.debug(f"Stored raw content as single page in LoreStore for {profile['id']}")
 
             # 2. Ingest into ProfileLibrary (ChromaDB) — still uses raw_content for chunking
+            logger.info(f"[ProfileGenerator] Step 2: Ingesting into ChromaDB for '{profile['id']}'...")
+            sys.stdout.flush()
             from ..context.profile_library import get_profile_library
             library = get_profile_library()
             library.add_profile_lore(profile['id'], research.raw_content, source="auto_research")
@@ -537,11 +542,14 @@ def load_existing_profile(anime_name: str) -> dict[str, Any] | None:
     """
     from ..profiles.loader import find_profile_by_title, reload_alias_index
 
+    logger.info(f"[Dedup] Checking for existing profile: '{anime_name}'")
+
     # Try fuzzy matching via alias index
     match_result = find_profile_by_title(anime_name, fuzzy_threshold=2)
 
     if match_result:
         profile_id, match_type = match_result
+        logger.info(f"[Dedup] Alias index matched: '{anime_name}' → '{profile_id}' (type={match_type})")
         v3_profiles = Path(__file__).parent.parent / "profiles"
         profile_path = v3_profiles / f"{profile_id}.yaml"
 
@@ -553,10 +561,13 @@ def load_existing_profile(anime_name: str) -> dict[str, Any] | None:
                 logger.info(f"Fuzzy matched '{anime_name}' to profile '{profile_id}'")
 
             return profile
+        else:
+            logger.warning(f"[Dedup] Matched profile '{profile_id}' but file {profile_path} doesn't exist!")
 
     # Fallback: Direct filename lookup (for backwards compatibility)
     normalized = _sanitize_profile_id(anime_name)
     normalized_no_space = anime_name.lower().replace(" ", "").replace(":", "").replace("-", "")
+    logger.info(f"[Dedup] No alias match. Trying direct filenames: {normalized}.yaml, {normalized_no_space}.yaml")
 
     v3_profiles = Path(__file__).parent.parent / "profiles"
     for name in [f"{normalized}.yaml", f"{normalized_no_space}.yaml"]:
@@ -566,8 +577,10 @@ def load_existing_profile(anime_name: str) -> dict[str, Any] | None:
                 profile = yaml.safe_load(f)
             # Rebuild index since we found a profile not in index
             reload_alias_index()
+            logger.info(f"[Dedup] Direct filename match: {name}")
             return profile
 
+    logger.info(f"[Dedup] No existing profile found for '{anime_name}'")
     return None
 
 
