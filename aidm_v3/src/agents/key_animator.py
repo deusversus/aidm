@@ -127,6 +127,57 @@ class KeyAnimator(PromptBuilderMixin):
         ("training_payoff",     "montage"),
     ]
 
+    # --- Approach D: Beat-Specific Craft Guidance ---
+    # Shapes prose STRUCTURE and RHYTHM per arc beat.
+    # Deliberately avoids tone/voice (that's Profile DNA's domain).
+    # 3-4 lines max per beat — enough to shift behavior, gentle enough
+    # not to override Director notes or profile authorial voice.
+
+    BEAT_CRAFT_GUIDANCE = {
+        "setup": (
+            "CRAFT: Establish before you escalate.\n"
+            "- Lead with environment and atmosphere — ground the reader in WHERE they are.\n"
+            "- Introduce details that can pay off later; plant, don't reveal.\n"
+            "- Longer sentences, wider lens. Let the scene breathe."
+        ),
+        "rising": (
+            "CRAFT: Let tension accumulate, not explode.\n"
+            "- Each paragraph should leave one question unanswered.\n"
+            "- Tighten sentence length gradually — the prose itself should accelerate.\n"
+            "- Introduce complications mid-scene, not at the end."
+        ),
+        "escalation": (
+            "CRAFT: The walls are closing in.\n"
+            "- Short paragraphs. Frequent scene cuts if multiple threads are active.\n"
+            "- Stakes should be FELT, not stated — show what's at risk through character reactions.\n"
+            "- Deny the character (and reader) moments of comfort."
+        ),
+        "climax": (
+            "CRAFT: This is the frame they'll remember.\n"
+            "- Slow the decisive moment down — one action, multiple sensory layers.\n"
+            "- Sentence fragments are powerful here. Impact. Silence. Then consequence.\n"
+            "- Earn the moment by connecting it to what was planted earlier."
+        ),
+        "falling": (
+            "CRAFT: Let the dust settle. Don't rush past the cost.\n"
+            "- Return to longer, slower prose — the adrenaline is fading.\n"
+            "- Show characters processing: injuries, exhaustion, quiet disbelief.\n"
+            "- Small sensory details carry weight here — a trembling hand, settling rubble."
+        ),
+        "resolution": (
+            "CRAFT: Close the loop, open a door.\n"
+            "- Mirror an image or phrase from the setup — the reader feels the arc complete.\n"
+            "- Emotional payoff lives in understatement, not speeches.\n"
+            "- End the scene on an image, not exposition. Plant one seed of what's next."
+        ),
+        "transition": (
+            "CRAFT: Bridge, don't linger.\n"
+            "- Quick establishing details for the new context — don't re-setup fully.\n"
+            "- A single beat of reflection on what just happened, then forward momentum.\n"
+            "- Shift the sensory palette — different light, sound, temperature."
+        ),
+    }
+
     def __init__(self, profile: NarrativeProfile, model_override: str | None = None):
         """Initialize the Key Animator.
         
@@ -779,6 +830,13 @@ MATCH the established voice, humor, and style from these exchanges.
                 pacing_text += f"**Foreshadowing**: {pacing.foreshadowing_hint}\n"
             if pacing.pacing_note:
                 pacing_text += f"\n{pacing.pacing_note}\n"
+
+            # Beat-specific craft guidance (Approach D)
+            # Secondary to Profile DNA — shapes structure/rhythm, not voice.
+            craft = self.BEAT_CRAFT_GUIDANCE.get(pacing.arc_beat, "")
+            if craft:
+                pacing_text += f"\n### Writing Craft (secondary to Profile DNA)\n{craft}\n"
+
             dynamic_parts.append(pacing_text)
 
         # Director Notes
