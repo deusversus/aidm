@@ -105,6 +105,7 @@ class PacingAgent(BaseAgent):
         situation: str,
         recent_summary: str,
         turns_in_phase: int = 0,
+        canonicality_context: str = "",
     ) -> PacingDirective | None:
         """Run the pre-turn pacing micro-check.
         
@@ -122,13 +123,18 @@ class PacingAgent(BaseAgent):
             PacingDirective or None on failure
         """
         try:
+            # Build arc state with optional canonicality
+            arc_state = (
+                f"Phase: {arc_phase}, Tension: {tension_level:.1f}, "
+                f"Turns in phase: {turns_in_phase}"
+            )
+            if canonicality_context:
+                arc_state += f"\n{canonicality_context}"
+
             result = await self.call(
                 player_input,
                 intent_summary=intent_summary,
-                current_arc_state=(
-                    f"Phase: {arc_phase}, Tension: {tension_level:.1f}, "
-                    f"Turns in phase: {turns_in_phase}"
-                ),
+                current_arc_state=arc_state,
                 situation=situation,
                 director_notes=bible_notes or "(No director notes yet)",
                 recent_turns=recent_summary or "(First turns)",

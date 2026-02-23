@@ -25,6 +25,10 @@ Given the current arc state and player's action, determine the optimal pacing fo
 7. avoid: Flag things that would break pacing.
 8. pacing_note: One sentence of actionable guidance.
 9. If the player is DERAILING the planned arc, acknowledge it — don't fight the player.
+10. If Canonicality Constraints are provided in arc state:
+    - `canon_adjacent` + `observable` → External canon timeline provides structure. Pacing can lean on upcoming canon events as natural escalation anchors.
+    - `alternate` or `influenceable` → Timeline is mutable. Pacing is fully player-driven.
+    - `inspired` or `background` → No external timeline. Pacing depends entirely on player actions and Director planning.
 
 ## Phase Gate Rules (#3)
 Evaluate `turns_in_phase` to detect stalling arcs:

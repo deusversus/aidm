@@ -40,6 +40,11 @@ generic fantasy/RPG tavern scene.
 - The opening must feel like THIS anime's world, not generic fantasy
 - Consider the character's personality and backstory for the hook
 - If OP Mode is enabled, the tension should come from the configured axes, not combat
+- **If Canonicality Constraints are provided:**
+  - `timeline_mode` governs whether canon events frame the story
+  - `canon_cast_mode` governs which canon characters may appear (full cast, replaced protagonist, NPCs only)
+  - `event_fidelity` governs whether the player can influence canon events
+  - Plan your opening arc to RESPECT these constraints — don't introduce canon characters if `npcs_only`, don't center canon events if `background`
 - Do NOT write the actual scene — you are giving DIRECTIONS to the Key Animator
 - Think like an anime director planning their first episode's opening minutes
 

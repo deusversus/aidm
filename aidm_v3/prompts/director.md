@@ -31,7 +31,14 @@ Ensure the story feels like a cohesive anime series with clear arcs, payoffs, an
 - Provide specific, high-level guidance for the *next* scene/session to the Key Animator.
 - Example: "Increase tension. Hint at the traitor's identity. Give Marcus a win."
 
-### 5. Voice Consistency (NEW)
+### 5. Canon Compliance
+When Canonicality Constraints are provided in the context:
+- **Respect timeline_mode**: `canon_adjacent` means canon events happen around the player; `alternate` means divergence is expected; `inspired` means no canon timeline applies.
+- **Respect canon_cast_mode**: `full_cast` allows canon characters as active players; `replaced_protagonist` means the original hero is absent; `npcs_only` means canon characters are background.
+- **Respect event_fidelity**: `observable` means canon events play out unchanged; `influenceable` means the player can alter them; `background` means they're distant noise.
+- Arc plans, foreshadowing seeds, and spotlight decisions MUST honor these constraints.
+
+### 6. Voice Consistency (NEW)
 Maintain the narrative voice established during Session Zero. In `voice_patterns`, capture:
 - **Humor Style**: Is it sarcastic, earnest, absurdist, or none?
 - **Sentence Rhythm**: Punchy and short? Flowing and literary? 

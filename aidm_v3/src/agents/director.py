@@ -191,6 +191,9 @@ Provide a CONCISE investigation report structured as:
         power_expression: str | None = None,
         narrative_focus: str | None = None,
         composition_name: str | None = None,
+        timeline_mode: str | None = None,
+        canon_cast_mode: str | None = None,
+        event_fidelity: str | None = None,
     ) -> DirectorOutput:
         """
         Create an initial storyboard at gameplay handoff (pilot episode planning).
@@ -239,6 +242,9 @@ Provide a CONCISE investigation report structured as:
             power_expression=power_expression,
             narrative_focus=narrative_focus,
             composition_name=composition_name,
+            timeline_mode=timeline_mode,
+            canon_cast_mode=canon_cast_mode,
+            event_fidelity=event_fidelity,
         )
 
         # 4. Replace {context} placeholder in prompt
@@ -261,8 +267,13 @@ Provide a CONCISE investigation report structured as:
         power_expression: str | None,
         narrative_focus: str | None,
         composition_name: str | None,
+        timeline_mode: str | None = None,
+        canon_cast_mode: str | None = None,
+        event_fidelity: str | None = None,
     ) -> str:
         """Build context for the Director's startup briefing."""
+
+        from ..core.canonicality import format_canonicality_block
 
         lines = ["# Pilot Episode Planning — Director Startup Briefing"]
 
@@ -274,6 +285,13 @@ Provide a CONCISE investigation report structured as:
         lines.append(f"**Starting Location:** {starting_location}")
         if power_tier:
             lines.append(f"**Power Tier:** {power_tier}")
+
+        # === CANONICALITY CONSTRAINTS ===
+        canon_block = format_canonicality_block(
+            timeline_mode, canon_cast_mode, event_fidelity
+        )
+        if canon_block:
+            lines.append(f"\n{canon_block}")
 
         # === NARRATIVE COMPOSITION ===
         if tension_source or power_expression or narrative_focus:
@@ -364,6 +382,8 @@ Provide a CONCISE investigation report structured as:
     ) -> str:
         """Construct the context prompt for the Director."""
 
+        from ..core.canonicality import format_canonicality_block
+
         lines = ["# Campaign Status Review"]
 
         # === INVESTIGATION FINDINGS (from agentic research) ===
@@ -379,6 +399,16 @@ Provide a CONCISE investigation report structured as:
             lines.append("in verbatim memory. Use for arc awareness, emotional trajectory, and continuity.")
             lines.append(compaction_text)
             lines.append("")
+
+        # === CANONICALITY CONSTRAINTS ===
+        if world_state:
+            canon_block = format_canonicality_block(
+                getattr(world_state, 'timeline_mode', None),
+                getattr(world_state, 'canon_cast_mode', None),
+                getattr(world_state, 'event_fidelity', None),
+            )
+            if canon_block:
+                lines.append(f"\n{canon_block}")
 
         # =====================================================================
         # Narrative DNA (Calibrate Arc Pacing)

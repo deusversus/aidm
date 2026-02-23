@@ -43,6 +43,10 @@ class FakeContext:
     present_npcs: list = None
     op_protagonist_enabled: bool = False
     director_notes: str = ""
+    # Canonicality (from Session Zero)
+    timeline_mode: str = None
+    canon_cast_mode: str = None
+    event_fidelity: str = None
 
     def __post_init__(self):
         if self.present_npcs is None:

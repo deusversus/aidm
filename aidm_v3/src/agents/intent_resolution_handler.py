@@ -171,6 +171,16 @@ async def resolve_media_intent(
         needs_research = [rt.canonical_title for rt in resolution.resolved_titles]
         logger.info(f"Safety net: populating needs_research from resolved titles: {needs_research}")
 
+    # AniList-down fallback: if resolution produced NOTHING (no titles, no research),
+    # treat the raw user input as the resolved title and trigger research anyway.
+    # The research pipeline has its own AniList→Fandom→web-search fallback chain.
+    if not needs_research and not existing_profiles and not resolution.resolved_titles:
+        needs_research = [media_ref]
+        logger.warning(
+            f"Intent resolution returned empty — AniList may be down. "
+            f"Falling back to raw title for research: {needs_research}"
+        )
+
     if not needs_research and existing_profiles:
         # All profiles exist — link them and mark ready
         profile_ids = [rt.profile_id for rt in resolution.resolved_titles]

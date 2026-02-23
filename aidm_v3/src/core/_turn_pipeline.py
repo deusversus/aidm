@@ -304,6 +304,7 @@ class TurnPipelineMixin:
             )
 
             # Pre-turn pacing micro-check (#1) — runs in parallel
+            from ..core.canonicality import format_canonicality_block
             pacing_task = asyncio.create_task(
                 self.pacing_agent.check(
                     player_input=player_input,
@@ -314,6 +315,11 @@ class TurnPipelineMixin:
                     situation=db_context.situation,
                     recent_summary=db_context.recent_summary,
                     turns_in_phase=db_context.turns_in_phase,  # #3: pacing gates
+                    canonicality_context=format_canonicality_block(
+                        db_context.timeline_mode,
+                        db_context.canon_cast_mode,
+                        db_context.event_fidelity,
+                    ),
                 )
             )
 

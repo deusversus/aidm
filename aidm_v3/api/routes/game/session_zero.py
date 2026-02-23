@@ -216,7 +216,11 @@ async def _handle_gameplay_handoff(session, session_id: str, result, agent) -> t
             location=draft.starting_location or "Unknown Location",
             situation=situation_text,
             arc_phase="setup",
-            tension_level=0.4
+            tension_level=0.4,
+            # Sync canonicality from Session Zero
+            timeline_mode=draft.timeline_mode,
+            canon_cast_mode=draft.canon_cast_mode,
+            event_fidelity=draft.event_fidelity,
         )
 
         try:
@@ -247,6 +251,9 @@ async def _handle_gameplay_handoff(session, session_id: str, result, agent) -> t
             power_expression=draft.power_expression or draft.op_power_expression,
             narrative_focus=draft.narrative_focus or draft.op_narrative_focus,
             composition_name=draft.composition_name or draft.op_preset,
+            timeline_mode=draft.timeline_mode,
+            canon_cast_mode=draft.canon_cast_mode,
+            event_fidelity=draft.event_fidelity,
         )
         logger.info("Director startup complete — initial storyboard created")
     except Exception as dir_err:
