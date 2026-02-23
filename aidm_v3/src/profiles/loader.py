@@ -547,13 +547,30 @@ def find_profile_by_title(
         # WORD ORDER GATE: reject if words are rearranged into a different title
         # "Super Dragon Ball Heroes" ≠ "Dragon Ball Super: Super Hero"
         order_sim = word_order_similarity(title, matched_alias)
-        if order_sim < 0.6:
+
+        # When one title is a prefix/subset of the other (e.g., "How a Realist Hero"
+        # matching "How a Realist Hero Rebuilt the Kingdom"), the raw order_sim can be
+        # low (4/7=0.57) even though all alias words appear in perfect order. In this
+        # case, check if LCS == min_word_count — that means it's a true containment
+        # match, NOT a rearrangement.
+        min_words = min(len(normalize_title(title).split()), len(normalize_title(matched_alias).split()))
+        max_words = max(len(normalize_title(title).split()), len(normalize_title(matched_alias).split()))
+        lcs_len = round(order_sim * max_words)  # Reverse the normalization
+        is_containment = (lcs_len >= min_words)
+
+        if order_sim < 0.5 and not is_containment:
             logger.warning(
                 f"Token match rejected (word order): '{title}' vs '{matched_alias}' "
                 f"(token_sim={similarity:.2f}, order_sim={order_sim:.2f})"
             )
         else:
-            logger.info(f"Token match: '{title}' -> '{matched_alias}' (similarity={similarity:.2f}, order={order_sim:.2f}) -> {profile_id}")
+            if is_containment and order_sim < 0.5:
+                logger.info(
+                    f"Token match (containment): '{title}' -> '{matched_alias}' "
+                    f"(token_sim={similarity:.2f}, order_sim={order_sim:.2f}, lcs={lcs_len}/{min_words}) -> {profile_id}"
+                )
+            else:
+                logger.info(f"Token match: '{title}' -> '{matched_alias}' (similarity={similarity:.2f}, order={order_sim:.2f}) -> {profile_id}")
             return (profile_id, "token")
 
 
