@@ -1,0 +1,116 @@
+id: how_a_realist_hero
+name: How a Realist Hero
+source_anime: How a Realist Hero
+media_type: anime
+status: completed
+generated_at: '2026-02-23T07:13:45.810713'
+confidence: 95
+research_method: bundled_parallel
+aliases:
+- Genjitsu Shugi Yūsha no Ōkoku Saikenki
+- genkoku
+- how a realist hero
+- howarealisthero
+- realist hero
+- reconstruction the elfrieden kingdom tales of realistic brave
+- 現実主義勇者の王国再建記
+dna_scales:
+  introspection_vs_action: 1
+  comedy_vs_drama: 3
+  simple_vs_complex: 7
+  power_fantasy_vs_struggle: 6
+  explained_vs_mysterious: 1
+  fast_paced_vs_slow_burn: 8
+  episodic_vs_serialized: 9
+  grounded_vs_absurd: 1
+  tactical_vs_instinctive: 0
+  hopeful_vs_cynical: 2
+  ensemble_vs_solo: 3
+power_distribution:
+  peak_tier: T6
+  typical_tier: T9
+  floor_tier: T10
+  gradient: top_heavy
+world_tier: T9
+tropes:
+  tournament_arc: false
+  training_montage: false
+  power_of_friendship: false
+  mentor_death: false
+  chosen_one: true
+  tragic_backstory: false
+  redemption_arc: false
+  betrayal: true
+  sacrifice: true
+  transformation: false
+  forbidden_technique: false
+  time_loop: false
+  false_identity: false
+  ensemble_focus: true
+  slow_burn_romance: true
+detected_genres:
+- Action
+- Adventure
+- Fantasy
+- Romance
+combat_system: tactical
+power_system:
+  name: Mana-based Magic
+  mechanics: 'Magic is categorized into six elements: Fire, Water, Earth, Wind, Light,
+    and Dark. While standard elements handle traditional offensive, defensive, and
+    healing magic, Dark Magic is a catch-all for unique abilities. Souma''s specific
+    Dark Magic, ''Living Poltergeists'', allows him to split his consciousness to
+    telekinetically pilot inanimate objects.'
+  limitations: Users face strict weight and mass limits. Control effectiveness, precision,
+    and range depend heavily on the object's shape, with creature-shaped objects being
+    much easier to control. Splitting consciousness causes severe mental fatigue,
+    and the user experiences intense phantom pain and mental feedback if a controlled
+    object is damaged.
+  tiers:
+  - Skill-based Progression
+  - Small Object Control (e.g., pens)
+  - Long-range Scouting (e.g., wooden mice)
+  - Combat Proxies (e.g., human-sized dolls)
+  - Massive Construct Piloting (e.g., Mechadra)
+tone:
+  comedy_level: 4
+  darkness_level: 3
+  optimism: 8
+director_personality: You are the director for a How a Realist Hero-style campaign.
+  You explore character thoughts and feelings deeply. You maintain dramatic weight;
+  comedy is rare and earned. You let scenes breathe. Patience is a virtue; payoffs
+  are earned. Hope is real in this world. Earned optimism, not naivety. You explain
+  strategies and tactics in detail.
+pacing:
+  scene_length: moderate
+  arc_length_sessions: 4-6
+sources_consulted:
+- power_system
+- combat
+- tone
+- visual_style
+- characters
+- factions
+- locations
+- arcs
+- sequels
+- adaptations
+- recent
+- series_aliases
+visual_style:
+  art_style: clean medieval fantasy with modern infrastructure elements
+  color_palette: bright, warm greens, golds, and royal blues with occasional muted
+    darks
+  line_work: standard conservative anime outlines
+  shading: basic flat cel shading
+  character_rendering: appealing but generic anime tropes, distinct colorful outfits
+  atmosphere: cozy, optimistic, and intellectually engaging
+  composition_style: static dialogue-heavy framing, panning shots, still frames
+  studio_reference: J.C.Staff
+  reference_descriptors:
+  - clean medieval fantasy
+  - bright warm colors
+  - standard isekai designs
+  - static dialogue scenes
+series_group: how_a_realist_hero_rebuilt_the_kingdom
+series_position: 1

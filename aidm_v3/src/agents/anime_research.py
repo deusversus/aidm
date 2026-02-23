@@ -359,6 +359,7 @@ Return ONLY the title.'''
 
             # Parse response - take first line only, clean up
             raw = response.content.strip()
+            logger.info(f"Title normalization RAW ({len(raw)} chars): {repr(raw)}")
             # Take first line only (LLM sometimes adds explanation)
             official = raw.split('\n')[0].strip().strip('"').strip("'").strip('.')
 

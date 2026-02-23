@@ -305,8 +305,22 @@ This triggers a portrait panel. Use sparingly — only for panel-worthy moments.
 
     def _build_scene_context(self, context: GameContext) -> str:
         """Build the scene context section."""
+
+        from ..core.canonicality import format_canonicality_block
+
         lines = [
             "## Current Scene Context",
+        ]
+
+        # Canonicality constraints (how to handle source material)
+        canon_block = format_canonicality_block(
+            context.timeline_mode, context.canon_cast_mode, context.event_fidelity
+        )
+        if canon_block:
+            lines.append("")
+            lines.append(canon_block)
+
+        lines.extend([
             "",
             f"**Location:** {context.location}",
             f"**Time:** {context.time_of_day}",
@@ -315,7 +329,7 @@ This triggers a portrait panel. Use sparingly — only for panel-worthy moments.
             f"**Character:** {context.character_summary}",
             "",
             f"**Arc Phase:** {context.arc_phase} (Tension: {context.tension_level:.1f})",
-        ]
+        ])
 
         if context.recent_summary:
             lines.append("")

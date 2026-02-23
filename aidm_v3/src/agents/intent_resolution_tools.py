@@ -26,9 +26,24 @@ logger = logging.getLogger(__name__)
 
 async def _search_anilist(client, title: str, media_type: str = "ANIME") -> list[dict]:
     """Search AniList and return all candidates."""
-    from ..scrapers.anilist import AniListResult
+    from ..scrapers.anilist import AniListClient, AniListResult
+
+    # Circuit breaker: if AniList is known to be down, skip and signal fallback
+    if not AniListClient.is_available():
+        return [{
+            "info": f"AniList API is currently unavailable. Proceed with '{title}' as the resolved title.",
+            "api_unavailable": True,
+        }]
 
     results = await client.search_multi(title, media_type=media_type)
+
+    # Check if the API went down during this call (circuit breaker tripped)
+    if not results and not AniListClient.is_available():
+        return [{
+            "info": f"AniList API is currently unavailable. Proceed with '{title}' as the resolved title.",
+            "api_unavailable": True,
+        }]
+
     if not results:
         return [{"info": f"No results found for '{title}' (type={media_type})"}]
 

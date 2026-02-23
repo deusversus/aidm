@@ -371,12 +371,18 @@ class AniListResult:
 # ─── Client ──────────────────────────────────────────────────────────────────
 
 ANILIST_API_URL = "https://graphql.anilist.co"
-MAX_RETRIES = 3
+MAX_RETRIES = 5
 RATE_LIMIT_SLEEP = 2.0  # seconds to wait on rate limit
+OUTAGE_BACKOFF_BASE = 2  # exponential base for outage retries (2,4,8,16,32s)
+CIRCUIT_BREAKER_COOLDOWN = 60  # seconds to cache "API down" status
 
 
 class AniListClient:
     """Async-compatible AniList GraphQL client."""
+
+    # Circuit breaker: class-level so all instances share state
+    _api_available: bool = True
+    _api_last_check: float = 0.0
 
     def __init__(self):
         self._session = requests.Session()
@@ -385,8 +391,44 @@ class AniListClient:
             "Accept": "application/json",
         })
 
+    @classmethod
+    def is_available(cls) -> bool:
+        """Check if AniList API is believed to be available.
+        
+        Returns cached status for CIRCUIT_BREAKER_COOLDOWN seconds
+        to avoid hammering a down API.
+        """
+        import time as _time
+        if not cls._api_available:
+            elapsed = _time.time() - cls._api_last_check
+            if elapsed < CIRCUIT_BREAKER_COOLDOWN:
+                return False
+            # Cooldown expired — allow retry
+            cls._api_available = True
+        return True
+
+    @classmethod
+    def _mark_unavailable(cls):
+        """Mark the API as down, starting the circuit breaker cooldown."""
+        import time as _time
+        cls._api_available = False
+        cls._api_last_check = _time.time()
+        logger.warning(f"AniList circuit breaker OPEN — suppressing calls for {CIRCUIT_BREAKER_COOLDOWN}s")
+
+    @classmethod
+    def _mark_available(cls):
+        """Reset circuit breaker on successful response."""
+        cls._api_available = True
+
     def _execute_query(self, query: str, variables: dict) -> dict:
-        """Execute a GraphQL query against AniList."""
+        """Execute a GraphQL query against AniList with exponential backoff."""
+        import time as _time
+
+        # Circuit breaker: skip retries if API recently confirmed down
+        if not self.is_available():
+            logger.info("AniList circuit breaker active — skipping request")
+            return {}
+
         for attempt in range(MAX_RETRIES):
             try:
                 response = self._session.post(
@@ -396,11 +438,22 @@ class AniListClient:
                 )
 
                 if response.status_code == 429:
-                    # Rate limited — back off
+                    # Rate limited — use server's Retry-After header
                     retry_after = int(response.headers.get("Retry-After", RATE_LIMIT_SLEEP))
                     logger.warning(f"AniList rate limited, waiting {retry_after}s...")
-                    import time
-                    time.sleep(retry_after)
+                    _time.sleep(retry_after)
+                    continue
+
+                if response.status_code in (404, 500, 502, 503, 504):
+                    # API outage — use longer exponential backoff
+                    wait = OUTAGE_BACKOFF_BASE ** attempt
+                    logger.error(
+                        f"AniList outage (HTTP {response.status_code}, "
+                        f"attempt {attempt+1}/{MAX_RETRIES}), "
+                        f"retrying in {wait}s..."
+                    )
+                    if attempt < MAX_RETRIES - 1:
+                        _time.sleep(wait)
                     continue
 
                 response.raise_for_status()
@@ -410,14 +463,20 @@ class AniListClient:
                     logger.warning(f"AniList GraphQL errors: {data['errors']}")
                     return {}
 
+                # Success — reset circuit breaker
+                self._mark_available()
                 return data.get("data", {})
 
             except requests.RequestException as e:
-                logger.error(f"AniList request failed (attempt {attempt+1}): {e}")
+                wait = OUTAGE_BACKOFF_BASE ** attempt
+                logger.error(
+                    f"AniList request failed (attempt {attempt+1}/{MAX_RETRIES}): {e}"
+                )
                 if attempt < MAX_RETRIES - 1:
-                    import time
-                    time.sleep(2 ** attempt)
+                    _time.sleep(wait)
 
+        # All retries exhausted — trip circuit breaker
+        self._mark_unavailable()
         return {}
 
     # Format priority for disambiguation: users almost always mean the main series

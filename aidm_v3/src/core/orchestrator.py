@@ -161,6 +161,9 @@ class Orchestrator(TurnPipelineMixin, BackgroundMixin):
         power_expression: str | None = None,
         narrative_focus: str | None = None,
         composition_name: str | None = None,
+        timeline_mode: str | None = None,
+        canon_cast_mode: str | None = None,
+        event_fidelity: str | None = None,
     ):
         """
         Run the Director's startup briefing at gameplay handoff.
@@ -183,6 +186,9 @@ class Orchestrator(TurnPipelineMixin, BackgroundMixin):
             power_expression=power_expression,
             narrative_focus=narrative_focus,
             composition_name=composition_name,
+            timeline_mode=timeline_mode,
+            canon_cast_mode=canon_cast_mode,
+            event_fidelity=event_fidelity,
         )
 
         # Persist to Campaign Bible
