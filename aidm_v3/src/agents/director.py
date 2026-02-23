@@ -609,8 +609,9 @@ Provide a CONCISE investigation report structured as:
         lines.append("1. Did we advance the current arc?")
         lines.append("2. Were any planted seeds paid off?")
         lines.append("3. Who was the MVP? Who was invisible?")
-        if op_preset:
-            lines.append(f"4. Are we honoring the {op_preset.replace('_', ' ').title()} composition? (tension from right sources?)")
+        composition_name = (profile.composition.get('name') or profile.composition.get('mode')) if (profile and profile.composition) else None
+        if composition_name:
+            lines.append(f"4. Are we honoring the {composition_name.replace('_', ' ').title()} composition? (tension from right sources?)")
         lines.append("Update the Bible accordingly.")
 
         return "\n".join(lines)

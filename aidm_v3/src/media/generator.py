@@ -938,11 +938,11 @@ STYLE:
         try:
             from google.genai import types
             loop = asyncio.get_running_loop()
-            image_bytes = image_path.read_bytes()
 
             def _start_generation():
                 """Start the Veo generation job (returns an operation to poll)."""
-                image = types.Part.from_bytes(data=image_bytes, mime_type="image/png")
+                # Veo's `image` parameter expects types.Image, not types.Part
+                image = types.Image.from_file(str(image_path))
                 operation = self._client.models.generate_videos(
                     model=self.VIDEO_MODEL,
                     prompt=prompt,
