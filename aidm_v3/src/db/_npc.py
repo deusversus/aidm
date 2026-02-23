@@ -374,7 +374,10 @@ class NPCMixin:
                 continue
 
             # Determine disposition label
-            disp = npc.disposition or 0
+            try:
+                disp = int(npc.disposition or 0)
+            except (ValueError, TypeError):
+                disp = 0
             if disp >= 90:
                 disp_label = "devoted"
             elif disp >= 60:
