@@ -123,18 +123,16 @@ class PacingAgent(BaseAgent):
             PacingDirective or None on failure
         """
         try:
-            # Build arc state with optional canonicality
             arc_state = (
                 f"Phase: {arc_phase}, Tension: {tension_level:.1f}, "
                 f"Turns in phase: {turns_in_phase}"
             )
-            if canonicality_context:
-                arc_state += f"\n{canonicality_context}"
 
             result = await self.call(
                 player_input,
                 intent_summary=intent_summary,
                 current_arc_state=arc_state,
+                canonicality_constraints=canonicality_context or "(No canonicality constraints — original world)",
                 situation=situation,
                 director_notes=bible_notes or "(No director notes yet)",
                 recent_turns=recent_summary or "(First turns)",
