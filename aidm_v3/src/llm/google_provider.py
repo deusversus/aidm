@@ -94,9 +94,13 @@ class GoogleProvider(LLMProvider):
         # Extended thinking
         if extended_thinking:
             config["thinking_config"] = {"include_thoughts": True}  # Gemini 2.0 style
-            # For Gemini 3 specific parameter if available:
-            # config["thinkingLevel"] = "high"
-            # Note: Using the most compatible approach for the google.genai SDK version
+            # Gemini counts thinking tokens AGAINST max_output_tokens,
+            # unlike Claude where they're separate. Bump the total so the
+            # caller's intended output budget is preserved.
+            # e.g. caller wants 8192 of prose → we set 8192 + 4096 = 12288
+            # so ~4096 can be used for thinking without clipping output.
+            thinking_budget = 4096
+            config["max_output_tokens"] = max_tokens + thinking_budget
 
 
         # Use streaming to prevent truncation issues with long responses
