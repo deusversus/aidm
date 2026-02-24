@@ -80,6 +80,7 @@ class Orchestrator(TurnPipelineMixin, BackgroundMixin):
             name=f"{self.profile.name} Campaign",
             profile_id=profile_id
         )
+        self.state.set_profile_world_tier(self.profile.world_tier or "T8")
 
         # Cache the campaign's media UUID for frontend media polling
         from src.db.models import Campaign
