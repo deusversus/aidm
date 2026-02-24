@@ -770,6 +770,19 @@ Return ONLY the title, nothing else.'''
                 if style_dict:
                     output.visual_style = style_dict
 
+            # Genres
+            if hasattr(extracted, 'genres') and extracted.genres:
+                g = extracted.genres
+                genres = []
+                primary = getattr(g, 'primary_genre', '')
+                if primary:
+                    genres.append(primary)
+                secondary = getattr(g, 'secondary_genres', [])
+                if secondary:
+                    genres.extend(secondary)
+                if genres:
+                    output.detected_genres = genres
+
         # Set raw content from all research (explicit None if empty, not empty string)
         raw_text = "\n\n".join(raw_sections)
         output.raw_content = raw_text if raw_text.strip() else None
