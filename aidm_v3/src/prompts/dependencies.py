@@ -1,7 +1,19 @@
 """Dependency graph for prompt-as-code system.
 
-Parses `depends_on` from prompt frontmatter and builds a DAG.
+Parses ``depends_on`` from prompt frontmatter and builds a DAG.
 When a prompt changes, reports which downstream agents are affected.
+
+.. status:: standalone utility
+    This module is **not** integrated into the runtime pipeline. It exists
+    as an offline developer tool for reasoning about prompt-file dependencies.
+
+    Usage example (from the project root)::
+
+        from src.prompts.dependencies import PromptDependencyGraph
+        g = PromptDependencyGraph()
+        g.build()
+        print(g.downstream("director"))   # agents affected by director changes
+        print(g.upstream("vibe_keeper"))   # prompts that feed vibe_keeper
 """
 
 from __future__ import annotations

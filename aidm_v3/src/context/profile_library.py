@@ -18,7 +18,9 @@ class ProfileLibrary:
     for filtered retrieval (e.g., only technique pages for ABILITY intents).
     """
 
-    def __init__(self, persist_dir: str = "./data/chroma"):
+    def __init__(self, persist_dir: str | None = None):
+        from ..paths import CHROMA_DIR
+        persist_dir = persist_dir or str(CHROMA_DIR)
         Path(persist_dir).mkdir(parents=True, exist_ok=True)
         self.client = chromadb.PersistentClient(path=persist_dir)
 

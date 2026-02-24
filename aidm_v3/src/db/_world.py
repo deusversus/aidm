@@ -126,7 +126,13 @@ class WorldMixin:
     def update_faction_reputation(self, faction_name: str, change: int, reason: str = ""):
         """
         Update PC's reputation with a faction.
-        
+
+        .. status:: unused
+            PC faction reputation changes. The system tracks reputation on the
+            Faction model (``pc_reputation``) and on the Character model
+            (``faction_reputations`` dict), but no agent currently calls this
+            method. Intended for Director-driven reputation shifts.
+
         Args:
             faction_name: Faction name
             change: Amount to change (-100 to +100 typically)
@@ -174,7 +180,13 @@ class WorldMixin:
     def add_subordinate_to_faction(self, faction_name: str, npc_id: int, role: str = "member"):
         """
         Add an NPC as a subordinate to a PC-controlled faction.
-        
+
+        .. status:: unused
+            Overlord/Rimuru-mode subordinate management. Designed for OP mode
+            ``narrative_focus="faction"`` where the PC builds an organization.
+            The faction system exists in the model layer but subordinate
+            assignment is not yet wired into any agent or tool.
+
         Args:
             faction_name: Faction name
             npc_id: NPC ID
@@ -596,7 +608,13 @@ class WorldMixin:
         )
 
     def get_location_by_name(self, name: str) -> Location | None:
-        """Get a specific location by name."""
+        """Get a specific location by name.
+
+        .. status:: unused
+            Simple name lookup, functionally superseded by ``get_locations()``
+            which returns all locations (callers filter as needed). Kept for
+            potential direct-lookup use cases.
+        """
         db = self._get_db()
         return db.query(Location).filter(
             Location.campaign_id == self.campaign_id,

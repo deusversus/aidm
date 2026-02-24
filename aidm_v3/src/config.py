@@ -39,7 +39,7 @@ class Config:
     CREATIVE_MODEL: str = os.getenv("CREATIVE_MODEL", "")
 
     # Database
-    DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./aidm_v3.db")
+    DATABASE_URL: str = os.getenv("DATABASE_URL", "postgresql://aidm:aidm@localhost:5432/aidm")
 
     # Debug
     DEBUG: bool = os.getenv("DEBUG", "false").lower() == "true"

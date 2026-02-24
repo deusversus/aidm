@@ -13,6 +13,13 @@ logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
 
+# Shared thinking-token budget used by providers that support extended thinking.
+# Gemini: additive — added on top of max_output_tokens so thinking doesn't eat
+#         into the caller's prose budget (e.g. 8192 + 4096 = 12288 total).
+# Anthropic: separate budget — passed as budget_tokens alongside max_tokens;
+#            max_tokens is bumped to at least 2× this value.
+THINKING_TOKEN_BUDGET: int = 4096
+
 # System prompt can be:
 #   str                        — plain text (backward compatible, no caching)
 #   List[Tuple[str, bool]]     — cache-aware blocks: [(text, should_cache), ...]

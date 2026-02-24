@@ -15,9 +15,8 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-# Base media directory
-MEDIA_BASE_DIR = Path(__file__).parent.parent.parent.parent / "data" / "media"
-TEMPLATES_DIR = MEDIA_BASE_DIR / "templates"
+# Base media directory — canonical resolution from src.paths
+from src.paths import MEDIA_DIR as MEDIA_BASE_DIR, TEMPLATES_DIR
 
 # Allowed subdirectories (prevent path traversal)
 ALLOWED_CATEGORIES = {"portraits", "models", "cutscenes", "locations"}

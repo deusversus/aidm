@@ -22,10 +22,8 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
-# Base paths
-PROJECT_ROOT = Path(__file__).parent.parent.parent
-TEMPLATES_DIR = PROJECT_ROOT / "data" / "media" / "templates"
-MEDIA_BASE_DIR = PROJECT_ROOT / "data" / "media"
+# Base paths — canonical resolution from src.paths
+from ..paths import PROJECT_ROOT, MEDIA_DIR as MEDIA_BASE_DIR, TEMPLATES_DIR
 
 
 class MediaGenerator:
@@ -656,6 +654,7 @@ Requirements:
         "female_busty":   "adult female, voluptuous / curvy build",
         "female_muscle":  "adult female, muscular / athletic build",
         "female_petite":  "female, slim / petite / youthful build",
+        "neutral":        "androgynous / gender-neutral build, moderate proportions",
     }
 
     async def generate_template(
@@ -689,7 +688,7 @@ Requirements:
 
         body_desc = self.TEMPLATE_BODY_TYPES.get(
             body_type,
-            self.TEMPLATE_BODY_TYPES["neutral"]
+            self.TEMPLATE_BODY_TYPES.get("neutral", "average build"),
         )
 
         prompt = f"""Create an ANIME CHARACTER TURNAROUND REFERENCE SHEET — a blank body template used in anime/game production.
