@@ -401,10 +401,13 @@ async def session_zero_turn(session_id: str, request: TurnRequest):
             # Later phases (IDENTITY, WRAP_UP, etc.) should not re-run disambiguation
             early_phases = [SessionPhase.MEDIA_DETECTION, SessionPhase.NARRATIVE_CALIBRATION, SessionPhase.CONCEPT]
 
-            # If a media form choice is pending, ensure we enter resolve_media_intent
-            # even if LLM didn't extract a media_reference from "1" or "the manga"
-            if not media_ref and session.phase_state.get('media_form_options') and not session.phase_state.get('media_form_chosen'):
-                media_ref = request.message  # Use raw user input for choice parsing
+            # If a media form choice or merge questions are pending, ensure we enter
+            # resolve_media_intent even if LLM didn't extract a media_reference
+            if not media_ref and (
+                (session.phase_state.get('media_form_options') and not session.phase_state.get('media_form_chosen'))
+                or session.phase_state.get('merge_questions_pending')
+            ):
+                media_ref = request.message  # Use raw user input for choice/answer parsing
 
             if media_ref and session.phase in early_phases:
                 # Note: We include CONCEPT because hybrid flow may need to run research there

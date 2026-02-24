@@ -1,88 +1,131 @@
 """
 Profile Merge Agent for AIDM v3.
 
-Intelligently blends two anime research outputs into a hybrid profile.
-Used when players want to mix elements from multiple series.
+Agentic profile merge that uses tools to analyze divergences between
+two versions of the same IP, ask the player clarifying questions,
+and produce an intelligently merged profile.
+
+Two-phase approach:
+    Phase 1 (Analysis): Use tools to read profiles, compare fields, search
+            lore, research divergences, and queue questions for the player.
+    Phase 2 (Merge): After player answers, produce the final merged profile
+            using analysis findings + player preferences.
+
+Extends AgenticAgent for tool-calling capability.
 """
 
+import logging
+from datetime import datetime, timezone
 from typing import Any
 
 from pydantic import BaseModel, Field
 
 from .anime_research import AnimeResearchOutput
-from .base import BaseAgent
+from .base import AgenticAgent
+from .merge_tools import build_merge_tools, PlayerQuestionCollector
+
+logger = logging.getLogger(__name__)
 
 
-class ProfileMergeOutput(BaseModel):
-    """Output from profile merge operation."""
-
-    merged_profile: dict[str, Any] = Field(
-        description="The merged profile data"
-    )
-
-    blend_summary: str = Field(
-        description="Human-readable summary of how profiles were blended"
-    )
-
-    power_system_resolution: str = Field(
-        description="How power systems were combined: 'primary', 'secondary', 'synthesized', 'coexist'"
-    )
-
-    confidence: int = Field(
-        default=85,
-        description="Confidence in the merge quality (0-100)"
-    )
+# ─── System Prompt ───────────────────────────────────────────────────────
 
 
-MERGE_PROMPT = """# Profile Merge Agent
+MERGE_ANALYSIS_PROMPT = """# Profile Merge Analysis Agent
 
-You specialize in blending two anime/manga profiles into a cohesive hybrid world.
+You are analyzing two anime/manga profiles to prepare for merging them into a
+single hybrid profile. These are typically different media forms of the same IP
+(e.g., a manhwa and its anime adaptation) or related IPs the player wants to blend.
 
 ## Your Task
 
-Given research outputs from two anime series, create a merged profile that:
-1. Combines the best narrative elements from both
-2. Resolves conflicts intelligently
-3. Creates a coherent world that fans of either series would recognize
+1. **Read both profiles** using the read_profile tool
+2. **Compare key fields** using compare_fields (power_system, tone, combat_system, dna_scales, tropes)
+3. **Search for divergences** — if profiles are versions of the same IP, use search_web
+   to find where/how they differ (changed endings, added characters, different power scaling, etc.)
+4. **Search lore** if available, to find detailed information about specific divergences
+5. **Ask the player** about meaningful divergences using ask_player. Only ask about:
+   - Canon-divergent endings or story arcs
+   - Different power system implementations
+   - Significantly different character fates
+   - Tone/style differences that would change gameplay
+   Do NOT ask about trivial differences (animation style, filler episodes, etc.)
 
-## Merge Guidelines
+## Guidelines
+
+- Be thorough but efficient. 3-5 questions maximum.
+- Frame questions as clear choices, not open-ended.
+- Include brief context so the player understands WHY you're asking.
+- After your analysis, summarize your findings and the questions you've queued.
+
+## Output
+
+End with a structured summary:
+- List of key divergences found
+- Which fields will need player input vs can be auto-merged
+- Your recommended merge approach for each field
+"""
+
+MERGE_EXECUTION_PROMPT = """# Profile Merge Execution Agent
+
+You are merging two anime/manga profiles into a single hybrid profile based on
+analysis findings and the player's preferences.
+
+## Your Inputs
+
+You will receive:
+1. Both original profiles (key fields)
+2. Analysis findings (divergences, recommendations)
+3. Player's answers to your questions (if any were asked)
+
+## Merge Rules
 
 ### DNA Scales (0-10)
-Blend numerically based on the ratio provided. For a 60/40 blend:
-- merged_value = (primary_value * 0.6) + (secondary_value * 0.4)
+- Blend numerically: merged = (primary * 0.6) + (secondary * 0.4)
 - Round to nearest integer
 
-### Power Systems
-Choose ONE approach:
-- **primary**: Use primary anime's power system, with influence from secondary
-- **secondary**: Use secondary anime's power system
-- **synthesized**: Create a NEW system that combines mechanics from both
-- **coexist**: Both power systems exist in the world
+### Power System
+Based on the specific divergences found, choose:
+- **primary**: Use primary's power system with secondary influence
+- **secondary**: Use secondary's power system
+- **synthesized**: Create a NEW system combining mechanics from both
+- **coexist**: Both power systems exist simultaneously (for cross-IP blends)
 
 ### Tropes
-- Union of both series' tropes (trope is true if either series uses it)
-- Note any conflicting tropes in the summary
-
-### Combat Style
-- Pick the dominant style, or synthesize if compatible
-- e.g., "tactical" + "spectacle" could become "tactical_spectacle"
+- Union: a trope is enabled if EITHER source uses it
 
 ### Tone
-- Blend the tone values like DNA scales
-- Note any tension (e.g., one dark, one light)
+- Blend numerically like DNA scales
+- If there's significant tension (one dark, one light), note it in director_personality
 
-## Output Format
+### Visual Style
+- Prefer the source with stronger/more distinct visual identity
+- Blend reference_descriptors from both
 
-Return a complete merged profile following the AnimeResearchOutput structure.
+### Director Personality
+- Synthesize a new director personality that respects both sources
+- Incorporate player preferences from their answers
+
+### Detected Genres
+- Union of genres from both profiles, primary genres first
+
+## Output
+
+Use the save_merged_profile tool to save the final profile. The profile JSON must include:
+- id: slug of the hybrid title (e.g., "solo_leveling_merged")
+- name: "Title A × Title B"
+- All standard profile fields (dna_scales, power_system, tone, tropes, etc.)
+- research_method: "agentic_merge"
+- series_group: from primary profile
 """
 
 
-class ProfileMergeAgent(BaseAgent):
+class ProfileMergeAgent(AgenticAgent):
     """
-    Agent that blends two anime profiles into a hybrid.
-    
-    Uses LLM intelligence for complex field merging (power systems, tone)
-    and simple math for numeric scales.
+    Agentic profile merge with tool-calling capability.
+
+    Phase 1: Analysis — reads profiles, compares fields, searches for
+             divergences, queues questions for the player.
+    Phase 2: Merge — uses analysis + player answers to produce the final profile.
     """
 
     agent_name = "profile_merge"
@@ -90,14 +133,108 @@ class ProfileMergeAgent(BaseAgent):
 
     def __init__(self, model_override: str | None = None):
         super().__init__(model_override=model_override)
+        self._question_collector: PlayerQuestionCollector | None = None
 
     @property
     def system_prompt(self) -> str:
-        return self.get_prompt()
+        return self.get_prompt(fallback=MERGE_ANALYSIS_PROMPT)
 
     @property
-    def output_schema(self) -> type[BaseModel]:
-        return ProfileMergeOutput
+    def output_schema(self) -> type[BaseModel] | None:
+        return None  # AgenticAgent uses free-form text, not structured output
+
+    # ── Phase 1: Analysis ──
+
+    async def analyze(
+        self,
+        profile_id_a: str,
+        profile_id_b: str,
+    ) -> tuple[str, PlayerQuestionCollector]:
+        """
+        Analyze two profiles for divergences and queue questions.
+
+        Args:
+            profile_id_a: First profile ID
+            profile_id_b: Second profile ID
+
+        Returns:
+            Tuple of (analysis_findings_text, question_collector)
+        """
+        tools, collector = build_merge_tools()
+        self._question_collector = collector
+        self.set_tools(tools)
+
+        analysis_prompt = (
+            f"Analyze these two profiles for merging:\n"
+            f"- Profile A: {profile_id_a}\n"
+            f"- Profile B: {profile_id_b}\n\n"
+            f"Read both profiles, compare their fields, search for divergences "
+            f"between these versions, and ask the player about any meaningful "
+            f"differences that would affect gameplay."
+        )
+
+        findings = await self.call_with_tools(
+            user_message=analysis_prompt,
+            system_prompt_override=MERGE_ANALYSIS_PROMPT,
+            max_tool_rounds=8,
+        )
+
+        return findings, collector
+
+    # ── Phase 2: Merge ──
+
+    async def merge_with_answers(
+        self,
+        profile_id_a: str,
+        profile_id_b: str,
+        analysis_findings: str,
+        player_answers: str = "",
+    ) -> dict:
+        """
+        Execute the merge using analysis findings and player preferences.
+
+        Args:
+            profile_id_a: First profile ID
+            profile_id_b: Second profile ID
+            analysis_findings: Text from Phase 1 analysis
+            player_answers: Player's answers to merge questions
+
+        Returns:
+            Dict with merged profile data and metadata
+        """
+        tools, _ = build_merge_tools()
+        self.set_tools(tools)
+
+        merge_prompt = (
+            f"Merge these two profiles based on the analysis and player preferences:\n\n"
+            f"## Profile IDs\n"
+            f"- Profile A: {profile_id_a}\n"
+            f"- Profile B: {profile_id_b}\n\n"
+            f"## Analysis Findings\n{analysis_findings}\n\n"
+        )
+
+        if player_answers:
+            merge_prompt += f"## Player's Preferences\n{player_answers}\n\n"
+
+        merge_prompt += (
+            "Read both profiles using read_profile, apply the merge rules, "
+            "and save the final merged profile using save_merged_profile."
+        )
+
+        result_text = await self.call_with_tools(
+            user_message=merge_prompt,
+            system_prompt_override=MERGE_EXECUTION_PROMPT,
+            max_tool_rounds=6,
+        )
+
+        return {
+            "status": "merged",
+            "result_text": result_text,
+            "profile_id_a": profile_id_a,
+            "profile_id_b": profile_id_b,
+        }
+
+    # ── Legacy compatibility: single-shot merge (no questions) ──
 
     async def merge(
         self,
@@ -105,22 +242,15 @@ class ProfileMergeAgent(BaseAgent):
         profile_b: AnimeResearchOutput,
         blend_ratio: float = 0.6,
         primary_name: str = "Primary",
-        secondary_name: str = "Secondary"
+        secondary_name: str = "Secondary",
     ) -> AnimeResearchOutput:
         """
-        Merge two anime research outputs into a hybrid profile.
-        
-        Args:
-            profile_a: Primary anime research output
-            profile_b: Secondary anime research output
-            blend_ratio: 0.0-1.0, weight given to primary (default 0.6 = 60% primary)
-            primary_name: Name of primary anime (for logging)
-            secondary_name: Name of secondary anime (for logging)
-            
-        Returns:
-            Merged AnimeResearchOutput
+        Legacy merge — single-shot blend without player interaction.
+
+        Kept for backward compatibility. For new code, use
+        analyze() + merge_with_answers().
         """
-        # Step 1: Numeric blends (pure Python, no LLM)
+        # Numeric blends (pure Python)
         merged_dna = self._blend_dna_scales(
             profile_a.dna_scales,
             profile_b.dna_scales,
@@ -138,46 +268,43 @@ class ProfileMergeAgent(BaseAgent):
             profile_b.storytelling_tropes
         )
 
-        # Step 2: Complex merges (LLM-assisted)
+        # Complex merges via tools
+        tools, _ = build_merge_tools()
+        self.set_tools(tools)
+
         context = self._build_merge_context(
             profile_a, profile_b,
             primary_name, secondary_name,
             blend_ratio
         )
 
-        llm_result = await self.call(context)
+        result_text = await self.call_with_tools(
+            user_message=context,
+            system_prompt_override=MERGE_EXECUTION_PROMPT,
+            max_tool_rounds=5,
+        )
 
-        # Step 3: Combine into final output
+        # Build output
         hybrid_title = f"{profile_a.title} × {profile_b.title}"
-
         merged = AnimeResearchOutput(
             title=hybrid_title,
             alternate_titles=[profile_a.title, profile_b.title],
             media_type="hybrid",
             status="completed",
-
-            # Numeric blends
             dna_scales=merged_dna,
             tone=merged_tone,
             storytelling_tropes=merged_tropes,
-
-            # From LLM merge
-            power_system=llm_result.merged_profile.get("power_system", profile_a.power_system),
-            combat_style=llm_result.merged_profile.get("combat_style", profile_a.combat_style),
-            world_setting=llm_result.merged_profile.get("world_setting", {}),
-
-            # Combine raw content for RAG
-            raw_content=self._combine_raw_content(profile_a, profile_b, llm_result.blend_summary),
-
-            # Sources from both
+            power_system=profile_a.power_system,  # Primary wins as fallback
+            combat_style=profile_a.combat_style,
+            raw_content=self._combine_raw_content(profile_a, profile_b, result_text),
             sources_consulted=profile_a.sources_consulted + profile_b.sources_consulted,
-
-            # Confidence based on merge quality
-            confidence=llm_result.confidence,
+            confidence=80,
             research_method="hybrid_merge"
         )
 
         return merged
+
+    # ── Helpers (kept from original) ──
 
     def _blend_dna_scales(
         self,
@@ -188,12 +315,10 @@ class ProfileMergeAgent(BaseAgent):
         """Blend DNA scales numerically."""
         merged = {}
         all_keys = set(dna_a.keys()) | set(dna_b.keys())
-
         for key in all_keys:
             val_a = dna_a.get(key, 5)
             val_b = dna_b.get(key, 5)
             merged[key] = round(val_a * ratio + val_b * (1 - ratio))
-
         return merged
 
     def _blend_tone(
@@ -204,12 +329,10 @@ class ProfileMergeAgent(BaseAgent):
     ) -> dict[str, Any]:
         """Blend tone values numerically."""
         merged = {}
-
         for key in ["comedy_level", "darkness_level", "optimism"]:
             val_a = tone_a.get(key, 5) if tone_a else 5
             val_b = tone_b.get(key, 5) if tone_b else 5
             merged[key] = round(val_a * ratio + val_b * (1 - ratio))
-
         return merged
 
     def _merge_tropes(
@@ -220,11 +343,8 @@ class ProfileMergeAgent(BaseAgent):
         """Union of tropes from both series."""
         merged = {}
         all_keys = set(tropes_a.keys()) | set(tropes_b.keys())
-
         for key in all_keys:
-            # Trope is enabled if either series uses it
             merged[key] = tropes_a.get(key, False) or tropes_b.get(key, False)
-
         return merged
 
     def _build_merge_context(
@@ -255,7 +375,7 @@ Create a merged profile that blends these two series. Focus on:
 2. Combat style (which dominates, or how do they blend?)
 3. World setting (create a coherent hybrid setting)
 
-Provide a brief summary explaining your merge decisions.
+Use read_profile and save_merged_profile tools to complete the merge.
 """
 
     def _combine_raw_content(
@@ -265,15 +385,12 @@ Provide a brief summary explaining your merge decisions.
         blend_summary: str
     ) -> str:
         """Combine raw content from both profiles for RAG."""
-        sections = []
-
-        sections.append(f"# Hybrid Profile: {profile_a.title} × {profile_b.title}\n")
-        sections.append(f"## Blend Summary\n{blend_summary}\n")
-
+        sections = [
+            f"# Hybrid Profile: {profile_a.title} × {profile_b.title}\n",
+            f"## Blend Summary\n{blend_summary}\n",
+        ]
         if profile_a.raw_content:
             sections.append(f"## From {profile_a.title}\n{profile_a.raw_content[:4000]}\n")
-
         if profile_b.raw_content:
             sections.append(f"## From {profile_b.title}\n{profile_b.raw_content[:4000]}\n")
-
         return "\n".join(sections)
