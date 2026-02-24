@@ -159,7 +159,8 @@ class CoreMixin:
         # Clear campaign memory collections from ChromaDB
         try:
             import chromadb
-            client = chromadb.PersistentClient(path="./data/chroma")
+            from ..paths import CHROMA_DIR
+            client = chromadb.PersistentClient(path=str(CHROMA_DIR))
             for col in client.list_collections():
                 if col.name.startswith("campaign_"):
                     client.delete_collection(col.name)
@@ -258,12 +259,21 @@ class CoreMixin:
         self._session_id: int | None = None
         self._turn_number: int = 0
         self._commit_deferred: bool = False
+        self._profile_world_tier: str = "T8"  # Overridden via set_profile_world_tier()
 
     def _get_db(self) -> SQLAlchemySession:
         """Get or create database session."""
         if self._db is None:
             self._db = create_session()
         return self._db
+
+    def set_profile_world_tier(self, world_tier: str) -> None:
+        """Push the profile's world_tier for use in get_context().
+
+        Called by Orchestrator after loading the narrative profile so that
+        GameContext reports the correct world baseline instead of a hardcoded T8.
+        """
+        self._profile_world_tier = world_tier
 
     def close(self):
         """Close the database session."""
@@ -524,7 +534,7 @@ class CoreMixin:
             op_preset=character.op_preset if character else None,
             # Power Differential System
             power_tier=character.power_tier if character else "T10",
-            world_tier="T8",  # TODO: Load from profile when available in context
+            world_tier=self._profile_world_tier,
             narrative_scale=getattr(world_state, 'narrative_scale', None) or "strategic",
             has_party=has_party,
             party_tier_delta=party_tier_delta,
