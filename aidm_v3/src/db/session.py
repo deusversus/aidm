@@ -19,8 +19,13 @@ _SessionLocal = None
 
 
 def get_database_url() -> str:
-    """Get database URL from environment or use PostgreSQL default."""
-    return os.getenv("DATABASE_URL", "postgresql://aidm:aidm@localhost:5432/aidm")
+    """Get database URL — single source of truth via src.config.Config.DATABASE_URL.
+
+    Default: postgresql://aidm:aidm@localhost:5432/aidm (Docker Compose).
+    Override via DATABASE_URL env var (CI uses sqlite:///:memory:).
+    """
+    from ..config import Config
+    return Config.DATABASE_URL
 
 
 def get_engine():
@@ -66,22 +71,40 @@ def init_db():
 
     This replaces the old create_all() + manual PRAGMA migrations.
     Alembic handles both initial schema creation and incremental changes.
+
+    For in-memory SQLite (tests), we skip Alembic entirely because each
+    connection gets its own database and Alembic's connection is discarded
+    after migration. We use create_all() directly instead.
     """
+    url = get_database_url()
+
+    # In-memory SQLite: Alembic opens a separate connection that gets its own
+    # empty database, so migrations "succeed" but leave our engine's DB empty.
+    # Skip Alembic and use create_all() directly.
+    if ":memory:" in url or "mode=memory" in url:
+        engine = get_engine()
+        Base.metadata.create_all(bind=engine)
+        logger.info("Database initialized via create_all (in-memory SQLite)")
+        return
+
     try:
         from alembic import command
         from alembic.config import Config
 
         alembic_cfg = Config("alembic.ini")
         # Override the URL with our environment-aware one
-        alembic_cfg.set_main_option("sqlalchemy.url", get_database_url())
+        alembic_cfg.set_main_option("sqlalchemy.url", url)
         command.upgrade(alembic_cfg, "head")
-        logger.info(f"Database initialized via Alembic: {get_database_url()}")
+        logger.info(f"Database initialized via Alembic: {url}")
     except Exception as e:
-        # Fallback to create_all for dev/testing if Alembic isn't set up yet
-        logger.warning(f"Alembic migration failed ({e}), falling back to create_all()")
+        # Fallback to create_all — should not happen in production.
+        logger.warning(
+            "Alembic migration failed (%s) — falling back to create_all(). "
+            "This should not happen in production.", e,
+        )
         engine = get_engine()
         Base.metadata.create_all(bind=engine)
-        logger.info(f"Database initialized via create_all: {get_database_url()}")
+        logger.info(f"Database initialized via create_all: {url}")
 
 
 def drop_db():
