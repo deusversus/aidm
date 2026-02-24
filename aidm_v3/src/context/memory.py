@@ -69,7 +69,9 @@ class MemoryStore:
     - Category-based decay rates
     """
 
-    def __init__(self, campaign_id: str, persist_dir: str = "./data/chroma"):
+    def __init__(self, campaign_id: str, persist_dir: str | None = None):
+        from ..paths import CHROMA_DIR
+        persist_dir = persist_dir or str(CHROMA_DIR)
         self.campaign_id = campaign_id
         self.client = chromadb.PersistentClient(path=persist_dir)
 

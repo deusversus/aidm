@@ -207,7 +207,8 @@ def export_session(campaign_id: int) -> bytes:
         # Campaign Memories from ChromaDB
         try:
             import chromadb
-            client = chromadb.PersistentClient(path="./data/chroma")
+            from ..paths import CHROMA_DIR
+            client = chromadb.PersistentClient(path=str(CHROMA_DIR))
             collection_name = f"campaign_{campaign_id}"
 
             try:
@@ -642,7 +643,8 @@ def import_session(zip_bytes: bytes) -> int:
     if memories_data.get("ids"):
         try:
             import chromadb
-            client = chromadb.PersistentClient(path="./data/chroma")
+            from ..paths import CHROMA_DIR
+            client = chromadb.PersistentClient(path=str(CHROMA_DIR))
             collection = client.get_or_create_collection(
                 name=f"campaign_{new_campaign_id}",
                 metadata={"hnsw:space": "cosine"}
