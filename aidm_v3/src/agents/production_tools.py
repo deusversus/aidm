@@ -641,13 +641,14 @@ def _save_media_asset(
         from ..db.models import MediaAsset
         from ..db.session import create_session as create_db_session
 
-        # Normalize file_path to relative path under data/media/
-        # The serve endpoint expects relative paths, not absolute ones
+        # Normalize file_path to be relative to MEDIA_BASE_DIR (data/media/).
+        # The serve endpoint does MEDIA_BASE_DIR / file_path, so we need just
+        # the portion AFTER data/media/ (e.g. "{uuid}/cutscenes/turn5_x.png").
         if file_path and os.path.isabs(file_path):
             # Try to extract relative path from data/media/ onwards
             parts = file_path.replace("\\", "/").split("data/media/")
             if len(parts) > 1:
-                file_path = "data/media/" + parts[-1]
+                file_path = parts[-1]
             else:
                 # Fallback: just use the filename
                 file_path = os.path.basename(file_path)

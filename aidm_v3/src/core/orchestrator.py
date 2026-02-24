@@ -81,6 +81,16 @@ class Orchestrator(TurnPipelineMixin, BackgroundMixin):
             profile_id=profile_id
         )
 
+        # Cache the campaign's media UUID for frontend media polling
+        from src.db.models import Campaign
+        from src.db.session import create_session as create_db_session
+        _db = create_db_session()
+        try:
+            _campaign = _db.query(Campaign).filter(Campaign.id == self.campaign_id).first()
+            self.campaign_media_uuid = _campaign.media_uuid if _campaign else None
+        finally:
+            _db.close()
+
         # Initialize Context Layer - use session_id for memory isolation
         self.memory = MemoryStore(self.session_id)
         self.rules = RuleLibrary()

@@ -347,9 +347,10 @@ async function handlePlayerAction() {
             loadContext().catch(e => console.warn('[Turn] Context load failed:', e));
             loadAllTrackers().catch(e => console.warn('[Turn] Tracker load failed:', e));
 
-            // Start media polling if turn_number + campaign_id provided
-            if (result.turn_number != null && result.campaign_id != null) {
-                pollForTurnMedia(result.campaign_id, result.turn_number);
+            // Start media polling if turn_number + media UUID provided
+            const mediaId = result.campaign_media_uuid || result.campaign_id;
+            if (result.turn_number != null && mediaId != null) {
+                pollForTurnMedia(mediaId, result.turn_number);
             }
         }
 

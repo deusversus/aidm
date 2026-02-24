@@ -107,6 +107,7 @@ async def process_turn(request: TurnRequest):
             portrait_map=result.portrait_map,
             turn_number=result.turn_number,
             campaign_id=result.campaign_id,
+            campaign_media_uuid=result.campaign_media_uuid,
         )
 
         # DEBUG: Log what we're actually returning

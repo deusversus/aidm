@@ -1,0 +1,118 @@
+id: how_a_realist_hero_rebuilt_the_kingdom
+name: How a Realist Hero Rebuilt the Kingdom
+source_anime: How a Realist Hero Rebuilt the Kingdom
+media_type: anime
+status: completed
+generated_at: '2026-02-23T10:33:57.557626'
+confidence: 95
+research_method: bundled_parallel
+aliases:
+- Genjitsu Shugi Yūsha no Oukoku Kaizōki
+- Re:Construction – The Elfrieden Kingdom Tales of Realistic Brave
+- Taikoku Kenzōki
+- a realist heros kingdom rebuilding chronicle
+- genjitsu shugi yuusha no oukoku saikenki
+- genkoku
+- how a realist hero rebuilt the kingdom
+- howarealistherorebuiltthekingdom
+- realist hero
+- 現実主義勇者の王国再建記
+dna_scales:
+  introspection_vs_action: 1
+  comedy_vs_drama: 3
+  simple_vs_complex: 8
+  power_fantasy_vs_struggle: 3
+  explained_vs_mysterious: 1
+  fast_paced_vs_slow_burn: 8
+  episodic_vs_serialized: 9
+  grounded_vs_absurd: 2
+  tactical_vs_instinctive: 1
+  hopeful_vs_cynical: 2
+  ensemble_vs_solo: 3
+power_distribution:
+  peak_tier: T5
+  typical_tier: T9
+  floor_tier: T10
+  gradient: top_heavy
+world_tier: T9
+tropes:
+  tournament_arc: false
+  training_montage: false
+  power_of_friendship: false
+  mentor_death: false
+  chosen_one: true
+  tragic_backstory: false
+  redemption_arc: false
+  betrayal: true
+  sacrifice: false
+  transformation: false
+  forbidden_technique: false
+  time_loop: false
+  false_identity: false
+  ensemble_focus: true
+  slow_burn_romance: true
+detected_genres:
+- Action
+- Adventure
+- Fantasy
+- Romance
+combat_system: tactical
+power_system:
+  name: Elemental Magic System
+  mechanics: Magic is innate and categorized into six elements (Fire, Water, Earth,
+    Wind, Light, and Dark) with practical, everyday applications. Dark magic is unique
+    and highly personalized; for example, the protagonist's 'Living Poltergeists'
+    ability allows him to split his consciousness to remotely control inanimate objects.
+  limitations: Controlling objects has weight and mass limits. Splitting consciousness
+    requires immense concentration, causing severe mental strain, headaches, and exhaustion.
+    There is also a range limit, though it can be bypassed using specially crafted
+    marionettes.
+  tiers:
+  - No strict numerical tiers
+  - Skill Mastery
+  - Technological Progression
+tone:
+  comedy_level: 4
+  darkness_level: 2
+  optimism: 9
+director_personality: You are the director for a How a Realist Hero Rebuilt the Kingdom-style
+  campaign. You explore character thoughts and feelings deeply. You maintain dramatic
+  weight; comedy is rare and earned. You let scenes breathe. Patience is a virtue;
+  payoffs are earned. Hope is real in this world. Earned optimism, not naivety. You
+  explain strategies and tactics in detail.
+pacing:
+  scene_length: moderate
+  arc_length_sessions: 4-6
+sources_consulted:
+- power_system
+- combat
+- tone
+- visual_style
+- characters
+- factions
+- locations
+- arcs
+- sequels
+- adaptations
+- recent
+- series_aliases
+visual_style:
+  art_style: Standard, clean modern isekai fantasy blending medieval European architecture
+    with classic JRPG elements
+  color_palette: Bright, warm, and vibrant with strict character color-coding (e.g.,
+    striking red, deep blues)
+  line_work: Clean and simplified to maintain consistency during long dialogue scenes
+  shading: Standard flat cel shading, highly functional and clear
+  character_rendering: Attractive anime archetypes with distinct, easily identifiable
+    features, simplified from the highly detailed light novel illustrations
+  atmosphere: Profoundly optimistic, relaxing, cheerful, and inviting
+  composition_style: Conservative talking-heads style, relying heavily on panning
+    shots, static frames, and expressive close-ups during political debates
+  studio_reference: J.C.Staff (Toradora!, Food Wars!)
+  reference_descriptors:
+  - clean modern isekai fantasy
+  - bright warm color palette
+  - standard anime archetypes
+  - talking-heads political drama
+series_group: how_a_realist_hero_rebuilt_the_kingdom
+series_position: 1
