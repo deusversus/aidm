@@ -22,6 +22,7 @@ class TurnResponse(BaseModel):
     portrait_map: dict[str, str] | None = None  # {"NPC Name": "/api/game/media/..."}
     turn_number: int | None = None
     campaign_id: int | None = None
+    campaign_media_uuid: str | None = None  # UUID for media filesystem polling
 
 
 class SessionZeroResponse(BaseModel):

@@ -107,21 +107,31 @@ class BackgroundMixin:
                             category=getattr(outcome, 'consequence_category', None)
                         )
 
+                    # Check if any quests were completed on the previous turn.
                     character = self.state.get_character()
                     progression_result = None
+                    # The ProductionAgent from turn N marks quests with completed_turn=N,
+                    # so on turn N+1 we check for completed_turn >= N.
+                    recently_completed = [
+                        q for q in self.state.get_quests(status="completed")
+                        if q.completed_turn and q.completed_turn >= db_context.turn_number - 1
+                    ]
+
                     should_calculate_progression = (
                         combat_occurred or
                         use_sakuga or
                         outcome.narrative_weight in [NarrativeWeight.SIGNIFICANT, NarrativeWeight.CLIMACTIC] or
-                        (hasattr(outcome, 'quest_progress') and outcome.quest_progress)
+                        bool(recently_completed)
                     )
 
                     if character and should_calculate_progression:
+                        quest_names = ", ".join(q.title for q in recently_completed) if recently_completed else None
                         turn_result_data = {
                             "combat_occurred": combat_occurred,
                             "boss_fight": combat_result.narrative_weight == NarrativeWeight.CLIMACTIC if combat_result else False,
                             "sakuga_moment": combat_result.sakuga_moment if combat_result else use_sakuga,
-                            "quest_completed": outcome.quest_progress if hasattr(outcome, 'quest_progress') else False,
+                            "quest_completed": bool(recently_completed),
+                            "quest_name": quest_names,
                             "significant_roleplay": outcome.narrative_weight in [NarrativeWeight.SIGNIFICANT, NarrativeWeight.CLIMACTIC],
                         }
                         progression_result = await self.progression.calculate_progression(

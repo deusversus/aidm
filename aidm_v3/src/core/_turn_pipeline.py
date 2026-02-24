@@ -444,7 +444,8 @@ class TurnPipelineMixin:
         rag_context = {
             "memories": ranked_memories,
             "rules": rag_base["rules"],
-            "short_term": rag_base["short_term"]
+            "short_term": rag_base["short_term"],
+            "lore": rag_base.get("lore", ""),
         }
 
         # Inject pacing directive if available (#1)
@@ -851,6 +852,7 @@ class TurnPipelineMixin:
             portrait_map=portrait_map or None,
             turn_number=db_context.turn_number,
             campaign_id=self.campaign_id,
+            campaign_media_uuid=getattr(self, 'campaign_media_uuid', None),
         )
 
     # -----------------------------------------------------------------
