@@ -38,17 +38,15 @@ class RuleLibrary:
 
     def __init__(
         self,
-        persist_dir: str = "./data/chroma",
+        persist_dir: str | None = None,
         library_dir: str | None = None
     ):
+        from ..paths import CHROMA_DIR, RULE_LIBRARY_DIR
+        persist_dir = persist_dir or str(CHROMA_DIR)
         self.client = chromadb.PersistentClient(path=persist_dir)
 
         # Find library directory
-        if library_dir:
-            self.library_dir = Path(library_dir)
-        else:
-            # Try relative to this file
-            self.library_dir = Path(__file__).parent.parent.parent / "rule_library"
+        self.library_dir = Path(library_dir) if library_dir else RULE_LIBRARY_DIR
 
         # Collection for rule chunks
         self.collection = self.client.get_or_create_collection(

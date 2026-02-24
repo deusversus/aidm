@@ -24,7 +24,9 @@ class CustomProfileLibrary:
     - Supports full cleanup when session is reset
     """
 
-    def __init__(self, persist_dir: str = "./data/chroma_custom"):
+    def __init__(self, persist_dir: str | None = None):
+        from ..paths import CHROMA_CUSTOM_DIR
+        persist_dir = persist_dir or str(CHROMA_CUSTOM_DIR)
         Path(persist_dir).mkdir(parents=True, exist_ok=True)
         self.persist_dir = persist_dir
         self.client = chromadb.PersistentClient(path=persist_dir)
