@@ -797,12 +797,47 @@ class AniListClient:
 
     async def search_with_fallback(self, title: str) -> AniListResult | None:
         """
-        Search AniList, trying ANIME first then MANGA if not found.
+        Search AniList, using embedded IDs when available, otherwise
+        trying ANIME first then MANGA.
+
+        Handles disambiguation titles like:
+          "Solo Leveling (Anime, AniList: 151807)"
+          "Solo Leveling (Manhwa, AniList: 105398)"
         """
-        result = await self.search(title, "ANIME")
+        import re
+
+        # If the title contains an embedded AniList ID, use direct lookup
+        id_match = re.search(r'AniList:\s*(\d+)', title)
+        if id_match:
+            anilist_id = int(id_match.group(1))
+            logger.info(f"AniList: Using embedded ID {anilist_id} from '{title}'")
+            result = await self.fetch_by_id(anilist_id)
+            if result:
+                return result
+            logger.warning(f"AniList: Direct ID lookup failed for {anilist_id}, falling back to search")
+
+        # Strip the disambiguation suffix for cleaner search
+        clean_title = re.sub(r'\s*\([^)]*AniList:\s*\d+[^)]*\)', '', title).strip()
+        search_term = clean_title or title
+
+        # Determine search order from media type hint in title
+        type_hint = None
+        hint_match = re.search(r'\((Anime|Manga|Manhwa|Donghua|Light Novel)', title, re.IGNORECASE)
+        if hint_match:
+            hint = hint_match.group(1).upper()
+            if hint in ("MANGA", "MANHWA", "LIGHT NOVEL", "DONGHUA"):
+                type_hint = "MANGA"
+            else:
+                type_hint = "ANIME"
+
+        # Search with hint-aware ordering
+        first_type = type_hint or "ANIME"
+        second_type = "MANGA" if first_type == "ANIME" else "ANIME"
+
+        result = await self.search(search_term, first_type)
         if not result:
-            logger.info("AniList: No anime result, falling back to MANGA search")
-            result = await self.search(title, "MANGA")
+            logger.info(f"AniList: No {first_type} result for '{search_term}', trying {second_type}")
+            result = await self.search(search_term, second_type)
         return result
 
     async def fetch_full_series(self, primary: AniListResult) -> AniListResult:
