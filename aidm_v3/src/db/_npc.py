@@ -507,11 +507,16 @@ class NPCMixin:
     def check_npc_knowledge(self, npc_id: int, topic: str) -> dict[str, Any]:
         """
         Check if NPC knows about a topic and at what depth.
-        
+
+        .. status:: unused
+            Knowledge-boundary gating for planned Module 04 (NPC Cognition).
+            The knowledge_topics and knowledge_boundaries fields on the NPC
+            model are populated but never queried at runtime yet.
+
         Args:
             npc_id: NPC ID
             topic: Topic to check
-            
+
         Returns:
             {"knows": bool, "depth": str|None, "can_share": bool, "reason": str}
         """
@@ -629,8 +634,13 @@ class NPCMixin:
     def assign_ensemble_archetype(self, npc_id: int) -> str | None:
         """
         Analyze NPC and assign appropriate ensemble archetype.
-        Called by Director during session review for recurring NPCs.
-        
+
+        .. status:: unused
+            Intended to be called by the Director agent during session review
+            to auto-assign ensemble archetypes to recurring NPCs. The Director
+            currently delegates archetype assignment to the NPC-creation prompt
+            rather than using this heuristic method.
+
         Returns:
             Assigned archetype or None
         """
@@ -865,7 +875,13 @@ class NPCMixin:
     def get_emotional_milestones(self, npc_id: int) -> dict[str, Any]:
         """
         Get all emotional milestones for an NPC, including which haven't happened yet.
-        
+
+        .. status:: unused
+            Structured milestone inspection for a planned UI panel or Director
+            review step. Milestones are recorded via ``record_emotional_milestone``
+            and consumed inline during narration, but this bulk-getter is not
+            called by any current code path.
+
         Returns:
             Dict with all milestone types, recorded ones have data, others are None
         """

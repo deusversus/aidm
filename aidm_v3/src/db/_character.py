@@ -458,7 +458,14 @@ class CharacterMixin:
         db.commit()
 
     def update_op_suggestion_dismissed(self, dismissed: bool):
-        """Mark that the player has dismissed the OP mode suggestion."""
+        """Mark that the player has dismissed the OP mode suggestion.
+
+        .. status:: unused
+            OP mode UI hook. Was intended for a frontend toggle that lets the
+            player permanently dismiss the auto-suggestion prompt. The UI was
+            retired; see ``_turn_pipeline.py:712`` where OP mode is now applied
+            silently by the Director agent.
+        """
         # Store in world state metadata for persistence
         db = self._get_db()
         world_state = db.query(WorldState).filter(
@@ -472,7 +479,13 @@ class CharacterMixin:
             db.commit()
 
     def increment_high_imbalance_count(self) -> int:
-        """Increment and return the high imbalance encounter count."""
+        """Increment and return the high imbalance encounter count.
+
+        .. status:: unused
+            Part of a planned progressive OP-mode detection system that would
+            auto-suggest OP mode after N consecutive high-imbalance encounters.
+            The detection logic was never wired into the turn pipeline.
+        """
         db = self._get_db()
         world_state = db.query(WorldState).filter(
             WorldState.campaign_id == self.campaign_id
@@ -488,7 +501,12 @@ class CharacterMixin:
         return 0
 
     def get_high_imbalance_count(self) -> int:
-        """Get current high imbalance encounter count."""
+        """Get current high imbalance encounter count.
+
+        .. status:: unused
+            Counterpart getter for ``increment_high_imbalance_count()``.
+            See that method's status note for context.
+        """
         db = self._get_db()
         world_state = db.query(WorldState).filter(
             WorldState.campaign_id == self.campaign_id
