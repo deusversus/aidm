@@ -29,6 +29,7 @@ Usage in session_zero.py:
 """
 
 import logging
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Coroutine
@@ -88,6 +89,21 @@ async def resolve_media_intent(
         IntentResult telling the route what to do next
     """
     detected_info = detected_info or {}
+
+    # ── Handle media form choice response (user replying to our version prompt) ──
+    media_form_options = session.phase_state.get('media_form_options')
+    if media_form_options and not session.phase_state.get('media_form_chosen'):
+        chosen = _parse_media_form_choice(media_ref, media_form_options)
+        session.phase_state['media_form_chosen'] = True
+
+        if chosen == "merge":
+            logger.info(f"Media form choice: MERGE all ({media_form_options})")
+            # Re-run resolution with franchise_link composition
+            # Fall through to normal flow — override needs_research below
+            session.phase_state['media_form_merge'] = True
+        else:
+            logger.info(f"Media form choice: {chosen}")
+            session.phase_state['media_form_selected'] = chosen
 
     # ── Check for custom/original world ──
     if media_ref.lower().strip() in ["original", "custom", "new", "fresh"]:
@@ -179,6 +195,46 @@ async def resolve_media_intent(
         logger.warning(
             f"Intent resolution returned empty — AniList may be down. "
             f"Falling back to raw title for research: {needs_research}"
+        )
+
+    # ── Apply media form choice if user already picked ──
+    if session.phase_state.get('media_form_merge'):
+        resolution.composition_type = "franchise_link"
+        needs_research = session.phase_state.get('media_form_options', needs_research)
+        logger.info(f"Applying merge choice: {needs_research}, type=franchise_link")
+    elif session.phase_state.get('media_form_selected'):
+        selected = session.phase_state['media_form_selected']
+        needs_research = [selected]
+        resolution.composition_type = "single"
+        # Filter resolved_titles to only the selected one
+        resolution.resolved_titles = [
+            rt for rt in resolution.resolved_titles
+            if rt.canonical_title == selected
+        ] or resolution.resolved_titles[:1]
+        logger.info(f"Applying single choice: {selected}")
+
+    # ── Prompt for media form choice if multiple versions of same IP ──
+    if (
+        not resolution.disambiguation_needed
+        and len(needs_research) > 1
+        and resolution.composition_type == "single"
+        and not session.phase_state.get('media_form_chosen')
+    ):
+        options_text = _format_media_form_options(needs_research)
+        session.phase_state['media_form_options'] = needs_research
+
+        # Save session so choice persists
+        from ..db.session_store import SessionStore
+        SessionStore().save(session)
+
+        return IntentResult(
+            action="disambiguation",
+            response_text=options_text,
+            disambiguation_options=[
+                {"name": t, "anilist_id": None, "format": None, "year": None}
+                for t in needs_research
+            ] + [{"name": "Merge all versions", "anilist_id": None, "format": None, "year": None}],
+            resolution=resolution,
         )
 
     if not needs_research and existing_profiles:
@@ -328,6 +384,65 @@ def _format_disambiguation_options(resolution: IntentResolution) -> str:
 **Just tell me the number or name!**"""
 
     return resolution.disambiguation_question or "Could you be more specific about the title?"
+
+
+def _format_media_form_options(titles: list[str]) -> str:
+    """Format media form options (manga vs anime vs etc) for the player."""
+    options = "\n".join(f"**{i+1}.** {t}" for i, t in enumerate(titles))
+    merge_n = len(titles) + 1
+    return f"""## 🎬 Multiple Versions Found
+
+This series has multiple media forms available:
+
+{options}
+**{merge_n}.** Merge all versions (combines canon from each)
+
+---
+
+**Which version should your campaign be based on? Pick a number or tell me!**"""
+
+
+def _parse_media_form_choice(user_input: str, options: list[str]) -> str:
+    """Parse the user's media form choice. Returns a title from options or 'merge'."""
+    text = user_input.strip().lower()
+
+    # Check for merge keywords
+    merge_keywords = ["merge", "all", "both", "combine", str(len(options) + 1)]
+    if any(kw in text for kw in merge_keywords):
+        return "merge"
+
+    # Check for number selection ("1", "2", etc.)
+    num_match = re.search(r'\b(\d+)\b', text)
+    if num_match:
+        idx = int(num_match.group(1)) - 1
+        if 0 <= idx < len(options):
+            return options[idx]
+        if idx == len(options):  # merge option
+            return "merge"
+
+    # Check for media type keywords
+    type_keywords = {
+        "manga": "MANGA", "manhwa": "MANHWA", "manhua": "MANHUA",
+        "anime": "ANIME", "light novel": "LIGHT_NOVEL", "novel": "LIGHT_NOVEL",
+        "donghua": "DONGHUA", "movie": "MOVIE", "film": "MOVIE",
+    }
+    for keyword, _ in type_keywords.items():
+        if keyword in text:
+            # Find the option that matches this media type
+            for opt in options:
+                if keyword in opt.lower():
+                    return opt
+
+    # Check for name fragment match
+    for opt in options:
+        # Check if any significant word from user input appears in the option
+        for word in text.split():
+            if len(word) > 3 and word in opt.lower():
+                return opt
+
+    # Default: first option
+    logger.warning(f"Could not parse media form choice '{user_input}', defaulting to first option")
+    return options[0]
 
 
 def _save_session_composition(
