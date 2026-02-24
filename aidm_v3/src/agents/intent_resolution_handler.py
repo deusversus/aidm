@@ -90,6 +90,10 @@ async def resolve_media_intent(
     """
     detected_info = detected_info or {}
 
+    # ── Handle merge question answers (user replying to merge questions) ──
+    if session.phase_state.get('merge_questions_pending'):
+        return await _handle_merge_answers(session, media_ref)
+
     # ── Handle media form choice response (user replying to our version prompt) ──
     media_form_options = session.phase_state.get('media_form_options')
     if media_form_options and not session.phase_state.get('media_form_chosen'):
@@ -320,11 +324,19 @@ async def resolve_media_intent(
                         session, title, progress_tracker=progress_tracker,
                     )
 
-            # After all research, save the session composition
-            _save_session_composition(session=session, resolution=resolution)
-            session.phase_state['profile_resolved'] = True
-            session.phase_state['active_profile_ids'] = all_profile_ids
-            session.phase_state['composition_type'] = resolution.composition_type
+            # ── Merge analysis phase (if merge was chosen) ──
+            if session.phase_state.get('media_form_merge') and len(all_profile_ids) >= 2:
+                await _run_merge_analysis(
+                    session=session,
+                    profile_ids=all_profile_ids,
+                    progress_tracker=progress_tracker,
+                )
+            else:
+                # Non-merge: save composition normally
+                _save_session_composition(session=session, resolution=resolution)
+                session.phase_state['profile_resolved'] = True
+                session.phase_state['active_profile_ids'] = all_profile_ids
+                session.phase_state['composition_type'] = resolution.composition_type
 
             # Save session
             from ..db.session_store import SessionStore
@@ -477,3 +489,189 @@ def _save_session_composition(
         )
     except Exception as e:
         logger.error(f"Failed to save session composition: {e}")
+
+
+async def _run_merge_analysis(
+    session: Any,
+    profile_ids: list[str],
+    progress_tracker: ProgressTracker,
+) -> None:
+    """Run Phase 1 of profile merge: agentic analysis + question collection.
+
+    After both profiles are researched, the merge agent reads them,
+    compares fields, searches for divergences, and queues questions.
+    Questions are stored in phase_state for delivery to the user.
+    """
+    from ..agents.profile_merge import ProfileMergeAgent
+    from ..agents.progress import ProgressPhase
+
+    try:
+        await progress_tracker.emit(
+            ProgressPhase.PARSING,
+            "Analyzing profiles for merge...",
+            85,
+        )
+
+        agent = ProfileMergeAgent()
+        analysis, collector = await agent.analyze(profile_ids[0], profile_ids[1])
+
+        # Store analysis in phase_state
+        session.phase_state['merge_analysis'] = analysis
+        session.phase_state['merge_profile_ids'] = profile_ids
+
+        if collector.has_questions():
+            # Questions pending — store for delivery and DON'T mark profile_resolved
+            session.phase_state['merge_questions_pending'] = True
+            session.phase_state['merge_questions_text'] = collector.format_for_display()
+            session.phase_state['merge_questions_raw'] = [
+                q for q in collector.get_questions()
+            ]
+
+            await progress_tracker.emit(
+                ProgressPhase.COMPLETE,
+                "Merge analysis complete — questions for you!",
+                100,
+                {"merge_questions": True, "question_count": len(collector.get_questions())},
+            )
+            logger.info(f"Merge analysis complete: {len(collector.get_questions())} questions queued")
+        else:
+            # No questions needed — auto-merge
+            await progress_tracker.emit(
+                ProgressPhase.PARSING,
+                "No divergences found — merging automatically...",
+                90,
+            )
+
+            result = await agent.merge_with_answers(
+                profile_ids[0], profile_ids[1],
+                analysis_findings=analysis,
+            )
+
+            # Mark resolved with merged profile
+            session.phase_state['profile_resolved'] = True
+            session.phase_state['composition_type'] = 'franchise_link'
+            session.phase_state['active_profile_ids'] = profile_ids
+
+            await progress_tracker.emit(
+                ProgressPhase.COMPLETE,
+                "Profiles merged successfully!",
+                100,
+            )
+            logger.info(f"Auto-merge complete (no questions): {result}")
+
+    except Exception as e:
+        logger.error(f"Merge analysis failed: {e}", exc_info=True)
+        # Fall back to non-merged composition
+        session.phase_state['profile_resolved'] = True
+        session.phase_state['active_profile_ids'] = profile_ids
+        session.phase_state['composition_type'] = 'franchise_link'
+        await progress_tracker.emit(
+            ProgressPhase.COMPLETE,
+            "Merge analysis failed — using both profiles independently.",
+            100,
+        )
+
+
+async def _handle_merge_answers(session: Any, user_input: str) -> IntentResult:
+    """Handle merge question flow — two-pass:
+
+    Pass 1: merge_questions_pending=True, merge_questions_shown=False
+            → Display questions to user (return disambiguation)
+    Pass 2: merge_questions_pending=True, merge_questions_shown=True
+            → Process user's answers, run Phase 2 merge
+    """
+    from ..agents.profile_merge import ProfileMergeAgent
+    from ..agents.progress import ProgressPhase
+
+    # Pass 1: Show questions to user
+    if not session.phase_state.get('merge_questions_shown'):
+        session.phase_state['merge_questions_shown'] = True
+        questions_text = session.phase_state.get('merge_questions_text', '')
+
+        # Save session so flag persists
+        from ..db.session_store import SessionStore
+        SessionStore().save(session)
+
+        return IntentResult(
+            action="disambiguation",
+            response_text=questions_text,
+            disambiguation_options=[],  # No structured options, free-form answers
+            resolution=None,
+        )
+
+    # Pass 2: Process answers and run Phase 2 merge
+    session.phase_state['merge_questions_pending'] = False
+
+    profile_ids = session.phase_state.get('merge_profile_ids', [])
+    analysis = session.phase_state.get('merge_analysis', '')
+
+    if len(profile_ids) < 2:
+        logger.error("Merge answer handler: missing profile IDs")
+        return IntentResult(
+            action="ready",
+            profile_id=profile_ids[0] if profile_ids else None,
+            profile_ids=profile_ids,
+            composition_type="single",
+        )
+
+    # Create a progress tracker for the merge execution
+    progress_tracker = ProgressTracker(total_steps=10)
+
+    async def do_merge():
+        """Background task: run Phase 2 merge with player answers."""
+        try:
+            await progress_tracker.emit(
+                ProgressPhase.PARSING,
+                "Merging profiles with your preferences...",
+                20,
+            )
+
+            agent = ProfileMergeAgent()
+            result = await agent.merge_with_answers(
+                profile_ids[0],
+                profile_ids[1],
+                analysis_findings=analysis,
+                player_answers=user_input,
+            )
+
+            # Mark resolved
+            session.phase_state['profile_resolved'] = True
+            session.phase_state['composition_type'] = 'franchise_link'
+            session.phase_state['active_profile_ids'] = profile_ids
+
+            # Save session
+            from ..db.session_store import SessionStore
+            SessionStore().save(session)
+
+            await progress_tracker.emit(
+                ProgressPhase.COMPLETE,
+                "Profiles merged successfully!",
+                100,
+            )
+            logger.info(f"Merge Phase 2 complete: {result}")
+
+        except Exception as e:
+            logger.error(f"Merge execution failed: {e}", exc_info=True)
+            # Fall back to non-merged
+            session.phase_state['profile_resolved'] = True
+            session.phase_state['active_profile_ids'] = profile_ids
+            session.phase_state['composition_type'] = 'franchise_link'
+
+            from ..db.session_store import SessionStore
+            SessionStore().save(session)
+            await progress_tracker.complete()
+
+    return IntentResult(
+        action="research",
+        background_coro=do_merge,
+        progress_tracker=progress_tracker,
+        profile_id=profile_ids[0],
+        profile_ids=profile_ids,
+        composition_type="franchise_link",
+        detected_info_updates={
+            "research_task_id": progress_tracker.task_id,
+            "research_status": "merging",
+        },
+    )
+
+
