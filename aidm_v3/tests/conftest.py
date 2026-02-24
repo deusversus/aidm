@@ -222,30 +222,3 @@ def sample_outcome():
     )
 
 
-@pytest.fixture
-def mock_profile():
-    """Minimal mock NarrativeProfile for testing."""
-    profile = MagicMock()
-    profile.id = "cowboy_bebop"
-    profile.name = "Cowboy Bebop"
-    profile.dna = {
-        "realism_fantasy": 0.4,
-        "comedy_drama": 0.5,
-        "action_intrigue": 0.7,
-        "episodic_serial": 0.6,
-        "light_dark": 0.5,
-    }
-    profile.tropes = {
-        "active_tropes": ["cowboy_brotherhood"],
-        "available_tropes": ["hot_spring_episode"],
-    }
-    profile.combat_system = "gun_kata"
-    profile.power_system = "none"
-    profile.tone_keywords = ["jazzy", "melancholic", "cool"]
-    profile.composition = {"dialogue_weight": 0.4, "action_weight": 0.3}
-    profile.genre = "sci-fi noir"
-    profile.voice_guidance = "Speak in a laid-back, jazzy noir tone."
-    profile.authors_voice = "Shinichiro Watanabe's contemplative jazz-infused style."
-    profile.season_count = 1
-    profile.filler_episode_numbers = []
-    return profile

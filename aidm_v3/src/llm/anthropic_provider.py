@@ -117,9 +117,10 @@ class AnthropicProvider(LLMProvider):
         if extended_thinking:
             # Claude requires: budget_tokens < max_tokens
             # Using conservative values to stay within limits
+            from .provider import THINKING_TOKEN_BUDGET
             kwargs["thinking"] = {
                 "type": "enabled",
-                "budget_tokens": 4096  # Reduced from 8192
+                "budget_tokens": THINKING_TOKEN_BUDGET
             }
             # CRITICAL: Anthropic requires temperature=1 when thinking is enabled
             kwargs["temperature"] = 1.0

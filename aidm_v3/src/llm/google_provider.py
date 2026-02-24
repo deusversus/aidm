@@ -99,8 +99,8 @@ class GoogleProvider(LLMProvider):
             # caller's intended output budget is preserved.
             # e.g. caller wants 8192 of prose → we set 8192 + 4096 = 12288
             # so ~4096 can be used for thinking without clipping output.
-            thinking_budget = 4096
-            config["max_output_tokens"] = max_tokens + thinking_budget
+            from .provider import THINKING_TOKEN_BUDGET
+            config["max_output_tokens"] = max_tokens + THINKING_TOKEN_BUDGET
 
 
         # Use streaming to prevent truncation issues with long responses
