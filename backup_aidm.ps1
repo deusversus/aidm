@@ -1,6 +1,7 @@
 # AIDM v3 Backup Script
 # Creates a timestamped zip backup preserving folder structure
-# Excludes: venv, Lib, node_modules, __pycache__, .git, data, *.pyc, settings.json
+# Excludes: venv, __pycache__, .git, data/chroma*, data/media, *.pyc, *.db,
+#           .env, settings.json, alembic.ini, tmp_*, research_diagnostics
 
 param(
     [string]$BackupDir = ".\backup"
@@ -18,23 +19,49 @@ $dest = Join-Path $BackupDir "${projectName}_$timestamp.zip"
 $excludeDirNames = @(
     'venv',
     'venv313',
-    'Lib',           # Another venv directory
-    'Include',       # venv Include
-    'share',         # venv share  
-    'Scripts',       # venv Scripts (but we want our scripts!)
+    'Lib',               # venv Lib
+    'Include',           # venv Include
+    'share',             # venv share
     'node_modules',
     '__pycache__',
     '.git',
     '.egg-info',
     '.pytest_cache',
     '.mypy_cache',
-    'chroma',
+    '.ruff_cache',
+    '.agent',            # Agent workflow definitions (reconstructable)
+    'chroma',            # ChromaDB data (regenerated from lore)
+    'chroma_custom',     # Custom ChromaDB collections
     'backup',
-    'test_chroma'
+    'test_chroma',
+    'research_diagnostics',  # Debug/analysis output
+    'media'              # Generated media assets (large, regenerable)
 )
 
+# Paths containing these segments are venv internals (case-insensitive)
+# This avoids excluding project dirs like 'scripts/' while still
+# catching venv313/Scripts/
+$venvRoots = @('venv', 'venv313')
+
 # File patterns to exclude
-$excludeFilePatterns = @('*.pyc', '*.pyo', '*.zip', '*.log', 'pyvenv.cfg', '.env', '.env.example', 'settings.json', 'apikeys_unencrypted')
+$excludeFilePatterns = @(
+    '*.pyc',
+    '*.pyo',
+    '*.zip',
+    '*.log',
+    '*.db',              # SQLite databases (session data, regenerable)
+    '*.sqlite',
+    'pyvenv.cfg',
+    '.env',              # API keys / secrets
+    '.env.example',      # Template with placeholder keys
+    'settings.json',     # Model config (user-specific)
+    'alembic.ini',       # Contains DB connection string
+    'apikeys_unencrypted',
+    'tmp_*',             # Temp debug/scratch files
+    'error.txt',         # Runtime error dumps
+    'test_output.txt',
+    'test_results.txt'
+)
 
 Write-Host "Creating backup..." -ForegroundColor Cyan
 Write-Host "  Source: $source"
@@ -53,13 +80,25 @@ $filteredFiles = @()
 
 foreach ($file in $allFiles) {
     $skip = $false
+    $relativePath = $file.FullName.Substring($source.Length + 1)
     
     # Check if any parent directory should be excluded
-    $pathParts = $file.FullName.Substring($source.Length + 1).Split('\')
+    $pathParts = $relativePath.Split('\')
     foreach ($part in $pathParts) {
         if ($excludeDirNames -contains $part) {
             $skip = $true
             break
+        }
+    }
+    
+    # Check if inside a venv root (catches venv313\Scripts\ without
+    # excluding project scripts\)
+    if (-not $skip) {
+        foreach ($root in $venvRoots) {
+            if ($relativePath -like "$root\*") {
+                $skip = $true
+                break
+            }
         }
     }
     

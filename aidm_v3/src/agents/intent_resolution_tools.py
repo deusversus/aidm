@@ -109,32 +109,35 @@ async def _get_franchise_graph(client, anilist_id: int) -> list[dict]:
 
 
 def _search_local_profiles(profiles_dir: Path, query: str) -> list[dict]:
-    """Search existing local profiles by fuzzy title matching."""
-    from ..profiles.loader import find_profile_by_title, load_profile
+    """Search existing local profiles by fuzzy title matching.
 
-    match = find_profile_by_title(query)
-    if not match:
+    Returns ALL matching profiles (not just the first) so the LLM can see
+    every local profile that matches the query (e.g., anime + manhwa variants).
+    """
+    from ..profiles.loader import find_all_profiles_by_title, load_profile
+
+    matches = find_all_profiles_by_title(query)
+    if not matches:
         return [{"info": f"No local profiles match '{query}'"}]
 
-    profile_id, match_type = match
+    results = []
+    for profile_id, match_type in matches:
+        result = {
+            "profile_id": profile_id,
+            "match_type": match_type,
+            "already_exists": True,
+        }
+        try:
+            profile = load_profile(profile_id, fallback=False)
+            result["name"] = profile.name
+            result["anilist_id"] = profile.anilist_id
+            result["source"] = profile.source
+        except Exception:
+            result["name"] = profile_id.replace("_", " ").title()
 
-    # Try to load the profile for richer info
-    result = {
-        "profile_id": profile_id,
-        "match_type": match_type,
-    }
+        results.append(result)
 
-    try:
-        profile = load_profile(profile_id, fallback=False)
-        result["name"] = profile.name
-        result["anilist_id"] = profile.anilist_id
-        result["source"] = profile.source
-        result["already_exists"] = True
-    except Exception:
-        result["name"] = profile_id.replace("_", " ").title()
-        result["already_exists"] = True  # YAML exists even if load fails
-
-    return [result]
+    return results
 
 
 # ─── Tool Registry Builder ──────────────────────────────────────────────
