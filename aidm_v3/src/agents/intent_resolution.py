@@ -122,16 +122,19 @@ and map them to profiles for the game system.
 
 ## CRITICAL: needs_research Format
 
-The `needs_research` list must contain CLEAN CANONICAL TITLES ONLY.
-- ✅ "Solo Leveling"
-- ✅ "Hellsing Ultimate"
-- ✅ "Dragon Ball Z"
-- ❌ "Solo Leveling (Anime, AniList: 151807)" — NO metadata
-- ❌ "Solo Leveling (Manhwa)" — NO format tags
+The `needs_research` list must contain clean titles with format/year designations
+when disambiguation was performed, but NEVER database IDs.
+- ✅ "Solo Leveling" — plain title (unambiguous)
+- ✅ "Hellsing Ultimate" — specific entry name
+- ✅ "Fullmetal Alchemist: Brotherhood" — specific entry name
+- ✅ "Solo Leveling (MANGA, 2018)" — format + year from disambiguation
+- ✅ "Hellsing (TV, 2001)" — format + year from disambiguation
+- ❌ "Solo Leveling (Anime, AniList: 151807)" — NO database IDs
 - ❌ "dragon_ball_z" — NO profile IDs, use display titles
 
 The research pipeline uses these titles directly as profile names.
-Decorating them with IDs or format tags corrupts the profile naming.
+Format/year designations help distinguish adaptations (anime vs manga vs OVA).
+Database IDs (AniList, MAL) corrupt the naming and must never appear.
 
 ## Disambiguation Guidelines
 

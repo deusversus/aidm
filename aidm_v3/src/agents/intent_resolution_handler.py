@@ -186,13 +186,19 @@ async def resolve_media_intent(
     needs_research = resolution.needs_research
 
     # ── SANITIZE needs_research titles ──
-    # Strip LLM metadata decorations that would corrupt profile naming.
-    # e.g., "Solo Leveling (Anime, AniList: 151807)" → "Solo Leveling"
+    # Strip ONLY parentheticals containing database IDs (AniList/MAL).
+    # Preserve format designations like (MANGA, 2018) or (TV, 2024) —
+    # these are essential for profile disambiguation and naming.
+    # e.g., "Solo Leveling (Anime, AniList: 151807)" → "Solo Leveling (Anime)"
+    #        "Solo Leveling (MANGA, 2018)" → kept as-is ✅
     if needs_research:
         sanitized = []
         for title in needs_research:
-            # Remove parenthetical metadata: (Anime), (Manhwa), (AniList: 12345), etc.
-            clean = re.sub(r'\s*\([^)]*(?:anilist|mal|anime|manga|manhwa|donghua|ova|tv|movie|light novel)[^)]*\)', '', title, flags=re.IGNORECASE).strip()
+            # Only strip parentheticals that contain "AniList:" or "MAL:" with IDs
+            clean = re.sub(r',?\s*(?:AniList|MAL)\s*:\s*\d+', '', title, flags=re.IGNORECASE).strip()
+            # Clean up empty parens left behind: "Solo Leveling (Anime, )" → "Solo Leveling (Anime)"
+            clean = re.sub(r',\s*\)', ')', clean)
+            clean = re.sub(r'\(\s*\)', '', clean).strip()
             if clean and clean != title:
                 logger.info(f"Sanitized needs_research title: '{title}' → '{clean}'")
             sanitized.append(clean or title)
