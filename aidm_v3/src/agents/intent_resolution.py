@@ -120,14 +120,40 @@ and map them to profiles for the game system.
 4. ALWAYS search_local_profiles to check if a profile already exists
 5. Only mark disambiguation_needed=true if you genuinely cannot determine which entry they mean
 
+## CRITICAL: needs_research Format
+
+The `needs_research` list must contain CLEAN CANONICAL TITLES ONLY.
+- ✅ "Solo Leveling"
+- ✅ "Hellsing Ultimate"
+- ✅ "Dragon Ball Z"
+- ❌ "Solo Leveling (Anime, AniList: 151807)" — NO metadata
+- ❌ "Solo Leveling (Manhwa)" — NO format tags
+- ❌ "dragon_ball_z" — NO profile IDs, use display titles
+
+The research pipeline uses these titles directly as profile names.
+Decorating them with IDs or format tags corrupts the profile naming.
+
 ## Disambiguation Guidelines
 
+GENERAL RULE: If search_anilist returns a franchise with 2+ DISTINCT entries
+(not just seasons/sequels of the same show), you MUST present disambiguation
+options or media form choice. Don't auto-pick one variant.
+
+Distinct entries = different adaptations, remakes, or media formats:
+- "Hellsing" → Ambiguous. Hellsing (2001 anime) vs Hellsing Ultimate (OVA) vs Hellsing (manga). Ask.
+- "Hunter x Hunter" → Ambiguous. 1999 vs 2011 adaptation. Ask.
+- "Fullmetal Alchemist" → Ambiguous. FMA (2003) vs Brotherhood (2009). Ask.
 - "Dragon Ball" → Ambiguous (5+ distinct series). Ask which one.
 - "Naruto" → Usually means the original. Naruto Shippuden is a common sequel. Ask if they want both.
-- "Attack on Titan" → Unambiguous (single continuity).
 - "Fate" → Very ambiguous (huge franchise). Ask which.
+
+NOT ambiguous (single continuity, just seasons):
+- "Attack on Titan" → Unambiguous (single continuity, seasons are just parts).
 - "One Piece" → Unambiguous.
+- "Demon Slayer" → Unambiguous (seasons are parts of one story).
 - If user says "Dragon Ball Super Super Hero" → That's the movie. Match it precisely.
+
+When in doubt, present options rather than guessing.
 
 ## Composition Types
 
@@ -144,11 +170,18 @@ After your investigation, provide a JSON summary in this exact format:
   "composition_type": "single|franchise_link|cross_ip_blend|custom",
   "needs_research": [...],
   "disambiguation_needed": true|false,
-  "disambiguation_options": [...],
-  "disambiguation_question": "...",
+  "disambiguation_options": [
+    {"anilist_id": 123, "title": "English Title From AniList", "format": "TV", "year": 2021, "description": "Brief description"},
+    ...
+  ],
+  "disambiguation_question": "Which version did you mean?",
   "confidence": 0.0-1.0,
   "reasoning": "..."
-}"""
+}
+
+When disambiguation_needed is true, you MUST populate disambiguation_options with
+concrete entries from AniList. Use the ENGLISH title from AniList (not romanized Japanese).
+Include format (TV, OVA, MANGA, etc.) and year so the user can easily distinguish entries."""
 
 
 # ─── Agent ───────────────────────────────────────────────────────────────

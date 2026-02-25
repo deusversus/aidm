@@ -34,7 +34,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Coroutine
 
-from ..agents.intent_resolution import IntentResolutionAgent, IntentResolution
+from ..agents.intent_resolution import IntentResolutionAgent, IntentResolution, ResolvedTitle
 from ..agents.progress import ProgressPhase, ProgressTracker
 from ..profiles.session_profile import ProfileBase, SessionLayer, SessionProfile, SessionProfileStore
 
@@ -184,6 +184,49 @@ async def resolve_media_intent(
         rt for rt in resolution.resolved_titles if rt.already_exists
     ]
     needs_research = resolution.needs_research
+
+    # ── SANITIZE needs_research titles ──
+    # Strip LLM metadata decorations that would corrupt profile naming.
+    # e.g., "Solo Leveling (Anime, AniList: 151807)" → "Solo Leveling"
+    if needs_research:
+        sanitized = []
+        for title in needs_research:
+            # Remove parenthetical metadata: (Anime), (Manhwa), (AniList: 12345), etc.
+            clean = re.sub(r'\s*\([^)]*(?:anilist|mal|anime|manga|manhwa|donghua|ova|tv|movie|light novel)[^)]*\)', '', title, flags=re.IGNORECASE).strip()
+            if clean and clean != title:
+                logger.info(f"Sanitized needs_research title: '{title}' → '{clean}'")
+            sanitized.append(clean or title)
+        needs_research = sanitized
+
+    # ── DETERMINISTIC DEDUP: Cross-check needs_research against disk ──
+    # The LLM may incorrectly mark a profile as needing research even when
+    # a matching profile already exists on disk. This is the critical safety
+    # net that prevents duplicate profile generation (e.g., Solo Leveling bug).
+    if needs_research:
+        from ..profiles.loader import find_all_profiles_by_title
+        verified_research = []
+        for title in needs_research:
+            matches = find_all_profiles_by_title(title)
+            if matches:
+                profile_id, match_type = matches[0]  # Use first match
+                logger.info(
+                    f"DEDUP: '{title}' already exists as '{profile_id}' "
+                    f"(match_type={match_type}, total_matches={len(matches)}) — skipping research"
+                )
+                # Add to existing_profiles so it's used instead of re-generated
+                existing_profiles.append(ResolvedTitle(
+                    profile_id=profile_id,
+                    canonical_title=title,
+                    already_exists=True,
+                ))
+            else:
+                verified_research.append(title)
+        if len(verified_research) < len(needs_research):
+            logger.info(
+                f"DEDUP: reduced needs_research from {len(needs_research)} "
+                f"to {len(verified_research)}: {verified_research}"
+            )
+        needs_research = verified_research
 
     # Safety net: if LLM resolved titles but none exist locally and
     # needs_research is empty, populate it from the non-existing titles

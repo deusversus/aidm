@@ -534,11 +534,12 @@ def find_profile_by_title(
         # Also check reverse: query tokens subset of alias tokens
         # e.g., {"frieren"} ⊆ {"frieren", "beyond", "journeys", "end"}
         elif token_subset_match(query_tokens, alias_tokens, min_alias_tokens=1):
-            # Calculate how much of the alias is covered
+            # Query is a subset of the alias — accept based on word order
+            # (not Jaccard, which penalizes decorated names like
+            # "Solo Leveling (Manhwa, AniList: 105398)")
             similarity = jaccard_similarity(query_tokens, alias_tokens)
-
-            # Stricter threshold for reverse matching (80%+)
-            if similarity >= 0.8 and similarity > best_similarity:
+            order_sim = word_order_similarity(title, alias)
+            if (order_sim >= 0.5 or len(query_tokens) >= 2) and similarity > best_similarity:
                 best_token_match = (profile_id, alias, similarity)
                 best_similarity = similarity
 
@@ -608,6 +609,118 @@ def reload_alias_index() -> None:
     global _INDEX_BUILT
     _ALIAS_INDEX.clear()
     _INDEX_BUILT = False
+
+
+def find_all_profiles_by_title(
+    title: str,
+    fuzzy_threshold: int = 2,
+) -> list[tuple[str, str]]:
+    """Find ALL profiles matching a title (not just the first).
+
+    Unlike find_profile_by_title which returns only the best single match,
+    this scans all profile YAML files and returns every profile whose name,
+    aliases, or ID match the query. Essential for franchises with multiple
+    media formats (e.g., "Solo Leveling" has anime + manhwa profiles).
+
+    Args:
+        title: The anime title to search for
+        fuzzy_threshold: Max Levenshtein distance for fuzzy match (0 = exact only)
+
+    Returns:
+        List of (profile_id, match_type) tuples. May be empty.
+    """
+    if not title:
+        return []
+
+    profiles_dir = Path(__file__).parent
+    normalized = normalize_title(title)
+    query_tokens = tokenize_title(title)
+    results: list[tuple[str, str]] = []
+    seen_ids: set[str] = set()
+
+    for profile_path in profiles_dir.glob("*.yaml"):
+        try:
+            with open(profile_path, encoding="utf-8") as f:
+                data = yaml.safe_load(f)
+            if not data:
+                continue
+
+            profile_id = data.get("id", profile_path.stem)
+            if profile_id in seen_ids:
+                continue
+
+            profile_name = data.get("name", profile_id)
+            explicit_aliases = data.get("aliases", [])
+
+            # Collect all searchable names for this profile
+            all_names = [profile_name, profile_id]
+            all_names.extend(explicit_aliases)
+            if not explicit_aliases:
+                all_names.extend(generate_aliases(profile_name))
+
+            # Check each name for a match
+            matched = False
+            for name in all_names:
+                norm_name = normalize_title(name)
+                if not norm_name:
+                    continue
+
+                # Exact match
+                if norm_name == normalized:
+                    results.append((profile_id, "exact"))
+                    seen_ids.add(profile_id)
+                    matched = True
+                    break
+
+                # Token subset match
+                name_tokens = tokenize_title(name)
+                if name_tokens and query_tokens:
+                    if token_subset_match(name_tokens, query_tokens, min_alias_tokens=2):
+                        sim = jaccard_similarity(name_tokens, query_tokens)
+                        order_sim = word_order_similarity(title, name)
+                        min_w = min(len(normalized.split()), len(norm_name.split()))
+                        max_w = max(len(normalized.split()), len(norm_name.split()))
+                        lcs_len = round(order_sim * max_w)
+                        is_containment = lcs_len >= min_w
+                        if order_sim >= 0.5 or is_containment:
+                            results.append((profile_id, "token"))
+                            seen_ids.add(profile_id)
+                            matched = True
+                            break
+
+                    elif token_subset_match(query_tokens, name_tokens, min_alias_tokens=1):
+                        # Query is a subset of the name — e.g., "Solo Leveling" ⊂
+                        # "Solo Leveling (Anime, AniList: 151807)". Accept based on
+                        # word order (not Jaccard, which penalizes decorated names).
+                        order_sim = word_order_similarity(title, name)
+                        if order_sim >= 0.5 or len(query_tokens) >= 2:
+                            results.append((profile_id, "token"))
+                            seen_ids.add(profile_id)
+                            matched = True
+                            break
+
+            if matched:
+                continue
+
+            # Fuzzy match (only if no exact/token match found)
+            if fuzzy_threshold > 0:
+                for name in all_names:
+                    norm_name = normalize_title(name)
+                    if not norm_name:
+                        continue
+                    sim = normalized_levenshtein(normalized, norm_name)
+                    if sim >= 0.85:
+                        order_sim = word_order_similarity(title, name)
+                        if order_sim >= 0.6:
+                            results.append((profile_id, "fuzzy"))
+                            seen_ids.add(profile_id)
+                            break
+
+        except Exception as e:
+            logger.error(f"Error scanning {profile_path}: {e}")
+
+    logger.info(f"find_all_profiles_by_title('{title}'): found {len(results)} matches: {results}")
+    return results
     _build_alias_index()
 
 

@@ -380,6 +380,24 @@ async def generate_and_save_profile(
             # Generate compact profile
             profile = generate_compact_profile(research)
 
+            # ── ANILIST ID DEDUP: prevent creating duplicate profiles ──
+            # If a profile with the same AniList ID already exists on disk,
+            # return that instead of creating a new one.
+            anilist_id = profile.get("anilist_id") or getattr(research, "anilist_id", None)
+            if anilist_id:
+                for existing_yaml in profiles_dir.glob("*.yaml"):
+                    try:
+                        with open(existing_yaml, encoding="utf-8") as ef:
+                            existing = yaml.safe_load(ef)
+                        if existing and existing.get("anilist_id") == anilist_id:
+                            logger.info(
+                                f"[AniListDedup] Profile with AniList ID {anilist_id} "
+                                f"already exists: {existing_yaml.name} — reusing"
+                            )
+                            return existing
+                    except Exception:
+                        continue
+
             # GUARDRAIL: Fail fast if research returned insufficient lore
             # This prevents orphaned YAML profiles without RAG grounding
             lore_len = len(research.raw_content or '')
