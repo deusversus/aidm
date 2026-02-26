@@ -30,6 +30,8 @@ class AnimeResearchOutput(BaseModel):
 
     # Core identification
     title: str = Field(default="Unknown", description="Official title of the anime/manga")
+    anilist_id: int | None = Field(default=None, description="AniList media ID (canonical identifier)")
+    mal_id: int | None = Field(default=None, description="MyAnimeList media ID")
     alternate_titles: list[str] = Field(default_factory=list, description="Other names (native script, romanized, abbreviations)")
     media_type: str = Field(default="anime", description="anime, manga, manhwa, donghua, light_novel")
     status: str = Field(default="completed", description="ongoing, completed, hiatus")
@@ -374,7 +376,10 @@ Return ONLY the title, nothing else.'''
 
             logger.info(f"Title normalization RAW ({len(raw)} chars): {repr(raw)}")
             # Take first line only (LLM sometimes adds explanation)
-            official = raw.split('\n')[0].strip().strip('"').strip("'").strip('.')
+            official = raw.split('\n')[0].strip().strip('"').strip('.')
+            # Only strip wrapping single quotes (not trailing apostrophes from possessives)
+            if official.startswith("'") and official.endswith("'") and len(official) > 2:
+                official = official[1:-1]
 
             logger.info(f"Title normalization: '{official}'")
 
@@ -383,13 +388,17 @@ Return ONLY the title, nothing else.'''
                 # Truncation guard: if the LLM returned a title that drops significant
                 # words from the input while keeping the same prefix, it's likely a
                 # truncation error, not a legitimate normalization.
+                def _norm_word(w):
+                    """Strip possessive suffixes for comparison (journey's → journey)."""
+                    return re.sub(r"['ʼ'](s)?$", "", w)
+
                 input_words = anime_name.lower().split()
                 output_words = official.lower().split()
                 if len(input_words) >= 4 and len(output_words) < len(input_words) * 0.7:
                     # Check if it's a prefix (same first N words)
                     shared_prefix = 0
                     for iw, ow in zip(input_words, output_words):
-                        if iw == ow:
+                        if _norm_word(iw) == _norm_word(ow):
                             shared_prefix += 1
                         else:
                             break
@@ -1289,7 +1298,10 @@ Supplemental knowledge: {response.content}
             # Pass the AniList-resolved official_title (not raw anime_name)
             # so _normalize_title doesn't re-resolve and potentially truncate it
             fallback_result = await self.research_anime(official_title, progress_tracker=progress_tracker)
-            # Carry AniList genres into the fallback if the legacy pipeline didn't populate them
+            # Carry AniList data into the fallback result
+            if not fallback_result.anilist_id and anilist:
+                fallback_result.anilist_id = anilist.id
+                fallback_result.mal_id = anilist.mal_id
             if not fallback_result.detected_genres and anilist and anilist.genres:
                 fallback_result.detected_genres = anilist.genres
             return fallback_result
@@ -1304,6 +1316,8 @@ Supplemental knowledge: {response.content}
 
         output = AnimeResearchOutput(
             title=official_title,
+            anilist_id=anilist.id,
+            mal_id=anilist.mal_id,
             alternate_titles=anilist.get_all_titles(),
             media_type=self._map_format(anilist.format),
             status=anilist.status.lower() if anilist.status else "completed",
