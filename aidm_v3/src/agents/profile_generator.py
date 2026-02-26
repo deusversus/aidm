@@ -8,6 +8,7 @@ Follows the format specified in dev/AIDM_V3_PROFILE_GENERATION.md.
 import asyncio
 import logging
 import re
+import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Optional
@@ -101,14 +102,23 @@ def generate_compact_profile(research: AnimeResearchOutput) -> dict[str, Any]:
     Returns:
         Dictionary ready for YAML serialization
     """
-    # Normalize title for ID (sanitize invalid filename characters)
-    profile_id = _sanitize_profile_id(research.title)
+    # Profile ID: use AniList ID when available, otherwise generate a unique AIDM ID
+    if research.anilist_id:
+        profile_id = f"al_{research.anilist_id}"
+    else:
+        profile_id = f"aidm_{uuid.uuid4().hex[:8]}"
+    
+    # Keep slug as human-readable reference (for logging, not identity)
+    slug = _sanitize_profile_id(research.title)
+    logger.info(f"Profile ID: {profile_id} (slug: {slug}, title: {research.title})")
 
     # Build compact profile
     profile = {
         "id": profile_id,
         "name": research.title,
         "source_anime": research.title,
+        "anilist_id": research.anilist_id,
+        "mal_id": research.mal_id,
         "media_type": research.media_type,
         "status": research.status,
         "generated_at": datetime.now().isoformat(),
@@ -381,22 +391,21 @@ async def generate_and_save_profile(
             profile = generate_compact_profile(research)
 
             # ── ANILIST ID DEDUP: prevent creating duplicate profiles ──
-            # If a profile with the same AniList ID already exists on disk,
-            # return that instead of creating a new one.
-            anilist_id = profile.get("anilist_id") or getattr(research, "anilist_id", None)
+            # Since profile_id is now al_{anilist_id}, dedup is a simple file check
+            anilist_id = research.anilist_id
             if anilist_id:
-                for existing_yaml in profiles_dir.glob("*.yaml"):
+                existing_path = profiles_dir / f"al_{anilist_id}.yaml"
+                if existing_path.exists():
                     try:
-                        with open(existing_yaml, encoding="utf-8") as ef:
+                        with open(existing_path, encoding="utf-8") as ef:
                             existing = yaml.safe_load(ef)
-                        if existing and existing.get("anilist_id") == anilist_id:
+                        if existing:
                             logger.info(
-                                f"[AniListDedup] Profile with AniList ID {anilist_id} "
-                                f"already exists: {existing_yaml.name} — reusing"
+                                f"[AniListDedup] Profile al_{anilist_id} already exists — reusing"
                             )
                             return existing
                     except Exception:
-                        continue
+                        pass  # Corrupted file, regenerate
 
             # GUARDRAIL: Fail fast if research returned insufficient lore
             # This prevents orphaned YAML profiles without RAG grounding
