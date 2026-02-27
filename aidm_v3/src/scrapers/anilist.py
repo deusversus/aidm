@@ -22,6 +22,13 @@ import requests
 
 logger = logging.getLogger(__name__)
 
+# ─── Shared AniList ID Injection Format ──────────────────────────────────────
+# Used by intent_resolution_handler to inject IDs into disambiguation titles
+# and by search_with_fallback to extract them.  Keep in sync.
+ANILIST_ID_TAG = "AniList"  # e.g. "Solo Leveling (MANGA, AniList: 105398)"
+ANILIST_ID_RE = rf'{ANILIST_ID_TAG}:\s*(\d+)'  # extraction regex
+ANILIST_ID_PAREN_RE = rf'\s*\([^)]*{ANILIST_ID_TAG}:\s*\d+[^)]*\)'  # strip regex
+
 
 # ─── GraphQL Queries ─────────────────────────────────────────────────────────
 
@@ -807,7 +814,7 @@ class AniListClient:
         import re
 
         # If the title contains an embedded AniList ID, use direct lookup
-        id_match = re.search(r'AniList:\s*(\d+)', title)
+        id_match = re.search(ANILIST_ID_RE, title)
         if id_match:
             anilist_id = int(id_match.group(1))
             logger.info(f"AniList: Using embedded ID {anilist_id} from '{title}'")
@@ -817,7 +824,7 @@ class AniListClient:
             logger.warning(f"AniList: Direct ID lookup failed for {anilist_id}, falling back to search")
 
         # Strip the disambiguation suffix for cleaner search
-        clean_title = re.sub(r'\s*\([^)]*AniList:\s*\d+[^)]*\)', '', title).strip()
+        clean_title = re.sub(ANILIST_ID_PAREN_RE, '', title).strip()
         search_term = clean_title or title
 
         # Determine search order from media type hint in title

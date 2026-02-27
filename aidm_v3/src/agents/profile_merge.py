@@ -202,7 +202,8 @@ class ProfileMergeAgent(AgenticAgent):
         Returns:
             Dict with merged profile data and metadata
         """
-        tools, _ = build_merge_tools()
+        merge_state: dict = {}
+        tools, _ = build_merge_tools(merge_state=merge_state)
         self.set_tools(tools)
 
         merge_prompt = (
@@ -232,6 +233,7 @@ class ProfileMergeAgent(AgenticAgent):
             "result_text": result_text,
             "profile_id_a": profile_id_a,
             "profile_id_b": profile_id_b,
+            "merged_profile_id": merge_state.get("saved_profile_id"),
         }
 
     # ── Legacy compatibility: single-shot merge (no questions) ──
@@ -268,8 +270,9 @@ class ProfileMergeAgent(AgenticAgent):
             profile_b.storytelling_tropes
         )
 
-        # Complex merges via tools
-        tools, _ = build_merge_tools()
+        # Complex merges via tools (collector intentionally discarded —
+        # legacy path doesn't support player questions; use analyze()+merge_with_answers())
+        tools, _collector = build_merge_tools()
         self.set_tools(tools)
 
         context = self._build_merge_context(
@@ -284,7 +287,7 @@ class ProfileMergeAgent(AgenticAgent):
             max_tool_rounds=5,
         )
 
-        # Build output
+        # Build output — include all fields downstream consumers expect
         hybrid_title = f"{profile_a.title} × {profile_b.title}"
         merged = AnimeResearchOutput(
             title=hybrid_title,
@@ -296,10 +299,22 @@ class ProfileMergeAgent(AgenticAgent):
             storytelling_tropes=merged_tropes,
             power_system=profile_a.power_system,  # Primary wins as fallback
             combat_style=profile_a.combat_style,
+            # Fields previously missing from legacy merge:
+            world_setting=profile_a.world_setting or profile_b.world_setting,
+            detected_genres=list(dict.fromkeys(
+                profile_a.detected_genres + profile_b.detected_genres
+            )),  # Union, primary first, deduped
+            visual_style=profile_a.visual_style or profile_b.visual_style,
+            director_personality=(
+                profile_a.director_personality or profile_b.director_personality
+            ),
+            pacing_style=profile_a.pacing_style or profile_b.pacing_style,
+            power_distribution=profile_a.power_distribution or profile_b.power_distribution,
+            series_group=profile_a.series_group,
             raw_content=self._combine_raw_content(profile_a, profile_b, result_text),
             sources_consulted=profile_a.sources_consulted + profile_b.sources_consulted,
             confidence=80,
-            research_method="hybrid_merge"
+            research_method="hybrid_merge",
         )
 
         return merged

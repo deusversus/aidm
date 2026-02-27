@@ -331,17 +331,19 @@ def load_profile(profile_id: str, fallback: bool = True) -> NarrativeProfile:
     profile_path = profiles_dir / f"{profile_id}.yaml"
 
     if not profile_path.exists():
-        if fallback:
-            # List available profiles for the error message
-            available = list_profiles()
-            available_str = ", ".join(available) if available else "(none)"
-            raise FileNotFoundError(
-                f"Profile not found: '{profile_id}'. "
-                f"Available profiles: {available_str}. "
-                f"The research pipeline may not have generated a profile for this title."
-            )
-        else:
+        if not fallback:
             raise FileNotFoundError(f"Profile not found: {profile_path}")
+        # Fallback mode: try to load first available profile instead of raising
+        available = list_profiles()
+        if not available:
+            raise FileNotFoundError(
+                f"Profile not found: '{profile_id}' and no fallback profiles available."
+            )
+        logger.warning(
+            f"Profile '{profile_id}' not found — falling back to '{available[0]}'. "
+            f"Available: {', '.join(available)}"
+        )
+        profile_path = profiles_dir / f"{available[0]}.yaml"
 
     with open(profile_path, encoding='utf-8') as f:
         data = yaml.safe_load(f)
@@ -721,7 +723,6 @@ def find_all_profiles_by_title(
 
     logger.info(f"find_all_profiles_by_title('{title}'): found {len(results)} matches: {results}")
     return results
-    _build_alias_index()
 
 
 # ============================================================================
@@ -755,8 +756,8 @@ def find_profiles_by_series_group(series_group: str) -> list[dict[str, Any]]:
                     'name': data.get('name', profile_path.stem),
                     'series_position': data.get('series_position', 999),
                 })
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Skipping {profile_path.name} in series scan: {e}")
 
     # Sort by series_position
     results.sort(key=lambda x: x['series_position'])
@@ -801,8 +802,8 @@ def find_related_profiles(series_group: str) -> list[dict[str, Any]]:
             elif data.get('related_franchise') == series_group:
                 related.append(profile_info)
 
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Skipping {profile_path.name} in related scan: {e}")
 
     # Sort canonical by position, related alphabetically
     canonical.sort(key=lambda x: x['series_position'])
@@ -847,7 +848,8 @@ def get_series_disambiguation(profile_id: str) -> list[dict[str, Any]] | None:
 
         return None
 
-    except Exception:
+    except Exception as e:
+        logger.debug(f"check_disambiguation failed for '{profile_id}': {e}")
         return None
 
 
@@ -888,7 +890,8 @@ def get_series_parent_profile(profile_id: str) -> dict[str, Any] | None:
         with open(parent_path, encoding='utf-8') as f:
             return yaml.safe_load(f)
 
-    except Exception:
+    except Exception as e:
+        logger.debug(f"_load_parent_profile failed for '{profile_id}': {e}")
         return None
 
 
@@ -983,17 +986,21 @@ def get_related_lore(profile_id: str) -> list[str]:
                 content = lore_store.get_combined_content(rid)
                 if content:
                     lore_contents.append(content)
-        except Exception:
-            pass  # LoreStore not available, fall through to .txt
+        except Exception as e:
+            logger.debug(f"LoreStore unavailable, falling back to .txt files: {e}")
 
         # Fallback: check .txt files for profiles not found in SQL
         if not lore_contents:
             for rid in related_ids:
                 lore_path = profiles_dir / f"{rid}_lore.txt"
                 if lore_path.exists():
-                    lore_contents.append(str(lore_path))
+                    try:
+                        lore_contents.append(lore_path.read_text(encoding='utf-8'))
+                    except Exception as e:
+                        logger.warning(f"Failed to read lore file {lore_path}: {e}")
 
         return lore_contents
 
-    except Exception:
+    except Exception as e:
+        logger.warning(f"get_related_series_lore failed for '{profile_id}': {e}")
         return []
