@@ -142,8 +142,8 @@ async function startSessionZero() {
                     loadAllTrackers().catch(e => console.warn('[Resume] Tracker load failed:', e));
 
                     // Re-inject media from all turns (survives page refresh)
-                    if (resumed.campaign_media_uuid && resumed.turn_number > 0) {
-                        reloadAllMedia(resumed.campaign_media_uuid, resumed.turn_number)
+                    if (resumed.campaign_media_uuid) {
+                        reloadAllMedia(resumed.campaign_media_uuid, resumed.turn_number || 0)
                             .catch(e => console.warn('[Resume] Media reload failed:', e));
                     }
                 }
