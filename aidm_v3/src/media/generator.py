@@ -941,7 +941,7 @@ STYLE:
             def _start_generation():
                 """Start the Veo generation job (returns an operation to poll)."""
                 # Veo's `image` parameter expects types.Image, not types.Part
-                image = types.Image.from_file(str(image_path))
+                image = types.Image.from_file(location=str(image_path))
                 operation = self._client.models.generate_videos(
                     model=self.VIDEO_MODEL,
                     prompt=prompt,
