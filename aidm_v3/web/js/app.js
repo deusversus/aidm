@@ -110,12 +110,22 @@ async function startSessionZero() {
                 // portrait_maps: {turn_number: {Name: url}, -1: {Name: url} (fallback)}
                 const pMaps = resumed.portrait_maps || {};
                 const fallbackMap = pMaps[-1] || null;  // Global fallback for older turns
-                let turnIdx = 0;  // Track which turn we're on
+                // Track turns: Session Zero is all turn 0, gameplay turns start at 1
+                let turnIdx = 0;
+                let gameplayStarted = false;
 
                 for (const msg of resumed.messages) {
                     if (msg.role === 'user' && msg.content?.trim() === '[BEGIN]') continue;
                     if (msg.role === 'user' && msg.content?.trim() === '[opening scene — the story begins]') continue;
-                    if (msg.role === 'user') turnIdx++;
+
+                    // Detect phase transition: session zero → gameplay
+                    if (msg.phase === 'gameplay' && !gameplayStarted) {
+                        gameplayStarted = true;
+                        turnIdx = 1;  // First gameplay turn
+                    } else if (gameplayStarted && msg.role === 'user') {
+                        turnIdx++;  // Only count user messages as turns during gameplay
+                    }
+
                     const isAssistant = msg.role !== 'user';
                     const turnMap = isAssistant ? (pMaps[turnIdx] || fallbackMap) : null;
                     addNarrativeEntry(msg.content, msg.role === 'user', turnMap, turnIdx);
