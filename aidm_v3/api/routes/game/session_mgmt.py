@@ -249,7 +249,7 @@ async def resume_session(session_id: str):
         except Exception as e:
             logger.warning(f"Resume campaign_id lookup failed: {e}")
 
-    if session.phase.value == "GAMEPLAY" and campaign_id:
+    if session.phase.value == "gameplay" and campaign_id:
         try:
             from src.db.models import Campaign, Session as DBSession, Turn
             from src.db.session import create_session as create_db_session
