@@ -208,12 +208,15 @@ def _save_merged_profile(profiles_dir: Path, profile_data: dict) -> dict:
 def build_merge_tools(
     profiles_dir: Path | None = None,
     question_collector: PlayerQuestionCollector | None = None,
+    merge_state: dict | None = None,
 ) -> tuple[ToolRegistry, PlayerQuestionCollector]:
     """Build the tool registry for the Profile Merge Agent.
 
     Args:
         profiles_dir: Directory containing profile YAML files
         question_collector: Optional existing collector (created if None)
+        merge_state: Optional mutable dict to capture save results.
+            After merge, check ``merge_state.get('saved_profile_id')``.
 
     Returns:
         Tuple of (ToolRegistry, PlayerQuestionCollector)
@@ -326,7 +329,11 @@ def build_merge_tools(
             data = json.loads(profile_data) if isinstance(profile_data, str) else profile_data
         except json.JSONDecodeError as e:
             return {"error": f"Invalid JSON: {e}"}
-        return _save_merged_profile(profiles_dir, data)
+        result = _save_merged_profile(profiles_dir, data)
+        # Capture saved profile_id so callers can wire it into the session
+        if merge_state is not None and result.get("profile_id"):
+            merge_state["saved_profile_id"] = result["profile_id"]
+        return result
 
     registry.register(ToolDefinition(
         name="save_merged_profile",

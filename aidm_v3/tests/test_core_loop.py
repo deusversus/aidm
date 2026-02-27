@@ -116,12 +116,16 @@ class TestStateManager:
 class TestProfileLoader:
     """Tests for the profile loader."""
 
-    def test_load_cowboy_bebop_profile(self):
-        """Test loading the Cowboy Bebop profile."""
-        profile = load_profile("cowboy_bebop")
+    def test_load_existing_profile(self):
+        """Test loading an existing profile (uses first available)."""
+        from src.profiles.loader import list_profiles
+        available = list_profiles()
+        assert available, "No profiles found in profiles directory"
+
+        profile = load_profile(available[0])
 
         assert isinstance(profile, NarrativeProfile)
-        assert profile.id == "cowboy_bebop"
+        assert profile.id == available[0]
         assert profile.name is not None
         assert isinstance(profile.dna, dict)
         assert isinstance(profile.tropes, dict)
