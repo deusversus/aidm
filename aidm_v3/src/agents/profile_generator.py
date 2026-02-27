@@ -113,10 +113,15 @@ def generate_compact_profile(research: AnimeResearchOutput) -> dict[str, Any]:
     logger.info(f"Profile ID: {profile_id} (slug: {slug}, title: {research.title})")
 
     # Build compact profile
+    # Strip format/disambiguation tags from the name (e.g., "(MANGA, 2018)")
+    # The research title may carry these from the disambiguation pipeline
+    clean_name = re.sub(r'\s*\([^)]*(?:MANGA|ANIME|MANHWA|DONGHUA|LIGHT.?NOVEL|TV|OVA|ONA|MOVIE|AniList)\b[^)]*\)', '', research.title, flags=re.IGNORECASE).strip()
+    display_name = clean_name or research.title
+
     profile = {
         "id": profile_id,
-        "name": research.title,
-        "source_anime": research.title,
+        "name": display_name,
+        "source_anime": display_name,
         "anilist_id": research.anilist_id,
         "mal_id": research.mal_id,
         "media_type": research.media_type,

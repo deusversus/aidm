@@ -167,6 +167,12 @@ async def resolve_media_intent(
 
         session.phase_state['disambiguation_shown'] = True
         session.phase_state['disambiguation_for'] = media_ref
+        # Preserve AniList ID mapping so it survives the disambiguation round-trip
+        session.phase_state['anilist_id_map'] = {
+            opt.title: opt.anilist_id
+            for opt in resolution.disambiguation_options
+            if opt.anilist_id
+        }
 
         return IntentResult(
             action="disambiguation",
@@ -194,22 +200,38 @@ async def resolve_media_intent(
     # their IDs into the needs_research titles so the research pipeline
     # can use fetch_by_id directly via search_with_fallback, instead of
     # re-searching by title (which fails when format tags are present).
+    #
+    # Sources (in priority order):
+    # 1. resolution.resolved_titles (current resolution pass)
+    # 2. session.phase_state['anilist_id_map'] (from disambiguation)
+    anilist_id_map = session.phase_state.get('anilist_id_map', {})
     if needs_research:
         enriched = []
         for title in needs_research:
             if f'{ANILIST_ID_TAG}:' not in title:
-                # Find the matching ResolvedTitle to get its anilist_id
+                # Source 1: matching ResolvedTitle from current resolution
                 matching_rt = next(
                     (rt for rt in resolution.resolved_titles
                      if rt.anilist_id and rt.canonical_title in title),
                     None
                 )
-                if matching_rt:
+                anilist_id = matching_rt.anilist_id if matching_rt else None
+
+                # Source 2: disambiguation AniList ID map (survives round-trip)
+                if not anilist_id:
+                    # Try exact match first, then substring match
+                    anilist_id = anilist_id_map.get(title)
+                    if not anilist_id:
+                        for map_title, map_id in anilist_id_map.items():
+                            if map_title in title or title in map_title:
+                                anilist_id = map_id
+                                break
+
+                if anilist_id:
                     # Inject AniList ID into existing parenthetical, or append new one
                     # search_with_fallback extracts "AniList: NNNN" and calls fetch_by_id
-                    id_tag = f"{ANILIST_ID_TAG}: {matching_rt.anilist_id}"
+                    id_tag = f"{ANILIST_ID_TAG}: {anilist_id}"
                     if re.search(r'\([^)]+\)\s*$', title):
-                        # Has trailing parens like "(MANGA, 2020)" → "(MANGA, 2020, AniList: 118586)"
                         enriched_title = re.sub(r'\)\s*$', f', {id_tag})', title)
                     else:
                         enriched_title = f"{title} ({id_tag})"
@@ -290,6 +312,13 @@ async def resolve_media_intent(
     ):
         options_text = _format_media_form_options(needs_research)
         session.phase_state['media_form_options'] = needs_research
+        # Preserve AniList ID mapping from resolved_titles
+        if not session.phase_state.get('anilist_id_map'):
+            session.phase_state['anilist_id_map'] = {
+                rt.canonical_title: rt.anilist_id
+                for rt in resolution.resolved_titles
+                if rt.anilist_id
+            }
 
         # Save session so choice persists
         from ..db.session_store import SessionStore
