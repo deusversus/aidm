@@ -60,6 +60,17 @@ def get_orchestrator() -> Orchestrator:
         session_id = settings.active_session_id or profile_id  # Fallback to profile_id for backward compatibility
         _orchestrator = Orchestrator(profile_id=profile_id, session_id=session_id)
 
+        # Persist campaign_id on the file-based session (prevents settings contamination)
+        try:
+            session_store = get_session_store()
+            file_session = session_store.load(session_id)
+            if file_session and not file_session.campaign_id:
+                file_session.campaign_id = _orchestrator.campaign_id
+                session_store.save(file_session)
+                logger.info(f"[get_orchestrator] Set session.campaign_id={_orchestrator.campaign_id}")
+        except Exception as e:
+            logger.warning(f"[get_orchestrator] Could not set campaign_id on session: {e}")
+
     return _orchestrator
 
 
@@ -217,8 +228,8 @@ async def resume_session(session_id: str):
     portrait_maps = {}
     campaign_media_uuid = None
 
-    # Resolve campaign_id: session object may not have it (file-based store).
-    # Look up the Campaign record by profile_id from settings.
+    # Resolve campaign_id: prefer session.campaign_id (set at gameplay handoff),
+    # fall back to profile_id lookup for legacy sessions.
     campaign_id = getattr(session, 'campaign_id', None)
     if not campaign_id:
         try:
