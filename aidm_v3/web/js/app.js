@@ -118,7 +118,7 @@ async function startSessionZero() {
                     if (msg.role === 'user') turnIdx++;
                     const isAssistant = msg.role !== 'user';
                     const turnMap = isAssistant ? (pMaps[turnIdx] || fallbackMap) : null;
-                    addNarrativeEntry(msg.content, msg.role === 'user', turnMap);
+                    addNarrativeEntry(msg.content, msg.role === 'user', turnMap, turnIdx);
                 }
 
                 // Update context panel
@@ -402,7 +402,7 @@ function updateDebugHUDSessionZero(result) {
 /**
  * Add a narrative entry to the display
  */
-function addNarrativeEntry(text, isPlayer, portraitMap) {
+function addNarrativeEntry(text, isPlayer, portraitMap, turnNumber) {
     const display = document.getElementById('narrative-display');
 
     // Remove welcome message if present
@@ -417,6 +417,11 @@ function addNarrativeEntry(text, isPlayer, portraitMap) {
 
     const entry = document.createElement('div');
     entry.className = `narrative-entry ${isPlayer ? 'player' : ''}`;
+
+    // Tag with turn number for media threading
+    if (turnNumber != null) {
+        entry.dataset.turn = turnNumber;
+    }
 
     if (isPlayer) {
         entry.innerHTML = `<p>${escapeHtml(text)}</p>`;
@@ -1689,7 +1694,7 @@ async function reloadAllMedia(campaignMediaUuid, turnCount) {
             if (!resp.ok) continue;
             const data = await resp.json();
             if (data.assets && data.assets.length > 0) {
-                data.assets.forEach(asset => injectCutsceneInline(asset));
+                data.assets.forEach(asset => injectCutsceneInline(asset, turn));
             }
         } catch (e) {
             // Silently skip — many turns won't have media
@@ -1703,7 +1708,8 @@ async function reloadAllMedia(campaignMediaUuid, turnCount) {
         if (resp.ok) {
             const data = await resp.json();
             if (data.assets && data.assets.length > 0) {
-                data.assets.forEach(asset => injectCutsceneInline(asset));
+                // Non-turn media goes after the last turn
+                data.assets.forEach(asset => injectCutsceneInline(asset, turnCount));
             }
         }
     } catch (e) {
@@ -1714,9 +1720,11 @@ async function reloadAllMedia(campaignMediaUuid, turnCount) {
 }
 
 /**
- * Inject a cutscene inline at the bottom of the narrative display.
+ * Inject a cutscene inline in the narrative display.
+ * If afterTurn is provided, inserts after the last narrative entry for that turn.
+ * Otherwise appends at the bottom (live gameplay behavior).
  */
-function injectCutsceneInline(asset) {
+function injectCutsceneInline(asset, afterTurn) {
     const display = document.getElementById('narrative-display');
     if (!display) return;
 
@@ -1751,7 +1759,24 @@ function injectCutsceneInline(asset) {
         `;
     }
 
-    display.appendChild(container);
+    // Thread into correct position if turn info provided
+    if (afterTurn != null) {
+        // Find the last narrative entry for this turn (or the closest earlier turn)
+        let anchor = null;
+        for (let t = afterTurn; t >= 0 && !anchor; t--) {
+            const entries = display.querySelectorAll(`.narrative-entry[data-turn='${t}']`);
+            if (entries.length > 0) {
+                anchor = entries[entries.length - 1];
+            }
+        }
+        if (anchor && anchor.nextSibling) {
+            display.insertBefore(container, anchor.nextSibling);
+        } else {
+            display.appendChild(container);
+        }
+    } else {
+        display.appendChild(container);
+    }
     display.scrollTop = display.scrollHeight;
 }
 
