@@ -37,6 +37,7 @@ from typing import Any, Callable, Coroutine
 from ..agents.intent_resolution import IntentResolutionAgent, IntentResolution, ResolvedTitle
 from ..agents.progress import ProgressPhase, ProgressTracker
 from ..profiles.session_profile import ProfileBase, SessionLayer, SessionProfile, SessionProfileStore
+from ..scrapers.anilist import ANILIST_ID_TAG
 
 logger = logging.getLogger(__name__)
 
@@ -105,9 +106,13 @@ async def resolve_media_intent(
             # Re-run resolution with franchise_link composition
             # Fall through to normal flow — override needs_research below
             session.phase_state['media_form_merge'] = True
+            # Use the original disambiguation title for re-resolution
+            media_ref = session.phase_state.get('disambiguation_for', media_ref)
         else:
             logger.info(f"Media form choice: {chosen}")
             session.phase_state['media_form_selected'] = chosen
+            # Use the resolved title (not raw user input like "manga" or "2")
+            media_ref = chosen
 
     # ── Check for custom/original world ──
     if media_ref.lower().strip() in ["original", "custom", "new", "fresh"]:
@@ -119,8 +124,7 @@ async def resolve_media_intent(
             },
         )
 
-    # ── Check if disambiguation was already completed ──
-    disambiguation_done = session.phase_state.get('disambiguation_complete', False)
+    # ── Check if profile was already resolved on a previous turn ──
     profile_resolved = session.phase_state.get('profile_resolved', False)
 
     if profile_resolved:
@@ -193,7 +197,7 @@ async def resolve_media_intent(
     if needs_research:
         enriched = []
         for title in needs_research:
-            if 'AniList:' not in title:
+            if f'{ANILIST_ID_TAG}:' not in title:
                 # Find the matching ResolvedTitle to get its anilist_id
                 matching_rt = next(
                     (rt for rt in resolution.resolved_titles
@@ -203,11 +207,12 @@ async def resolve_media_intent(
                 if matching_rt:
                     # Inject AniList ID into existing parenthetical, or append new one
                     # search_with_fallback extracts "AniList: NNNN" and calls fetch_by_id
+                    id_tag = f"{ANILIST_ID_TAG}: {matching_rt.anilist_id}"
                     if re.search(r'\([^)]+\)\s*$', title):
                         # Has trailing parens like "(MANGA, 2020)" → "(MANGA, 2020, AniList: 118586)"
-                        enriched_title = re.sub(r'\)\s*$', f', AniList: {matching_rt.anilist_id})', title)
+                        enriched_title = re.sub(r'\)\s*$', f', {id_tag})', title)
                     else:
-                        enriched_title = f"{title} (AniList: {matching_rt.anilist_id})"
+                        enriched_title = f"{title} ({id_tag})"
                     logger.info(f"Enriched needs_research: '{title}' → '{enriched_title}'")
                     enriched.append(enriched_title)
                     continue

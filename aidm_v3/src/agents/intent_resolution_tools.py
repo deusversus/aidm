@@ -9,7 +9,6 @@ Tool inventory:
     fetch_anilist_by_id  — Verify a specific AniList entry by ID
     get_franchise_graph  — Map all franchise entries from one AniList ID
     search_local_profiles — Find existing profiles that might match
-    confirm_with_user    — Request disambiguation from the user
 """
 
 import logging
