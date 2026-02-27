@@ -105,30 +105,20 @@ async function startSessionZero() {
             if (resumed && resumed.messages) {
                 isSessionZero = (resumed.phase || '').toLowerCase() !== 'gameplay';
 
-                // Build portrait map for message replay
+                // Replay messages — backend annotates each with turn_number
                 display.innerHTML = '';
-                // portrait_maps: {turn_number: {Name: url}, -1: {Name: url} (fallback)}
                 const pMaps = resumed.portrait_maps || {};
-                const fallbackMap = pMaps[-1] || null;  // Global fallback for older turns
-                // Track turns: Session Zero is all turn 0, gameplay turns start at 1
-                let turnIdx = 0;
-                let gameplayStarted = false;
+                const fallbackMap = pMaps[-1] || null;
 
                 for (const msg of resumed.messages) {
+                    // Skip sentinel messages
                     if (msg.role === 'user' && msg.content?.trim() === '[BEGIN]') continue;
                     if (msg.role === 'user' && msg.content?.trim() === '[opening scene — the story begins]') continue;
 
-                    // Detect phase transition: session zero → gameplay
-                    if (msg.phase === 'gameplay' && !gameplayStarted) {
-                        gameplayStarted = true;
-                        turnIdx = 1;  // First gameplay turn
-                    } else if (gameplayStarted && msg.role === 'user') {
-                        turnIdx++;  // Only count user messages as turns during gameplay
-                    }
-
-                    const isAssistant = msg.role !== 'user';
-                    const turnMap = isAssistant ? (pMaps[turnIdx] || fallbackMap) : null;
-                    addNarrativeEntry(msg.content, msg.role === 'user', turnMap, turnIdx);
+                    const turnNum = msg.turn_number ?? 0;
+                    const isPlayer = msg.role === 'user';
+                    const turnMap = !isPlayer ? (pMaps[turnNum] || fallbackMap) : null;
+                    addNarrativeEntry(msg.content, isPlayer, turnMap, turnNum);
                 }
 
                 // Update context panel
@@ -144,14 +134,13 @@ async function startSessionZero() {
 
                 console.log('[Session] Resumed session:', savedSessionId);
 
-                // Load sidebar data for gameplay sessions
+                // Load sidebar data and media for gameplay sessions
                 if (!isSessionZero) {
                     console.log('[DEBUG] Resume: isSessionZero is false, calling loadAllTrackers');
-                    // Run independently — loadContext failure must not block sidebar
                     loadContext().catch(e => console.warn('[Resume] Context load failed:', e));
                     loadAllTrackers().catch(e => console.warn('[Resume] Tracker load failed:', e));
 
-                    // Re-inject media from all turns (survives page refresh)
+                    // Re-inject cutscene media at correct turn positions
                     if (resumed.campaign_media_uuid) {
                         reloadAllMedia(resumed.campaign_media_uuid, resumed.turn_number || 0)
                             .catch(e => console.warn('[Resume] Media reload failed:', e));
@@ -357,7 +346,16 @@ async function handlePlayerAction() {
             const text = result.narrative || result.response || '';
             console.log('[Gameplay] Final text length:', text.length);
 
-            addNarrativeEntry(text, false, result.portrait_map);
+            addNarrativeEntry(text, false, result.portrait_map, result.turn_number);
+
+            // Retroactively tag the user message entry we added earlier
+            const allEntries = document.querySelectorAll('.narrative-entry');
+            if (allEntries.length >= 2) {
+                const userEntry = allEntries[allEntries.length - 2];
+                if (userEntry && userEntry.classList.contains('player') && result.turn_number != null) {
+                    userEntry.dataset.turn = result.turn_number;
+                }
+            }
             updateDebugHUD(result);
             // Run independently — loadContext failure must not block sidebar
             loadContext().catch(e => console.warn('[Turn] Context load failed:', e));
@@ -1638,6 +1636,14 @@ document.addEventListener('DOMContentLoaded', init);
 // Media Cutscene Display — Phase 5/6
 // =========================================================================
 
+// Only these cutscene types appear as inline media in chat.
+// Portraits → portrait_maps chips. Models → sidebar/gallery only.
+const CHAT_MEDIA_TYPES = new Set([
+    'location_reveal', 'character_intro', 'emotional_peak',
+    'power_awakening', 'arc_transition', 'dramatic_moment',
+    'battle_scene', 'climax', 'opening_scene'
+]);
+
 /**
  * Poll for media generated during a turn (fire-and-forget cutscenes).
  * Polls every 10s for up to 2 minutes.
@@ -1652,7 +1658,8 @@ function pollForTurnMedia(campaignId, turnNumber, maxAttempts = 12) {
             const data = await resp.json();
             if (data.assets && data.assets.length > 0) {
                 data.assets.forEach(asset => {
-                    if (asset.status === 'complete' || asset.status === 'partial') {
+                    if ((asset.status === 'complete' || asset.status === 'partial')
+                        && CHAT_MEDIA_TYPES.has(asset.cutscene_type)) {
                         injectCutsceneInline(asset);
                     }
                 });
@@ -1667,27 +1674,13 @@ function pollForTurnMedia(campaignId, turnNumber, maxAttempts = 12) {
 
 /**
  * Poll for recently generated non-turn media (portraits, models, locations).
- * These are fire-and-forget background assets without turn prefixes.
+ * These are NOT injected into chat — portraits use the chip system,
+ * models go to sidebar/gallery. This function is retained for future use
+ * but no longer injects into the chat DOM.
  */
 function pollForLatestMedia(campaignId, maxAttempts = 6) {
-    let attempt = 0;
-    const interval = setInterval(async () => {
-        attempt++;
-        try {
-            const resp = await fetch(`/api/game/turn/${campaignId}/latest`);
-            if (!resp.ok) return;
-            const data = await resp.json();
-            if (data.assets && data.assets.length > 0) {
-                data.assets.forEach(asset => {
-                    injectCutsceneInline(asset);
-                });
-                clearInterval(interval);
-            }
-        } catch (e) {
-            console.warn('[Media] Latest poll error:', e);
-        }
-        if (attempt >= maxAttempts) clearInterval(interval);
-    }, 10000);
+    // No-op: portraits handled by portrait_maps, models by sidebar.
+    // Retained function signature for API compatibility.
 }
 
 /**
@@ -1698,12 +1691,7 @@ async function reloadAllMedia(campaignMediaUuid, turnCount) {
     console.log(`[Media] Reloading media for ${turnCount + 1} turns...`);
 
     // Only these cutscene_type values should appear as inline media in chat.
-    // Portraits are handled via portrait_maps chips. Models never go in chat.
-    const CHAT_MEDIA_TYPES = new Set([
-        'location_reveal', 'character_intro', 'emotional_peak',
-        'power_awakening', 'arc_transition', 'dramatic_moment',
-        'battle_scene', 'climax', 'opening_scene'
-    ]);
+    // (Uses module-level CHAT_MEDIA_TYPES constant)
 
     // Fetch turn-based media (cutscenes, location reveals) for each turn
     for (let turn = 0; turn <= turnCount; turn++) {

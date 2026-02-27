@@ -289,10 +289,30 @@ async def resume_session(session_id: str):
         except Exception as e:
             logger.warning(f"Resume portrait_maps failed (non-fatal): {e}")
 
+    # Annotate each message with its DB turn_number before returning.
+    # Session Zero messages → turn_number 0.
+    # Gameplay messages → sequential DB turn numbers.
+    # User message = start of new turn. Assistant response = same turn.
+    annotated_messages = []
+    gameplay_turn = 0
+    in_gameplay = False
+    for msg in session.messages:
+        phase = msg.get("phase", "")
+        if phase == "gameplay" and not in_gameplay:
+            in_gameplay = True
+            gameplay_turn = 0  # Will become 1 on first user message
+
+        if in_gameplay and msg.get("role") == "user":
+            gameplay_turn += 1  # Increment BEFORE assigning
+
+        m = dict(msg)  # Shallow copy
+        m["turn_number"] = gameplay_turn if in_gameplay else 0
+        annotated_messages.append(m)
+
     return ResumeSessionResponse(
         session_id=session_id,
         phase=session.phase.value,
-        messages=session.messages,
+        messages=annotated_messages,
         character_draft=draft_dict,
         recap=recap_text,
         turn_number=current_turn,
