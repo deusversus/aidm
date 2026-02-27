@@ -1721,12 +1721,16 @@ function injectCutsceneInline(asset, afterTurn) {
     const display = document.getElementById('narrative-display');
     if (!display) return;
 
-    // Skip if already injected
-    if (document.getElementById(`cutscene-${asset.id}`)) return;
+    // Use file_url as unique key (API id is a sequence number, not unique across turns)
+    const uniqueKey = btoa(asset.file_url || '').slice(0, 20);
+    const elementId = `cutscene-${uniqueKey}`;
+    if (document.getElementById(elementId)) return;  // Already injected
+
+    console.log(`[Media] Injecting ${asset.cutscene_type} at turn ${afterTurn}`);
 
     const container = document.createElement('div');
     container.className = 'cutscene-container';
-    container.id = `cutscene-${asset.id}`;
+    container.id = elementId;
 
     if (asset.asset_type === 'video' && asset.file_url) {
         const autoplay = document.getElementById('media-autoplay-toggle')?.checked ?? true;
