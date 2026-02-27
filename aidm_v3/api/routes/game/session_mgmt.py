@@ -216,14 +216,36 @@ async def resume_session(session_id: str):
     current_turn = 0
     portrait_maps = {}
     campaign_media_uuid = None
-    if session.phase.value == "GAMEPLAY" and session.campaign_id:
+
+    # Resolve campaign_id: session object may not have it (file-based store).
+    # Look up the Campaign record by profile_id from settings.
+    campaign_id = getattr(session, 'campaign_id', None)
+    if not campaign_id:
         try:
-            from src.db.models import Session as DBSession, Turn
+            from src.db.models import Campaign
+            from src.db.session import create_session as create_db_session
+            _settings = get_settings_store().load()
+            if _settings.active_profile_id:
+                _db = create_db_session()
+                _campaign = _db.query(Campaign).filter(
+                    Campaign.profile_id == _settings.active_profile_id
+                ).first()
+                if _campaign:
+                    campaign_id = _campaign.id
+                    if _campaign.media_uuid:
+                        campaign_media_uuid = _campaign.media_uuid
+                _db.close()
+        except Exception as e:
+            logger.warning(f"Resume campaign_id lookup failed: {e}")
+
+    if session.phase.value == "GAMEPLAY" and campaign_id:
+        try:
+            from src.db.models import Campaign, Session as DBSession, Turn
             from src.db.session import create_session as create_db_session
             db = create_db_session()
             turns = db.query(Turn).filter(
                 Turn.session_id.in_(
-                    db.query(DBSession.id).filter(DBSession.campaign_id == session.campaign_id)
+                    db.query(DBSession.id).filter(DBSession.campaign_id == campaign_id)
                 )
             ).order_by(Turn.turn_number.asc()).all()
 
@@ -240,7 +262,7 @@ async def resume_session(session_id: str):
                 try:
                     from src.media.resolver import resolve_portraits
                     # Build one combined map from current NPC/Character portraits
-                    _, combined_map = resolve_portraits("", session.campaign_id)
+                    _, combined_map = resolve_portraits("", campaign_id)
                     if combined_map:
                         # Apply to all assistant messages
                         portrait_maps[-1] = combined_map  # -1 = "apply to all"
@@ -248,13 +270,9 @@ async def resume_session(session_id: str):
                     pass
 
             # Capture campaign_media_uuid for media reload
-            try:
-                from src.db.models import Campaign
-                campaign = db.query(Campaign).filter(Campaign.id == session.campaign_id).first()
-                if campaign and campaign.media_uuid:
-                    campaign_media_uuid = campaign.media_uuid
-            except Exception:
-                pass
+            campaign = db.query(Campaign).filter(Campaign.id == campaign_id).first()
+            if campaign and campaign.media_uuid:
+                campaign_media_uuid = campaign.media_uuid
 
             db.close()
         except Exception as e:
