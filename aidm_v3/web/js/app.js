@@ -140,6 +140,12 @@ async function startSessionZero() {
                     // Run independently — loadContext failure must not block sidebar
                     loadContext().catch(e => console.warn('[Resume] Context load failed:', e));
                     loadAllTrackers().catch(e => console.warn('[Resume] Tracker load failed:', e));
+
+                    // Re-inject media from all turns (survives page refresh)
+                    if (resumed.campaign_media_uuid && resumed.turn_number > 0) {
+                        reloadAllMedia(resumed.campaign_media_uuid, resumed.turn_number)
+                            .catch(e => console.warn('[Resume] Media reload failed:', e));
+                    }
                 }
 
                 return;
@@ -1667,6 +1673,44 @@ function pollForLatestMedia(campaignId, maxAttempts = 6) {
         }
         if (attempt >= maxAttempts) clearInterval(interval);
     }, 10000);
+}
+
+/**
+ * Reload all media for an existing session (called on page refresh/resume).
+ * Fetches turn-based media for turns 0..turnCount and latest non-turn media.
+ */
+async function reloadAllMedia(campaignMediaUuid, turnCount) {
+    console.log(`[Media] Reloading media for ${turnCount + 1} turns...`);
+
+    // Fetch turn-based media (cutscenes, location reveals) for each turn
+    for (let turn = 0; turn <= turnCount; turn++) {
+        try {
+            const resp = await fetch(`/api/game/turn/${campaignMediaUuid}/${turn}/media`);
+            if (!resp.ok) continue;
+            const data = await resp.json();
+            if (data.assets && data.assets.length > 0) {
+                data.assets.forEach(asset => injectCutsceneInline(asset));
+            }
+        } catch (e) {
+            // Silently skip — many turns won't have media
+        }
+    }
+
+    // Fetch latest non-turn media (portraits, models, locations)
+    // Use a very large time window (1 day) to capture everything from this session
+    try {
+        const resp = await fetch(`/api/game/turn/${campaignMediaUuid}/latest?since_seconds=86400`);
+        if (resp.ok) {
+            const data = await resp.json();
+            if (data.assets && data.assets.length > 0) {
+                data.assets.forEach(asset => injectCutsceneInline(asset));
+            }
+        }
+    } catch (e) {
+        console.warn('[Media] Latest media reload failed:', e);
+    }
+
+    console.log('[Media] Reload complete.');
 }
 
 /**

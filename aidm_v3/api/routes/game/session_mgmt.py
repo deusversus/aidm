@@ -215,6 +215,7 @@ async def resume_session(session_id: str):
     # Get current turn count from DB for gameplay detection
     current_turn = 0
     portrait_maps = {}
+    campaign_media_uuid = None
     if session.phase.value == "GAMEPLAY" and session.campaign_id:
         try:
             from src.db.models import Session as DBSession, Turn
@@ -246,6 +247,15 @@ async def resume_session(session_id: str):
                 except Exception:
                     pass
 
+            # Capture campaign_media_uuid for media reload
+            try:
+                from src.db.models import Campaign
+                campaign = db.query(Campaign).filter(Campaign.id == session.campaign_id).first()
+                if campaign and campaign.media_uuid:
+                    campaign_media_uuid = campaign.media_uuid
+            except Exception:
+                pass
+
             db.close()
         except Exception as e:
             logger.warning(f"Resume portrait_maps failed (non-fatal): {e}")
@@ -258,6 +268,7 @@ async def resume_session(session_id: str):
         recap=recap_text,
         turn_number=current_turn,
         portrait_maps=portrait_maps or None,
+        campaign_media_uuid=campaign_media_uuid,
     )
 
 

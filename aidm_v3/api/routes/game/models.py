@@ -251,6 +251,7 @@ class ResumeSessionResponse(BaseModel):
     recap: str | None = None  # "Previously On..." recap for session continuity
     turn_number: int = 0  # Current turn count (0 = no gameplay turns yet)
     portrait_maps: dict[int, dict[str, str]] | None = None  # {turn_number: {"NPC Name": "/api/game/media/..."}}
+    campaign_media_uuid: str | None = None  # UUID for media folder — enables media reload on resume
 
 
 # === Phase 5: Media Gallery & Cost Models ===
