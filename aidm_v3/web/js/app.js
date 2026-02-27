@@ -1697,6 +1697,14 @@ function pollForLatestMedia(campaignId, maxAttempts = 6) {
 async function reloadAllMedia(campaignMediaUuid, turnCount) {
     console.log(`[Media] Reloading media for ${turnCount + 1} turns...`);
 
+    // Only these cutscene_type values should appear as inline media in chat.
+    // Portraits are handled via portrait_maps chips. Models never go in chat.
+    const CHAT_MEDIA_TYPES = new Set([
+        'location_reveal', 'character_intro', 'emotional_peak',
+        'power_awakening', 'arc_transition', 'dramatic_moment',
+        'battle_scene', 'climax', 'opening_scene'
+    ]);
+
     // Fetch turn-based media (cutscenes, location reveals) for each turn
     for (let turn = 0; turn <= turnCount; turn++) {
         try {
@@ -1704,26 +1712,13 @@ async function reloadAllMedia(campaignMediaUuid, turnCount) {
             if (!resp.ok) continue;
             const data = await resp.json();
             if (data.assets && data.assets.length > 0) {
-                data.assets.forEach(asset => injectCutsceneInline(asset, turn));
+                data.assets
+                    .filter(a => CHAT_MEDIA_TYPES.has(a.cutscene_type))
+                    .forEach(asset => injectCutsceneInline(asset, turn));
             }
         } catch (e) {
             // Silently skip — many turns won't have media
         }
-    }
-
-    // Fetch latest non-turn media (portraits, models, locations)
-    // Use a very large time window (1 day) to capture everything from this session
-    try {
-        const resp = await fetch(`/api/game/turn/${campaignMediaUuid}/latest?since_seconds=86400`);
-        if (resp.ok) {
-            const data = await resp.json();
-            if (data.assets && data.assets.length > 0) {
-                // Non-turn media goes after the last turn
-                data.assets.forEach(asset => injectCutsceneInline(asset, turnCount));
-            }
-        }
-    } catch (e) {
-        console.warn('[Media] Latest media reload failed:', e);
     }
 
     console.log('[Media] Reload complete.');
