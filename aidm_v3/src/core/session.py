@@ -308,6 +308,9 @@ class Session:
     arc_committed_at_turn: int | None = None            # turn number when Director committed
     arc_transition_signal: str | None = None            # narrative event that will close this arc
 
+    # Campaign link — set at gameplay handoff, survives serialization
+    campaign_id: int | None = None
+
     def is_session_zero(self) -> bool:
         """Check if we're still in Session Zero."""
         return self.phase not in (SessionPhase.GAMEPLAY, SessionPhase.META_CONVERSATION)
@@ -388,6 +391,8 @@ class Session:
             "arc_pov_protagonist": self.arc_pov_protagonist,
             "arc_committed_at_turn": self.arc_committed_at_turn,
             "arc_transition_signal": self.arc_transition_signal,
+            # Campaign link
+            "campaign_id": self.campaign_id,
         }
 
     @classmethod
@@ -415,6 +420,7 @@ class Session:
         session.arc_pov_protagonist = data.get("arc_pov_protagonist")
         session.arc_committed_at_turn = data.get("arc_committed_at_turn")
         session.arc_transition_signal = data.get("arc_transition_signal")
+        session.campaign_id = data.get("campaign_id")
         return session
 
 
