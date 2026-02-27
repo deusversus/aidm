@@ -203,10 +203,12 @@ async def get_turn_media(campaign_media_id: str, turn_number: int):
     assets = []
     asset_id = 0
 
-    # Check cutscenes for turn-prefixed files (e.g. turn15_power_awakening_*.png)
-    cutscenes_dir = campaign_dir / "cutscenes"
-    if cutscenes_dir.exists():
-        for fp in sorted(cutscenes_dir.iterdir()):
+    # Scan both cutscenes/ and locations/ for turn-prefixed files
+    for category in ("cutscenes", "locations"):
+        cat_dir = campaign_dir / category
+        if not cat_dir.exists():
+            continue
+        for fp in sorted(cat_dir.iterdir()):
             if fp.is_file() and fp.name.startswith(f"turn{turn_number}_"):
                 suffix = fp.suffix.lower()
                 if suffix in MIME_MAP:
@@ -219,8 +221,60 @@ async def get_turn_media(campaign_media_id: str, turn_number: int):
                         "id": asset_id,
                         "asset_type": "video" if is_video else "image",
                         "cutscene_type": cutscene_type,
-                        "file_url": f"/api/game/media/{campaign_media_id}/cutscenes/{fp.name}",
+                        "category": category,
+                        "file_url": f"/api/game/media/{campaign_media_id}/{category}/{fp.name}",
                         "status": "complete",
                     })
 
     return {"assets": assets}
+
+
+@router.get("/turn/{campaign_media_id}/latest")
+async def get_latest_media(campaign_media_id: str, since_seconds: int = 300):
+    """Get recently generated non-turn media (portraits, models, locations).
+    
+    These are fire-and-forget assets that don't have turn prefixes.
+    The frontend polls this after each turn to pick up background-generated media.
+    
+    Args:
+        campaign_media_id: UUID of the campaign's media folder
+        since_seconds: Only return files created in the last N seconds (default 5 min)
+    """
+    import time
+
+    campaign_dir = MEDIA_BASE_DIR / campaign_media_id
+    if not campaign_dir.exists():
+        return {"assets": []}
+
+    assets = []
+    asset_id = 0
+    cutoff = time.time() - since_seconds
+
+    for category in ("portraits", "models", "locations"):
+        cat_dir = campaign_dir / category
+        if not cat_dir.exists():
+            continue
+        for fp in sorted(cat_dir.iterdir()):
+            if not fp.is_file():
+                continue
+            suffix = fp.suffix.lower()
+            if suffix not in MIME_MAP:
+                continue
+            # Only include recently created files
+            if fp.stat().st_mtime < cutoff:
+                continue
+            # Skip turn-prefixed files (already served by get_turn_media)
+            if fp.name.startswith("turn"):
+                continue
+            asset_id += 1
+            assets.append({
+                "id": f"latest_{asset_id}",
+                "asset_type": "video" if suffix in (".mp4", ".webm") else "image",
+                "category": category,
+                "filename": fp.name,
+                "file_url": f"/api/game/media/{campaign_media_id}/{category}/{fp.name}",
+                "status": "complete",
+            })
+
+    return {"assets": assets}
+

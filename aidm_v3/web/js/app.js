@@ -351,6 +351,12 @@ async function handlePlayerAction() {
             const mediaId = result.campaign_media_uuid || result.campaign_id;
             if (result.turn_number != null && mediaId != null) {
                 pollForTurnMedia(mediaId, result.turn_number);
+                // On first gameplay turn, also poll for turn 0 media (handoff cutscenes)
+                if (result.turn_number === 1) {
+                    pollForTurnMedia(mediaId, 0);
+                }
+                // Poll for non-turn media (portraits, models, locations)
+                pollForLatestMedia(mediaId);
             }
         }
 
@@ -1636,6 +1642,31 @@ function pollForTurnMedia(campaignId, turnNumber, maxAttempts = 12) {
         }
         if (attempt >= maxAttempts) clearInterval(interval);
     }, 10000);  // Every 10 seconds
+}
+
+/**
+ * Poll for recently generated non-turn media (portraits, models, locations).
+ * These are fire-and-forget background assets without turn prefixes.
+ */
+function pollForLatestMedia(campaignId, maxAttempts = 6) {
+    let attempt = 0;
+    const interval = setInterval(async () => {
+        attempt++;
+        try {
+            const resp = await fetch(`/api/game/turn/${campaignId}/latest`);
+            if (!resp.ok) return;
+            const data = await resp.json();
+            if (data.assets && data.assets.length > 0) {
+                data.assets.forEach(asset => {
+                    injectCutsceneInline(asset);
+                });
+                clearInterval(interval);
+            }
+        } catch (e) {
+            console.warn('[Media] Latest poll error:', e);
+        }
+        if (attempt >= maxAttempts) clearInterval(interval);
+    }, 10000);
 }
 
 /**
