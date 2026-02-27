@@ -219,13 +219,18 @@ async def resolve_media_intent(
 
                 # Source 2: disambiguation AniList ID map (survives round-trip)
                 if not anilist_id:
+                    # Normalize Unicode quotes for comparison — AniList uses curly
+                    # apostrophes (\u2018\u2019) but LLM/user titles use straight (')
+                    def _norm(s: str) -> str:
+                        return s.replace('\u2018', "'").replace('\u2019', "'").replace('\u201c', '"').replace('\u201d', '"')
+
+                    norm_title = _norm(title)
                     # Try exact match first, then substring match
-                    anilist_id = anilist_id_map.get(title)
-                    if not anilist_id:
-                        for map_title, map_id in anilist_id_map.items():
-                            if map_title in title or title in map_title:
-                                anilist_id = map_id
-                                break
+                    for map_title, map_id in anilist_id_map.items():
+                        norm_map = _norm(map_title)
+                        if norm_map == norm_title or norm_map in norm_title or norm_title in norm_map:
+                            anilist_id = map_id
+                            break
 
                 if anilist_id:
                     # Inject AniList ID into existing parenthetical, or append new one

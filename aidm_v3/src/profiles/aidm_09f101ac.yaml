@@ -1,0 +1,114 @@
+id: aidm_09f101ac
+name: 'Frieren: Beyond Journey''s End'
+source_anime: 'Frieren: Beyond Journey''s End'
+anilist_id: null
+mal_id: null
+media_type: anime
+status: completed
+generated_at: '2026-02-27T10:09:46.151046'
+confidence: 95
+research_method: bundled_parallel
+aliases:
+- Sōsō no Furīren
+- frieren
+- frieren at the funeral
+- frieren beyond journeys end manga 2020
+- frieren remnants of the departed
+- frieren the slayer
+- frierenbeyondjourneysendmanga2020
+- sousou no frieren
+- 葬送のフリーレン
+dna_scales:
+  introspection_vs_action: 2
+  comedy_vs_drama: 4
+  simple_vs_complex: 4
+  power_fantasy_vs_struggle: 2
+  explained_vs_mysterious: 3
+  fast_paced_vs_slow_burn: 9
+  episodic_vs_serialized: 5
+  grounded_vs_absurd: 2
+  tactical_vs_instinctive: 2
+  hopeful_vs_cynical: 1
+  ensemble_vs_solo: 3
+power_distribution:
+  peak_tier: T4
+  typical_tier: T8
+  floor_tier: T9
+  gradient: top_heavy
+world_tier: T8
+tropes:
+  tournament_arc: true
+  training_montage: true
+  power_of_friendship: true
+  mentor_death: true
+  chosen_one: false
+  tragic_backstory: true
+  redemption_arc: false
+  betrayal: false
+  sacrifice: true
+  transformation: false
+  forbidden_technique: false
+  time_loop: false
+  false_identity: true
+  ensemble_focus: true
+  slow_burn_romance: true
+detected_genres: []
+combat_system: tactical
+power_system:
+  name: Magic
+  mechanics: 'Magic operates on four fundamental pillars: Mana (internal energy source),
+    Control (precise manipulation and suppression of aura), Spell Formulas (structural
+    blueprints dictating physical possibilities), and Visualization (the absolute
+    rule where a mage must clearly picture an outcome for the spell to succeed).'
+  limitations: Restricted by the conservation of energy and mass (creating from nothing
+    requires immense mana), mental blocks (a mage's psychology and subconscious doubts
+    can cause spells to fail or defenses to weaken), and rock-paper-scissors matchup
+    dynamics.
+  tiers:
+  - Third-Class Mage
+  - Second-Class Mage
+  - First-Class Mage
+tone:
+  comedy_level: 4
+  darkness_level: 3
+  optimism: 9
+director_personality: 'You are the director for a Frieren: Beyond Journey''s End (MANGA,
+  2020)-style campaign. You explore character thoughts and feelings deeply. You let
+  scenes breathe. Patience is a virtue; payoffs are earned. Hope is real in this world.
+  Earned optimism, not naivety. You explain strategies and tactics in detail.'
+pacing:
+  scene_length: moderate
+  arc_length_sessions: 4-6
+sources_consulted:
+- power_system
+- combat
+- tone
+- visual_style
+- characters
+- factions
+- locations
+- arcs
+- sequels
+- adaptations
+- recent
+- series_aliases
+visual_style:
+  art_style: storybook nostalgic fantasy with clean linework
+  color_palette: soft, muted, and pastel-leaning, utilizing warm golden-hour lighting
+    and cool starry night blues
+  line_work: clean, uncluttered linework
+  shading: soft watercolor shading with cinematic lighting and subtle film grain
+  character_rendering: expressive, soft character designs with practical attire and
+    subtle facial expressions ranging from deadpan to wistful
+  atmosphere: melancholic, reflective, and cozy with a timeless, cinematic quality
+  composition_style: meticulous attention to subtle character acting in quiet moments,
+    contrasting with dynamic camera movements and heavy impact frames during action
+  studio_reference: Studio Madhouse (directed by Keiichirō Saitō)
+  reference_descriptors:
+  - storybook fantasy anime
+  - soft pastel color palette
+  - watercolor backgrounds
+  - clean expressive character design
+  - cinematic lighting with film grain
+series_group: frieren
+series_position: 1
