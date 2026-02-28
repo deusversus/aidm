@@ -404,59 +404,342 @@ def get_profile_context_for_agent(session: Session) -> str:
     return "\n".join(parts)
 
 
+def _derive_dna_from_calibration(
+    tone: str, combat_style: str, stakes: str, genre: str
+) -> dict[str, int]:
+    """Deterministically derive 11 DNA scale values from calibration preferences."""
+    dna = {
+        "introspection_vs_action": 5,
+        "comedy_vs_drama": 5,
+        "simple_vs_complex": 5,
+        "power_fantasy_vs_struggle": 5,
+        "explained_vs_mysterious": 5,
+        "fast_paced_vs_slow_burn": 5,
+        "episodic_vs_serialized": 6,
+        "grounded_vs_absurd": 4,
+        "tactical_vs_instinctive": 5,
+        "hopeful_vs_cynical": 5,
+        "ensemble_vs_solo": 5,
+    }
+
+    # Tone adjustments
+    if tone == "comedy":
+        dna["comedy_vs_drama"] = 8
+        dna["hopeful_vs_cynical"] = 3
+        dna["grounded_vs_absurd"] = 6
+    elif tone == "drama_heavy":
+        dna["comedy_vs_drama"] = 2
+        dna["hopeful_vs_cynical"] = 7
+        dna["introspection_vs_action"] = 4
+
+    # Combat adjustments
+    if combat_style == "tactical":
+        dna["tactical_vs_instinctive"] = 3
+        dna["simple_vs_complex"] = 7
+    elif combat_style in ("instinctive", "spectacle"):
+        dna["tactical_vs_instinctive"] = 8
+        dna["simple_vs_complex"] = 3
+        dna["fast_paced_vs_slow_burn"] = 3
+
+    # Stakes adjustments
+    if stakes == "permanent_consequences":
+        dna["power_fantasy_vs_struggle"] = 7
+        dna["hopeful_vs_cynical"] = min(dna["hopeful_vs_cynical"] + 1, 10)
+    elif stakes == "plot_armor":
+        dna["power_fantasy_vs_struggle"] = 2
+
+    # Genre adjustments
+    if genre == "urban_supernatural":
+        dna["grounded_vs_absurd"] = 3
+        dna["explained_vs_mysterious"] = 7
+    elif genre == "scifi":
+        dna["explained_vs_mysterious"] = 3
+        dna["simple_vs_complex"] = 7
+    elif genre == "post_apocalyptic":
+        dna["hopeful_vs_cynical"] = 7
+        dna["power_fantasy_vs_struggle"] = 7
+
+    return dna
+
+
+async def _synthesize_creative_fields(
+    calibration: dict,
+    genre: str,
+    tone: str,
+    combat_style: str,
+    power_flavor: str,
+) -> tuple[str, dict, dict]:
+    """
+    Synthesize director_personality, author_voice, and visual_style via LLM.
+    
+    Returns:
+        Tuple of (director_personality_str, author_voice_dict, visual_style_dict)
+    """
+    import json
+
+    from ..llm import get_llm_manager
+
+    # Build the synthesis prompt from calibration data
+    director_vision = calibration.get("custom_director_vision", "")
+    authorial_voice = calibration.get("custom_authorial_voice", "")
+    art_direction = calibration.get("custom_art_direction", "")
+
+    # If no creative direction was given, use defaults
+    if not any([director_vision, authorial_voice, art_direction]):
+        return _default_creative_fields(genre)
+
+    prompt = f"""You are generating creative direction for an original-world RPG campaign.
+
+PLAYER PREFERENCES:
+- Genre: {genre}
+- Tone: {tone}
+- Combat: {combat_style}
+- Power system: {power_flavor}
+- Director vision: {director_vision or "Not specified"}
+- Writing style: {authorial_voice or "Not specified"}  
+- Visual style: {art_direction or "Not specified"}
+
+Generate a JSON object with EXACTLY these three fields:
+
+1. "director_personality": A 3-5 sentence directing style prompt (second person, like instructions to a showrunner). Capture the player's stated vision — pacing, dramatic tension, emotional core. Be specific and evocative.
+
+2. "author_voice": An object with these exact keys:
+   - "sentence_patterns": array of 2-3 strings describing prose rhythm
+   - "structural_motifs": array of 2-3 strings describing narrative structure
+   - "dialogue_quirks": array of 2-3 strings describing dialogue style
+   - "emotional_rhythm": array of 2-3 strings describing emotional pacing
+   - "example_voice": a single sentence of example prose in this voice
+
+3. "visual_style": An object with these exact keys:
+   - "art_style": string (e.g., "dark ink-heavy manga", "vibrant cel-shaded")
+   - "color_palette": string (e.g., "dark moody tones with neon accents")
+   - "line_work": string (e.g., "heavy bold lines", "clean sharp")
+   - "shading": string (e.g., "high contrast noir", "soft gradient")
+   - "character_rendering": string
+   - "atmosphere": string
+   - "composition_style": string
+   - "studio_reference": string (anime studio or director reference, or empty)
+   - "reference_descriptors": array of 2-3 strings
+
+OUTPUT: Valid JSON only. No markdown, no explanation. Start with {{ and end with }}.
+"""
+
+    try:
+        manager = get_llm_manager()
+        provider, model = manager.get_provider_for_agent("session_zero")
+
+        response = await provider.complete(
+            messages=[{"role": "user", "content": prompt}],
+            system="You are a creative director for anime-inspired RPG campaigns. Output valid JSON only.",
+            model=model,
+            max_tokens=1500,
+            temperature=0.8,
+        )
+
+        # Parse JSON response
+        content = response.content.strip()
+        # Strip any markdown fencing if present
+        if content.startswith("```"):
+            content = content.split("\n", 1)[1].rsplit("```", 1)[0].strip()
+
+        result = json.loads(content)
+
+        director = result.get("director_personality", "")
+        voice = result.get("author_voice", {})
+        style = result.get("visual_style", {})
+
+        # Validate we got meaningful content
+        if director and voice and style:
+            logger.info(f"LLM synthesis successful: director={len(director)} chars, "
+                        f"voice={len(voice.get('sentence_patterns', []))} patterns")
+            return director, voice, style
+        else:
+            logger.warning("LLM synthesis returned incomplete data — using defaults")
+            return _default_creative_fields(genre)
+
+    except Exception as e:
+        logger.warning(f"LLM synthesis failed ({e}) — using defaults")
+        return _default_creative_fields(genre)
+
+
+def _default_creative_fields(genre: str) -> tuple[str, dict, dict]:
+    """Fallback creative fields when LLM synthesis fails or no preferences given."""
+    genre_vibes = {
+        "fantasy": ("adventurous and inviting with hints of mystery", "warm earth tones with magical accent colors",
+                    "high fantasy illustration"),
+        "scifi": ("sleek futuristic with technological wonder", "cool blues and chrome with neon accents",
+                  "hard sci-fi illustration"),
+        "urban_supernatural": ("gritty modern noir with supernatural undertones", "dark urban tones with supernatural glow",
+                               "modern dark manga"),
+        "post_apocalyptic": ("desolate beauty with survival tension", "muted earth tones with rust and decay",
+                             "post-apocalyptic realism"),
+    }
+    atmosphere, palette, art = genre_vibes.get(genre, genre_vibes["fantasy"])
+
+    director = (
+        "You guide a collaborative world shaped by the player's choices. "
+        "Balance wonder and danger — every new location should feel like it holds "
+        "secrets worth exploring and threats worth overcoming. Let the player's "
+        "character concept drive the tone: lean into their strengths to create "
+        "satisfying moments, and probe their weaknesses to create meaningful tension."
+    )
+    voice = {
+        "sentence_patterns": ["Mix action and description in balanced rhythm",
+                              "Use sensory details to ground fantastical elements"],
+        "structural_motifs": ["Escalating stakes within each arc",
+                              "Quiet character moments between action beats"],
+        "dialogue_quirks": ["NPCs speak naturally with setting-appropriate diction",
+                            "Humor emerges organically from character interactions"],
+        "emotional_rhythm": ["Build tension through exploration and discovery",
+                             "Release through combat resolution or revelation"],
+        "example_voice": "",
+    }
+    style = {
+        "art_style": art,
+        "color_palette": palette,
+        "line_work": "clean detailed lines",
+        "shading": "soft gradient shading",
+        "character_rendering": "proportional characters with distinctive features",
+        "atmosphere": atmosphere,
+        "composition_style": "wide establishing shots alternating with character close-ups",
+        "studio_reference": "",
+        "reference_descriptors": ["detailed environments", "atmospheric lighting"],
+    }
+    return director, voice, style
+
+
 async def generate_custom_profile(session: Session) -> dict[str, Any]:
     """
     Generate a custom (original) world profile for the session.
     
-    Called when player says "Original" instead of an anime reference.
-    Creates a basic fantasy world profile, saves it to session-scoped storage,
-    and indexes it for RAG retrieval.
-    
-    Args:
-        session: Current session state
-        
-    Returns:
-        Dict with creation status
+    Consumes player calibration from session.phase_state["custom_calibration"]
+    and synthesizes creative fields via LLM. Falls back to defaults if missing.
     """
+    import json
     from datetime import datetime
 
     from ..context.custom_profile_library import get_custom_profile_library, save_custom_profile
+    from ..llm import get_llm_manager
 
     session_id = session.session_id
+    calibration = session.phase_state.get("custom_calibration", {})
 
-    # Create a default custom world profile
-    # In a future enhancement, we could use an AI agent to generate this
+    # --- Derive deterministic fields from calibration ---
+    genre = calibration.get("custom_genre", "fantasy")
+    tone = calibration.get("custom_tone", "balanced")
+    combat_style = calibration.get("custom_combat_style", "tactical")
+    stakes = calibration.get("custom_stakes", "balanced")
+    power_flavor = calibration.get("custom_power_flavor", "magic")
+    pacing = calibration.get("custom_pacing", "moderate")
+
+    # DNA scales from calibration
+    dna = _derive_dna_from_calibration(tone, combat_style, stakes, genre)
+
+    # Combat system mapping
+    combat_map = {
+        "tactical": "tactical", "instinctive": "spectacle",
+        "spectacle": "spectacle", "balanced": "tactical",
+    }
+    combat_system = combat_map.get(combat_style, "tactical")
+
+    # Pacing mapping
+    pacing_map = {
+        "rapid": {"scene_length": "rapid", "arc_length_sessions": "2-3"},
+        "moderate": {"scene_length": "moderate", "arc_length_sessions": "3-5"},
+        "deliberate": {"scene_length": "extended", "arc_length_sessions": "5-8"},
+    }
+    pacing_config = pacing_map.get(pacing, pacing_map["moderate"])
+
+    # Genre-based defaults  
+    genre_genres_map = {
+        "fantasy": ["fantasy", "action"], "scifi": ["sci-fi", "action"],
+        "urban_supernatural": ["supernatural", "action", "thriller"],
+        "post_apocalyptic": ["post-apocalyptic", "survival", "action"],
+    }
+    detected_genres = genre_genres_map.get(genre, ["fantasy", "action"])
+
+    # Power system from flavor
+    power_systems = {
+        "magic": {"name": "Flexible Magic", "mechanics": "Character-defined magical abilities with creative freedom",
+                  "limitations": "Limited by mana and mastery", "tiers": []},
+        "technology": {"name": "Technology & Augmentation", "mechanics": "Devices, cybernetics, and engineered systems",
+                       "limitations": "Limited by resources and maintenance", "tiers": []},
+        "martial_arts": {"name": "Martial Arts & Ki", "mechanics": "Body-harnessed energy channeled through technique",
+                         "limitations": "Physical stamina and training requirements", "tiers": []},
+        "psychic": {"name": "Psychic Abilities", "mechanics": "Mental and psionic powers manifested through willpower",
+                    "limitations": "Mental strain and concentration limits", "tiers": []},
+        "hybrid": {"name": "Hybrid Power System", "mechanics": "Multiple power sources coexist and interact",
+                   "limitations": "Specialization vs versatility trade-offs", "tiers": []},
+    }
+    power_system = power_systems.get(power_flavor, power_systems["magic"])
+
+    # Tone config
+    tone_configs = {
+        "comedy": {"comedy_level": 8, "darkness_level": 2, "optimism": 8},
+        "drama_heavy": {"comedy_level": 2, "darkness_level": 7, "optimism": 4},
+        "balanced": {"comedy_level": 5, "darkness_level": 5, "optimism": 5},
+    }
+    tone_config = tone_configs.get(tone, tone_configs["balanced"])
+
+    # --- LLM Synthesis for creative fields ---
+    director_personality, author_voice, visual_style = await _synthesize_creative_fields(
+        calibration, genre, tone, combat_style, power_flavor
+    )
+
     world_data = {
+        # --- Identity ---
         "id": f"custom_{session_id[:8]}",
-        "name": "Original Fantasy World",
+        "name": calibration.get("custom_world_name", "Original World"),
+        "source_anime": "Original",
         "profile_type": "custom",
         "session_id": session_id,
         "generated_at": datetime.now().isoformat(),
+        "confidence": 100,
+        "research_method": "custom",
 
-        # Default DNA scales for balanced fantasy
-        "dna_scales": {
-            "introspection_vs_action": 5,
-            "comedy_vs_drama": 5,
-            "tactical_vs_instinctive": 5,
-            "grounded_vs_absurd": 4,
-            "power_fantasy_vs_struggle": 5,
-            "fast_vs_slow": 5,
-            "episodic_vs_serial": 6,
-            "ensemble_vs_solo": 5,
-            "mystery_vs_transparent": 5,
-            "dark_vs_hopeful": 5,
-            "romance_weight": 3
+        # --- DNA Scales ---
+        "dna_scales": dna,
+
+        # --- Power Distribution ---
+        "power_distribution": {
+            "peak_tier": "T6", "typical_tier": "T8",
+            "floor_tier": "T10", "gradient": "flat",
+        },
+        "world_tier": "T8",
+
+        # --- Tropes (all off — evolve during play) ---
+        "tropes": {
+            "tournament_arc": False, "training_montage": False,
+            "power_of_friendship": False, "mentor_death": False,
+            "chosen_one": False, "tragic_backstory": False,
+            "redemption_arc": False, "betrayal": False,
+            "sacrifice": False, "transformation": False,
+            "forbidden_technique": False, "time_loop": False,
+            "false_identity": False, "ensemble_focus": False,
+            "slow_burn_romance": False,
         },
 
-        "combat_system": "tactical_fantasy",
-        "power_system": {
-            "name": "Flexible Magic & Skills",
-            "mechanics": "Character-defined abilities with creative freedom"
-        },
-        "tone": "Balanced fantasy adventure with room for exploration"
+        # --- Derived fields ---
+        "detected_genres": detected_genres,
+        "combat_system": combat_system,
+        "power_system": power_system,
+        "tone": tone_config,
+        "pacing": pacing_config,
+
+        # --- LLM-synthesized creative fields ---
+        "director_personality": director_personality,
+        "author_voice": author_voice,
+        "visual_style": visual_style,
+
+        # --- Sources ---
+        "sources_consulted": ["player_input"],
+
+        # --- Series ---
+        "series_group": f"custom_{session_id[:8]}",
+        "series_position": 1,
     }
 
-    # Generate some starter lore for RAG
+    # Generate starter lore for RAG
     lore_content = f"""
 # Custom Fantasy World
 

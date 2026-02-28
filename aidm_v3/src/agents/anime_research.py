@@ -54,6 +54,18 @@ class AnimeResearchOutput(BaseModel):
         description="Name, mechanics, limitations, tiers"
     )
 
+    # Canonical stat system mapping (Layer 2 presentation)
+    stat_mapping: dict[str, Any] | None = Field(
+        default=None,
+        description=(
+            "Canonical stat system mapping if IP has EXPLICIT stats shown on-screen/in-text "
+            "(e.g. Solo Leveling's System window, Overlord's character sheet). "
+            "null if IP has no canonical stat system or confidence < 90%. "
+            "Schema: {system_name, confidence, aliases: {ALIAS: {base: [D&D_STAT], method: direct|max|avg}}, "
+            "meta_resources: {NAME: {description}}, display_scale: {multiplier, offset}, hidden: [STATS], display_order: [STATS]}"
+        )
+    )
+
     # World setting
     world_setting: dict[str, Any] = Field(
         default_factory=dict,
@@ -663,6 +675,37 @@ Return ONLY the title, nothing else.'''
                     "limitations": getattr(ps, 'limitations', ''),
                     "tiers": getattr(ps, 'tiers', [])
                 }
+
+            # Stat mapping (canonical stat system for Layer 2 presentation)
+            if hasattr(extracted, 'stat_mapping') and extracted.stat_mapping:
+                sm = extracted.stat_mapping
+                if getattr(sm, 'has_canonical_stats', False) and getattr(sm, 'confidence', 0) >= 90:
+                    # Convert extraction schema to stat_presentation format
+                    aliases = {}
+                    for alias_name, alias_data in getattr(sm, 'aliases', {}).items():
+                        aliases[alias_name] = {
+                            "base": getattr(alias_data, 'base', []),
+                            "method": getattr(alias_data, 'method', 'direct'),
+                        }
+                    meta = {}
+                    for res_name, res_desc in getattr(sm, 'meta_resources', {}).items():
+                        meta[res_name] = {"description": res_desc}
+
+                    output.stat_mapping = {
+                        "system_name": getattr(sm, 'system_name', ''),
+                        "confidence": getattr(sm, 'confidence', 0),
+                        "aliases": aliases,
+                        "meta_resources": meta,
+                        "display_scale": getattr(sm, 'display_scale', {}),
+                        "hidden": getattr(sm, 'hidden', []),
+                        "display_order": getattr(sm, 'display_order', []),
+                    }
+                    logger.info(f"Stat mapping extracted: {getattr(sm, 'system_name', 'unknown')} "
+                                f"(confidence: {getattr(sm, 'confidence', 0)}%)")
+                else:
+                    logger.info(f"No canonical stat system "
+                                f"(has_canonical={getattr(sm, 'has_canonical_stats', False)}, "
+                                f"confidence={getattr(sm, 'confidence', 0)}%)")
 
             # Combat style
             if hasattr(extracted, 'combat') and extracted.combat:

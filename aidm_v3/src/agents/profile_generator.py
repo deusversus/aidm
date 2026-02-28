@@ -176,6 +176,10 @@ def generate_compact_profile(research: AnimeResearchOutput) -> dict[str, Any]:
     if research.visual_style:
         profile["visual_style"] = research.visual_style
 
+    # Add canonical stat mapping for Layer 2 presentation (if extracted)
+    if research.stat_mapping:
+        profile["stat_mapping"] = research.stat_mapping
+
     # Add series detection fields
     profile["series_group"] = research.series_group or profile_id
     profile["series_position"] = research.series_position or 1

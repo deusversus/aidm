@@ -227,6 +227,9 @@ class CharacterMixin:
         short_term_goal: str | None = None,
         long_term_goal: str | None = None,
         inventory: list | None = None,
+        # Stats (Layer 1 + Layer 2)
+        stats: dict | None = None,
+        stat_presentation: dict | None = None,
     ):
         """Update character fields."""
         db = self._get_db()
@@ -270,6 +273,10 @@ class CharacterMixin:
                 character.long_term_goal = long_term_goal
             if inventory is not None:
                 character.inventory = inventory
+            if stats is not None:
+                character.stats = stats
+            if stat_presentation is not None:
+                character.stat_presentation = stat_presentation
             db.commit()
 
     def get_campaign_bible(self) -> CampaignBible | None:

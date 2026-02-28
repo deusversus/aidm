@@ -178,6 +178,7 @@ class CharacterDraft:
 
     # Phase 3: Mechanical build
     attributes: dict[str, int] = field(default_factory=dict)  # STR, DEX, etc.
+    stat_presentation: dict[str, Any] | None = None  # Layer 2: aliases, display scale, meta-resources
     resources: dict[str, int] = field(default_factory=dict)   # HP, MP, SP
     unique_ability: dict[str, Any] | None = None
     skills: list[str] = field(default_factory=list)
@@ -221,6 +222,7 @@ class CharacterDraft:
             "goals": self.goals,
             "quirks": self.quirks,
             "attributes": self.attributes,
+            "stat_presentation": self.stat_presentation,
             "resources": self.resources,
             "unique_ability": self.unique_ability,
             "skills": self.skills,
@@ -264,6 +266,7 @@ class CharacterDraft:
             goals=data.get("goals", {}),
             quirks=data.get("quirks", []),
             attributes=data.get("attributes", {}),
+            stat_presentation=data.get("stat_presentation"),
             resources=data.get("resources", {}),
             unique_ability=data.get("unique_ability"),
             skills=data.get("skills", []),

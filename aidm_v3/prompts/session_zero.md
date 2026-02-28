@@ -183,15 +183,145 @@ Include in detected_info:
 - This triggers the hybrid research with profile caching
 
 **If original/no reference:**
-```
-Let's calibrate the tone of our adventure:
 
-1. Combat style: Tactical (chess-like) or Instinctive (flashy, gut feelings)?
-2. Tone: Comedy-leaning, Drama-heavy, or Balanced?
-3. Stakes: Permanent consequences, or plot armor for the protagonist?
+**IMPORTANT**: This is a MULTI-TURN creative dialogue. Ask these questions across 2-3 turns, not all at once.
+The player may reference anime/manga as inspiration (e.g., "I want combat like Bleach but in a sci-fi setting") — 
+this is NORMAL. Do NOT treat these as media selection. The system has already locked in "Original" mode.
 
-Pick what feels right!
+**Turn 1: Genre, Tone & Combat**
 ```
+## 🌍 Building Your World
+
+Since you're going original, let's shape your world from the ground up!
+
+### 🎭 Genre & Setting
+
+What kind of world do you envision?
+
+- **Fantasy** — Swords, sorcery, ancient kingdoms
+- **Sci-Fi** — Space, technology, cyberpunk futures
+- **Urban Supernatural** — Modern world with hidden powers
+- **Post-Apocalyptic** — Survival in a broken world
+- **Hybrid** — Mix elements! "Fantasy with mecha" or "Sci-fi with magic"
+
+> *Feel free to reference anime for inspiration: "I want a world like Made in Abyss but with more technology"*
+
+---
+
+### 🎵 Tone & Stakes
+
+1. **Combat style**: Tactical (chess-like strategy) or Instinctive (flashy, gut-driven)?
+2. **Tone**: Comedy-leaning, Drama-heavy, or Balanced?
+3. **Stakes**: Permanent consequences, or plot armor for the protagonist?
+4. **Power system flavor**: Magic? Technology? Martial arts? Psychic abilities? Divine blessing? Hybrid?
+
+---
+
+**Paint me a picture of your ideal world!**
+```
+
+Include in detected_info:
+```json
+{
+  "custom_genre": "urban_supernatural",
+  "custom_tone": "drama_heavy",
+  "custom_combat_style": "tactical",
+  "custom_stakes": "permanent_consequences",
+  "custom_power_flavor": "psychic_abilities"
+}
+```
+
+**Turn 2: Director Vision & Authorial Voice**
+```
+## 🎬 Creative Direction
+
+Now let's dial in the *feel* of your story.
+
+### 🎥 Director's Vision
+
+If this were an anime, what kind of director would helm it? Think about:
+
+- **Pacing**: Fast-paced action with short, punchy scenes? Or slow-burn with scenes that breathe?
+- **Dramatic tension**: Where does the drama come from — life-or-death stakes? Moral dilemmas? Relationship dynamics? Mystery and intrigue?
+- **Emotional core**: What feeling should linger after each session?
+
+> *Examples:*
+> *"I want it to feel like a Shinichiro Watanabe show — stylish, jazz-infused, episodic but emotionally resonant"*
+> *"More like Makoto Shinkai — beautiful, bittersweet, focused on connection"*
+> *"Grimdark like Berserk — no one is safe, every victory costs something"*
+
+---
+
+### ✍️ Authorial Voice
+
+How should the narrative *read*? Think about:
+
+- **Action descriptions**: Visceral and blow-by-blow? Or impressionistic and poetic?
+- **Dialogue style**: Witty banter? Formal speech? Internal monologues?
+- **Humor**: Dark comedy? Slapstick? Dry wit? None?
+
+---
+
+**Describe your vision — even a few words help!**
+```
+
+Include in detected_info:
+```json
+{
+  "custom_director_vision": "slow-burn, moral tension, bittersweet emotional core",
+  "custom_authorial_voice": "impressionistic action, witty dialogue, dark comedy",
+  "custom_pacing": "deliberate"
+}
+```
+
+**Turn 3: Art Direction & Wrap-Up**
+```
+## 🎨 Art Direction
+
+Last creative question — what should this world *look like*?
+
+### 🖌️ Visual Style
+
+- **Art style**: Realistic? Stylized? Watercolor? Bold manga lines?
+- **Color palette**: Dark and moody? Bright and vibrant? Muted and earthy?
+- **Atmosphere**: Oppressive? Whimsical? Cinematic? Dreamlike?
+
+> *Examples:*
+> *"Dark ink-heavy art like Berserk or Hellsing"*
+> *"Vibrant and fluid like Demon Slayer"*
+> *"Soft and atmospheric like Mushishi"*
+> *"Gritty urban realism like Ghost in the Shell"*
+
+---
+
+**What visual vibe fits your world?**
+```
+
+Include in detected_info:
+```json
+{
+  "custom_art_direction": "dark, gritty, urban realism with neon accents",
+  "custom_calibration_complete": true
+}
+```
+
+**CRITICAL**: Set `"custom_calibration_complete": true` on the SAME turn as `custom_art_direction`. This triggers profile generation.
+
+**Custom detected_info keys** (use `custom_` prefix for ALL custom world data):
+
+| Key | When | Example |
+|-----|------|---------|
+| `custom_genre` | Turn 1 | `"urban_supernatural"`, `"fantasy"`, `"scifi"`, `"post_apocalyptic"` |
+| `custom_tone` | Turn 1 | `"comedy"`, `"drama_heavy"`, `"balanced"` |
+| `custom_combat_style` | Turn 1 | `"tactical"`, `"instinctive"`, `"spectacle"` |
+| `custom_stakes` | Turn 1 | `"permanent_consequences"`, `"plot_armor"`, `"balanced"` |
+| `custom_power_flavor` | Turn 1 | `"magic"`, `"technology"`, `"martial_arts"`, `"psychic"`, `"hybrid"` |
+| `custom_director_vision` | Turn 2 | Free-text description of directorial vision |
+| `custom_authorial_voice` | Turn 2 | Free-text description of writing style preferences |
+| `custom_pacing` | Turn 2 | `"rapid"`, `"moderate"`, `"deliberate"` |
+| `custom_art_direction` | Turn 3 | Free-text description of visual style |
+| `custom_calibration_complete` | Turn 3 | `true` (triggers profile generation) |
+| `custom_stat_names` | Optional | `{"STR": "Power", "DEX": "Speed"}` (custom stat aliases) |
 
 ---
 
