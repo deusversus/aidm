@@ -72,6 +72,7 @@ class CharacterStatusResponse(BaseModel):
     sp_current: int
     sp_max: int
     stats: dict[str, Any]  # STR, INT, etc.
+    stat_presentation: dict[str, Any] | None = None  # Layer 2: aliases, display scale, meta-resources
     power_tier: str
     abilities: list
     character_class: str | None = None

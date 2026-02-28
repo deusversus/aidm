@@ -996,6 +996,98 @@ function toggleSection(sectionName) {
 }
 
 /**
+ * Build display stats from base stats + optional Layer 2 presentation map.
+ * Returns array of [name, displayValue] pairs ready for rendering.
+ *
+ * Layer 2 handles: aliases (1:1 rename, composites), display scaling,
+ * hidden stats, meta-resources (LUK), and display ordering.
+ * When presentation is null/undefined, returns raw base stats.
+ */
+function buildDisplayStats(baseStats, presentation) {
+    if (!presentation) {
+        return Object.entries(baseStats);
+    }
+
+    const aliases = presentation.aliases || {};
+    const hidden = new Set(presentation.hidden || []);
+    const meta = presentation.meta_resources || {};
+    const scale = presentation.display_scale || null;
+    const order = presentation.display_order || null;
+
+    // Compute aliased stats
+    const result = {};
+    const aliasedBaseKeys = new Set(); // track which base keys are consumed by aliases
+
+    for (const [aliasName, config] of Object.entries(aliases)) {
+        const bases = config.base || [];
+        const method = config.method || 'direct';
+        bases.forEach(k => aliasedBaseKeys.add(k));
+
+        let value;
+        const baseValues = bases.map(k => baseStats[k] || 0);
+
+        switch (method) {
+            case 'direct':
+                value = baseValues[0] || 0;
+                break;
+            case 'max':
+                value = Math.max(...baseValues);
+                break;
+            case 'avg':
+                value = Math.round(baseValues.reduce((a, b) => a + b, 0) / baseValues.length);
+                break;
+            case 'primary':
+                // First base is primary, others contribute modifier (value/2 - 5, d20 style)
+                value = (baseValues[0] || 0) + Math.floor(((baseValues[1] || 10) - 10) / 2);
+                break;
+            default:
+                value = baseValues[0] || 0;
+        }
+
+        result[aliasName] = value;
+    }
+
+    // Include non-aliased, non-hidden base stats
+    for (const [key, value] of Object.entries(baseStats)) {
+        if (!aliasedBaseKeys.has(key) && !hidden.has(key)) {
+            result[key] = value;
+        }
+    }
+
+    // Apply display scaling
+    if (scale) {
+        const mult = scale.multiplier || 1;
+        const offset = scale.offset || 0;
+        for (const key of Object.keys(result)) {
+            result[key] = Math.round(result[key] * mult + offset);
+        }
+    }
+
+    // Build entries array
+    let entries = Object.entries(result);
+
+    // Append meta-resources (LUK etc.)
+    for (const [name, config] of Object.entries(meta)) {
+        const pool = config.pool_per_session;
+        const displayVal = pool ? `${config.value} (${pool}pts)` : config.value;
+        entries.push([name, displayVal]);
+    }
+
+    // Apply display ordering if specified
+    if (order) {
+        const orderMap = {};
+        order.forEach((name, i) => { orderMap[name] = i; });
+        entries.sort((a, b) => {
+            const ai = orderMap[a[0]] ?? 999;
+            const bi = orderMap[b[0]] ?? 999;
+            return ai - bi;
+        });
+    }
+
+    return entries;
+}
+
+/**
  * Load character status from API
  */
 async function loadCharacterStatus() {
@@ -1035,11 +1127,12 @@ async function loadCharacterStatus() {
         document.getElementById('xp-current').textContent = data.xp_current;
         document.getElementById('xp-max').textContent = data.xp_to_next;
 
-        // Update stats grid
+        // Update stats grid (Layer 2 aware)
         const statsGrid = document.getElementById('stats-grid');
         statsGrid.innerHTML = '';
         if (data.stats && typeof data.stats === 'object') {
-            for (const [name, value] of Object.entries(data.stats)) {
+            const displayStats = buildDisplayStats(data.stats, data.stat_presentation);
+            for (const [name, value] of displayStats) {
                 statsGrid.innerHTML += `
                     <div class="stat-item">
                         <span class="stat-name">${name}</span>

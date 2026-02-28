@@ -123,6 +123,7 @@ async def get_character_status():
         sp_current=char.sp_current or 50,
         sp_max=char.sp_max or 50,
         stats=char.stats or {},
+        stat_presentation=char.stat_presentation,
         power_tier=char.power_tier or "T10",
         abilities=char.abilities or [],
         character_class=char.character_class,
