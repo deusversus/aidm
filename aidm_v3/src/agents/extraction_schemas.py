@@ -23,6 +23,53 @@ class PowerSystemExtract(BaseModel):
     tiers: list[str] = Field(default_factory=list, description="Power levels or ranks if applicable")
 
 
+class StatAliasExtract(BaseModel):
+    """Single stat alias mapping."""
+    base: list[str] = Field(description="D&D base stat(s): STR, DEX, CON, INT, WIS, CHA")
+    method: str = Field(default="direct", description="Mapping method: direct (1:1), max (highest), avg (average), primary (first in list)")
+
+
+class StatMappingExtract(BaseModel):
+    """Canonical stat system mapping for IPs with EXPLICIT stat displays.
+    
+    Only populate if the IP canonically shows a stat screen, character sheet,
+    or numeric stat values on-screen/in-text. If the IP has no explicit stat
+    system, leave all fields empty/default and set confidence to 0.
+    """
+    has_canonical_stats: bool = Field(
+        default=False,
+        description="True ONLY if the IP shows explicit stat names/values (e.g., Solo Leveling's System window, Overlord's character sheet, SAO's menu). False for IPs like Hunter x Hunter, Demon Slayer, or Hellsing that have power systems but no stat screens."
+    )
+    confidence: int = Field(
+        default=0, ge=0, le=100,
+        description="Confidence that this mapping is accurate. Must be >= 90 to be used. 0 if no canonical system."
+    )
+    system_name: str = Field(
+        default="",
+        description="Name of the stat system (e.g., 'Hunter System', 'YGGDRASIL Character Sheet', 'SAO Status Window')"
+    )
+    aliases: dict[str, StatAliasExtract] = Field(
+        default_factory=dict,
+        description="Map of CANONICAL_STAT_NAME -> {base: [D&D stats], method}. Keys are the IP's stat names."
+    )
+    meta_resources: dict[str, str] = Field(
+        default_factory=dict,
+        description="Non-standard stats that function as meta-resources (e.g., LUK as reroll pool). Map of NAME -> description."
+    )
+    display_scale: dict[str, int] = Field(
+        default_factory=dict,
+        description="Display value scaling: {multiplier, offset}. base_value * multiplier + offset = displayed_value. Empty = no scaling."
+    )
+    hidden: list[str] = Field(
+        default_factory=list,
+        description="D&D base stats to HIDE in display because the IP doesn't use them (e.g., CHA in Solo Leveling)"
+    )
+    display_order: list[str] = Field(
+        default_factory=list,
+        description="Ordered list of stat names as they should appear in the UI"
+    )
+
+
 class ToneExtract(BaseModel):
     """Extracted tone/mood data."""
     comedy_level: int = Field(default=5, ge=0, le=10, description="0=serious, 10=comedy")
@@ -447,6 +494,10 @@ def build_bundle_schema(topics: list[str]) -> type[BaseModel]:
     if "visual_style" in topics or ("tone" in topics and "visual_style" not in fields):
         fields["visual_style"] = (VisualStyleExtract, Field(default_factory=VisualStyleExtract))
 
+    # Include stat_mapping when power_system is in the bundle
+    if "power_system" in topics:
+        fields["stat_mapping"] = (StatMappingExtract, Field(default_factory=StatMappingExtract))
+
     return create_model("BundleExtract", **fields)
 
 
@@ -469,7 +520,46 @@ def get_extraction_prompt(topics: list[str], anime_name: str) -> str:
   - name: The formal name of the power system (e.g., "Nen", "Quirks", "Devil Fruits", "Breathing Techniques")
   - mechanics: How powers work in this world
   - limitations: Costs, restrictions, or drawbacks of using powers
-  - tiers: List of power levels or ranks if they exist""")
+  - tiers: List of power levels or ranks if they exist
+
+- **stat_mapping**: Canonical stat system mapping. ONLY populate if the IP has EXPLICIT stat names and/or numeric values shown on-screen or in-text (e.g., a System window, character sheet, status screen, or game-like UI).
+  
+  SET has_canonical_stats = false for IPs that have power systems but NO stat screens. Most anime/manga do NOT have explicit stats.
+  
+  KNOWN REFERENCE MAPPINGS (use these as calibration):
+  
+  Solo Leveling (has_canonical_stats=true, confidence=98):
+    system_name: "Hunter System"
+    aliases: STR→STR(direct), AGI→DEX(direct), VIT→CON(direct), INT→INT(direct), SENSE→WIS(direct)
+    meta_resources: LUK="Luck pool — functions as reroll resource, not a linear modifier"
+    hidden: [CHA]
+    display_order: [STR, AGI, VIT, INT, SENSE, LUK]
+    display_scale: {multiplier: 1, offset: 0}  # SL stats are small numbers like D&D
+  
+  Overlord (has_canonical_stats=true, confidence=95):
+    system_name: "YGGDRASIL Character Sheet"
+    aliases: Physical ATK→STR(direct), Agility→DEX(direct), Physical DEF→CON(direct),
+             Magic ATK→[INT,WIS](max), Resistance→CON(direct), Special→CHA(direct)
+    hidden: []
+    display_scale: {multiplier: 5, offset: 10}  # YGGDRASIL uses large numbers
+  
+  SAO (has_canonical_stats=false, confidence=0):
+    # SAO has levels and skills but no canonical STAT screen with named attributes.
+    # The menu shows HP/MP bars but not base attributes. → null mapping
+  
+  Hunter x Hunter (has_canonical_stats=false, confidence=0):
+    # Has Nen categories (Enhancement, Transmutation, etc.) but these are TYPE categories,
+    # not numeric stats. No stat screen exists. → null mapping
+  
+  Demon Slayer (has_canonical_stats=false, confidence=0):
+    # Has breathing styles and ranks but no numeric stat display. → null mapping
+  
+  If has_canonical_stats is true AND confidence >= 90:
+    → Map each canonical stat to its D&D base stat(s) with method (direct/max/avg/primary)
+    → Flag any meta-resources (luck pools, reroll mechanics, non-standard stats)
+    → Estimate display_scale from canonical value ranges (D&D-like=no scaling, JRPG hundreds={multiplier:5,offset:10})
+    → List hidden D&D stats that the IP doesn't expose
+    → Provide display_order matching the IP's canonical stat ordering""")
 
         elif topic == "tone":
             topic_instructions.append("""- **tone**: Assess the overall mood (0=minimum, 10=maximum):

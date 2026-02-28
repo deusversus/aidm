@@ -147,6 +147,8 @@ async def _handle_gameplay_handoff(session, session_id: str, result, agent) -> t
         short_term_goal=draft.goals.get("short_term") if draft.goals else None,
         long_term_goal=draft.goals.get("long_term") if draft.goals else None,
         inventory=draft.inventory,
+        stats=draft.attributes or {},
+        stat_presentation=draft.stat_presentation,
     )
     logger.info(f"Power tier set to: {final_tier}")
 
@@ -409,8 +411,10 @@ async def session_zero_turn(session_id: str, request: TurnRequest):
             ):
                 media_ref = request.message  # Use raw user input for choice/answer parsing
 
-            if media_ref and session.phase in early_phases:
+            if media_ref and session.phase in early_phases and session.phase_state.get("profile_type") != "custom":
                 # Note: We include CONCEPT because hybrid flow may need to run research there
+                # GUARD: Skip entirely if custom profile is active — player may reference
+                # anime during world-building without triggering research/disambiguation
                 logger.debug(f"DEBUG: Triggering research logic for '{media_ref}' (Phase: {session.phase})")
 
                 # ======== INTENT RESOLUTION (replaces disambiguation + research routing) ========
@@ -426,12 +430,13 @@ async def session_zero_turn(session_id: str, request: TurnRequest):
                 result.detected_info.update(intent_result.detected_info_updates)
 
                 if intent_result.action == "custom":
-                    # CUSTOM/ORIGINAL PROFILE
-                    try:
-                        from src.agents.session_zero import generate_custom_profile
-                        await generate_custom_profile(session)
-                    except Exception as custom_error:
-                        logger.error(f"Custom profile generation failed: {custom_error}")
+                    # CUSTOM/ORIGINAL PROFILE — defer generation until calibration completes
+                    # Just set the flag; actual profile generation happens after the SZ agent
+                    # collects creative preferences (director personality, art direction, etc.)
+                    session.phase_state["profile_type"] = "custom"
+                    session.phase_state["awaiting_calibration"] = True
+                    session.character_draft.media_reference = "Original"
+                    logger.info("Custom profile selected — deferring generation until calibration")
 
                 elif intent_result.action == "disambiguation":
                     # Agent needs user clarification — return options
@@ -484,12 +489,59 @@ async def session_zero_turn(session_id: str, request: TurnRequest):
                             f"(task_id: {intent_result.progress_tracker.task_id if intent_result.progress_tracker else 'none'})"
                         )
 
+        # DEFERRED CUSTOM PROFILE GENERATION
+        # When custom profile was selected but generation was deferred until calibration,
+        # check if the SZ agent has now collected the creative preferences.
+        if (session.phase_state.get("profile_type") == "custom"
+                and session.phase_state.get("awaiting_calibration")
+                and not session.phase_state.get("profile_data")):
+            # Check if calibration data has been collected
+            calibration_keys = {"custom_genre", "custom_tone", "custom_combat_style",
+                                "custom_director_vision", "custom_art_direction"}
+            collected = {k for k in result.detected_info if k in calibration_keys}
+
+            # Also check if SZ agent explicitly flagged calibration complete
+            if result.detected_info.get("custom_calibration_complete") or len(collected) >= 3:
+                try:
+                    from src.agents.session_zero import generate_custom_profile
+                    # Store calibration data in phase_state for generate_custom_profile to consume
+                    session.phase_state["custom_calibration"] = {
+                        k: v for k, v in result.detected_info.items()
+                        if k.startswith("custom_")
+                    }
+                    await generate_custom_profile(session)
+                    session.phase_state["awaiting_calibration"] = False
+                    logger.info("Custom profile generated after calibration")
+                except Exception as custom_error:
+                    logger.error(f"Custom profile generation failed: {custom_error}")
+
         # COMPLETENESS-DRIVEN PHASE TRACKING
         # Sync phase to actual data completeness (allows multi-phase skip)
         actual_phase = get_current_phase_for_draft(session.character_draft)
         if actual_phase != session.phase:
             logger.info(f"Phase sync: {session.phase.value} -> {actual_phase.value}")
             session.skip_to_phase(actual_phase)
+
+        # STAT PRESENTATION: When MECHANICAL_BUILD completes (attributes filled),
+        # consume the profile's stat_mapping to generate stat_presentation (Layer 2).
+        # This converts research-extracted canonical stats into the display format.
+        draft = session.character_draft
+        if draft.attributes and not draft.stat_presentation:
+            profile_data = session.phase_state.get("profile_data", {})
+            stat_mapping = profile_data.get("stat_mapping")
+            if stat_mapping and stat_mapping.get("confidence", 0) >= 90:
+                draft.stat_presentation = {
+                    "aliases": stat_mapping.get("aliases", {}),
+                    "meta_resources": stat_mapping.get("meta_resources", {}),
+                    "display_scale": stat_mapping.get("display_scale", {}),
+                    "hidden": stat_mapping.get("hidden", []),
+                    "display_order": stat_mapping.get("display_order", []),
+                }
+                logger.info(f"Stat presentation generated from profile: "
+                            f"{stat_mapping.get('system_name', 'unknown')} "
+                            f"({len(stat_mapping.get('aliases', {}))} aliases)")
+            else:
+                logger.debug("No canonical stat mapping in profile — using D&D defaults")
 
         # Handle gameplay transition
         if result.ready_for_gameplay:
