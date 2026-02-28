@@ -280,6 +280,10 @@ async def resume_session(session_id: str):
                     ).all()
                     for npc in npcs:
                         combined_map[npc.name] = npc.portrait_url
+                        # Add first-name alias (e.g. "Kota" for "Kota Blackfire")
+                        first = npc.name.split()[0] if ' ' in npc.name else None
+                        if first and first not in combined_map:
+                            combined_map[first] = npc.portrait_url
                     # Player character portrait
                     char = db.query(Character).filter(
                         Character.campaign_id == campaign_id,
@@ -287,6 +291,9 @@ async def resume_session(session_id: str):
                     ).first()
                     if char:
                         combined_map[char.name] = char.portrait_url
+                        first = char.name.split()[0] if ' ' in char.name else None
+                        if first and first not in combined_map:
+                            combined_map[first] = char.portrait_url
                     if combined_map:
                         portrait_maps[-1] = combined_map  # -1 = apply to all turns
                         logger.info(f"Resume: built fallback portrait_maps with {len(combined_map)} entries: {list(combined_map.keys())}")
