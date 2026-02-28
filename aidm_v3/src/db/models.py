@@ -118,6 +118,7 @@ class Character(Base):
     sp_current = Column(Integer, default=50)  # Stamina/Skill Points
     sp_max = Column(Integer, default=50)
     stats = Column(JSON, default=dict)  # Dynamic stats (STR, INT, Chakra, etc.)
+    stat_presentation = Column(JSON, nullable=True)  # Layer 2: aliases, display scale, meta-resources (LUK)
 
     # Power system (profile-specific)
     power_tier = Column(String(10), default="T10")  # VS Battles tier
