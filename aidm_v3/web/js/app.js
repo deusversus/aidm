@@ -1697,15 +1697,16 @@ async function reloadAllMedia(campaignMediaUuid, turnCount) {
     for (let turn = 0; turn <= turnCount; turn++) {
         try {
             const resp = await fetch(`/api/game/turn/${campaignMediaUuid}/${turn}/media`);
+            console.log(`[Media] Turn ${turn}: status=${resp.status}`);
             if (!resp.ok) continue;
             const data = await resp.json();
-            if (data.assets && data.assets.length > 0) {
-                data.assets
-                    .filter(a => CHAT_MEDIA_TYPES.has(a.cutscene_type))
-                    .forEach(asset => injectCutsceneInline(asset, turn));
-            }
+            const allAssets = data.assets || [];
+            const filtered = allAssets.filter(a => CHAT_MEDIA_TYPES.has(a.cutscene_type));
+            console.log(`[Media] Turn ${turn}: ${allAssets.length} assets, ${filtered.length} pass filter`,
+                allAssets.map(a => `${a.cutscene_type}(${a.status})`));
+            filtered.forEach(asset => injectCutsceneInline(asset, turn));
         } catch (e) {
-            // Silently skip — many turns won't have media
+            console.warn(`[Media] Turn ${turn}: fetch error`, e);
         }
     }
 
@@ -1721,8 +1722,8 @@ function injectCutsceneInline(asset, afterTurn) {
     const display = document.getElementById('narrative-display');
     if (!display) return;
 
-    // Use file_url as unique key (API id is a sequence number, not unique across turns)
-    const uniqueKey = btoa(asset.file_url || '').slice(0, 20);
+    // Unique key: afterTurn + cutscene_type (guaranteed unique per asset)
+    const uniqueKey = `${afterTurn ?? 'live'}-${asset.cutscene_type || 'scene'}-${asset.file_url?.split('/').pop() || ''}`;
     const elementId = `cutscene-${uniqueKey}`;
     if (document.getElementById(elementId)) return;  // Already injected
 
