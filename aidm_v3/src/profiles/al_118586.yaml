@@ -138,5 +138,18 @@ author_voice:
   example_voice: It had been twenty-seven years since the death of Himmel the Hero,
     yet the spell to make a field of flowers bloom felt just as warm as the day she
     first learned it.
+visual_style:
+  art_style: soft watercolor-influenced fantasy illustration
+  color_palette: muted pastoral greens and warm sunset golds with cool twilight blues
+  line_work: clean and delicate with flowing organic curves
+  shading: soft gradient with diffused natural lighting
+  character_rendering: elegant proportional characters with subtle expressive details
+  atmosphere: contemplative and nostalgic with quiet warmth
+  composition_style: wide landscape shots emphasizing scale of time, intimate close-ups for emotional beats
+  studio_reference: Madhouse
+  reference_descriptors:
+  - pastoral fantasy landscapes
+  - soft atmospheric lighting
+  - melancholic beauty
 series_group: al_118586
 series_position: 1

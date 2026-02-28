@@ -48,8 +48,16 @@ detected_genres:
 combat_system: spectacle
 power_system:
   name: Skills and Authorities
-  mechanics: The power system is divided into standard Skills that operate using mana
-  limitations: Requires mana and specific conditions for activation
+  mechanics: The System grants Hunters measurable stats and Skills that can be activated
+    using mana. Standard Skills (e.g., Stealth, Ruler's Authority) are earned through
+    leveling, quests, or defeating bosses. The protagonist uniquely gains the Shadow
+    Extraction ability, allowing him to raise defeated enemies as shadow soldiers who
+    retain their original powers. Stats increase through grinding and quest completion,
+    following RPG mechanics with visible UI prompts. Authorities are rare, transcendent
+    abilities granted by the Rulers or Monarchs that operate beyond normal System limits.
+  limitations: Requires mana and specific conditions for activation. Shadow Extraction
+    only works on sufficiently powerful or recently defeated targets. Authority-level
+    powers come with immense physical and metaphysical strain.
   tiers: []
 tone:
   comedy_level: 2

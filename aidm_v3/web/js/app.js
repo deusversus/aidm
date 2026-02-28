@@ -108,7 +108,7 @@ async function startSessionZero() {
                 // Replay messages — backend annotates each with turn_number
                 display.innerHTML = '';
                 const pMaps = resumed.portrait_maps || {};
-                const fallbackMap = pMaps[-1] || null;
+                const fallbackMap = pMaps["-1"] || pMaps[-1] || null;  // Python int -1 → JSON string "-1"
 
                 for (const msg of resumed.messages) {
                     // Skip sentinel messages
@@ -1754,6 +1754,8 @@ function pollForTurnMedia(campaignId, turnNumber, maxAttempts = 12) {
                     if ((asset.status === 'complete' || asset.status === 'partial')
                         && CHAT_MEDIA_TYPES.has(asset.cutscene_type)) {
                         injectCutsceneInline(asset);
+                    } else if (asset.status === 'complete' && !CHAT_MEDIA_TYPES.has(asset.cutscene_type)) {
+                        console.warn(`[Media] Unknown cutscene type '${asset.cutscene_type}' — not displayed inline`);
                     }
                 });
                 clearInterval(interval);  // Got media, stop polling

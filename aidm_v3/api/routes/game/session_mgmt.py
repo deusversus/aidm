@@ -268,8 +268,8 @@ async def resume_session(session_id: str):
                 if t.portrait_map:
                     portrait_maps[t.turn_number] = t.portrait_map
 
-            # Fallback: build portrait map directly from NPC + Character tables
-            if turns and not portrait_maps:
+            # Fallback: build portrait map from NPC + Character tables for turns without maps
+            if turns and len(portrait_maps) < len(turns):
                 try:
                     from src.db.models import NPC, Character
                     combined_map = {}

@@ -43,7 +43,21 @@ detected_genres:
 - Adventure
 - Fantasy
 combat_system: tactical
-power_system: {}
+power_system:
+  name: Nen
+  mechanics: Nen is life energy (aura) that all living beings possess but few can
+    consciously control. Users learn Four Major Principles (Ten, Zetsu, Ren, Hatsu)
+    and are classified into six categories based on their Hatsu type — Enhancer, Transmuter,
+    Conjurer, Emitter, Manipulator, or Specialist. Each user develops a unique Hatsu
+    ability shaped by their personality and training. Abilities can be powered up through
+    Conditions and Limitations — self-imposed restrictions that amplify power proportionally
+    to the risk accepted (e.g., Kurapika's chain jail only works on Phantom Troupe members,
+    violation means death).
+  limitations: Nen is bounded by aura capacity, physical stamina, and the user's Nen
+    category. Conditions and Limitations are binding — breaking a vow can result in
+    death or permanent loss of Nen. Categories have natural strengths and weaknesses
+    against each other, making matchups critical.
+  tiers: []
 tone:
   comedy_level: 3
   darkness_level: 7
