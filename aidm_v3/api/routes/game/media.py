@@ -203,8 +203,8 @@ async def get_turn_media(campaign_media_id: str, turn_number: int):
     assets = []
     asset_id = 0
 
-    # Scan both cutscenes/ and locations/ for turn-prefixed files
-    for category in ("cutscenes", "locations"):
+    # Scan all media categories for turn-prefixed files
+    for category in ("cutscenes", "locations", "portraits", "models"):
         cat_dir = campaign_dir / category
         if not cat_dir.exists():
             continue

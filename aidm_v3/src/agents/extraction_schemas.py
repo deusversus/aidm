@@ -441,6 +441,7 @@ TOPIC_SCHEMAS: dict[str, type[BaseModel]] = {
     "recent": RecentExtract,
     "series_aliases": SeriesAliasesExtract,
     "visual_style": VisualStyleExtract,
+    "stat_mapping": StatMappingExtract,
 }
 
 # DNA scales, tropes, genres, and voice are extracted from research
@@ -463,6 +464,7 @@ def build_bundle_schema(topics: list[str]) -> type[BaseModel]:
     Dynamically create a Pydantic schema for a topic bundle.
     
     Args:
+
         topics: List of topic names to include in the bundle
         
     Returns:
@@ -483,7 +485,7 @@ def build_bundle_schema(topics: list[str]) -> type[BaseModel]:
         else:
             logger.warning(f"Warning: Unknown topic '{topic}'")
 
-    # Also include DNA scales, tropes, power_distribution, and visual_style when tone is in the bundle
+    # Also include DNA scales, tropes, and power_distribution when tone is in the bundle
     if "tone" in topics:
         fields["dna_scales"] = (DNAScalesExtract, Field(default_factory=DNAScalesExtract))
         fields["tropes"] = (StorytellingTropesExtract, Field(default_factory=StorytellingTropesExtract))

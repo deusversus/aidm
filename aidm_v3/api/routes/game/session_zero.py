@@ -541,6 +541,11 @@ async def session_zero_turn(session_id: str, request: TurnRequest):
                             f"{stat_mapping.get('system_name', 'unknown')} "
                             f"({len(stat_mapping.get('aliases', {}))} aliases)")
             else:
+                # Generate empty-but-present defaults so frontend has a valid structure
+                draft.stat_presentation = {
+                    "aliases": {}, "meta_resources": {}, "display_scale": {},
+                    "hidden": [], "display_order": [],
+                }
                 logger.debug("No canonical stat mapping in profile — using D&D defaults")
 
         # Handle gameplay transition
