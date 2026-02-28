@@ -268,17 +268,30 @@ async def resume_session(session_id: str):
                 if t.portrait_map:
                     portrait_maps[t.turn_number] = t.portrait_map
 
-            # Fallback: re-resolve portraits for turns without saved maps
+            # Fallback: build portrait map directly from NPC + Character tables
             if turns and not portrait_maps:
                 try:
-                    from src.media.resolver import resolve_portraits
-                    # Build one combined map from current NPC/Character portraits
-                    _, combined_map = resolve_portraits("", campaign_id)
+                    from src.db.models import NPC, Character
+                    combined_map = {}
+                    # All NPCs with portraits
+                    npcs = db.query(NPC).filter(
+                        NPC.campaign_id == campaign_id,
+                        NPC.portrait_url.isnot(None),
+                    ).all()
+                    for npc in npcs:
+                        combined_map[npc.name] = npc.portrait_url
+                    # Player character portrait
+                    char = db.query(Character).filter(
+                        Character.campaign_id == campaign_id,
+                        Character.portrait_url.isnot(None),
+                    ).first()
+                    if char:
+                        combined_map[char.name] = char.portrait_url
                     if combined_map:
-                        # Apply to all assistant messages
-                        portrait_maps[-1] = combined_map  # -1 = "apply to all"
-                except Exception:
-                    pass
+                        portrait_maps[-1] = combined_map  # -1 = apply to all turns
+                        logger.info(f"Resume: built fallback portrait_maps with {len(combined_map)} entries: {list(combined_map.keys())}")
+                except Exception as e:
+                    logger.warning(f"Resume fallback portrait build failed: {e}")
 
             # Capture campaign_media_uuid for media reload
             campaign = db.query(Campaign).filter(Campaign.id == campaign_id).first()
