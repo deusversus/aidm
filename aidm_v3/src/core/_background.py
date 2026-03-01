@@ -652,7 +652,7 @@ class BackgroundMixin:
     async def _bg_relationship_analysis(self, narrative: str, player_input: str, outcome, turn_number: int):
         """Background NPC relationship analysis from narrative."""
         try:
-            post_narr_npcs = self.state.detect_npcs_in_text(narrative)
+            post_narr_npcs = self.state.get_active_scene_cast()
             if post_narr_npcs:
                 rel_results = await self.relationship_analyzer.analyze_batch(
                     npc_names=post_narr_npcs,
@@ -697,6 +697,12 @@ class BackgroundMixin:
             knowledge_topics = (npc_data.knowledge_topics if npc_data else details.get("knowledge_topics")) or None
             power_tier = (npc_data.power_tier if npc_data else details.get("power_tier")) or None
             ensemble_archetype = (npc_data.ensemble_archetype if npc_data else details.get("ensemble_archetype")) or None
+
+            # Only enrich EXISTING NPCs. Do not blindly create new ones (KA must use tools to spawn them).
+            existing = self.state.get_npc_by_name(entity.name)
+            if not existing:
+                logger.debug(f"WorldBuilder extracted NPC '{entity.name}' but they are not in the catalog. Skipping implicit creation.")
+                return
 
             # Create or enrich NPC via upsert
             try:

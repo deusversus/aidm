@@ -723,21 +723,31 @@ class TurnPipelineMixin:
             logger.info(f"Mode transition: {prev_mode} → {new_mode} (threat: {current_threat or 'world baseline'})")
         logger.info(f"Power Differential: {effective_comp.get('differential', 0)} tiers, mode={new_mode}")
 
-        # === NPC CONTEXT CARDS (Module 04) ===
-        # Build structured NPC relationship data for disposition-aware narration
+        # === NPC CONTEXT CARDS (Card Catalog System) ===
+        # Load structured NPC relationship data for currently active cast members
         npc_context = ""
-        pre_narr_npcs = self.state.detect_npcs_in_text(
-            player_input + " " + (db_context.situation or "")
-        )
-        if pre_narr_npcs:
-            npc_context = self.state.get_present_npc_cards(pre_narr_npcs)
+        scene_cast = self.state.get_active_scene_cast()
+        if scene_cast:
+            npc_context = self.state.get_present_npc_cards(scene_cast)
+            
+        # Append transient entities
+        transients = self.state.get_transients()
+        if transients:
+            transient_lines = ["\n**[Transient Entities in Scene]**"]
+            for t in transients:
+                transient_lines.append(f"- {t['name']}: {t['description']}")
+            if npc_context:
+                npc_context += "\n"
+            npc_context += "\n".join(transient_lines)
+
+        if scene_cast:
             # Add spotlight debt hints for narrative balancing
             spotlight = self.state.compute_spotlight_debt()
             if spotlight:
                 underserved = [f"{name} (+{debt})" for name, debt in spotlight.items() if debt > 0]
                 if underserved:
                     npc_context += f"\n\n[Spotlight Hint] These NPCs need more screen time: {', '.join(underserved)}"
-            logger.info(f"NPC context: {len(pre_narr_npcs)} NPCs present")
+            logger.info(f"NPC context: {len(scene_cast)} catalog NPCs, {len(transients)} transients present")
 
         # === FORESHADOWING CALLBACKS (#9) ===
         # Surface seeds that are ready for payoff to the KeyAnimator
