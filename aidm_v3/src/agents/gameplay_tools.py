@@ -139,6 +139,63 @@ def build_gameplay_tools(
         handler=lambda **kwargs: _update_npc(state, **kwargs)
     ))
 
+    registry.register(ToolDefinition(
+        name="spawn_transient",
+        description=(
+            "Spawn a temporary/background actor for the current scene. "
+            "Use this for unnamed mobs, transient vendors, or environmental enemies "
+            "(e.g., 'Verdant Wolves', 'Tavern Barkeep'). This creates a temporary "
+            "reference without cluttering the persistent character catalog."
+        ),
+        parameters=[
+            ToolParam("name", "str", "Name of the transient entity", required=True),
+            ToolParam("description", "str", "Brief description of who/what they are", required=True),
+        ],
+        handler=lambda name, description: _spawn_transient(state, name, description)
+    ))
+
+    registry.register(ToolDefinition(
+        name="register_catalog_npc",
+        description=(
+            "Explicitly register a new, permanent NPC into the cast catalog. "
+            "Use this ONLY when introducing a named character of narrative importance "
+            "(e.g., a new party member, recurring villain, or crucial contact). "
+            "This will trigger portrait generation and relationship tracking."
+        ),
+        parameters=[
+            ToolParam("name", "str", "NPC name", required=True),
+            ToolParam("role", "str", "Role (ally, enemy, neutral, rival, mentor)", required=True),
+            ToolParam("visual_tags", "list", "Visual descriptors (e.g. ['red hair', 'tall', 'scar']) for portrait", required=True),
+            ToolParam("personality", "str", "Core personality traits", required=True),
+        ],
+        handler=lambda name, role, visual_tags, personality: _register_catalog_npc(state, name, role, visual_tags, personality)
+    ))
+
+    registry.register(ToolDefinition(
+        name="summon_npc",
+        description=(
+            "Pull an existing permanent NPC from the catalog into the current scene. "
+            "Use this when a known character walks into the scene or the PC goes to meet them. "
+            "This ensures their full Card (disposition, history) is loaded into context."
+        ),
+        parameters=[
+            ToolParam("name", "str", "NPC name (fuzzy match supported)", required=True),
+        ],
+        handler=lambda name: _summon_npc(state, name)
+    ))
+
+    registry.register(ToolDefinition(
+        name="dismiss_npc",
+        description=(
+            "Remove a permanent NPC from the active scene cast. "
+            "Use this when a character explicitly leaves the scene or the scene changes."
+        ),
+        parameters=[
+            ToolParam("name", "str", "NPC name", required=True),
+        ],
+        handler=lambda name: _dismiss_npc(state, name)
+    ))
+
     # -----------------------------------------------------------------
     # TRANSCRIPT TOOLS
     # -----------------------------------------------------------------
@@ -592,3 +649,58 @@ def _recall_scene(state, query: str, npc: str = None, turn_range: str = None):
         player_ctx = f" (Player: {r['player_input']})" if r.get("player_input") else ""
         lines.append(f"**Turn {r['turn']}**{player_ctx}\n{r['narrative_excerpt']}")
     return "\n---\n".join(lines)
+
+
+def _spawn_transient(state, name: str, description: str) -> dict:
+    """Spawn a temporary entity into the scene."""
+    try:
+        ctx = state.get_context()
+        turn_number = ctx.turn_number if ctx else 0
+        state.spawn_transient(name=name, description=description, spawned_turn=turn_number)
+        return {"status": "success", "message": f"Spawned transient: {name}"}
+    except Exception as e:
+        return {"error": f"Failed to spawn transient '{name}': {e}"}
+
+
+def _register_catalog_npc(state, name: str, role: str, visual_tags: list, personality: str) -> dict:
+    """Register a new permanent NPC and add to scene cast."""
+    try:
+        # Check if already exists
+        existing = state.get_npc_by_name(name)
+        if existing:
+            state.add_to_scene_cast(existing.name)
+            return {"status": "success", "message": f"{existing.name} already in catalog, summoned to scene."}
+            
+        npc = state.upsert_npc(
+            name=name, 
+            role=role, 
+            visual_tags=visual_tags, 
+            personality=personality
+        )
+        state.add_to_scene_cast(npc.name)
+        return {"status": "success", "message": f"Registered new catalog NPC: {npc.name}"}
+    except Exception as e:
+        return {"error": f"Failed to register NPC '{name}': {e}"}
+
+
+def _summon_npc(state, name: str) -> dict:
+    """Summon an existing NPC to the scene."""
+    try:
+        npc = state.get_npc_by_name(name)
+        if not npc:
+            return {"error": f"NPC '{name}' not found in catalog. Use register_catalog_npc if they are new."}
+        state.add_to_scene_cast(npc.name)
+        return {"status": "success", "message": f"Summoned {npc.name} to scene."}
+    except Exception as e:
+        return {"error": f"Failed to summon NPC '{name}': {e}"}
+
+
+def _dismiss_npc(state, name: str) -> dict:
+    """Dismiss an NPC from the scene."""
+    try:
+        npc = state.get_npc_by_name(name)
+        actual_name = npc.name if npc else name
+        state.remove_from_scene_cast(actual_name)
+        return {"status": "success", "message": f"Dismissed {actual_name} from scene."}
+    except Exception as e:
+        return {"error": f"Failed to dismiss NPC '{name}': {e}"}

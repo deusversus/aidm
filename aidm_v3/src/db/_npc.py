@@ -775,28 +775,6 @@ class NPCMixin:
 
         return None
 
-    def detect_npcs_in_text(self, text: str) -> list[str]:
-        """
-        Detect known NPC names mentioned in narrative text.
-        Used to populate present_npcs for context.
-        
-        Args:
-            text: Narrative or situation text
-            
-        Returns:
-            List of NPC names found
-        """
-        db = self._get_db()
-        npcs = db.query(NPC).filter(NPC.campaign_id == self.campaign_id).all()
-
-        found = []
-        text_lower = text.lower()
-        for npc in npcs:
-            if npc.name.lower() in text_lower:
-                found.append(npc.name)
-
-        return found
-
     def get_disposition_label(self, disposition: int) -> str:
         """Get the threshold label for a disposition score."""
         for label, (low, high) in self.DISPOSITION_THRESHOLDS.items():
@@ -924,3 +902,98 @@ class NPCMixin:
         if not npc:
             return 0
         return npc.interaction_count or 0
+
+    # ==== Scene Cast & Transient Entity Management ====
+
+    def get_active_scene_cast(self) -> list[str]:
+        """Get the list of permanent NPCs currently in the scene."""
+        from .models import WorldState
+        db = self._get_db()
+        state = db.query(WorldState).filter(WorldState.campaign_id == self.campaign_id).first()
+        if not state:
+            return []
+        return state.active_scene_cast or []
+
+    def set_active_scene_cast(self, npc_names: list[str]):
+        """Set the active scene cast to a specific list of names."""
+        from .models import WorldState
+        db = self._get_db()
+        state = db.query(WorldState).filter(WorldState.campaign_id == self.campaign_id).first()
+        if state:
+            state.active_scene_cast = npc_names
+            db.commit()
+
+    def add_to_scene_cast(self, npc_name: str):
+        """Add a permanent NPC to the active scene cast."""
+        from .models import WorldState
+        db = self._get_db()
+        state = db.query(WorldState).filter(WorldState.campaign_id == self.campaign_id).first()
+        if state:
+            cast = state.active_scene_cast or []
+            if npc_name not in cast:
+                state.active_scene_cast = cast + [npc_name]
+                db.commit()
+
+    def remove_from_scene_cast(self, npc_name: str):
+        """Remove a permanent NPC from the active scene cast."""
+        from .models import WorldState
+        db = self._get_db()
+        state = db.query(WorldState).filter(WorldState.campaign_id == self.campaign_id).first()
+        if state:
+            cast = state.active_scene_cast or []
+            if npc_name in cast:
+                cast.remove(npc_name)
+                state.active_scene_cast = list(cast)
+                db.commit()
+
+    def spawn_transient(self, name: str, description: str, spawned_turn: int):
+        """Add a transient entity to the current scene. Does NOT create an NPC record."""
+        from .models import WorldState
+        db = self._get_db()
+        state = db.query(WorldState).filter(WorldState.campaign_id == self.campaign_id).first()
+        if state:
+            transients = state.transient_entities or []
+            # Update existing if same name, else append
+            existing = next((t for t in transients if t["name"].lower() == name.lower()), None)
+            if existing:
+                existing["description"] = description
+                existing["spawned_turn"] = spawned_turn
+            else:
+                transients.append({
+                    "name": name,
+                    "description": description,
+                    "spawned_turn": spawned_turn
+                })
+            state.transient_entities = list(transients)
+            db.commit()
+            logger.info(f"Spawned transient entity: {name}")
+
+    def get_transients(self) -> list[dict]:
+        """Get all current transient entities."""
+        from .models import WorldState
+        db = self._get_db()
+        state = db.query(WorldState).filter(WorldState.campaign_id == self.campaign_id).first()
+        if not state:
+            return []
+        return state.transient_entities or []
+
+    def clear_transients(self):
+        """Clear all transient entities from the scene."""
+        from .models import WorldState
+        db = self._get_db()
+        state = db.query(WorldState).filter(WorldState.campaign_id == self.campaign_id).first()
+        if state:
+            state.transient_entities = []
+            db.commit()
+
+    def remove_transient(self, name: str):
+        """Remove a specific transient entity."""
+        from .models import WorldState
+        db = self._get_db()
+        state = db.query(WorldState).filter(WorldState.campaign_id == self.campaign_id).first()
+        if state:
+            transients = state.transient_entities or []
+            filtered = [t for t in transients if t["name"].lower() != name.lower()]
+            if len(filtered) < len(transients):
+                state.transient_entities = filtered
+                db.commit()

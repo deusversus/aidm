@@ -104,6 +104,9 @@ class DirectorAgent(AgenticAgent):
         location = world_state.location if world_state else "Unknown"
         situation = world_state.situation if world_state else "Unknown"
         session_summary = session.summary or "(No summary yet)"
+        
+        transients = world_state.get_transients() if world_state else []
+        transient_str = "\n".join(f"- {t['name']}: {t['description']}" for t in transients) if transients else "None"
 
         investigation_prompt = f"""You are a narrative analyst investigating the current state 
 of an anime RPG campaign to help the Director plan the next arc.
@@ -111,19 +114,23 @@ of an anime RPG campaign to help the Director plan the next arc.
 Session summary: {session_summary[:500]}
 Current location: {location}
 Current situation: {situation}
+Transient Entities in scene: 
+{transient_str}
 
-Using the tools available, investigate:
+Using the tools available, investigate and manage:
 1. Get the campaign bible to understand previous Director decisions
 2. Check active foreshadowing — any seeds ready for callback or overdue?
 3. Run a spotlight analysis — which NPCs need more or less screen time?
 4. For the top 1-2 underserved NPCs, get their full trajectory
 5. Search memory for any unresolved plot threads
+6. If any Transient Entities have become narratively significant, USE the promote_to_catalog tool to make them permanent NPCs.
 
 Provide a CONCISE investigation report structured as:
 - ARC CONTINUITY: What did the last Director pass plan? Are we on track?
 - FORESHADOWING STATUS: Seeds ready for payoff, seeds going stale
 - NPC SPOTLIGHT: Who needs attention, who's overexposed
 - UNRESOLVED THREADS: Plot hooks that need addressing
+- PROMOTIONS: Any transient entities you promoted to the permanent catalog
 - RECOMMENDATION: What should the next arc beat focus on?"""
 
         # Set tools and delegate to AgenticAgent.research_with_tools()
@@ -603,6 +610,13 @@ Provide a CONCISE investigation report structured as:
             lines.append(f"Location: {world_state.location}")
             if world_state.situation:
                 lines.append(f"Situation: {world_state.situation}")
+            
+            transients = world_state.get_transients()
+            if transients:
+                lines.append("\n## Transient Entities in Scene")
+                lines.append("These characters are currently in the scene but are NOT permanent NPCs.")
+                for t in transients:
+                    lines.append(f"- {t['name']}: {t['description']}")
 
         lines.append("\n## Instructions")
         lines.append("Analyze the session events. Specific focus on:")

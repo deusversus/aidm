@@ -522,10 +522,9 @@ class CoreMixin:
             situation=world_state.situation if world_state else "The adventure begins...",
             arc_phase=world_state.arc_phase if world_state else ArcPhase.RISING_ACTION,
             tension_level=world_state.tension_level if world_state else 0.5,
-            turns_in_phase=getattr(world_state, 'turns_in_phase', 0) or 0 if world_state else 0,
             pinned_messages=getattr(world_state, 'pinned_messages', []) or [] if world_state else [],
             recent_summary=recent_summary,
-            present_npcs=self._detect_present_npcs(recent_summary, world_state),
+            present_npcs=self.get_active_scene_cast(),
             director_notes=director_notes,
             op_protagonist_enabled=bool(character.op_enabled if character else False),
             op_tension_source=character.op_tension_source if character else None,
@@ -552,20 +551,6 @@ class CoreMixin:
             character_fears=_format_list(character.fears) if character else None,
             character_goals=f"Short: {character.short_term_goal or 'None'}, Long: {character.long_term_goal or 'None'}" if character else None,
         )
-
-    def _detect_present_npcs(self, recent_summary: str, world_state: WorldState | None) -> list[str]:
-        """
-        Detect NPCs present in recent narrative and situation.
-        Uses detect_npcs_in_text to find known NPC names.
-        """
-        text_to_check = recent_summary or ""
-        if world_state and world_state.situation:
-            text_to_check += " " + world_state.situation
-
-        if not text_to_check.strip():
-            return []
-
-        return self.detect_npcs_in_text(text_to_check)
 
     def record_turn(
         self,

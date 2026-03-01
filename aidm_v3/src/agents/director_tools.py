@@ -124,6 +124,23 @@ def build_director_tools(
         handler=lambda name: _get_npc_trajectory(state, name)
     ))
 
+    registry.register(ToolDefinition(
+        name="promote_to_catalog",
+        description=(
+            "Promote a transient scene entity (like a vendor or background mob) "
+            "into a permanent, tracked NPC in the Card Catalog. Use this when the "
+            "player forms an unexpected attachment to a background character or "
+            "they become narratively important."
+        ),
+        parameters=[
+            ToolParam("transient_name", "str", "Name of the existing transient entity", required=True),
+            ToolParam("role", "str", "Assigned role (ally, neutral, enemy, vendor, etc.)", required=True),
+            ToolParam("visual_tags", "list", "Visual descriptors for portrait generation", required=True),
+            ToolParam("personality", "str", "Core personality traits", required=True),
+        ],
+        handler=lambda **kwargs: _promote_to_catalog(state, **kwargs)
+    ))
+
     # -----------------------------------------------------------------
     # MEMORY TOOLS
     # -----------------------------------------------------------------
@@ -409,6 +426,36 @@ def _get_npc_trajectory(state, name: str) -> dict:
         # Trajectory hints
         "next_growth_stage": _next_growth(npc.growth_stage),
         "next_intelligence": _next_intelligence(npc.intelligence_stage, npc.interaction_count or 0),
+    }
+
+
+def _promote_to_catalog(state, **kwargs) -> dict:
+    """Promote a transient entity to a permanent catalog NPC."""
+    transient_name = kwargs.get("transient_name", "")
+    role = kwargs.get("role", "neutral")
+    visual_tags = kwargs.get("visual_tags", [])
+    personality = kwargs.get("personality", "")
+
+    if not transient_name:
+        return {"error": "transient_name is required"}
+
+    # Upsert the new permanent NPC
+    npc = state.upsert_npc(
+        name=transient_name,
+        role=role,
+        visual_tags=visual_tags,
+        personality=personality
+    )
+
+    # Remove from transients and add to active scene cast
+    state.remove_transient(transient_name)
+    state.add_to_scene_cast(npc.name)
+
+    logger.info(f"Promoted transient '{transient_name}' to catalog NPC")
+    return {
+        "promoted": True,
+        "name": npc.name,
+        "message": f"Successfully promoted {transient_name} to permanent NPC catalog and generated portrait baseline."
     }
 
 

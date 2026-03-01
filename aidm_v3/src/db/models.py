@@ -239,6 +239,10 @@ class WorldState(Base):
     # Foreshadowing seeds planted (for Phase 4)
     foreshadowing = Column(JSON, default=list)
 
+    # Dynamic Cast Management (Card Catalog System)
+    active_scene_cast = Column(JSON, default=list)     # List of permanent NPC names currently present
+    transient_entities = Column(JSON, default=list)    # [{"name": "...", "desc": "...", "spawned_turn": int}]
+
     # #5: Pinned messages (up to 5 exchanges that stay in working memory)
     pinned_messages = Column(JSON, default=list)
 
