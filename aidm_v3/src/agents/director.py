@@ -611,7 +611,7 @@ Provide a CONCISE investigation report structured as:
             if world_state.situation:
                 lines.append(f"Situation: {world_state.situation}")
             
-            transients = world_state.get_transients()
+            transients = world_state.transient_entities or []
             if transients:
                 lines.append("\n## Transient Entities in Scene")
                 lines.append("These characters are currently in the scene but are NOT permanent NPCs.")

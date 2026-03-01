@@ -57,6 +57,8 @@ def resolve_portraits(
             name_to_url: dict[str, str | None] = {}
             canonical_names: dict[str, str] = {}  # lowercase -> display name
             for npc in npcs:
+                if not npc.name:
+                    continue
                 name_to_url[npc.name.lower()] = npc.portrait_url
                 canonical_names[npc.name.lower()] = npc.name
                 # First-name alias
@@ -70,7 +72,7 @@ def resolve_portraits(
             char = db.query(Character).filter(
                 Character.campaign_id == campaign_id,
             ).first()
-            if char:
+            if char and char.name:
                 name_to_url[char.name.lower()] = char.portrait_url
                 canonical_names[char.name.lower()] = char.name
                 if ' ' in char.name:
