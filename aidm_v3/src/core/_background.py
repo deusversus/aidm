@@ -652,7 +652,12 @@ class BackgroundMixin:
     async def _bg_relationship_analysis(self, narrative: str, player_input: str, outcome, turn_number: int):
         """Background NPC relationship analysis from narrative."""
         try:
-            post_narr_npcs = self.state.get_active_scene_cast()
+            # Start with explicit scene cast, then add NPCs mentioned in narrative
+            post_narr_npcs = list(self.state.get_active_scene_cast())
+            narrative_lower = narrative.lower()
+            for npc in self.state.get_all_npcs():
+                if npc.name and npc.name not in post_narr_npcs and npc.name.lower() in narrative_lower:
+                    post_narr_npcs.append(npc.name)
             if post_narr_npcs:
                 rel_results = await self.relationship_analyzer.analyze_batch(
                     npc_names=post_narr_npcs,

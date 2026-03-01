@@ -6,6 +6,8 @@ Split from state_manager.py for maintainability.
 import logging
 from typing import Any
 
+from sqlalchemy import func as sa_func
+
 from ..enums import NPCIntelligenceStage
 from .models import NPC
 
@@ -57,11 +59,17 @@ class NPCMixin:
         """
         db = self._get_db()
 
-        # Check if NPC already exists
+        # Check if NPC already exists (exact first, then fuzzy)
         existing = (
             db.query(NPC)
             .filter(NPC.campaign_id == self.campaign_id)
+            .filter(NPC.name.ilike(name))
+            .first()
+        ) or (
+            db.query(NPC)
+            .filter(NPC.campaign_id == self.campaign_id)
             .filter(NPC.name.ilike(f"%{name}%"))
+            .order_by(sa_func.length(NPC.name))
             .first()
         )
         if existing:
@@ -138,11 +146,17 @@ class NPCMixin:
         """
         db = self._get_db()
 
-        # Check for existing NPC (fuzzy)
+        # Check for existing NPC (exact first, then fuzzy)
         existing = (
             db.query(NPC)
             .filter(NPC.campaign_id == self.campaign_id)
+            .filter(NPC.name.ilike(name))
+            .first()
+        ) or (
+            db.query(NPC)
+            .filter(NPC.campaign_id == self.campaign_id)
             .filter(NPC.name.ilike(f"%{name}%"))
+            .order_by(sa_func.length(NPC.name))
             .first()
         )
 
@@ -247,12 +261,23 @@ class NPCMixin:
         return db.query(NPC).filter(NPC.id == npc_id).first()
 
     def get_npc_by_name(self, name: str) -> NPC | None:
-        """Get an NPC by name (fuzzy match)."""
+        """Get an NPC by name. Tries exact match first, then fuzzy."""
         db = self._get_db()
+        # Exact match first (case-insensitive)
+        exact = (
+            db.query(NPC)
+            .filter(NPC.campaign_id == self.campaign_id)
+            .filter(NPC.name.ilike(name))
+            .first()
+        )
+        if exact:
+            return exact
+        # Fuzzy fallback — prefer shortest name (closest match)
         return (
             db.query(NPC)
             .filter(NPC.campaign_id == self.campaign_id)
             .filter(NPC.name.ilike(f"%{name}%"))
+            .order_by(sa_func.length(NPC.name))
             .first()
         )
 
@@ -825,6 +850,7 @@ class NPCMixin:
             "turn": self._turn_number
         }
         npc.emotional_milestones = milestones
+        db.commit()
 
         logger.info(f"{npc.name}: {milestone_type} - {context[:50]}...")
 
@@ -889,6 +915,7 @@ class NPCMixin:
 
         db = self._get_db()
         npc.interaction_count = (npc.interaction_count or 0) + 1
+        db.commit()
 
         return npc.interaction_count
 
@@ -948,6 +975,12 @@ class NPCMixin:
 
     def spawn_transient(self, name: str, description: str, spawned_turn: int):
         """Add a transient entity to the current scene. Does NOT create an NPC record."""
+        if not name or not name.strip():
+            logger.warning("spawn_transient called with empty name — skipped")
+            return
+        if not description or not description.strip():
+            logger.warning(f"spawn_transient '{name}' called with empty description — skipped")
+            return
         from .models import WorldState
         db = self._get_db()
         state = db.query(WorldState).filter(WorldState.campaign_id == self.campaign_id).first()
