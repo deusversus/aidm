@@ -241,7 +241,8 @@ class WorldState(Base):
 
     # Dynamic Cast Management (Card Catalog System)
     active_scene_cast = Column(JSON, default=list)     # List of permanent NPC names currently present
-    transient_entities = Column(JSON, default=list)    # [{"name": "...", "desc": "...", "spawned_turn": int}]
+    transient_entities = Column(JSON, default=list)    # [{"name": str, "description": str, "spawned_turn": int}]
+    # spawned_turn: tracks when transient was created for future age-based cleanup/expiry
 
     # #5: Pinned messages (up to 5 exchanges that stay in working memory)
     pinned_messages = Column(JSON, default=list)
