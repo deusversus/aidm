@@ -10,8 +10,10 @@ import re
 
 logger = logging.getLogger(__name__)
 
-# Legacy pattern: {{Name}} markers (kept for backwards compatibility)
-PORTRAIT_MARKER = re.compile(r'\{\{([A-Za-z][A-Za-z\' ]{0,50}?)\}\}')
+# NPC marker pattern — matches {{Name}} or {{ Name }} (with optional whitespace).
+# Character class uses \w (unicode word chars) so names like Ärva, Huldvára, etc. work.
+# The inner group is stripped of surrounding whitespace after capture.
+PORTRAIT_MARKER = re.compile(r'\{\{\s*([\w][\w\'\- ]{0,50}?)\s*\}\}', re.UNICODE)
 
 
 def resolve_portraits(
@@ -38,6 +40,17 @@ def resolve_portraits(
         - portrait_map is {"Name": "/api/game/media/..."} for names with portraits
     """
     portrait_map: dict[str, str] = {}
+
+    # ── Step 1: Extract {{Name}} marker names BEFORE the DB scan ──────────────
+    # This lets us add portrait URLs for marker-named NPCs in the same pass as
+    # the word-boundary scan.  We also need the names early so the conversion to
+    # **Name** can happen even if the DB scan later throws an exception.
+    marker_names: list[str] = []  # cleaned names extracted from {{…}} markers
+    if '{{' in narrative:
+        for m in PORTRAIT_MARKER.finditer(narrative):
+            cleaned = m.group(1).strip()
+            if cleaned:
+                marker_names.append(cleaned)
 
     try:
         from src.db.models import NPC, Character
@@ -81,7 +94,9 @@ def resolve_portraits(
                         name_to_url[first.lower()] = char.portrait_url
                         canonical_names[first.lower()] = first
 
-            # Scan narrative for known names using word-boundary regex
+            # Scan narrative for known names using word-boundary regex.
+            # Because {{Name}} markers contain the bare name as a word, they match
+            # here too — so the portrait lookup works for both **Name** and {{Name}}.
             narrative_lower = narrative.lower()
             for name_lower, url in name_to_url.items():
                 if url and name_lower in narrative_lower:
@@ -91,6 +106,14 @@ def resolve_portraits(
                         display_name = canonical_names[name_lower]
                         portrait_map[display_name] = url
 
+            # ── Step 2: Ensure {{Name}}-marked NPCs get their portrait even when
+            # the DB name casing differs slightly from the marker text ────────────
+            for mname in marker_names:
+                mname_lower = mname.lower()
+                if mname_lower in name_to_url and name_to_url[mname_lower]:
+                    display_name = canonical_names.get(mname_lower, mname)
+                    portrait_map.setdefault(display_name, name_to_url[mname_lower])
+
         finally:
             if close_session:
                 db.close()
@@ -99,12 +122,17 @@ def resolve_portraits(
         # Resolution failure should never break the narrative
         logger.error(f"Portrait lookup failed: {e}")
 
-    # Handle legacy {{Name}} markers → convert to **Name**
-    if '{{' in narrative:
+    # ── Step 3: Convert {{Name}} → **Name** ───────────────────────────────────
+    # This always runs (outside try/except) so a DB error never leaves raw {{}}
+    # markers visible to the player.  marker_names were extracted in Step 1.
+    if marker_names:
         def replace_marker(match):
-            name = match.group(1)
+            name = match.group(1).strip()
             return f"**{name}**"
         narrative = PORTRAIT_MARKER.sub(replace_marker, narrative)
+        # Sanity-check: warn if any {{ survived (e.g. nested/malformed tags)
+        if '{{' in narrative:
+            logger.warning("resolve_portraits: some {{…}} markers were not converted — check KA output format")
 
     if portrait_map:
         logger.info(f"Resolved {len(portrait_map)} portraits: {list(portrait_map.keys())}")

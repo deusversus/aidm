@@ -309,13 +309,27 @@ async def research_and_apply_profile(
     """
     from .profile_generator import generate_and_save_profile, load_existing_profile
 
-    # First check if profile already exists
     existing = load_existing_profile(anime_name)
     if existing:
         # We have a v3 compact profile - use it directly
         session.character_draft.narrative_profile = existing.get("id")
         session.character_draft.media_reference = anime_name
         session.phase_state["profile_data"] = existing
+        
+        if progress_tracker:
+            from .progress import ProgressPhase
+            import asyncio
+            # We must emit the completion event so the UI doesn't hang
+            # await it if we are already in an async context
+            asyncio.create_task(
+                progress_tracker.emit(
+                    ProgressPhase.COMPLETE,
+                    f"Found existing profile: {anime_name}",
+                    100,
+                    {"profile_id": existing.get("id")}
+                )
+            )
+
         return {
             "status": "existing_profile",
             "profile_id": existing.get("id"),
@@ -379,6 +393,25 @@ def get_profile_context_for_agent(session: Session) -> str:
         return "(No profile loaded yet)"
 
     parts = [f"# Loaded Profile: {profile_data.get('name', 'Unknown')}"]
+
+    # World tier — CRITICAL for power-level selection in Session Zero
+    if world_tier := profile_data.get("world_tier"):
+        parts.append(f"\n## World Tier: {world_tier}")
+        parts.append(
+            "  (This is the baseline power level of this anime's world. "
+            "Use it when presenting power-tier options to the player.)"
+        )
+
+    # Stat mapping — drives MECHANICAL_BUILD attribute naming
+    if stat_mapping := profile_data.get("stat_mapping"):
+        if isinstance(stat_mapping, dict):
+            sm_name = stat_mapping.get("system_name", "")
+            aliases = stat_mapping.get("aliases", {})
+            if sm_name:
+                parts.append(f"\n## Stat System: {sm_name}")
+            if aliases:
+                alias_str = ", ".join(f"{k}→{v}" for k, v in list(aliases.items())[:6])
+                parts.append(f"  Canonical aliases: {alias_str}")
 
     # DNA scales
     if dna := profile_data.get("dna_scales", {}):

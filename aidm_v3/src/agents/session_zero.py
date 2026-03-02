@@ -104,19 +104,29 @@ class SessionZeroAgent(BaseAgent):
 
     def _build_context(self, session: Session, player_input: str) -> str:
         """Build the context string to send to the LLM."""
+        from ._session_zero_research import get_profile_context_for_agent
+
         # Format character draft as readable summary
         draft = session.character_draft
         draft_summary = self._format_draft(draft)
-        
-        # Format recent messages (last 10)
+
+        # Inject profile data (world_tier, stat system, DNA, etc.)
+        # This is CRITICAL for phases that reference the anime baseline —
+        # especially NARRATIVE_CALIBRATION (power tier) and MECHANICAL_BUILD (stats).
+        profile_context = get_profile_context_for_agent(session)
+
+        # Format recent messages (last 30)
         recent_messages = session.messages[-30:] if session.messages else []
         messages_str = "\n".join([
-            f"[{m['role'].upper()}]: {m['content']}" 
+            f"[{m['role'].upper()}]: {m['content']}"
             for m in recent_messages
         ])
-        
+
         # Current player input
         context = f"""## Current Phase: {session.phase.value}
+
+## Anime Profile (Research Output):
+{profile_context}
 
 ## Character Draft So Far:
 {draft_summary}
@@ -377,8 +387,21 @@ async def process_session_zero_state(
             if campaign_id is not None:
                 state = StateManager(campaign_id)
             else:
-                logger.warning("[SessionZero→State] No campaign_id provided, skipping NPC DB creation")
+                # No campaign yet (normal during Session Zero — campaign is created at handoff).
+                # Stash full NPC dicts in phase_state so _handle_gameplay_handoff can replay them
+                # against the real campaign_id once it exists.
                 state = None
+                pending = session.phase_state.setdefault("pending_npcs", [])
+                existing_names = {p.get("name", "").lower() for p in pending}
+                for npc in npcs:
+                    if isinstance(npc, dict) and "name" in npc:
+                        if npc["name"].lower() not in existing_names:
+                            pending.append(npc)
+                            existing_names.add(npc["name"].lower())
+                logger.info(
+                    f"[SessionZero→State] No campaign_id — stashed {len(npcs)} NPC(s) in pending_npcs "
+                    f"(total queued: {len(pending)})"
+                )
 
             for npc in npcs:
                 if isinstance(npc, dict) and "name" in npc:
@@ -741,10 +764,10 @@ async def _generate_session_zero_npc_portrait(
             )
             if npc:
                 if result.get("portrait"):
-                    npc.portrait_url = f"/api/game/media/{campaign_id}/{result['portrait'].name}"
+                    npc.portrait_url = gen.get_media_url(campaign_id, "portraits", result['portrait'].name)
                     logger.info(f"[SessionZero→Media] Portrait saved for {npc_name}: {npc.portrait_url}")
                 if result.get("model_sheet"):
-                    npc.model_sheet_url = f"/api/game/media/{campaign_id}/{result['model_sheet'].name}"
+                    npc.model_sheet_url = gen.get_media_url(campaign_id, "models", result['model_sheet'].name)
                 db.commit()
             db.close()
 

@@ -137,22 +137,37 @@ async def resolve_media_intent(
             composition_type=session.phase_state.get('composition_type', 'single'),
         )
 
-    # ── Resolve via Intent Agent ──
-    agent = IntentResolutionAgent()
+    # ── Handle disambiguation response (user replying to our disambiguation prompt) ──
+    # This MUST come before the Intent Agent call to prevent re-disambiguation.
+    # Without this guard, the agent re-searches AniList, finds multiple entries
+    # again, and shows disambiguation a second (or third) time.
+    resolution = None
+    if session.phase_state.get('disambiguation_shown'):
+        resolution = _resolve_from_disambiguation(session, media_ref, detected_info)
+        if resolution:
+            session.phase_state['disambiguation_shown'] = False
+            logger.info(
+                f"Disambiguation bypassed agent: resolved to "
+                f"{[rt.canonical_title for rt in resolution.resolved_titles]}"
+            )
 
-    if media_refs and len(media_refs) >= 2:
-        # Multi-title array (franchise-entry detection)
-        resolution = await agent.resolve_hybrid(media_refs)
-    elif secondary_ref:
-        # Hybrid/blend request (2 titles)
-        resolution = await agent.resolve_hybrid([media_ref, secondary_ref])
-    else:
-        # Single title
-        resolution = await agent.resolve(
-            user_input=media_ref,
-            context=f"Disambiguation response: {detected_info.get('disambiguation_selection')}"
-            if detected_info.get('disambiguation_selection') else None,
-        )
+    # ── Resolve via Intent Agent (only if not already resolved above) ──
+    if resolution is None:
+        agent = IntentResolutionAgent()
+
+        if media_refs and len(media_refs) >= 2:
+            # Multi-title array (franchise-entry detection)
+            resolution = await agent.resolve_hybrid(media_refs)
+        elif secondary_ref:
+            # Hybrid/blend request (2 titles)
+            resolution = await agent.resolve_hybrid([media_ref, secondary_ref])
+        else:
+            # Single title
+            resolution = await agent.resolve(
+                user_input=media_ref,
+                context=f"Disambiguation response: {detected_info.get('disambiguation_selection')}"
+                if detected_info.get('disambiguation_selection') else None,
+            )
 
     logger.info(
         f"Intent resolution: confidence={resolution.confidence:.2f}, "
@@ -167,12 +182,35 @@ async def resolve_media_intent(
 
         session.phase_state['disambiguation_shown'] = True
         session.phase_state['disambiguation_for'] = media_ref
-        # Preserve AniList ID mapping so it survives the disambiguation round-trip
+
+        # Use the FULL display label (title + format + year) as both the map key
+        # and the ordered list entry. This guarantees uniqueness even when multiple
+        # options share the same base title (e.g. "Frieren: Beyond Journey's End"
+        # appears as both TV/2023 and MANGA/2020 — the base title is identical so
+        # a plain-title map collapses them into one entry, breaking numeric "2").
+        def _option_label(opt) -> str:
+            if opt.format and opt.year:
+                return f"{opt.title} ({opt.format}, {opt.year})"
+            elif opt.format:
+                return f"{opt.title} ({opt.format})"
+            elif opt.year:
+                return f"{opt.title} ({opt.year})"
+            return opt.title
+
         session.phase_state['anilist_id_map'] = {
+            _option_label(opt): opt.anilist_id
+            for opt in resolution.disambiguation_options
+            if opt.anilist_id
+        }
+        # Also store base-title → anilist_id fallback for old-style substring matching
+        session.phase_state['anilist_id_map_base'] = {
             opt.title: opt.anilist_id
             for opt in resolution.disambiguation_options
             if opt.anilist_id
         }
+        session.phase_state['disambiguation_options_ordered'] = [
+            _option_label(opt) for opt in resolution.disambiguation_options
+        ]
 
         return IntentResult(
             action="disambiguation",
@@ -246,35 +284,50 @@ async def resolve_media_intent(
             enriched.append(title)
         needs_research = enriched
 
-    # ── DETERMINISTIC DEDUP: Cross-check needs_research against disk ──
+    # ── DETERMINISTIC DEDUP: Cross-check ALL titles against disk ──
     # The LLM may incorrectly mark a profile as needing research even when
-    # a matching profile already exists on disk. This is the critical safety
-    # net that prevents duplicate profile generation (e.g., Solo Leveling bug).
-    if needs_research:
-        from ..profiles.loader import find_all_profiles_by_title
-        verified_research = []
-        for title in needs_research:
-            matches = find_all_profiles_by_title(title)
-            if matches:
-                profile_id, match_type = matches[0]  # Use first match
-                logger.info(
-                    f"DEDUP: '{title}' already exists as '{profile_id}' "
-                    f"(match_type={match_type}, total_matches={len(matches)}) — skipping research"
-                )
-                # Add to existing_profiles so it's used instead of re-generated
-                existing_profiles.append(ResolvedTitle(
-                    profile_id=profile_id,
-                    canonical_title=title,
-                    already_exists=True,
-                ))
-            else:
-                verified_research.append(title)
-        if len(verified_research) < len(needs_research):
+    # a matching profile already exists on disk, or fail to flag it as existing.
+    from ..profiles.loader import find_all_profiles_by_title
+    
+    verified_existing = []
+    verified_research = []
+    
+    # Gather all unique titles to check
+    all_titles_to_check = []
+    if resolution.resolved_titles:
+        for rt in resolution.resolved_titles:
+            if rt.canonical_title not in all_titles_to_check:
+                all_titles_to_check.append(rt.canonical_title)
+    for title in needs_research:
+        if title not in all_titles_to_check:
+            # Drop parentheticals added during enrichment for dedup
+            clean_title = re.sub(r'\s*\([^)]*\)\s*$', '', title)
+            if clean_title not in all_titles_to_check:
+                all_titles_to_check.append(title)  # keep original enriched version
+
+    for title in all_titles_to_check:
+        clean_title = re.sub(r'\s*\([^)]*\)\s*$', '', title)
+        matches = find_all_profiles_by_title(clean_title)
+        if matches:
+            profile_id, match_type = matches[0]
             logger.info(
-                f"DEDUP: reduced needs_research from {len(needs_research)} "
-                f"to {len(verified_research)}: {verified_research}"
+                f"DEDUP: '{clean_title}' already exists as '{profile_id}' "
+                f"(match_type={match_type}, total_matches={len(matches)})"
             )
-        needs_research = verified_research
+            matching_rt = next((rt for rt in resolution.resolved_titles if rt.canonical_title == clean_title), None)
+            verified_existing.append(ResolvedTitle(
+                profile_id=profile_id,
+                canonical_title=clean_title, # use clean title for profile
+                anilist_id=matching_rt.anilist_id if matching_rt else None,
+                mal_id=matching_rt.mal_id if matching_rt else None,
+                role=matching_rt.role if matching_rt else "primary",
+                already_exists=True,
+            ))
+        else:
+            verified_research.append(title)
+            
+    existing_profiles = verified_existing
+    needs_research = verified_research
 
     # Safety net: if LLM resolved titles but none exist locally and
     # needs_research is empty, populate it from the non-existing titles
@@ -340,8 +393,13 @@ async def resolve_media_intent(
         )
 
     if not needs_research and existing_profiles:
-        # All profiles exist — link them and mark ready
-        profile_ids = [rt.profile_id for rt in resolution.resolved_titles]
+        # All profiles already exist on disk.  Use the DEDUP-verified
+        # existing_profiles list which carries the real on-disk profile_id
+        # (e.g. "al_118586") rather than the synthetic ID produced by
+        # _resolve_from_disambiguation (e.g. "frieren_beyond_journeys_end").
+        # Update resolution so _save_session_composition stores correct IDs.
+        resolution.resolved_titles = existing_profiles
+        profile_ids = [rt.profile_id for rt in existing_profiles]
         primary_id = profile_ids[0] if profile_ids else None
 
         # Build and save session composition
@@ -355,9 +413,9 @@ async def resolve_media_intent(
         session.phase_state['composition_type'] = resolution.composition_type
         session.character_draft.narrative_profile = primary_id
         session.character_draft.media_reference = (
-            " × ".join(rt.canonical_title for rt in resolution.resolved_titles)
-            if len(resolution.resolved_titles) > 1
-            else resolution.resolved_titles[0].canonical_title
+            " × ".join(rt.canonical_title for rt in existing_profiles)
+            if len(existing_profiles) > 1
+            else existing_profiles[0].canonical_title
         )
 
         return IntentResult(
@@ -553,6 +611,130 @@ def _parse_media_form_choice(user_input: str, options: list[str]) -> str:
     # Default: first option
     logger.warning(f"Could not parse media form choice '{user_input}', defaulting to first option")
     return options[0]
+
+
+def _resolve_from_disambiguation(
+    session: Any,
+    media_ref: str,
+    detected_info: dict | None = None,
+) -> IntentResolution | None:
+    """Parse the user's disambiguation choice and build a direct resolution.
+
+    Deterministically maps the user's response (number, name, or Session Zero
+    agent extraction) to one of the previously-shown disambiguation options.
+    Returns an IntentResolution if the choice was parsed, None to fall through
+    to the Intent Agent.
+    """
+    anilist_id_map = session.phase_state.get('anilist_id_map', {})
+    options_ordered = session.phase_state.get('disambiguation_options_ordered', [])
+
+    if not anilist_id_map and not options_ordered:
+        return None  # No disambiguation state to work with
+
+    chosen_title = None
+    chosen_anilist_id = None
+
+    # Source 1: The Session Zero agent's extracted media_ref
+    text = media_ref.strip()
+    text_lower = text.lower()
+
+    # Source 2: Raw user input (last user message in session)
+    raw_input = ""
+    if session.messages:
+        for msg in reversed(session.messages):
+            if msg.get('role') == 'user':
+                raw_input = msg.get('content', '').strip()
+                break
+
+    # Try numeric selection from raw input first ("1", "2", etc.)
+    # Raw input is more reliable than Session Zero agent extraction for numbers
+    for source in [raw_input, text]:
+        if chosen_title:
+            break
+        num_match = re.search(r'\b(\d+)\b', source)
+        if num_match and options_ordered:
+            idx = int(num_match.group(1)) - 1
+            if 0 <= idx < len(options_ordered):
+                chosen_title = options_ordered[idx]
+                chosen_anilist_id = anilist_id_map.get(chosen_title)
+                logger.info(f"Disambiguation: numeric match '{source}' → option {idx+1}: '{chosen_title}'")
+
+    # Try exact match of media_ref against option titles
+    if not chosen_title:
+        for title in options_ordered or list(anilist_id_map.keys()):
+            if title.lower() == text_lower:
+                chosen_title = title
+                chosen_anilist_id = anilist_id_map.get(title)
+                logger.info(f"Disambiguation: exact match '{text}' → '{chosen_title}'")
+                break
+
+    # Try substring match (media_ref contained in option, or option contained in media_ref)
+    if not chosen_title:
+        for title in options_ordered or list(anilist_id_map.keys()):
+            title_lower = title.lower()
+            if text_lower in title_lower or title_lower in text_lower:
+                chosen_title = title
+                chosen_anilist_id = anilist_id_map.get(title)
+                logger.info(f"Disambiguation: substring match '{text}' → '{chosen_title}'")
+                break
+
+    # Try matching raw user input against option titles (for cases like "shippuden")
+    if not chosen_title and raw_input:
+        raw_lower = raw_input.lower()
+        for title in options_ordered or list(anilist_id_map.keys()):
+            title_lower = title.lower()
+            if raw_lower in title_lower or title_lower in raw_lower:
+                chosen_title = title
+                chosen_anilist_id = anilist_id_map.get(title)
+                logger.info(f"Disambiguation: raw input match '{raw_input}' → '{chosen_title}'")
+                break
+
+    # Try word-level matching for partial names
+    if not chosen_title:
+        for source in [raw_input, text]:
+            if chosen_title:
+                break
+            words = [w for w in source.lower().split() if len(w) > 3]
+            for title in options_ordered or list(anilist_id_map.keys()):
+                title_lower = title.lower()
+                if any(w in title_lower for w in words):
+                    chosen_title = title
+                    chosen_anilist_id = anilist_id_map.get(title)
+                    logger.info(f"Disambiguation: word match '{source}' → '{chosen_title}'")
+                    break
+
+    if not chosen_title:
+        logger.warning(
+            f"Could not parse disambiguation choice from media_ref='{media_ref}', "
+            f"raw_input='{raw_input}', options={options_ordered} — falling through to agent"
+        )
+        return None
+
+    # chosen_title is the full display label produced by _option_label()
+    # (e.g. "Frieren: Beyond Journey's End (MANGA, 2020)").  Strip the trailing
+    # (FORMAT, YEAR) metadata so that the research pipeline and profile store
+    # receive the bare canonical title ("Frieren: Beyond Journey's End").
+    # We keep chosen_anilist_id which is the authoritative identity.
+    canonical_title = re.sub(r'\s*\([^)]+\)\s*$', '', chosen_title).strip() or chosen_title
+    if canonical_title != chosen_title:
+        logger.info(f"Stripped label metadata: '{chosen_title}' → '{canonical_title}'")
+
+    # Build synthetic resolution — bypass the intent agent entirely
+    from ..agents.profile_generator import _sanitize_profile_id
+    profile_id = _sanitize_profile_id(canonical_title)
+
+    return IntentResolution(
+        resolved_titles=[ResolvedTitle(
+            profile_id=profile_id,
+            canonical_title=canonical_title,
+            anilist_id=chosen_anilist_id,
+            already_exists=False,
+        )],
+        composition_type='single',
+        needs_research=[canonical_title],
+        confidence=1.0,
+        reasoning=f"User selected '{chosen_title}' from disambiguation options",
+    )
 
 
 def _save_session_composition(

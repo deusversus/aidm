@@ -46,6 +46,16 @@ PHASE_ORDER = [
     SessionPhase.GAMEPLAY,
 ]
 
+# phase_state keys that must survive phase transitions.
+# These hold cross-phase data (research output, composition IDs) that is
+# written early in Session Zero but consumed much later (e.g. stat_presentation
+# is generated at MECHANICAL_BUILD using profile_data set at MEDIA_DETECTION).
+PERSISTENT_PHASE_STATE_KEYS: frozenset = frozenset({
+    'profile_data',        # Research output — stat_mapping, world_tier, etc.
+    'active_profile_ids',  # Multi-profile composition IDs used by get_active_profile_ids()
+    'pending_npcs',        # NPC dicts queued before campaign_id exists; flushed at handoff
+})
+
 
 # Hard requirements for gameplay transition
 # Session Zero MUST collect ALL of these before handoff
@@ -329,7 +339,10 @@ class Session:
         current_idx = PHASE_ORDER.index(self.phase)
         if current_idx < len(PHASE_ORDER) - 1:
             self.phase = PHASE_ORDER[current_idx + 1]
-            self.phase_state = {}  # Reset phase-specific state
+            # Preserve cross-phase data (research output, composition IDs).
+            # All other phase-specific state is cleared on phase advance.
+            persistent = {k: self.phase_state[k] for k in PERSISTENT_PHASE_STATE_KEYS if k in self.phase_state}
+            self.phase_state = persistent
             self.last_activity = datetime.now()
             return True
         return False
@@ -340,7 +353,10 @@ class Session:
         """
         if target in PHASE_ORDER:
             self.phase = target
-            self.phase_state = {}
+            # Preserve cross-phase data (research output, composition IDs).
+            # All other phase-specific state is cleared on phase skip.
+            persistent = {k: self.phase_state[k] for k in PERSISTENT_PHASE_STATE_KEYS if k in self.phase_state}
+            self.phase_state = persistent
             self.last_activity = datetime.now()
             return True
         return False

@@ -11,6 +11,7 @@ from src.agents.session_zero import (
 )
 from src.agents.intent_resolution_handler import resolve_media_intent
 from src.core.session import (
+    PHASE_ORDER,
     SessionPhase,
     get_current_phase_for_draft,
     get_missing_requirements,
@@ -30,6 +31,34 @@ from .session_mgmt import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _default_attributes_for_tier(world_tier: str, concept: str | None = None) -> dict:
+    """Generate a balanced 75-point attribute fallback when the LLM failed to commit stats.
+
+    Distribution is concept-aware (mage → INT heavy, warrior → STR/CON heavy, etc.).
+    The point total (75) matches the MECHANICAL_BUILD prompt's point-buy budget.
+    """
+    concept_lower = (concept or "").lower()
+
+    # Concept-driven defaults (still balanced, just weighted differently)
+    if any(k in concept_lower for k in ("mage", "magic", "wizard", "sorcerer", "witch", "spellcaster", "scholar")):
+        attrs = {"STR": 8, "DEX": 11, "CON": 10, "INT": 18, "WIS": 16, "CHA": 12}
+    elif any(k in concept_lower for k in ("rogue", "assassin", "thief", "ranger", "archer", "ninja", "scout")):
+        attrs = {"STR": 10, "DEX": 18, "CON": 10, "INT": 12, "WIS": 13, "CHA": 12}
+    elif any(k in concept_lower for k in ("warrior", "fighter", "knight", "paladin", "soldier", "berserker")):
+        attrs = {"STR": 18, "DEX": 10, "CON": 16, "INT": 8, "WIS": 11, "CHA": 12}
+    elif any(k in concept_lower for k in ("healer", "cleric", "priest", "support", "medic")):
+        attrs = {"STR": 8, "DEX": 11, "CON": 12, "INT": 14, "WIS": 18, "CHA": 12}
+    elif any(k in concept_lower for k in ("bard", "performer", "noble", "diplomat", "leader")):
+        attrs = {"STR": 9, "DEX": 12, "CON": 10, "INT": 14, "WIS": 12, "CHA": 18}
+    else:
+        # Balanced generalist
+        attrs = {"STR": 12, "DEX": 13, "CON": 12, "INT": 13, "WIS": 12, "CHA": 13}
+
+    # Sanity check: total should always be 75
+    assert sum(attrs.values()) == 75, f"Default attrs don't sum to 75: {attrs}"
+    return attrs
 
 
 async def _handle_gameplay_handoff(session, session_id: str, result, agent) -> tuple:
@@ -117,6 +146,26 @@ async def _handle_gameplay_handoff(session, session_id: str, result, agent) -> t
     logger.info("[Handoff] About to call get_orchestrator()...")
     orchestrator = get_orchestrator()
     logger.info(f"[Handoff] Orchestrator created successfully with profile: {orchestrator.profile_id}")
+
+    # --- 0b. Flush NPCs queued during Session Zero ---
+    # NPCs described before the campaign existed were stashed in phase_state["pending_npcs"].
+    # Now that we have a real campaign_id, replay them so they appear in the NPC table
+    # (and optionally trigger portrait generation).
+    pending_npcs = session.phase_state.get("pending_npcs", [])
+    if pending_npcs:
+        try:
+            npc_stats = await process_session_zero_state(
+                session=session,
+                detected_info={"npcs": pending_npcs},
+                session_id=session.session_id,
+                campaign_id=orchestrator.state.campaign_id,
+            )
+            logger.info(
+                f"[Handoff] Flushed {len(pending_npcs)} pending NPC(s) → "
+                f"created={npc_stats.get('npcs_created', 0)}"
+            )
+        except Exception as npc_err:
+            logger.error(f"[Handoff] Pending NPC flush failed (non-fatal): {npc_err}")
 
     # --- 1. Update Character ---
     if draft.power_tier:
@@ -403,13 +452,14 @@ async def session_zero_turn(session_id: str, request: TurnRequest):
             # Later phases (IDENTITY, WRAP_UP, etc.) should not re-run disambiguation
             early_phases = [SessionPhase.MEDIA_DETECTION, SessionPhase.NARRATIVE_CALIBRATION, SessionPhase.CONCEPT]
 
-            # If a media form choice or merge questions are pending, ensure we enter
-            # resolve_media_intent even if LLM didn't extract a media_reference
+            # If a media form choice, merge questions, or disambiguation are pending,
+            # ensure we enter resolve_media_intent even if LLM didn't extract a media_reference
             if not media_ref and (
                 (session.phase_state.get('media_form_options') and not session.phase_state.get('media_form_chosen'))
                 or session.phase_state.get('merge_questions_pending')
+                or session.phase_state.get('disambiguation_shown')
             ):
-                media_ref = request.message  # Use raw user input for choice/answer parsing
+                media_ref = request.player_input  # Use raw user input for choice/answer parsing
 
             if media_ref and session.phase in early_phases and session.phase_state.get("profile_type") != "custom":
                 # Note: We include CONCEPT because hybrid flow may need to run research there
@@ -516,11 +566,24 @@ async def session_zero_turn(session_id: str, request: TurnRequest):
                     logger.error(f"Custom profile generation failed: {custom_error}")
 
         # COMPLETENESS-DRIVEN PHASE TRACKING
-        # Sync phase to actual data completeness (allows multi-phase skip)
+        # Sync phase to actual data completeness (allows multi-phase skip).
+        # Only advance — never regress.  Backward suggestions almost always mean
+        # the LLM has not yet emitted narrative_calibrated=true; staying on the
+        # current phase lets it catch up on the next turn rather than nuking
+        # phase_state (and the phase_data/profile_data inside it).
         actual_phase = get_current_phase_for_draft(session.character_draft)
         if actual_phase != session.phase:
-            logger.info(f"Phase sync: {session.phase.value} -> {actual_phase.value}")
-            session.skip_to_phase(actual_phase)
+            current_idx = PHASE_ORDER.index(session.phase)
+            actual_idx = PHASE_ORDER.index(actual_phase)
+            if actual_idx > current_idx:
+                logger.info(f"Phase sync: {session.phase.value} -> {actual_phase.value}")
+                session.skip_to_phase(actual_phase)
+            else:
+                logger.warning(
+                    f"Phase sync SUPPRESSED (would regress): "
+                    f"{session.phase.value} -> {actual_phase.value} "
+                    f"(narrative_calibrated={session.character_draft.narrative_calibrated!r})"
+                )
 
         # STAT PRESENTATION: When MECHANICAL_BUILD completes (attributes filled),
         # consume the profile's stat_mapping to generate stat_presentation (Layer 2).
@@ -529,7 +592,7 @@ async def session_zero_turn(session_id: str, request: TurnRequest):
         if draft.attributes and not draft.stat_presentation:
             profile_data = session.phase_state.get("profile_data", {})
             stat_mapping = profile_data.get("stat_mapping")
-            if stat_mapping and stat_mapping.get("confidence", 0) >= 90:
+            if stat_mapping and stat_mapping.get("confidence", 0) >= 70:
                 draft.stat_presentation = {
                     "aliases": stat_mapping.get("aliases", {}),
                     "meta_resources": stat_mapping.get("meta_resources", {}),
@@ -551,6 +614,18 @@ async def session_zero_turn(session_id: str, request: TurnRequest):
         # Handle gameplay transition
         if result.ready_for_gameplay:
             logger.info("Agent set ready_for_gameplay=True")
+
+            # SAFETY NET: if the LLM forgot to commit attributes to detected_info
+            # (e.g. said the numbers in narrative text but not in structured output),
+            # generate a balanced fallback so handoff isn't permanently blocked.
+            if not session.character_draft.attributes:
+                world_tier = session.phase_state.get("profile_data", {}).get("world_tier", "T10")
+                session.character_draft.attributes = _default_attributes_for_tier(world_tier, session.character_draft.concept)
+                logger.warning(
+                    f"[SessionZero] attributes were empty at ready_for_gameplay — "
+                    f"auto-generated defaults for {world_tier}: {session.character_draft.attributes}"
+                )
+
             # Validate that we actually have all requirements
             missing = get_missing_requirements(session.character_draft)
             if missing:
@@ -578,7 +653,7 @@ async def session_zero_turn(session_id: str, request: TurnRequest):
                     level=1,
                     hp_current=draft.resources.get("HP", 100),
                     hp_max=draft.resources.get("HP", 100),
-                    power_tier=draft.attributes.get("power_tier", "T10"),
+                    power_tier=draft.power_tier or session.phase_state.get("profile_data", {}).get("world_tier", "T10"),
                     abilities=draft.skills,
                     # Identity sync from Session Zero
                     concept=draft.concept,
@@ -592,6 +667,9 @@ async def session_zero_turn(session_id: str, request: TurnRequest):
                     short_term_goal=draft.goals.get("short_term") if draft.goals else None,
                     long_term_goal=draft.goals.get("long_term") if draft.goals else None,
                     inventory=draft.inventory,
+                    # Stats (Layer 1 + Layer 2) — parity with primary handoff path
+                    stats=draft.attributes or {},
+                    stat_presentation=draft.stat_presentation,
                 )
 
                 if draft.starting_location:

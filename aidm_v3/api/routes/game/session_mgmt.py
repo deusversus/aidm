@@ -197,6 +197,18 @@ async def resume_session(session_id: str):
             character = state.get_character()
             char_name = character.name if character else "Protagonist"
 
+            # --- Primary source: extract recent assistant (narrative) messages ---
+            # These are the actual story text — far more useful than arc metadata.
+            # Take the last 5 GAMEPLAY assistant messages, each capped at 800 chars.
+            recent_narrative = ""
+            gameplay_assistant_msgs = [
+                m["content"] for m in session.messages
+                if m.get("role") == "assistant" and m.get("phase") == "GAMEPLAY"
+            ]
+            if gameplay_assistant_msgs:
+                recent_parts = [p[:800] for p in gameplay_assistant_msgs[-5:]]
+                recent_narrative = "\n\n---\n\n".join(recent_parts)
+
             # Get top narrative beat memories (if memory system available)
             narrative_beats = []
             try:
@@ -216,8 +228,9 @@ async def resume_session(session_id: str):
                 current_situation=situation,
                 character_name=char_name,
                 arc_phase=arc_phase,
+                recent_narrative=recent_narrative,
             )
-            if recap_output:
+            if recap_output and recap_output.recap_text:
                 recap_text = recap_output.recap_text
                 logger.info(f"Generated recap: {recap_text[:100]}...")
         except Exception as e:
@@ -684,11 +697,10 @@ async def _generate_handoff_character_media(
             )
             if char:
                 if result.get("portrait"):
-                    # Portrait is under portraits/ subdir, e.g. data/media/1/portraits/name_portrait.png
-                    char.portrait_url = f"/api/game/media/{campaign_id}/portraits/{result['portrait'].name}"
+                    char.portrait_url = gen.get_media_url(campaign_id, "portraits", result['portrait'].name)
                     logger.info(f"[Handoff→Media] Player portrait saved: {char.portrait_url}")
                 if result.get("model_sheet"):
-                    char.model_sheet_url = f"/api/game/media/{campaign_id}/models/{result['model_sheet'].name}"
+                    char.model_sheet_url = gen.get_media_url(campaign_id, "models", result['model_sheet'].name)
                     logger.info(f"[Handoff→Media] Player model sheet saved: {char.model_sheet_url}")
                 db.commit()
             db.close()

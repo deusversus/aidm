@@ -62,9 +62,10 @@ class RecapAgent(BaseAgent):
         current_situation: str,
         character_name: str,
         arc_phase: str,
+        recent_narrative: str = "",
     ) -> RecapOutput | None:
         """Generate a session-opening recap.
-        
+
         Args:
             arc_history: List of arc_history entries from Campaign Bible
             narrative_beats: Top narrative_beat memories by heat
@@ -72,11 +73,12 @@ class RecapAgent(BaseAgent):
             current_situation: Current WorldState situation
             character_name: Player character name
             arc_phase: Current arc phase
-            
+            recent_narrative: Actual story text from recent turns (primary source)
+
         Returns:
             RecapOutput or None on failure
         """
-        # Build context from arc_history
+        # Build context from arc_history (metadata only — not primary source)
         history_text = ""
         if arc_history:
             for i, entry in enumerate(arc_history[-5:]):  # Last 5 entries
@@ -91,12 +93,19 @@ class RecapAgent(BaseAgent):
             for i, beat in enumerate(narrative_beats[:5]):  # Top 5
                 beats_text += f"Beat {i+1}: {beat}\n"
 
+        # If there's nothing at all to recap, bail early
+        has_content = bool(recent_narrative or beats_text or history_text)
+        if not has_content:
+            logger.info("Recap skipped: no story content available yet")
+            return None
+
         try:
             result = await self.call(
                 f"Generate a recap for {character_name}'s story so far.",
-                arc_history=history_text or "(No arc history yet)",
-                narrative_beats=beats_text or "(No narrative beats yet)",
-                director_notes=director_notes or "(No director notes)",
+                recent_narrative=recent_narrative or None,
+                arc_history=history_text or None,
+                narrative_beats=beats_text or None,
+                director_notes=director_notes or None,
                 current_situation=current_situation,
                 arc_phase=arc_phase,
             )

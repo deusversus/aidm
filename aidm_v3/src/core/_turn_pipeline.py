@@ -334,7 +334,8 @@ class TurnPipelineMixin:
                     arc_history = bible.planning_data.get('arc_history', [])
 
                 # Only generate recap if we have story to recap
-                if arc_history or db_context.director_notes:
+                # compaction_text (micro-summaries of past turns) is the primary content source
+                if arc_history or db_context.director_notes or compaction_text:
                     # Get top narrative_beat memories
                     beat_mems = []
                     try:
@@ -356,6 +357,7 @@ class TurnPipelineMixin:
                             current_situation=db_context.situation,
                             character_name=db_context.character_name,
                             arc_phase=db_context.arc_phase,
+                            recent_narrative=compaction_text,  # micro-summaries of prior turns
                         )
                     )
 
