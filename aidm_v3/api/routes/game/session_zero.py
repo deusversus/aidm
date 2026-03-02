@@ -1,6 +1,7 @@
 """Session Zero turn endpoint — the character creation conversation loop."""
 
 import logging
+import traceback
 
 from fastapi import APIRouter, HTTPException
 
@@ -393,7 +394,15 @@ async def session_zero_turn(session_id: str, request: TurnRequest):
         # Apply any detected information to the character draft
 
         logger.debug(f"DEBUG: Raw result.detected_info = {result.detected_info}")
-        if result.detected_info:
+        # Also enter this block when a disambiguation/media-form/merge choice is pending,
+        # even if the LLM returned empty detected_info (e.g. Claude returning {} for "1").
+        # Without this, numeric selections are silently swallowed and disambiguation loops.
+        _pending_resolution = (
+            session.phase_state.get('disambiguation_shown')
+            or (session.phase_state.get('media_form_options') and not session.phase_state.get('media_form_chosen'))
+            or session.phase_state.get('merge_questions_pending')
+        )
+        if result.detected_info or _pending_resolution:
             # DEBUG: Log what the LLM returned
             try:
                 safe_detected_info = {
@@ -749,6 +758,7 @@ async def session_zero_turn(session_id: str, request: TurnRequest):
         )
 
     except Exception as e:
+        logger.error(f"Session Zero error: {str(e)}\n{traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"Session Zero error: {str(e)}")
 
     finally:

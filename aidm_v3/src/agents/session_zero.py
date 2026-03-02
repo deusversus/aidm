@@ -153,7 +153,7 @@ Based on the phase-specific instructions in the system prompt, generate an appro
         if draft.narrative_profile:
             lines.append(f"- Narrative Profile: {draft.narrative_profile}")
         if draft.backstory:
-            lines.append(f"- Backstory: {draft.backstory[:200]}...")
+            lines.append(f"- Backstory: {str(draft.backstory)[:200]}...")
         if draft.personality_traits:
             lines.append(f"- Traits: {', '.join(draft.personality_traits)}")
         if draft.skills:
@@ -197,7 +197,7 @@ Welcome the player warmly and ask if they have an anime/manga reference in mind.
 def apply_detected_info(session: Session, detected: dict[str, Any]) -> None:
     """
     Apply detected information from the agent's response to the character draft.
-    
+
     This maps field names from the agent's output to the CharacterDraft.
     """
     draft = session.character_draft
@@ -240,9 +240,42 @@ def apply_detected_info(session: Session, detected: dict[str, Any]) -> None:
         "power_tier": "power_tier",
     }
 
+    # Fields that must store plain strings — LLMs sometimes return dicts/lists for these.
+    # Python 3.13 raises TypeError(slice_object) (not a string message) when you slice a dict,
+    # so type-coercion here prevents cryptic "slice(None, 200, None)" 500 errors downstream.
+    _STRING_FIELDS = {
+        "media_reference", "manga_reference", "narrative_profile",
+        "timeline_mode", "canon_cast_mode", "event_fidelity",
+        "op_preset", "op_tension_source", "op_power_expression", "op_narrative_focus",
+        "tension_source", "power_expression", "narrative_focus", "composition_name",
+        "concept", "name", "backstory", "starting_location", "power_tier",
+    }
+    # Fields that must be booleans
+    _BOOL_FIELDS = {"narrative_calibrated", "op_protagonist_enabled", "media_researched"}
+    # Fields that must be integers
+    _INT_FIELDS = {"age"}
+
     for key, value in detected.items():
         if key in field_mapping:
             target_field = field_mapping[key]
+            # Coerce to the expected type so downstream slicing / logic is safe
+            if value is not None:
+                if target_field in _STRING_FIELDS and not isinstance(value, str):
+                    # LLM returned a dict or list for a string field — flatten it
+                    if isinstance(value, dict):
+                        value = "; ".join(f"{k}: {v}" for k, v in value.items())
+                    elif isinstance(value, list):
+                        value = "; ".join(str(item) for item in value)
+                    else:
+                        value = str(value)
+                elif target_field in _BOOL_FIELDS and not isinstance(value, bool):
+                    value = bool(value)
+                elif target_field in _INT_FIELDS:
+                    try:
+                        value = int(value)
+                    except (ValueError, TypeError):
+                        logger.warning(f"[apply_detected_info] Could not coerce {key!r}={value!r} to int — skipping")
+                        continue
             setattr(draft, target_field, value)
 
         # Handle nested fields

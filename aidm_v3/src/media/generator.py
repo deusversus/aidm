@@ -402,11 +402,16 @@ Requirements:
                     model=self.IMAGE_MODEL,
                     contents=[
                         types.Part.from_bytes(data=model_bytes, mime_type="image/png"),
-                        "Based on this character model sheet, create a close-up head-and-shoulders portrait. "
-                        "Same character, same art style, same details. Focus on the face and upper body. "
-                        "Maintain the exact same art style and color palette as the reference. "
-                        "Clean dark or neutral background suitable for a character profile card. "
-                        "Dramatic lighting that matches the tone of the source material.",
+                        "The attached image is a character turnaround model sheet — use it as a VISUAL REFERENCE ONLY "
+                        "to understand what this character looks like. "
+                        "OUTPUT: A single standalone character portrait. "
+                        "Do NOT reproduce the model sheet layout. "
+                        "Do NOT include multiple views, rotation panels, turnarounds, or reference grids. "
+                        "COMPOSITION: One tight head-and-shoulders close-up — face and upper chest only, "
+                        "character facing slightly toward the viewer, roughly centered. "
+                        "Use the same face, hair style, hair color, eye color, and art style as the reference character. "
+                        "Plain dark or deep-colored background suitable for a character profile card. "
+                        "Anime-style dramatic lighting — no harsh fills, rich shadows on the face.",
                     ],
                     config=types.GenerateContentConfig(
                         response_modalities=["image", "text"],

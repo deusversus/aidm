@@ -23,18 +23,19 @@ COPILOT_FALLBACK_MODELS: list[dict[str, str]] = [
     {"id": "claude-opus-4-5", "name": "Claude Opus 4.5", "tier": "premium", "description": "Anthropic Claude Opus 4.5 via Copilot"},
     {"id": "claude-opus-4-6", "name": "Claude Opus 4.6", "tier": "premium", "description": "Anthropic Claude Opus 4.6 via Copilot"},
     # Google — fast tier
-    {"id": "gemini-2.0-flash", "name": "Gemini 2.0 Flash", "tier": "fast", "description": "Google Gemini 2.0 Flash via Copilot"},
+    {"id": "gemini-2.5-flash", "name": "Gemini 2.5 Flash", "tier": "fast", "description": "Google Gemini 2.5 Flash (stable GA) via Copilot"},
     {"id": "gemini-3-flash-preview", "name": "Gemini 3 Flash", "tier": "fast", "description": "Google Gemini 3 Flash (preview) via Copilot"},
     # Google — creative tier
-    {"id": "gemini-2.5-pro", "name": "Gemini 2.5 Pro", "tier": "creative", "description": "Google Gemini 2.5 Pro via Copilot"},
-    {"id": "gemini-3-pro-preview", "name": "Gemini 3 Pro", "tier": "creative", "description": "Google Gemini 3 Pro (preview) via Copilot"},
+    {"id": "gemini-2.5-pro", "name": "Gemini 2.5 Pro", "tier": "creative", "description": "Google Gemini 2.5 Pro (stable GA) via Copilot"},
+    {"id": "gemini-3.1-pro-preview", "name": "Gemini 3.1 Pro", "tier": "creative", "description": "Google Gemini 3.1 Pro (preview) via Copilot"},
 ]
 
 # Available models per provider (December 2025)
 AVAILABLE_MODELS: dict[str, list[dict[str, str]]] = {
     "google": [
-        {"id": "gemini-3-flash-preview", "name": "Gemini 3 Flash", "tier": "fast", "description": "Fast, affordable for structured tasks"},
-        {"id": "gemini-3-pro-preview", "name": "Gemini 3 Pro", "tier": "creative", "description": "High quality reasoning and generation"},
+        {"id": "gemini-2.5-flash", "name": "Gemini 2.5 Flash", "tier": "fast", "description": "Fast, affordable — stable GA"},
+        {"id": "gemini-3-flash-preview", "name": "Gemini 3 Flash", "tier": "fast", "description": "Fast with Pro-level intelligence (preview)"},
+        {"id": "gemini-2.5-pro", "name": "Gemini 2.5 Pro", "tier": "creative", "description": "High quality reasoning — stable GA"},
         {"id": "gemini-3.1-pro-preview", "name": "Gemini 3.1 Pro", "tier": "creative", "description": "Latest Gemini Pro — improved reasoning and generation"},
     ],
     "anthropic": [
@@ -50,6 +51,23 @@ AVAILABLE_MODELS: dict[str, list[dict[str, str]]] = {
         {"id": "gpt-5.2-pro", "name": "GPT-5.2 Pro", "tier": "premium", "description": "Highest quality, more compute"},
     ],
 }
+
+
+def _dedup_models(model_list: list[dict]) -> list[dict]:
+    """Deduplicate a model list by name (case-insensitive), keeping the first occurrence.
+
+    The Copilot API returns many version-pinned variants of the same model
+    (e.g. gpt-4o, gpt-4o-2024-05-13, gpt-4o-2024-08-06) all sharing the same
+    display name.  This strips the extras so the UI shows each model once.
+    """
+    seen: set[str] = set()
+    result: list[dict] = []
+    for m in model_list:
+        key = m.get("name", m.get("id", "")).lower()
+        if key not in seen:
+            seen.add(key)
+            result.append(m)
+    return result
 
 
 def get_available_models(provider: str = None) -> dict[str, list[dict[str, str]]]:
@@ -72,7 +90,9 @@ def get_available_models(provider: str = None) -> dict[str, list[dict[str, str]]
         from .store import get_settings_store
         settings = get_settings_store().load()
         if settings.copilot_models:
-            models["copilot"] = settings.copilot_models
+            # Deduplicate at read-time so stale stored lists are cleaned up
+            # immediately without requiring the user to reconnect.
+            models["copilot"] = _dedup_models(settings.copilot_models)
         else:
             models["copilot"] = COPILOT_FALLBACK_MODELS
     except Exception:

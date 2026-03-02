@@ -2,6 +2,7 @@
 
 import json
 import logging
+import re
 from typing import Any
 
 from pydantic import BaseModel
@@ -9,6 +10,19 @@ from pydantic import BaseModel
 from .provider import LLMProvider, LLMResponse
 
 logger = logging.getLogger(__name__)
+
+
+def _is_reasoning_model(model_name: str) -> bool:
+    """True for OpenAI o-series reasoning models (o1/o3/o4 families) and GPT-5.
+
+    These models use max_completion_tokens instead of max_tokens, don't accept
+    temperature, and support the reasoning_effort parameter.  Uses a word-boundary
+    check so 'gpt-4o' (which contains 'o' but is NOT a reasoning model) is not
+    accidentally matched.
+    """
+    low = model_name.lower()
+    return "gpt-5" in low or bool(re.search(r"\bo[134]", low))
+
 
 class OpenAIProvider(LLMProvider):
     """OpenAI ChatGPT provider implementation.
@@ -96,9 +110,9 @@ class OpenAIProvider(LLMProvider):
 
         # Generate response using streaming to prevent truncation
         try:
-            # Handle parameter differences for newer models (GPT-5+)
-            if "gpt-5" in model_name or "o1" in model_name:
-                # GPT-5/o1 often don't support temperature or use max_completion_tokens
+            # o-series (o1/o3/o4) and GPT-5 use max_completion_tokens, no temperature,
+            # and support reasoning_effort.  gpt-4o is NOT a reasoning model.
+            if _is_reasoning_model(model_name):
                 kwargs = {
                     "model": model_name,
                     "messages": full_messages,
@@ -286,7 +300,7 @@ class OpenAIProvider(LLMProvider):
 
         # Generate response with function calling using streaming
         try:
-            if "gpt-5" in model_name or "o1" in model_name:
+            if _is_reasoning_model(model_name):
                 kwargs = {
                     "model": model_name,
                     "messages": full_messages,

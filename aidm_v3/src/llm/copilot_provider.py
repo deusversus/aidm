@@ -14,6 +14,7 @@ this class simply subclasses OpenAIProvider and overrides:
 
 import json
 import logging
+import re
 import time
 import urllib.error
 import urllib.request
@@ -200,12 +201,14 @@ class CopilotProvider(OpenAIProvider):
             if not model_id:
                 continue
 
-            # Infer tier from model name patterns
+            # Infer tier from model name patterns.
+            # Check o-series FIRST — o3-mini/o4-mini are reasoning models, not fast.
+            # Use word-boundary match so "gpt-4o" (non-reasoning) is not caught.
             low = model_id.lower()
-            if any(k in low for k in ("mini", "flash", "haiku", "nano")):
-                tier = "fast"
-            elif any(k in low for k in ("o1", "o3", "o4", "reasoning")):
+            if re.search(r"\bo[134]", low) or "reasoning" in low:
                 tier = "thinking"
+            elif any(k in low for k in ("mini", "flash", "haiku", "nano")):
+                tier = "fast"
             else:
                 tier = "creative"
 
@@ -219,7 +222,22 @@ class CopilotProvider(OpenAIProvider):
                 "description": f"{name} via GitHub Copilot",
             })
 
-        # Sort: fast first, then creative, then thinking
+        # Sort: fast first, then creative, then thinking.
+        # Within each tier, shorter IDs (base model, e.g. "gpt-4o") sort before
+        # dated/versioned variants (e.g. "gpt-4o-2024-11-20"), so when we
+        # deduplicate by name below we always keep the canonical base model.
         tier_order = {"fast": 0, "creative": 1, "thinking": 2}
-        result.sort(key=lambda m: (tier_order.get(m["tier"], 9), m["id"]))
-        return result
+        result.sort(key=lambda m: (tier_order.get(m["tier"], 9), len(m["id"]), m["id"]))
+
+        # Deduplicate by name — the Copilot API returns many version-pinned
+        # variants (gpt-4o, gpt-4o-2024-05-13, gpt-4o-2024-08-06 …) all with
+        # the same display name.  Keep the first (shortest/canonical) ID only.
+        seen_names: set[str] = set()
+        deduped: list[dict] = []
+        for model in result:
+            key = model["name"].lower()
+            if key not in seen_names:
+                seen_names.add(key)
+                deduped.append(model)
+
+        return deduped
