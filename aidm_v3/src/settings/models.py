@@ -4,7 +4,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-ProviderType = Literal["google", "anthropic", "openai"]
+ProviderType = Literal["google", "anthropic", "openai", "copilot"]
 
 
 class ModelConfig(BaseModel):
@@ -162,7 +162,7 @@ class AgentSettings(BaseModel):
 
 class APIKeySettings(BaseModel):
     """API key configuration for LLM providers.
-    
+
     Keys are stored encrypted in settings.json.
     """
 
@@ -177,6 +177,10 @@ class APIKeySettings(BaseModel):
     openai_api_key: str = Field(
         default="",
         description="OpenAI ChatGPT API key (stored encrypted)"
+    )
+    copilot_github_token: str = Field(
+        default="",
+        description="GitHub OAuth token for Copilot access (stored encrypted)"
     )
 
 
@@ -250,6 +254,12 @@ class UserSettings(BaseModel):
     media_auto_play: bool = Field(
         default=True,
         description="Auto-play generated cutscene videos (muted)"
+    )
+
+    # Dynamically fetched Copilot model list (cached after first auth)
+    copilot_models: list[dict] | None = Field(
+        default=None,
+        description="Cached model list from GitHub Copilot API (refreshed on connect)"
     )
 
     class Config:

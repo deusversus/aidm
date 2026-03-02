@@ -24,13 +24,16 @@ class OpenAIProvider(LLMProvider):
         return "openai"
 
     def get_default_model(self) -> str:
-        return "gpt-5.2"
+        import os
+        return os.getenv("OPENAI_DEFAULT_MODEL", "") or "gpt-5.2"
 
     def get_fast_model(self) -> str:
-        return "gpt-5-mini"
+        import os
+        return os.getenv("FAST_MODEL", "") or "gpt-5-mini"
 
     def get_creative_model(self) -> str:
-        return "gpt-5.2"
+        import os
+        return os.getenv("CREATIVE_MODEL", "") or "gpt-5.2"
 
     def get_research_model(self) -> str:
         """Model optimized for research with web search."""
@@ -44,9 +47,18 @@ class OpenAIProvider(LLMProvider):
         return 10
 
     def _init_client(self):
-        """Initialize the OpenAI client."""
+        """Initialize the OpenAI client.
+
+        Respects OPENAI_BASE_URL for custom endpoints (Copilot proxies, GitHub Models,
+        local Ollama, etc.). Set OPENAI_BASE_URL in .env to redirect all OpenAI calls.
+        """
+        import os
         import openai
-        self._client = openai.OpenAI(api_key=self.api_key)
+        kwargs = {"api_key": self.api_key}
+        base_url = os.getenv("OPENAI_BASE_URL", "").strip()
+        if base_url:
+            kwargs["base_url"] = base_url
+        self._client = openai.OpenAI(**kwargs)
 
     @staticmethod
     def _flatten_system(system) -> str:

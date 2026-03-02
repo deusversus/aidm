@@ -194,10 +194,10 @@ class SettingsStore:
 
     def set_api_key(self, provider: str, key: str) -> None:
         """Set an API key for a provider (will be encrypted).
-        
+
         Args:
-            provider: One of 'google', 'anthropic', 'openai'
-            key: The plain API key
+            provider: One of 'google', 'anthropic', 'openai', 'copilot'
+            key: The plain API key / GitHub OAuth token
         """
         settings = self.load()
 
@@ -211,6 +211,8 @@ class SettingsStore:
             settings.api_keys.anthropic_api_key = encrypted
         elif provider == "openai":
             settings.api_keys.openai_api_key = encrypted
+        elif provider == "copilot":
+            settings.api_keys.copilot_github_token = encrypted
         else:
             raise ValueError(f"Unknown provider: {provider}")
 
@@ -220,12 +222,12 @@ class SettingsStore:
 
     def get_api_key(self, provider: str) -> str:
         """Get a decrypted API key for a provider.
-        
+
         Args:
-            provider: One of 'google', 'anthropic', 'openai'
-            
+            provider: One of 'google', 'anthropic', 'openai', 'copilot'
+
         Returns:
-            Decrypted API key or empty string
+            Decrypted API key / GitHub token, or empty string
         """
         settings = self.load()
 
@@ -236,11 +238,15 @@ class SettingsStore:
             encrypted = settings.api_keys.anthropic_api_key
         elif provider == "openai":
             encrypted = settings.api_keys.openai_api_key
+        elif provider == "copilot":
+            encrypted = settings.api_keys.copilot_github_token
 
         if not encrypted:
-            # Fallback to environment variable
-            env_var = f"{provider.upper()}_API_KEY"
-            return os.getenv(env_var, "")
+            # Fallback to environment variable (copilot has no env fallback)
+            if provider != "copilot":
+                env_var = f"{provider.upper()}_API_KEY"
+                return os.getenv(env_var, "")
+            return ""
 
         try:
             return decrypt_api_key(encrypted)
@@ -249,7 +255,7 @@ class SettingsStore:
 
     def get_masked_keys(self) -> dict[str, str]:
         """Get masked versions of all API keys for display.
-        
+
         Returns:
             Dict of provider -> masked key
         """
@@ -259,11 +265,12 @@ class SettingsStore:
             "google": mask_api_key(settings.api_keys.google_api_key),
             "anthropic": mask_api_key(settings.api_keys.anthropic_api_key),
             "openai": mask_api_key(settings.api_keys.openai_api_key),
+            "copilot": mask_api_key(settings.api_keys.copilot_github_token),
         }
 
     def get_configured_providers(self) -> dict[str, bool]:
         """Check which providers have API keys configured.
-        
+
         Returns:
             Dict of provider -> is_configured
         """
@@ -273,7 +280,19 @@ class SettingsStore:
             "google": is_key_configured(settings.api_keys.google_api_key) or bool(os.getenv("GOOGLE_API_KEY")),
             "anthropic": is_key_configured(settings.api_keys.anthropic_api_key) or bool(os.getenv("ANTHROPIC_API_KEY")),
             "openai": is_key_configured(settings.api_keys.openai_api_key) or bool(os.getenv("OPENAI_API_KEY")),
+            "copilot": is_key_configured(settings.api_keys.copilot_github_token),
         }
+
+    def set_copilot_models(self, models: list[dict]) -> None:
+        """Cache the model list fetched from the Copilot API.
+
+        Args:
+            models: List of model dicts with id, name, tier, description
+        """
+        settings = self.load()
+        settings.copilot_models = models
+        self.save()
+        self._settings = None
 
 
 # Global store instance

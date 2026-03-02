@@ -4,6 +4,7 @@ import os
 from enum import Enum
 
 from .anthropic_provider import AnthropicProvider
+from .copilot_provider import CopilotProvider
 from .google_provider import GoogleProvider
 from .openai_provider import OpenAIProvider
 from .provider import LLMProvider
@@ -14,6 +15,7 @@ class ProviderType(str, Enum):
     GOOGLE = "google"
     ANTHROPIC = "anthropic"
     OPENAI = "openai"
+    COPILOT = "copilot"
 
 
 class LLMManager:
@@ -45,6 +47,7 @@ class LLMManager:
         self._google_key = google_api_key or settings_keys.get("google", "") or os.getenv("GOOGLE_API_KEY", "")
         self._anthropic_key = anthropic_api_key or settings_keys.get("anthropic", "") or os.getenv("ANTHROPIC_API_KEY", "")
         self._openai_key = openai_api_key or settings_keys.get("openai", "") or os.getenv("OPENAI_API_KEY", "")
+        self._copilot_token = settings_keys.get("copilot", "")
 
         # Determine primary provider
         self._primary = self._resolve_primary(primary_provider)
@@ -61,6 +64,7 @@ class LLMManager:
                 "google": store.get_api_key("google"),
                 "anthropic": store.get_api_key("anthropic"),
                 "openai": store.get_api_key("openai"),
+                "copilot": store.get_api_key("copilot"),
             }
         except Exception:
             return {}
@@ -76,6 +80,8 @@ class LLMManager:
                 return "anthropic"
             elif requested == "openai" and self._openai_key:
                 return "openai"
+            elif requested == "copilot" and self._copilot_token:
+                return "copilot"
 
         # Check environment variable
         env_provider = os.getenv("LLM_PROVIDER", "").lower()
@@ -86,6 +92,8 @@ class LLMManager:
                 return "anthropic"
             elif env_provider == "openai" and self._openai_key:
                 return "openai"
+            elif env_provider == "copilot" and self._copilot_token:
+                return "copilot"
 
         # Auto-detect based on available keys (prefer Google for affordability)
         if self._google_key:
@@ -94,10 +102,12 @@ class LLMManager:
             return "anthropic"
         elif self._openai_key:
             return "openai"
+        elif self._copilot_token:
+            return "copilot"
 
         raise ValueError(
             "No LLM API keys configured. Set one of: "
-            "GOOGLE_API_KEY, ANTHROPIC_API_KEY, or OPENAI_API_KEY"
+            "GOOGLE_API_KEY, ANTHROPIC_API_KEY, OPENAI_API_KEY, or connect GitHub Copilot."
         )
 
     def get_provider(self, provider_name: str | None = None) -> LLMProvider:
@@ -136,6 +146,11 @@ class LLMManager:
                 raise ValueError("OpenAI API key not configured")
             return OpenAIProvider(api_key=self._openai_key)
 
+        elif name == "copilot":
+            if not self._copilot_token:
+                raise ValueError("GitHub Copilot not connected — complete the OAuth flow in Settings")
+            return CopilotProvider(github_token=self._copilot_token)
+
         else:
             raise ValueError(f"Unknown provider: {name}")
 
@@ -156,14 +171,14 @@ class LLMManager:
         store = get_settings_store()
         provider_name, model = store.get_agent_model(agent_name)
 
-        # Validate the provider has a key configured
-        if provider_name == "google" and not self._google_key:
-            provider_name = self._primary
-            model = self.get_provider(provider_name).get_fast_model()
-        elif provider_name == "anthropic" and not self._anthropic_key:
-            provider_name = self._primary
-            model = self.get_provider(provider_name).get_fast_model()
-        elif provider_name == "openai" and not self._openai_key:
+        # Validate the provider has a key configured; fall back to primary if not
+        key_map = {
+            "google": self._google_key,
+            "anthropic": self._anthropic_key,
+            "openai": self._openai_key,
+            "copilot": self._copilot_token,
+        }
+        if not key_map.get(provider_name):
             provider_name = self._primary
             model = self.get_provider(provider_name).get_fast_model()
 
@@ -201,6 +216,8 @@ class LLMManager:
             available.append("anthropic")
         if self._openai_key:
             available.append("openai")
+        if self._copilot_token:
+            available.append("copilot")
         return available
 
 

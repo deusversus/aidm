@@ -5,6 +5,9 @@
 apikeys_unencrypted
 .env
 settings.json
+# GitHub Copilot — any raw/unencrypted token dumps
+copilot_token*
+github_token*
 
 # === Virtual Environments ===
 venv/
@@ -38,6 +41,10 @@ data/
 log/
 backup/
 *.zip
+
+# === Scratch / temp files ===
+tmp_query.py
+pr_diff*.txt
 
 # === IDE & System ===
 .git/

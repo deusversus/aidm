@@ -95,6 +95,31 @@ const SettingsAPI = {
     async deleteKey(provider) {
         return apiRequest(`/settings/keys/${provider}`, { method: 'DELETE' });
     },
+
+    // ── GitHub Copilot OAuth ──────────────────────────────────────────────
+
+    /**
+     * Start the GitHub device OAuth flow.
+     * Returns { user_code, verification_uri, expires_in, interval }
+     */
+    async startCopilotAuth() {
+        return apiRequest('/settings/copilot/auth/start', { method: 'POST' });
+    },
+
+    /**
+     * Poll for OAuth completion.
+     * Returns { status: 'pending'|'complete'|'expired'|'error', message? }
+     */
+    async pollCopilotAuth() {
+        return apiRequest('/settings/copilot/auth/status');
+    },
+
+    /**
+     * Disconnect GitHub Copilot (clears stored token).
+     */
+    async disconnectCopilot() {
+        return apiRequest('/settings/copilot/auth', { method: 'DELETE' });
+    },
 };
 
 /**

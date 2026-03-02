@@ -1,8 +1,12 @@
 """Settings API routes."""
 
+import logging
+import time
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
+
+logger = logging.getLogger(__name__)
 
 from src.settings import (
     AgentSettings,
@@ -13,6 +17,14 @@ from src.settings import (
 from src.settings.defaults import get_available_models
 
 router = APIRouter()
+
+# GitHub Copilot OAuth device-flow constants
+_GITHUB_CLIENT_ID = "Iv1.b507a08c87ecfe98"  # VSCode Copilot extension client ID
+_GITHUB_DEVICE_CODE_URL = "https://github.com/login/device/code"
+_GITHUB_TOKEN_URL = "https://github.com/login/oauth/access_token"
+
+# In-memory auth state (fine for single-user local app)
+_copilot_auth_state: dict = {}
 
 
 class ModelInfo(BaseModel):
@@ -44,6 +56,7 @@ class APIKeysResponse(BaseModel):
     google: APIKeyStatus
     anthropic: APIKeyStatus
     openai: APIKeyStatus
+    copilot: APIKeyStatus
 
 
 @router.get("", response_model=UserSettings)
@@ -75,6 +88,14 @@ async def update_settings(settings: UserSettings):
         settings.api_keys.anthropic_api_key = current.api_keys.anthropic_api_key
     if not settings.api_keys.openai_api_key:
         settings.api_keys.openai_api_key = current.api_keys.openai_api_key
+    # Copilot token is never sent by the frontend — always preserve it
+    if not settings.api_keys.copilot_github_token:
+        settings.api_keys.copilot_github_token = current.api_keys.copilot_github_token
+
+    # Preserve the cached Copilot model list — it's populated by the background
+    # fetch after auth and should never be cleared by a plain settings save
+    if not settings.copilot_models and current.copilot_models:
+        settings.copilot_models = current.copilot_models
 
     # Preserve active session state — these are set by Session Zero / gameplay,
     # not by the settings UI. Without this, saving model config overwrites the
@@ -182,18 +203,19 @@ async def get_api_keys():
         google=APIKeyStatus(configured=configured["google"], masked=masked["google"]),
         anthropic=APIKeyStatus(configured=configured["anthropic"], masked=masked["anthropic"]),
         openai=APIKeyStatus(configured=configured["openai"], masked=masked["openai"]),
+        copilot=APIKeyStatus(configured=configured["copilot"], masked=masked["copilot"]),
     )
 
 
 @router.put("/keys/{provider}")
 async def set_api_key(provider: str, request: APIKeyRequest):
     """Set an API key for a provider.
-    
+
     Args:
         provider: One of 'google', 'anthropic', 'openai'
         request: The API key to set
     """
-    valid_providers = ["google", "anthropic", "openai"]
+    valid_providers = ["google", "anthropic", "openai"]  # copilot goes through /copilot/auth
     if provider not in valid_providers:
         raise HTTPException(
             status_code=400,
@@ -218,11 +240,11 @@ async def set_api_key(provider: str, request: APIKeyRequest):
 @router.delete("/keys/{provider}")
 async def delete_api_key(provider: str):
     """Remove an API key for a provider.
-    
+
     Args:
         provider: One of 'google', 'anthropic', 'openai'
     """
-    valid_providers = ["google", "anthropic", "openai"]
+    valid_providers = ["google", "anthropic", "openai"]  # copilot: use DELETE /copilot/auth
     if provider not in valid_providers:
         raise HTTPException(
             status_code=400,
@@ -316,3 +338,173 @@ async def validate_settings():
         warnings=warnings,
         configured_providers=configured
     )
+
+
+# ── GitHub Copilot OAuth device flow ─────────────────────────────────────────
+
+class CopilotAuthStartResponse(BaseModel):
+    """Response from the start-auth endpoint."""
+    user_code: str
+    verification_uri: str
+    expires_in: int
+    interval: int
+
+
+class CopilotAuthStatusResponse(BaseModel):
+    """Response from the poll-auth endpoint."""
+    status: str  # "pending" | "complete" | "expired" | "error" | "not_started"
+    message: str = ""
+    next_interval: int | None = None  # seconds — set when GitHub says slow_down
+
+
+@router.post("/copilot/auth/start", response_model=CopilotAuthStartResponse)
+async def start_copilot_auth():
+    """Initiate GitHub device OAuth flow for Copilot access.
+
+    Returns a one-time user_code + URL the user must visit to authorize.
+    Poll GET /copilot/auth/status until status == 'complete'.
+    """
+    import httpx
+
+    async with httpx.AsyncClient(timeout=15) as client:
+        resp = await client.post(
+            _GITHUB_DEVICE_CODE_URL,
+            data={"client_id": _GITHUB_CLIENT_ID, "scope": ""},
+            headers={"Accept": "application/json"},
+        )
+        if resp.status_code != 200:
+            raise HTTPException(status_code=502, detail=f"GitHub device flow failed: {resp.text}")
+        data = resp.json()
+
+    _copilot_auth_state.clear()
+    _copilot_auth_state.update({
+        "device_code": data["device_code"],
+        "interval": data.get("interval", 5),
+        "started_at": time.time(),
+        "expires_in": data.get("expires_in", 900),
+    })
+
+    return CopilotAuthStartResponse(
+        user_code=data["user_code"],
+        verification_uri=data.get("verification_uri", "https://github.com/login/device"),
+        expires_in=data.get("expires_in", 900),
+        interval=data.get("interval", 5),
+    )
+
+
+@router.get("/copilot/auth/status", response_model=CopilotAuthStatusResponse)
+async def poll_copilot_auth():
+    """Poll GitHub for Copilot OAuth completion.
+
+    Returns:
+        status = 'pending'   — user hasn't authorized yet, keep polling
+        status = 'complete'  — success, GitHub token stored, models cached
+        status = 'expired'   — code expired, restart the flow
+        status = 'error'     — unexpected error
+        status = 'not_started' — call /start first
+    """
+    device_code = _copilot_auth_state.get("device_code")
+    if not device_code:
+        return CopilotAuthStatusResponse(status="not_started")
+
+    # Check expiry
+    started_at = _copilot_auth_state.get("started_at", 0)
+    expires_in = _copilot_auth_state.get("expires_in", 900)
+    if time.time() - started_at > expires_in:
+        _copilot_auth_state.clear()
+        return CopilotAuthStatusResponse(status="expired", message="Authorization code expired. Please start over.")
+
+    import httpx
+
+    async with httpx.AsyncClient(timeout=15) as client:
+        resp = await client.post(
+            _GITHUB_TOKEN_URL,
+            data={
+                "client_id": _GITHUB_CLIENT_ID,
+                "device_code": device_code,
+                "grant_type": "urn:ietf:params:oauth:grant-type:device_code",
+            },
+            headers={"Accept": "application/json"},
+        )
+        if resp.status_code != 200:
+            return CopilotAuthStatusResponse(status="error", message=f"GitHub error: {resp.text}")
+        data = resp.json()
+
+    error = data.get("error", "")
+    logger.info(f"[copilot] Poll response: status={resp.status_code} error={error!r} keys={list(data.keys())}")
+    if error == "authorization_pending":
+        return CopilotAuthStatusResponse(status="pending")
+    if error == "slow_down":
+        # GitHub requires us to back off — return the new interval so the
+        # frontend can slow its polling rate accordingly
+        new_interval = data.get("interval", 10)
+        logger.info(f"[copilot] slow_down received — new interval: {new_interval}s")
+        return CopilotAuthStatusResponse(status="pending", next_interval=new_interval)
+    if error == "expired_token":
+        _copilot_auth_state.clear()
+        return CopilotAuthStatusResponse(status="expired", message="Authorization code expired. Please start over.")
+    if error:
+        return CopilotAuthStatusResponse(
+            status="error",
+            message=data.get("error_description", error)
+        )
+
+    # Success — we have a GitHub OAuth token
+    github_token = data.get("access_token", "")
+    if not github_token:
+        return CopilotAuthStatusResponse(status="error", message="No access token in GitHub response.")
+
+    logger.info("[copilot] OAuth complete — storing token")
+
+    # Persist the token (encrypted) and clear auth state immediately
+    store = get_settings_store()
+    store.set_api_key("copilot", github_token)
+    _copilot_auth_state.clear()
+
+    # Reset LLM manager + agents so they pick up the new provider right away
+    from src.llm import reset_llm_manager
+    reset_llm_manager()
+    from api.routes.game import reset_orchestrator, reset_session_zero_agent
+    reset_session_zero_agent()
+    reset_orchestrator()
+
+    # Kick off model-list fetch in the background — do NOT block auth completion.
+    # fetch_models() makes two outbound HTTP calls that can be slow; if we await
+    # them here the frontend poll never gets a "complete" response.
+    import asyncio
+    from src.llm.copilot_provider import CopilotProvider
+
+    async def _bg_fetch():
+        try:
+            loop = asyncio.get_running_loop()
+            models = await asyncio.wait_for(
+                loop.run_in_executor(None, lambda: CopilotProvider.fetch_models(github_token)),
+                timeout=20.0,
+            )
+            if models:
+                store.set_copilot_models(models)
+                logger.info(f"[copilot] Cached {len(models)} models from API")
+        except Exception as exc:
+            logger.warning(f"[copilot] Background model fetch failed (non-fatal): {exc}")
+
+    asyncio.create_task(_bg_fetch())
+
+    return CopilotAuthStatusResponse(status="complete")
+
+
+@router.delete("/copilot/auth", response_model=CopilotAuthStatusResponse)
+async def disconnect_copilot():
+    """Disconnect GitHub Copilot — clears the stored token."""
+    _copilot_auth_state.clear()
+
+    store = get_settings_store()
+    store.set_api_key("copilot", "")
+    store.set_copilot_models([])
+
+    from src.llm import reset_llm_manager
+    reset_llm_manager()
+    from api.routes.game import reset_orchestrator, reset_session_zero_agent
+    reset_session_zero_agent()
+    reset_orchestrator()
+
+    return CopilotAuthStatusResponse(status="ok")

@@ -3,6 +3,33 @@
 
 from .models import AgentSettings, ModelConfig, UserSettings
 
+# Fallback Copilot models shown before the real list is fetched from the API.
+# After connecting, get_available_models() replaces this with the live list from GitHub.
+# Based on GitHub Copilot supported models documentation (2025).
+COPILOT_FALLBACK_MODELS: list[dict[str, str]] = [
+    # OpenAI — fast tier
+    {"id": "gpt-4o-mini", "name": "GPT-4o Mini", "tier": "fast", "description": "Fast, affordable chat model via Copilot"},
+    {"id": "gpt-4.1-mini", "name": "GPT-4.1 Mini", "tier": "fast", "description": "Compact GPT-4.1 via Copilot"},
+    # OpenAI — creative tier
+    {"id": "gpt-4o", "name": "GPT-4o", "tier": "creative", "description": "Multimodal GPT-4o via Copilot"},
+    {"id": "gpt-4.1", "name": "GPT-4.1", "tier": "creative", "description": "Latest GPT-4.1 via Copilot"},
+    # OpenAI — reasoning tier
+    {"id": "o3-mini", "name": "o3-mini", "tier": "thinking", "description": "Compact reasoning model via Copilot"},
+    {"id": "o4-mini", "name": "o4-mini", "tier": "thinking", "description": "Fast reasoning model via Copilot"},
+    # Anthropic — creative tier
+    {"id": "claude-sonnet-4-5", "name": "Claude Sonnet 4.5", "tier": "creative", "description": "Anthropic Claude Sonnet 4.5 via Copilot"},
+    {"id": "claude-sonnet-4-6", "name": "Claude Sonnet 4.6", "tier": "creative", "description": "Anthropic Claude Sonnet 4.6 via Copilot"},
+    # Anthropic — premium tier
+    {"id": "claude-opus-4-5", "name": "Claude Opus 4.5", "tier": "premium", "description": "Anthropic Claude Opus 4.5 via Copilot"},
+    {"id": "claude-opus-4-6", "name": "Claude Opus 4.6", "tier": "premium", "description": "Anthropic Claude Opus 4.6 via Copilot"},
+    # Google — fast tier
+    {"id": "gemini-2.0-flash", "name": "Gemini 2.0 Flash", "tier": "fast", "description": "Google Gemini 2.0 Flash via Copilot"},
+    {"id": "gemini-3-flash-preview", "name": "Gemini 3 Flash", "tier": "fast", "description": "Google Gemini 3 Flash (preview) via Copilot"},
+    # Google — creative tier
+    {"id": "gemini-2.5-pro", "name": "Gemini 2.5 Pro", "tier": "creative", "description": "Google Gemini 2.5 Pro via Copilot"},
+    {"id": "gemini-3-pro-preview", "name": "Gemini 3 Pro", "tier": "creative", "description": "Google Gemini 3 Pro (preview) via Copilot"},
+]
+
 # Available models per provider (December 2025)
 AVAILABLE_MODELS: dict[str, list[dict[str, str]]] = {
     "google": [
@@ -27,16 +54,33 @@ AVAILABLE_MODELS: dict[str, list[dict[str, str]]] = {
 
 def get_available_models(provider: str = None) -> dict[str, list[dict[str, str]]]:
     """Get available models, optionally filtered by provider.
-    
+
+    For the 'copilot' provider, merges the live cached model list (from the
+    settings store) over the static fallback, so the frontend always sees the
+    user's actual Copilot subscription models after they connect.
+
     Args:
         provider: Optional provider to filter by
-        
+
     Returns:
         Dict of provider -> list of model info
     """
+    # Build full model map with dynamic copilot list if available
+    models = dict(AVAILABLE_MODELS)
+
+    try:
+        from .store import get_settings_store
+        settings = get_settings_store().load()
+        if settings.copilot_models:
+            models["copilot"] = settings.copilot_models
+        else:
+            models["copilot"] = COPILOT_FALLBACK_MODELS
+    except Exception:
+        models["copilot"] = COPILOT_FALLBACK_MODELS
+
     if provider:
-        return {provider: AVAILABLE_MODELS.get(provider, [])}
-    return AVAILABLE_MODELS
+        return {provider: models.get(provider, [])}
+    return models
 
 
 def get_default_fast_model(provider: str) -> str:

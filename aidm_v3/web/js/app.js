@@ -736,6 +736,27 @@ async function loadApiKeys() {
                 masked.textContent = '';
             }
         });
+
+        // Copilot connection status
+        const copilotStatus = keys.copilot;
+        if (copilotStatus) {
+            const badge = document.getElementById('copilot-status');
+            const masked = document.getElementById('copilot-masked');
+            const connectBtn = document.getElementById('copilot-connect-btn');
+            const disconnectBtn = document.getElementById('copilot-disconnect-btn');
+
+            if (copilotStatus.configured) {
+                if (badge) { badge.textContent = 'Connected'; badge.classList.add('configured'); }
+                if (masked) masked.textContent = copilotStatus.masked;
+                if (connectBtn) connectBtn.style.display = 'none';
+                if (disconnectBtn) disconnectBtn.style.display = '';
+            } else {
+                if (badge) { badge.textContent = 'Not connected'; badge.classList.remove('configured'); }
+                if (masked) masked.textContent = '';
+                if (connectBtn) connectBtn.style.display = '';
+                if (disconnectBtn) disconnectBtn.style.display = 'none';
+            }
+        }
     } catch (error) {
         console.error('Failed to load API keys:', error);
     }
@@ -744,6 +765,109 @@ async function loadApiKeys() {
 /**
  * Check for provider misconfigurations and display warnings
  */
+// ── GitHub Copilot OAuth ──────────────────────────────────────────────────────
+
+let _copilotPollTimer = null;
+let _copilotPollIntervalMs = 5000;  // tracks current poll interval, grows on slow_down
+
+/**
+ * Start the GitHub Copilot device OAuth flow and show the auth modal.
+ */
+async function connectCopilot() {
+    const connectBtn = document.getElementById('copilot-connect-btn');
+    if (connectBtn) { connectBtn.disabled = true; connectBtn.textContent = '⏳ Starting...'; }
+
+    try {
+        const data = await API.Settings.startCopilotAuth();
+
+        // Fill the modal
+        const modal = document.getElementById('copilot-auth-modal');
+        const codeEl = document.getElementById('copilot-user-code');
+        const urlEl = document.getElementById('copilot-verify-url');
+        const msgEl = document.getElementById('copilot-auth-msg');
+
+        if (codeEl) codeEl.textContent = data.user_code;
+        if (urlEl) { urlEl.href = data.verification_uri; urlEl.textContent = data.verification_uri.replace('https://', ''); }
+        if (msgEl) msgEl.textContent = 'Waiting for authorization...';
+        if (modal) { modal.style.display = 'flex'; }
+
+        // Use recursive setTimeout instead of setInterval so polls never overlap.
+        // GitHub's device flow spec requires waiting for each response before
+        // sending the next request — concurrent polls trigger slow_down errors.
+        _copilotPollIntervalMs = Math.max((data.interval || 5) * 1000, 5000);
+        _copilotPollTimer = setTimeout(_pollCopilotAuth, _copilotPollIntervalMs);
+
+    } catch (err) {
+        showStatus(`Copilot auth error: ${err.message}`, 'error');
+    } finally {
+        if (connectBtn) { connectBtn.disabled = false; connectBtn.textContent = '🔗 Connect with GitHub'; }
+    }
+}
+
+async function _pollCopilotAuth() {
+    _copilotPollTimer = null;  // timer has fired; we own control now
+    try {
+        const result = await API.Settings.pollCopilotAuth();
+
+        if (result.status === 'pending') {
+            // Honor GitHub's slow_down interval if the server relayed one
+            if (result.next_interval) {
+                _copilotPollIntervalMs = result.next_interval * 1000;
+            }
+            // Schedule next poll only AFTER this one is fully done (no overlap)
+            _copilotPollTimer = setTimeout(_pollCopilotAuth, _copilotPollIntervalMs);
+            return;
+        }
+
+        // Done (complete / expired / error) — timer not rescheduled, modal closes
+        const modal = document.getElementById('copilot-auth-modal');
+        if (modal) modal.style.display = 'none';
+
+        if (result.status === 'complete') {
+            await loadApiKeys();
+            await loadSettings();
+            showStatus('GitHub Copilot connected! Fetching available models...', 'success');
+            // Background model fetch on the server takes ~5-15 s; refresh once more
+            // so the dropdowns show the live model list without a manual page reload.
+            setTimeout(async () => {
+                await loadSettings();
+                showStatus('GitHub Copilot connected!', 'success');
+            }, 12000);
+        } else {
+            showStatus(`Copilot auth failed: ${result.message || result.status}`, 'error');
+        }
+    } catch (err) {
+        const modal = document.getElementById('copilot-auth-modal');
+        if (modal) modal.style.display = 'none';
+        showStatus(`Copilot polling error: ${err.message}`, 'error');
+    }
+}
+
+/**
+ * Cancel the in-progress Copilot auth modal without disconnecting.
+ */
+function cancelCopilotAuth() {
+    if (_copilotPollTimer) { clearTimeout(_copilotPollTimer); _copilotPollTimer = null; }
+    const modal = document.getElementById('copilot-auth-modal');
+    if (modal) modal.style.display = 'none';
+}
+
+/**
+ * Disconnect GitHub Copilot.
+ */
+async function disconnectCopilot() {
+    if (!confirm('Disconnect GitHub Copilot? You can reconnect at any time.')) return;
+    try {
+        await API.Settings.disconnectCopilot();
+        await loadApiKeys();
+        showStatus('GitHub Copilot disconnected.', 'success');
+    } catch (err) {
+        showStatus(`Error: ${err.message}`, 'error');
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 async function checkProviderWarnings() {
     try {
         const response = await fetch('/api/settings/validate');

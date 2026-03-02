@@ -40,31 +40,39 @@ def kill_all_python_processes(skip_pids=None):
     killed = 0
 
     try:
-        # Use tasklist to find all python.exe processes
+        # Use PowerShell to check command lines and selectively kill our apps
+        import csv
+        import io
+        ps_cmd = (
+            "Get-CimInstance Win32_Process -Filter \"Name='python.exe'\" | "
+            "Select-Object ProcessId, CommandLine | ConvertTo-Csv -NoTypeInformation"
+        )
         result = subprocess.run(
-            ['tasklist', '/FI', 'IMAGENAME eq python.exe', '/FO', 'CSV', '/NH'],
+            ['powershell', '-NoProfile', '-Command', ps_cmd],
             capture_output=True, text=True
         )
-        for line in result.stdout.strip().split('\n'):
-            if line and 'python.exe' in line.lower():
+        
+        reader = csv.reader(io.StringIO(result.stdout.strip()))
+        for row in reader:
+            if len(row) >= 2 and row[0].strip() != "ProcessId":
                 try:
-                    # Parse CSV: "python.exe","PID","..."
-                    parts = line.split(',')
-                    if len(parts) >= 2:
-                        pid = int(parts[1].strip('"'))
-                        if pid not in protected_pids:
-                            print(f"[run_server] Killing Python process (PID {pid})")
-                            os.kill(pid, signal.SIGTERM)
-                            killed += 1
+                    pid = int(row[0])
+                    cmdline = row[1].lower() if row[1] else ""
+                    
+                    # Target ONLY uvicorn or script instances that might lock ports/files
+                    if pid not in protected_pids and ("uvicorn" in cmdline or "run_server" in cmdline):
+                        print(f"[run_server] Killing application process (PID {pid})")
+                        os.kill(pid, signal.SIGTERM)
+                        killed += 1
                 except (ValueError, OSError, IndexError):
                     pass
     except Exception as e:
-        print(f"[run_server] Warning: Could not kill processes: {e}")
+        print(f"[run_server] Warning: Could not selectively kill processes: {e}")
 
     if killed > 0:
-        print(f"[run_server] Killed {killed} Python process(es)")
+        print(f"[run_server] Killed {killed} application process(es)")
     else:
-        print("[run_server] No stale Python processes found")
+        print("[run_server] No stale application processes found")
 
 # Kill all Python processes for clean slate
 kill_all_python_processes()
