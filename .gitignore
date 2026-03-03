@@ -4,6 +4,7 @@
 # === SENSITIVE FILES (NEVER COMMIT) ===
 apikeys_unencrypted
 .env
+!.env.example
 settings.json
 # GitHub Copilot — any raw/unencrypted token dumps
 copilot_token*
@@ -53,3 +54,10 @@ pr_diff*.txt
 *.swo
 Thumbs.db
 .DS_Store
+
+# === Agent & CI (local-only) ===
+.agent/
+.github/
+
+# === Generated profiles (auto-regenerated from DB) ===
+src/profiles/catalog/*.yaml

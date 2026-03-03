@@ -606,6 +606,22 @@ function setupSettingsPage() {
             }
         });
     }
+
+    // Media generation toggle - auto-save on change
+    const mediaEnabledToggle = document.getElementById('media-enabled-toggle');
+    if (mediaEnabledToggle) {
+        mediaEnabledToggle.addEventListener('change', async () => {
+            try {
+                const settings = await API.Settings.get();
+                settings.media_enabled = mediaEnabledToggle.checked;
+                await API.Settings.update(settings);
+                showStatus(`Media generation ${mediaEnabledToggle.checked ? 'enabled' : 'disabled'}`, 'success');
+            } catch (error) {
+                showStatus(`Error: ${error.message}`, 'error');
+                mediaEnabledToggle.checked = !mediaEnabledToggle.checked;
+            }
+        });
+    }
 }
 
 /**
