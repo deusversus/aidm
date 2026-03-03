@@ -28,11 +28,13 @@ COPY requirements.txt .
 COPY run_server.py .
 COPY settings.json .
 COPY .env.example .env.example
+COPY entrypoint.sh .
+RUN chmod +x entrypoint.sh
 
 # Create data directory for ChromaDB + media
 RUN mkdir -p data
 
 EXPOSE 8000
 
-# Run with uvicorn directly (run_server.py wraps this for Windows)
-CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# entrypoint.sh runs `alembic upgrade head` then starts uvicorn
+CMD ["./entrypoint.sh"]

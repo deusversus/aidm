@@ -32,6 +32,8 @@ services:
       - ./data/media:/app/data/media
       - ./data/chroma:/app/data/chroma
       - ./src/profiles/catalog:/app/src/profiles/catalog
+      # Persist settings (API keys, model config) across image rebuilds
+      - ./settings.json:/app/settings.json
 
 volumes:
   pgdata:

@@ -34,28 +34,58 @@ The memory architecture reinforces this — a **three-tier system** (working mem
 
 ## Quick Start
 
+### Docker (recommended — includes PostgreSQL automatically)
+
 ```bash
-# 1. Create virtual environment (Python 3.13+)
-python -m venv venv313
-.\venv313\Scripts\activate      # Windows
-# source venv313/bin/activate   # Linux/Mac
+# 1. Clone and enter the repo
+git clone https://github.com/deusversus/aidm.git
+cd aidm/aidm_v3
+
+# 2. Create your .env from the example
+cp .env.example .env
+# Edit .env and add at least one API key:
+#   GOOGLE_API_KEY=...
+#   ANTHROPIC_API_KEY=...
+#   OPENAI_API_KEY=...
+
+# 3. Start everything (PostgreSQL + AIDM, migrations run automatically)
+docker-compose up --build
+```
+
+Open **http://localhost:8000**. PostgreSQL data persists in the `pgdata` Docker volume. Generated media and ChromaDB vectors are mounted at `./data/` on the host so they survive image rebuilds. Settings (API keys, model config) persist via the `settings.json` bind-mount.
+
+> On subsequent starts you can omit `--build`: `docker-compose up`
+
+---
+
+### Local Development (Windows / Linux / Mac)
+
+```bash
+# 1. Python 3.13+ virtual environment
+python -m venv venv
+.\venv\Scripts\activate        # Windows
+# source venv/bin/activate     # Linux/Mac
 
 # 2. Install dependencies
 pip install -r requirements.txt
 
 # 3. Configure API keys
-# Create a .env file with your provider keys:
-#   GOOGLE_API_KEY=...
-#   ANTHROPIC_API_KEY=...
-#   OPENAI_API_KEY=...
+cp .env.example .env
+# Edit .env with your provider keys
 
-# 4. Run the server
-python run_server.py
+# 4. Run database migrations (first time only)
+alembic upgrade head
+
+# 5. Start the server
+python run_server.py           # Windows (auto-venv, hot-reload)
+# uvicorn api.main:app --reload --host 0.0.0.0 --port 8000  # Linux/Mac
 ```
 
 Open **http://localhost:8000** for the web interface. Server logs are written to `server.log`.
 
-> `run_server.py` auto-detects the venv, kills stale processes, and launches uvicorn with hot-reload and UTF-8 encoding.
+> **Database**: By default connects to PostgreSQL at `postgresql://aidm:aidm@localhost:5432/aidm`. For quick local testing without Postgres, set `DATABASE_URL=sqlite:///aidm_v3.db` in your `.env`.
+
+> **API Keys**: After first launch, enter keys via the Settings page in the UI — they're stored encrypted in `settings.json`. The `.env` file is an alternative for Docker/CI use.
 
 ---
 
