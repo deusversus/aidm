@@ -78,32 +78,39 @@ Provider is auto-detected from available API keys, or set explicitly with `LLM_P
 ```
 Player Input
     ↓
-[Meta/Override intercept] ─────────────────────────────► Meta dialogue / Override response (early exit)
+[Meta/Override intercept]
+    │ matched → Meta dialogue / Override (early exit)
     ↓
-Intent Classifier         → Parse action into structured intent
+Intent Classifier
+    → Parse action into structured intent
     ↓
-[World Building branch] ──────────────────────────────── World Builder validates entities → early exit if rejected
+[World Building branch]
+    │ matched → World Builder validates entities
+    │           early exit if rejected/needs clarification
     ↓
-RAG Retrieval             → Context Selector fetches relevant memories
+RAG Retrieval
+    → Context Selector fetches relevant memories
     ↓
-┌─────────────────────────────────────────────────────┐
-│  PARALLEL                                           │
-│  Outcome Judge    → Success/failure + narrative weight  │
-│  Memory Ranker    → Rank retrieved memories         │
-│  Pacing Agent     → Arc tension directive           │
-└─────────────────────────────────────────────────────┘
+┌── PARALLEL ──────────────────────────────┐
+│ Outcome Judge   → success/failure        │
+│ Memory Ranker   → rank memories          │
+│ Pacing Agent    → arc tension directive  │
+└──────────────────────────────────────────┘
     ↓
-[Combat branch]  ─────────────────────────────────────── Combat Agent resolves D20 mechanics
+[Combat branch]
+    │ matched → Combat Agent resolves D20 mechanics
+    │           Scale Selector for power imbalance
     ↓
-[Scale Selector] ─────────────────────────────────────── Power imbalance calculation (combat only)
+Key Animator
+    → Narrative prose
+      (foreshadowing callbacks, NPC cards, rule guidance)
     ↓
-Key Animator              → Generate narrative prose (with foreshadowing callbacks, NPC cards, rule guidance)
-    ↓
-State Update              → Persist to PostgreSQL
+State Update → Persist to PostgreSQL
     ↓
 Response to Player
-    ↓ (async, non-blocking)
-Background Pipeline       → Director planning, Production agent, memory updates, media generation
+    ↓ async / non-blocking
+Background Pipeline
+    → Director, Production, memory updates, media gen
 ```
 
 ### Agent Roster
