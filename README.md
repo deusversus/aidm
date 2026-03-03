@@ -78,17 +78,32 @@ Provider is auto-detected from available API keys, or set explicitly with `LLM_P
 ```
 Player Input
     ↓
-Intent Classifier     → Parse action into structured intent
+[Meta/Override intercept] ─────────────────────────────► Meta dialogue / Override response (early exit)
     ↓
-Outcome Judge         → Determine success/failure + narrative weight
+Intent Classifier         → Parse action into structured intent
     ↓
-Key Animator          → Generate narrative prose
+[World Building branch] ──────────────────────────────── World Builder validates entities → early exit if rejected
     ↓
-State Update          → Persist to PostgreSQL
+RAG Retrieval             → Context Selector fetches relevant memories
     ↓
-Background Pipeline   → Director, foreshadowing, media generation (async)
+┌─────────────────────────────────────────────────────┐
+│  PARALLEL                                           │
+│  Outcome Judge    → Success/failure + narrative weight  │
+│  Memory Ranker    → Rank retrieved memories         │
+│  Pacing Agent     → Arc tension directive           │
+└─────────────────────────────────────────────────────┘
+    ↓
+[Combat branch]  ─────────────────────────────────────── Combat Agent resolves D20 mechanics
+    ↓
+[Scale Selector] ─────────────────────────────────────── Power imbalance calculation (combat only)
+    ↓
+Key Animator              → Generate narrative prose (with foreshadowing callbacks, NPC cards, rule guidance)
+    ↓
+State Update              → Persist to PostgreSQL
     ↓
 Response to Player
+    ↓ (async, non-blocking)
+Background Pipeline       → Director planning, Production agent, memory updates, media generation
 ```
 
 ### Agent Roster
