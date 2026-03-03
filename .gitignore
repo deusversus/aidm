@@ -58,6 +58,7 @@ Thumbs.db
 # === Agent & CI (local-only) ===
 .agent/
 .github/
+.claude/
 
 # === Generated profiles (auto-regenerated from DB) ===
 src/profiles/catalog/*.yaml
