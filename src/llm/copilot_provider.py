@@ -86,7 +86,13 @@ class CopilotProvider(OpenAIProvider):
             or time.time() >= self._token_expires_at - 60  # 60 s buffer
         )
         if needs_refresh:
-            self._refresh_copilot_token()
+            try:
+                self._refresh_copilot_token()
+            except Exception:
+                # Ensure stale client is discarded — never let an expired/invalid
+                # session token remain in use after a failed refresh.
+                self._client = None
+                raise
             self._client = None  # force client reinit with new token
 
         if self._client is None:
@@ -94,6 +100,29 @@ class CopilotProvider(OpenAIProvider):
 
     def _refresh_copilot_token(self):
         """Synchronously exchange the GitHub OAuth token for a Copilot session token."""
+        # Proactive check: if we know the GitHub OAuth token has expired, raise
+        # immediately with an actionable message instead of hitting the API.
+        try:
+            from ..settings import get_settings_store
+            store = get_settings_store()
+            token_expires_at = store.get_copilot_token_expiry()
+            if token_expires_at > 0:
+                remaining = token_expires_at - time.time()
+                if remaining <= 0:
+                    raise RuntimeError(
+                        "GitHub authorization has expired — please reconnect "
+                        "GitHub Copilot in Settings."
+                    )
+                if remaining < 1800:  # < 30 minutes
+                    logger.warning(
+                        f"[copilot] GitHub OAuth token expires in {remaining/60:.0f} min — "
+                        "reconnect soon via Settings → GitHub Copilot"
+                    )
+        except RuntimeError:
+            raise
+        except Exception:
+            pass  # don't let settings access failure block the refresh attempt
+
         req = urllib.request.Request(
             _COPILOT_TOKEN_URL,
             headers={
@@ -107,6 +136,11 @@ class CopilotProvider(OpenAIProvider):
             with urllib.request.urlopen(req, timeout=10) as response:
                 data = json.loads(response.read())
         except urllib.error.HTTPError as exc:
+            if exc.code == 401:
+                raise RuntimeError(
+                    "GitHub authorization has expired — please reconnect "
+                    "GitHub Copilot in Settings."
+                ) from exc
             raise RuntimeError(
                 f"Failed to obtain Copilot session token (HTTP {exc.code}). "
                 "Check that your GitHub Copilot subscription is active."

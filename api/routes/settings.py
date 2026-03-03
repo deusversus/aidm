@@ -459,6 +459,18 @@ async def poll_copilot_auth():
     # Persist the token (encrypted) and clear auth state immediately
     store = get_settings_store()
     store.set_api_key("copilot", github_token)
+
+    # Store expiry time so we can warn the user before it expires.
+    # expires_in is seconds until the GitHub OAuth token expires.
+    # 0 / absent means GitHub issued a non-expiring token (classic OAuth Apps).
+    expires_in = data.get("expires_in", 0)
+    expires_at = (time.time() + expires_in) if expires_in else 0.0
+    store.set_copilot_token_expiry(expires_at)
+    if expires_in:
+        logger.info(f"[copilot] GitHub OAuth token expires in {expires_in}s ({expires_in/3600:.1f}h)")
+    else:
+        logger.info("[copilot] GitHub OAuth token is non-expiring")
+
     _copilot_auth_state.clear()
 
     # Reset LLM manager + agents so they pick up the new provider right away
@@ -492,6 +504,45 @@ async def poll_copilot_auth():
     return CopilotAuthStatusResponse(status="complete")
 
 
+class CopilotStatusResponse(BaseModel):
+    """Copilot connection health."""
+    configured: bool
+    expires_at: float  # 0 = non-expiring / unknown
+    remaining_seconds: float | None  # None if no expiry stored
+    is_expired: bool
+    is_expiring_soon: bool  # < 2 hours remaining
+
+
+@router.get("/copilot/status", response_model=CopilotStatusResponse)
+async def get_copilot_status():
+    """Return GitHub Copilot connection health including OAuth token expiry.
+
+    Clients can poll this (e.g. on settings-page open) to show a proactive
+    re-auth warning before the token expires mid-session.
+    """
+    store = get_settings_store()
+    is_configured = store.get_configured_providers().get("copilot", False)
+    expires_at = store.get_copilot_token_expiry()
+
+    now = time.time()
+    if expires_at > 0:
+        remaining = expires_at - now
+        is_expired = remaining <= 0
+        is_expiring_soon = not is_expired and remaining < 7200  # warn < 2h
+    else:
+        remaining = None
+        is_expired = False
+        is_expiring_soon = False
+
+    return CopilotStatusResponse(
+        configured=is_configured,
+        expires_at=expires_at,
+        remaining_seconds=remaining,
+        is_expired=is_expired,
+        is_expiring_soon=is_expiring_soon,
+    )
+
+
 @router.delete("/copilot/auth", response_model=CopilotAuthStatusResponse)
 async def disconnect_copilot():
     """Disconnect GitHub Copilot — clears the stored token."""
@@ -500,6 +551,7 @@ async def disconnect_copilot():
     store = get_settings_store()
     store.set_api_key("copilot", "")
     store.set_copilot_models([])
+    store.set_copilot_token_expiry(0.0)
 
     from src.llm import reset_llm_manager
     reset_llm_manager()

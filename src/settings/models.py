@@ -182,6 +182,10 @@ class APIKeySettings(BaseModel):
         default="",
         description="GitHub OAuth token for Copilot access (stored encrypted)"
     )
+    copilot_github_token_expires_at: float = Field(
+        default=0.0,
+        description="Unix timestamp when the GitHub OAuth token expires (0 = unknown/non-expiring)"
+    )
 
 
 class UserSettings(BaseModel):

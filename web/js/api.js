@@ -120,6 +120,14 @@ const SettingsAPI = {
     async disconnectCopilot() {
         return apiRequest('/settings/copilot/auth', { method: 'DELETE' });
     },
+
+    /**
+     * Get Copilot connection health (token expiry info).
+     * Returns { configured, expires_at, remaining_seconds, is_expired, is_expiring_soon }
+     */
+    async copilotStatus() {
+        return apiRequest('/settings/copilot/status');
+    },
 };
 
 /**

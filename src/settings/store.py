@@ -283,6 +283,26 @@ class SettingsStore:
             "copilot": is_key_configured(settings.api_keys.copilot_github_token),
         }
 
+    def set_copilot_token_expiry(self, expires_at: float) -> None:
+        """Store when the GitHub OAuth token expires.
+
+        Args:
+            expires_at: Unix timestamp when token expires (0 = non-expiring / unknown)
+        """
+        settings = self.load()
+        settings.api_keys.copilot_github_token_expires_at = expires_at
+        self.save()
+        self._settings = None
+
+    def get_copilot_token_expiry(self) -> float:
+        """Get the GitHub OAuth token expiry timestamp.
+
+        Returns:
+            Unix timestamp, or 0.0 if unknown/non-expiring
+        """
+        settings = self.load()
+        return settings.api_keys.copilot_github_token_expires_at
+
     def set_copilot_models(self, models: list[dict]) -> None:
         """Cache the model list fetched from the Copilot API.
 

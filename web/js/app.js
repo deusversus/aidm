@@ -760,17 +760,37 @@ async function loadApiKeys() {
             const masked = document.getElementById('copilot-masked');
             const connectBtn = document.getElementById('copilot-connect-btn');
             const disconnectBtn = document.getElementById('copilot-disconnect-btn');
+            const expiryWarning = document.getElementById('copilot-expiry-warning');
 
             if (copilotStatus.configured) {
                 if (badge) { badge.textContent = 'Connected'; badge.classList.add('configured'); }
                 if (masked) masked.textContent = copilotStatus.masked;
                 if (connectBtn) connectBtn.style.display = 'none';
                 if (disconnectBtn) disconnectBtn.style.display = '';
+
+                // Check token expiry and show proactive warning if needed
+                try {
+                    const health = await API.Settings.copilotStatus();
+                    if (expiryWarning) {
+                        if (health.is_expired) {
+                            expiryWarning.textContent = 'GitHub authorization has expired — please reconnect.';
+                            expiryWarning.style.display = '';
+                            if (badge) { badge.textContent = 'Expired'; badge.classList.remove('configured'); }
+                        } else if (health.is_expiring_soon) {
+                            const mins = Math.round(health.remaining_seconds / 60);
+                            expiryWarning.textContent = `GitHub authorization expires in ~${mins} min — reconnect soon to avoid interruption.`;
+                            expiryWarning.style.display = '';
+                        } else {
+                            expiryWarning.style.display = 'none';
+                        }
+                    }
+                } catch (_) { /* non-fatal */ }
             } else {
                 if (badge) { badge.textContent = 'Not connected'; badge.classList.remove('configured'); }
                 if (masked) masked.textContent = '';
                 if (connectBtn) connectBtn.style.display = '';
                 if (disconnectBtn) disconnectBtn.style.display = 'none';
+                if (expiryWarning) expiryWarning.style.display = 'none';
             }
         }
     } catch (error) {
