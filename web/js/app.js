@@ -155,7 +155,19 @@ async function startSessionZero() {
         }
     }
 
-    // No saved session or resume failed - start fresh
+    // No saved session or resume failed - check server for latest session before starting fresh
+    try {
+        const latest = await API.Game.getLatestSession();
+        if (latest && latest.session_id) {
+            console.log('[Session] Found latest session on server, resuming:', latest.session_id);
+            localStorage.setItem('aidm_session_id', latest.session_id);
+            API.Game.currentSessionId = latest.session_id;
+            return startSessionZero();
+        }
+    } catch (e) {
+        console.log('[Session] No latest session found, starting fresh:', e.message);
+    }
+
     display.innerHTML = `
         <div class="welcome-message">
             <h2>⏳ Starting Session Zero...</h2>
@@ -293,8 +305,14 @@ async function handlePlayerAction() {
                 console.log('[App] No research_task_id in response:', result.research_task_id);
             }
 
-            // Add AI response
-            addNarrativeEntry(result.response, false);
+            // Check if we've transitioned to gameplay
+            console.log('[Handoff] Checking transition - phase:', result.phase, 'ready_for_gameplay:', result.ready_for_gameplay);
+            const isHandoff = (result.phase || '').toLowerCase() === 'gameplay' || result.ready_for_gameplay;
+
+            // Show closing message only if this is NOT a handoff (on handoff, opening scene replaces it)
+            if (!isHandoff) {
+                addNarrativeEntry(result.response, false);
+            }
 
             // Update context panel with phase
             const ctxArcTurn = document.getElementById('ctx-arc');
@@ -306,14 +324,18 @@ async function handlePlayerAction() {
                 if (profileEl) profileEl.textContent = result.character_draft.media_reference;
             }
 
-            // Check if we've transitioned to gameplay
-            console.log('[Handoff] Checking transition - phase:', result.phase, 'ready_for_gameplay:', result.ready_for_gameplay);
-            if ((result.phase || '').toLowerCase() === 'gameplay' || result.ready_for_gameplay) {
+            if (isHandoff) {
                 isSessionZero = false;
                 console.log('[Handoff] Transition confirmed! Phase:', result.phase, 'ready_for_gameplay:', result.ready_for_gameplay);
 
                 // Display the server-side stitched opening scene (no reload needed)
                 if (result.opening_scene) {
+                    // Insert scene break divider
+                    const divider = document.createElement('div');
+                    divider.className = 'scene-break';
+                    divider.innerHTML = '<span>— The Adventure Begins —</span>';
+                    document.getElementById('narrative-display').appendChild(divider);
+
                     addNarrativeEntry(result.opening_scene, false, result.opening_portrait_map);
                     console.log('[Handoff] Opening scene displayed inline (' + result.opening_scene.length + ' chars)');
                 }

@@ -222,6 +222,13 @@ const GameAPI = {
     },
 
     /**
+     * Get the most recently active session (fallback when localStorage is lost)
+     */
+    async getLatestSession() {
+        return apiRequest('/game/session/latest');
+    },
+
+    /**
      * Delete a session (for reset)
      */
     async deleteSession(sessionId = null) {

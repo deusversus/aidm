@@ -240,6 +240,24 @@ body {
     margin-top: 0;
 }
 
+.scene-break {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin: 1.5rem 0;
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+}
+
+.scene-break::before,
+.scene-break::after {
+    content: '';
+    flex: 1;
+    border-top: 1px solid var(--border-color);
+}
+
 .narrative-entry ul,
 .narrative-entry ol {
     margin: 0.75rem 0 1rem 1.5rem;
