@@ -30,7 +30,8 @@ class Campaign(Base):
     id = Column(Integer, primary_key=True)
     media_uuid = Column(String(36), nullable=False, default=lambda: str(uuid.uuid4()))
     name = Column(String(255), nullable=False)
-    profile_id = Column(String(100), nullable=False)  # e.g., "hunterxhunter"
+    profile_id = Column(String(100), nullable=True)   # narrative profile metadata; not the lookup key
+    session_id = Column(String(64), nullable=True, index=True, unique=True)  # primary lookup key (session UUID)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     # Relationships

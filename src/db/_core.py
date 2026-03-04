@@ -183,6 +183,70 @@ class CoreMixin:
             logger.warning(f"Warning: Could not clear media folders: {e}")
 
     @staticmethod
+    def get_or_create_campaign_by_session(session_id: str, profile_id: str, profile_name: str = None) -> int:
+        """Look up or create a campaign by session UUID (primary lookup key).
+
+        profile_id is stored as metadata only — it does not determine campaign identity.
+        One session maps to exactly one campaign. Future multi-session campaigns will
+        introduce a join table; this method remains the creation path.
+
+        Args:
+            session_id: The session UUID from session_zero_states
+            profile_id: Narrative profile metadata (e.g., "al_1", "cowboy_bebop")
+            profile_name: Optional display name for the campaign
+
+        Returns:
+            Integer campaign_id from the database
+        """
+        db = create_session()
+        try:
+            campaign = db.query(Campaign).filter(Campaign.session_id == session_id).first()
+            if not campaign:
+                display_name = profile_name or f"{profile_id.replace('_', ' ').title()} Campaign"
+                campaign = Campaign(
+                    name=display_name,
+                    profile_id=profile_id,
+                    session_id=session_id,
+                )
+                db.add(campaign)
+                db.commit()
+                db.refresh(campaign)
+                logger.info(f"Created campaign: id={campaign.id}, session_id={session_id}, profile_id={profile_id}")
+
+                world_state = WorldState(
+                    campaign_id=campaign.id,
+                    location="Unknown",
+                    time_of_day="Day",
+                    situation="The adventure begins...",
+                    arc_phase=ArcPhase.RISING_ACTION,
+                    tension_level=0.3
+                )
+                db.add(world_state)
+
+                character = Character(
+                    campaign_id=campaign.id,
+                    name="Protagonist",
+                    level=1,
+                    hp_current=100,
+                    hp_max=100,
+                    power_tier="T10"
+                )
+                db.add(character)
+
+                bible = CampaignBible(
+                    campaign_id=campaign.id,
+                    planning_data={"notes": "Initial setup. Establish the world and characters."}
+                )
+                db.add(bible)
+
+                db.commit()
+                logger.info(f"Created supporting entities for campaign {campaign.id}")
+
+            return campaign.id
+        finally:
+            db.close()
+
+    @staticmethod
     def get_or_create_campaign_by_profile(profile_id: str, profile_name: str = None) -> int:
         """Look up or create a campaign by profile_id, returning integer campaign_id.
         

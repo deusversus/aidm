@@ -127,8 +127,15 @@ async def _handle_gameplay_handoff(session, session_id: str, result, agent) -> t
     current_settings = settings_store.load()
     logger.info(f"[Handoff] Syncing settings: {current_settings.active_profile_id} -> {profile_to_use}")
     current_settings.active_profile_id = profile_to_use
-    current_settings.active_campaign_id = profile_to_use
     current_settings.active_session_id = session.session_id
+    # Resolve (or create) campaign by session_id now; store integer campaign.id
+    from src.db._core import StateManager
+    resolved_campaign_id = StateManager.get_or_create_campaign_by_session(
+        session_id=session.session_id,
+        profile_id=profile_to_use,
+        profile_name=f"{profile_to_use.replace('_', ' ').title()} Campaign",
+    )
+    current_settings.active_campaign_id = str(resolved_campaign_id)
     settings_store.save(current_settings)
 
     # Verify settings file
@@ -738,7 +745,7 @@ async def session_zero_turn(session_id: str, request: TurnRequest):
             if current_settings.active_profile_id != profile_to_sync:
                 logger.info(f"[SessionZero] Defensive sync: {current_settings.active_profile_id} -> {profile_to_sync}")
                 current_settings.active_profile_id = profile_to_sync
-                current_settings.active_campaign_id = profile_to_sync
+                # Do not overwrite active_campaign_id here — only the full handoff sets it
                 settings_store.save(current_settings)
                 # Reset orchestrator so next /turn call creates fresh instance with new profile
                 reset_orchestrator()

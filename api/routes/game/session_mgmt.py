@@ -173,6 +173,27 @@ async def resume_session(session_id: str):
     # Put it back into the session manager
     manager._sessions[session_id] = session
 
+    # Sync settings so the orchestrator initializes with the correct profile/session
+    if session.phase.value == "gameplay" and session.character_draft:
+        profile_id = session.character_draft.narrative_profile
+        campaign_id = getattr(session, "campaign_id", None)
+        if profile_id:
+            try:
+                from src.settings import reset_settings_store
+                settings_store = get_settings_store()
+                current = settings_store.load()
+                if (current.active_session_id != session_id
+                        or current.active_profile_id != profile_id):
+                    logger.info(f"[Resume] Syncing settings: profile={profile_id}, session={session_id}, campaign={campaign_id}")
+                    current.active_session_id = session_id
+                    current.active_profile_id = profile_id
+                    current.active_campaign_id = str(campaign_id) if campaign_id else None
+                    settings_store.save(current)
+                    reset_settings_store()
+                    reset_orchestrator()
+            except Exception as e:
+                logger.warning(f"[Resume] Settings sync failed (non-fatal): {e}")
+
     # Get character draft if exists
     draft_dict = None
     if session.character_draft:

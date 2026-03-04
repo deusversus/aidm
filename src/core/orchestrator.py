@@ -68,11 +68,20 @@ class Orchestrator(TurnPipelineMixin, BackgroundMixin):
         # Load profile first to get display name
         self.profile: NarrativeProfile = load_profile(profile_id)
 
-        # Resolve profile_id to integer campaign_id
-        self.campaign_id = StateManager.get_or_create_campaign_by_profile(
-            profile_id=profile_id,
-            profile_name=f"{self.profile.name} Campaign"
-        )
+        # Resolve to integer campaign_id — prefer session-based lookup to avoid splits
+        _real_session_id = session_id if (session_id and session_id != profile_id) else None
+        if _real_session_id:
+            self.campaign_id = StateManager.get_or_create_campaign_by_session(
+                session_id=_real_session_id,
+                profile_id=profile_id,
+                profile_name=f"{self.profile.name} Campaign"
+            )
+        else:
+            # Legacy fallback: no real session UUID available
+            self.campaign_id = StateManager.get_or_create_campaign_by_profile(
+                profile_id=profile_id,
+                profile_name=f"{self.profile.name} Campaign"
+            )
 
         # Initialize state manager with resolved campaign_id
         self.state = StateManager(self.campaign_id)

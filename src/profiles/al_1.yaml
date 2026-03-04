@@ -1,0 +1,205 @@
+id: al_1
+name: Cowboy Bebop
+source_anime: Cowboy Bebop
+anilist_id: 1
+mal_id: 1
+media_type: anime
+status: finished
+generated_at: '2026-03-03T13:38:18.003636'
+confidence: 90
+research_method: api_first
+aliases:
+- cowboy bebop
+- cowboybebop
+- kowboj bebop
+- Καουμπόηδες του Διαστήματος
+- Ковбой Бибоп
+- קאובוי ביבופ
+- คาวบอย บีบ๊อป
+- カウボーイビバップ
+- 카우보이 비밥
+dna_scales:
+  introspection_vs_action: 4
+  comedy_vs_drama: 4
+  simple_vs_complex: 7
+  power_fantasy_vs_struggle: 7
+  explained_vs_mysterious: 6
+  fast_paced_vs_slow_burn: 5
+  episodic_vs_serialized: 2
+  grounded_vs_absurd: 3
+  tactical_vs_instinctive: 6
+  hopeful_vs_cynical: 7
+  ensemble_vs_solo: 3
+power_distribution:
+  peak_tier: T9
+  typical_tier: T9
+  floor_tier: T10
+  gradient: compressed
+world_tier: T9
+tropes:
+  tournament_arc: false
+  training_montage: false
+  power_of_friendship: false
+  mentor_death: false
+  chosen_one: false
+  tragic_backstory: true
+  redemption_arc: true
+  betrayal: true
+  sacrifice: true
+  transformation: false
+  forbidden_technique: false
+  time_loop: false
+  false_identity: true
+  ensemble_focus: true
+  slow_burn_romance: true
+detected_genres:
+- Action
+- Adventure
+- Drama
+- Sci-Fi
+combat_system: narrative
+power_system: {}
+tone:
+  comedy_level: 4
+  darkness_level: 7
+  optimism: 3
+director_personality: 'You are a jazz musician directing a noir film set in the rust
+  and static of a dying solar system — you improvise, you digress, you let a scene
+  linger on a half-eaten meal or a cigarette burning down to nothing, because in this
+  world, the spaces between the action are where the truth lives. Conflict is never
+  about who wins the fight; it''s about what the fight costs, what it reminds someone
+  of, and whether the blood on the floor looks anything like the past they''re running
+  from. You frame your crew not as heroes but as drifters held together by proximity
+  and debt, and you resist every urge to make their bond feel warm — it is real precisely
+  because it is unspoken, fraying, and inconvenient. Every bounty is a mirror: the
+  mark reflects something back at Spike, Jet, Faye, or Ed that they would rather not
+  see, and the episode ends before anyone has to admit it. You cut away at the moment
+  of resolution — not because nothing matters, but because in the Bebop''s world,
+  closure is a luxury nobody can afford.'
+pacing:
+  scene_length: deliberate
+  arc_length_sessions: 6-10
+sources_consulted:
+- anilist.co
+- https://cowboybebop.fandom.com
+voice_cards:
+- name: Character List (Spike Spiegel implied)
+  speech_patterns: Casual, laconic, and dismissive. Uses short declarative lists to
+    express disdain or preference. Avoids sentimentality in word choice.
+  humor_type: Sardonic
+  signature_phrases:
+  - kids, pets, and women with attitudes.
+  dialogue_rhythm: Clipped lists and fragments; trailing-off structure implies more
+    than is said
+- name: Alisa
+  speech_patterns: Composed and reflective; speaks in measured, complete sentences.
+    Slightly formal, emotionally pointed without being explosive.
+  humor_type: none
+  signature_phrases:
+  - You seem to think that time on Ganymede had stopped.
+  dialogue_rhythm: Full, deliberate sentences with embedded accusations; uses second-person
+    ('you') to confront directly
+- name: Anastasia
+  speech_patterns: Guarded and precise when setting boundaries; shifts to casual,
+    everyday small-talk in softer moments. Modern, conversational register.
+  humor_type: none
+  signature_phrases:
+  - There are only two people that can call me by that name.
+  - It got a little chilly today. It's those cold winds...
+  dialogue_rhythm: Alternates between short, firm declarative sentences (boundary-setting)
+    and loose, trailing observations (casual mood). Ellipses signal trailing thought.
+- name: Andy
+  speech_patterns: Bombastic, theatrical, and hyperbolic. Speaks with the confidence
+    of someone performing a role. Modern speech filtered through exaggerated western-hero
+    affect.
+  humor_type: Earnest — he is the joke without knowing it; sincerity played totally
+    straight
+  signature_phrases:
+  - See you, Space Cowboy!
+  dialogue_rhythm: Short, punchy declarations and exclamations; favors dramatic send-offs
+    and proclamations over conversation
+- name: Annie
+  speech_patterns: Warm but firm; uses the same phrasing as Anastasia (shared lines
+    suggest a character type — older, settled women with quiet authority). Conversational
+    and grounded.
+  humor_type: none
+  signature_phrases:
+  - There are only two people that can call me by that name.
+  - It got a little chilly today. It's those cold winds...
+  dialogue_rhythm: Short declarative statements for authority; casual, observational
+    fragments for everyday warmth. Trailing ellipses on softer lines.
+- name: Edward Wong Hau Pepelu Tivrusky IV
+  speech_patterns: Highly idiosyncratic, childlike, and non-linear. Frequently speaks
+    in third person ('Ed sees!', 'Ed wants!'). Mixes fragments, invented words, nonsense
+    sounds, and sudden bursts of clarity. No distinction between formal and casual
+    — Ed has only one mode.
+  humor_type: Slapstick and absurdist — humor is physical, spontaneous, and entirely
+    unself-conscious
+  signature_phrases:
+  - Ed sees! Ed sees!
+  - Edward Wong Hau Pepelu Tivrusky the Fourth!
+  - Radical Edward!
+  - Ein! Ein! Ein!
+  - Bebop bebop bebop~
+  dialogue_rhythm: Rapid-fire, staccato repetition; sentence fragments dominate; third-person
+    self-reference; questions and exclamations back-to-back with no pause for response;
+    occasional long, breathless run-ons when excited
+author_voice:
+  sentence_patterns:
+  - Short, declarative punches during action that drop all connective tissue — subject,
+    verb, done
+  - Long, drifting sentences during introspection that accumulate details like space
+    debris until they collapse under their own weight
+  - Fragments used not for emphasis but for exhaustion — the thought simply runs out
+  - Rhetorical questions left unanswered, hanging in the prose like smoke
+  structural_motifs:
+  - Cold open that drops the reader into a scene with zero orientation — locale, stakes,
+    and character established through behavior not exposition
+  - Flashback intrusions that rupture the present tense without warning, triggered
+    by sensory detail — a smell, a chord, a silhouette
+  - Episodic self-contained arcs that secretly deposit one irreversible shard of backstory
+    before the credits roll
+  - Parallel cutting between a bounty's mundane life and the crew's desperate pursuit,
+    humanizing the target right before the net closes
+  - Endings that resolve the plot and leave the emotional wound open and unaddressed
+  dialogue_quirks:
+  - Characters deflect every sincere moment with a wisecrack, a non sequitur, or sudden
+    interest in food
+  - Jet speaks in blunt declaratives with the cadence of a man who has already argued
+    this and lost
+  - Spike answers questions he wasn't asked and ignores the ones he was
+  - Faye's bravado fractures mid-sentence when memory ambushes her
+  - Nobody says what they mean — subtext is the only text
+  emotional_rhythm:
+  - Extended cool detachment punctuated by a single unguarded beat that lands like
+    a gut punch
+  - Humor deployed as a pressure valve just before a scene becomes unbearable
+  - 'Grief never announced — it appears in behavior: skipped meals, extra cigarettes,
+    picking a fight for no reason'
+  - Catharsis denied or deferred; the audience carries the weight the characters refuse
+    to put down
+  example_voice: He lit a cigarette he didn't want and watched the bounty's ship shrink
+    into the dark, and somewhere behind him Jet was already running the numbers on
+    what they'd lost, and neither of them said a word about it because there wasn't
+    a word for it yet.
+visual_style:
+  art_style: retro cyberpunk noir anime
+  color_palette: muted warm tones — amber, rust, navy, and shadow black with occasional
+    neon accents
+  line_work: clean confident lines with expressive fluidity during action sequences
+  shading: soft gradient shading with dramatic shadow pooling in noir scenes
+  character_rendering: realistic proportions with stylized cool-expressionist faces,
+    lean athletic builds
+  atmosphere: smoky, jazz-soaked, melancholic — vast cosmic loneliness punctuated
+    by neon-lit dive bars and derelict spaceships
+  composition_style: cinematic wide shots and low-angle close-ups; heavily influenced
+    by film noir and 70s action cinema framing
+  studio_reference: Sunrise (Cowboy Bebop, dir. Shinichiro Watanabe)
+  reference_descriptors:
+  - retro sci-fi noir anime
+  - jazz-era space western aesthetic
+  - muted amber and shadow palette
+  - cinematic film noir composition
+  - gritty 90s anime realism
+series_group: al_1
+series_position: 1

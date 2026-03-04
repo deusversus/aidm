@@ -47,6 +47,46 @@ def kill_stale_processes():
         print("[run_server] No stale processes found")
 
 
+def ensure_postgres():
+    """Ensure postgres is available, starting via Docker if needed."""
+    import socket
+    import time
+
+    def port_open(host="127.0.0.1", port=5432):
+        try:
+            with socket.create_connection((host, port), timeout=1):
+                return True
+        except OSError:
+            return False
+
+    # If postgres is already accepting connections, nothing to do
+    if port_open():
+        print("[run_server] Postgres already running on :5432.")
+        return
+
+    # Check if Docker daemon is running
+    result = subprocess.run(["docker", "info"], capture_output=True)
+    if result.returncode != 0:
+        print("[run_server] Docker is not running. Attempting to start Docker...")
+        subprocess.run(["sudo", "systemctl", "start", "docker"], check=True)
+        time.sleep(3)
+
+    print("[run_server] Starting postgres (docker compose db)...")
+    subprocess.run(["docker", "compose", "up", "-d", "db"], cwd=SCRIPT_DIR, check=True)
+
+    # Wait for healthy
+    print("[run_server] Waiting for postgres to be ready...", end="", flush=True)
+    for _ in range(30):
+        if port_open():
+            print(" ready.")
+            return
+        print(".", end="", flush=True)
+        time.sleep(1)
+    print()
+    print("[run_server] WARNING: postgres did not become ready in time, proceeding anyway.")
+
+
+ensure_postgres()
 kill_stale_processes()
 
 import time
