@@ -403,88 +403,104 @@ async def get_latest_session():
 
 @router.delete("/session/{session_id}")
 async def delete_session(session_id: str):
-    """Delete a session (for reset).
-    
-    Removes the session from both memory and persistent storage.
-    Also cleans up any custom profile data for this session.
+    """Delete a session and all associated data (full reset).
+
+    Cleans up:
+    - In-memory session state
+    - session_zero_states DB row
+    - Campaign row + all children (Character, NPCs, WorldState, Turns, etc.) via cascade
+    - ChromaDB memory collection
+    - Generated media files
+    - Custom profile/lore data
+    - Active settings (profile, session, campaign)
+    - Orchestrator singleton
     """
+    import shutil
+    from pathlib import Path
+
+    from src.context.custom_profile_library import delete_custom_profile, get_custom_profile_library
+    from src.db._core import get_db
+    from src.db.models import Campaign
+    from src.settings import get_settings_store, reset_settings_store
+
     store = get_session_store()
     manager = get_session_manager()
+    results = {}
 
-    # Remove from memory
+    # 1. Remove from memory
     if session_id in manager._sessions:
         del manager._sessions[session_id]
 
-    # Remove from persistent store
-    deleted = store.delete(session_id)
+    # 2. Remove session_zero_states row
+    results["session_deleted"] = store.delete(session_id)
 
-    # Clean up custom profile (if any)
-    from src.context.custom_profile_library import delete_custom_profile, get_custom_profile_library
-    custom_lib = get_custom_profile_library()
-    lore_deleted = custom_lib.delete_session_lore(session_id)
-    folder_deleted = delete_custom_profile(session_id)
+    # 3. Delete Campaign + all DB children (cascade)
+    results["campaign_deleted"] = False
+    try:
+        db = next(get_db())
+        campaign = db.query(Campaign).filter(Campaign.session_id == session_id).first()
+        if not campaign:
+            # Legacy fallback: look up by active profile_id
+            settings_fb = get_settings_store().load()
+            if settings_fb.active_profile_id:
+                campaign = db.query(Campaign).filter(
+                    Campaign.profile_id == settings_fb.active_profile_id
+                ).first()
+        if campaign:
+            # Delete media files before removing DB row (need media_uuid first)
+            media_uuid = campaign.media_uuid or str(campaign.id)
+            media_dir = Path(__file__).parent.parent.parent.parent / "data" / "media" / media_uuid
+            if media_dir.exists():
+                shutil.rmtree(media_dir)
+                logger.info(f"Deleted media directory: {media_dir}")
+                results["media_deleted"] = True
 
-    # Clear campaign memory (ChromaDB collection)
-    # Now uses session_id for proper isolation
-    memory_deleted = False
+            db.delete(campaign)  # cascade handles all children
+            db.commit()
+            results["campaign_deleted"] = True
+            logger.info(f"Deleted campaign and all children for session {session_id}")
+    except Exception as e:
+        logger.error(f"Campaign DB cleanup error: {e}")
+        results["campaign_deleted"] = False
+
+    # 4. Clear ChromaDB memory collection
+    results["memory_deleted"] = False
     try:
         import chromadb
-
-        from src.settings import get_settings_store
-        settings_store = get_settings_store()
-        settings = settings_store.load()
-
-        # Use active_session_id for session-based memory isolation
-        # Fallback to active_profile_id for backward compatibility
-        session_collection_id = settings.active_session_id or settings.active_profile_id
-
-        if session_collection_id:
-            client = chromadb.PersistentClient(path="./data/chroma")
-            collection_name = f"campaign_{session_collection_id}"
-
-            # Check if collection exists before deleting
-            existing = [c.name for c in client.list_collections()]
-            if collection_name in existing:
-                client.delete_collection(collection_name)
-                memory_deleted = True
-                logger.info(f"Deleted memory collection: {collection_name}")
+        client = chromadb.PersistentClient(path="./data/chroma")
+        collection_name = f"campaign_{session_id}"
+        existing = [c.name for c in client.list_collections()]
+        if collection_name in existing:
+            client.delete_collection(collection_name)
+            results["memory_deleted"] = True
+            logger.info(f"Deleted memory collection: {collection_name}")
     except Exception as e:
         logger.error(f"Memory cleanup error: {e}")
 
-    # Clean up generated media files (portraits, model sheets, cutscenes, locations)
-    media_deleted = False
+    # 5. Clean up custom profile/lore data
+    custom_lib = get_custom_profile_library()
+    results["custom_lore_deleted"] = custom_lib.delete_session_lore(session_id)
+    results["custom_folder_deleted"] = delete_custom_profile(session_id)
+
+    # 6. Clear active settings so next start is fresh
     try:
-        from pathlib import Path
-
-        from src.db._core import get_db
-        from src.db.models import Campaign
-        from src.settings import get_settings_store
-
-        settings_for_media = get_settings_store().load()
-        profile_id = settings_for_media.active_profile_id
-
-        if profile_id:
-            db = next(get_db())
-            campaign = db.query(Campaign).filter(Campaign.profile_id == profile_id).first()
-            if campaign:
-                media_uuid = campaign.media_uuid if campaign.media_uuid else str(campaign.id)
-                media_dir = Path(__file__).parent.parent.parent.parent / "data" / "media" / media_uuid
-                if media_dir.exists():
-                    import shutil
-                    shutil.rmtree(media_dir)
-                    media_deleted = True
-                    logger.info(f"Deleted media directory: {media_dir}")
+        settings_store = get_settings_store()
+        current = settings_store.load()
+        current.active_session_id = ""
+        current.active_profile_id = ""
+        current.active_campaign_id = None
+        settings_store.save(current)
+        reset_settings_store()
+        results["settings_cleared"] = True
     except Exception as e:
-        logger.error(f"Media cleanup error: {e}")
+        logger.error(f"Settings clear error: {e}")
+        results["settings_cleared"] = False
 
-    return {
-        "deleted": deleted,
-        "session_id": session_id,
-        "custom_lore_deleted": lore_deleted,
-        "custom_folder_deleted": folder_deleted,
-        "memory_deleted": memory_deleted,
-        "media_deleted": media_deleted
-    }
+    # 7. Reset orchestrator singleton
+    reset_orchestrator()
+
+    results["session_id"] = session_id
+    return results
 
 
 def _build_session_zero_summary(session, draft) -> str:
