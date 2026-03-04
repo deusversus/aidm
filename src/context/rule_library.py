@@ -460,6 +460,6 @@ class RuleLibrary:
 
 
 # Convenience function
-def get_rule_library(persist_dir: str = "./data/chroma") -> RuleLibrary:
+def get_rule_library(persist_dir: str = None) -> RuleLibrary:
     """Get a RuleLibrary instance."""
     return RuleLibrary(persist_dir=persist_dir)

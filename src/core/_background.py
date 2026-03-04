@@ -381,6 +381,15 @@ class BackgroundMixin:
                 except Exception as e:
                     logger.error(f"Episodic write failed (idempotent, will retry): {e}")
 
+                # =============================================================
+                # 10. MEMORY HEAT DECAY
+                # =============================================================
+                try:
+                    self.memory.decay_heat(db_context.turn_number)
+                    logger.debug(f"Memory heat decayed for turn {db_context.turn_number}")
+                except Exception as e:
+                    logger.error(f"Memory heat decay failed (non-fatal): {e}")
+
                 bg_elapsed = int((time.time() - bg_start) * 1000)
                 logger.info(f"Post-narrative processing complete ({bg_elapsed}ms)")
 

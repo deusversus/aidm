@@ -235,7 +235,7 @@ async def resume_session(session_id: str):
             try:
                 from src.context.memory import MemoryStore
                 memory = MemoryStore(campaign_id=session.campaign_id)
-                beat_results = memory.search("recent emotional narrative moments", top_k=5, category="narrative_beat")
+                beat_results = memory.search("recent emotional narrative moments", limit=5, memory_type="narrative_beat")
                 narrative_beats = [r["content"] for r in beat_results] if beat_results else []
             except Exception:
                 pass  # Memory not available, proceed without beats
@@ -467,7 +467,8 @@ async def delete_session(session_id: str):
     results["memory_deleted"] = False
     try:
         import chromadb
-        client = chromadb.PersistentClient(path="./data/chroma")
+        from src.paths import CHROMA_DIR
+        client = chromadb.PersistentClient(path=str(CHROMA_DIR))
         collection_name = f"campaign_{session_id}"
         existing = [c.name for c in client.list_collections()]
         if collection_name in existing:

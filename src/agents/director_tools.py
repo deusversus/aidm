@@ -338,7 +338,7 @@ def _mark_memory_critical(memory, **kwargs) -> dict:
 
     try:
         # Search for the best matching memory
-        results = memory.search(query, top_k=1)
+        results = memory.search(query, limit=1)
         if not results:
             return {"error": f"No memories found matching '{query}'", "flagged": False}
 
