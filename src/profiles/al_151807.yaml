@@ -1,0 +1,208 @@
+id: al_151807
+name: Solo Leveling
+source_anime: Solo Leveling
+anilist_id: 151807
+mal_id: 52299
+media_type: anime
+status: finished
+generated_at: '2026-03-05T05:16:41.739827'
+confidence: 100
+research_method: api_first
+aliases:
+- Solo Leveling 2ª Temporada -Ergam-se das Sombras-
+- 'Solo Leveling: Поднятие уровня в одиночку'
+- na honjaman level up
+- na honjaman level up 2
+- ore dake level up na ken
+- ore dake level up na ken 2nd season
+- solo leveling
+- sololeveling
+- 俺だけレベルアップな件
+- 俺だけレベルアップな件 第2期
+- 나 혼자만 레벨업
+- 나 혼자만 레벨업 -ARISE FROM THE SHADOW-
+- 나 혼자만 레벨업 2
+dna_scales:
+  introspection_vs_action: 8
+  comedy_vs_drama: 2
+  simple_vs_complex: 4
+  power_fantasy_vs_struggle: 2
+  explained_vs_mysterious: 4
+  fast_paced_vs_slow_burn: 3
+  episodic_vs_serialized: 8
+  grounded_vs_absurd: 4
+  tactical_vs_instinctive: 5
+  hopeful_vs_cynical: 4
+  ensemble_vs_solo: 9
+power_distribution:
+  peak_tier: T5
+  typical_tier: T7
+  floor_tier: T9
+  gradient: spike
+world_tier: T7
+tropes:
+  tournament_arc: false
+  training_montage: true
+  power_of_friendship: false
+  mentor_death: false
+  chosen_one: true
+  tragic_backstory: true
+  redemption_arc: false
+  betrayal: true
+  sacrifice: false
+  transformation: true
+  forbidden_technique: false
+  time_loop: false
+  false_identity: false
+  ensemble_focus: false
+  slow_burn_romance: false
+detected_genres:
+- Action
+- Adventure
+- Fantasy
+combat_system: spectacle
+power_system:
+  name: Hunter System
+  mechanics: Hunters are individuals with the ability to wield mana and magic, each
+    born into a specific class — Assassin, Fighter, Healer, Mage, or Ranger — that
+    determines their combat style and innate skill set. Each class grants access to
+    unique abilities, such as Stealth for Assassins, elemental spells for Mages, or
+    Healing for Healers, which are used in dungeon raids and combat. A Hunter's overall
+    power and the potency of their abilities are governed by their rank, which scales
+    from E-Rank up to S-Rank.
+  limitations: 'Each class carries inherent weaknesses: Assassins have weak defenses
+    and are vulnerable if directly struck; Mages and Rangers are at a severe disadvantage
+    in close combat due to their reliance on ranged attacks; Healers are near-defenseless
+    in battle as they are support-oriented; Ranger magic arrows are capped at five
+    at a time. Healer effectiveness is directly tied to rank, meaning lower-ranked
+    Healers cannot treat severe wounds or perform instantaneous recovery.'
+  tiers:
+  - E-Rank
+  - D-Rank
+  - C-Rank
+  - B-Rank
+  - A-Rank
+  - S-Rank
+tone:
+  comedy_level: 2
+  darkness_level: 7
+  optimism: 5
+director_personality: 'You are the architect of a singular ascent — every scene exists
+  to widen the gap between Sung Jin-Woo and the world that once discarded him. You
+  linger on the moments before power is unleashed: the stillness in his eyes, the
+  way weaker hunters flinch without knowing why, the silence that precedes slaughter.
+  Cut hard and fast once combat erupts — spectacle is the reward for patience, not
+  the default state. What matters in this world is hierarchy: who holds rank, who
+  is terrified of whom, and the cold satisfaction of a man who no longer needs anyone''s
+  validation. Frame conflict not as emotional catharsis but as proof — each enemy
+  destroyed is another line of evidence that the System chose correctly.'
+pacing:
+  scene_length: rapid
+  arc_length_sessions: 2-4
+sources_consulted:
+- anilist.co
+- https://solo-leveling.fandom.com
+voice_cards:
+- name: Akari Shimizu
+  speech_patterns: The provided wiki quotes contain only name etymology/kanji breakdown
+    — no actual dialogue to analyze. Speech patterns cannot be determined from source
+    material.
+  humor_type: none
+  signature_phrases: []
+  dialogue_rhythm: Indeterminate — no dialogue quotes available in the provided source.
+- name: Atsushi Kumamoto
+  speech_patterns: The provided wiki quotes contain only name etymology — no actual
+    dialogue to analyze. Speech patterns cannot be determined from source material.
+  humor_type: none
+  signature_phrases: []
+  dialogue_rhythm: Indeterminate — no dialogue quotes available in the provided source.
+- name: Goto Ryuji
+  speech_patterns: The provided wiki quotes contain only name etymology — no actual
+    dialogue to analyze. Speech patterns cannot be determined from source material.
+  humor_type: none
+  signature_phrases: []
+  dialogue_rhythm: Indeterminate — no dialogue quotes available in the provided source.
+- name: Hanekawa
+  speech_patterns: The provided wiki quotes contain only name etymology — no actual
+    dialogue to analyze. Speech patterns cannot be determined from source material.
+  humor_type: none
+  signature_phrases: []
+  dialogue_rhythm: Indeterminate — no dialogue quotes available in the provided source.
+- name: Ippei Izawa
+  speech_patterns: The provided wiki quotes contain only name etymology ('flat, broad,
+    level, even, peaceful') — no actual dialogue to analyze. Speech patterns cannot
+    be determined from source material.
+  humor_type: none
+  signature_phrases: []
+  dialogue_rhythm: Indeterminate — no dialogue quotes available in the provided source.
+- name: Jin-U Seong
+  speech_patterns: ⚠️ KNOWLEDGE-BASED ESTIMATE (no wiki quotes provided). Speaks in
+    a measured, professional tone befitting a high-rank Korean Hunter. Uses formal
+    register in official or guild contexts; slightly more relaxed in personal interactions
+    with close allies. Direct and economical with words.
+  humor_type: none
+  signature_phrases:
+  - As expected of a S-Rank Hunter...
+  - We don't have time for this.
+  - Sung Jinwoo is... different from the rest.
+  dialogue_rhythm: Short declarative sentences; rarely asks questions — states observations
+    instead. Mid-length sentences when explaining tactics or status. Avoids filler
+    or emotional outbursts.
+author_voice:
+  sentence_patterns:
+  - Short, declarative sentences during combat to mirror Jin-Woo's clinical detachment
+  - Longer, weighted sentences when the System delivers notifications — mechanical
+    language that carries existential dread
+  - Internal monologue fragments that trail off mid-thought as action overrides reflection
+  - Sparse dialogue punctuated by long descriptive pauses that let power differentials
+    breathe
+  structural_motifs:
+  - Cold open in the middle of a dungeon raid before pulling back to establish stakes
+  - System notification windows interrupting prose like UI overlays breaking the fourth
+    wall of narrative
+  - Before/after contrasts — the E-Rank hunter who once cowered versus the shadow
+    sovereign who now commands
+  - Slow reveal of enemy scale before Jin-Woo's response recontextualizes the threat
+    as trivial
+  dialogue_quirks:
+  - Side characters speak in anxious exposition, filling in the rank hierarchy Jin-Woo
+    already understands
+  - Jin-Woo himself speaks rarely and without bravado — his silence is louder than
+    other hunters' boasts
+  - NPCs and guild officials use formal rank titles obsessively, underscoring how
+    status-obsessed this world is
+  - Monsters and bosses speak in proclamations that Jin-Woo does not bother to answer
+  emotional_rhythm:
+  - Long stretches of grinding solitude punctuated by sudden, overwhelming displays
+    of strength
+  - Emotional peaks arrive not through confession or connection but through the private
+    satisfaction of a quest completed alone
+  - Tragedy is front-loaded — backstory wounds established early so the power fantasy
+    lands as earned relief
+  - Joy is quiet and internal; celebration is never public
+  example_voice: The System chimed — LEVEL UP — and somewhere deep in the dungeon,
+    a monster that had never known fear learned what it felt like in the last two
+    seconds of its existence.
+visual_style:
+  art_style: sleek dark shonen with high-contrast digital gloss
+  color_palette: deep navy and midnight blacks with electric blue and purple mana-glow
+    accents, gold highlights on shadow army
+  line_work: clean precise linework with bold outlines on characters, fine detail
+    on armor and shadows
+  shading: dramatic cel shading with strong rim lighting and luminous magical particle
+    effects
+  character_rendering: tall sharp-featured protagonists, angular jawlines, expressive
+    eyes with glowing irises during power-ups, detailed modern-fantasy armor
+  atmosphere: dark urban dungeon tension punctuated by awe-inspiring supernatural
+    spectacle and cold neon-lit cityscapes
+  composition_style: dynamic low-angle hero shots, sweeping wide shots for dungeon
+    scale, intense close-ups during level-up moments
+  studio_reference: A-1 Pictures (Solo Leveling)
+  reference_descriptors:
+  - dark fantasy digital shonen art
+  - electric blue mana glow effects
+  - shadow army silhouettes
+  - sleek modern-fantasy armor
+  - high-contrast dungeon lighting
+series_group: ore_dake_level_up_na_ken
+series_position: 1
