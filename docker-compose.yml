@@ -1,6 +1,6 @@
 services:
   db:
-    image: timescale/timescaledb-ha:pg17-all
+    image: pgvector/pgvector:pg17
     restart: unless-stopped
     environment:
       POSTGRES_USER: aidm
@@ -9,23 +9,12 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - pgdata:/home/postgres/pgdata/data
+      - pgdata:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U aidm"]
       interval: 5s
       timeout: 5s
       retries: 5
-
-  pgai-worker:
-    image: timescale/pgai-vectorizer-worker:latest
-    restart: unless-stopped
-    depends_on:
-      db:
-        condition: service_healthy
-    environment:
-      PGAI_VECTORIZER_WORKER_DB_URL: postgresql://aidm:aidm@db:5432/aidm
-      OPENAI_API_KEY: ${OPENAI_API_KEY}
-    command: ["python", "-m", "pgai", "vectorizer", "worker", "--poll-interval", "5s"]
 
   aidm:
     build: .
