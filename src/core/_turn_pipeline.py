@@ -920,12 +920,14 @@ class TurnPipelineMixin:
                 meta_history = s.meta_conversation_history
                 break
 
-        # --- Director responds first ---
-        director_response = await self.director.respond_to_meta(
+        # --- Director responds first (structured: response + resolved flag) ---
+        director_result = await self.director.respond_to_meta(
             feedback=player_input,
             game_context=game_context,
             conversation_history=meta_history,
         )
+        director_response = director_result.response
+        meta_resolved = director_result.resolved
 
         # --- KA responds with Director's context ---
         ka_response = await self.key_animator.respond_to_meta(
@@ -947,9 +949,15 @@ class TurnPipelineMixin:
                 {"role": "key_animator", "content": ka_response}
             )
 
-        # Format the dialectic response
-        narrative = f"🎬 **Director:**\n{director_response}\n\n🎨 **Key Animator:**\n{ka_response}"
-        narrative += "\n\n---\n*Type `/resume` to return to the story, or continue the conversation.*"
+        # If Director signals the interlude is resolved, auto-exit meta mode
+        if meta_resolved:
+            self._in_meta_conversation = False
+            logger.info("Meta conversation resolved by Director — auto-exiting meta mode")
+            narrative = f"🎬 **Director:**\n{director_response}\n\n🎨 **Key Animator:**\n{ka_response}"
+            narrative += "\n\n---\n*Back to the story.*"
+        else:
+            narrative = f"🎬 **Director:**\n{director_response}\n\n🎨 **Key Animator:**\n{ka_response}"
+            narrative += "\n\n---\n*Continue the conversation, or type `/resume` to return to the story.*"
 
         # Build a minimal intent for the TurnResult
         meta_intent = IntentOutput(

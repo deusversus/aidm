@@ -19,6 +19,15 @@ from .base import AgenticAgent
 logger = logging.getLogger(__name__)
 
 
+class MetaDirectorResponse(BaseModel):
+    """Structured output from the Director during a meta-conversation interlude."""
+    response: str = Field(description="The Director's response to the player")
+    resolved: bool = Field(
+        default=False,
+        description="Set true when the meta concern is addressed and the player should return to gameplay"
+    )
+
+
 class DirectorOutput(BaseModel):
     """Structured output from the Director's planning session."""
 
@@ -636,27 +645,32 @@ Provide a CONCISE investigation report structured as:
 
     META_SYSTEM_PROMPT = """You are the Director (showrunner) of an anime production studio.
 
-The player is speaking to you OUT OF CHARACTER about how the game is being run.
-This is a meta-conversation — they want to talk to the DM, not act in the story.
+THE STORY IS CURRENTLY PAUSED. The player has stepped outside the narrative to speak with you directly — this is an interlude between scenes, not a scene itself. Your one job is to address what they need and get them back into the story.
 
-Your job:
-- Listen to the player's concern or request and respond with a clear decision or adjustment
-- If they want to tweak tone, pacing, NPC behavior, etc. — acknowledge it and commit to a specific change
-- If you disagree with something, say so briefly and explain why from a storytelling perspective
-- Be warm and direct, like a good DM between sessions
+Context you have:
+- The current game state (arc, location, situation, character) is provided with each message
+- You know the campaign's narrative DNA and any active creative overrides
 
-CRITICAL RULES:
-- NEVER present a menu of options (a/b/c, option 1/2/3, etc.). Make a directorial call and own it.
-- If the player is ready to start playing or wants the story to begin, tell them to type /resume (or just start typing their action) — do NOT ask them how they want to approach the scene.
-- Keep responses to 2-4 sentences. You're a collaborator, not a consultant.
-- Do NOT write narrative prose or in-character dialogue. This is out-of-character talk."""
+Your role in this interlude:
+- Address the player's concern directly and honestly (arc pacing, tone, NPC behavior, power calibration, etc.)
+- If they want a change, commit to a specific adjustment — don't just acknowledge it
+- If you disagree, explain why briefly from a storytelling perspective
+- When the concern is resolved — or when the player signals they want to return — set resolved=true
+
+Set resolved=true when:
+- The player explicitly says they're done or ready to return (e.g. "ok thanks", "let's go", "start", "sounds good")
+- You've addressed their concern and there's nothing left to discuss
+- They haven't asked a follow-up question
+
+Keep responses concise (2-4 sentences). This is a production meeting, not a therapy session.
+Do NOT write narrative prose or in-character dialogue."""
 
     async def respond_to_meta(
         self,
         feedback: str,
         game_context: str,
         conversation_history: list[dict[str, str]] | None = None,
-    ) -> str:
+    ) -> "MetaDirectorResponse":
         """Respond to player meta-conversation as the Director (showrunner).
 
         Args:
@@ -665,7 +679,7 @@ CRITICAL RULES:
             conversation_history: Previous meta conversation turns
 
         Returns:
-            Free-form conversational response
+            MetaDirectorResponse with response text and resolved flag
         """
         from ..llm.manager import get_llm_manager
 
@@ -694,18 +708,20 @@ CRITICAL RULES:
         try:
             manager = get_llm_manager()
             provider = manager.get_provider()
-            model = manager.get_fast_model()  # Use fast model for meta dialogue
+            model = manager.get_fast_model()
 
-            response = await provider.complete(
+            result = await provider.complete_with_schema(
                 messages=messages,
+                schema=MetaDirectorResponse,
                 system=self.META_SYSTEM_PROMPT,
                 model=model,
                 max_tokens=1024,
-                temperature=0.7,
             )
-
-            return response.content.strip()
+            return result
 
         except Exception as e:
             logger.error(f"[director] Meta conversation failed: {e}")
-            return "I hear you — let me think about that. (The Director encountered an issue processing this meta-conversation.)"
+            return MetaDirectorResponse(
+                response="I hear you — let me think about that. (The Director encountered an issue.)",
+                resolved=False,
+            )
