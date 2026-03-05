@@ -144,15 +144,16 @@ class MemoryStore:
             # Generate embedding
             vec = self._embed(content)
             vec_literal = vec_to_pg(vec) if vec else None
+            vec_sql = "CAST(:vec AS vector)" if vec_literal else "NULL"
 
-            result = conn.execute(sa.text("""
+            result = conn.execute(sa.text(f"""
                 INSERT INTO campaign_memories
                     (campaign_id, content, memory_type, heat, decay_rate,
                      turn_number, flags, extra_meta, embedding_vec, created_at)
                 VALUES
                     (:cid, :content, :mtype, 100.0, :decay,
                      :turn, :flags::jsonb, :meta::jsonb,
-                     :vec::vector, now())
+                     {vec_sql}, now())
                 RETURNING id
             """), {
                 "cid": self._campaign_id,
@@ -222,14 +223,14 @@ class MemoryStore:
                 rows = conn.execute(sa.text(f"""
                     SELECT id, content, memory_type, heat, decay_rate,
                            turn_number, flags, extra_meta,
-                           (embedding_vec <=> :vec::vector) AS distance
+                           (embedding_vec <=> CAST(:vec AS vector)) AS distance
                     FROM campaign_memories
                     WHERE campaign_id = :cid
                       AND heat >= :min_heat
                       AND embedding_vec IS NOT NULL
                       {type_filter}
                       {kw_filter}
-                    ORDER BY embedding_vec <=> :vec::vector
+                    ORDER BY embedding_vec <=> CAST(:vec AS vector)
                     LIMIT :fetch
                 """), params).fetchall()
             else:

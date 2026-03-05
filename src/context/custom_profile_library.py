@@ -65,18 +65,20 @@ class CustomProfileLibrary:
             for i, chunk_text in enumerate(chunks):
                 chunk_id = f"{session_id}_{uuid.uuid4()}"
                 vec = self._embed(chunk_text)
-                conn.execute(sa.text("""
+                vec_str = vec_to_pg(vec) if vec else None
+                vec_sql = "CAST(:vec AS vector)" if vec_str else "NULL"
+                conn.execute(sa.text(f"""
                     INSERT INTO custom_profile_lore_chunks
                         (session_id, chunk_id, category, tags, content, embedding_vec, created_at)
                     VALUES
-                        (:sid, :cid, :cat, '[]'::jsonb, :content, :vec::vector, now())
+                        (:sid, :cid, :cat, '[]'::jsonb, :content, {vec_sql}, now())
                     ON CONFLICT (session_id, chunk_id) DO NOTHING
                 """), {
                     "sid": session_id,
                     "cid": chunk_id,
                     "cat": source,
                     "content": chunk_text,
-                    "vec": vec_to_pg(vec) if vec else None,
+                    "vec": vec_str,
                 })
             conn.commit()
 
@@ -100,7 +102,7 @@ class CustomProfileLibrary:
                     SELECT content
                     FROM custom_profile_lore_chunks
                     WHERE session_id = :sid AND embedding_vec IS NOT NULL
-                    ORDER BY embedding_vec <=> :vec::vector
+                    ORDER BY embedding_vec <=> CAST(:vec AS vector)
                     LIMIT :limit
                 """), {"sid": session_id, "vec": vec_to_pg(vec), "limit": limit}).fetchall()
             else:

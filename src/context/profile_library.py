@@ -67,13 +67,15 @@ class ProfileLibrary:
                 text = chunk["text"]
                 chunk_id = f"{profile_id}_{uuid.uuid4()}"
                 vec = self._embed(text)
-                conn.execute(sa.text("""
+                vec_str = vec_to_pg(vec) if vec else None
+                vec_sql = "CAST(:vec AS vector)" if vec_str else "NULL"
+                conn.execute(sa.text(f"""
                     INSERT INTO profile_lore_chunks
                         (profile_id, chunk_id, page_title, page_type, content,
                          word_count, embedding_vec, created_at)
                     VALUES
                         (:pid, :cid, :title, :ptype, :content,
-                         :wc, :vec::vector, now())
+                         :wc, {vec_sql}, now())
                     ON CONFLICT (profile_id, chunk_id) DO NOTHING
                 """), {
                     "pid": profile_id,
@@ -82,7 +84,7 @@ class ProfileLibrary:
                     "ptype": chunk.get("page_type", "general"),
                     "content": text,
                     "wc": len(text.split()),
-                    "vec": vec_to_pg(vec) if vec else None,
+                    "vec": vec_str,
                 })
             conn.commit()
 
@@ -143,7 +145,7 @@ class ProfileLibrary:
                     WHERE profile_id IN ({placeholders})
                       AND embedding_vec IS NOT NULL
                       {ptype_filter}
-                    ORDER BY embedding_vec <=> :vec::vector
+                    ORDER BY embedding_vec <=> CAST(:vec AS vector)
                     LIMIT :limit
                 """), params).fetchall()
             else:

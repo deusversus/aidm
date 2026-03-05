@@ -123,14 +123,16 @@ class RuleLibrary:
         """Upsert a chunk into the database."""
         import json
         vec = self._embed(chunk.content)
+        vec_str = vec_to_pg(vec) if vec else None
+        vec_sql = "CAST(:vec AS vector)" if vec_str else "NULL"
         with self._conn() as conn:
-            conn.execute(sa.text("""
+            conn.execute(sa.text(f"""
                 INSERT INTO rule_library_chunks
                     (chunk_id, category, source_module, tags, retrieve_conditions,
                      content, embedding_vec, created_at)
                 VALUES
                     (:cid, :cat, :src, :tags::jsonb, :conds::jsonb,
-                     :content, :vec::vector, now())
+                     :content, {vec_sql}, now())
                 ON CONFLICT (chunk_id) DO UPDATE
                     SET category = EXCLUDED.category,
                         source_module = EXCLUDED.source_module,
@@ -179,11 +181,11 @@ class RuleLibrary:
                 params["vec"] = vec_to_pg(vec)
                 rows = conn.execute(sa.text(f"""
                     SELECT chunk_id, category, tags, content,
-                           (embedding_vec <=> :vec::vector) AS distance
+                           (embedding_vec <=> CAST(:vec AS vector)) AS distance
                     FROM rule_library_chunks
                     WHERE embedding_vec IS NOT NULL
                       {cat_filter}
-                    ORDER BY embedding_vec <=> :vec::vector
+                    ORDER BY embedding_vec <=> CAST(:vec AS vector)
                     LIMIT :limit
                 """), params).fetchall()
             else:
