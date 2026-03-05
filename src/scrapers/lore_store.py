@@ -18,10 +18,11 @@ import logging
 import time
 from typing import Any
 
+import sqlalchemy as sa
 from sqlalchemy import func
 
 from ..db.models import WikiPage
-from ..db.session import get_session
+from ..db.session import get_engine, get_session
 
 logger = logging.getLogger(__name__)
 
@@ -57,43 +58,35 @@ class LoreStore:
         stored = 0
 
         try:
-            with get_session() as db:
+            with get_engine().connect() as conn:
                 for page in pages:
                     content = page.get("content", "")
-                    word_count = len(content.split())
                     page_title = page.get("title", "Unknown")
-
-                    # Upsert: check if exists, update or insert
-                    existing = (
-                        db.query(WikiPage)
-                        .filter(
-                            WikiPage.profile_id == profile_id,
-                            WikiPage.page_title == page_title,
-                        )
-                        .first()
-                    )
-
-                    if existing:
-                        existing.page_type = page.get("page_type", "general")
-                        existing.content = content
-                        existing.word_count = word_count
-                        existing.source_wiki = source_wiki
-                        existing.scraped_at = now
-                    else:
-                        entry = WikiPage(
-                            profile_id=profile_id,
-                            page_title=page_title,
-                            page_type=page.get("page_type", "general"),
-                            content=content,
-                            word_count=word_count,
-                            source_wiki=source_wiki,
-                            scraped_at=now,
-                        )
-                        db.add(entry)
-
+                    conn.execute(sa.text("""
+                        INSERT INTO wiki_pages
+                            (profile_id, page_title, page_type, content,
+                             word_count, source_wiki, scraped_at)
+                        VALUES
+                            (:pid, :title, :ptype, :content,
+                             :wc, :wiki, :ts)
+                        ON CONFLICT (profile_id, page_title) DO UPDATE SET
+                            page_type  = EXCLUDED.page_type,
+                            content    = EXCLUDED.content,
+                            word_count = EXCLUDED.word_count,
+                            source_wiki = EXCLUDED.source_wiki,
+                            scraped_at = EXCLUDED.scraped_at
+                    """), {
+                        "pid": profile_id,
+                        "title": page_title,
+                        "ptype": page.get("page_type", "general"),
+                        "content": content,
+                        "wc": len(content.split()),
+                        "wiki": source_wiki,
+                        "ts": now,
+                    })
                     stored += 1
-
-                logger.info(f"[LoreStore] Stored {stored} pages for '{profile_id}' from {source_wiki}")
+                conn.commit()
+            logger.info(f"[LoreStore] Stored {stored} pages for '{profile_id}' from {source_wiki}")
         except Exception as e:
             logger.error(f"[LoreStore] Error storing pages for '{profile_id}': {e}")
 
