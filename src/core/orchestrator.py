@@ -101,8 +101,8 @@ class Orchestrator(TurnPipelineMixin, BackgroundMixin):
         finally:
             _db.close()
 
-        # Initialize Context Layer - use session_id for memory isolation
-        self.memory = MemoryStore(self.session_id)
+        # Initialize Context Layer - keyed by integer campaign_id
+        self.memory = MemoryStore(self.campaign_id)
         self.rules = RuleLibrary()
         self.context_selector = ContextSelector(self.memory, self.rules)
 

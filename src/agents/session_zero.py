@@ -328,8 +328,10 @@ async def process_session_zero_state(
     if not detected_info:
         return stats
 
-    # Initialize stores - use session_id for memory isolation
-    memory = MemoryStore(campaign_id=session_id)
+    # Initialize stores - keyed by integer campaign_id (falls back to None-safe skip)
+    if not campaign_id:
+        return stats
+    memory = MemoryStore(campaign_id=campaign_id)
 
     # === CHARACTER IDENTITY MEMORIES ===
 
@@ -581,33 +583,35 @@ async def process_session_zero_state(
 # ============================================================================
 
 
-async def index_session_zero_to_memory(session: Session) -> int:
+async def index_session_zero_to_memory(session: Session, campaign_id: int | None = None) -> int:
     """
     Index Session Zero dialogue into memory system for gameplay retrieval.
-    
+
     Called once at handoff. Uses existing MemoryStore to store character
     creation content so gameplay can retrieve it via RAG.
-    
+
     Chunks and categorizes the character creation content:
     - core: Character identity, backstory, abilities (no decay)
     - relationship: Handler/mentor relationships (slow decay)
     - fact: World-building decisions (slow decay)
-    
+
     Args:
         session: The completed Session Zero session
-        
+        campaign_id: Integer campaign ID (must be resolved before calling)
+
     Returns:
         Number of memory chunks indexed
     """
     from ..context.memory import MemoryStore
 
-    # Use session_id for memory isolation (not profile_id)
-    session_id = session.session_id
+    if not campaign_id:
+        logger.warning("[SessionZero→Memory] No campaign_id provided — skipping memory indexing")
+        return 0
 
-    logger.info(f"[SessionZero→Memory] Indexing character creation to memory for session: {session_id}")
+    logger.info(f"[SessionZero→Memory] Indexing character creation to memory for campaign: {campaign_id}")
 
-    # Create memory store for this session
-    memory = MemoryStore(campaign_id=session_id)
+    # Create memory store keyed by campaign_id
+    memory = MemoryStore(campaign_id=campaign_id)
 
     # Get all Session Zero messages
     messages = session.messages

@@ -76,14 +76,6 @@ async def _handle_gameplay_handoff(session, session_id: str, result, agent) -> t
     opening_narrative = None
     opening_portrait_map = None
 
-    # INDEX SESSION ZERO TO MEMORY (before creating orchestrator)
-    from src.agents.session_zero import index_session_zero_to_memory
-    try:
-        indexed_count = await index_session_zero_to_memory(session)
-        logger.info(f"Indexed {indexed_count} Session Zero chunks to memory")
-    except Exception as mem_err:
-        logger.error(f"Memory indexing failed (non-fatal): {mem_err}")
-
     # --- Settings Sync & Profile Resolution ---
     draft = session.character_draft
     profile_to_use = draft.narrative_profile
@@ -137,6 +129,14 @@ async def _handle_gameplay_handoff(session, session_id: str, result, agent) -> t
     )
     current_settings.active_campaign_id = str(resolved_campaign_id)
     settings_store.save(current_settings)
+
+    # INDEX SESSION ZERO TO MEMORY (after campaign_id is resolved)
+    from src.agents.session_zero import index_session_zero_to_memory
+    try:
+        indexed_count = await index_session_zero_to_memory(session, campaign_id=resolved_campaign_id)
+        logger.info(f"Indexed {indexed_count} Session Zero chunks to memory")
+    except Exception as mem_err:
+        logger.error(f"Memory indexing failed (non-fatal): {mem_err}")
 
     # Verify settings file
     import json
