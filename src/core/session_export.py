@@ -204,26 +204,27 @@ def export_session(campaign_id: int) -> bytes:
                 ]
             })
 
-        # Campaign Memories from ChromaDB
+        # Campaign Memories from PostgreSQL
         try:
-            import chromadb
-            from ..paths import CHROMA_DIR
-            client = chromadb.PersistentClient(path=str(CHROMA_DIR))
-            collection_name = f"campaign_{campaign_id}"
-
-            try:
-                collection = client.get_collection(collection_name)
-                results = collection.get(include=["documents", "metadatas"])
-                export_data["memories"] = {
-                    "ids": results["ids"],
-                    "documents": results["documents"],
-                    "metadatas": results["metadatas"]
+            from ..db.session import get_engine
+            import sqlalchemy as sa
+            with get_engine().connect() as conn:
+                rows = conn.execute(sa.text("""
+                    SELECT id, content, memory_type, heat, decay_rate,
+                           turn_number, flags, extra_meta
+                    FROM campaign_memories WHERE campaign_id = :cid
+                """), {"cid": campaign_id}).fetchall()
+            export_data["memories"] = [
+                {
+                    "id": str(r[0]), "content": r[1], "memory_type": r[2],
+                    "heat": r[3], "decay_rate": r[4], "turn_number": r[5],
+                    "flags": r[6], "extra_meta": r[7],
                 }
-            except Exception:
-                export_data["memories"] = {"ids": [], "documents": [], "metadatas": []}
+                for r in rows
+            ]
         except Exception as e:
             logger.warning(f"Warning: Could not export memories: {e}")
-            export_data["memories"] = {"ids": [], "documents": [], "metadatas": []}
+            export_data["memories"] = []
 
         # Settings
         from ..settings import get_settings_store
@@ -638,23 +639,22 @@ def import_session(zip_bytes: bytes) -> int:
     finally:
         db.close()
 
-    # Import memories to ChromaDB
-    memories_data = export_data.get("memories", {})
-    if memories_data.get("ids"):
+    # Import memories to PostgreSQL (re-embed via MemoryStore)
+    memories_data = export_data.get("memories", [])
+    if memories_data:
         try:
-            import chromadb
-            from ..paths import CHROMA_DIR
-            client = chromadb.PersistentClient(path=str(CHROMA_DIR))
-            collection = client.get_or_create_collection(
-                name=f"campaign_{new_campaign_id}",
-                metadata={"hnsw:space": "cosine"}
-            )
-            collection.add(
-                ids=memories_data["ids"],
-                documents=memories_data["documents"],
-                metadatas=memories_data["metadatas"]
-            )
-            logger.info(f"Restored {len(memories_data['ids'])} memories")
+            from ..context.memory import MemoryStore
+            store = MemoryStore(str(new_campaign_id))
+            for mem in memories_data:
+                store.add_memory(
+                    content=mem["content"],
+                    memory_type=mem.get("memory_type", "episodic"),
+                    turn_number=mem.get("turn_number") or 0,
+                    metadata=mem.get("extra_meta") or {},
+                    decay_rate=mem.get("decay_rate"),
+                    flags=mem.get("flags") or [],
+                )
+            logger.info(f"Restored {len(memories_data)} memories")
         except Exception as e:
             logger.warning(f"Warning: Could not restore memories: {e}")
 

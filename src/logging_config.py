@@ -31,7 +31,6 @@ def setup_logging(level: str = "INFO") -> None:
 
     # Quiet noisy third-party loggers
     for name in (
-        "chromadb",
         "httpx",
         "httpcore",
         "uvicorn.access",

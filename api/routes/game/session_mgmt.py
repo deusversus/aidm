@@ -463,20 +463,8 @@ async def delete_session(session_id: str):
         logger.error(f"Campaign DB cleanup error: {e}")
         results["campaign_deleted"] = False
 
-    # 4. Clear ChromaDB memory collection
-    results["memory_deleted"] = False
-    try:
-        import chromadb
-        from src.paths import CHROMA_DIR
-        client = chromadb.PersistentClient(path=str(CHROMA_DIR))
-        collection_name = f"campaign_{session_id}"
-        existing = [c.name for c in client.list_collections()]
-        if collection_name in existing:
-            client.delete_collection(collection_name)
-            results["memory_deleted"] = True
-            logger.info(f"Deleted memory collection: {collection_name}")
-    except Exception as e:
-        logger.error(f"Memory cleanup error: {e}")
+    # 4. campaign_memories rows are cascade-deleted with the campaign above
+    results["memory_deleted"] = results.get("campaign_deleted", False)
 
     # 5. Clean up custom profile/lore data
     custom_lib = get_custom_profile_library()

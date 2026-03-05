@@ -1,22 +1,26 @@
 """
 Rule Library for AIDM v3.
 
-Manages the RAG system for narrative guidance chunks extracted from 
+Manages the RAG system for narrative guidance chunks extracted from
 Module 12 (Narrative Scaling) and Module 13 (Narrative Calibration).
 
 Chunks are stored as YAML files in aidm_v3/rule_library/ and indexed
-in ChromaDB for semantic retrieval.
+in PostgreSQL with pgvector embeddings on first run.
 """
 
 import logging
 from pathlib import Path
 from typing import Any
 
-import chromadb
+import sqlalchemy as sa
 import yaml
 from pydantic import BaseModel
 
+from ..db.session import get_engine
+from ._embeddings import embed, get_api_key, vec_to_pg
+
 logger = logging.getLogger(__name__)
+
 
 class RuleChunk(BaseModel):
     """A single retrievable rule/guidance chunk."""
@@ -31,400 +35,276 @@ class RuleChunk(BaseModel):
 class RuleLibrary:
     """
     Manages the RAG system for narrative guidance chunks.
-    
+
     Loads YAML chunks from rule_library/ directory and indexes them
-    in ChromaDB for semantic retrieval.
+    in PostgreSQL (rule_library_chunks table) on first run.
     """
 
     def __init__(
         self,
-        persist_dir: str | None = None,
-        library_dir: str | None = None
+        persist_dir: str | None = None,   # ignored, legacy ChromaDB param
+        library_dir: str | None = None,
     ):
-        from ..paths import CHROMA_DIR, RULE_LIBRARY_DIR
-        persist_dir = persist_dir or str(CHROMA_DIR)
-        self.client = chromadb.PersistentClient(path=persist_dir)
-
-        # Find library directory
+        from ..paths import RULE_LIBRARY_DIR
+        self._engine = get_engine()
         self.library_dir = Path(library_dir) if library_dir else RULE_LIBRARY_DIR
 
-        # Collection for rule chunks
-        self.collection = self.client.get_or_create_collection(
-            name="rule_library_v2",
-            metadata={"hnsw:space": "cosine"}
-        )
-
-        # Track loaded chunks
-        self._chunks: dict[str, RuleChunk] = {}
-
-        # Initialize if empty
-        if self.collection.count() == 0:
+        # Initialize if table is empty
+        if self._count_db() == 0:
             self.initialize()
+
+    def _conn(self):
+        return self._engine.connect()
+
+    def _embed(self, text: str) -> list[float] | None:
+        return embed(text, api_key=get_api_key())
+
+    def _count_db(self) -> int:
+        try:
+            with self._conn() as conn:
+                return conn.execute(sa.text("SELECT COUNT(*) FROM rule_library_chunks")).scalar() or 0
+        except Exception:
+            return 0
+
+    # ── Initialization ────────────────────────────────────────────────────────
 
     def initialize(self):
         """Load all YAML chunks from library directory and index them."""
         if not self.library_dir.exists():
-            logger.warning(f"Warning: Rule library directory not found at {self.library_dir}")
+            logger.warning(f"Rule library directory not found at {self.library_dir}")
             return
 
         logger.info(f"Initializing Rule Library from {self.library_dir}...")
-
         chunks_loaded = 0
 
-        # Load all YAML files
         for yaml_file in self.library_dir.glob("**/*.yaml"):
             try:
-                chunks = self._load_yaml_file(yaml_file)
-                chunks_loaded += len(chunks)
+                chunks_loaded += self._load_yaml_file(yaml_file)
             except Exception as e:
                 logger.error(f"Error loading {yaml_file}: {e}")
 
         logger.info(f"Loaded {chunks_loaded} chunks into Rule Library.")
 
-    def _load_yaml_file(self, file_path: Path) -> list[RuleChunk]:
-        """Load chunks from a YAML file."""
-        with open(file_path, encoding='utf-8') as f:
+    def _load_yaml_file(self, file_path: Path) -> int:
+        """Load chunks from a YAML file, return count loaded."""
+        with open(file_path, encoding="utf-8") as f:
             content = f.read()
 
-        # YAML files contain multiple documents separated by ---
-        chunks = []
+        count = 0
         for doc in yaml.safe_load_all(content):
             if doc is None:
                 continue
-
-            # Handle both single chunk and list of chunks
             if isinstance(doc, list):
                 for item in doc:
-                    chunk = self._parse_chunk(item)
-                    if chunk:
-                        chunks.append(chunk)
-                        self._index_chunk(chunk)
+                    if self._index_chunk_dict(item):
+                        count += 1
             elif isinstance(doc, dict):
-                chunk = self._parse_chunk(doc)
-                if chunk:
-                    chunks.append(chunk)
-                    self._index_chunk(chunk)
+                if self._index_chunk_dict(doc):
+                    count += 1
+        return count
 
-        return chunks
+    def _index_chunk_dict(self, data: dict) -> bool:
+        """Parse and index a single chunk dict. Returns True if indexed."""
+        if not data or "id" not in data or "content" not in data:
+            return False
 
-    def _parse_chunk(self, data: dict) -> RuleChunk | None:
-        """Parse a dict into a RuleChunk."""
-        if not data or 'id' not in data or 'content' not in data:
-            return None
-
-        return RuleChunk(
-            id=data['id'],
-            category=data.get('category', 'unknown'),
-            source_module=data.get('source_module', 'unknown'),
-            tags=data.get('tags', []),
-            retrieve_conditions=data.get('retrieve_conditions', []),
-            content=data['content']
+        chunk = RuleChunk(
+            id=data["id"],
+            category=data.get("category", "unknown"),
+            source_module=data.get("source_module", "unknown"),
+            tags=data.get("tags", []),
+            retrieve_conditions=data.get("retrieve_conditions", []),
+            content=data["content"],
         )
+        self._index_chunk(chunk)
+        return True
 
     def _index_chunk(self, chunk: RuleChunk):
-        """Index a chunk in ChromaDB."""
-        self._chunks[chunk.id] = chunk
+        """Upsert a chunk into the database."""
+        import json
+        vec = self._embed(chunk.content)
+        with self._conn() as conn:
+            conn.execute(sa.text("""
+                INSERT INTO rule_library_chunks
+                    (chunk_id, category, source_module, tags, retrieve_conditions,
+                     content, embedding_vec, created_at)
+                VALUES
+                    (:cid, :cat, :src, :tags::jsonb, :conds::jsonb,
+                     :content, :vec::vector, now())
+                ON CONFLICT (chunk_id) DO UPDATE
+                    SET category = EXCLUDED.category,
+                        source_module = EXCLUDED.source_module,
+                        tags = EXCLUDED.tags,
+                        retrieve_conditions = EXCLUDED.retrieve_conditions,
+                        content = EXCLUDED.content,
+                        embedding_vec = EXCLUDED.embedding_vec
+            """), {
+                "cid": chunk.id,
+                "cat": chunk.category,
+                "src": chunk.source_module,
+                "tags": json.dumps(chunk.tags),
+                "conds": json.dumps(chunk.retrieve_conditions),
+                "content": chunk.content,
+                "vec": vec_to_pg(vec) if vec else None,
+            })
+            conn.commit()
 
-        # Prepare metadata
-        metadata = {
-            "category": chunk.category,
-            "source_module": chunk.source_module,
-            "tags": ",".join(chunk.tags),
-            "conditions": ",".join(chunk.retrieve_conditions)
-        }
-
-        # Add to collection
-        self.collection.upsert(
-            ids=[chunk.id],
-            documents=[chunk.content],
-            metadatas=[metadata]
-        )
+    # ── Retrieval ─────────────────────────────────────────────────────────────
 
     def retrieve(
         self,
         query: str,
         limit: int = 5,
         category: str | None = None,
-        tags: list[str] | None = None
+        tags: list[str] | None = None,
     ) -> list[dict[str, Any]]:
         """
         Retrieve relevant chunks based on semantic search.
-        
+
         Args:
-            query: Search query (e.g., "how to narrate tactical combat")
+            query: Search query
             limit: Maximum results to return
-            category: Filter by category (scale, archetype, ceremony, dna, genre)
+            category: Filter by category
             tags: Filter by tags (must have at least one)
-            
+
         Returns:
             List of dicts with chunk content and metadata
         """
-        # Build where clause for filtering
-        where = None
-        if category:
-            where = {"category": category}
+        cat_filter = "AND category = :cat" if category else ""
+        vec = self._embed(query)
+        params: dict[str, Any] = {"limit": limit * 2, "cat": category}
 
-        try:
-            results = self.collection.query(
-                query_texts=[query],
-                n_results=limit,
-                where=where
-            )
-        except Exception as e:
-            if "hnsw" in str(e).lower() or "Nothing found on disk" in str(e):
-                # HNSW index corrupted (e.g. server reload mid-write) — rebuild
-                logger.warning(f"HNSW index corrupted, rebuilding rule_library_v2: {e}")
-                self.client.delete_collection("rule_library_v2")
-                self.collection = self.client.get_or_create_collection(
-                    name="rule_library_v2",
-                    metadata={"hnsw:space": "cosine"}
-                )
-                self.initialize()
-                # Retry the query
-                results = self.collection.query(
-                    query_texts=[query],
-                    n_results=limit,
-                    where=where
-                )
+        with self._conn() as conn:
+            if vec:
+                params["vec"] = vec_to_pg(vec)
+                rows = conn.execute(sa.text(f"""
+                    SELECT chunk_id, category, tags, content,
+                           (embedding_vec <=> :vec::vector) AS distance
+                    FROM rule_library_chunks
+                    WHERE embedding_vec IS NOT NULL
+                      {cat_filter}
+                    ORDER BY embedding_vec <=> :vec::vector
+                    LIMIT :limit
+                """), params).fetchall()
             else:
-                raise
+                rows = conn.execute(sa.text(f"""
+                    SELECT chunk_id, category, tags, content, 0.5 AS distance
+                    FROM rule_library_chunks
+                    WHERE (
+                        to_tsvector('english', content) @@ plainto_tsquery('english', :query)
+                        OR content ILIKE :ilike
+                    )
+                    {cat_filter}
+                    ORDER BY LENGTH(content) DESC
+                    LIMIT :limit
+                """), {**params, "query": query, "ilike": f"%{query[:50]}%"}).fetchall()
 
         chunks = []
-        if results["ids"]:
-            ids = results["ids"][0]
-            documents = results["documents"][0]
-            metadatas = results["metadatas"][0]
-            distances = results["distances"][0] if results.get("distances") else [0] * len(ids)
+        for row in rows:
+            chunk_id, cat, tags_raw, content, distance = row
+            chunk_tags = tags_raw if isinstance(tags_raw, list) else []
 
-            for i, chunk_id in enumerate(ids):
-                # Optional tag filtering (post-query)
-                if tags:
-                    chunk_tags = metadatas[i].get("tags", "").split(",")
-                    if not any(t in chunk_tags for t in tags):
-                        continue
+            # Optional tag post-filter
+            if tags and not any(t in chunk_tags for t in tags):
+                continue
 
-                chunks.append({
-                    "id": chunk_id,
-                    "content": documents[i],
-                    "category": metadatas[i].get("category"),
-                    "tags": metadatas[i].get("tags", "").split(","),
-                    "score": 1.0 - distances[i]
-                })
+            chunks.append({
+                "id": chunk_id,
+                "content": content,
+                "category": cat,
+                "tags": chunk_tags,
+                "score": 1.0 - float(distance),
+            })
+            if len(chunks) >= limit:
+                break
 
         return chunks
 
     def get_relevant_rules(self, query: str, limit: int = 5) -> str:
-        """
-        Retrieve relevant rules as a formatted string context.
-        (Backwards compatible with old interface)
-        """
+        """Retrieve relevant rules as a formatted string context."""
         chunks = self.retrieve(query, limit=limit)
-
-        context_parts = []
+        parts = []
         for chunk in chunks:
             category = chunk.get("category", "unknown")
-            context_parts.append(
-                f"--- {category.upper()} Guidance ---\n{chunk['content']}"
-            )
-
-        return "\n\n".join(context_parts)
+            parts.append(f"--- {category.upper()} Guidance ---\n{chunk['content']}")
+        return "\n\n".join(parts)
 
     def get_by_category(self, category: str, limit: int = 10) -> list[dict[str, Any]]:
-        """Get all chunks of a specific category."""
-        return self.retrieve(
-            query=f"{category} guidance",
-            limit=limit,
-            category=category
-        )
+        return self.retrieve(query=f"{category} guidance", limit=limit, category=category)
 
     def get_scale_guidance(self, scale_name: str) -> str | None:
-        """Get guidance for a specific narrative scale."""
-        chunks = self.retrieve(
-            query=f"{scale_name} narrative scale",
-            limit=1,
-            category="scale"
-        )
+        chunks = self.retrieve(query=f"{scale_name} narrative scale", limit=1, category="scale")
         return chunks[0]["content"] if chunks else None
 
     def get_archetype_guidance(self, archetype: str) -> str | None:
-        """Get guidance for a specific OP archetype (legacy - use get_op_axis_guidance for 3-axis)."""
-        chunks = self.retrieve(
-            query=f"{archetype} archetype techniques",
-            limit=1,
-            category="archetype"
-        )
+        chunks = self.retrieve(query=f"{archetype} archetype techniques", limit=1, category="archetype")
         return chunks[0]["content"] if chunks else None
 
     def get_op_axis_guidance(self, axis: str, value: str) -> str | None:
-        """
-        Get guidance for a specific OP mode axis value.
-        
-        Args:
-            axis: Which axis (tension, expression, focus)
-            value: The value (e.g., "existential", "instantaneous", "faction")
-            
-        Returns:
-            Guidance content for that axis value
-        """
         if not value:
             return None
-
-        # Map axis to category
         category_map = {
             "tension": "op_tension",
             "expression": "op_expression",
-            "focus": "op_focus"
+            "focus": "op_focus",
         }
-
         category = category_map.get(axis)
         if not category:
             return None
-
         chunks = self.retrieve(
             query=f"{value} {axis} OP protagonist mode",
             limit=1,
-            category=category
+            category=category,
         )
         return chunks[0]["content"] if chunks else None
 
     def get_by_id(self, doc_id: str) -> str | None:
-        """
-        Get a document by its exact ID.
-        
-        Args:
-            doc_id: The document ID (e.g., "ceremony_t8_t7", "archetype_saitama")
-            
-        Returns:
-            Document content or None if not found
-        """
-        try:
-            results = self.collection.get(ids=[doc_id])
-            if results["documents"] and results["documents"][0]:
-                return results["documents"][0]
-        except Exception:
-            pass
-        return None
+        """Get a document by its exact chunk_id."""
+        with self._conn() as conn:
+            row = conn.execute(sa.text(
+                "SELECT content FROM rule_library_chunks WHERE chunk_id = :cid"
+            ), {"cid": doc_id}).fetchone()
+        return row[0] if row else None
 
     def get_ceremony_text(self, old_tier: int, new_tier: int) -> str | None:
-        """
-        Get tier transition ceremony text by exact ID lookup.
-        
-        Args:
-            old_tier: Previous tier number (e.g., 8 for T8)
-            new_tier: New tier number (e.g., 7 for T7)
-        """
-        # Direct ID lookup - ceremonies use format "ceremony_t8_t7"
-        doc_id = f"ceremony_t{old_tier}_t{new_tier}"
-        return self.get_by_id(doc_id)
+        return self.get_by_id(f"ceremony_t{old_tier}_t{new_tier}")
 
     def get_compatibility_guidance(self, tier: int, scale: str) -> str | None:
-        """
-        Get Director guidance for tier×scale combinations.
-        
-        Args:
-            tier: Character's power tier (0-11)
-            scale: Story scale (personal, local, continental, planetary, cosmic, ensemble, mythic)
-            
-        Returns:
-            Guidance for handling this combination, including:
-            - Compatibility assessment
-            - Recommended archetypes
-            - Narrative techniques
-            - Examples
-        """
-        # Determine tier range label for better matching
-        if tier <= 3:
-            tier_label = "low tier"
-        elif tier <= 7:
-            tier_label = "mid tier"
-        else:
-            tier_label = "high tier"
-
+        tier_label = "low tier" if tier <= 3 else ("mid tier" if tier <= 7 else "high tier")
         chunks = self.retrieve(
             query=f"{tier_label} tier {tier} {scale} scale compatibility guidance",
             limit=1,
-            category="compatibility"
+            category="compatibility",
         )
         return chunks[0]["content"] if chunks else None
 
     def get_power_tier_guidance(self, tier: int) -> str | None:
-        """
-        Get full power tier definition + narrative guidance.
-        
-        Args:
-            tier: Power tier (0-11)
-            
-        Returns:
-            Full tier guidance including:
-            - VS Battles definition
-            - Scale compatibility
-            - Combat/Focus/Challenges guidance
-            - Examples
-        """
         chunks = self.retrieve(
             query=f"power tier T{tier} narrative guidance scale compatibility",
             limit=1,
-            category="power_tier"
+            category="power_tier",
         )
         return chunks[0]["content"] if chunks else None
 
     def get_genre_guidance(self, genre: str, topic: str = "") -> str | None:
-        """
-        Get structural guidance for a genre.
-        
-        Args:
-            genre: Genre name (shonen, mystery, seinen, isekai, comedy, horror, slice_of_life)
-            topic: Optional specific topic (e.g., "training arc", "investigation")
-            
-        Returns:
-            Genre guidance with core elements and techniques
-        """
         query = f"{genre} genre"
         if topic:
             query += f" {topic}"
-
-        chunks = self.retrieve(
-            query=query,
-            limit=1,
-            category="genre"
-        )
+        chunks = self.retrieve(query=query, limit=1, category="genre")
         return chunks[0]["content"] if chunks else None
 
     def get_dna_guidance(self, scale_name: str, value: int) -> str | None:
-        """Get narration guidance for a DNA scale value."""
-        # Determine if low (0-3), mid (4-6), or high (7-10)
-        if value <= 3:
-            level = "low"
-        elif value >= 7:
-            level = "high"
-        else:
-            level = "mid"
-
+        level = "low" if value <= 3 else ("high" if value >= 7 else "mid")
         chunks = self.retrieve(
             query=f"{scale_name} {level} DNA narration style",
             limit=1,
-            category="dna"
+            category="dna",
         )
         return chunks[0]["content"] if chunks else None
 
     def get_tension_guidance(self, archetype: str, power_imbalance: float) -> str | None:
-        """
-        Get appropriate tension guidance based on archetype and power imbalance.
-        
-        For high power imbalance (>10), returns non-combat tension types.
-        
-        Args:
-            archetype: OP archetype (saitama, mob, overlord, etc.)
-            power_imbalance: PC power ÷ threat power
-            
-        Returns:
-            Tension guidance string or None
-        """
         if power_imbalance <= 3:
-            return None  # Standard combat is fine
-
-        # Select tension type based on archetype
-        tension_type = "structural"  # Default
+            return None
 
         archetype_tensions = {
             "saitama": "existential",
@@ -435,31 +315,23 @@ class RuleLibrary:
             "disguised_god": "social",
             "vampire_d": "existential",
             "rimuru": "ensemble",
-            "mashle": "structural"
+            "mashle": "structural",
         }
-
-        if archetype and archetype.lower() in archetype_tensions:
-            tension_type = archetype_tensions[archetype.lower()]
-
-        # Retrieve from RAG
+        tension_type = archetype_tensions.get((archetype or "").lower(), "structural")
         chunks = self.retrieve(
             query=f"{tension_type} tension OP protagonist",
             limit=1,
-            category="tension"
+            category="tension",
         )
-
         return chunks[0]["content"] if chunks else None
 
     def count(self) -> int:
-        """Get total number of indexed chunks."""
-        return self.collection.count()
+        return self._count_db()
 
     def close(self):
-        """Cleanup if needed."""
         pass
 
 
 # Convenience function
 def get_rule_library(persist_dir: str = None) -> RuleLibrary:
-    """Get a RuleLibrary instance."""
     return RuleLibrary(persist_dir=persist_dir)

@@ -14,8 +14,8 @@ fastapi>=0.100.0
 uvicorn>=0.24.0
 httpx>=0.27.0
 
-# Vector store
-chromadb>=1.0.0
+# Vector store (pgvector via timescale/timescaledb-ha:pg17-all)
+# chromadb removed — see dev/migrate_chroma_to_pg.py for one-time data migration
 
 # Utilities
 pydantic>=2.5.0

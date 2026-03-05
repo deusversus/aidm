@@ -11,6 +11,7 @@ PROJECT_ROOT = Path(__file__).parent.parent
 
 # Data directories
 DATA_DIR = PROJECT_ROOT / "data"
+# Legacy ChromaDB dirs — kept only for one-time data migration script
 CHROMA_DIR = DATA_DIR / "chroma"
 CHROMA_CUSTOM_DIR = DATA_DIR / "chroma_custom"
 MEDIA_DIR = DATA_DIR / "media"

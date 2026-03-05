@@ -156,17 +156,7 @@ class CoreMixin:
         except Exception as e:
             logger.error(f"Warning: init_db failed during reset: {e}")
 
-        # Clear campaign memory collections from ChromaDB
-        try:
-            import chromadb
-            from ..paths import CHROMA_DIR
-            client = chromadb.PersistentClient(path=str(CHROMA_DIR))
-            for col in client.list_collections():
-                if col.name.startswith("campaign_"):
-                    client.delete_collection(col.name)
-                    logger.info(f"Deleted memory collection: {col.name}")
-        except Exception as e:
-            logger.warning(f"Warning: Could not clear ChromaDB collections: {e}")
+        # campaign_memories rows are already cascade-deleted with campaigns above
 
         # Clear campaign media folders (preserve templates/ and references/)
         try:

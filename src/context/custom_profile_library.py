@@ -2,7 +2,7 @@
 Custom Profile Library for AIDM v3.
 
 Manages RAG storage for custom/original profiles.
-Uses a SEPARATE ChromaDB instance from canonical profiles for easy cleanup.
+Stores lore chunks in PostgreSQL (separate from canonical profiles).
 """
 
 import logging
@@ -10,179 +10,138 @@ import shutil
 import uuid
 from pathlib import Path
 
-import chromadb
+import sqlalchemy as sa
+
+from ..db.session import get_engine
+from ._embeddings import embed, get_api_key, vec_to_pg
 
 logger = logging.getLogger(__name__)
+
 
 class CustomProfileLibrary:
     """
     Manages the RAG system for custom (original) profiles.
-    
+
     Key differences from ProfileLibrary:
-    - Separate ChromaDB instance at data/chroma_custom/
     - Profiles keyed by session_id (not anime name)
     - Supports full cleanup when session is reset
+    - Uses custom_profile_lore_chunks table
     """
 
     def __init__(self, persist_dir: str | None = None):
-        from ..paths import CHROMA_CUSTOM_DIR
-        persist_dir = persist_dir or str(CHROMA_CUSTOM_DIR)
-        Path(persist_dir).mkdir(parents=True, exist_ok=True)
-        self.persist_dir = persist_dir
-        self.client = chromadb.PersistentClient(path=persist_dir)
+        # persist_dir is ignored (legacy ChromaDB param kept for interface compat)
+        self._engine = get_engine()
 
-        # Collection for custom profile lore
-        self.collection = self.client.get_or_create_collection(
-            name="custom_profiles_lore",
-            metadata={"hnsw:space": "cosine"}
-        )
+    def _conn(self):
+        return self._engine.connect()
+
+    def _embed(self, text: str) -> list[float] | None:
+        return embed(text, api_key=get_api_key())
+
+    # ── Ingestion ─────────────────────────────────────────────────────────────
 
     def add_custom_lore(
         self,
         session_id: str,
         content: str,
-        source: str = "generated"
+        source: str = "generated",
     ) -> int:
         """
         Ingest lore content for a custom profile.
-        
+
         Args:
             session_id: The session this profile belongs to
             content: Raw text content to chunk and index
-            source: Source type (e.g., "generated", "user_input")
-            
+            source: Source type ("generated", "user_input")
+
         Returns:
             Number of chunks indexed
         """
         chunks = self._chunk_text(content)
-
         if not chunks:
             return 0
 
-        ids = [f"{session_id}_{uuid.uuid4()}" for _ in chunks]
-        metadatas = [{
-            "session_id": session_id,
-            "source": source,
-            "chunk_index": i
-        } for i in range(len(chunks))]
-
-        self.collection.add(
-            ids=ids,
-            documents=chunks,
-            metadatas=metadatas
-        )
+        with self._conn() as conn:
+            for i, chunk_text in enumerate(chunks):
+                chunk_id = f"{session_id}_{uuid.uuid4()}"
+                vec = self._embed(chunk_text)
+                conn.execute(sa.text("""
+                    INSERT INTO custom_profile_lore_chunks
+                        (session_id, chunk_id, category, tags, content, embedding_vec, created_at)
+                    VALUES
+                        (:sid, :cid, :cat, '[]'::jsonb, :content, :vec::vector, now())
+                    ON CONFLICT (session_id, chunk_id) DO NOTHING
+                """), {
+                    "sid": session_id,
+                    "cid": chunk_id,
+                    "cat": source,
+                    "content": chunk_text,
+                    "vec": vec_to_pg(vec) if vec else None,
+                })
+            conn.commit()
 
         logger.info(f"Indexed {len(chunks)} lore chunks for session {session_id[:8]}...")
         return len(chunks)
+
+    # ── Search ────────────────────────────────────────────────────────────────
 
     def search_lore(
         self,
         session_id: str,
         query: str,
-        limit: int = 5
+        limit: int = 5,
     ) -> list[str]:
-        """
-        Search for lore relevant to the query, filtered by session_id.
-        
-        Args:
-            session_id: The session to search within
-            query: Search query
-            limit: Max results to return
-            
-        Returns:
-            List of matching lore chunks
-        """
-        results = self.collection.query(
-            query_texts=[query],
-            n_results=limit,
-            where={"session_id": session_id}
-        )
+        """Search for lore relevant to the query, filtered by session_id."""
+        vec = self._embed(query)
 
-        if results["documents"]:
-            return results["documents"][0]
-        return []
+        with self._conn() as conn:
+            if vec:
+                rows = conn.execute(sa.text("""
+                    SELECT content
+                    FROM custom_profile_lore_chunks
+                    WHERE session_id = :sid AND embedding_vec IS NOT NULL
+                    ORDER BY embedding_vec <=> :vec::vector
+                    LIMIT :limit
+                """), {"sid": session_id, "vec": vec_to_pg(vec), "limit": limit}).fetchall()
+            else:
+                rows = conn.execute(sa.text("""
+                    SELECT content
+                    FROM custom_profile_lore_chunks
+                    WHERE session_id = :sid
+                      AND (
+                          to_tsvector('english', content) @@ plainto_tsquery('english', :query)
+                          OR content ILIKE :ilike
+                      )
+                    LIMIT :limit
+                """), {"sid": session_id, "query": query, "ilike": f"%{query[:50]}%",
+                       "limit": limit}).fetchall()
+
+        return [r[0] for r in rows]
+
+    # ── Deletion ──────────────────────────────────────────────────────────────
 
     def delete_session_lore(self, session_id: str) -> int:
-        """
-        Delete all lore chunks for a session.
-        
-        Called when session is reset/deleted.
-        
-        Args:
-            session_id: The session to clean up
-            
-        Returns:
-            Number of chunks deleted
-        """
-        # Get all chunk IDs for this session
-        results = self.collection.get(
-            where={"session_id": session_id}
-        )
-
-        if results["ids"]:
-            self.collection.delete(ids=results["ids"])
-            logger.info(f"Deleted {len(results['ids'])} lore chunks for session {session_id[:8]}...")
-            return len(results["ids"])
-
-        return 0
+        """Delete all lore chunks for a session. Called when session is reset."""
+        with self._conn() as conn:
+            result = conn.execute(sa.text(
+                "DELETE FROM custom_profile_lore_chunks WHERE session_id = :sid"
+            ), {"sid": session_id})
+            conn.commit()
+            count = result.rowcount
+        logger.info(f"Deleted {count} lore chunks for session {session_id[:8]}...")
+        return count
 
     def has_session_profile(self, session_id: str, profiles_base: str = "./data/custom_profiles") -> bool:
-        """
-        Check if a session has a custom/hybrid profile stored.
-        
-        Used during handoff to verify hybrid profiles exist before using them.
-        
-        Args:
-            session_id: The session to check
-            profiles_base: Base directory for custom profiles
-            
-        Returns:
-            True if session has a stored profile, False otherwise
-        """
-        from pathlib import Path
+        """Check if a session has a custom/hybrid profile stored."""
         session_dir = Path(profiles_base) / session_id
         return session_dir.exists() and any(session_dir.glob("*.yaml"))
 
-    def _chunk_text(self, text: str, chunk_size: int = 1000, overlap: int = 100) -> list[str]:
-        """Simple chunking by paragraphs."""
-        if not text:
-            return []
-
-        paragraphs = text.split("\n\n")
-        chunks = []
-        current_chunk = ""
-
-        for para in paragraphs:
-            if len(current_chunk) + len(para) < chunk_size:
-                current_chunk += "\n\n" + para
-            else:
-                if current_chunk:
-                    chunks.append(current_chunk.strip())
-                current_chunk = para
-
-        if current_chunk:
-            chunks.append(current_chunk.strip())
-
-        return chunks
-
     def clear_all(self):
-        """Delete all custom profile data (lore + files).
-        
-        Called during full reset to clear hybrid/original profiles.
-        """
-        # Clear ChromaDB collection by deleting and recreating
-        try:
-            self.client.delete_collection("custom_profiles_lore")
-        except Exception:
-            pass  # Collection may not exist
+        """Delete all custom profile data (lore + files). Called during full reset."""
+        with self._conn() as conn:
+            conn.execute(sa.text("DELETE FROM custom_profile_lore_chunks"))
+            conn.commit()
 
-        self.collection = self.client.get_or_create_collection(
-            name="custom_profiles_lore",
-            metadata={"hnsw:space": "cosine"}
-        )
-
-        # Delete all custom profile folders
-        import shutil
         custom_dir = Path("./data/custom_profiles")
         if custom_dir.exists():
             shutil.rmtree(custom_dir)
@@ -190,38 +149,46 @@ class CustomProfileLibrary:
 
         logger.info("Cleared all custom profiles")
 
+    # ── Chunking ──────────────────────────────────────────────────────────────
+
+    def _chunk_text(self, text: str, chunk_size: int = 1000) -> list[str]:
+        """Simple paragraph-based chunking."""
+        if not text:
+            return []
+        paragraphs = text.split("\n\n")
+        chunks, current = [], ""
+        for para in paragraphs:
+            if len(current) + len(para) < chunk_size:
+                current += "\n\n" + para
+            else:
+                if current:
+                    chunks.append(current.strip())
+                current = para
+        if current:
+            chunks.append(current.strip())
+        return chunks
+
+
+# ── Module-level helpers (disk I/O, unchanged) ────────────────────────────────
 
 def save_custom_profile(
     session_id: str,
     world_data: dict,
     lore_content: str,
-    profiles_base: str = "./data/custom_profiles"
+    profiles_base: str = "./data/custom_profiles",
 ) -> Path:
-    """
-    Save a custom profile to disk.
-    
-    Args:
-        session_id: Session ID for folder naming
-        world_data: World configuration dict
-        lore_content: Generated lore text
-        profiles_base: Base directory for custom profiles
-        
-    Returns:
-        Path to the created profile folder
-    """
+    """Save a custom profile to disk."""
     import yaml
 
     profile_dir = Path(profiles_base) / session_id
     profile_dir.mkdir(parents=True, exist_ok=True)
 
-    # Save world config
     world_path = profile_dir / "world.yaml"
-    with open(world_path, 'w', encoding='utf-8') as f:
+    with open(world_path, "w", encoding="utf-8") as f:
         yaml.dump(world_data, f, default_flow_style=False, allow_unicode=True)
 
-    # Save lore text
     lore_path = profile_dir / "world_lore.txt"
-    with open(lore_path, 'w', encoding='utf-8') as f:
+    with open(lore_path, "w", encoding="utf-8") as f:
         f.write(lore_content)
 
     logger.info(f"Saved custom profile to {profile_dir}")
@@ -230,25 +197,14 @@ def save_custom_profile(
 
 def delete_custom_profile(
     session_id: str,
-    profiles_base: str = "./data/custom_profiles"
+    profiles_base: str = "./data/custom_profiles",
 ) -> bool:
-    """
-    Delete a custom profile folder from disk.
-    
-    Args:
-        session_id: Session ID
-        profiles_base: Base directory
-        
-    Returns:
-        True if deleted, False if not found
-    """
+    """Delete a custom profile folder from disk."""
     profile_dir = Path(profiles_base) / session_id
-
     if profile_dir.exists():
         shutil.rmtree(profile_dir)
         logger.info(f"Deleted custom profile folder for session {session_id[:8]}...")
         return True
-
     return False
 
 

@@ -1,6 +1,6 @@
 services:
   db:
-    image: postgres:17-alpine
+    image: timescale/timescaledb-ha:pg17-all
     restart: unless-stopped
     environment:
       POSTGRES_USER: aidm
@@ -9,12 +9,23 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - pgdata:/home/postgres/pgdata/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U aidm"]
       interval: 5s
       timeout: 5s
       retries: 5
+
+  pgai-worker:
+    image: timescale/pgai-vectorizer-worker:latest
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGAI_VECTORIZER_WORKER_DB_URL: postgresql://aidm:aidm@db:5432/aidm
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+    command: ["python", "-m", "pgai", "vectorizer", "worker", "--poll-interval", "5s"]
 
   aidm:
     build: .
@@ -30,7 +41,6 @@ services:
       - .env
     volumes:
       - ./data/media:/app/data/media
-      - ./data/chroma:/app/data/chroma
       - ./src/profiles/catalog:/app/src/profiles/catalog
       # Persist settings (API keys, model config) across image rebuilds
       - ./settings.json:/app/settings.json
