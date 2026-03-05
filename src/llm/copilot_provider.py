@@ -12,6 +12,7 @@ this class simply subclasses OpenAIProvider and overrides:
   - get_*_model()     — return Copilot-appropriate defaults
 """
 
+import asyncio
 import json
 import logging
 import re
@@ -168,6 +169,59 @@ class CopilotProvider(OpenAIProvider):
             base_url=_COPILOT_CHAT_URL,
             default_headers=_COPILOT_HEADERS,
         )
+
+    # ── Retry with auth recovery ───────────────────────────────────────────
+
+    async def _run_with_retry(
+        self,
+        sync_fn,
+        max_retries: int = 3,
+        base_delay: float = 2.0,
+    ):
+        """Override: on 401 auth errors, refresh the session token and retry once.
+
+        The base class only retries 429/529 rate-limit errors. Copilot session
+        tokens expire after ~1 hour; if a token expires mid-call (during
+        streaming) the API returns 401, which we catch here, force-refresh the
+        token, and transparently retry — without surfacing an error to the user.
+        """
+        loop = asyncio.get_running_loop()
+        auth_refreshed = False
+        last_exc = None
+
+        for attempt in range(max_retries + 1):
+            try:
+                return await loop.run_in_executor(None, sync_fn)
+            except Exception as exc:
+                # 401 / AuthenticationError: refresh the session token once
+                status = getattr(exc, "status_code", None)
+                is_auth = status == 401 or type(exc).__name__ == "AuthenticationError"
+                if is_auth and not auth_refreshed:
+                    logger.warning(
+                        "[copilot] 401 during API call — session token expired mid-call; "
+                        "refreshing and retrying"
+                    )
+                    auth_refreshed = True
+                    self._copilot_token = None
+                    self._client = None
+                    try:
+                        self._ensure_client()
+                    except Exception as refresh_exc:
+                        logger.error(f"[copilot] Token refresh failed: {refresh_exc}")
+                        raise exc from refresh_exc
+                    continue  # retry with new client
+
+                if not self._is_retryable(exc) or attempt == max_retries:
+                    raise
+                last_exc = exc
+                delay = base_delay * (2 ** attempt)
+                logger.warning(
+                    f"[copilot] {type(exc).__name__} — retrying in {delay:.0f}s "
+                    f"(attempt {attempt + 1}/{max_retries})"
+                )
+                await asyncio.sleep(delay)
+
+        raise last_exc  # unreachable, satisfies type checker
 
     # ── Model list helper (used by auth endpoint) ──────────────────────────
 
