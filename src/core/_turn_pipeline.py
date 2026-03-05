@@ -57,20 +57,12 @@ class TurnPipelineMixin:
                 None,
             )
 
-            # Auto-exit on explicit scene-start intent keywords (not inside /meta)
-            _start_keywords = ("start", "begin", "generate", "show scene", "let's go", "lets go", "kick off")
-            _auto_exit = not matched_exit and any(kw in stripped_lower for kw in _start_keywords)
-
-            if matched_exit or _auto_exit:
+            if matched_exit:
                 self._in_meta_conversation = False
-                logger.info("Exiting meta conversation mode (matched_exit=%s, auto_exit=%s)", matched_exit, _auto_exit)
+                logger.info("Exiting meta conversation mode via %s", matched_exit)
 
-                # Extract any trailing text after the exit command to pass as first gameplay turn
-                if matched_exit:
-                    suffix = stripped[len(matched_exit):].strip()
-                else:
-                    suffix = stripped  # auto-exit: full input becomes first gameplay turn
-
+                # Pass any trailing text as the first gameplay turn
+                suffix = stripped[len(matched_exit):].strip()
                 if suffix:
                     logger.info("Passing suffix as first gameplay turn: %r", suffix[:80])
                     return await self.process_turn(suffix)
@@ -86,7 +78,7 @@ class TurnPipelineMixin:
                     cost_usd=0.0
                 )
 
-            # Continue the meta conversation
+            # Continue the meta conversation (Director may auto-resolve)
             return await self._handle_meta_conversation(
                 player_input=player_input,
                 start_time=start,
@@ -911,14 +903,8 @@ class TurnPipelineMixin:
         # Get session for meta conversation history
         from .session import get_session_manager
         session_mgr = get_session_manager()
-        # Find the session — iterate since we don't have the ID here
-        meta_history = []
-        session = None
-        for sid, s in session_mgr._sessions.items():
-            if hasattr(s, 'meta_conversation_history'):
-                session = s
-                meta_history = s.meta_conversation_history
-                break
+        session = session_mgr.get_session(self.session_id)
+        meta_history = session.meta_conversation_history if session else []
 
         # --- Director responds first (structured: response + resolved flag) ---
         director_result = await self.director.respond_to_meta(
@@ -953,11 +939,11 @@ class TurnPipelineMixin:
         if meta_resolved:
             self._in_meta_conversation = False
             logger.info("Meta conversation resolved by Director — auto-exiting meta mode")
-            narrative = f"🎬 **Director:**\n{director_response}\n\n🎨 **Key Animator:**\n{ka_response}"
-            narrative += "\n\n---\n*Back to the story.*"
+            footer = "\n\n---\n*Back to the story.*"
         else:
-            narrative = f"🎬 **Director:**\n{director_response}\n\n🎨 **Key Animator:**\n{ka_response}"
-            narrative += "\n\n---\n*Continue the conversation, or type `/resume` to return to the story.*"
+            footer = "\n\n---\n*Continue the conversation, or type `/resume` to return to the story.*"
+
+        narrative = f"🎬 **Director:**\n{director_response}\n\n🎨 **Key Animator:**\n{ka_response}{footer}"
 
         # Build a minimal intent for the TurnResult
         meta_intent = IntentOutput(

@@ -996,16 +996,25 @@ Keep your response to 1-3 sentences. Do NOT write narrative prose or in-characte
         """
         messages = []
 
-        # Include conversation history for multi-turn meta dialogue
+        # Replay full conversation history so both Director and KA context is visible.
+        # Player turns become "user" messages; Director + KA responses from the same
+        # turn are bundled into a single "assistant" message.
         if conversation_history:
-            for entry in conversation_history:
-                role = entry.get("role", "user")
-                content = entry.get("content", "")
-                if role == "player":
-                    messages.append({"role": "user", "content": content})
-                elif role == "key_animator":
-                    messages.append({"role": "assistant", "content": content})
-                # Skip Director entries — they're handled separately
+            i = 0
+            while i < len(conversation_history):
+                entry = conversation_history[i]
+                if entry.get("role") == "player":
+                    messages.append({"role": "user", "content": entry["content"]})
+                    i += 1
+                    parts = []
+                    while i < len(conversation_history) and conversation_history[i].get("role") in ("director", "key_animator"):
+                        label = "🎬 Director" if conversation_history[i]["role"] == "director" else "🎨 Key Animator"
+                        parts.append(f"{label}:\n{conversation_history[i]['content']}")
+                        i += 1
+                    if parts:
+                        messages.append({"role": "assistant", "content": "\n\n".join(parts)})
+                else:
+                    i += 1
 
         # Inject meta interlude framing + game state + player message
         user_message = f"""{self._META_INTERLUDE_CONTEXT}
