@@ -91,8 +91,17 @@ async def _handle_gameplay_handoff(session, session_id: str, result, agent) -> t
             logger.info(f"Inferred profile from media_reference: {profile_to_use}")
 
     if profile_to_use and profile_to_use not in available_profiles:
-        logger.warning(f"Profile '{profile_to_use}' not found in: {available_profiles[:5]}...")
-        profile_to_use = None
+        # Try alias index — profile IDs are al_<anilist_id>, not slugs like "solo_leveling"
+        from src.profiles.loader import get_alias_index
+        from src.utils.title_utils import normalize_title
+        alias_map = get_alias_index()
+        resolved = alias_map.get(normalize_title(profile_to_use))
+        if resolved and resolved in available_profiles:
+            logger.info(f"Resolved profile '{profile_to_use}' → '{resolved}' via alias index")
+            profile_to_use = resolved
+        else:
+            logger.warning(f"Profile '{profile_to_use}' not found in: {available_profiles[:5]}...")
+            profile_to_use = None
 
     if not profile_to_use:
         session_profile_type = session.phase_state.get("profile_type")
