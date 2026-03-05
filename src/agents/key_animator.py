@@ -971,17 +971,12 @@ MATCH the established voice, humor, and style from these exchanges.
     # META CONVERSATION — out-of-character dialogue with the player
     # -----------------------------------------------------------------
 
-    META_SYSTEM_PROMPT = """You are the Key Animator (lead creative) of an anime production studio.
-
-THE STORY IS CURRENTLY PAUSED. The player has stepped outside the narrative to speak with the production team — this is a brief interlude between scenes. The Director has already responded; you add the creative execution perspective.
-
-Your role in this interlude:
-- Offer your creative perspective on how the narrative will be executed (tone, voice, pacing, imagery)
-- You may agree or build on the Director's response, or offer a different artistic angle
-- Be specific: "I'll open the next scene with..." or "I can shift the prose register toward..."
-
-Keep responses to 1-3 sentences. You're the artist, not the planner.
-Do NOT write narrative prose or in-character dialogue."""
+    # Injected into the user message so the KA's primary system prompt is preserved.
+    _META_INTERLUDE_CONTEXT = """\
+[META INTERLUDE — THE STORY IS CURRENTLY PAUSED]
+The player has stepped outside the narrative for a brief production conversation.
+Respond from your creative voice — tone, imagery, prose register, scene execution.
+Keep your response to 1-3 sentences. Do NOT write narrative prose or in-character dialogue."""
 
     async def respond_to_meta(
         self,
@@ -992,11 +987,9 @@ Do NOT write narrative prose or in-character dialogue."""
     ) -> str:
         """Respond to player meta-conversation as the Key Animator.
 
-        Args:
-            feedback: The player's out-of-character message
-            game_context: Formatted string with current game state
-            director_response: The Director's response (so KA can agree/disagree)
-            conversation_history: Previous meta conversation turns
+        Uses the KA's primary system prompt (vibe keeper template + profile DNA)
+        so narrative voice and campaign identity are fully preserved. Meta interlude
+        framing is injected into the user message, not the system prompt.
 
         Returns:
             Free-form conversational response
@@ -1014,8 +1007,10 @@ Do NOT write narrative prose or in-character dialogue."""
                     messages.append({"role": "assistant", "content": content})
                 # Skip Director entries — they're handled separately
 
-        # Current player message with context + Director's take
-        user_message = f"""## Current Game State
+        # Inject meta interlude framing + game state + player message
+        user_message = f"""{self._META_INTERLUDE_CONTEXT}
+
+## Current Game State
 {game_context}
 
 ## Player's Message (Out-of-Character)
@@ -1025,19 +1020,26 @@ Do NOT write narrative prose or in-character dialogue."""
             user_message += f"""
 
 ## Director's Response
-The Director (showrunner) already responded:
 {director_response}
 
-You may agree, disagree, or add a different creative perspective."""
+Add your creative execution perspective — agree, push back, or offer a different angle."""
 
         messages.append({"role": "user", "content": user_message})
 
         try:
             provider, model = self._get_provider_and_model()
 
+            # Build primary system prompt (template + profile DNA, no dynamic injections)
+            primary_prompt = self.vibe_keeper_template
+            primary_prompt = primary_prompt.replace("{{PROFILE_DNA_INJECTION}}", self._build_profile_dna())
+            for placeholder in ("{{SCENE_CONTEXT_INJECTION}}", "{{DIRECTOR_NOTES_INJECTION}}",
+                                "{{SAKUGA_MODE_INJECTION}}", "{{LORE_INJECTION}}",
+                                "{{MEMORIES_INJECTION}}", "{{RETRIEVED_CHUNKS_INJECTION}}"):
+                primary_prompt = primary_prompt.replace(placeholder, "")
+
             response = await provider.complete(
                 messages=messages,
-                system=self.META_SYSTEM_PROMPT,
+                system=primary_prompt,  # primary prompt — NOT overridden
                 model=model,
                 max_tokens=768,
                 temperature=0.7,
@@ -1047,4 +1049,4 @@ You may agree, disagree, or add a different creative perspective."""
 
         except Exception as e:
             logger.error(f"[key_animator] Meta conversation failed: {e}")
-            return "Noted — I'll keep that in mind for the next scene. (The Key Animator encountered an issue processing this.)"
+            return "Noted — I'll keep that in mind for the next scene."

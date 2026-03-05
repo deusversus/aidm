@@ -643,27 +643,18 @@ Provide a CONCISE investigation report structured as:
     # META CONVERSATION — out-of-character dialogue with the player
     # -----------------------------------------------------------------
 
-    META_SYSTEM_PROMPT = """You are the Director (showrunner) of an anime production studio.
-
-THE STORY IS CURRENTLY PAUSED. The player has stepped outside the narrative to speak with you directly — this is an interlude between scenes, not a scene itself. Your one job is to address what they need and get them back into the story.
-
-Context you have:
-- The current game state (arc, location, situation, character) is provided with each message
-- You know the campaign's narrative DNA and any active creative overrides
-
-Your role in this interlude:
-- Address the player's concern directly and honestly (arc pacing, tone, NPC behavior, power calibration, etc.)
-- If they want a change, commit to a specific adjustment — don't just acknowledge it
-- If you disagree, explain why briefly from a storytelling perspective
-- When the concern is resolved — or when the player signals they want to return — set resolved=true
+    # Injected into the user message (not the system prompt) so the Director's
+    # primary identity and campaign context are fully preserved.
+    _META_INTERLUDE_CONTEXT = """\
+[META INTERLUDE — THE STORY IS CURRENTLY PAUSED]
+The player has stepped outside the narrative to speak with you directly.
+Address their concern using your full knowledge of the campaign, then signal
+when the conversation is resolved (resolved=true) so they can return to the story.
 
 Set resolved=true when:
-- The player explicitly says they're done or ready to return (e.g. "ok thanks", "let's go", "start", "sounds good")
-- You've addressed their concern and there's nothing left to discuss
-- They haven't asked a follow-up question
-
-Keep responses concise (2-4 sentences). This is a production meeting, not a therapy session.
-Do NOT write narrative prose or in-character dialogue."""
+- The player signals they're done (e.g. "ok thanks", "let's go", "sounds good")
+- You've addressed their concern and there are no open questions
+Do NOT write narrative prose or in-character dialogue during this interlude."""
 
     async def respond_to_meta(
         self,
@@ -673,10 +664,9 @@ Do NOT write narrative prose or in-character dialogue."""
     ) -> "MetaDirectorResponse":
         """Respond to player meta-conversation as the Director (showrunner).
 
-        Args:
-            feedback: The player's out-of-character message
-            game_context: Formatted string with current game state
-            conversation_history: Previous meta conversation turns
+        Uses the Director's primary system prompt so campaign context and
+        identity are fully preserved. Meta interlude framing is injected
+        into the user message, not the system prompt.
 
         Returns:
             MetaDirectorResponse with response text and resolved flag
@@ -696,8 +686,10 @@ Do NOT write narrative prose or in-character dialogue."""
                     messages.append({"role": "assistant", "content": content})
                 # Skip KA entries — they appear separately
 
-        # Current player message with context
-        user_message = f"""## Current Game State
+        # Inject meta interlude framing + game state + player message
+        user_message = f"""{self._META_INTERLUDE_CONTEXT}
+
+## Current Game State
 {game_context}
 
 ## Player's Message (Out-of-Character)
@@ -713,7 +705,7 @@ Do NOT write narrative prose or in-character dialogue."""
             result = await provider.complete_with_schema(
                 messages=messages,
                 schema=MetaDirectorResponse,
-                system=self.META_SYSTEM_PROMPT,
+                system=self.system_prompt,  # primary prompt — NOT overridden
                 model=model,
                 max_tokens=1024,
             )
