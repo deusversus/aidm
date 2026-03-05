@@ -129,7 +129,7 @@ async def _handle_gameplay_handoff(session, session_id: str, result, agent) -> t
     current_settings.active_profile_id = profile_to_use
     current_settings.active_session_id = session.session_id
     # Resolve (or create) campaign by session_id now; store integer campaign.id
-    from src.db._core import StateManager
+    from src.db.state_manager import StateManager
     resolved_campaign_id = StateManager.get_or_create_campaign_by_session(
         session_id=session.session_id,
         profile_id=profile_to_use,
