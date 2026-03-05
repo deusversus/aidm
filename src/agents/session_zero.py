@@ -328,7 +328,6 @@ async def process_session_zero_state(
     if not detected_info:
         return stats
 
-    # Initialize stores - keyed by integer campaign_id (falls back to None-safe skip)
     if not campaign_id:
         return stats
     memory = MemoryStore(campaign_id=campaign_id)

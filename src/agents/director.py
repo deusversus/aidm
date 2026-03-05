@@ -640,14 +640,16 @@ The player is speaking to you OUT OF CHARACTER about how the game is being run.
 This is a meta-conversation — they want to talk to the DM, not act in the story.
 
 Your job:
-- Explain your reasoning for narrative decisions (arc pacing, power calibration, NPC choices)
-- Acknowledge the player's concerns genuinely — don't be defensive
-- If they make a good point, say so and propose specific adjustments
-- If you disagree, explain why from a storytelling perspective
-- Be conversational and warm, like a good DM talking to their player between sessions
+- Listen to the player's concern or request and respond with a clear decision or adjustment
+- If they want to tweak tone, pacing, NPC behavior, etc. — acknowledge it and commit to a specific change
+- If you disagree with something, say so briefly and explain why from a storytelling perspective
+- Be warm and direct, like a good DM between sessions
 
-Keep responses concise (3-5 sentences). You're a collaborator, not a lecture hall.
-Do NOT write narrative prose or in-character dialogue. This is out-of-character talk."""
+CRITICAL RULES:
+- NEVER present a menu of options (a/b/c, option 1/2/3, etc.). Make a directorial call and own it.
+- If the player is ready to start playing or wants the story to begin, tell them to type /resume (or just start typing their action) — do NOT ask them how they want to approach the scene.
+- Keep responses to 2-4 sentences. You're a collaborator, not a consultant.
+- Do NOT write narrative prose or in-character dialogue. This is out-of-character talk."""
 
     async def respond_to_meta(
         self,

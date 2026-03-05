@@ -47,13 +47,34 @@ class TurnPipelineMixin:
         # If so, skip intent classification — everything is meta until exit
         # =====================================================================
         if self._in_meta_conversation:
-            stripped = player_input.strip().lower()
-            exit_commands = {"/resume", "/play", "/back", "/exit"}
+            stripped = player_input.strip()
+            stripped_lower = stripped.lower()
+            exit_prefixes = ("/resume", "/play", "/back", "/exit")
 
-            if stripped in exit_commands:
-                # Exit meta mode
+            # Check if input starts with an exit command (may have trailing text)
+            matched_exit = next(
+                (cmd for cmd in exit_prefixes if stripped_lower == cmd or stripped_lower.startswith(cmd + " ")),
+                None,
+            )
+
+            # Auto-exit on explicit scene-start intent keywords (not inside /meta)
+            _start_keywords = ("start", "begin", "generate", "show scene", "let's go", "lets go", "kick off")
+            _auto_exit = not matched_exit and any(kw in stripped_lower for kw in _start_keywords)
+
+            if matched_exit or _auto_exit:
                 self._in_meta_conversation = False
-                logger.info("Exiting meta conversation mode")
+                logger.info("Exiting meta conversation mode (matched_exit=%s, auto_exit=%s)", matched_exit, _auto_exit)
+
+                # Extract any trailing text after the exit command to pass as first gameplay turn
+                if matched_exit:
+                    suffix = stripped[len(matched_exit):].strip()
+                else:
+                    suffix = stripped  # auto-exit: full input becomes first gameplay turn
+
+                if suffix:
+                    logger.info("Passing suffix as first gameplay turn: %r", suffix[:80])
+                    return await self.process_turn(suffix)
+
                 return TurnResult(
                     narrative="*The production studio lights dim as the cameras roll again...*\n\n---\n\n*You're back in the story. Any adjustments discussed will take effect going forward.*",
                     intent=await self.intent_classifier.call(

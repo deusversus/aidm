@@ -400,6 +400,26 @@ async def session_zero_turn(session_id: str, request: TurnRequest):
     except Exception:
         logger.debug(f"DEBUG: {msg_count} messages in session.")
 
+    # Ensure campaign exists from the very first turn so memory indexing works in real-time.
+    # profile_id may not be known yet — use whatever is on the draft (may be None/empty).
+    # get_or_create_campaign_by_session is idempotent; handoff will call it again safely.
+    if not session.phase_state.get("campaign_id"):
+        from src.db.state_manager import StateManager as _SM
+        _draft_profile = session.character_draft.narrative_profile or "session_zero"
+        _cid = _SM.get_or_create_campaign_by_session(
+            session_id=session.session_id,
+            profile_id=_draft_profile,
+            profile_name=f"Session Zero — {session.session_id[:8]}",
+        )
+        session.phase_state["campaign_id"] = _cid
+        logger.info(f"[SessionZero] Campaign created early: campaign_id={_cid}")
+
+    _early_campaign_id: int = session.phase_state["campaign_id"]
+
+    # Snapshot requirements BEFORE this turn so we can detect if they were
+    # already all met (the LLM sometimes narrates the scene instead of handing off)
+    _reqs_already_met = len(get_missing_requirements(session.character_draft)) == 0
+
     try:
         result = await agent.process_turn(session, request.player_input)
 
@@ -432,14 +452,14 @@ async def session_zero_turn(session_id: str, request: TurnRequest):
 
             apply_detected_info(session, result.detected_info)
 
-            # FLUID STATE INTEGRATION: Process detected_info for memory/NPC updates
-            # This calls add_memory() for character facts, creates NPCs, stores canonicality
-            # Use session_id for memory isolation (not profile_id)
+            # FLUID STATE INTEGRATION: Index character facts and create NPC records
+            # in real-time using the campaign that was created at turn start.
             try:
                 state_stats = await process_session_zero_state(
                     session=session,
                     detected_info=result.detected_info,
-                    session_id=session.session_id
+                    session_id=session.session_id,
+                    campaign_id=_early_campaign_id,
                 )
                 if state_stats.get("memories_added", 0) > 0:
                     logger.info(f"Fluid state: {state_stats['memories_added']} memories, {state_stats.get('npcs_created', 0)} NPCs")
@@ -635,6 +655,16 @@ async def session_zero_turn(session_id: str, request: TurnRequest):
                     "hidden": [], "display_order": [],
                 }
                 logger.debug("No canonical stat mapping in profile — using D&D defaults")
+
+        # SAFETY NET: if requirements were already all met before this turn,
+        # the LLM should have set ready_for_gameplay but may have written prose instead.
+        # Force handoff so the player is never stuck after completing character creation.
+        if _reqs_already_met and not result.ready_for_gameplay:
+            logger.warning(
+                "[SessionZero] Safety net: requirements were already complete — "
+                "forcing ready_for_gameplay=True (LLM did not set it)"
+            )
+            result.ready_for_gameplay = True
 
         # Handle gameplay transition
         if result.ready_for_gameplay:
