@@ -152,7 +152,7 @@ class MemoryStore:
                      turn_number, flags, extra_meta, embedding_vec, created_at)
                 VALUES
                     (:cid, :content, :mtype, 100.0, :decay,
-                     :turn, :flags::jsonb, :meta::jsonb,
+                     :turn, CAST(:flags AS jsonb), CAST(:meta AS jsonb),
                      {vec_sql}, now())
                 RETURNING id
             """), {

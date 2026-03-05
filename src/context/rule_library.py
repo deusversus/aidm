@@ -131,7 +131,7 @@ class RuleLibrary:
                     (chunk_id, category, source_module, tags, retrieve_conditions,
                      content, embedding_vec, created_at)
                 VALUES
-                    (:cid, :cat, :src, :tags::jsonb, :conds::jsonb,
+                    (:cid, :cat, :src, CAST(:tags AS jsonb), CAST(:conds AS jsonb),
                      :content, {vec_sql}, now())
                 ON CONFLICT (chunk_id) DO UPDATE
                     SET category = EXCLUDED.category,
