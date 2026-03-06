@@ -115,6 +115,17 @@ class ContextSelector:
             # Guaranteed plot-critical injection
             critical = self._get_plot_critical_memories()
             raw_memories = self._merge_and_dedup(raw_memories, critical)
+
+            # Hot memory baseline: memories the campaign keeps returning to.
+            # Appended last (lowest priority) so they fill context gaps without
+            # displacing semantically-matched or plot-critical memories.
+            hot = self.memory.get_hot_memories(min_heat=60.0, limit=3)
+            if hot:
+                existing_keys = {m.get("content", "")[:100] for m in raw_memories}
+                new_hot = [h for h in hot if h.get("content", "")[:100] not in existing_keys]
+                if new_hot:
+                    raw_memories = raw_memories + new_hot
+                    logger.debug(f"Hot memory baseline: injected {len(new_hot)} high-heat memories")
         else:
             raw_memories = []  # Tier 0: no memory retrieval
 
