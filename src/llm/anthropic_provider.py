@@ -45,6 +45,20 @@ class AnthropicProvider(LLMProvider):
         """Get Opus model explicitly."""
         return "claude-opus-4-6"
 
+    # Models that support the 1M token context window via beta header.
+    _1M_CONTEXT_MODELS = frozenset({"opus-4-6", "sonnet-4-6", "sonnet-4-5"})
+
+    def _get_betas(self, model_name: str, base_betas: list[str] | None = None) -> list[str]:
+        """Return the beta features list for the given model.
+
+        Appends context-1m-2025-08-07 for models that support the 1M token
+        context window (Opus 4.6, Sonnet 4.6, Sonnet 4.5).
+        """
+        betas = list(base_betas or [])
+        if any(slug in model_name for slug in self._1M_CONTEXT_MODELS):
+            betas.append("context-1m-2025-08-07")
+        return betas
+
     def get_research_model(self) -> str:
         """Model optimized for research with web search."""
         return "claude-sonnet-4-6"
@@ -128,10 +142,16 @@ class AnthropicProvider(LLMProvider):
             kwargs["max_tokens"] = max(max_tokens, 8192)
 
         # Use streaming to prevent truncation issues with long responses
+        betas = self._get_betas(model_name)
         async def _stream_and_collect():
             full_text = ""
             final_message = None
-            async with self._client.messages.stream(**kwargs) as stream:
+            stream_ctx = (
+                self._client.beta.messages.stream(**kwargs, betas=betas)
+                if betas else
+                self._client.messages.stream(**kwargs)
+            )
+            async with stream_ctx as stream:
                 async for text in stream.text_stream:
                     full_text += text
                 final_message = await stream.get_final_message()
@@ -204,13 +224,19 @@ class AnthropicProvider(LLMProvider):
             kwargs["max_tokens"] = max(max_tokens, 8192)
 
         # Use streaming to prevent truncation with long responses
+        betas = self._get_betas(model_name)
         async def _stream_and_collect():
             content = ""
             search_results = []
             citations = []
             final_message = None
 
-            async with self._client.messages.stream(**kwargs) as stream:
+            stream_ctx = (
+                self._client.beta.messages.stream(**kwargs, betas=betas)
+                if betas else
+                self._client.messages.stream(**kwargs)
+            )
+            async with stream_ctx as stream:
                 async for text in stream.text_stream:
                     content += text
                 final_message = await stream.get_final_message()
@@ -305,15 +331,19 @@ class AnthropicProvider(LLMProvider):
             kwargs["tool_choice"] = {"type": "tool", "name": "respond"}
 
         # Use streaming to prevent truncation with long responses
+        betas = self._get_betas(model_name)
         async def _stream_and_collect():
             text_content = ""
             final_message = None
-
-            async with self._client.messages.stream(**kwargs) as stream:
+            stream_ctx = (
+                self._client.beta.messages.stream(**kwargs, betas=betas)
+                if betas else
+                self._client.messages.stream(**kwargs)
+            )
+            async with stream_ctx as stream:
                 async for text in stream.text_stream:
                     text_content += text
                 final_message = await stream.get_final_message()
-
             return text_content, final_message
 
         text_content, final_message = await self._call_with_retry(_stream_and_collect)
@@ -430,11 +460,19 @@ Your response must match the required JSON schema.
             kwargs["temperature"] = 1.0
             kwargs["max_tokens"] = max(max_tokens, 8192)
 
-        # Regular messages endpoint - no beta needed for web search
-        response = await self._call_with_retry(
-            self._client.messages.create,
-            **kwargs
-        )
+        # Route to beta.messages.create for models that need context-1m header
+        betas = self._get_betas(model_name)
+        if betas:
+            response = await self._call_with_retry(
+                self._client.beta.messages.create,
+                betas=betas,
+                **kwargs
+            )
+        else:
+            response = await self._call_with_retry(
+                self._client.messages.create,
+                **kwargs
+            )
 
         # Extract structured response from tool use
         for block in response.content:
@@ -522,7 +560,7 @@ Your response must match the required JSON schema.
         for round_num in range(max_tool_rounds):
             kwargs = {
                 "model": model_name,
-                "betas": ["advanced-tool-use-2025-11-20"],
+                "betas": self._get_betas(model_name, ["advanced-tool-use-2025-11-20"]),
                 "max_tokens": max_tokens,
                 "system": self._build_system_blocks(system),
                 "messages": conversation,
@@ -665,7 +703,7 @@ Your response must match the required JSON schema.
         final_response = await self._call_with_retry(
             self._client.beta.messages.create,
             model=model_name,
-            betas=["advanced-tool-use-2025-11-20"],
+            betas=self._get_betas(model_name, ["advanced-tool-use-2025-11-20"]),
             max_tokens=max_tokens,
             system=system or "",
             messages=conversation,
@@ -719,10 +757,18 @@ Your response must match the required JSON schema.
                 "tools": anthropic_tools,
             }
 
-            response = await self._call_with_retry(
-                self._client.messages.create,
-                **kwargs
-            )
+            betas = self._get_betas(model_name)
+            if betas:
+                response = await self._call_with_retry(
+                    self._client.beta.messages.create,
+                    betas=betas,
+                    **kwargs
+                )
+            else:
+                response = await self._call_with_retry(
+                    self._client.messages.create,
+                    **kwargs
+                )
 
             if hasattr(response, 'usage'):
                 total_usage["prompt_tokens"] += response.usage.input_tokens
@@ -798,13 +844,24 @@ Your response must match the required JSON schema.
             "content": "You've completed your research. Now produce your final response based on everything you've found."
         })
 
-        final_response = await self._call_with_retry(
-            self._client.messages.create,
-            model=model_name,
-            max_tokens=max_tokens,
-            system=system or "",
-            messages=conversation,
-        )
+        _betas = self._get_betas(model_name)
+        if _betas:
+            final_response = await self._call_with_retry(
+                self._client.beta.messages.create,
+                model=model_name,
+                betas=_betas,
+                max_tokens=max_tokens,
+                system=system or "",
+                messages=conversation,
+            )
+        else:
+            final_response = await self._call_with_retry(
+                self._client.messages.create,
+                model=model_name,
+                max_tokens=max_tokens,
+                system=system or "",
+                messages=conversation,
+            )
 
         final_text = ""
         for block in final_response.content:
