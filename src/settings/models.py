@@ -18,8 +18,6 @@ class ModelConfig(BaseModel):
     )
 
 
-from typing import ClassVar
-
 class AgentSettings(BaseModel):
     """Per-agent model configuration.
     
