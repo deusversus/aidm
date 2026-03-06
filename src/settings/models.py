@@ -73,10 +73,6 @@ class AgentSettings(BaseModel):
         default=None,
         description="Model for memory relevance scoring (fast model preferred)"
     )
-    context_selector: ModelConfig | None = Field(
-        default=None,
-        description="RESERVED: ContextSelector is not a BaseAgent and does not use this field"
-    )
 
     # === JUDGMENT AGENTS (Phase 3) ===
     combat: ModelConfig | None = Field(

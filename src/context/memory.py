@@ -537,7 +537,7 @@ class MemoryStore:
         )
         try:
             manager = get_llm_manager()
-            provider, model = manager.get_provider_for_agent("context_selector")
+            provider, model = manager.get_provider_for_agent("compactor")
             response = await provider.complete(
                 messages=[{"role": "user", "content": prompt}],
                 system="You are a memory compression assistant. Create concise summaries that preserve essential information.",
