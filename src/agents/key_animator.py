@@ -595,7 +595,7 @@ Time compresses. Multiple scenes, one momentum:
                 "1. get_npc_details — Get the FULL profile of any NPC being interacted with (disposition, emotional milestones, secrets)\n"
                 "2. search_memory — Search for shared history between protagonist and this NPC\n"
                 "3. list_known_npcs — Who else is relevant to this social dynamic?\n"
-                "4. search_turn_history — Did something happen earlier in the story that relates? Search by keyword."
+                "4. recall_scene — Did something happen earlier in the story that relates? Search by keyword."
             ),
             "EXPLORATION": (
                 "EXPLORATION RESEARCH PRIORITY:\n"
@@ -648,6 +648,30 @@ Situation: {context.situation or 'Unknown'}{npc_hint}
 
 ## Investigation Strategy
 {strategy}
+
+## All Available Tools
+**Memory & History**
+- `search_memory` — semantic search over long-term ChromaDB memories (relationships, past events, Session Zero facts)
+- `get_critical_memories` — retrieve memories flagged as plot-critical (never decays)
+- `get_recent_episodes` — recent turn summaries for continuity
+- `recall_scene` — keyword search of full turn history in DB; finds specific scenes from any point in the campaign
+- `get_turn_narrative` — get the complete text of a specific turn number (use after recall_scene)
+
+**Characters & NPCs**
+- `get_character_sheet` — protagonist's full stats, abilities, inventory, level
+- `get_npc_details` — full NPC profile: disposition, emotional milestones, secrets, faction ties
+- `list_known_npcs` — all catalogued NPCs with brief summaries
+- `update_npc` — record newly learned info about an NPC (personality, goals, secrets)
+- `summon_npc` — bring an existing catalog NPC into the active scene
+- `dismiss_npc` — remove an NPC from the active scene
+- `spawn_transient` — create a temporary background actor (unnamed mobs, vendors, bystanders)
+- `register_catalog_npc` — add a new named NPC of narrative importance to the permanent catalog
+
+**World & Factions**
+- `get_world_state` — current location, situation, arc phase, tension level
+- `get_faction_details` — full faction profile (goals, reputation, members)
+- `list_factions` — all known factions with brief summaries
+- `search_lore` — search narrative profile lore/world-building documents (if available)
 
 ## Rules
 - Be SURGICAL. Only use 2-4 tool calls maximum — pick the ones most relevant to this action.

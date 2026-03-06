@@ -201,33 +201,10 @@ def build_gameplay_tools(
     # -----------------------------------------------------------------
 
     registry.register(ToolDefinition(
-        name="search_turn_history",
-        description=(
-            "Search the full campaign turn history (all past turns in the DB) by keyword. "
-            "Use this to recall specific scenes, events, or moments that happened earlier "
-            "in the story — including turns that are no longer in the active context window. "
-            "Returns turn number, player input, and a narrative excerpt for each match. "
-            "Optionally narrow results by NPC name or turn range."
-        ),
-        parameters=[
-            ToolParam("query", "str", "Keyword to search for in past narratives", required=True),
-            ToolParam("npc", "str", "Optional: filter results to turns mentioning this NPC name", required=False),
-            ToolParam("turn_start", "int", "Optional: only search turns at or after this turn number", required=False),
-            ToolParam("turn_end", "int", "Optional: only search turns at or before this turn number", required=False),
-            ToolParam("limit", "int", "Max results to return (default 5)", required=False),
-        ],
-        handler=lambda query, npc=None, turn_start=None, turn_end=None, limit=5: _search_turn_history(
-            state, query, npc=npc,
-            turn_range=(turn_start, turn_end) if turn_start is not None or turn_end is not None else None,
-            limit=limit
-        )
-    ))
-
-    registry.register(ToolDefinition(
         name="get_turn_narrative",
         description=(
             "Retrieve the full narrative text for a specific turn number. "
-            "Use after search_turn_history to read the complete scene for a turn of interest."
+            "Use after recall_scene to read the complete scene for a turn of interest."
         ),
         parameters=[
             ToolParam("turn_number", "int", "The turn number to retrieve", required=True),
@@ -505,17 +482,6 @@ def _update_npc(state, name: str, **kwargs) -> dict:
         }
     except Exception as e:
         return {"error": f"Failed to update NPC '{name}': {e}"}
-
-
-def _search_turn_history(state, query: str, npc: str = None, turn_range: tuple = None, limit: int = 5) -> list[dict]:
-    """Search full turn history in the DB by keyword."""
-    try:
-        results = state.search_turns(query, npc=npc, turn_range=turn_range, limit=limit)
-        if not results:
-            return [{"info": f"No turn history matches for '{query}'"}]
-        return results
-    except Exception as e:
-        return [{"error": f"Turn history search failed: {e}"}]
 
 
 def _get_turn_narrative(state, turn_number: int) -> dict:

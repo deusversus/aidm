@@ -131,8 +131,43 @@ Using the tools available, investigate and manage:
 2. Check active foreshadowing — any seeds ready for callback or overdue?
 3. Run a spotlight analysis — which NPCs need more or less screen time?
 4. For the top 1-2 underserved NPCs, get their full trajectory
-5. Search memory for any unresolved plot threads. Use search_turn_history to find specific scenes or moments from earlier in the campaign that are no longer in recent context.
+5. Search memory for any unresolved plot threads. Use recall_scene to find specific scenes from earlier in the campaign that are no longer in recent context.
 6. If any Transient Entities have become narratively significant, USE the promote_to_catalog tool to make them permanent NPCs.
+
+## All Available Tools
+**Arc & Story**
+- `get_campaign_bible` — previous Director arc decisions, tension targets, narrative goals
+- `get_active_foreshadowing` — seeds currently in play, their payoff windows and status
+- `get_overdue_seeds` — seeds past their maximum payoff window (resolve, escalate, or abandon)
+- `plant_foreshadowing_seed` — plant a new seed (mystery, threat, promise, Chekhov's gun, etc.)
+- `get_spotlight_analysis` — which NPCs are over/underexposed relative to their role
+- `get_npc_trajectory` — full arc history and next beat recommendation for a specific NPC
+- `create_quest` — establish a new quest/objective in the DB
+- `update_quest_status` — mark a quest active, completed, failed, or abandoned
+- `complete_quest_objective` — mark a specific sub-objective as done
+
+**Memory & History**
+- `search_memory` — semantic search over long-term ChromaDB memories
+- `get_critical_memories` — memories flagged as plot-critical
+- `mark_memory_critical` — flag a key memory so it never decays (betrayals, revelations, defining moments)
+- `get_recent_episodes` — recent turn summaries
+- `recall_scene` — keyword search of full turn history in DB; finds scenes from any point in the campaign
+- `get_turn_narrative` — get complete text for a specific turn number (use after recall_scene)
+
+**Characters & NPCs**
+- `get_npc_details` — full NPC profile: disposition, milestones, secrets
+- `list_known_npcs` — all catalogued NPCs
+- `get_npc_trajectory` — NPC's narrative arc and recommended next beat
+- `update_npc` — record newly learned info about an NPC
+- `promote_to_catalog` — promote a transient entity to a permanent catalog NPC
+- `summon_npc` / `dismiss_npc` — manage scene presence
+
+**World & Factions**
+- `get_world_state` — current location, arc phase, tension level
+- `get_character_sheet` — protagonist stats and abilities
+- `get_faction_details` — faction goals, members, reputation
+- `list_factions` — all known factions
+- `search_lore` — search profile lore documents (if available)
 
 Provide a CONCISE investigation report structured as:
 - ARC CONTINUITY: What did the last Director pass plan? Are we on track?
