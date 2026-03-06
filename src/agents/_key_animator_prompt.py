@@ -291,6 +291,11 @@ This triggers a portrait panel. Use sparingly — only for panel-worthy moments.
             lines.append("### 📏 Rule Library Guidance (Structural)")
             lines.append(self._static_rule_guidance)
 
+        if getattr(self, '_voice_journal', None):
+            lines.append("")
+            lines.append("### 🎙️ Voice Calibration (Previous Session)")
+            lines.append(self._voice_journal)
+
         return "\n".join(lines)
 
     def set_static_rule_guidance(self, guidance: str) -> None:

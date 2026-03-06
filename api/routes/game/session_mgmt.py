@@ -29,6 +29,11 @@ _orchestrator: Orchestrator | None = None
 _session_zero_agent: SessionZeroAgent | None = None
 
 
+def get_orchestrator_optional() -> "Orchestrator | None":
+    """Return the current orchestrator if one exists, without creating a new one."""
+    return _orchestrator
+
+
 def get_orchestrator() -> Orchestrator:
     """Get or create the orchestrator instance."""
     global _orchestrator

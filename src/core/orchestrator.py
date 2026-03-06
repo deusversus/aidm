@@ -109,7 +109,10 @@ class Orchestrator(TurnPipelineMixin, BackgroundMixin):
         # Initialize agents
         self.intent_classifier = IntentClassifier()
         self.outcome_judge = OutcomeJudge()
-        self.key_animator = KeyAnimator(self.profile)
+        # Load voice journal from bible if available (step 13)
+        _bible = self.state.get_campaign_bible()
+        _voice_journal = (_bible.planning_data or {}).get("voice_journal") if _bible else None
+        self.key_animator = KeyAnimator(self.profile, voice_journal=_voice_journal)
         self.validator = ValidatorAgent()
 
         # Phase 4: Director
@@ -169,6 +172,84 @@ class Orchestrator(TurnPipelineMixin, BackgroundMixin):
         except Exception as e:
             logger.warning("Orchestrator close — state close failed: %s", e)
         logger.info("Orchestrator for '%s' shut down", self.profile_id)
+
+    async def async_close(self) -> None:
+        """Async teardown: writes KA voice journal and Director session memo, then closes."""
+        try:
+            from ..context.session_memory_writer import SessionMemoryWriter
+            writer = SessionMemoryWriter()
+            db_context = self.state.get_context()
+            bible = self.state.get_campaign_bible()
+            planning = bible.planning_data or {} if bible else {}
+
+            # Gather inputs
+            recent_narrative = ""
+            try:
+                compaction = self.state.get_compaction_text() if hasattr(self.state, 'get_compaction_text') else ""
+                recent_narrative = compaction or ""
+            except Exception:
+                pass
+            meta_feedback = ""
+            try:
+                meta_history = self.state.get_meta_conversation_history()
+                meta_feedback = " ".join(
+                    m.get("content", "") for m in (meta_history or []) if m.get("role") == "user"
+                )[-2000:]
+            except Exception:
+                pass
+
+            active_seeds: list[dict] = []
+            try:
+                seeds = self.foreshadowing.get_active_seeds()
+                active_seeds = [
+                    {"description": s.description, "status": s.status.value} for s in seeds
+                ]
+            except Exception:
+                pass
+
+            npc_debt: list[dict] = []
+            try:
+                npcs = self.state.get_all_npcs()
+                npc_debt = sorted(
+                    [{"name": n.name, "scene_count": n.scene_count} for n in npcs if n.scene_count > 0],
+                    key=lambda x: -x["scene_count"],
+                )[:10]
+            except Exception:
+                pass
+
+            voice_journal_task = asyncio.create_task(writer.write_voice_journal(
+                campaign_id=self.campaign_id,
+                recent_narrative=recent_narrative,
+                meta_feedback=meta_feedback,
+                profile_name=getattr(self.profile, 'name', self.profile_id),
+                existing_journal=planning.get("voice_journal", ""),
+            ))
+            director_memo_task = asyncio.create_task(writer.write_director_memo(
+                campaign_id=self.campaign_id,
+                arc_phase=db_context.arc_phase or "",
+                current_arc=planning.get("current_arc", ""),
+                director_notes=db_context.director_notes or "",
+                active_seeds=active_seeds,
+                npc_spotlight_debt=npc_debt,
+                planning_data=planning,
+            ))
+
+            voice_journal, director_memo = await asyncio.gather(
+                voice_journal_task, director_memo_task, return_exceptions=True
+            )
+
+            updates: dict = {}
+            if voice_journal and not isinstance(voice_journal, Exception):
+                updates["voice_journal"] = voice_journal
+            if director_memo and not isinstance(director_memo, Exception):
+                updates["director_session_memo"] = director_memo
+            if updates:
+                self.state.update_campaign_bible(updates, db_context.turn_number)
+                logger.info("[async_close] Saved voice_journal + director_session_memo to bible")
+        except Exception:
+            logger.exception("[async_close] Session memory write failed (non-fatal)")
+        finally:
+            self.close()
 
     async def run_director_startup(
         self,

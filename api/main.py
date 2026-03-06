@@ -24,7 +24,14 @@ async def lifespan(app: FastAPI):
     init_langfuse()
     yield
     # Shutdown: release orchestrator resources
-    from .routes.game import reset_orchestrator
+    from .routes.game import get_orchestrator_optional, reset_orchestrator
+    orch = get_orchestrator_optional()
+    if orch:
+        try:
+            await orch.async_close()
+        except Exception as e:
+            logger.warning("async_close failed: %s", e)
+            orch.close()
     reset_orchestrator()
     logger.info("AIDM v3 shut down cleanly")
 

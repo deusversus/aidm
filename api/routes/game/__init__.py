@@ -37,6 +37,7 @@ router.include_router(_status_router)
 # ---------------------------------------------------------------------------
 from .session_mgmt import (  # noqa: F401  — re-export
     get_orchestrator,
+    get_orchestrator_optional,
     get_session_zero_agent,
     reset_orchestrator,
     reset_session_zero_agent,

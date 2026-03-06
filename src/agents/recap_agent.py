@@ -63,6 +63,7 @@ class RecapAgent(BaseAgent):
         character_name: str,
         arc_phase: str,
         recent_narrative: str = "",
+        arc_blocks: list[dict] | None = None,
     ) -> RecapOutput | None:
         """Generate a session-opening recap.
 
@@ -78,9 +79,15 @@ class RecapAgent(BaseAgent):
         Returns:
             RecapOutput or None on failure
         """
+        # Build context from arc blocks (richer than raw arc_history)
+        blocks_text = ""
+        if arc_blocks:
+            for block in arc_blocks:
+                blocks_text += f"[{block.get('block_type', 'arc').upper()} — {block.get('entity_name', '')}]\n{block.get('content', '')}\n\n"
+
         # Build context from arc_history (metadata only — not primary source)
-        history_text = ""
-        if arc_history:
+        history_text = blocks_text  # prefer blocks over raw history when available
+        if not blocks_text and arc_history:
             for i, entry in enumerate(arc_history[-5:]):  # Last 5 entries
                 if isinstance(entry, dict):
                     history_text += f"Arc Event {i+1}: {entry.get('summary', str(entry))}\n"

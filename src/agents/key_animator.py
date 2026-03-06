@@ -178,15 +178,17 @@ class KeyAnimator(PromptBuilderMixin):
         ),
     }
 
-    def __init__(self, profile: NarrativeProfile, model_override: str | None = None):
+    def __init__(self, profile: NarrativeProfile, model_override: str | None = None, voice_journal: str | None = None):
         """Initialize the Key Animator.
         
         Args:
             profile: The narrative profile for this campaign
             model_override: Specific model to use (overrides settings)
+            voice_journal: Optional session voice calibration notes from previous session
         """
         self.profile = profile
         self._model_override = model_override
+        self._voice_journal = voice_journal
         self._cached_provider: LLMProvider | None = None
         self._cached_model: str | None = None
         self._vibe_keeper_template: str | None = None

@@ -371,6 +371,15 @@ class TurnPipelineMixin:
                 # Only generate recap if we have story to recap
                 # compaction_text (micro-summaries of past turns) is the primary content source
                 if arc_history or db_context.director_notes or compaction_text:
+                    # Fetch context blocks (arc + active quests) for richer recap
+                    arc_blocks: list[dict] = []
+                    try:
+                        from ..context.context_blocks import ContextBlockStore
+                        block_store = ContextBlockStore(self.campaign_id)
+                        arc_blocks = block_store.get_active_by_type("arc")
+                        arc_blocks += block_store.get_active_by_type("quest")
+                    except Exception:
+                        pass
                     # Get top narrative_beat memories
                     beat_mems = []
                     try:
@@ -393,6 +402,7 @@ class TurnPipelineMixin:
                             character_name=db_context.character_name,
                             arc_phase=db_context.arc_phase,
                             recent_narrative=compaction_text,  # micro-summaries of prior turns
+                            arc_blocks=arc_blocks or None,
                         )
                     )
 
