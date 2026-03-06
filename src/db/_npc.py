@@ -18,6 +18,10 @@ logger = logging.getLogger(__name__)
 class NPCMixin:
     """NPC CRUD, relationships, intelligence, behavior, milestones."""
 
+    # NPC IDs that had increment_npc_scene_count called this session.
+    # Flushed by orchestrator.async_close() to trigger end-of-session block updates.
+    _session_npc_updates: set[int]
+
     # ==== NPC Intelligence (Module 04) ====
 
     DISPOSITION_THRESHOLDS = {
@@ -555,6 +559,8 @@ class NPCMixin:
             npc.last_appeared = turn_number
             new_count = npc.scene_count
             npc_id = npc.id
+            # Track for session-end flush (async_close fires updates for all NPCs that appeared)
+            self._session_npc_updates.add(npc_id)
             # Trigger block creation at 3 scenes, then update every 5 after that
             if new_count == 3 or (new_count > 3 and new_count % 5 == 0):
                 _fire_npc_block_task(self.campaign_id, npc_id, turn_number)

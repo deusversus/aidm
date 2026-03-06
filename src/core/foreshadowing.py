@@ -513,8 +513,7 @@ def _fire_thread_block_task(campaign_id: int, seed: "ForeshadowingSeed", current
             from ..context._block_triggers import create_or_update_thread_block
             await create_or_update_thread_block(campaign_id, seed, current_turn, close=close)
 
-        loop = asyncio.get_running_loop()
-        safe_create_task(loop, _thread_block_upsert())
+        safe_create_task(_thread_block_upsert(), name="thread_block_upsert")
     except RuntimeError:
         pass  # No event loop — skip
     except Exception:

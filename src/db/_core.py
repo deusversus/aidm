@@ -314,6 +314,7 @@ class CoreMixin:
         self._turn_number: int = 0
         self._commit_deferred: bool = False
         self._profile_world_tier: str = "T8"  # Overridden via set_profile_world_tier()
+        self._session_npc_updates: set[int] = set()  # NPC IDs that appeared this session
 
     def _get_db(self) -> SQLAlchemySession:
         """Get or create database session."""

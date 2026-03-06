@@ -182,12 +182,14 @@ class CharacterMixin:
             if situation is not None:
                 world_state.situation = situation
             if arc_name is not None and world_state.arc_name != arc_name:
-                # Arc name changed — old arc is closing
+                # Arc name changed — old arc is closing, new arc is starting
                 old_arc = world_state.arc_name
+                old_arc_start = getattr(world_state, "arc_start_turn", 1) or 1
                 world_state.arc_name = arc_name
+                world_state.arc_start_turn = self._turn_number  # new arc starts now
                 if old_arc:
                     _fire_arc_block_task(
-                        self.campaign_id, old_arc, self._turn_number
+                        self.campaign_id, old_arc, old_arc_start, self._turn_number
                     )
             if arc_phase is not None:
                 # #3: Reset turns_in_phase on phase transition
@@ -197,7 +199,9 @@ class CharacterMixin:
                     # Arc close on RESOLUTION — generate block for current arc
                     if arc_phase == ArcPhase.RESOLUTION and world_state.arc_name:
                         _fire_arc_block_task(
-                            self.campaign_id, world_state.arc_name, self._turn_number
+                            self.campaign_id, world_state.arc_name,
+                            getattr(world_state, "arc_start_turn", 1) or 1,
+                            self._turn_number,
                         )
                 world_state.arc_phase = arc_phase
             if tension_level is not None:
@@ -551,19 +555,19 @@ class CharacterMixin:
 
 # ── Context block trigger helpers ─────────────────────────────────────────────
 
-def _fire_arc_block_task(campaign_id: int, arc_name: str, current_turn: int) -> None:
+def _fire_arc_block_task(campaign_id: int, arc_name: str, arc_start_turn: int, current_turn: int) -> None:
     """Schedule arc block generation if an event loop is running."""
     try:
         asyncio.get_running_loop()
         from ..utils.tasks import safe_create_task
         safe_create_task(
-            _arc_block_create(campaign_id, arc_name, current_turn),
+            _arc_block_create(campaign_id, arc_name, arc_start_turn, current_turn),
             name="arc_block_create",
         )
     except RuntimeError:
         pass
 
 
-async def _arc_block_create(campaign_id: int, arc_name: str, current_turn: int) -> None:
+async def _arc_block_create(campaign_id: int, arc_name: str, arc_start_turn: int, current_turn: int) -> None:
     from ..context._block_triggers import create_arc_block
-    await create_arc_block(campaign_id, arc_name, arc_start_turn=1, arc_end_turn=current_turn)
+    await create_arc_block(campaign_id, arc_name, arc_start_turn=arc_start_turn, arc_end_turn=current_turn)

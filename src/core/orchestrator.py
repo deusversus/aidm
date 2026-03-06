@@ -217,6 +217,22 @@ class Orchestrator(TurnPipelineMixin, BackgroundMixin):
             except Exception:
                 pass
 
+            # Flush NPC block updates for all NPCs that appeared this session.
+            # Covers NPCs that gained scenes but didn't hit the periodic trigger thresholds.
+            try:
+                from ..context._block_triggers import create_or_update_npc_block
+                from ..utils.tasks import safe_create_task
+                session_npcs = list(self.state._session_npc_updates)
+                if session_npcs:
+                    logger.info("[async_close] Flushing NPC block updates for %d NPC(s)", len(session_npcs))
+                    for npc_id in session_npcs:
+                        safe_create_task(
+                            create_or_update_npc_block(self.campaign_id, npc_id, db_context.turn_number),
+                            name=f"npc_block_session_flush_{npc_id}",
+                        )
+            except Exception:
+                logger.exception("[async_close] NPC block session flush failed (non-fatal)")
+
             voice_journal_task = asyncio.create_task(writer.write_voice_journal(
                 campaign_id=self.campaign_id,
                 recent_narrative=recent_narrative,
