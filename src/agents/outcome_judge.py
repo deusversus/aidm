@@ -11,7 +11,7 @@ class OutcomeOutput(BaseModel):
     """Structured output for outcome judgment."""
 
     should_succeed: bool = Field(
-        description="Final verdict based on roll vs DC"
+        description="True for critical/success/partial outcomes, false for failure. Partial = achieved intent with complication."
     )
     difficulty_class: int = Field(
         description="The target number (DC) for the action"

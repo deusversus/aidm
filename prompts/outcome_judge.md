@@ -52,15 +52,22 @@ You will receive the character's power tier and OP mode status. Use this to cali
 3.  **Set the DC:** Based on difficulty, context, AND power tier. Routine actions for OP characters = DC 5.
 4.  **Identify Modifiers:** Look for advantages/disadvantages. Include power tier advantage.
 5.  **Roll the Dice (Virtual):** Simulate a d20 roll + modifiers vs DC.
-6.  **Determine Outcome:**
-    - Roll >= DC: **SUCCESS**
-    - Roll >= DC + 10: **CRITICAL SUCCESS**
-    - Roll < DC: **FAILURE**
-    - Roll == 1 (Natural): **CRITICAL FAILURE**
+6.  **Determine Outcome** — use the exact `success_level` string from this table:
+
+    | Roll result          | `success_level` | `should_succeed` | Notes |
+    |----------------------|-----------------|------------------|-------|
+    | Roll >= DC + 10      | `"critical"`    | `true`           | Exceptional — clean win with flair |
+    | Roll >= DC           | `"success"`     | `true`           | Clean success |
+    | Roll >= DC − 4       | `"partial"`     | `true`           | Achieved intent but with a complication or cost — always set `cost` or `consequence` |
+    | Roll < DC − 4        | `"failure"`     | `false`          | Did not achieve intent |
+    | Natural 1 (d20 = 1)  | `"failure"`     | `false`          | Catastrophic fumble — describe vividly in `reasoning`, may set `consequence` |
+
 7.  **Assign Narrative Weight:** How much screen time does this need?
-8.  **Cost/Consequence Check:** Is this a moment that DEMANDS a cost? If not, set both to null.
+8.  **Cost/Consequence Check:** Is this a moment that DEMANDS a cost? If not, set both to null. Partial success (`"partial"`) should almost always have a `cost` or `consequence`.
 
 ## Output Schema
 
 Return JSON matching the schema.
+`success_level` must be exactly one of: `"critical"`, `"success"`, `"partial"`, `"failure"`.
+`should_succeed` must be `true` for critical/success/partial, `false` for failure.
 Ensure `reasoning` explicitly mentions the "Roll: X + Y = Z vs DC W".
