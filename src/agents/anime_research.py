@@ -897,9 +897,10 @@ Return ONLY the title, nothing else.'''
 
         try:
             if hasattr(provider, 'complete_with_search'):
+                from ..utils.source_trust import get_trust_guidance_prompt
                 response = await provider.complete_with_search(
                     messages=[{"role": "user", "content": query}],
-                    system=self.system_prompt,
+                    system=self.system_prompt + get_trust_guidance_prompt(),
                     model=model,
                     max_tokens=4096,
                     temperature=0.5,

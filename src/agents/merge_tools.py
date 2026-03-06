@@ -122,15 +122,21 @@ async def _search_web(query: str) -> str:
     """Research divergences between versions via LLM web search."""
     try:
         from ..llm import get_llm_manager
+        from ..utils.source_trust import get_trust_guidance_prompt
 
         manager = get_llm_manager()
         provider = manager.fast_provider
         model = manager.get_fast_model()
 
         if hasattr(provider, "complete_with_search"):
+            system = (
+                "Provide a concise, factual answer about anime/manga differences. "
+                "Focus on canon divergences, different endings, different characters, or different power systems."
+                + get_trust_guidance_prompt()
+            )
             response = await provider.complete_with_search(
                 messages=[{"role": "user", "content": query}],
-                system="Provide a concise, factual answer about anime/manga differences. Focus on canon divergences, different endings, different characters, or different power systems.",
+                system=system,
                 model=model,
                 max_tokens=1024,
                 temperature=0.3,
