@@ -48,10 +48,9 @@ AVAILABLE_MODELS: dict[str, list[dict[str, str]]] = {
     "openai": [
         {"id": "gpt-5-nano", "name": "GPT-5 Nano", "tier": "fast", "description": "Fastest, most lightweight OpenAI model"},
         {"id": "gpt-5-mini", "name": "GPT-5 Mini", "tier": "fast", "description": "Fast and affordable"},
+        {"id": "gpt-4o", "name": "GPT-4o", "tier": "creative", "description": "Best OpenAI model for creative prose"},
         {"id": "gpt-5.2", "name": "GPT-5.2", "tier": "creative", "description": "Balanced quality and speed"},
-        {"id": "gpt-5.2-pro", "name": "GPT-5.2 Pro", "tier": "premium", "description": "Highest quality, more compute"},
         {"id": "gpt-5.4", "name": "GPT-5.4", "tier": "creative", "description": "Latest GPT-5.4 model"},
-        {"id": "gpt-5.4-pro", "name": "GPT-5.4 Pro", "tier": "premium", "description": "GPT-5.4 Pro — highest capability"},
     ],
 }
 
