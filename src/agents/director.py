@@ -129,16 +129,20 @@ Transient Entities in scene:
 Using the tools available, investigate and manage:
 1. Get the campaign bible to understand previous Director decisions
 2. Check active foreshadowing — any seeds ready for callback or overdue?
-3. Run a spotlight analysis — which NPCs need more or less screen time?
-4. For the top 1-2 underserved NPCs, get their full trajectory
-5. Search memory for any unresolved plot threads. Use recall_scene to find specific scenes from earlier in the campaign that are no longer in recent context.
-6. If any Transient Entities have become narratively significant, USE the promote_to_catalog tool to make them permanent NPCs.
+3. Check for convergence points — are multiple plot threads approaching climax at once?
+4. Run a spotlight analysis — which NPCs need more or less screen time?
+5. For the top 1-2 underserved NPCs, get their full trajectory AND their related foreshadowing seeds
+6. Search memory for any unresolved plot threads. Use recall_scene to find specific scenes from earlier in the campaign that are no longer in recent context.
+7. If any Transient Entities have become narratively significant, USE the promote_to_catalog tool to make them permanent NPCs.
 
 ## All Available Tools
 **Arc & Story**
 - `get_campaign_bible` — previous Director arc decisions, tension targets, narrative goals
-- `get_active_foreshadowing` — seeds currently in play, their payoff windows and status
+- `get_active_foreshadowing` — all active seeds with callback-ready and overdue flags
 - `get_overdue_seeds` — seeds past their maximum payoff window (resolve, escalate, or abandon)
+- `get_seeds_for_npc` — all foreshadowing seeds tied to a specific NPC; use alongside get_npc_trajectory
+- `get_seeds_by_type` — filter seeds by type: plot, character, mystery, threat, promise, chekhov, relationship
+- `get_convergence_points` — detect multiple plot threads approaching climax simultaneously (shared NPCs or resolved dependencies)
 - `plant_foreshadowing_seed` — plant a new seed (mystery, threat, promise, Chekhov's gun, etc.)
 - `get_spotlight_analysis` — which NPCs are over/underexposed relative to their role
 - `get_npc_trajectory` — full arc history and next beat recommendation for a specific NPC

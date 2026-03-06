@@ -78,6 +78,44 @@ def build_director_tools(
     ))
 
     registry.register(ToolDefinition(
+        name="get_seeds_for_npc",
+        description=(
+            "Get all foreshadowing seeds related to a specific NPC. "
+            "Use during NPC trajectory analysis to find what plot threads are tied to them — "
+            "unresolved promises, secrets, threats, or relationship arcs."
+        ),
+        parameters=[
+            ToolParam("npc_name", "str", "NPC name to look up seeds for", required=True),
+        ],
+        handler=lambda npc_name: _get_seeds_for_npc(foreshadowing, npc_name)
+    ))
+
+    registry.register(ToolDefinition(
+        name="get_seeds_by_type",
+        description=(
+            "Get all active foreshadowing seeds of a specific type. "
+            "Use to find all threats, or all unresolved promises, or all character reveal seeds, etc."
+        ),
+        parameters=[
+            ToolParam("seed_type", "str",
+                "Type to filter by: plot, character, mystery, threat, promise, chekhov, relationship",
+                required=True),
+        ],
+        handler=lambda seed_type: _get_seeds_by_type(foreshadowing, seed_type)
+    ))
+
+    registry.register(ToolDefinition(
+        name="get_convergence_points",
+        description=(
+            "Detect multiple plot threads approaching climax simultaneously. "
+            "Returns groups of callback-ready seeds that share NPCs or resolved dependencies — "
+            "these are high-impact moments where several story threads can pay off together."
+        ),
+        parameters=[],
+        handler=lambda: _get_convergence_points(foreshadowing, current_turn)
+    ))
+
+    registry.register(ToolDefinition(
         name="plant_foreshadowing_seed",
         description=(
             "Plant a new foreshadowing seed for future payoff. Use this to set up "
@@ -264,6 +302,66 @@ def _get_active_foreshadowing(foreshadowing, current_turn: int) -> dict:
         "overdue": len(overdue),
         "seeds": seeds,
     }
+
+
+def _get_seeds_for_npc(foreshadowing, npc_name: str) -> list[dict]:
+    """Get foreshadowing seeds related to a specific NPC."""
+    seeds = foreshadowing.get_seeds_for_npc(npc_name)
+    if not seeds:
+        return [{"info": f"No foreshadowing seeds found related to '{npc_name}'"}]
+    return [
+        {
+            "id": s.id,
+            "type": s.seed_type.value if hasattr(s.seed_type, 'value') else str(s.seed_type),
+            "description": s.description,
+            "status": s.status.value if hasattr(s.status, 'value') else str(s.status),
+            "planted_turn": s.planted_turn,
+            "expected_payoff": s.expected_payoff,
+            "related_npcs": s.related_npcs or [],
+        }
+        for s in seeds
+    ]
+
+
+def _get_seeds_by_type(foreshadowing, seed_type: str) -> list[dict]:
+    """Get active foreshadowing seeds by type."""
+    from ..core.foreshadowing import SeedType
+    try:
+        stype = SeedType(seed_type.lower())
+    except ValueError:
+        valid = [t.value for t in SeedType]
+        return [{"error": f"Unknown seed_type '{seed_type}'. Valid: {valid}"}]
+    seeds = foreshadowing.get_seeds_by_type(stype)
+    if not seeds:
+        return [{"info": f"No '{seed_type}' seeds found"}]
+    return [
+        {
+            "id": s.id,
+            "description": s.description,
+            "status": s.status.value if hasattr(s.status, 'value') else str(s.status),
+            "planted_turn": s.planted_turn,
+            "expected_payoff": s.expected_payoff,
+            "related_npcs": s.related_npcs or [],
+        }
+        for s in seeds
+    ]
+
+
+def _get_convergence_points(foreshadowing, current_turn: int) -> list[dict]:
+    """Detect multiple plot threads approaching climax simultaneously."""
+    convergences = foreshadowing.get_convergence_points(current_turn)
+    if not convergences:
+        return [{"info": "No convergence points detected — plot threads are not yet aligning"}]
+    return [
+        {
+            "convergence": description,
+            "seeds": [
+                {"id": s.id, "description": s.description, "expected_payoff": s.expected_payoff}
+                for s in seeds
+            ],
+        }
+        for description, seeds in convergences
+    ]
 
 
 def _get_overdue_seeds(foreshadowing, current_turn: int) -> list[dict]:

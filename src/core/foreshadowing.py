@@ -392,65 +392,12 @@ class ForeshadowingLedger:
             if npc_name.lower() in [n.lower() for n in s.related_npcs]
         ]
 
-    def generate_director_context(self, current_turn: int) -> str:
-        """Generate context for the Director Agent about foreshadowing state."""
-        lines = ["## Foreshadowing Status"]
-
-        # Active seeds
-        active = self.get_active_seeds()
-        lines.append(f"\n**Active Seeds:** {len(active)}")
-
-        # Ready for callback
-        ready = self.get_callback_opportunities(current_turn)
-        if ready:
-            lines.append(f"\n### Ready for Callback ({len(ready)})")
-            for seed in ready[:5]:  # Top 5
-                lines.append(f"- **{seed.description}** (urgency: {seed.urgency:.1f})")
-                lines.append(f"  Expected: {seed.expected_payoff[:100]}...")
-
-        # Overdue
-        overdue = self.get_overdue_seeds(current_turn)
-        if overdue:
-            lines.append(f"\n### \u26a0\ufe0f OVERDUE ({len(overdue)})")
-            for seed in overdue:
-                turns_over = current_turn - seed.planted_turn - seed.max_turns_to_payoff
-                lines.append(f"- **{seed.description}** ({turns_over} turns overdue)")
-
-        # Growing
-        growing = [s for s in active if s.status == SeedStatus.GROWING]
-        if growing:
-            lines.append(f"\n### Growing ({len(growing)})")
-            for seed in growing[:3]:
-                lines.append(f"- {seed.description} (mentions: {seed.mentions})")
-
-        # #11: Convergence detection — seeds sharing dependencies approaching callback
-        convergence = self._detect_convergence(current_turn)
-        if convergence:
-            lines.append("\n### \U0001f4a5 Convergence Points")
-            lines.append("Multiple plot threads are approaching climax simultaneously:")
-            for group_desc, seeds in convergence:
-                seed_names = ", ".join(s.description[:40] for s in seeds)
-                lines.append(f"- **{group_desc}:** {seed_names}")
-
-        # #11: Pending triggers — seeds that need planting after resolution
-        for seed in active:
-            if seed.triggers:
-                # Check if any trigger targets are from resolved seeds
-                resolved_triggers = [
-                    tid for tid in seed.triggers
-                    if tid not in self._seeds  # Not yet planted
-                ]
-                if resolved_triggers:
-                    lines.append("\n### \U0001f331 Pending Trigger Seeds")
-                    lines.append(f"- **{seed.description}** resolving would trigger: {resolved_triggers}")
-                    break  # Only show first to avoid context bloat
-
-        return "\n".join(lines)
-
-    def _detect_convergence(self, current_turn: int) -> list[tuple]:
-        """#11: Detect seeds sharing dependencies that are all near callback.
+    def get_convergence_points(self, current_turn: int) -> list[tuple]:
+        """Detect seeds sharing dependencies that are all near callback.
         
         Returns list of (description, [seeds]) tuples for convergence groups.
+        Useful for the Director to identify when multiple plot threads are
+        approaching climax simultaneously.
         """
         active = self.get_active_seeds()
         if len(active) < 2:
