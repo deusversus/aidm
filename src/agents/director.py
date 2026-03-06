@@ -196,7 +196,8 @@ Provide a CONCISE investigation report structured as:
         profile: NarrativeProfile,
         world_state: WorldState | None = None,
         tools: ToolRegistry | None = None,
-        compaction_text: str = ""
+        compaction_text: str = "",
+        session_start_blocks: dict | None = None,
     ) -> DirectorOutput:
         """
         Analyze the session and update the Campaign Bible.
@@ -226,7 +227,8 @@ Provide a CONCISE investigation report structured as:
         context = self._build_review_context(
             session, bible, world_state, profile,
             investigation_findings=investigation_findings,
-            compaction_text=compaction_text
+            compaction_text=compaction_text,
+            session_start_blocks=session_start_blocks,
         )
 
         # 3. Call LLM with dynamic system prompt override
@@ -432,13 +434,39 @@ Provide a CONCISE investigation report structured as:
         world_state: WorldState | None,
         profile: NarrativeProfile | None = None,
         investigation_findings: str = "",
-        compaction_text: str = ""
+        compaction_text: str = "",
+        session_start_blocks: dict | None = None,
     ) -> str:
         """Construct the context prompt for the Director."""
 
         from ..core.canonicality import format_canonicality_block
 
         lines = ["# Campaign Status Review"]
+
+        # === SESSION-START CONTEXT BLOCKS (narrative summaries) ===
+        if session_start_blocks:
+            arc_block = session_start_blocks.get("current_arc_block")
+            quest_blocks = session_start_blocks.get("active_quest_blocks", [])
+            thread_blocks = session_start_blocks.get("callback_thread_blocks", [])
+
+            if arc_block or quest_blocks or thread_blocks:
+                lines.append("\n## 📖 Narrative Context Blocks (Living Summaries)")
+
+            if arc_block:
+                lines.append(f"\n### Current Arc: {arc_block['entity_name']}")
+                lines.append(arc_block["content"])
+
+            if quest_blocks:
+                lines.append("\n### Active Quests")
+                for qb in quest_blocks:
+                    lines.append(f"\n**{qb['entity_name']}** (last updated turn {qb.get('last_updated_turn', '?')})")
+                    lines.append(qb["content"])
+
+            if thread_blocks:
+                lines.append("\n### Threads Ready for Payoff")
+                for tb in thread_blocks:
+                    lines.append(f"\n**{tb['entity_name']}**")
+                    lines.append(tb["content"])
 
         # === INVESTIGATION FINDINGS (from agentic research) ===
         if investigation_findings:

@@ -316,6 +316,11 @@ def build_gameplay_tools(
         )
     ))
 
+    # Context block tools — available to all gameplay agents (Director + KA)
+    if hasattr(state, "campaign_id") and state.campaign_id:
+        from .context_block_tools import register_context_block_tools
+        register_context_block_tools(registry, state.campaign_id)
+
     return registry
 
 

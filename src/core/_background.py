@@ -331,7 +331,8 @@ class BackgroundMixin:
                                 profile=self.profile,
                                 world_state=world_state,
                                 tools=director_tools,
-                                compaction_text=compaction_text
+                                compaction_text=compaction_text,
+                                session_start_blocks=self._get_session_start_blocks(),
                             )
 
                             spotlight_debt = self.state.compute_spotlight_debt()
@@ -832,3 +833,12 @@ class BackgroundMixin:
                 flags=["world_building", "ability", "unverified"]
             )
             logger.info(f"Indexed ability reference: {entity.name}")
+
+
+    def _get_session_start_blocks(self) -> dict | None:
+        """Fetch context blocks relevant at session open (arc, quests, callback threads)."""
+        try:
+            from ..context.context_blocks import ContextBlockStore
+            return ContextBlockStore(self.state.campaign_id).get_for_session_start()
+        except Exception:
+            return None
