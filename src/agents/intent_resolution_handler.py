@@ -747,19 +747,37 @@ def _resolve_from_disambiguation(
     if canonical_title != chosen_title:
         logger.info(f"Stripped label metadata: '{chosen_title}' → '{canonical_title}'")
 
-    # Build synthetic resolution — bypass the intent agent entirely
+    # Check if we already have a profile on disk — avoids kicking off research
+    # and ensures profile_resolved is set synchronously in the caller.
+    from ..profiles.loader import find_profile_by_title
     from ..agents.profile_generator import _sanitize_profile_id
-    profile_id = _sanitize_profile_id(canonical_title)
+
+    existing_profile_id: str | None = None
+    if chosen_anilist_id:
+        al_id = f"al_{chosen_anilist_id}"
+        from pathlib import Path
+        profiles_dir = Path(__file__).parent.parent / "profiles"
+        if (profiles_dir / f"{al_id}.yaml").exists():
+            existing_profile_id = al_id
+            logger.info(f"Disambiguation: found existing profile by AniList ID: {al_id}")
+    if not existing_profile_id:
+        match = find_profile_by_title(canonical_title)
+        if match:
+            existing_profile_id = match[0]
+            logger.info(f"Disambiguation: found existing profile by title '{canonical_title}': {existing_profile_id}")
+
+    profile_id = existing_profile_id or _sanitize_profile_id(canonical_title)
+    already_exists = existing_profile_id is not None
 
     return IntentResolution(
         resolved_titles=[ResolvedTitle(
             profile_id=profile_id,
             canonical_title=canonical_title,
             anilist_id=chosen_anilist_id,
-            already_exists=False,
+            already_exists=already_exists,
         )],
         composition_type='single',
-        needs_research=[canonical_title],
+        needs_research=[] if already_exists else [canonical_title],
         confidence=1.0,
         reasoning=f"User selected '{chosen_title}' from disambiguation options",
     )
