@@ -37,6 +37,7 @@ AVAILABLE_MODELS: dict[str, list[dict[str, str]]] = {
         {"id": "gemini-3-flash-preview", "name": "Gemini 3 Flash", "tier": "fast", "description": "Fast with Pro-level intelligence (preview)"},
         {"id": "gemini-3.1-flash-lite-preview", "name": "Gemini 3.1 Flash Lite", "tier": "fast", "description": "Lightest and fastest Gemini model (preview)"},
         {"id": "gemini-2.5-pro", "name": "Gemini 2.5 Pro", "tier": "creative", "description": "High quality reasoning — stable GA"},
+        {"id": "gemini-3-pro-preview", "name": "Gemini 3 Pro", "tier": "creative", "description": "Gemini 3 Pro (preview)"},
         {"id": "gemini-3.1-pro-preview", "name": "Gemini 3.1 Pro", "tier": "creative", "description": "Latest Gemini Pro — improved reasoning and generation"},
     ],
     "anthropic": [
