@@ -595,7 +595,7 @@ Time compresses. Multiple scenes, one momentum:
                 "1. get_npc_details — Get the FULL profile of any NPC being interacted with (disposition, emotional milestones, secrets)\n"
                 "2. search_memory — Search for shared history between protagonist and this NPC\n"
                 "3. list_known_npcs — Who else is relevant to this social dynamic?\n"
-                "4. search_transcript — Did the player say something earlier this session that relates?"
+                "4. search_turn_history — Did something happen earlier in the story that relates? Search by keyword."
             ),
             "EXPLORATION": (
                 "EXPLORATION RESEARCH PRIORITY:\n"

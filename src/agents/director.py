@@ -131,7 +131,7 @@ Using the tools available, investigate and manage:
 2. Check active foreshadowing — any seeds ready for callback or overdue?
 3. Run a spotlight analysis — which NPCs need more or less screen time?
 4. For the top 1-2 underserved NPCs, get their full trajectory
-5. Search memory for any unresolved plot threads
+5. Search memory for any unresolved plot threads. Use search_turn_history to find specific scenes or moments from earlier in the campaign that are no longer in recent context.
 6. If any Transient Entities have become narratively significant, USE the promote_to_catalog tool to make them permanent NPCs.
 
 Provide a CONCISE investigation report structured as:

@@ -20,7 +20,7 @@ from ..llm.tools import ToolDefinition, ToolParam, ToolRegistry
 def build_gameplay_tools(
     memory: Any,         # MemoryStore
     state: Any,          # StateManager
-    session_transcript: list = None,
+    session_transcript: list = None,  # unused, kept for call-site compatibility
     profile_library: Any = None,  # ProfileLibrary (for lore search)
     profile_ids: list[str] = None, # Active profile IDs (for lore search, N+1 composition)
 ) -> ToolRegistry:
@@ -29,7 +29,7 @@ def build_gameplay_tools(
     Args:
         memory: MemoryStore instance (ChromaDB)
         state: StateManager instance (SQLite)
-        session_transcript: Recent messages for transcript search
+        session_transcript: Unused (kept for call-site compatibility)
         profile_library: ProfileLibrary instance for lore search (optional)
         profile_ids: Active profile ID(s) for scoping lore search (optional, list)
         
@@ -197,20 +197,42 @@ def build_gameplay_tools(
     ))
 
     # -----------------------------------------------------------------
-    # TRANSCRIPT TOOLS
+    # TURN HISTORY TOOLS
     # -----------------------------------------------------------------
 
     registry.register(ToolDefinition(
-        name="search_transcript",
+        name="search_turn_history",
         description=(
-            "Search the current session transcript for exact phrases or topics. "
-            "Returns matching messages with speaker (PLAYER or DM) and content. "
-            "Use this to find what the PLAYER actually said about something."
+            "Search the full campaign turn history (all past turns in the DB) by keyword. "
+            "Use this to recall specific scenes, events, or moments that happened earlier "
+            "in the story — including turns that are no longer in the active context window. "
+            "Returns turn number, player input, and a narrative excerpt for each match. "
+            "Optionally narrow results by NPC name or turn range."
         ),
         parameters=[
-            ToolParam("query", "str", "Search term to look for in the transcript", required=True),
+            ToolParam("query", "str", "Keyword to search for in past narratives", required=True),
+            ToolParam("npc", "str", "Optional: filter results to turns mentioning this NPC name", required=False),
+            ToolParam("turn_start", "int", "Optional: only search turns at or after this turn number", required=False),
+            ToolParam("turn_end", "int", "Optional: only search turns at or before this turn number", required=False),
+            ToolParam("limit", "int", "Max results to return (default 5)", required=False),
         ],
-        handler=lambda query: _search_transcript(session_transcript, query)
+        handler=lambda query, npc=None, turn_start=None, turn_end=None, limit=5: _search_turn_history(
+            state, query, npc=npc,
+            turn_range=(turn_start, turn_end) if turn_start is not None or turn_end is not None else None,
+            limit=limit
+        )
+    ))
+
+    registry.register(ToolDefinition(
+        name="get_turn_narrative",
+        description=(
+            "Retrieve the full narrative text for a specific turn number. "
+            "Use after search_turn_history to read the complete scene for a turn of interest."
+        ),
+        parameters=[
+            ToolParam("turn_number", "int", "The turn number to retrieve", required=True),
+        ],
+        handler=lambda turn_number: _get_turn_narrative(state, turn_number)
     ))
 
     # -----------------------------------------------------------------
@@ -485,26 +507,26 @@ def _update_npc(state, name: str, **kwargs) -> dict:
         return {"error": f"Failed to update NPC '{name}': {e}"}
 
 
-def _search_transcript(transcript: list, query: str) -> list[dict]:
-    """Simple keyword search on the session transcript."""
-    if not transcript:
-        return [{"info": "No transcript available for this session"}]
+def _search_turn_history(state, query: str, npc: str = None, turn_range: tuple = None, limit: int = 5) -> list[dict]:
+    """Search full turn history in the DB by keyword."""
+    try:
+        results = state.search_turns(query, npc=npc, turn_range=turn_range, limit=limit)
+        if not results:
+            return [{"info": f"No turn history matches for '{query}'"}]
+        return results
+    except Exception as e:
+        return [{"error": f"Turn history search failed: {e}"}]
 
-    query_lower = query.lower()
-    matches = []
-    for msg in transcript:
-        content = msg.get("content", "")
-        if query_lower in content.lower():
-            role = "PLAYER" if msg.get("role") == "user" else "DM"
-            matches.append({
-                "speaker": role,
-                "excerpt": content[:500],
-            })
 
-    if not matches:
-        return [{"info": f"No transcript matches for '{query}'"}]
-
-    return matches[:10]  # Cap at 10 results
+def _get_turn_narrative(state, turn_number: int) -> dict:
+    """Retrieve the full narrative text for a specific turn."""
+    try:
+        narrative = state.get_turn_narrative(turn_number)
+        if not narrative:
+            return {"error": f"No narrative found for turn {turn_number}"}
+        return {"turn": turn_number, "narrative": narrative}
+    except Exception as e:
+        return {"error": f"Failed to retrieve turn {turn_number}: {e}"}
 
 
 def _get_world_state(state) -> dict:
