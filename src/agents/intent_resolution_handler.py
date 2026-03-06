@@ -441,11 +441,34 @@ async def resolve_media_intent(
     async def do_research():
         """Background task: research all needed profiles, then save composition."""
         try:
-            from ..agents._session_zero_research import research_and_apply_profile, resolve_anime_direct
+            from ..agents._session_zero_research import research_and_apply_profile
             from ..agents.progress import WeightedProgressGroup, ProgressPhase
+            from ..profiles.resolved_anime import ResolvedAnime as _ResolvedAnime
 
-            # Build a title → ResolvedTitle lookup so we can pass anilist_id forward
+            # Build a title → ResolvedTitle lookup so we can pass anilist_id forward.
+            # needs_research titles may be enriched with "(AniList: NNNN)" tags, so we
+            # also build a stripped-title index as a fallback.
+            _tag_re = re.compile(r'\s*\([^)]*' + re.escape(ANILIST_ID_TAG) + r'[^)]*\)\s*$', re.IGNORECASE)
+
+            def _strip_anilist_tag(t: str) -> str:
+                return _tag_re.sub('', t).strip()
+
             rt_by_title = {rt.canonical_title: rt for rt in resolution.resolved_titles}
+
+            def _get_rt(title: str):
+                """Look up ResolvedTitle by exact or stripped-tag match."""
+                return rt_by_title.get(title) or rt_by_title.get(_strip_anilist_tag(title))
+
+            def _build_resolved(rt, raw_title: str) -> "_ResolvedAnime | None":
+                """Build a minimal ResolvedAnime from a ResolvedTitle — no extra API calls."""
+                if rt is None or not rt.anilist_id:
+                    return None
+                return _ResolvedAnime(
+                    title=rt.canonical_title,
+                    anilist_id=rt.anilist_id,
+                    source="anilist",
+                    raw_input=raw_title,
+                )
 
             if len(needs_research) > 1:
                 # Multi-profile: use WeightedProgressGroup so each profile contributes
@@ -465,8 +488,7 @@ async def resolve_media_intent(
                         f"Researching {title}...",
                         detail={"current_title": title},
                     )
-                    rt = rt_by_title.get(title)
-                    resolved = await resolve_anime_direct(title) if (rt and rt.anilist_id) else None
+                    resolved = _build_resolved(_get_rt(title), title)
                     await research_and_apply_profile(
                         session, title, progress_tracker=sub, resolved=resolved,
                     )
@@ -481,8 +503,7 @@ async def resolve_media_intent(
             else:
                 # Single profile: use tracker directly (existing behavior)
                 for title in needs_research:
-                    rt = rt_by_title.get(title)
-                    resolved = await resolve_anime_direct(title) if (rt and rt.anilist_id) else None
+                    resolved = _build_resolved(_get_rt(title), title)
                     await research_and_apply_profile(
                         session, title, progress_tracker=progress_tracker, resolved=resolved,
                     )

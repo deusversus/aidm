@@ -302,9 +302,11 @@ async def research_and_apply_profile(
     3. Training data (fallback only)
     
     Args:
-        session: Current session state
-        anime_name: Name of the anime mentioned
+        session:          Current session state
+        anime_name:       Name of the anime mentioned
         progress_tracker: Optional tracker for streaming progress updates
+        resolved:         Optional pre-resolved identity from disambiguation. When provided,
+                          skips redundant AniList search and title normalization steps.
         
     Returns:
         Research summary dict with key info
