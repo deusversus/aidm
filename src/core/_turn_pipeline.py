@@ -9,6 +9,7 @@ import logging
 import time
 
 from ..enums import NarrativeWeight
+from ..observability import end_trace, log_span, start_trace
 from ..utils.tasks import safe_create_task
 
 logger = logging.getLogger(__name__)
@@ -61,6 +62,12 @@ class TurnPipelineMixin:
                 self._in_meta_conversation = False
                 logger.info("Exiting meta conversation mode via %s", matched_exit)
 
+                # Clear history — only needed for in-progress conversation continuity
+                from .session import get_session_manager
+                _sess = get_session_manager().get_session(self.session_id)
+                if _sess:
+                    _sess.meta_conversation_history.clear()
+
                 # Pass any trailing text as the first gameplay turn
                 suffix = stripped[len(matched_exit):].strip()
                 if suffix:
@@ -90,16 +97,31 @@ class TurnPipelineMixin:
         # #17: Expire old consequences at turn start
         self.state.expire_consequences(db_context.turn_number)
 
+        # Start observability trace for this turn
+        start_trace(
+            "process_turn",
+            session_id=self.session_id,
+            metadata={
+                "campaign_id": self.campaign_id,
+                "turn_number": db_context.turn_number,
+            },
+            tags=[f"campaign:{self.campaign_id}"],
+            input=player_input,
+        )
+
         # =====================================================================
         # PHASE 1a: Intent Classification (fast, ~1s)
         # Run first to determine memory tier for RAG
         # =====================================================================
+        _ic_start = time.time()
         intent = await self.intent_classifier.call(
             player_input,
             current_situation=db_context.situation,
             character_state=db_context.character_summary,
             location=db_context.location
         )
+        log_span("intent_classification", input=player_input,
+                 output=intent.intent, metadata={"latency_ms": int((time.time() - _ic_start) * 1000)})
 
         # =====================================================================
         # HANDLE META/OVERRIDE COMMANDS (early exit - skip normal turn flow)
@@ -795,6 +817,7 @@ class TurnPipelineMixin:
             profile_ids=[self.profile_id] if self.profile_id else None,
         )
 
+        _ka_start = time.time()
         narrative = await self.key_animator.generate(
             player_input=player_input,
             intent=intent,
@@ -807,6 +830,10 @@ class TurnPipelineMixin:
             tools=gameplay_tools,
             compaction_text=compaction_text
         )
+        log_span("ka_generation", input=player_input,
+                 output=(narrative or "")[:500],
+                 metadata={"latency_ms": int((time.time() - _ka_start) * 1000),
+                           "sakuga": use_sakuga})
 
         # DEBUG: Log narrative generation
         logger.info("Narrative generated:")
@@ -869,6 +896,12 @@ class TurnPipelineMixin:
             name="post_narrative_processing",
         )
 
+        end_trace(
+            output=(narrative or "")[:500],
+            metadata={"intent": intent.intent, "latency_ms": latency,
+                      "outcome": outcome.result if outcome else None},
+        )
+
         return TurnResult(
             narrative=narrative,
             intent=intent,
@@ -879,9 +912,6 @@ class TurnPipelineMixin:
             campaign_id=self.campaign_id,
             campaign_media_uuid=getattr(self, 'campaign_media_uuid', None),
         )
-
-    # -----------------------------------------------------------------
-    # META CONVERSATION helpers
     # -----------------------------------------------------------------
 
     async def _handle_meta_conversation(
@@ -939,6 +969,9 @@ class TurnPipelineMixin:
         if meta_resolved:
             self._in_meta_conversation = False
             logger.info("Meta conversation resolved by Director — auto-exiting meta mode")
+            # Clear history — it's only needed for in-progress conversation continuity
+            if session:
+                session.meta_conversation_history.clear()
             footer = "\n\n---\n*Back to the story.*"
         else:
             footer = "\n\n---\n*Continue the conversation, or type `/resume` to return to the story.*"

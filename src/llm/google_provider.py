@@ -296,6 +296,17 @@ class GoogleProvider(LLMProvider):
             if cached_tokens > 0:
                 prompt_tokens = getattr(last_chunk.usage_metadata, 'prompt_token_count', 1) or 1
                 logger.info(f"{cached_tokens} tokens cached ({cached_tokens/max(prompt_tokens, 1)*100:.0f}% of prompt)")
+            # Log to observability trace
+            try:
+                from ..observability import log_generation
+                log_generation(
+                    agent_name=schema.__name__,
+                    model=model_name,
+                    input_tokens=getattr(last_chunk.usage_metadata, 'prompt_token_count', 0) or 0,
+                    output_tokens=getattr(last_chunk.usage_metadata, 'candidates_token_count', 0) or 0,
+                )
+            except Exception:
+                pass
 
         # Parse response - should be valid JSON thanks to native mode
         content = full_text.strip() if full_text else "{}"

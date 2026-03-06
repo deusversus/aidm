@@ -350,6 +350,20 @@ class AnthropicProvider(LLMProvider):
 
         # Extract tool use response from final message
         if final_message:
+            # Log token usage to current observability trace
+            try:
+                from ..observability import log_generation
+                usage = getattr(final_message, "usage", None)
+                if usage:
+                    log_generation(
+                        agent_name=schema.__name__,
+                        model=model_name,
+                        input_tokens=getattr(usage, "input_tokens", 0),
+                        output_tokens=getattr(usage, "output_tokens", 0),
+                    )
+            except Exception:
+                pass
+
             for block in final_message.content:
                 if hasattr(block, 'type') and block.type == "thinking":
                     continue

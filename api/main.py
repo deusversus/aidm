@@ -20,6 +20,8 @@ async def lifespan(app: FastAPI):
     """Application startup and shutdown lifecycle."""
     setup_logging()
     logger.info("AIDM v3 starting up")
+    from src.observability import init_langfuse
+    init_langfuse()
     yield
     # Shutdown: release orchestrator resources
     from .routes.game import reset_orchestrator
