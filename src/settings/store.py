@@ -7,7 +7,7 @@ from pathlib import Path
 
 from .crypto import decrypt_api_key, encrypt_api_key, is_key_configured, mask_api_key
 from .defaults import DEFAULT_SETTINGS
-from .models import UserSettings
+from .models import AgentSettings, UserSettings
 
 logger = logging.getLogger(__name__)
 
@@ -119,7 +119,7 @@ class SettingsStore:
         preserved_campaign_id = current.active_campaign_id
 
         # Reset agent models to defaults (Google Flash for all base configs)
-        from .models import AgentSettings, ModelConfig
+        from .models import ModelConfig
 
         # Create fresh agent settings with Google Flash for all 3 base configs
         default_flash = ModelConfig(provider="google", model="gemini-3-flash-preview")
@@ -163,22 +163,12 @@ class SettingsStore:
         if config:
             return config.provider, config.model
 
-        # Determine agent tier for fallback
-        fast_tier_agents = {
-            "intent_classifier", "outcome_judge", "validator", "memory_ranker",
-            "combat", "progression", "scale_selector",
-            "relationship_analyzer", "session_zero", "world_builder",
-            "wiki_scout", "compactor", "scope", "pacing", "recap",
-            "production",
-        }
-        creative_tier_agents = {"key_animator"}  # Prose generation
-        thinking_tier_agents = {"director", "research", "profile_merge"}  # Reasoning/planning
-
-        if agent_name in fast_tier_agents:
+        # Determine agent tier for fallback using AgentSettings as single source of truth
+        if agent_name in AgentSettings.FAST_TIER:
             base_config = getattr(agent_models, "base_fast", None)
-        elif agent_name in creative_tier_agents:
+        elif agent_name in AgentSettings.CREATIVE_TIER:
             base_config = getattr(agent_models, "base_creative", None)
-        elif agent_name in thinking_tier_agents:
+        elif agent_name in AgentSettings.THINKING_TIER:
             base_config = getattr(agent_models, "base_thinking", None)
         else:
             # Unknown agent - fall back to thinking tier as safest default

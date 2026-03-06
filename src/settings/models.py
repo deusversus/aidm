@@ -1,6 +1,6 @@
 """Pydantic models for user settings."""
 
-from typing import Literal
+from typing import ClassVar, Literal
 
 from pydantic import BaseModel, Field
 
@@ -17,6 +17,8 @@ class ModelConfig(BaseModel):
         description="The specific model name (e.g., 'gemini-3-flash-preview')"
     )
 
+
+from typing import ClassVar
 
 class AgentSettings(BaseModel):
     """Per-agent model configuration.
@@ -35,6 +37,20 @@ class AgentSettings(BaseModel):
     The 'base_fast', 'base_thinking', and 'base_creative' fields serve as 
     fallbacks when an agent is not explicitly configured.
     """
+
+    # === TIER MEMBERSHIP (single source of truth for store.py fallback logic) ===
+    FAST_TIER: ClassVar[frozenset[str]] = frozenset({
+        "intent_classifier", "outcome_judge", "validator", "memory_ranker",
+        "combat", "progression", "scale_selector", "relationship_analyzer",
+        "session_zero", "world_builder", "wiki_scout", "compactor",
+        "scope", "pacing", "recap", "production",
+    })
+    THINKING_TIER: ClassVar[frozenset[str]] = frozenset({
+        "director", "research", "profile_merge",
+    })
+    CREATIVE_TIER: ClassVar[frozenset[str]] = frozenset({
+        "key_animator",
+    })
 
     # === BASE DEFAULTS (Fallback for unconfigured agents) ===
     base_fast: ModelConfig | None = Field(
