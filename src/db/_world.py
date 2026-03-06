@@ -3,12 +3,23 @@
 Split from state_manager.py for maintainability.
 """
 
+import asyncio
 import logging
 from typing import Any, Optional
 
 from .models import Location, MediaAsset, Quest
 
 logger = logging.getLogger(__name__)
+
+
+def _fire_block_task(coro, name: str) -> None:
+    """Schedule a context block background task if an event loop is running."""
+    try:
+        loop = asyncio.get_running_loop()
+        from ..utils.tasks import safe_create_task
+        safe_create_task(coro, name=name)
+    except RuntimeError:
+        pass  # No running event loop (e.g., sync test context)
 
 
 class WorldMixin:
@@ -469,6 +480,11 @@ class WorldMixin:
             created_turn=created_turn or self._turn_number,
         )
         db.add(quest)
+        # Schedule block creation once the session commits (fire-and-forget)
+        _fire_block_task(
+            _quest_block_create(self.campaign_id, quest, self._turn_number),
+            name="quest_block_create",
+        )
         return quest
 
     def get_quests(self, status: str = None) -> list:
@@ -493,6 +509,10 @@ class WorldMixin:
             quest.status = status
             if status in ("completed", "failed"):
                 quest.completed_turn = self._turn_number
+            _fire_block_task(
+                _quest_block_update(self.campaign_id, quest_id, self._turn_number),
+                name="quest_block_update",
+            )
         return quest
 
     def update_quest_objective(
@@ -515,6 +535,10 @@ class WorldMixin:
                 "turn_completed": self._turn_number if completed else None,
             }
             quest.objectives = objectives
+            _fire_block_task(
+                _quest_block_update(self.campaign_id, quest_id, self._turn_number),
+                name="quest_block_update",
+            )
         return quest
 
     # -----------------------------------------------------------------
@@ -739,3 +763,19 @@ class WorldMixin:
             query = query.filter(MediaAsset.session_id == session_id)
         result = query.scalar()
         return result or 0.0
+
+
+# ── Context block trigger coroutines ─────────────────────────────────────────
+# Thin wrappers so _world.py methods don't directly import from src.context
+# (avoids circular imports — state_manager ← context ← db ← state_manager).
+
+async def _quest_block_create(campaign_id: int, quest: "Quest", current_turn: int) -> None:
+    from ..context._block_triggers import create_quest_block
+    # quest.id may be None before flush; fall back to 0 guard
+    if quest.id:
+        await create_quest_block(campaign_id, quest.id, current_turn)
+
+
+async def _quest_block_update(campaign_id: int, quest_id: int, current_turn: int) -> None:
+    from ..context._block_triggers import update_quest_block
+    await update_quest_block(campaign_id, quest_id, current_turn)

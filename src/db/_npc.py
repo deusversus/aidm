@@ -3,6 +3,7 @@
 Split from state_manager.py for maintainability.
 """
 
+import asyncio
 import logging
 from typing import Any
 
@@ -316,9 +317,15 @@ class NPCMixin:
         db = self._get_db()
 
         # Update affinity (clamp to -100/+100)
-        npc.affinity = max(-100, min(100, (npc.affinity or 0) + affinity_delta))
+        old_affinity = npc.affinity or 0
+        npc.affinity = max(-100, min(100, old_affinity + affinity_delta))
         npc.interaction_count = (npc.interaction_count or 0) + 1
         npc.last_appeared = turn_number
+
+        # Trigger block creation when affinity first crosses ±30 (plot-relevant)
+        _AFFINITY_THRESHOLD = 30
+        if (abs(old_affinity) < _AFFINITY_THRESHOLD <= abs(npc.affinity)) and npc.scene_count and npc.scene_count < 3:
+            _fire_npc_block_task(self.campaign_id, npc.id, turn_number)
 
         # Track emotional milestone (only firsts count)
         if emotional_milestone:
@@ -429,6 +436,24 @@ class NPCMixin:
                 f"  Personality: {npc.personality or 'Unknown'}\n"
                 f"  Milestones: {milestone_str}"
             )
+
+            # Attach continuity checklist from context block if available
+            try:
+                from ..context.context_blocks import ContextBlockStore
+                block = ContextBlockStore(self.campaign_id).get("npc", str(npc.id))
+                if block and block.get("continuity_checklist"):
+                    checklist = block["continuity_checklist"]
+                    entities = checklist.get("entities", [])
+                    if entities:
+                        lines = []
+                        for e in entities:
+                            attrs = ", ".join(e.get("attributes", []))
+                            state = e.get("last_known_state", "")
+                            lines.append(f"    • {e['name']}: {attrs}" + (f" — {state}" if state else ""))
+                        card += "\n  Continuity:\n" + "\n".join(lines)
+            except Exception:
+                pass  # Checklist injection is best-effort
+
             cards.append(card)
 
         return "\n\n".join(cards)
@@ -528,6 +553,11 @@ class NPCMixin:
         if npc:
             npc.scene_count = (npc.scene_count or 0) + 1
             npc.last_appeared = turn_number
+            new_count = npc.scene_count
+            npc_id = npc.id
+            # Trigger block creation at 3 scenes, then update every 5 after that
+            if new_count == 3 or (new_count > 3 and new_count % 5 == 0):
+                _fire_npc_block_task(self.campaign_id, npc_id, turn_number)
 
     def check_npc_knowledge(self, npc_id: int, topic: str) -> dict[str, Any]:
         """
@@ -1030,3 +1060,23 @@ class NPCMixin:
             if len(filtered) < len(transients):
                 state.transient_entities = filtered
                 db.commit()
+
+
+# ── Context block trigger helpers ─────────────────────────────────────────────
+
+def _fire_npc_block_task(campaign_id: int, npc_id: int, turn_number: int) -> None:
+    """Schedule NPC block generation if an event loop is running."""
+    try:
+        asyncio.get_running_loop()
+        from ..utils.tasks import safe_create_task
+        safe_create_task(
+            _npc_block_upsert(campaign_id, npc_id, turn_number),
+            name="npc_block_upsert",
+        )
+    except RuntimeError:
+        pass
+
+
+async def _npc_block_upsert(campaign_id: int, npc_id: int, turn_number: int) -> None:
+    from ..context._block_triggers import create_or_update_npc_block
+    await create_or_update_npc_block(campaign_id, npc_id, turn_number)
