@@ -30,11 +30,10 @@ class SessionMemoryWriter:
         """
         try:
             from ..llm.manager import get_llm_manager
-            from ..core.prompt_registry import get_registry
+            from ..llm.manager import get_llm_manager
 
-            registry = get_registry()
             manager = get_llm_manager()
-            provider = manager.get_provider_for_agent("compactor")
+            provider, model = manager.get_provider_for_agent("compactor")
 
             system_prompt = (
                 "You are the voice calibration system for an AI narrator. "
@@ -57,6 +56,7 @@ class SessionMemoryWriter:
             response = await provider.complete(
                 messages=[{"role": "user", "content": user_msg}],
                 system=system_prompt,
+                model=model,
                 max_tokens=400,
             )
             return response.content.strip() if response and response.content else None
@@ -82,7 +82,7 @@ class SessionMemoryWriter:
             from ..llm.manager import get_llm_manager
 
             manager = get_llm_manager()
-            provider = manager.get_provider_for_agent("compactor")
+            provider, model = manager.get_provider_for_agent("compactor")
 
             system_prompt = (
                 "You are a narrative continuity director. "
@@ -111,6 +111,7 @@ class SessionMemoryWriter:
             response = await provider.complete(
                 messages=[{"role": "user", "content": user_msg}],
                 system=system_prompt,
+                model=model,
                 max_tokens=500,
             )
             return response.content.strip() if response and response.content else None

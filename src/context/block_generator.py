@@ -109,24 +109,24 @@ class ContextBlockGenerator:
     async def generate_thread_block(
         self,
         seed: dict,
-        relevant_turns: list[dict],
-        memories: list[dict],
+        relevant_turns: list[dict] | None = None,
+        memories: list[dict] | None = None,
         existing_block: dict | None = None,
     ) -> tuple[str, dict] | None:
         """Generate or update a foreshadowing thread block."""
         seed_summary = (
-            f"Seed ID: {seed.get('seed_id', '?')}\n"
+            f"Seed ID: {seed.get('id', seed.get('seed_id', '?'))}\n"
             f"Description: {seed.get('description', '')}\n"
             f"Status: {seed.get('status', '')}\n"
             f"Related NPCs: {', '.join(seed.get('related_npcs', []))}\n"
             f"Planted turn: {seed.get('planted_turn', '?')}"
         )
         sections = [
-            f"## Block Type: thread\n## Entity: {seed.get('description', seed.get('seed_id', '?'))}",
+            f"## Block Type: thread\n## Entity: {seed.get('description', seed.get('id', seed.get('seed_id', '?')))}",
             f"## Seed Record\n{seed_summary}",
             self._existing_section(existing_block),
-            self._memories_section(memories),
-            self._turns_section(relevant_turns),
+            self._memories_section(memories or []),
+            self._turns_section(relevant_turns or []),
         ]
         msg = "\n\n".join(s for s in sections if s)
         return await self._generate(msg)
@@ -168,11 +168,11 @@ class ContextBlockGenerator:
         """Generate or update an NPC block."""
         npc_summary = (
             f"Name: {npc.get('name', '?')}\n"
-            f"Affinity: {npc.get('affinity_score', 0)}\n"
+            f"Affinity: {npc.get('affinity', npc.get('affinity_score', 0))}\n"
             f"Scene count: {npc.get('scene_count', 0)}\n"
             f"Personality: {npc.get('personality', '')}\n"
             f"Secrets: {npc.get('secrets', '')}\n"
-            f"Milestones: {json.dumps(npc.get('milestones', []))}"
+            f"Milestones: {json.dumps(npc.get('emotional_milestones', npc.get('milestones', [])))}"
         )
         sections = [
             f"## Block Type: npc\n## Entity: {npc.get('name', '?')}",

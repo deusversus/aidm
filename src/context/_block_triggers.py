@@ -124,8 +124,8 @@ async def create_or_update_npc_block(campaign_id: int, npc_id: int, current_turn
         engine = get_engine()
         with engine.connect() as conn:
             row = conn.execute(sa.text("""
-                SELECT id, name, affinity_score, scene_count,
-                       personality, secrets, milestones, npc_type
+                SELECT id, name, affinity, scene_count,
+                       personality, secrets, emotional_milestones, role
                 FROM npcs
                 WHERE id = :nid AND campaign_id = :cid
             """), {"nid": npc_id, "cid": campaign_id}).fetchone()
