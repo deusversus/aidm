@@ -20,7 +20,7 @@ def init_langfuse() -> bool:
     global _client
     public_key = os.getenv("LANGFUSE_PUBLIC_KEY")
     secret_key = os.getenv("LANGFUSE_SECRET_KEY")
-    host = os.getenv("LANGFUSE_HOST", "https://cloud.langfuse.com")
+    host = os.getenv("LANGFUSE_HOST") or os.getenv("LANGFUSE_BASE_URL", "https://cloud.langfuse.com")
 
     if not (public_key and secret_key):
         logger.info("Langfuse not configured (LANGFUSE_PUBLIC_KEY/SECRET_KEY absent) — observability disabled")
