@@ -33,6 +33,7 @@ COPILOT_FALLBACK_MODELS: list[dict[str, str]] = [
 # Available models per provider (December 2025)
 AVAILABLE_MODELS: dict[str, list[dict[str, str]]] = {
     "google": [
+        {"id": "gemini-3.1-flash-lite-preview", "name": "Gemini 3.1 Flash Lite", "tier": "fast", "description": "Lightest and fastest Gemini model (preview)"},
         {"id": "gemini-2.5-flash", "name": "Gemini 2.5 Flash", "tier": "fast", "description": "Fast, affordable — stable GA"},
         {"id": "gemini-3-flash-preview", "name": "Gemini 3 Flash", "tier": "fast", "description": "Fast with Pro-level intelligence (preview)"},
         {"id": "gemini-2.5-pro", "name": "Gemini 2.5 Pro", "tier": "creative", "description": "High quality reasoning — stable GA"},
