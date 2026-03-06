@@ -49,6 +49,8 @@ AVAILABLE_MODELS: dict[str, list[dict[str, str]]] = {
         {"id": "gpt-5.2-chat-latest", "name": "GPT-5.2 Chat", "tier": "fast", "description": "Fast, optimized for chat"},
         {"id": "gpt-5.2", "name": "GPT-5.2", "tier": "creative", "description": "Balanced quality and speed"},
         {"id": "gpt-5.2-pro", "name": "GPT-5.2 Pro", "tier": "premium", "description": "Highest quality, more compute"},
+        {"id": "gpt-5.4", "name": "GPT-5.4", "tier": "creative", "description": "Latest GPT-5.4 model"},
+        {"id": "gpt-5.4-pro", "name": "GPT-5.4 Pro", "tier": "premium", "description": "GPT-5.4 Pro — highest capability"},
     ],
 }
 
