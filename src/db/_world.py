@@ -134,6 +134,18 @@ class WorldMixin:
         db.commit()
         logger.info(f"{faction1_name} ↔ {faction2_name}: {relationship}")
 
+        # Trigger block update for both factions (relationship change is narratively significant)
+        if faction1 and faction1.influence_score and faction1.influence_score > 10:
+            _fire_block_task(
+                _faction_block_upsert(self.campaign_id, faction1, self._turn_number),
+                name="faction_block_upsert",
+            )
+        if faction2 and faction2.influence_score and faction2.influence_score > 10:
+            _fire_block_task(
+                _faction_block_upsert(self.campaign_id, faction2, self._turn_number),
+                name="faction_block_upsert",
+            )
+
     def update_faction_reputation(self, faction_name: str, change: int, reason: str = ""):
         """
         Update PC's reputation with a faction.
@@ -171,6 +183,13 @@ class WorldMixin:
         db.commit()
 
         logger.info(f"PC reputation with {faction_name}: {old_rep} → {new_rep} ({reason})")
+
+        # Trigger block update when faction becomes plot-relevant (influence > 20)
+        if faction.influence_score and faction.influence_score > 20:
+            _fire_block_task(
+                _faction_block_upsert(self.campaign_id, faction, self._turn_number),
+                name="faction_block_upsert",
+            )
 
     def get_pc_controlled_factions(self) -> list["Faction"]:
         """
@@ -779,3 +798,14 @@ async def _quest_block_create(campaign_id: int, quest: "Quest", current_turn: in
 async def _quest_block_update(campaign_id: int, quest_id: int, current_turn: int) -> None:
     from ..context._block_triggers import update_quest_block
     await update_quest_block(campaign_id, quest_id, current_turn)
+
+
+async def _faction_block_upsert(campaign_id: int, faction: "Faction", current_turn: int) -> None:
+    from ..context._block_triggers import create_or_update_faction_block
+    faction_data = {
+        "name": faction.name,
+        "influence_score": faction.influence_score,
+        "pc_is_member": faction.pc_is_member,
+        "relationships": faction.relationships or {},
+    }
+    await create_or_update_faction_block(campaign_id, faction_data, current_turn)

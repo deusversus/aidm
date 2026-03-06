@@ -3,10 +3,11 @@
 Split from state_manager.py for maintainability.
 """
 
+import asyncio
 import logging
 from typing import Any
 
-from ..enums import NarrativeWeight
+from ..enums import ArcPhase, NarrativeWeight
 from .models import NPC, CampaignBible, Character, Consequence, WorldState
 
 logger = logging.getLogger(__name__)
@@ -157,6 +158,7 @@ class CharacterMixin:
         location: str | None = None,
         time_of_day: str | None = None,
         situation: str | None = None,
+        arc_name: str | None = None,
         arc_phase: str | None = None,
         tension_level: float | None = None,
         timeline_mode: str | None = None,
@@ -179,11 +181,24 @@ class CharacterMixin:
                 world_state.time_of_day = time_of_day
             if situation is not None:
                 world_state.situation = situation
+            if arc_name is not None and world_state.arc_name != arc_name:
+                # Arc name changed — old arc is closing
+                old_arc = world_state.arc_name
+                world_state.arc_name = arc_name
+                if old_arc:
+                    _fire_arc_block_task(
+                        self.campaign_id, old_arc, self._turn_number
+                    )
             if arc_phase is not None:
                 # #3: Reset turns_in_phase on phase transition
                 if world_state.arc_phase != arc_phase:
                     world_state.turns_in_phase = 0
                     logger.info(f"Phase transition: {world_state.arc_phase} → {arc_phase}, turns_in_phase reset")
+                    # Arc close on RESOLUTION — generate block for current arc
+                    if arc_phase == ArcPhase.RESOLUTION and world_state.arc_name:
+                        _fire_arc_block_task(
+                            self.campaign_id, world_state.arc_name, self._turn_number
+                        )
                 world_state.arc_phase = arc_phase
             if tension_level is not None:
                 world_state.tension_level = tension_level
@@ -532,3 +547,23 @@ class CharacterMixin:
             .filter(WorldState.campaign_id == self.campaign_id)
             .first()
         )
+
+
+# ── Context block trigger helpers ─────────────────────────────────────────────
+
+def _fire_arc_block_task(campaign_id: int, arc_name: str, current_turn: int) -> None:
+    """Schedule arc block generation if an event loop is running."""
+    try:
+        asyncio.get_running_loop()
+        from ..utils.tasks import safe_create_task
+        safe_create_task(
+            _arc_block_create(campaign_id, arc_name, current_turn),
+            name="arc_block_create",
+        )
+    except RuntimeError:
+        pass
+
+
+async def _arc_block_create(campaign_id: int, arc_name: str, current_turn: int) -> None:
+    from ..context._block_triggers import create_arc_block
+    await create_arc_block(campaign_id, arc_name, arc_start_turn=1, arc_end_turn=current_turn)

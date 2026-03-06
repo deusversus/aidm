@@ -250,3 +250,92 @@ def _fetch_npc_turns(campaign_id: int, npc_name: str, up_to_turn: int, limit: in
     except Exception:
         logger.warning("[block_triggers] _fetch_npc_turns failed", exc_info=True)
         return []
+
+
+async def create_or_update_faction_block(
+    campaign_id: int, faction: dict, current_turn: int
+) -> None:
+    """Generate or refresh context block for a faction."""
+    try:
+        from .block_generator import ContextBlockGenerator
+        from .context_blocks import ContextBlockStore
+        from ..context.memory import MemoryStore
+
+        store = ContextBlockStore(campaign_id)
+        faction_name = faction.get("name", "")
+        entity_id = faction_name.lower().replace(" ", "_")[:80]
+        existing = store.get("faction", entity_id)
+
+        mem_store = MemoryStore(campaign_id)
+        memories = mem_store.search(faction_name, limit=10)
+        turns = _fetch_npc_turns(campaign_id, faction_name, current_turn, limit=10)
+
+        gen = ContextBlockGenerator()
+        result = await gen.generate_faction_block(
+            faction=faction, memories=memories, relevant_turns=turns, existing_block=existing
+        )
+        if not result:
+            return
+
+        content, checklist = result
+        checklist["last_generated_turn"] = current_turn
+        store.upsert(
+            block_type="faction",
+            entity_id=entity_id,
+            entity_name=faction_name,
+            content=content,
+            continuity_checklist=checklist,
+            last_updated_turn=current_turn,
+            first_turn=existing["first_turn"] if existing else current_turn,
+        )
+        logger.info(f"[block_triggers] Upserted faction block for '{faction_name}'")
+    except Exception:
+        logger.exception(f"[block_triggers] create_or_update_faction_block failed for '{faction.get('name')}'")
+
+
+async def create_or_update_thread_block(
+    campaign_id: int, seed, current_turn: int, close: bool = False
+) -> None:
+    """Generate or refresh a foreshadowing thread context block."""
+    try:
+        from .block_generator import ContextBlockGenerator
+        from .context_blocks import ContextBlockStore
+
+        store = ContextBlockStore(campaign_id)
+        entity_id = str(seed.id)[:80]
+        existing = store.get("thread", entity_id)
+
+        seed_data = {
+            "id": seed.id,
+            "description": seed.description,
+            "status": seed.status.value,
+            "planted_turn": seed.planted_turn,
+            "mentions": seed.mentions,
+            "urgency": seed.urgency,
+            "expected_payoff": getattr(seed, "expected_payoff", ""),
+        }
+
+        gen = ContextBlockGenerator()
+        result = await gen.generate_thread_block(seed=seed_data, existing_block=existing)
+        if not result:
+            return
+
+        content, checklist = result
+        checklist["last_generated_turn"] = current_turn
+        # Mark callback-ready seeds with seed_status so session start loader can find them
+        metadata = {"seed_status": seed.status.value}
+        store.upsert(
+            block_type="thread",
+            entity_id=entity_id,
+            entity_name=seed_data["description"][:120],
+            content=content,
+            continuity_checklist=checklist,
+            last_updated_turn=current_turn,
+            first_turn=existing["first_turn"] if existing else current_turn,
+            metadata=metadata,
+        )
+        if close:
+            store.close_block("thread", entity_id)
+        logger.info(f"[block_triggers] Upserted thread block for seed '{entity_id}' (close={close})")
+    except Exception:
+        logger.exception(f"[block_triggers] create_or_update_thread_block failed for seed '{getattr(seed, 'id', '?')}'")

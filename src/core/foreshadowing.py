@@ -13,6 +13,7 @@ Per Module 12 / Phase 4 spec:
 via StateManager CRUD methods. In-memory _seeds dict is kept for fast reads.
 """
 
+import asyncio
 import logging
 from enum import Enum
 from typing import Any
@@ -268,6 +269,8 @@ class ForeshadowingLedger:
                 urgency=seed.urgency,
                 status=seed.status.value
             )
+            # Update thread block on mention (if block exists)
+            _fire_thread_block_task(self.campaign_id, seed, turn_number, close=False)
 
     def check_callback_ready(self, seed_id: str, current_turn: int) -> bool:
         """Check if a seed is ready for callback (payoff).
@@ -299,6 +302,9 @@ class ForeshadowingLedger:
         if seed_id in self._seeds:
             self._seeds[seed_id].status = SeedStatus.CALLBACK
             self._update_seed_db(seed_id, status=SeedStatus.CALLBACK.value)
+            # Create/update thread block — seed is now ready for payoff
+            seed = self._seeds[seed_id]
+            _fire_thread_block_task(self.campaign_id, seed, seed.last_mentioned_turn or seed.planted_turn, close=False)
 
     def resolve_seed(self, seed_id: str, turn_number: int, resolution_narrative: str):
         """Resolve a seed (successful payoff).
@@ -333,6 +339,9 @@ class ForeshadowingLedger:
             if seed.triggers:
                 logger.info(f"Seed {seed_id} resolved — triggers pending: {seed.triggers}")
 
+            # Final thread block update + close
+            _fire_thread_block_task(self.campaign_id, seed, turn_number, close=True)
+
     def abandon_seed(self, seed_id: str, reason: str = ""):
         """Abandon a seed (explicitly drop it)."""
         if seed_id in self._seeds:
@@ -347,6 +356,8 @@ class ForeshadowingLedger:
                 status=SeedStatus.ABANDONED.value,
                 resolution_narrative=resolution
             )
+            # Final thread block update + close
+            _fire_thread_block_task(self.campaign_id, seed, seed.last_mentioned_turn or seed.planted_turn, close=True)
 
     def get_overdue_seeds(self, current_turn: int) -> list[ForeshadowingSeed]:
         """Get seeds that are past their due date."""
@@ -492,3 +503,19 @@ class ForeshadowingLedger:
 def create_foreshadowing_ledger(campaign_id: int, state_manager=None) -> ForeshadowingLedger:
     """Create a new foreshadowing ledger for a campaign."""
     return ForeshadowingLedger(campaign_id=campaign_id, state_manager=state_manager)
+
+
+def _fire_thread_block_task(campaign_id: int, seed: "ForeshadowingSeed", current_turn: int, close: bool) -> None:
+    try:
+        from ..utils.tasks import safe_create_task
+
+        async def _thread_block_upsert() -> None:
+            from ..context._block_triggers import create_or_update_thread_block
+            await create_or_update_thread_block(campaign_id, seed, current_turn, close=close)
+
+        loop = asyncio.get_running_loop()
+        safe_create_task(loop, _thread_block_upsert())
+    except RuntimeError:
+        pass  # No event loop — skip
+    except Exception:
+        logger.exception("[foreshadowing] _fire_thread_block_task failed")
