@@ -441,8 +441,11 @@ async def resolve_media_intent(
     async def do_research():
         """Background task: research all needed profiles, then save composition."""
         try:
-            from ..agents._session_zero_research import research_and_apply_profile
+            from ..agents._session_zero_research import research_and_apply_profile, resolve_anime_direct
             from ..agents.progress import WeightedProgressGroup, ProgressPhase
+
+            # Build a title → ResolvedTitle lookup so we can pass anilist_id forward
+            rt_by_title = {rt.canonical_title: rt for rt in resolution.resolved_titles}
 
             if len(needs_research) > 1:
                 # Multi-profile: use WeightedProgressGroup so each profile contributes
@@ -462,8 +465,10 @@ async def resolve_media_intent(
                         f"Researching {title}...",
                         detail={"current_title": title},
                     )
+                    rt = rt_by_title.get(title)
+                    resolved = await resolve_anime_direct(title) if (rt and rt.anilist_id) else None
                     await research_and_apply_profile(
-                        session, title, progress_tracker=sub,
+                        session, title, progress_tracker=sub, resolved=resolved,
                     )
 
                 # All profiles done — fire the real complete on the parent
@@ -476,8 +481,10 @@ async def resolve_media_intent(
             else:
                 # Single profile: use tracker directly (existing behavior)
                 for title in needs_research:
+                    rt = rt_by_title.get(title)
+                    resolved = await resolve_anime_direct(title) if (rt and rt.anilist_id) else None
                     await research_and_apply_profile(
-                        session, title, progress_tracker=progress_tracker,
+                        session, title, progress_tracker=progress_tracker, resolved=resolved,
                     )
 
             # ── Merge analysis phase (if merge was chosen) ──

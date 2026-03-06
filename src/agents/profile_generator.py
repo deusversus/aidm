@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from .progress import ProgressTracker
+    from ..profiles.resolved_anime import ResolvedAnime
 
 
 def _sanitize_profile_id(name: str) -> str:
@@ -370,15 +371,19 @@ async def _validate_and_update_series_positions(series_group: str, profiles_dir:
 async def generate_and_save_profile(
     anime_name: str,
     profiles_dir: Path | None = None,
-    progress_tracker: Optional["ProgressTracker"] = None
+    progress_tracker: Optional["ProgressTracker"] = None,
+    resolved: "ResolvedAnime | None" = None,
 ) -> dict[str, Any]:
     """
     Full pipeline: Research anime → Generate profile → Save YAML.
     
     Args:
-        anime_name: Name of the anime to research
-        profiles_dir: Where to save the profile (default: src/profiles/)
+        anime_name:       Name of the anime to research
+        profiles_dir:     Where to save the profile (default: src/profiles/)
         progress_tracker: Optional tracker for streaming progress updates
+        resolved:         Optional pre-resolved identity from disambiguation. When provided,
+                          skips redundant AniList search + title normalization steps, and
+                          allows instant AniList-ID-based dedup before research begins.
         
     Returns:
         Generated profile dictionary
@@ -391,10 +396,32 @@ async def generate_and_save_profile(
     retry_count = 0
     last_error = None
 
+    # ── EARLY ANILIST ID DEDUP ──
+    # When resolved carries an AniList ID we can check for an existing profile
+    # before paying the cost of research.
+    if resolved is not None and resolved.anilist_id is not None:
+        early_path = profiles_dir / f"al_{resolved.anilist_id}.yaml"
+        if early_path.exists():
+            try:
+                with open(early_path, encoding="utf-8") as ef:
+                    existing = yaml.safe_load(ef)
+                if existing:
+                    logger.info(
+                        f"[AniListDedup] Profile al_{resolved.anilist_id} already exists — reusing (pre-research)"
+                    )
+                    return existing
+            except Exception:
+                pass  # Corrupted file — fall through and regenerate
+
     while retry_count < MAX_RETRIES:
         try:
-            # Research the anime
-            research = await research_anime_with_search(anime_name, progress_tracker=progress_tracker)
+            # Research the anime, passing resolved identity so downstream steps
+            # skip redundant AniList search and title normalization.
+            research = await research_anime_with_search(
+                anime_name,
+                progress_tracker=progress_tracker,
+                resolved=resolved,
+            )
 
             # Generate compact profile
             profile = generate_compact_profile(research)

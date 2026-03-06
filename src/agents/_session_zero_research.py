@@ -9,6 +9,7 @@ import logging
 from typing import TYPE_CHECKING, Any, Optional
 
 from ..core.session import Session
+from ..profiles.resolved_anime import FranchiseEntry, ResolvedAnime
 
 logger = logging.getLogger(__name__)
 
@@ -286,7 +287,8 @@ Start your response with [ and end with ]'''
 async def research_and_apply_profile(
     session: Session,
     anime_name: str,
-    progress_tracker: Optional["ProgressTracker"] = None
+    progress_tracker: Optional["ProgressTracker"] = None,
+    resolved: "ResolvedAnime | None" = None,
 ) -> dict[str, Any]:
     """
     Research an anime and apply the profile to the session.
@@ -340,7 +342,11 @@ async def research_and_apply_profile(
 
     # Research the anime AND save to disk + index to RAG
     logger.info(f"Researching and saving profile for: {anime_name}")
-    profile = await generate_and_save_profile(anime_name, progress_tracker=progress_tracker)
+    profile = await generate_and_save_profile(
+        anime_name,
+        progress_tracker=progress_tracker,
+        resolved=resolved,
+    )
 
     # Apply to session
     session.character_draft.media_reference = anime_name
@@ -1355,3 +1361,139 @@ async def ensure_hybrid_prerequisites(
             "Sources ready. Please confirm blend preferences.",
             100
         )
+
+
+# ─── ResolvedAnime construction ───────────────────────────────────────────────
+
+async def build_resolved_anime_from_choice(
+    choice: dict[str, Any],
+    all_options: list[dict[str, Any]],
+    source: str,
+) -> ResolvedAnime:
+    """Construct a ResolvedAnime from the user's disambiguation pick.
+
+    Called immediately after the user selects an entry from the disambiguation
+    UI. Captures the full identity at the moment of selection so downstream
+    steps (research, profile generation) never need to re-discover it.
+
+    Args:
+        choice:      The picked option dict — {name, id, relation_type}.
+        all_options: All options that were presented (from get_disambiguation_options).
+                     Used to populate franchise_entries.
+        source:      'anilist' or 'web_search' (from get_disambiguation_options result).
+
+    Returns:
+        ResolvedAnime ready to pass into research_anime_with_search().
+    """
+    chosen_title = choice.get("name", "")
+    chosen_id = choice.get("id")  # int or None
+
+    # Build franchise entries from all sibling options (not the chosen one itself)
+    franchise_entries = [
+        FranchiseEntry(
+            title=opt["name"],
+            anilist_id=opt.get("id"),
+            relation_type=opt.get("relation_type", "unknown"),
+        )
+        for opt in all_options
+        if opt.get("name") != chosen_title
+    ]
+
+    # AniList path: fetch full title variants for the chosen entry
+    if source == "anilist" and chosen_id is not None:
+        try:
+            from ..scrapers.anilist import AniListClient
+            client = AniListClient()
+            result = await client.fetch_by_id(int(chosen_id))
+            if result:
+                canonical_title = result.title_english or result.title_romaji or chosen_title
+                all_titles = result.get_all_titles()
+                logger.info(
+                    f"[ResolvedAnime] Built from AniList choice: '{canonical_title}' "
+                    f"(id={chosen_id}, {len(all_titles)} title variants, "
+                    f"{len(franchise_entries)} siblings)"
+                )
+                return ResolvedAnime(
+                    title=canonical_title,
+                    anilist_id=int(chosen_id),
+                    franchise_entries=franchise_entries,
+                    all_titles=all_titles,
+                    source="anilist",
+                    raw_input=chosen_title,
+                )
+        except Exception as e:
+            logger.warning(f"[ResolvedAnime] AniList fetch failed for id={chosen_id}: {e}")
+
+    # Web search path (or AniList fetch failed): build with what we have
+    logger.info(
+        f"[ResolvedAnime] Built from web_search choice: '{chosen_title}' "
+        f"({len(franchise_entries)} siblings)"
+    )
+    return ResolvedAnime(
+        title=chosen_title,
+        anilist_id=int(chosen_id) if chosen_id is not None else None,
+        franchise_entries=franchise_entries,
+        all_titles=[chosen_title],
+        source=source,
+        raw_input=chosen_title,
+    )
+
+
+async def resolve_anime_direct(anime_name: str) -> ResolvedAnime:
+    """Resolve an anime title without the disambiguation UI step.
+
+    Used by programmatic callers (API endpoints, CLI, tests) that call
+    generate_and_save_profile() directly. Tries AniList first; falls back
+    to a minimal direct-input ResolvedAnime if the API is unavailable.
+
+    Args:
+        anime_name: Title to resolve (may be abbreviated or informal).
+
+    Returns:
+        ResolvedAnime — always succeeds; worst case is a minimal direct object.
+    """
+    try:
+        from ..scrapers.anilist import AniListClient
+        client = AniListClient()
+
+        # Search for the primary entry
+        result = await client.search(anime_name)
+        if result is None:
+            logger.info(f"[ResolvedAnime] AniList found nothing for '{anime_name}', using direct")
+            return ResolvedAnime.from_direct_input(anime_name)
+
+        canonical_title = result.title_english or result.title_romaji or anime_name
+        all_titles = result.get_all_titles()
+
+        # Also fetch franchise siblings (best-effort; no exception on failure)
+        franchise_entries: list[FranchiseEntry] = []
+        try:
+            franchise = await client.get_franchise_entries(anime_name)
+            franchise_entries = [
+                FranchiseEntry(
+                    title=entry["title"],
+                    anilist_id=entry.get("id"),
+                    relation_type=entry.get("relation", "unknown"),
+                )
+                for entry in franchise
+                if entry.get("title") != canonical_title
+            ]
+        except Exception as fe:
+            logger.debug(f"[ResolvedAnime] Franchise fetch skipped: {fe}")
+
+        logger.info(
+            f"[ResolvedAnime] Resolved '{anime_name}' → '{canonical_title}' "
+            f"(id={result.id}, {len(franchise_entries)} siblings)"
+        )
+        return ResolvedAnime(
+            title=canonical_title,
+            anilist_id=result.id,
+            franchise_entries=franchise_entries,
+            all_titles=all_titles,
+            source="anilist",
+            raw_input=anime_name,
+        )
+
+    except Exception as e:
+        logger.warning(f"[ResolvedAnime] Direct resolve failed for '{anime_name}': {e}")
+        return ResolvedAnime.from_direct_input(anime_name)

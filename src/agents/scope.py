@@ -32,26 +32,6 @@ class ScopeOutput(BaseModel):
         default_factory=list,
         description="Topic bundles for parallel research+extraction"
     )
-    media_variants: list[str] = Field(
-        default_factory=list,
-        description="Known media variants (manga, anime, movie, spinoff, etc.)"
-    )
-    has_sequels: bool = Field(
-        default=False,
-        description="Whether series has sequels or spinoffs"
-    )
-    known_series_entries: list[str] = Field(
-        default_factory=list,
-        description="All known entries in this franchise (e.g., ['Naruto', 'Naruto Shippuden', 'Boruto'])"
-    )
-    is_ongoing: bool = Field(
-        default=False,
-        description="Whether series is currently ongoing"
-    )
-    estimated_episodes: int = Field(
-        default=0,
-        description="Approximate episode/chapter count"
-    )
     reasoning: str = Field(
         default="",
         description="Brief explanation for the classification"
@@ -151,22 +131,7 @@ Think about:
 
 Based on your analysis, provide:
 - scope: Must be exactly one of: MICRO, STANDARD, COMPLEX, or EPIC
-- media_variants: List like ["manga", "anime", "movie"] 
-- has_sequels: true or false
-- known_series_entries: List ALL entries in this franchise with FULL OFFICIAL TITLES
-- is_ongoing: true or false  
-- estimated_episodes: Number (approximate)
 - reasoning: Your brief explanation
-
-CRITICAL for known_series_entries:
-- Use ACTUAL OFFICIAL TITLES only (e.g., "Naruto Shippuden", "Dragon Ball Z", "Fate/stay night: Unlimited Blade Works")
-- NEVER use generic labels like "Original Series", "Sequel", "Spinoff", "Prequel"
-- If you don't know specific titles, return an EMPTY list []
-- Include the queried title itself plus any related entries you KNOW exist
-- Examples:
-  - "Naruto" → ["Naruto", "Naruto Shippuden", "Boruto: Naruto Next Generations"]
-  - "Fate/stay night" → ["Fate/stay night", "Fate/Zero", "Fate/stay night: Unlimited Blade Works", "Fate/Grand Order"]
-  - "Akira" → ["Akira"] (single film, no sequels)
 
 Remember:
 - MICRO = under 20 episodes, single film/OVA
@@ -193,12 +158,19 @@ class ScopeAgent(BaseAgent):
     def output_schema(self) -> type[BaseModel]:
         return ScopeOutput
 
-    async def classify(self, anime_name: str) -> ScopeOutput:
+    async def classify(
+        self,
+        anime_name: str,
+        franchise_entries: list | None = None,
+    ) -> ScopeOutput:
         """
         Classify the scope of an anime/manga series.
         
         Args:
-            anime_name: Name of the anime/manga to classify
+            anime_name:        Name of the anime/manga to classify
+            franchise_entries: Optional list of FranchiseEntry objects from ResolvedAnime.
+                               When provided, the LLM no longer needs to guess franchise
+                               membership — scope classification becomes purely about scale.
             
         Returns:
             ScopeOutput with classification and recommended topics
@@ -221,7 +193,7 @@ class ScopeAgent(BaseAgent):
             )
 
             # Assign topics and bundles based on scope
-            result.bundles = self._get_bundles_for_scope(result.scope, result)
+            result.bundles = self._get_bundles_for_scope(result.scope, franchise_entries=franchise_entries)
             result.topics = [topic for bundle in result.bundles for topic in bundle]
 
             logger.info(f"Classified as {result.scope} with {len(result.bundles)} bundles ({len(result.topics)} topics)")
@@ -236,7 +208,11 @@ class ScopeAgent(BaseAgent):
                 reasoning=f"Classification failed: {e}"
             )
 
-    def _get_bundles_for_scope(self, scope: str, result: ScopeOutput) -> list[list[str]]:
+    def _get_bundles_for_scope(
+        self,
+        scope: str,
+        franchise_entries: list | None = None,
+    ) -> list[list[str]]:
         """Get the appropriate topic bundles for a given scope."""
 
         if scope == "MICRO":
@@ -252,7 +228,7 @@ class ScopeAgent(BaseAgent):
 
         return bundles
 
-    def _get_topics_for_scope(self, scope: str, result: ScopeOutput) -> list[str]:
+    def _get_topics_for_scope(self, scope: str, result: ScopeOutput | None = None) -> list[str]:
         """Get flat topic list for backward compatibility."""
-        bundles = self._get_bundles_for_scope(scope, result)
+        bundles = self._get_bundles_for_scope(scope)
         return [topic for bundle in bundles for topic in bundle]

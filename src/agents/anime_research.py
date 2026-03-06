@@ -15,13 +15,16 @@ Includes robust error handling:
 import asyncio
 import re
 import logging
-from typing import Any, Optional
+from typing import Any, Optional, TYPE_CHECKING
 
 from pydantic import BaseModel, Field
 
 from ..settings import get_settings_store
 from .base import BaseAgent
 from .progress import ProgressPhase, ProgressTracker
+
+if TYPE_CHECKING:
+    from ..profiles.resolved_anime import ResolvedAnime
 
 logger = logging.getLogger(__name__)
 
@@ -430,7 +433,8 @@ Return ONLY the title, nothing else.'''
     async def research_anime(
         self,
         anime_name: str,
-        progress_tracker: ProgressTracker | None = None
+        progress_tracker: ProgressTracker | None = None,
+        resolved: "ResolvedAnime | None" = None,
     ) -> AnimeResearchOutput:
         """
         Research an anime/manga using bundle-based parallel research+extraction.
@@ -458,18 +462,22 @@ Return ONLY the title, nothing else.'''
         use_extended_thinking = settings.extended_thinking
 
         # ========== STEP 0: Title Normalization ==========
-        # Resolve informal names to official titles (e.g., "Dragon Ball Kai" → "Dragon Ball Z Kai")
-        if progress_tracker:
-            await progress_tracker.emit(
-                ProgressPhase.SCOPE,
-                "Resolving title...",
-                2
-            )
-
-        official_title = await self._normalize_title(provider, model, anime_name)
-        if official_title and official_title != anime_name:
-            logger.info(f"Title normalized: '{anime_name}' → '{official_title}'")
-            anime_name = official_title
+        # Skip when ResolvedAnime already provides a clean canonical title.
+        # Otherwise resolve informal names (e.g., "Dragon Ball Kai" → "Dragon Ball Z Kai").
+        if resolved is not None:
+            anime_name = resolved.title
+            logger.info(f"[research_anime] Using resolved title: '{anime_name}'")
+        else:
+            if progress_tracker:
+                await progress_tracker.emit(
+                    ProgressPhase.SCOPE,
+                    "Resolving title...",
+                    2
+                )
+            official_title = await self._normalize_title(provider, model, anime_name)
+            if official_title and official_title != anime_name:
+                logger.info(f"Title normalized: '{anime_name}' → '{official_title}'")
+                anime_name = official_title
 
         # ========== STEP 1: Scope Classification ==========
         if progress_tracker:
@@ -480,7 +488,8 @@ Return ONLY the title, nothing else.'''
             )
 
         scope_agent = ScopeAgent()
-        scope = await scope_agent.classify(anime_name)
+        franchise_entries = resolved.franchise_entries if resolved is not None else None
+        scope = await scope_agent.classify(anime_name, franchise_entries=franchise_entries)
 
         logger.info(f"Scope: {scope.scope} ({len(scope.bundles)} bundles, {len(scope.topics)} topics)")
 
@@ -878,42 +887,6 @@ Return ONLY the title, nothing else.'''
             )
             return response.content
 
-    async def _pass1_web_search(
-        self,
-        provider,
-        model: str,
-        anime_name: str,
-        existing_context: str,
-        extended_thinking: bool = False
-    ) -> str:
-        """Pass 1: Use web search to gather raw research text."""
-
-        query = RESEARCH_QUERY_TEMPLATE.format(
-            anime_name=anime_name,
-            existing_context=existing_context
-        )
-
-        logger.info(f"Pass 1: Web search via {provider.name}...")
-
-        try:
-            if hasattr(provider, 'complete_with_search'):
-                from ..utils.source_trust import get_trust_guidance_prompt
-                response = await provider.complete_with_search(
-                    messages=[{"role": "user", "content": query}],
-                    system=self.system_prompt + get_trust_guidance_prompt(),
-                    model=model,
-                    max_tokens=4096,
-                    temperature=0.5,
-                    extended_thinking=extended_thinking
-                )
-                return response.content
-            else:
-                logger.warning("WARNING: Provider doesn't support search")
-                return ""
-        except Exception as e:
-            logger.error(f"ERROR in Pass 1: {e}")
-            return ""
-
     async def _pass2_parse_to_schema(
         self,
         provider,
@@ -1187,7 +1160,8 @@ Supplemental knowledge: {response.content}
     async def research_anime_api(
         self,
         anime_name: str,
-        progress_tracker: ProgressTracker | None = None
+        progress_tracker: ProgressTracker | None = None,
+        resolved: "ResolvedAnime | None" = None,
     ) -> AnimeResearchOutput:
         """
         API-first research pipeline: AniList + Fandom + 2-3 LLM calls.
@@ -1217,11 +1191,24 @@ Supplemental knowledge: {response.content}
             )
 
         anilist_client = AniListClient()
-        anilist = await anilist_client.search_with_fallback(anime_name)
+
+        # When ResolvedAnime carries an AniList ID we already know the entry —
+        # skip the search and go straight to fetch_by_id.
+        if resolved is not None and resolved.anilist_id is not None:
+            logger.info(f"[research_anime_api] Using resolved AniList id={resolved.anilist_id}")
+            anilist = await anilist_client.fetch_by_id(resolved.anilist_id)
+            if not anilist:
+                logger.warning(
+                    f"fetch_by_id({resolved.anilist_id}) returned nothing, "
+                    "falling back to search"
+                )
+                anilist = await anilist_client.search_with_fallback(anime_name)
+        else:
+            anilist = await anilist_client.search_with_fallback(anime_name)
 
         if not anilist:
             logger.info(f"AniList returned nothing for '{anime_name}', falling back to web search")
-            return await self.research_anime(anime_name, progress_tracker=progress_tracker)
+            return await self.research_anime(anime_name, progress_tracker=progress_tracker, resolved=resolved)
 
         # Merge all seasons of the same series (walks SEQUEL/PREQUEL relations)
         anilist = await anilist_client.fetch_full_series(anilist)
@@ -1862,7 +1849,8 @@ Respond with ONLY valid JSON."""
 async def research_anime_with_search(
     anime_name: str,
     progress_tracker: Optional["ProgressTracker"] = None,
-    use_api: bool = True
+    use_api: bool = True,
+    resolved: "ResolvedAnime | None" = None,
 ) -> AnimeResearchOutput:
     """
     Convenience function for anime research.
@@ -1871,21 +1859,37 @@ async def research_anime_with_search(
     Uses the API-first pipeline by default, falls back to web search.
     
     Args:
-        anime_name: Name of anime to research
+        anime_name:       Name of anime to research
         progress_tracker: Optional tracker for streaming progress updates
-        use_api: If True, use API-first pipeline (default). If False, use web search.
+        use_api:          If True, use API-first pipeline (default). If False, use web search.
+        resolved:         Optional pre-resolved identity from disambiguation. When provided,
+                          skips redundant AniList search and title normalization steps.
         
     Returns:
         AnimeResearchOutput with research results
     """
+    # Use resolved title as the canonical name when available
+    effective_name = resolved.title if resolved is not None else anime_name
     agent = AnimeResearchAgent()
 
     if use_api:
         try:
-            return await agent.research_anime_api(anime_name, progress_tracker=progress_tracker)
+            return await agent.research_anime_api(
+                effective_name,
+                progress_tracker=progress_tracker,
+                resolved=resolved,
+            )
         except Exception as e:
             logger.error(f"API pipeline failed: {e}, falling back to web search")
-            return await agent.research_anime(anime_name, progress_tracker=progress_tracker)
+            return await agent.research_anime(
+                effective_name,
+                progress_tracker=progress_tracker,
+                resolved=resolved,
+            )
     else:
-        return await agent.research_anime(anime_name, progress_tracker=progress_tracker)
+        return await agent.research_anime(
+            effective_name,
+            progress_tracker=progress_tracker,
+            resolved=resolved,
+        )
 
