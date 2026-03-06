@@ -147,6 +147,9 @@ Background Pipeline
 
 ## Features
 
+### Observability
+Optional [Langfuse](https://langfuse.com) integration traces every turn end-to-end: intent classification, KA generation, and per-provider LLM calls with token counts. Activate by adding `LANGFUSE_SECRET_KEY` and `LANGFUSE_PUBLIC_KEY` to `.env` — no code changes needed. Tracing is silently skipped if keys are absent.
+
 ### Session Zero
 8-phase character creation protocol before gameplay begins. Interviews the player, builds a canonical character profile, and seeds the world with lore and NPCs drawn from the selected anime series.
 
@@ -189,6 +192,7 @@ aidm/
 │   ├── profiles/           # Character profile loading
 │   ├── scrapers/           # AniList + wiki scrapers
 │   ├── settings/           # User settings + encrypted key storage
+│   ├── observability.py    # Langfuse tracing (opt-in)
 │   └── utils/
 ├── web/                    # Static frontend (HTML/CSS/JS)
 ├── prompts/                # Agent prompt templates (Markdown)
@@ -223,6 +227,12 @@ DATABASE_URL=postgresql://aidm:aidm@localhost:5432/aidm
 # Optional model overrides
 # FAST_MODEL=gemini-3-flash-preview
 # CREATIVE_MODEL=gemini-3-pro-preview
+
+# Observability — Langfuse (optional)
+# Sign up at https://langfuse.com or self-host. Tracing is disabled if keys are absent.
+# LANGFUSE_SECRET_KEY=sk-lf-...
+# LANGFUSE_PUBLIC_KEY=pk-lf-...
+# LANGFUSE_BASE_URL=https://us.cloud.langfuse.com  # omit for EU region (default)
 
 # Debug
 DEBUG=true
