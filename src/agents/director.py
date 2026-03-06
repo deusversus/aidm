@@ -272,14 +272,13 @@ Provide a CONCISE investigation report structured as:
         Returns:
             DirectorOutput with initial arc plan, foreshadowing seeds, and voice guidance
         """
-        from pathlib import Path
+        from ..prompts import get_registry
 
         # 1. Load startup-specific prompt
-        startup_prompt_path = Path(__file__).parent.parent / "prompts" / "director_startup.md"
-        try:
-            startup_prompt = startup_prompt_path.read_text(encoding="utf-8")
-        except FileNotFoundError:
-            startup_prompt = "You are directing the pilot episode of a new anime series. Plan the opening arc."
+        startup_prompt = get_registry().get_content(
+            "director_startup",
+            fallback="You are directing the pilot episode of a new anime series. Plan the opening arc.",
+        )
 
         # 2. Build Director persona from profile
         persona = profile.director_personality or "You are a thoughtful anime director."

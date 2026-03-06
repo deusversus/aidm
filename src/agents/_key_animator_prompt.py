@@ -6,9 +6,9 @@ prompt-construction methods that assemble the static system blocks.
 """
 
 import logging
-from pathlib import Path
 
 from ..db.state_manager import GameContext
+from ..prompts import get_registry
 from .intent_classifier import IntentOutput
 from .outcome_judge import OutcomeOutput
 
@@ -30,15 +30,11 @@ class PromptBuilderMixin:
 
     @property
     def vibe_keeper_template(self) -> str:
-        """Load the Vibe Keeper template from prompts/ directory."""
+        """Load the Vibe Keeper template from the PromptRegistry."""
         if self._vibe_keeper_template is None:
-            # Try to load from file
-            prompt_path = Path(__file__).parent.parent.parent / "prompts" / "vibe_keeper.md"
-            if prompt_path.exists():
-                self._vibe_keeper_template = prompt_path.read_text(encoding="utf-8")
-            else:
-                # Fallback to inline template
-                self._vibe_keeper_template = self._default_template()
+            self._vibe_keeper_template = get_registry().get_content(
+                "vibe_keeper", fallback=self._default_template()
+            )
         return self._vibe_keeper_template
 
     def _default_template(self) -> str:

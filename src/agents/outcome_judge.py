@@ -60,5 +60,4 @@ class OutcomeJudge(BaseAgent):
 
     @property
     def system_prompt(self) -> str:
-        with open("prompts/outcome_judge.md", encoding="utf-8") as f:
-            return f.read()
+        return self.get_prompt()

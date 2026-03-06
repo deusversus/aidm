@@ -8,12 +8,12 @@ Profile research functions are split into _session_zero_research.py.
 """
 
 import logging
-from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, Field
 
 from ..core.session import Session
+from ..prompts import get_registry
 from .base import BaseAgent
 
 logger = logging.getLogger(__name__)
@@ -66,7 +66,6 @@ class SessionZeroAgent(BaseAgent):
 
     def __init__(self, model_override: str | None = None):
         super().__init__(model_override=model_override)
-        self._prompt_path = Path(__file__).parent.parent.parent / "prompts" / "session_zero.md"
 
     @property
     def system_prompt(self) -> list[tuple[str, bool]]:
@@ -76,7 +75,7 @@ class SessionZeroAgent(BaseAgent):
         The session_zero prompt is static and ~28KB — caching saves
         90% on Anthropic input tokens after the first turn.
         """
-        return [(self._prompt_path.read_text(encoding="utf-8"), True)]
+        return [(get_registry().get_content("session_zero"), True)]
 
     @property
     def output_schema(self) -> type[BaseModel]:
