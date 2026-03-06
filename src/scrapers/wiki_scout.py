@@ -256,11 +256,19 @@ Total categories: {len(all_categories)}
 
 Your goal: Investigate this wiki's structure to identify the BEST categories for RPG lore.
 
-Steps:
-1. List categories (try filtering for "Character", "Technique", "Location" etc.)
-2. For promising categories, check their SIZE (get_category_size)
-3. For the top 2-3 candidates, PREVIEW a sample page to verify content quality
-4. Note any IP-specific patterns (e.g., this IP uses "Quirks" instead of "Techniques")
+## Available Tools
+- `list_categories` — list all category names; use the optional filter param (e.g., "Character", "Technique", "Location") to narrow results
+- `get_category_size` — count how many pages a category contains; use to assess scraping value
+- `preview_category` — get the first 10 page titles from a category; use to verify it contains relevant content
+- `preview_page` — get the first 500 chars of a page; use to check content quality for a specific title
+- `search_wiki` — search the wiki by query string; use to find pages by topic when categories are ambiguous
+
+## Steps
+1. Use `list_categories` (try filters: "Character", "Technique", "Location", "Ability", "Power")
+2. For promising categories, call `get_category_size` to assess scale
+3. For the top 2-3 candidates, use `preview_category` then `preview_page` on a sample title to verify content quality
+4. If category names are unclear, use `search_wiki` to spot-check what exists
+5. Note any IP-specific naming patterns (e.g., this IP uses "Quirks" instead of "Techniques")
 
 After exploring, provide a CONCISE summary of:
 - Which categories are the best targets and why

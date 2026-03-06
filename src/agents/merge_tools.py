@@ -65,7 +65,7 @@ def _read_profile(profiles_dir: Path, profile_id: str) -> dict:
 def _search_lore(profile_id: str, query: str, limit: int = 5) -> list[dict]:
     """Search scraped wiki/lore pages for a topic within a profile."""
     try:
-        from ..db.engine import get_session
+        from ..db.session import get_session
         from ..db.models import WikiPage
 
         with get_session() as db:

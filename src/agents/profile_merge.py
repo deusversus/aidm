@@ -137,7 +137,7 @@ class ProfileMergeAgent(AgenticAgent):
 
     @property
     def system_prompt(self) -> str:
-        return self.get_prompt(fallback=MERGE_ANALYSIS_PROMPT)
+        return MERGE_ANALYSIS_PROMPT  # all call sites use system_prompt_override; this is the correct fallback
 
     @property
     def output_schema(self) -> type[BaseModel] | None:
