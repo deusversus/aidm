@@ -277,14 +277,13 @@ After exploring, provide a CONCISE summary of:
 
     try:
         manager = get_llm_manager()
-        fast_provider = manager.fast_provider
-        fast_model = manager.get_fast_model()
+        provider, model = manager.get_provider_for_agent("wiki_scout")
 
-        response = await fast_provider.complete_with_tools(
+        response = await provider.complete_with_tools(
             messages=[{"role": "user", "content": explore_prompt}],
             tools=tools,
             system="You are a wiki analyst. Use tools to investigate wiki structure, then summarize findings.",
-            model=fast_model,
+            model=model,
             max_tokens=2048,
             max_tool_rounds=5,
         )

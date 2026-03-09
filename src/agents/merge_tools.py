@@ -125,8 +125,7 @@ async def _search_web(query: str) -> str:
         from ..utils.source_trust import get_trust_guidance_prompt
 
         manager = get_llm_manager()
-        provider = manager.fast_provider
-        model = manager.get_fast_model()
+        provider, model = manager.get_provider_for_agent("profile_merge")
 
         if hasattr(provider, "complete_with_search"):
             system = (

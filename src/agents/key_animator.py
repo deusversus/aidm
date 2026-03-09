@@ -42,7 +42,8 @@ class KeyAnimator(PromptBuilderMixin):
         """Get the provider and model from settings."""
         if self._model_override:
             manager = get_llm_manager()
-            return manager.get_provider(), self._model_override
+            provider, _ = manager.get_provider_for_agent(self.agent_name)
+            return provider, self._model_override
 
         if self._cached_provider is None:
             manager = get_llm_manager()
@@ -691,19 +692,14 @@ After investigating, provide a TIGHT summary:
 
 Omit any section that has nothing useful. Brevity over completeness."""
 
-        # Use fast model directly — KeyAnimator doesn't extend AgenticAgent,
-        # so we call the provider without the base class wrapper.
         try:
-            from ..llm import get_llm_manager
-            manager = get_llm_manager()
-            fast_provider = manager.fast_provider
-            fast_model = manager.get_fast_model()
+            provider, model = self._get_provider_and_model()
 
-            response = await fast_provider.complete_with_tools(
+            response = await provider.complete_with_tools(
                 messages=[{"role": "user", "content": research_prompt}],
                 tools=tools,
                 system="You are a concise narrative researcher. Use tools to gather facts, then summarize.",
-                model=fast_model,
+                model=model,
                 max_tokens=2048,
                 max_tool_rounds=3,
             )

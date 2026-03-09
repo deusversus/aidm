@@ -41,10 +41,10 @@ class AgentSettings(BaseModel):
         "intent_classifier", "outcome_judge", "validator", "memory_ranker",
         "combat", "progression", "scale_selector", "relationship_analyzer",
         "session_zero", "world_builder", "wiki_scout", "compactor",
-        "scope", "pacing", "recap", "production",
+        "scope", "pacing", "recap", "production", "beat_extractor",
     })
     THINKING_TIER: ClassVar[frozenset[str]] = frozenset({
-        "director", "research", "profile_merge",
+        "director", "research", "profile_merge", "intent_resolution",
     })
     CREATIVE_TIER: ClassVar[frozenset[str]] = frozenset({
         "key_animator",

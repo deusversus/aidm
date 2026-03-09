@@ -610,9 +610,7 @@ class BackgroundMixin:
                     description="1-3 narrative beats extracted from the text"
                 )
 
-            manager = get_llm_manager()
-            fast_provider = manager.fast_provider
-            fast_model = manager.get_fast_model()
+            beat_provider, beat_model = manager.get_provider_for_agent("beat_extractor")
 
             system = (
                 "You extract narrative beats from RPG game master narration. "
@@ -623,11 +621,11 @@ class BackgroundMixin:
                 "(e.g., a character death, a major alliance formed, a secret revealed)."
             )
 
-            result = await fast_provider.complete_with_schema(
+            result = await beat_provider.complete_with_schema(
                 messages=[{"role": "user", "content": narrative[:800]}],
                 schema=NarrativeBeatsOutput,
                 system=system,
-                model=fast_model,
+                model=beat_model,
                 max_tokens=512,
             )
 

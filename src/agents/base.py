@@ -84,7 +84,8 @@ class BaseAgent(ABC):
         manager = get_llm_manager()
 
         if self._model_override:
-            return manager.get_provider(), self._model_override
+            provider, _ = manager.get_provider_for_agent(self.agent_name)
+            return provider, self._model_override
 
         return manager.get_provider_for_agent(self.agent_name)
 
@@ -263,15 +264,13 @@ class AgenticAgent(BaseAgent):
             return ""
 
         try:
-            manager = get_llm_manager()
-            fast_provider = manager.fast_provider
-            fast_model = manager.get_fast_model()
+            provider, model = self._get_provider_and_model()
 
-            response = await fast_provider.complete_with_tools(
+            response = await provider.complete_with_tools(
                 messages=[{"role": "user", "content": research_prompt}],
                 tools=tools,
                 system=system,
-                model=fast_model,
+                model=model,
                 max_tokens=max_tokens,
                 max_tool_rounds=max_tool_rounds,
             )
