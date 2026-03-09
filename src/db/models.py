@@ -122,7 +122,7 @@ class Character(Base):
     stat_presentation = Column(JSON, nullable=True)  # Layer 2: aliases, display scale, meta-resources (LUK)
 
     # Power system (profile-specific)
-    power_tier = Column(String(10), default="T10")  # VS Battles tier
+    power_tier = Column(String(50), default="T10")  # VS Battles tier
     abilities = Column(JSON, default=list)
     inventory = Column(JSON, default=list)
 
@@ -170,7 +170,7 @@ class NPC(Base):
 
     # Basics
     role = Column(String(100), nullable=True)  # ally, enemy, neutral, rival
-    power_tier = Column(String(10), default="T10")
+    power_tier = Column(String(50), default="T10")
     faction = Column(String(100), nullable=True)  # For disposition calculation
 
     # Relationship with PC (Module 04)
