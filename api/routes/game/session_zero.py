@@ -416,10 +416,6 @@ async def session_zero_turn(session_id: str, request: TurnRequest):
 
     _early_campaign_id: int = session.phase_state["campaign_id"]
 
-    # Snapshot requirements BEFORE this turn so we can detect if they were
-    # already all met (the LLM sometimes narrates the scene instead of handing off)
-    _reqs_already_met = len(get_missing_requirements(session.character_draft)) == 0
-
     try:
         result = await agent.process_turn(session, request.player_input)
 
@@ -656,12 +652,14 @@ async def session_zero_turn(session_id: str, request: TurnRequest):
                 }
                 logger.debug("No canonical stat mapping in profile — using D&D defaults")
 
-        # SAFETY NET: if requirements were already all met before this turn,
-        # the LLM should have set ready_for_gameplay but may have written prose instead.
+        # SAFETY NET: if all requirements are met NOW (either they were already met before
+        # this turn, or this turn's input completed the final requirement), the LLM should
+        # have set ready_for_gameplay but may have written prose instead.
         # Force handoff so the player is never stuck after completing character creation.
-        if _reqs_already_met and not result.ready_for_gameplay:
+        _reqs_now_met = len(get_missing_requirements(session.character_draft)) == 0
+        if _reqs_now_met and not result.ready_for_gameplay:
             logger.warning(
-                "[SessionZero] Safety net: requirements were already complete — "
+                "[SessionZero] Safety net: all requirements met after this turn — "
                 "forcing ready_for_gameplay=True (LLM did not set it)"
             )
             result.ready_for_gameplay = True
