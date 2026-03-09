@@ -720,14 +720,15 @@ class TurnPipelineMixin:
                 break
 
             # If invalid, regenerate outcome with correction
-            logger.error(f"Validation failed: {validation.correction}. Retrying...")
+            correction = "; ".join(e.message for e in validation.errors)
+            logger.error(f"Validation failed: {correction}. Retrying...")
             outcome = await self.outcome_judge.call(
                 f"Action: {intent.action} (RETRY)",
                 intent=intent.model_dump_json(),
                 profile_tropes=str(self.profile.tropes),
                 arc_phase=db_context.arc_phase,
                 recent_events=db_context.recent_summary,
-                correction_feedback=validation.correction,
+                correction_feedback=correction,
                 power_context=power_context
             )
             current_turn.outcome = outcome
