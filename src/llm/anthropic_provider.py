@@ -8,6 +8,7 @@ from typing import Any
 from pydantic import BaseModel
 
 from .provider import LLMProvider, LLMResponse
+from ..observability import get_current_agent, log_generation
 
 logger = logging.getLogger(__name__)
 
@@ -174,6 +175,12 @@ class AnthropicProvider(LLMProvider):
                 usage["cached_tokens"] = cached_tokens
                 logger.info(f"{cached_tokens} tokens cached ({cached_tokens/usage.get('prompt_tokens', 1)*100:.0f}% of prompt)")
 
+        log_generation(
+            agent_name=get_current_agent() or model_name,
+            model=model_name,
+            input_tokens=usage.get("prompt_tokens", 0),
+            output_tokens=usage.get("completion_tokens", 0),
+        )
         return LLMResponse(
             content=full_text,
             model=model_name,
@@ -352,11 +359,10 @@ class AnthropicProvider(LLMProvider):
         if final_message:
             # Log token usage to current observability trace
             try:
-                from ..observability import log_generation
                 usage = getattr(final_message, "usage", None)
                 if usage:
                     log_generation(
-                        agent_name=schema.__name__,
+                        agent_name=get_current_agent() or schema.__name__,
                         model=model_name,
                         input_tokens=getattr(usage, "input_tokens", 0),
                         output_tokens=getattr(usage, "output_tokens", 0),
@@ -532,14 +538,21 @@ Your response must match the required JSON schema.
 
         # Try programmatic tool calling first, fall back to standard
         try:
-            return await self._complete_with_tools_programmatic(
+            result = await self._complete_with_tools_programmatic(
                 messages, tools, system, model_name, max_tokens, max_tool_rounds
             )
         except Exception as e:
             logger.error(f"Programmatic tool calling failed ({e}), falling back to standard")
-            return await self._complete_with_tools_standard(
+            result = await self._complete_with_tools_standard(
                 messages, tools, system, model_name, max_tokens, max_tool_rounds
             )
+        log_generation(
+            agent_name=get_current_agent() or model_name,
+            model=model_name,
+            input_tokens=result.usage.get("prompt_tokens", 0) if result.usage else 0,
+            output_tokens=result.usage.get("completion_tokens", 0) if result.usage else 0,
+        )
+        return result
 
     async def _complete_with_tools_programmatic(
         self,

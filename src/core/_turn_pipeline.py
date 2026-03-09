@@ -410,10 +410,12 @@ class TurnPipelineMixin:
             if recap_task:
                 tasks_to_gather.append(recap_task)
 
+            _phase2_start = time.time()
             phase2_results = await asyncio.gather(
                 *tasks_to_gather,
                 return_exceptions=True
             )
+            log_span("parallel_phase", metadata={"latency_ms": int((time.time() - _phase2_start) * 1000)})
 
             # Handle potential exceptions
             outcome = phase2_results[0]
@@ -948,6 +950,7 @@ class TurnPipelineMixin:
         meta_history = session.meta_conversation_history if session else []
 
         # --- Director responds first (structured: response + resolved flag) ---
+        _director_start = time.time()
         director_result = await self.director.respond_to_meta(
             feedback=player_input,
             game_context=game_context,
@@ -955,14 +958,20 @@ class TurnPipelineMixin:
         )
         director_response = director_result.response
         meta_resolved = director_result.resolved
+        log_span("director_meta", output=director_response[:300] if director_response else None,
+                 metadata={"latency_ms": int((time.time() - _director_start) * 1000),
+                           "resolved": meta_resolved})
 
         # --- KA responds with Director's context ---
+        _ka_meta_start = time.time()
         ka_response = await self.key_animator.respond_to_meta(
             feedback=player_input,
             game_context=game_context,
             director_response=director_response,
             conversation_history=meta_history,
         )
+        log_span("ka_meta", output=ka_response[:300] if ka_response else None,
+                 metadata={"latency_ms": int((time.time() - _ka_meta_start) * 1000)})
 
         # Store in meta conversation history
         if session:

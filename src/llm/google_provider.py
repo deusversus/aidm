@@ -13,6 +13,7 @@ from typing import Any
 from pydantic import BaseModel
 
 from .provider import LLMProvider, LLMResponse
+from ..observability import get_current_agent, log_generation
 
 logger = logging.getLogger(__name__)
 
@@ -134,6 +135,12 @@ class GoogleProvider(LLMProvider):
                 usage["cached_tokens"] = cached_tokens
                 logger.info(f"{cached_tokens} tokens cached ({cached_tokens/max(usage.get('prompt_tokens', 1), 1)*100:.0f}% of prompt)")
 
+        log_generation(
+            agent_name=get_current_agent() or model_name,
+            model=model_name,
+            input_tokens=usage.get("prompt_tokens", 0),
+            output_tokens=usage.get("completion_tokens", 0),
+        )
         return LLMResponse(
             content=full_text,
             model=model_name,
@@ -298,9 +305,8 @@ class GoogleProvider(LLMProvider):
                 logger.info(f"{cached_tokens} tokens cached ({cached_tokens/max(prompt_tokens, 1)*100:.0f}% of prompt)")
             # Log to observability trace
             try:
-                from ..observability import log_generation
                 log_generation(
-                    agent_name=schema.__name__,
+                    agent_name=get_current_agent() or schema.__name__,
                     model=model_name,
                     input_tokens=getattr(last_chunk.usage_metadata, 'prompt_token_count', 0) or 0,
                     output_tokens=getattr(last_chunk.usage_metadata, 'candidates_token_count', 0) or 0,
@@ -467,6 +473,12 @@ Respond ONLY with the JSON object, no markdown formatting or explanation.
                 # Model is done — returned text without function calls
                 final_text = "".join(text_parts)
                 logger.info(f"Round {round_num+1}: Model returned final text ({len(final_text)} chars)")
+                log_generation(
+                    agent_name=get_current_agent() or model_name,
+                    model=model_name,
+                    input_tokens=total_usage.get("prompt_tokens", 0),
+                    output_tokens=total_usage.get("completion_tokens", 0),
+                )
                 return LLMResponse(
                     content=final_text,
                     tool_calls=all_tool_calls,
@@ -544,6 +556,12 @@ Respond ONLY with the JSON object, no markdown formatting or explanation.
                 if hasattr(part, 'text') and part.text:
                     final_text += part.text
 
+        log_generation(
+            agent_name=get_current_agent() or model_name,
+            model=model_name,
+            input_tokens=total_usage.get("prompt_tokens", 0),
+            output_tokens=total_usage.get("completion_tokens", 0),
+        )
         return LLMResponse(
             content=final_text,
             tool_calls=all_tool_calls,

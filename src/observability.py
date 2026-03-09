@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 
 _client = None
 _current_trace: ContextVar = ContextVar("langfuse_trace", default=None)
+_current_agent: ContextVar = ContextVar("langfuse_agent", default=None)
 
 
 def init_langfuse() -> bool:
@@ -69,6 +70,16 @@ def start_trace(
 
 def get_trace():
     return _current_trace.get()
+
+
+def set_current_agent(name: str) -> None:
+    """Set the currently-executing agent name so providers can annotate traces."""
+    _current_agent.set(name)
+
+
+def get_current_agent() -> str | None:
+    """Get the currently-executing agent name."""
+    return _current_agent.get()
 
 
 def end_trace(output: Any = None, metadata: dict | None = None):

@@ -8,6 +8,7 @@ from typing import Any
 from pydantic import BaseModel
 
 from .provider import LLMProvider, LLMResponse
+from ..observability import get_current_agent, log_generation
 
 logger = logging.getLogger(__name__)
 
@@ -167,6 +168,12 @@ class OpenAIProvider(LLMProvider):
                     usage["cached_tokens"] = cached_tokens
                     logger.info(f"{cached_tokens} tokens cached ({cached_tokens/usage.get('prompt_tokens', 1)*100:.0f}% of prompt)")
 
+        log_generation(
+            agent_name=get_current_agent() or model_name,
+            model=model_name,
+            input_tokens=usage.get("prompt_tokens", 0),
+            output_tokens=usage.get("completion_tokens", 0),
+        )
         return LLMResponse(
             content=full_text,
             model=model_name,
@@ -362,6 +369,17 @@ class OpenAIProvider(LLMProvider):
             if self._is_retryable(e):
                 raise
             raise RuntimeError(f"OpenAI structured completion failed for {model_name}: {e}")
+
+        if final_usage:
+            try:
+                log_generation(
+                    agent_name=get_current_agent() or schema.__name__,
+                    model=model_name,
+                    input_tokens=getattr(final_usage, "prompt_tokens", 0),
+                    output_tokens=getattr(final_usage, "completion_tokens", 0),
+                )
+            except Exception:
+                pass
 
         # Parse the streamed tool call response
         if tool_name == "respond" and tool_args:
@@ -561,6 +579,12 @@ Respond ONLY with the JSON object, no markdown formatting.
                 # Model is done — returned text without tool calls
                 final_text = message.content or ""
                 logger.info(f"Round {round_num+1}: Final text ({len(final_text)} chars)")
+                log_generation(
+                    agent_name=get_current_agent() or model_name,
+                    model=model_name,
+                    input_tokens=total_usage.get("prompt_tokens", 0),
+                    output_tokens=total_usage.get("completion_tokens", 0),
+                )
                 return LLMResponse(
                     content=final_text,
                     tool_calls=all_tool_calls,
@@ -650,6 +674,12 @@ Respond ONLY with the JSON object, no markdown formatting.
         if final_response.choices:
             final_text = final_response.choices[0].message.content or ""
 
+        log_generation(
+            agent_name=get_current_agent() or model_name,
+            model=model_name,
+            input_tokens=total_usage.get("prompt_tokens", 0),
+            output_tokens=total_usage.get("completion_tokens", 0),
+        )
         return LLMResponse(
             content=final_text,
             tool_calls=all_tool_calls,

@@ -7,6 +7,7 @@ from typing import Any
 from pydantic import BaseModel
 
 from ..llm import LLMProvider, get_llm_manager
+from ..observability import set_current_agent
 from ..prompts import get_registry
 from ..settings import get_settings_store
 
@@ -152,6 +153,9 @@ class BaseAgent(ABC):
         # Increase token limit for thinking models
         max_tokens = 16384 if use_extended_thinking else 8192
 
+        # Announce agent to observability layer before the LLM call
+        set_current_agent(self.agent_name)
+
         result = await self.provider.complete_with_schema(
             messages=messages,
             schema=self.output_schema,
@@ -259,6 +263,7 @@ class AgenticAgent(BaseAgent):
         """
         from ..llm.tools import ToolRegistry
 
+        set_current_agent(self.agent_name)
         tools = self.get_tools()
         if not tools or not isinstance(tools, ToolRegistry):
             return ""
@@ -317,6 +322,7 @@ class AgenticAgent(BaseAgent):
         """
         from ..llm.tools import ToolRegistry
 
+        set_current_agent(self.agent_name)
         tools = self.get_tools()
         if not tools or not isinstance(tools, ToolRegistry):
             # No tools — fall back to standard text completion
