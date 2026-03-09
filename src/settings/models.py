@@ -40,11 +40,12 @@ class AgentSettings(BaseModel):
     FAST_TIER: ClassVar[frozenset[str]] = frozenset({
         "intent_classifier", "outcome_judge", "validator", "memory_ranker",
         "combat", "progression", "scale_selector", "relationship_analyzer",
-        "session_zero", "world_builder", "wiki_scout", "compactor",
+        "world_builder", "wiki_scout", "compactor",
         "scope", "pacing", "recap", "production", "beat_extractor",
     })
     THINKING_TIER: ClassVar[frozenset[str]] = frozenset({
         "director", "research", "profile_merge", "intent_resolution",
+        "session_zero",
     })
     CREATIVE_TIER: ClassVar[frozenset[str]] = frozenset({
         "key_animator",
@@ -138,7 +139,7 @@ class AgentSettings(BaseModel):
     # === SESSION ZERO (Character Creation) ===
     session_zero: ModelConfig | None = Field(
         default=None,
-        description="Model for character creation dialogue (fast model preferred)"
+        description="Model for character creation dialogue (thinking model preferred)"
     )
 
     # === WORLD BUILDING (Entity Extraction & Validation) ===
