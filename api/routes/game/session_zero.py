@@ -754,8 +754,11 @@ async def session_zero_turn(session_id: str, request: TurnRequest):
                 pass  # Invalid phase, ignore
 
 
-        # Record AI response
-        session.add_message("assistant", result.response)
+        # Record AI response — skip on handoff, since the sendoff is suppressed
+        # in live play and the opening scene already serves as the canonical
+        # transition message in replay history.
+        if not result.ready_for_gameplay:
+            session.add_message("assistant", result.response)
 
         # Build character draft summary for response
         draft_dict = {
