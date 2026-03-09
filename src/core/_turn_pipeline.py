@@ -909,7 +909,7 @@ class TurnPipelineMixin:
         end_trace(
             output=(narrative or "")[:500],
             metadata={"intent": intent.intent, "latency_ms": latency,
-                      "outcome": outcome.result if outcome else None},
+                      "outcome": outcome.success_level if outcome else None},
         )
 
         return TurnResult(
