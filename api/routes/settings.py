@@ -150,6 +150,9 @@ async def update_agent_model(agent_name: str, config: ModelConfig):
         "compactor",
         # Post-Narrative Production
         "production",
+        "beat_extractor",
+        # Intent Resolution
+        "intent_resolution",
     ]
     if agent_name not in valid_agents:
         raise HTTPException(

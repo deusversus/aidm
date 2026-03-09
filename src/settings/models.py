@@ -168,6 +168,16 @@ class AgentSettings(BaseModel):
         default=None,
         description="Model for post-narrative quest tracking and location discovery (fast model preferred)"
     )
+    beat_extractor: ModelConfig | None = Field(
+        default=None,
+        description="Model for extracting narrative beats from GM narration for memory indexing (fast model preferred)"
+    )
+
+    # === INTENT RESOLUTION ===
+    intent_resolution: ModelConfig | None = Field(
+        default=None,
+        description="Model for resolving player intent with tool-calling research (thinking model preferred)"
+    )
 
 
 class APIKeySettings(BaseModel):

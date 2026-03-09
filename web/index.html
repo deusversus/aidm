@@ -715,6 +715,24 @@
                                         </div>
                                     </div>
 
+                                    <!-- Beat Extractor -->
+                                    <div class="setting-card">
+                                        <h3>🎵 Beat Extractor</h3>
+                                        <p class="setting-desc">Extracts narrative beats from GM narration for memory
+                                            indexing (fast model preferred)</p>
+                                        <div class="setting-inputs">
+                                            <select id="beat_extractor-provider" class="provider-select"
+                                                data-agent="beat_extractor">
+                                                <option value="google">Google</option>
+                                                <option value="anthropic">Anthropic</option>
+                                                <option value="openai">OpenAI</option>
+                                                <option value="copilot">GitHub Copilot</option>
+                                            </select>
+                                            <select id="beat_extractor-model" class="model-select"
+                                                data-agent="beat_extractor"></select>
+                                        </div>
+                                    </div>
+
                                     <!-- Compactor -->
                                     <div class="setting-card">
                                         <h3>🗜️ Compactor</h3>
@@ -730,6 +748,24 @@
                                             </select>
                                             <select id="compactor-model" class="model-select"
                                                 data-agent="compactor"></select>
+                                        </div>
+                                    </div>
+
+                                    <!-- Intent Resolution -->
+                                    <div class="setting-card">
+                                        <h3>🧩 Intent Resolution</h3>
+                                        <p class="setting-desc">Resolves player intent with tool-calling research
+                                            (thinking model preferred)</p>
+                                        <div class="setting-inputs">
+                                            <select id="intent_resolution-provider" class="provider-select"
+                                                data-agent="intent_resolution">
+                                                <option value="google">Google</option>
+                                                <option value="anthropic">Anthropic</option>
+                                                <option value="openai">OpenAI</option>
+                                                <option value="copilot">GitHub Copilot</option>
+                                            </select>
+                                            <select id="intent_resolution-model" class="model-select"
+                                                data-agent="intent_resolution"></select>
                                         </div>
                                     </div>
 

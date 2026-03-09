@@ -707,6 +707,10 @@ async function loadSettings() {
 
         // Post-Narrative Production
         populateAgentSetting('production', agentModels.production);
+        populateAgentSetting('beat_extractor', agentModels.beat_extractor);
+
+        // Intent Resolution
+        populateAgentSetting('intent_resolution', agentModels.intent_resolution);
 
         // Extended thinking toggle
         const extendedThinkingToggle = document.getElementById('extended-thinking-toggle');
@@ -1085,6 +1089,9 @@ async function saveAdvancedSettings() {
                 recap: getAgentConfig('recap'),
                 // Post-Narrative Production
                 production: getAgentConfig('production'),
+                beat_extractor: getAgentConfig('beat_extractor'),
+                // Intent Resolution
+                intent_resolution: getAgentConfig('intent_resolution'),
             },
             debug_mode: true,
             extended_thinking: extendedThinkingToggle?.checked || false,
