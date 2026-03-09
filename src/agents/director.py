@@ -737,8 +737,6 @@ Do NOT write narrative prose or in-character dialogue during this interlude."""
         Returns:
             MetaDirectorResponse with response text and resolved flag
         """
-        from ..llm.manager import get_llm_manager
-
         messages = []
 
         # Replay full conversation history so both Director and KA context is visible.
@@ -773,9 +771,7 @@ Do NOT write narrative prose or in-character dialogue during this interlude."""
         messages.append({"role": "user", "content": user_message})
 
         try:
-            manager = get_llm_manager()
-            provider = manager.get_provider()
-            model = manager.get_fast_model()
+            provider, model = self._get_provider_and_model()
 
             result = await provider.complete_with_schema(
                 messages=messages,
@@ -787,7 +783,7 @@ Do NOT write narrative prose or in-character dialogue during this interlude."""
             return result
 
         except Exception as e:
-            logger.error(f"[director] Meta conversation failed: {e}")
+            logger.error(f"[director] Meta conversation failed: {e}", exc_info=True)
             return MetaDirectorResponse(
                 response="I hear you — let me think about that. (The Director encountered an issue.)",
                 resolved=False,
