@@ -10,10 +10,19 @@ A FastAPI + PostgreSQL application that runs a full TTRPG dungeon master pipelin
 
 ### Prerequisites
 
-- Python 3.11+ (3.13 recommended)
-- Docker (for PostgreSQL)
+- Docker + Docker Compose v2
 
-### Setup
+### Fresh machine setup (recommended)
+
+```bash
+git clone https://github.com/deusversus/aidm.git
+cd aidm
+./setup.sh
+```
+
+`setup.sh` pulls/builds images, starts PostgreSQL + AIDM, and optionally spins up a self-hosted Langfuse instance. Add your LLM API keys via the Settings UI at **http://localhost:8000** after startup.
+
+### Manual / developer setup
 
 ```bash
 # 1. Clone and enter repo
@@ -47,10 +56,14 @@ Open **http://localhost:8000** for the web interface.
 ### Docker (full stack)
 
 ```bash
+# App + PostgreSQL only
 docker compose up
+
+# App + PostgreSQL + self-hosted Langfuse (port 3000)
+docker compose --profile langfuse up
 ```
 
-Runs PostgreSQL + the application together. Migrations run automatically on startup.
+Migrations run automatically on startup.
 
 ---
 
@@ -148,7 +161,16 @@ Background Pipeline
 ## Features
 
 ### Observability
-Optional [Langfuse](https://langfuse.com) integration traces every turn end-to-end: intent classification, KA generation, and per-provider LLM calls with token counts. Activate by adding `LANGFUSE_SECRET_KEY` and `LANGFUSE_PUBLIC_KEY` to `.env` — no code changes needed. Tracing is silently skipped if keys are absent.
+Optional [Langfuse](https://langfuse.com) integration traces every turn end-to-end: intent classification, KA generation, and per-provider LLM calls with token counts. Tracing is silently skipped if keys are absent.
+
+**Cloud:** Add `LANGFUSE_SECRET_KEY` and `LANGFUSE_PUBLIC_KEY` from your Langfuse Cloud account to `.env`.
+
+**Self-hosted:** Run `docker compose --profile langfuse up` (or let `setup.sh` configure it). Set in `.env`:
+```
+LANGFUSE_SECRET_KEY=local-secret-key
+LANGFUSE_PUBLIC_KEY=local-public-key
+LANGFUSE_HOST=http://localhost:3000
+```
 
 ### Session Zero
 8-phase character creation protocol before gameplay begins. Interviews the player, builds a canonical character profile, and seeds the world with lore and NPCs drawn from the selected anime series.
