@@ -266,10 +266,14 @@ class SettingsStore:
         """
         settings = self.load()
 
+        def env_key_configured(env_var: str) -> bool:
+            val = os.getenv(env_var, "")
+            return bool(val) and not val.startswith("your-")
+
         return {
-            "google": is_key_configured(settings.api_keys.google_api_key) or bool(os.getenv("GOOGLE_API_KEY")),
-            "anthropic": is_key_configured(settings.api_keys.anthropic_api_key) or bool(os.getenv("ANTHROPIC_API_KEY")),
-            "openai": is_key_configured(settings.api_keys.openai_api_key) or bool(os.getenv("OPENAI_API_KEY")),
+            "google": is_key_configured(settings.api_keys.google_api_key) or env_key_configured("GOOGLE_API_KEY"),
+            "anthropic": is_key_configured(settings.api_keys.anthropic_api_key) or env_key_configured("ANTHROPIC_API_KEY"),
+            "openai": is_key_configured(settings.api_keys.openai_api_key) or env_key_configured("OPENAI_API_KEY"),
             "copilot": is_key_configured(settings.api_keys.copilot_github_token),
         }
 
