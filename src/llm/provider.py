@@ -186,11 +186,13 @@ class LLMProvider(ABC):
 
     @staticmethod
     def _is_retryable(exc: Exception) -> bool:
-        """Check if an exception is a transient overload/rate-limit error.
+        """Check if an exception is a transient overload/rate-limit/network error.
         
         Works for Anthropic (OverloadedError, RateLimitError, APIStatusError 529)
         and OpenAI (RateLimitError, APIStatusError 429) without hard-importing
-        either SDK.
+        either SDK.  Also catches low-level connection drops (incomplete chunked
+        reads, remote peer closing mid-stream) which the Copilot API occasionally
+        produces under load.
         """
         cls_name = type(exc).__name__
 
@@ -209,6 +211,22 @@ class LLMProvider(ABC):
             err_type = err_body.get("error", {}).get("type", "")
             if err_type in ("overloaded_error", "rate_limit_error"):
                 return True
+
+        # Low-level network / connection errors (httpcore / httpx / urllib3).
+        # "peer closed connection without sending complete message body" and
+        # similar incomplete-read errors are transient and safe to retry.
+        if cls_name in ("RemoteProtocolError", "IncompleteRead", "ChunkedEncodingError",
+                        "ConnectionError", "ReadError", "ConnectError"):
+            return True
+        msg = str(exc).lower()
+        if any(phrase in msg for phrase in (
+            "incomplete chunked read",
+            "peer closed connection",
+            "incomplete read",
+            "connection reset",
+            "connection aborted",
+        )):
+            return True
 
         return False
 

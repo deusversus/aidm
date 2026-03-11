@@ -144,6 +144,8 @@ class OpenAIProvider(LLMProvider):
                     # Capture usage from final chunk
                     if hasattr(chunk, 'usage') and chunk.usage:
                         final_usage = chunk.usage
+                if not full_text:
+                    raise ConnectionError("Stream ended with no data (silent truncation)")
                 return full_text, final_usage
 
             full_text, final_usage = await self._run_with_retry(_stream_and_collect)
@@ -360,6 +362,11 @@ class OpenAIProvider(LLMProvider):
                     # Also capture content if present
                     if delta.content:
                         content += delta.content
+
+                # If the stream completed without any tool call or content,
+                # the connection was silently truncated — treat as retryable.
+                if not tool_name and not tool_args and not content:
+                    raise ConnectionError("Stream ended with no data (silent truncation)")
 
                 return tool_name, tool_args, content, final_usage
 
