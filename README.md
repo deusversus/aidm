@@ -169,7 +169,7 @@ Optional [Langfuse](https://langfuse.com) integration traces every turn end-to-e
 ```
 LANGFUSE_SECRET_KEY=local-secret-key
 LANGFUSE_PUBLIC_KEY=local-public-key
-LANGFUSE_HOST=http://localhost:3000
+LANGFUSE_HOST=http://langfuse:3000
 ```
 
 ### Session Zero

@@ -188,7 +188,8 @@ class TurnPipelineMixin:
         # When players assert facts about NPCs, items, locations, etc.
         # =====================================================================
         world_building_context = ""
-        if intent.intent == "WORLD_BUILDING":
+        is_opening_scene_seed = player_input.strip() == "[opening scene — the story begins]"
+        if intent.intent == "WORLD_BUILDING" and not is_opening_scene_seed:
             from ..agents.world_builder import WorldBuilderAgent
             world_builder = WorldBuilderAgent()
 
@@ -255,6 +256,8 @@ class TurnPipelineMixin:
                 world_building_context = "[World Building] Player established:\n" + "\n".join(entity_descs)
                 if wb_result.narrative_integration:
                     world_building_context += f"\nIntegration note: {wb_result.narrative_integration}"
+        elif intent.intent == "WORLD_BUILDING" and is_opening_scene_seed:
+            logger.info("Skipping WORLD_BUILDING validation for synthetic opening-scene seed")
 
         # =====================================================================
         # PHASE 1b: RAG Base Retrieval (uses intent for dynamic memory tiering)

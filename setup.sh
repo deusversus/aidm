@@ -58,7 +58,7 @@ case "$LF_CHOICE" in
 # Self-hosted Langfuse (injected by setup.sh)
 LANGFUSE_SECRET_KEY=local-secret-key
 LANGFUSE_PUBLIC_KEY=local-public-key
-LANGFUSE_HOST=http://localhost:3000
+LANGFUSE_HOST=http://langfuse:3000
 ENVBLOCK
         ok "Self-hosted Langfuse keys added to .env."
     else
