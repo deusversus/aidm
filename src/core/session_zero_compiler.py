@@ -155,26 +155,45 @@ class HandoffCompiler:
         Returns:
             HandoffCompilerResult with success flag, package, and artifacts
         """
+        from ..agents.progress import ProgressPhase, ProgressTracker
+
+        tracker = ProgressTracker(total_steps=10)
         logger.info(
-            "[HandoffCompiler] Starting %s for session=%s messages=%d",
-            self.run_type, self.session_id, len(self._ctx.messages),
+            "[HandoffCompiler] Starting %s for session=%s messages=%d (task_id=%s)",
+            self.run_type, self.session_id, len(self._ctx.messages), tracker.task_id,
         )
 
         try:
+            await tracker.emit(ProgressPhase.INITIALIZING, "Handoff compiler starting…", 5)
+
             # Pass 1: Extraction
+            n_chunks = max(1, (len(self._ctx.messages) + _EXTRACTION_CHUNK_SIZE - 1) // _EXTRACTION_CHUNK_SIZE)
+            await tracker.emit(ProgressPhase.PARSING, f"Pass 1: extracting facts ({n_chunks} chunk(s))…", 15)
             await self._run_extraction_pass()
+            stats = self._ctx.extraction_stats()
+            await tracker.emit(ProgressPhase.PARSING, f"Pass 1 done — {stats['entities']} entities, {stats['facts']} facts", 35)
 
             # Pass 2: Entity Resolution
+            await tracker.emit(ProgressPhase.PARSING, "Pass 2: resolving entities…", 45)
             await self._run_entity_resolution_pass()
+            n_canonical = len(self._ctx.entity_resolution.canonical_entities) if self._ctx.entity_resolution else 0
+            await tracker.emit(ProgressPhase.PARSING, f"Pass 2 done — {n_canonical} canonical entities", 60)
 
             # Pass 3: Gap Analysis
+            await tracker.emit(ProgressPhase.PARSING, "Pass 3: gap analysis…", 65)
             await self._run_gap_analysis_pass()
+            n_gaps = len(self._ctx.gap_analysis.unresolved_items) if self._ctx.gap_analysis else 0
+            await tracker.emit(ProgressPhase.PARSING, f"Pass 3 done — {n_gaps} gaps found", 75)
 
             # Pass 4: Handoff Assembly
+            await tracker.emit(ProgressPhase.SAVING, "Pass 4: assembling opening-state package…", 80)
             await self._run_handoff_assembly_pass()
 
             # Persist all artifacts in a single transaction
+            await tracker.emit(ProgressPhase.SAVING, "Persisting artifacts…", 90)
             run, saved = await self._persist_artifacts()
+
+            await tracker.complete("Handoff compiler complete")
 
             package = self._ctx.opening_package
             return HandoffCompilerResult(
@@ -186,14 +205,20 @@ class HandoffCompiler:
                 artifact_version=saved.get("opening_state_package", {}).version if saved else None,
                 run_id=run.id if run else None,
                 warnings=self._ctx.gap_analysis.warnings if self._ctx.gap_analysis else [],
+                compiler_task_id=tracker.task_id,
             )
 
         except Exception as exc:
             logger.exception("[HandoffCompiler] Pipeline failed for session=%s", self.session_id)
+            try:
+                await tracker.error(f"Compiler failed: {exc}")
+            except Exception:
+                pass
             return HandoffCompilerResult(
                 success=False,
                 checkpoints=self._ctx.checkpoints,
                 error=str(exc),
+                compiler_task_id=tracker.task_id,
             )
 
     # ──────────────────────────────────────────────────────────────────────

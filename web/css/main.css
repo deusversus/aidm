@@ -258,6 +258,40 @@ body {
     border-top: 1px solid var(--border-color);
 }
 
+/* Handoff gap follow-up and warning banners */
+.handoff-followup {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.6rem;
+    margin: 1rem 0;
+    padding: 0.75rem 1rem;
+    background: rgba(var(--accent-primary-rgb, 147, 112, 219), 0.08);
+    border-left: 3px solid var(--accent-secondary, #9370db);
+    border-radius: 4px;
+    font-size: 0.9rem;
+    color: var(--text-primary);
+    line-height: 1.5;
+}
+
+.handoff-followup-icon { font-size: 1.1rem; flex-shrink: 0; padding-top: 0.1rem; }
+
+.handoff-warnings {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.6rem;
+    margin: 0.75rem 0;
+    padding: 0.6rem 1rem;
+    background: rgba(255, 193, 7, 0.06);
+    border-left: 3px solid rgba(255, 193, 7, 0.4);
+    border-radius: 4px;
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+}
+
+.handoff-warnings-icon { flex-shrink: 0; }
+.handoff-warnings ul { margin: 0; padding-left: 1.2rem; }
+.handoff-warnings li { margin-bottom: 0.25rem; }
+
 .narrative-entry ul,
 .narrative-entry ol {
     margin: 0.75rem 0 1rem 1.5rem;

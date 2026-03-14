@@ -554,6 +554,7 @@ class HandoffCompilerResult(BaseModel):
     run_id: int | None = None
     error: str | None = None
     warnings: list[str] = Field(default_factory=list)
+    compiler_task_id: str | None = None  # ProgressTracker task ID for SSE
 
 
 # ─────────────────────────────────────────────

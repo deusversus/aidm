@@ -71,11 +71,18 @@ async def _handle_gameplay_handoff(session, session_id: str, result, agent) -> t
     OP mode transfer, context injection, director startup, opening scene.
     
     Returns:
-        Tuple of (opening_narrative, opening_portrait_map).
-        Both may be None if opening scene generation fails.
+        Tuple of (opening_narrative, opening_portrait_map, handoff_status,
+                  handoff_warnings, gap_follow_up_prompt, compiler_task_id,
+                  compiler_artifact_version).
+        narrative and portrait_map may be None if opening scene generation fails.
     """
     opening_narrative = None
     opening_portrait_map = None
+    _handoff_status = "compiler_skipped"
+    _handoff_warnings: list[str] = []
+    _gap_follow_up_prompt: str | None = None
+    _compiler_task_id: str | None = None
+    _compiler_artifact_version: int | None = None
 
     # --- Settings Sync & Profile Resolution ---
     draft = session.character_draft
@@ -229,17 +236,38 @@ async def _handle_gameplay_handoff(session, session_id: str, result, agent) -> t
                 tone_composition=_tone,
             )
             _compiler_result = await compiler.run()
+            _compiler_task_id = _compiler_result.compiler_task_id
             if _compiler_result.success:
                 _compiler_package = _compiler_result.opening_state_package
+                _compiler_artifact_version = _compiler_result.artifact_version
+                gap = _compiler_result.gap_analysis
+                n_gaps = len(gap.unresolved_items) if gap else 0
+                _handoff_status = "complete" if (gap and gap.handoff_safe) else "degraded"
+                _handoff_warnings = list(_compiler_result.warnings)
+                if gap:
+                    _handoff_warnings.extend(gap.warnings)
+                    # Build gap follow-up prompt from critical/high unresolved items
+                    critical_items = [
+                        u for u in gap.unresolved_items
+                        if u.priority in ("critical", "high") and u.candidate_followup
+                    ]
+                    if critical_items:
+                        prompts = [u.candidate_followup for u in critical_items[:2]]
+                        _gap_follow_up_prompt = " ".join(prompts)
+                    elif gap.recommended_player_followups:
+                        _gap_follow_up_prompt = gap.recommended_player_followups[0]
                 logger.info(
-                    "[Handoff] HandoffCompiler complete: version=%s gaps=%d safe=%s",
-                    _compiler_result.artifact_version,
-                    len(_compiler_result.gap_analysis.unresolved_items) if _compiler_result.gap_analysis else 0,
-                    _compiler_result.gap_analysis.handoff_safe if _compiler_result.gap_analysis else "?",
+                    "[Handoff] HandoffCompiler complete: version=%s gaps=%d safe=%s status=%s",
+                    _compiler_result.artifact_version, n_gaps,
+                    gap.handoff_safe if gap else "?", _handoff_status,
                 )
             else:
+                _handoff_status = "compiler_failed"
+                if _compiler_result.error:
+                    _handoff_warnings.append(f"Compiler error: {_compiler_result.error}")
                 logger.error("[Handoff] HandoffCompiler failed: %s", _compiler_result.error)
         except Exception as compiler_err:
+            _handoff_status = "compiler_failed"
             logger.error("[Handoff] HandoffCompiler error (non-blocking): %s", compiler_err, exc_info=True)
 
     # --- 1. Update Character ---
@@ -406,7 +434,15 @@ async def _handle_gameplay_handoff(session, session_id: str, result, agent) -> t
         import traceback
         traceback.print_exc()
 
-    return opening_narrative, opening_portrait_map
+    return (
+        opening_narrative,
+        opening_portrait_map,
+        _handoff_status,
+        _handoff_warnings,
+        _gap_follow_up_prompt,
+        _compiler_task_id,
+        _compiler_artifact_version,
+    )
 
 
 router = APIRouter()
@@ -480,6 +516,11 @@ async def session_zero_turn(session_id: str, request: TurnRequest):
         # Initialize opening scene vars (only populated during handoff)
         opening_narrative = None
         opening_portrait_map = None
+        _handoff_status_outer: str | None = None
+        _handoff_warnings_outer: list[str] = []
+        _gap_follow_up_prompt_outer: str | None = None
+        _compiler_task_id_outer: str | None = None
+        _compiler_artifact_version_outer: int | None = None
 
         # Apply any detected information to the character draft
 
@@ -745,7 +786,15 @@ async def session_zero_turn(session_id: str, request: TurnRequest):
                 result.ready_for_gameplay = False
             else:
                 logger.info("All requirements met - proceeding with handoff")
-                opening_narrative, opening_portrait_map = await _handle_gameplay_handoff(
+                (
+                    opening_narrative,
+                    opening_portrait_map,
+                    _handoff_status_outer,
+                    _handoff_warnings_outer,
+                    _gap_follow_up_prompt_outer,
+                    _compiler_task_id_outer,
+                    _compiler_artifact_version_outer,
+                ) = await _handle_gameplay_handoff(
                     session, session_id, result, agent
                 )
 
@@ -860,6 +909,11 @@ async def session_zero_turn(session_id: str, request: TurnRequest):
             detected_info=result.detected_info,
             opening_scene=opening_narrative if result.ready_for_gameplay else None,
             opening_portrait_map=opening_portrait_map if result.ready_for_gameplay else None,
+            handoff_status=_handoff_status_outer if result.ready_for_gameplay else None,
+            handoff_warnings=_handoff_warnings_outer if result.ready_for_gameplay else [],
+            gap_follow_up_prompt=_gap_follow_up_prompt_outer if result.ready_for_gameplay else None,
+            compiler_task_id=_compiler_task_id_outer if result.ready_for_gameplay else None,
+            compiler_artifact_version=_compiler_artifact_version_outer if result.ready_for_gameplay else None,
         )
 
     except Exception as e:

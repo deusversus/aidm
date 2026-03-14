@@ -340,6 +340,24 @@ async function handlePlayerAction() {
                     console.log('[Handoff] Opening scene displayed inline (' + result.opening_scene.length + ' chars)');
                 }
 
+                // Show handoff warnings (gap follow-up prompt or non-blocking notices)
+                if (result.gap_follow_up_prompt) {
+                    const followUpEl = document.createElement('div');
+                    followUpEl.className = 'handoff-followup';
+                    followUpEl.innerHTML = `<span class="handoff-followup-icon">📝</span><span>${escapeHtml(result.gap_follow_up_prompt)}</span>`;
+                    document.getElementById('narrative-display').appendChild(followUpEl);
+                } else if (result.handoff_warnings && result.handoff_warnings.length > 0 && result.handoff_status === 'degraded') {
+                    const warningsEl = document.createElement('div');
+                    warningsEl.className = 'handoff-warnings';
+                    warningsEl.innerHTML = '<span class="handoff-warnings-icon">ℹ️</span><ul>' +
+                        result.handoff_warnings.map(w => `<li>${escapeHtml(w)}</li>`).join('') +
+                        '</ul>';
+                    document.getElementById('narrative-display').appendChild(warningsEl);
+                }
+                if (result.compiler_task_id) {
+                    console.log('[Handoff] Compiler task ID:', result.compiler_task_id, '| status:', result.handoff_status);
+                }
+
                 // Update context panel
                 const ctxArcHandoff = document.getElementById('ctx-arc');
                 if (ctxArcHandoff) ctxArcHandoff.textContent = 'Gameplay';

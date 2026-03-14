@@ -44,6 +44,12 @@ class SessionZeroResponse(BaseModel):
     # Server-side stitched opening scene (returned during handoff)
     opening_scene: str | None = None
     opening_portrait_map: dict[str, str] | None = None
+    # Handoff compiler status fields (M4)
+    handoff_status: str | None = None  # "complete", "degraded", "compiler_skipped", "compiler_failed"
+    handoff_warnings: list[str] = []  # Non-blocking gap warnings
+    gap_follow_up_prompt: str | None = None  # Player follow-up prompt if gaps need attention
+    compiler_task_id: str | None = None  # SSE task ID for compiler progress stream
+    compiler_artifact_version: int | None = None  # Version of persisted artifact
 
 
 class ContextResponse(BaseModel):
