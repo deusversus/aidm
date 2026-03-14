@@ -137,17 +137,11 @@ class HandoffCompiler:
             draft_hash=compute_draft_hash(character_draft),
         )
 
-        # Instantiate agents with their provider/model from settings
-        mgr = get_llm_manager()
-        self._extractor = self._make_agent(SZExtractorAgent, mgr)
-        self._resolver = self._make_agent(SZEntityResolverAgent, mgr)
-        self._gap_analyzer = self._make_agent(SZGapAnalyzerAgent, mgr)
-        self._handoff_agent = self._make_agent(SZHandoffAgent, mgr)
-
-    @staticmethod
-    def _make_agent(agent_class, mgr):
-        provider, model = mgr.get_provider_for_agent(agent_class.agent_name)
-        return agent_class(provider=provider, model=model)
+        # Instantiate agents — they call get_llm_manager() themselves on first use
+        self._extractor = SZExtractorAgent()
+        self._resolver = SZEntityResolverAgent()
+        self._gap_analyzer = SZGapAnalyzerAgent()
+        self._handoff_agent = SZHandoffAgent()
 
     async def run(self) -> HandoffCompilerResult:
         """Run the full compiler pipeline end-to-end.

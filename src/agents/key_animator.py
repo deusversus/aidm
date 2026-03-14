@@ -1278,17 +1278,21 @@ Add your creative execution perspective — agree, push back, or offer a differe
 
         # === ANIMATION INPUTS ===
         ai = pkg.animation_inputs
-        if ai.visual_tone or ai.recommended_palette or ai.key_visual_elements:
+        if ai.visual_anchor_images or ai.emotional_target or ai.required_beats:
             lines.append("\n## Animation / Atmosphere Guidance")
-            if ai.visual_tone:
-                lines.append(f"**Visual Tone:** {ai.visual_tone}")
-            if ai.recommended_palette:
-                lines.append(f"**Palette:** {', '.join(ai.recommended_palette[:4])}")
-            if ai.key_visual_elements:
-                for el in ai.key_visual_elements[:4]:
+            if ai.emotional_target:
+                lines.append(f"**Emotional Target:** {ai.emotional_target}")
+            if ai.prose_pressure:
+                lines.append(f"**Prose Pressure:** {ai.prose_pressure}")
+            if ai.visual_anchor_images:
+                for el in ai.visual_anchor_images[:4]:
                     lines.append(f"  - {el}")
-            if ai.forbidden_visuals:
-                lines.append(f"**Avoid:** {'; '.join(ai.forbidden_visuals[:3])}")
+            if ai.required_beats:
+                lines.append(f"**Required Beats:** {'; '.join(str(b) for b in ai.required_beats[:3])}")
+            if ai.must_land_on:
+                lines.append(f"**Must Land On:** {ai.must_land_on}")
+            if ai.must_not_end_on:
+                lines.append(f"**Avoid Ending On:** {ai.must_not_end_on}")
 
         # === PROFILE DNA ===
         if profile.dna:

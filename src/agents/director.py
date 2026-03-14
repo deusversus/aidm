@@ -497,7 +497,7 @@ Provide a CONCISE investigation report structured as:
 
             # === UNCERTAINTIES ===
             unc = pkg.uncertainties
-            if unc.safe_assumptions or unc.warnings:
+            if unc.safe_assumptions or unc.known_unknowns:
                 notes = list(unc.safe_assumptions[:3]) + list(unc.degraded_generation_guidance[:1] if unc.degraded_generation_guidance else [])
                 if notes:
                     lines.append("\n## 🔍 Compiler Notes")
