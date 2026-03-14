@@ -372,6 +372,7 @@ async def _handle_gameplay_handoff(session, session_id: str, result, agent) -> t
             timeline_mode=draft.timeline_mode,
             canon_cast_mode=draft.canon_cast_mode,
             event_fidelity=draft.event_fidelity,
+            opening_state_package=_compiler_package,
         )
         logger.info("Director startup complete — initial storyboard created")
     except Exception as dir_err:

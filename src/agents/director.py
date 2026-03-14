@@ -251,6 +251,7 @@ Provide a CONCISE investigation report structured as:
         timeline_mode: str | None = None,
         canon_cast_mode: str | None = None,
         event_fidelity: str | None = None,
+        opening_state_package: "Any | None" = None,
     ) -> DirectorOutput:
         """
         Create an initial storyboard at gameplay handoff (pilot episode planning).
@@ -260,16 +261,15 @@ Provide a CONCISE investigation report structured as:
         Called once when Session Zero completes and gameplay begins.
         
         Args:
-            session_zero_summary: Summary of the Session Zero conversation
+            session_zero_summary: Lossy summary fallback (used when opening_state_package is None)
             profile: The full narrative profile (DNA, tropes, voice, etc.)
             character_name: Player character's name
             character_concept: Character concept/tagline
             starting_location: Where the story begins
-            op_mode: Whether OP protagonist mode is enabled
-            op_preset: OP config name if applicable
-            op_tension_source: OP tension axis values
-            op_power_expression: OP power expression axis values
-            op_narrative_focus: OP narrative focus axis values
+            opening_state_package: (Optional) Rich structured OpeningStatePackage from
+                HandoffCompiler. When provided, used as primary briefing source in place
+                of the summary string. Individual fields (character_name, etc.) still serve
+                as fallbacks if the package sections are sparse.
             
         Returns:
             DirectorOutput with initial arc plan, foreshadowing seeds, and voice guidance
@@ -286,7 +286,7 @@ Provide a CONCISE investigation report structured as:
         persona = profile.director_personality or "You are a thoughtful anime director."
         system_prompt = f"{persona}\n\n{startup_prompt}"
 
-        # 3. Build startup context
+        # 3. Build startup context — use OpeningStatePackage when available
         context = self._build_startup_context(
             session_zero_summary=session_zero_summary,
             profile=profile,
@@ -301,6 +301,7 @@ Provide a CONCISE investigation report structured as:
             timeline_mode=timeline_mode,
             canon_cast_mode=canon_cast_mode,
             event_fidelity=event_fidelity,
+            opening_state_package=opening_state_package,
         )
 
         # 4. Replace {context} placeholder in prompt
@@ -326,92 +327,238 @@ Provide a CONCISE investigation report structured as:
         timeline_mode: str | None = None,
         canon_cast_mode: str | None = None,
         event_fidelity: str | None = None,
+        opening_state_package: "Any | None" = None,
     ) -> str:
-        """Build context for the Director's startup briefing."""
+        """Build context for the Director's startup briefing.
+
+        When opening_state_package is provided (M1+ compiler path), uses the rich
+        structured data from the Handoff Compiler for a much higher-quality brief.
+        Falls back to the legacy summary string when the package is absent.
+        """
 
         from ..core.canonicality import format_canonicality_block
 
         lines = ["# Pilot Episode Planning — Director Startup Briefing"]
 
-        # === CHARACTER DOSSIER ===
-        lines.append("\n## 🎭 Character Dossier")
-        lines.append(f"**Name:** {character_name}")
-        if character_concept:
-            lines.append(f"**Concept:** {character_concept}")
-        lines.append(f"**Starting Location:** {starting_location}")
-        if power_tier:
-            lines.append(f"**Power Tier:** {power_tier}")
+        # ── PACKAGE PATH (compiler output available) ─────────────────────
+        if opening_state_package is not None:
+            pkg = opening_state_package
 
-        # === CANONICALITY CONSTRAINTS ===
-        canon_block = format_canonicality_block(
-            timeline_mode, canon_cast_mode, event_fidelity
-        )
-        if canon_block:
-            lines.append(f"\n{canon_block}")
+            # Resolve field-level fallbacks: package section > individual args > defaults
+            pc = pkg.player_character
+            sit = pkg.opening_situation
+            tone = pkg.tone_and_composition
+            di = pkg.director_inputs
 
-        # === NARRATIVE COMPOSITION ===
-        if tension_source or power_expression or narrative_focus:
-            lines.append("\n## ✨ Narrative Composition")
-            if composition_name:
-                lines.append(f"**Configuration:** {composition_name}")
-            if tension_source:
-                lines.append(f"**Tension Source:** {tension_source}")
-            if power_expression:
-                lines.append(f"**Power Expression:** {power_expression}")
-            if narrative_focus:
-                lines.append(f"**Narrative Focus:** {narrative_focus}")
-            lines.append("\n*Opening tension and arc structure should follow these composition axes.*")
+            _name = pc.name or character_name
+            _concept = pc.core_identity or pc.concept or character_concept
+            _location = sit.starting_location or starting_location
+            _tier = pc.power_tier or power_tier
+            _tension = tone.tension_source or tension_source
+            _power_expr = tone.power_expression or power_expression
+            _narrative_focus_val = tone.narrative_focus or narrative_focus
+            _composition = tone.composition_name or composition_name
+            _timeline = pkg.canon_rules.timeline_mode or timeline_mode
+            _canon_cast = pkg.canon_rules.canon_cast_mode or canon_cast_mode
+            _event_fid = pkg.canon_rules.event_fidelity or event_fidelity
 
-        # === NARRATIVE PROFILE DNA ===
-        if profile.dna:
-            lines.append("\n## 🧬 Narrative DNA (IP Identity)")
-            dna = profile.dna
-            for key, value in dna.items():
-                label = key.replace('_', ' ').replace('vs', '↔').title()
-                lines.append(f"- {label}: {value}/10")
+            # === CHARACTER DOSSIER ===
+            lines.append("\n## 🎭 Character Dossier")
+            lines.append(f"**Name:** {_name}")
+            if _concept:
+                lines.append(f"**Concept:** {_concept}")
+            if pc.personality:
+                lines.append(f"**Personality:** {pc.personality}")
+            if pc.values:
+                lines.append(f"**Values:** {', '.join(pc.values)}")
+            if pc.fears:
+                lines.append(f"**Fears:** {', '.join(pc.fears)}")
+            lines.append(f"**Starting Location:** {_location}")
+            if _tier:
+                lines.append(f"**Power Tier:** {_tier}")
+            if pc.social_position:
+                lines.append(f"**Social Position:** {pc.social_position}")
+            if pc.backstory_beats:
+                lines.append("\n**Backstory Beats:**")
+                for beat in pc.backstory_beats[:5]:
+                    lines.append(f"  - {beat}")
 
-        # === GENRE ===
-        if hasattr(profile, 'detected_genres') and profile.detected_genres:
-            lines.append(f"\n**Detected Genres:** {', '.join(profile.detected_genres)}")
+            # === OPENING SITUATION ===
+            lines.append("\n## 🎬 Opening Situation")
+            lines.append(f"**Immediate Situation:** {sit.immediate_situation or sit.what_is_happening_right_now}")
+            if sit.immediate_pressure:
+                lines.append(f"**Immediate Pressure:** {sit.immediate_pressure}")
+            if sit.scene_question:
+                lines.append(f"**Scene Question:** *{sit.scene_question}*")
+            if sit.why_this_moment_is_the_start:
+                lines.append(f"**Why This Moment:** {sit.why_this_moment_is_the_start}")
+            if sit.scene_objective:
+                lines.append(f"**Scene Objective:** {sit.scene_objective}")
+            if sit.forbidden_opening_moves:
+                lines.append("**Do NOT open with:**")
+                for f_ in sit.forbidden_opening_moves:
+                    lines.append(f"  - {f_}")
 
-        # === TROPES ===
-        if profile.tropes:
-            active = [k.replace('_', ' ').title() for k, v in profile.tropes.items() if v]
-            if active:
-                lines.append(f"\n## 📖 Active Tropes: {', '.join(active)}")
-                lines.append("*Consider planting seeds for these tropes in the opening arc.*")
+            # === ARC PLANNING INPUTS ===
+            if di.arc_seed_candidates or di.opening_antagonistic_pressure or di.recommended_first_arc_scope:
+                lines.append("\n## 🌱 Arc Planning Inputs")
+                if di.arc_seed_candidates:
+                    lines.append("**Arc Seed Candidates:**")
+                    for seed in di.arc_seed_candidates[:4]:
+                        lines.append(f"  - {seed}")
+                if di.opening_antagonistic_pressure:
+                    lines.append(f"**Opening Antagonistic Pressure:** {di.opening_antagonistic_pressure}")
+                if di.recommended_first_arc_scope:
+                    lines.append(f"**Recommended First Arc Scope:** {di.recommended_first_arc_scope}")
+                if di.recommended_foreshadowing_targets:
+                    lines.append("**Recommended Foreshadowing Targets:**")
+                    for t in di.recommended_foreshadowing_targets[:4]:
+                        lines.append(f"  - {t}")
+                if di.spotlight_priorities:
+                    lines.append(f"**Spotlight Priorities:** {', '.join(di.spotlight_priorities)}")
+                if di.narrative_risks:
+                    lines.append("**Narrative Risks to Manage:**")
+                    for risk in di.narrative_risks[:3]:
+                        lines.append(f"  - {risk}")
 
-        # === VOICE / AUTHOR VOICE ===
-        if hasattr(profile, 'author_voice') and profile.author_voice:
-            lines.append("\n## ✍️ Author's Voice")
-            if isinstance(profile.author_voice, dict):
-                for key, value in profile.author_voice.items():
-                    label = key.replace('_', ' ').title()
-                    if isinstance(value, list):
-                        lines.append(f"**{label}:** {'; '.join(str(v) for v in value)}")
-                    else:
-                        lines.append(f"**{label}:** {value}")
-            else:
-                lines.append(str(profile.author_voice))
+            # === ACTIVE CAST ===
+            cast = pkg.opening_cast
+            if cast.required_present or cast.optional_present:
+                lines.append("\n## 👥 Opening Cast")
+                for m in cast.required_present:
+                    rel = f" ({m.relationship_to_pc})" if m.relationship_to_pc else ""
+                    lines.append(f"  - **{m.display_name}** [REQUIRED]{rel} — {m.role_in_scene or m.tone}")
+                for m in cast.optional_present[:4]:
+                    rel = f" ({m.relationship_to_pc})" if m.relationship_to_pc else ""
+                    lines.append(f"  - {m.display_name} [optional]{rel}")
+                if cast.offscreen_but_relevant:
+                    names = ", ".join(m.display_name for m in cast.offscreen_but_relevant[:3])
+                    lines.append(f"\n*Off-screen but plot-relevant: {names}*")
 
-        if hasattr(profile, 'voice_cards') and profile.voice_cards:
-            lines.append("\n## 🗣️ Character Voice Cards")
-            for card in profile.voice_cards[:3]:  # Top 3
-                if isinstance(card, dict):
-                    name = card.get('name', 'Unknown')
-                    voice = card.get('voice', card.get('description', ''))
-                    lines.append(f"- **{name}:** {voice[:200]}")
+            # === ACTIVE THREADS ===
+            threads = pkg.active_threads
+            if threads.quests_or_hooks_to_surface or threads.threads_to_foreshadow:
+                lines.append("\n## 🧵 Active Threads")
+                if threads.quests_or_hooks_to_surface:
+                    lines.append("**Surface early:**")
+                    for q in threads.quests_or_hooks_to_surface[:3]:
+                        lines.append(f"  - {q}")
+                if threads.threads_to_foreshadow:
+                    lines.append("**Plant seeds for (do not reveal):**")
+                    for t in threads.threads_to_foreshadow[:3]:
+                        lines.append(f"  - {t}")
 
-        # === SESSION ZERO TRANSCRIPT SUMMARY ===
-        lines.append("\n## 📝 Session Zero Summary")
-        lines.append("This is what happened during character creation:")
-        lines.append(session_zero_summary)
+            # === HARD CONSTRAINTS ===
+            if pkg.hard_constraints:
+                lines.append("\n## ⚠️ Hard Constraints (MUST NOT CONTRADICT)")
+                for c in pkg.hard_constraints[:8]:
+                    lines.append(f"  - {c}")
 
-        # === CAMPAIGN BIBLE ===
+            # === CANONICALITY ===
+            canon_block = format_canonicality_block(_timeline, _canon_cast, _event_fid)
+            if canon_block:
+                lines.append(f"\n{canon_block}")
+            if pkg.canon_rules.accepted_divergences:
+                lines.append("\n**Accepted Divergences from Canon:**")
+                for d in pkg.canon_rules.accepted_divergences[:3]:
+                    lines.append(f"  - {d}")
+
+            # === NARRATIVE COMPOSITION ===
+            if _tension or _power_expr or _narrative_focus_val:
+                lines.append("\n## ✨ Narrative Composition")
+                if _composition:
+                    lines.append(f"**Configuration:** {_composition}")
+                if _tension:
+                    lines.append(f"**Tension Source:** {_tension}")
+                if _power_expr:
+                    lines.append(f"**Power Expression:** {_power_expr}")
+                if _narrative_focus_val:
+                    lines.append(f"**Narrative Focus:** {_narrative_focus_val}")
+                if tone.genre_pressure:
+                    lines.append(f"**Genre Pressure:** {tone.genre_pressure}")
+                lines.append("\n*Opening tension and arc structure should follow these composition axes.*")
+
+            # === WORLD CONTEXT ===
+            wc = pkg.world_context
+            if wc.setting_truths or wc.local_dangers or wc.local_opportunities:
+                lines.append("\n## 🌍 World Context")
+                if wc.location_description:
+                    lines.append(f"**Location:** {wc.location_description}")
+                if wc.setting_truths:
+                    lines.append("**World Truths:**")
+                    for t in wc.setting_truths[:5]:
+                        lines.append(f"  - {t}")
+                if wc.local_dangers:
+                    lines.append(f"**Local Dangers:** {'; '.join(wc.local_dangers[:3])}")
+                if wc.taboo_or_impossible_elements:
+                    lines.append("**Forbidden / Impossible:**")
+                    for t in wc.taboo_or_impossible_elements[:3]:
+                        lines.append(f"  - {t}")
+
+            # === UNCERTAINTIES ===
+            unc = pkg.uncertainties
+            if unc.safe_assumptions or unc.warnings:
+                notes = list(unc.safe_assumptions[:3]) + list(unc.degraded_generation_guidance[:1] if unc.degraded_generation_guidance else [])
+                if notes:
+                    lines.append("\n## 🔍 Compiler Notes")
+                    for n in notes:
+                        lines.append(f"  - {n}")
+
+            # === NARRATIVE PROFILE DNA ===
+            self._append_profile_dna(lines, profile)
+
+            # === SESSION ZERO TRANSCRIPT SUMMARY (abbreviated) ===
+            lines.append("\n## 📝 Session Zero Summary (Supplementary)")
+            lines.append("*(Full structured data above supersedes this summary — use for flavour/tone only)*")
+            if session_zero_summary:
+                summary_snippet = session_zero_summary[:600]
+                if len(session_zero_summary) > 600:
+                    summary_snippet += "..."
+                lines.append(summary_snippet)
+
+        # ── LEGACY PATH (no compiler output) ─────────────────────────────
+        else:
+            # === CHARACTER DOSSIER ===
+            lines.append("\n## 🎭 Character Dossier")
+            lines.append(f"**Name:** {character_name}")
+            if character_concept:
+                lines.append(f"**Concept:** {character_concept}")
+            lines.append(f"**Starting Location:** {starting_location}")
+            if power_tier:
+                lines.append(f"**Power Tier:** {power_tier}")
+
+            # === CANONICALITY CONSTRAINTS ===
+            canon_block = format_canonicality_block(
+                timeline_mode, canon_cast_mode, event_fidelity
+            )
+            if canon_block:
+                lines.append(f"\n{canon_block}")
+
+            # === NARRATIVE COMPOSITION ===
+            if tension_source or power_expression or narrative_focus:
+                lines.append("\n## ✨ Narrative Composition")
+                if composition_name:
+                    lines.append(f"**Configuration:** {composition_name}")
+                if tension_source:
+                    lines.append(f"**Tension Source:** {tension_source}")
+                if power_expression:
+                    lines.append(f"**Power Expression:** {power_expression}")
+                if narrative_focus:
+                    lines.append(f"**Narrative Focus:** {narrative_focus}")
+                lines.append("\n*Opening tension and arc structure should follow these composition axes.*")
+
+            # === NARRATIVE PROFILE DNA ===
+            self._append_profile_dna(lines, profile)
+
+            # === SESSION ZERO TRANSCRIPT SUMMARY ===
+            lines.append("\n## 📝 Session Zero Summary")
+            lines.append("This is what happened during character creation:")
+            lines.append(session_zero_summary)
+
+        # === COMMON TAIL ===
         lines.append("\n## Campaign Bible")
         lines.append("(Empty — this is the first session. You are creating the initial plan.)")
 
-        # === INSTRUCTIONS ===
         lines.append("\n## Your Task")
         lines.append("Plan the OPENING ARC for this character in this world.")
         lines.append("1. Name the arc (IP-appropriate, evocative)")
@@ -426,6 +573,43 @@ Provide a CONCISE investigation report structured as:
         lines.append("6. Set voice_patterns matching this IP's tone")
 
         return "\n".join(lines)
+
+    def _append_profile_dna(self, lines: list[str], profile: NarrativeProfile) -> None:
+        """Append narrative profile DNA, genres, tropes, and voice sections to lines."""
+        if profile.dna:
+            lines.append("\n## 🧬 Narrative DNA (IP Identity)")
+            for key, value in profile.dna.items():
+                label = key.replace('_', ' ').replace('vs', '↔').title()
+                lines.append(f"- {label}: {value}/10")
+
+        if hasattr(profile, 'detected_genres') and profile.detected_genres:
+            lines.append(f"\n**Detected Genres:** {', '.join(profile.detected_genres)}")
+
+        if profile.tropes:
+            active = [k.replace('_', ' ').title() for k, v in profile.tropes.items() if v]
+            if active:
+                lines.append(f"\n## 📖 Active Tropes: {', '.join(active)}")
+                lines.append("*Consider planting seeds for these tropes in the opening arc.*")
+
+        if hasattr(profile, 'author_voice') and profile.author_voice:
+            lines.append("\n## ✍️ Author's Voice")
+            if isinstance(profile.author_voice, dict):
+                for key, value in profile.author_voice.items():
+                    label = key.replace('_', ' ').title()
+                    if isinstance(value, list):
+                        lines.append(f"**{label}:** {'; '.join(str(v) for v in value)}")
+                    else:
+                        lines.append(f"**{label}:** {value}")
+            else:
+                lines.append(str(profile.author_voice))
+
+        if hasattr(profile, 'voice_cards') and profile.voice_cards:
+            lines.append("\n## 🗣️ Character Voice Cards")
+            for card in profile.voice_cards[:3]:
+                if isinstance(card, dict):
+                    name = card.get('name', 'Unknown')
+                    voice = card.get('voice', card.get('description', ''))
+                    lines.append(f"- **{name}:** {voice[:200]}")
 
     def _build_review_context(
         self,

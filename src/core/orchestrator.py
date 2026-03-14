@@ -281,6 +281,7 @@ class Orchestrator(TurnPipelineMixin, BackgroundMixin):
         timeline_mode: str | None = None,
         canon_cast_mode: str | None = None,
         event_fidelity: str | None = None,
+        opening_state_package=None,
     ):
         """
         Run the Director's startup briefing at gameplay handoff.
@@ -306,6 +307,7 @@ class Orchestrator(TurnPipelineMixin, BackgroundMixin):
             timeline_mode=timeline_mode,
             canon_cast_mode=canon_cast_mode,
             event_fidelity=event_fidelity,
+            opening_state_package=opening_state_package,
         )
 
         # Persist to Campaign Bible
