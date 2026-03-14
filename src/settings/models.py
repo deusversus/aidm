@@ -27,9 +27,11 @@ class AgentSettings(BaseModel):
     Agent Tiers:
     - FAST: intent_classifier, outcome_judge, validator, memory_ranker, 
       combat, progression, scale_selector, relationship_analyzer,
-      session_zero, world_builder, compactor, scope, pacing, recap,
+      world_builder, compactor, scope, pacing, recap,
       wiki_scout, production
-    - THINKING: director, research, profile_merge
+    - THINKING: director, research, profile_merge, intent_resolution,
+      session_zero, sz_extractor, sz_gap_analyzer, sz_entity_resolver,
+      sz_handoff
     - CREATIVE: key_animator (prose generation)
     
     The 'base_fast', 'base_thinking', and 'base_creative' fields serve as 
@@ -46,6 +48,8 @@ class AgentSettings(BaseModel):
     THINKING_TIER: ClassVar[frozenset[str]] = frozenset({
         "director", "research", "profile_merge", "intent_resolution",
         "session_zero",
+        # Session Zero Compiler agents
+        "sz_extractor", "sz_gap_analyzer", "sz_entity_resolver", "sz_handoff",
     })
     CREATIVE_TIER: ClassVar[frozenset[str]] = frozenset({
         "key_animator",
@@ -140,6 +144,24 @@ class AgentSettings(BaseModel):
     session_zero: ModelConfig | None = Field(
         default=None,
         description="Model for character creation dialogue (thinking model preferred)"
+    )
+
+    # === SESSION ZERO COMPILER (Handoff Compilation) ===
+    sz_extractor: ModelConfig | None = Field(
+        default=None,
+        description="Extracts entities, facts, and cues from the SZ transcript (thinking model preferred)"
+    )
+    sz_gap_analyzer: ModelConfig | None = Field(
+        default=None,
+        description="Identifies narrative gaps, contradictions, and ambiguities in extracted data (thinking model preferred)"
+    )
+    sz_entity_resolver: ModelConfig | None = Field(
+        default=None,
+        description="Deduplicates and canonicalizes extracted entities and relationships (thinking model preferred)"
+    )
+    sz_handoff: ModelConfig | None = Field(
+        default=None,
+        description="Assembles the final OpeningStatePackage handed to Director and Key Animator (thinking model preferred)"
     )
 
     # === WORLD BUILDING (Entity Extraction & Validation) ===

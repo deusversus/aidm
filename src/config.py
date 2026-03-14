@@ -45,6 +45,19 @@ class Config:
     DEBUG: bool = os.getenv("DEBUG", "false").lower() == "true"
     LOG_AGENT_DECISIONS: bool = os.getenv("LOG_AGENT_DECISIONS", "false").lower() == "true"
 
+    # ── Session Zero Compiler feature flags ──────────────────────────────────
+    # Enable the HandoffCompiler to run at SZ→gameplay handoff.
+    # When False, the legacy _build_session_zero_summary() path is used.
+    SESSION_ZERO_COMPILER_ENABLED: bool = os.getenv("SESSION_ZERO_COMPILER_ENABLED", "false").lower() == "true"
+
+    # Enable the dedicated opening-scene generation path (SZ§12.4).
+    # When False, the legacy synthetic-turn path is used.
+    SESSION_ZERO_DEDICATED_OPENING_SCENE_ENABLED: bool = os.getenv("SESSION_ZERO_DEDICATED_OPENING_SCENE_ENABLED", "false").lower() == "true"
+
+    # Enable the full SZ Orchestrator (M6 — turn-level extraction during SZ).
+    # When False, the current monolithic SessionZeroAgent handles all turns.
+    SESSION_ZERO_ORCHESTRATOR_ENABLED: bool = os.getenv("SESSION_ZERO_ORCHESTRATOR_ENABLED", "false").lower() == "true"
+
     @classmethod
     def validate(cls) -> list[str]:
         """Validate configuration, return list of issues."""

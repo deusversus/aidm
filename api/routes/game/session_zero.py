@@ -11,6 +11,7 @@ from src.agents.session_zero import (
     process_session_zero_state,
 )
 from src.agents.intent_resolution_handler import resolve_media_intent
+from src.config import Config
 from src.core.session import (
     PHASE_ORDER,
     SessionPhase,
@@ -184,7 +185,8 @@ async def _handle_gameplay_handoff(session, session_id: str, result, agent) -> t
         except Exception as npc_err:
             logger.error(f"[Handoff] Pending NPC flush failed (non-fatal): {npc_err}")
 
-    # --- 1. Update Character ---
+    # --- HandoffCompiler (SESSION_ZERO_COMPILER_ENABLED) ---
+    # Resolve final_tier first — the compiler uses it for tone_composition.
     if draft.power_tier:
         final_tier = draft.power_tier
     elif draft.op_protagonist_enabled:
@@ -193,7 +195,55 @@ async def _handle_gameplay_handoff(session, session_id: str, result, agent) -> t
         final_tier = f"T{max(1, tier_num - 4)}"
     else:
         final_tier = session.phase_state.get("profile_data", {}).get("world_tier", "T10")
+    # Runs after reset_orchestrator() so the new orchestrator's campaign_id is available.
+    # Persists versioned artifacts (OpeningStatePackage, entity graph, gap analysis)
+    # to session_zero_artifacts for Director/KA consumption in M2+.
+    # Falls back gracefully — compiler failure never blocks handoff.
+    _compiler_package = None
+    if Config.SESSION_ZERO_COMPILER_ENABLED:
+        try:
+            from src.core.session_zero_compiler import HandoffCompiler
 
+            # Build profile context summary for disambiguation
+            _profile_ctx = (
+                f"Profile: {profile_to_use}"
+                if profile_to_use else ""
+            )
+
+            # Build tone_composition from the character draft
+            _tone = {
+                "composition_name": draft.composition_name or draft.op_preset,
+                "tension_source": draft.tension_source or draft.op_tension_source,
+                "power_expression": draft.power_expression or draft.op_power_expression,
+                "narrative_focus": draft.narrative_focus or draft.op_narrative_focus,
+                "power_tier": final_tier,
+            }
+
+            logger.info("[Handoff] Starting HandoffCompiler for session=%s", session_id)
+            compiler = HandoffCompiler(
+                session_id=session_id,
+                messages=session.messages,
+                character_draft=draft.to_dict(),
+                campaign_id=resolved_campaign_id,
+                profile_context=_profile_ctx,
+                tone_composition=_tone,
+            )
+            _compiler_result = await compiler.run()
+            if _compiler_result.success:
+                _compiler_package = _compiler_result.opening_state_package
+                logger.info(
+                    "[Handoff] HandoffCompiler complete: version=%s gaps=%d safe=%s",
+                    _compiler_result.artifact_version,
+                    len(_compiler_result.gap_analysis.unresolved_items) if _compiler_result.gap_analysis else 0,
+                    _compiler_result.gap_analysis.handoff_safe if _compiler_result.gap_analysis else "?",
+                )
+            else:
+                logger.error("[Handoff] HandoffCompiler failed: %s", _compiler_result.error)
+        except Exception as compiler_err:
+            logger.error("[Handoff] HandoffCompiler error (non-blocking): %s", compiler_err, exc_info=True)
+
+    # --- 1. Update Character ---
+    # (final_tier already computed above before HandoffCompiler)
     orchestrator.state.update_character(
         name=draft.name or "Unnamed Protagonist",
         level=1,

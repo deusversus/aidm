@@ -144,6 +144,8 @@ async def update_agent_model(agent_name: str, config: ModelConfig):
         "relationship_analyzer",
         # Session Zero & World Building
         "session_zero", "world_builder", "wiki_scout",
+        # Session Zero Compiler
+        "sz_extractor", "sz_gap_analyzer", "sz_entity_resolver", "sz_handoff",
         # Narrative Pacing
         "pacing", "recap",
         # Memory & Compression

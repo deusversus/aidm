@@ -696,6 +696,12 @@ async function loadSettings() {
         populateAgentSetting('session_zero', agentModels.session_zero);
         populateAgentSetting('profile_merge', agentModels.profile_merge);
 
+        // Session Zero Compiler
+        populateAgentSetting('sz_extractor', agentModels.sz_extractor);
+        populateAgentSetting('sz_entity_resolver', agentModels.sz_entity_resolver);
+        populateAgentSetting('sz_gap_analyzer', agentModels.sz_gap_analyzer);
+        populateAgentSetting('sz_handoff', agentModels.sz_handoff);
+
         // World Building & Research Support
         populateAgentSetting('world_builder', agentModels.world_builder);
         populateAgentSetting('wiki_scout', agentModels.wiki_scout);
@@ -1080,6 +1086,11 @@ async function saveAdvancedSettings() {
                 // Session Zero & Profile
                 session_zero: getAgentConfig('session_zero'),
                 profile_merge: getAgentConfig('profile_merge'),
+                // Session Zero Compiler
+                sz_extractor: getAgentConfig('sz_extractor'),
+                sz_entity_resolver: getAgentConfig('sz_entity_resolver'),
+                sz_gap_analyzer: getAgentConfig('sz_gap_analyzer'),
+                sz_handoff: getAgentConfig('sz_handoff'),
                 // World Building & Research Support
                 world_builder: getAgentConfig('world_builder'),
                 wiki_scout: getAgentConfig('wiki_scout'),

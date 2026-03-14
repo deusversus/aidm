@@ -135,16 +135,12 @@ class BaseAgent(ABC):
         settings = get_settings_store().load()
         use_extended_thinking = False
         if settings.extended_thinking:
-            # Apply to agents that benefit from deeper reasoning
-            # - director: Long-term campaign planning
-            # - key_animator: Complex narrative generation
-            # - research: Anime research synthesis
-            # - combat: Complex tactical decisions (boss fights)
-            EXTENDED_THINKING_AGENTS = [
-                "director", "key_animator", "research",
-                "combat"
-            ]
-            if self.agent_name in EXTENDED_THINKING_AGENTS:
+            # Apply extended thinking to agents in THINKING_TIER.
+            # This replaces the previous hardcoded list and automatically includes
+            # new thinking-tier agents (sz_extractor, sz_handoff, etc.) without
+            # requiring changes here.
+            from ..settings.models import AgentSettings
+            if self.agent_name in AgentSettings.THINKING_TIER:
                 use_extended_thinking = True
 
         # Use override if provided, otherwise use default

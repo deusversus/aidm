@@ -637,3 +637,103 @@ class SessionProfileComposition(Base):
     data = Column(Text, nullable=False)  # JSON blob of SessionProfile.to_dict()
     created_at = Column(String(50), nullable=False)  # ISO format
 
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Session Zero Compiler artifacts
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class SessionZeroRun(Base):
+    """Tracks a single HandoffCompiler execution (turn-level or handoff-level).
+
+    One row per compiler run.  Rows are never deleted; the compiler's
+    checkpoint/recovery logic queries by session_id ordered by id desc.
+
+    run_type: 'turn_orchestration' | 'handoff_compile' | 'recovery_compile'
+    status:   'running' | 'completed' | 'failed' | 'cancelled'
+    """
+
+    __tablename__ = "session_zero_runs"
+
+    id = Column(Integer, primary_key=True)
+    session_id = Column(String(64), nullable=False, index=True)
+    run_type = Column(String(30), nullable=False)
+    status = Column(String(20), nullable=False, default="running")
+
+    # Metadata
+    started_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    completed_at = Column(DateTime, nullable=True)
+    error_message = Column(Text, nullable=True)
+
+    # Pass-level counters (updated as passes complete)
+    entities_extracted = Column(Integer, default=0)
+    entities_resolved = Column(Integer, default=0)
+    contradictions_found = Column(Integer, default=0)
+    contradictions_resolved = Column(Integer, default=0)
+    unresolved_items = Column(Integer, default=0)
+    handoff_blocked = Column(Boolean, default=False)
+
+    # JSON checkpoints from each pass
+    checkpoints_json = Column(Text, nullable=True)  # JSON list of CompilerCheckpoint
+
+    # FK to the artifact produced (nullable — set after artifact is written)
+    artifact_id = Column(Integer, sa.ForeignKey("session_zero_artifacts.id"), nullable=True)
+
+    artifact = relationship("SessionZeroArtifact", foreign_keys=[artifact_id])
+
+    __table_args__ = (
+        sa.Index("idx_sz_runs_session_status", "session_id", "status"),
+    )
+
+
+class SessionZeroArtifact(Base):
+    """Versioned, immutable artifact produced by the HandoffCompiler.
+
+    Each successful compile produces a new artifact version for the session.
+    The most recent 'active' artifact is the canonical state used for
+    Director startup and opening-scene generation.
+
+    artifact_type:
+        'opening_state_package'  — OpeningStatePackage (used by Director + KA)
+        'entity_graph'           — EntityResolutionOutput (resolved entity graph)
+        'gap_analysis'           — GapAnalysisOutput (unresolved items + contradictions)
+
+    status: 'draft' | 'active' | 'superseded' | 'failed'
+
+    Locking rule (from sz_upgrade_plan.md §11.5.9 Rule 5):
+        All artifact writes for a single handoff must complete inside a single
+        DB transaction.  The caller is responsible for wrapping
+        SessionZeroArtifact writes in get_session() as a unit.
+    """
+
+    __tablename__ = "session_zero_artifacts"
+
+    id = Column(Integer, primary_key=True)
+    session_id = Column(String(64), nullable=False, index=True)
+    artifact_type = Column(String(50), nullable=False)
+    version = Column(Integer, nullable=False, default=1)
+    status = Column(String(20), nullable=False, default="draft")
+
+    # Content stored as JSON
+    content_json = Column(Text, nullable=False)  # Pydantic model .model_dump_json()
+
+    # Provenance
+    source_run_id = Column(Integer, sa.ForeignKey("session_zero_runs.id"), nullable=True)
+    transcript_hash = Column(String(64), nullable=True)
+    character_draft_hash = Column(String(64), nullable=True)
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    superseded_at = Column(DateTime, nullable=True)
+
+    source_run = relationship("SessionZeroRun", foreign_keys=[source_run_id])
+
+    __table_args__ = (
+        sa.Index("idx_sz_artifact_session_type", "session_id", "artifact_type"),
+        sa.Index("idx_sz_artifact_session_status", "session_id", "status"),
+        sa.UniqueConstraint(
+            "session_id", "artifact_type", "version",
+            name="uq_sz_artifact_session_type_version",
+        ),
+    )
+

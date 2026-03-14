@@ -629,6 +629,71 @@
                                         </div>
                                     </div>
 
+                                    <!-- Session Zero Orchestration -->
+                                    <div class="setting-card">
+                                        <h3>🔬 SZ Extractor</h3>
+                                        <p class="setting-desc">Extracts entities, facts, and narrative cues from the Session Zero transcript at handoff (thinking model preferred)</p>
+                                        <div class="setting-inputs">
+                                            <select id="sz_extractor-provider" class="provider-select"
+                                                data-agent="sz_extractor">
+                                                <option value="google">Google</option>
+                                                <option value="anthropic">Anthropic</option>
+                                                <option value="openai">OpenAI</option>
+                                                <option value="copilot">GitHub Copilot</option>
+                                            </select>
+                                            <select id="sz_extractor-model" class="model-select"
+                                                data-agent="sz_extractor"></select>
+                                        </div>
+                                    </div>
+
+                                    <div class="setting-card">
+                                        <h3>🔍 SZ Entity Resolver</h3>
+                                        <p class="setting-desc">Deduplicates and canonicalizes extracted entities and relationships into a consistent entity graph (thinking model preferred)</p>
+                                        <div class="setting-inputs">
+                                            <select id="sz_entity_resolver-provider" class="provider-select"
+                                                data-agent="sz_entity_resolver">
+                                                <option value="google">Google</option>
+                                                <option value="anthropic">Anthropic</option>
+                                                <option value="openai">OpenAI</option>
+                                                <option value="copilot">GitHub Copilot</option>
+                                            </select>
+                                            <select id="sz_entity_resolver-model" class="model-select"
+                                                data-agent="sz_entity_resolver"></select>
+                                        </div>
+                                    </div>
+
+                                    <div class="setting-card">
+                                        <h3>🧩 SZ Gap Analyzer</h3>
+                                        <p class="setting-desc">Identifies narrative gaps, contradictions, and ambiguities that need resolution before gameplay begins (thinking model preferred)</p>
+                                        <div class="setting-inputs">
+                                            <select id="sz_gap_analyzer-provider" class="provider-select"
+                                                data-agent="sz_gap_analyzer">
+                                                <option value="google">Google</option>
+                                                <option value="anthropic">Anthropic</option>
+                                                <option value="openai">OpenAI</option>
+                                                <option value="copilot">GitHub Copilot</option>
+                                            </select>
+                                            <select id="sz_gap_analyzer-model" class="model-select"
+                                                data-agent="sz_gap_analyzer"></select>
+                                        </div>
+                                    </div>
+
+                                    <div class="setting-card">
+                                        <h3>📦 SZ Handoff</h3>
+                                        <p class="setting-desc">Assembles the final Opening State Package handed to Director and Key Animator for the first scene (thinking model preferred)</p>
+                                        <div class="setting-inputs">
+                                            <select id="sz_handoff-provider" class="provider-select"
+                                                data-agent="sz_handoff">
+                                                <option value="google">Google</option>
+                                                <option value="anthropic">Anthropic</option>
+                                                <option value="openai">OpenAI</option>
+                                                <option value="copilot">GitHub Copilot</option>
+                                            </select>
+                                            <select id="sz_handoff-model" class="model-select"
+                                                data-agent="sz_handoff"></select>
+                                        </div>
+                                    </div>
+
                                     <!-- World Builder -->
                                     <div class="setting-card">
                                         <h3>🌍 World Builder</h3>
