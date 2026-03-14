@@ -330,6 +330,47 @@ class Orchestrator(TurnPipelineMixin, BackgroundMixin):
         if director_output.active_foreshadowing:
             logger.info(f"Foreshadowing seeds: {len(director_output.active_foreshadowing)}")
 
+    async def generate_opening_scene(
+        self,
+        opening_state_package: "Any | None" = None,
+        recent_messages: list | None = None,
+    ) -> tuple[str, dict[str, str]]:
+        """Generate the pilot episode opening scene via dedicated KA pathway.
+
+        Uses the compiled OpeningStatePackage and the Director's stored output from
+        the campaign bible to produce a targeted cinematic first scene without routing
+        through the full gameplay turn pipeline.
+
+        Falls back to an empty result if the package is None (caller should use
+        process_turn() fallback instead).
+
+        Returns:
+            (narrative, portrait_map)
+        """
+        if opening_state_package is None:
+            raise ValueError("generate_opening_scene requires a non-None opening_state_package")
+
+        # Retrieve Director output from campaign bible
+        director_output = None
+        try:
+            bible = self.state.get_campaign_bible()
+            if bible and bible.planning_data:
+                from ..agents.director import DirectorOutput
+                director_output = DirectorOutput.model_validate(bible.planning_data)
+        except Exception:
+            pass  # director_output stays None; KA will work without it
+
+        narrative, portrait_map = await self.key_animator.generate_opening_scene(
+            opening_state_package=opening_state_package,
+            director_output=director_output,
+            profile=self.profile,
+            campaign_id=self.campaign_id,
+            recent_messages=recent_messages,
+        )
+        return narrative, portrait_map
+
+
+
     def get_profile(self) -> NarrativeProfile:
         """Get the current narrative profile."""
         return self.profile

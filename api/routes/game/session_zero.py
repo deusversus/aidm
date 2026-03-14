@@ -383,13 +383,20 @@ async def _handle_gameplay_handoff(session, session_id: str, result, agent) -> t
     # --- 6. Server-side Opening Scene ---
     try:
         logger.info("Generating opening scene server-side...")
-        opening_result = await orchestrator.process_turn(
-            player_input="[opening scene — the story begins]",
-            recent_messages=session.messages[-30:],
-            compaction_text=""
-        )
-        opening_narrative = opening_result.narrative
-        opening_portrait_map = opening_result.portrait_map
+        if Config.SESSION_ZERO_DEDICATED_OPENING_SCENE_ENABLED and _compiler_package is not None:
+            logger.info("Using dedicated opening scene pathway (OpeningStatePackage available)")
+            opening_narrative, opening_portrait_map = await orchestrator.generate_opening_scene(
+                opening_state_package=_compiler_package,
+                recent_messages=session.messages[-10:],
+            )
+        else:
+            opening_result = await orchestrator.process_turn(
+                player_input="[opening scene — the story begins]",
+                recent_messages=session.messages[-30:],
+                compaction_text=""
+            )
+            opening_narrative = opening_result.narrative
+            opening_portrait_map = opening_result.portrait_map
         session.add_message("assistant", opening_narrative)
         session_store = get_session_store()
         session_store.save(session)

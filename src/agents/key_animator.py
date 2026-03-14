@@ -1081,3 +1081,220 @@ Add your creative execution perspective — agree, push back, or offer a differe
         except Exception as e:
             logger.error(f"[key_animator] Meta conversation failed: {e}")
             return "Noted — I'll keep that in mind for the next scene."
+
+    # ===================================================================
+    # DEDICATED OPENING SCENE GENERATOR (M3)
+    #
+    # Used when SESSION_ZERO_DEDICATED_OPENING_SCENE_ENABLED=true and
+    # a compiled OpeningStatePackage is available at handoff.
+    # Bypasses the full gameplay pipeline (no intent/outcome/compaction).
+    # ===================================================================
+
+    async def generate_opening_scene(
+        self,
+        opening_state_package: "Any",
+        director_output: "Any | None",
+        profile: NarrativeProfile,
+        campaign_id: int,
+        recent_messages: list | None = None,
+    ) -> tuple[str, dict[str, str]]:
+        """Generate the pilot episode opening scene from a compiled OpeningStatePackage.
+
+        This is a dedicated pathway that bypasses the full gameplay turn pipeline.
+        It uses the structured package data directly to produce a cinematic first scene.
+
+        Args:
+            opening_state_package: Compiled OpeningStatePackage from HandoffCompiler
+            director_output: DirectorOutput from run_startup_briefing (arc plan, notes)
+            profile: Narrative profile for DNA/voice context
+            campaign_id: For portrait resolution
+            recent_messages: Last few SZ messages for tone/voice calibration (optional)
+
+        Returns:
+            (narrative, portrait_map) — same shape as process_turn result
+        """
+        from ..prompts import get_registry
+        from ..media.resolver import resolve_portraits
+
+        provider, model = self._get_provider_and_model()
+
+        # --- Build context block ---
+        context = self._build_opening_scene_context(
+            opening_state_package, director_output, profile
+        )
+
+        # --- Load opening scene prompt template ---
+        raw_prompt = get_registry().get_content(
+            "opening_scene",
+            fallback=(
+                "You are the Key Animator. Write the opening scene of the pilot episode. "
+                "Use the context below. 400-600 words. Cinematic, immersive.\n\n{{OPENING_SCENE_CONTEXT}}"
+            ),
+        )
+        system_prompt = raw_prompt.replace("{{OPENING_SCENE_CONTEXT}}", context)
+
+        # --- Optional: tail of SZ transcript for voice calibration ---
+        messages: list[dict] = []
+        if recent_messages:
+            tail = recent_messages[-6:]
+            transcript_lines = []
+            for m in tail:
+                role = m.get("role", "user")
+                content = m.get("content", "")
+                if content:
+                    transcript_lines.append(f"[{role}]: {content[:300]}")
+            if transcript_lines:
+                messages.append({
+                    "role": "user",
+                    "content": (
+                        "## Session Zero Tail (voice/tone reference only)\n\n"
+                        + "\n".join(transcript_lines)
+                        + "\n\n---\n\nNow write the opening scene:"
+                    ),
+                })
+        else:
+            messages.append({"role": "user", "content": "Write the opening scene now."})
+
+        logger.info(f"[key_animator] Generating dedicated opening scene (model={model})")
+
+        try:
+            response = await provider.complete(
+                messages=messages,
+                system=system_prompt,
+                model=model,
+                max_tokens=1024,
+                temperature=0.85,
+            )
+            narrative = response.content.strip()
+        except Exception as e:
+            logger.error(f"[key_animator] Dedicated opening scene generation failed: {e}")
+            raise
+
+        # Resolve portraits from DB
+        try:
+            narrative, portrait_map = resolve_portraits(narrative, campaign_id)
+        except Exception as pe:
+            logger.warning(f"[key_animator] Portrait resolution failed in opening scene: {pe}")
+            portrait_map = {}
+
+        logger.info(f"[key_animator] Opening scene generated ({len(narrative)} chars, {len(portrait_map)} portraits)")
+        return narrative, portrait_map
+
+    def _build_opening_scene_context(
+        self,
+        pkg: "Any",
+        director_output: "Any | None",
+        profile: NarrativeProfile,
+    ) -> str:
+        """Build the context block injected into the opening scene prompt."""
+        lines = []
+
+        # === CHARACTER ===
+        pc = pkg.player_character
+        lines.append("## Character")
+        lines.append(f"**Name:** {pc.name or 'Unknown'}")
+        if pc.core_identity or pc.concept:
+            lines.append(f"**Concept:** {pc.core_identity or pc.concept}")
+        if pc.personality:
+            lines.append(f"**Personality:** {pc.personality}")
+        if pc.power_tier:
+            lines.append(f"**Power Tier:** {pc.power_tier}")
+        if pc.social_position:
+            lines.append(f"**Social Position:** {pc.social_position}")
+
+        # === OPENING SITUATION ===
+        sit = pkg.opening_situation
+        lines.append("\n## Opening Situation")
+        lines.append(sit.immediate_situation or sit.what_is_happening_right_now or "(not specified)")
+        if sit.immediate_pressure:
+            lines.append(f"**Pressure:** {sit.immediate_pressure}")
+        if sit.starting_location:
+            lines.append(f"**Location:** {sit.starting_location}")
+        if sit.scene_question:
+            lines.append(f"**Scene Question:** *{sit.scene_question}*")
+        if sit.why_this_moment_is_the_start:
+            lines.append(f"**Why This Moment:** {sit.why_this_moment_is_the_start}")
+        if sit.forbidden_opening_moves:
+            lines.append("**Do NOT open with:**")
+            for f_ in sit.forbidden_opening_moves:
+                lines.append(f"  - {f_}")
+
+        # === OPENING CAST ===
+        cast = pkg.opening_cast
+        if cast.required_present or cast.optional_present:
+            lines.append("\n## Opening Cast")
+            for m in cast.required_present:
+                rel = f" ({m.relationship_to_pc})" if m.relationship_to_pc else ""
+                lines.append(f"  - **{m.display_name}** [REQUIRED]{rel} — {m.role_in_scene or m.tone}")
+            for m in cast.optional_present[:3]:
+                rel = f" ({m.relationship_to_pc})" if m.relationship_to_pc else ""
+                lines.append(f"  - {m.display_name} [optional]{rel}")
+
+        # === DIRECTOR NOTES ===
+        if director_output is not None:
+            lines.append("\n## Director's Scene Notes")
+            if hasattr(director_output, 'director_notes') and director_output.director_notes:
+                lines.append(director_output.director_notes[:600])
+            if hasattr(director_output, 'current_arc') and director_output.current_arc:
+                lines.append(f"\n**Opening Arc:** {director_output.current_arc}")
+            if hasattr(director_output, 'active_foreshadowing') and director_output.active_foreshadowing:
+                lines.append("**Seeds to Plant:**")
+                for seed in director_output.active_foreshadowing[:2]:
+                    if isinstance(seed, dict):
+                        lines.append(f"  - {seed.get('symbol', str(seed))}")
+                    else:
+                        lines.append(f"  - {str(seed)[:120]}")
+
+        # === HARD CONSTRAINTS ===
+        if pkg.hard_constraints:
+            lines.append("\n## Hard Constraints (INVIOLABLE)")
+            for c in pkg.hard_constraints[:8]:
+                lines.append(f"  - {c}")
+
+        # === TONE & COMPOSITION ===
+        tone = pkg.tone_and_composition
+        if tone.tension_source or tone.genre_pressure or tone.narrative_focus:
+            lines.append("\n## Tone & Composition")
+            if tone.composition_name:
+                lines.append(f"**Config:** {tone.composition_name}")
+            if tone.tension_source:
+                lines.append(f"**Tension:** {tone.tension_source}")
+            if tone.genre_pressure:
+                lines.append(f"**Genre Pressure:** {tone.genre_pressure}")
+            if tone.narrative_focus:
+                lines.append(f"**Narrative Focus:** {tone.narrative_focus}")
+
+        # === WORLD CONTEXT ===
+        wc = pkg.world_context
+        if wc.location_description or wc.setting_truths:
+            lines.append("\n## World Context")
+            if wc.location_description:
+                lines.append(wc.location_description)
+            if wc.setting_truths:
+                for t in wc.setting_truths[:4]:
+                    lines.append(f"  - {t}")
+            if wc.local_dangers:
+                lines.append(f"**Nearby dangers:** {'; '.join(wc.local_dangers[:2])}")
+
+        # === ANIMATION INPUTS ===
+        ai = pkg.animation_inputs
+        if ai.visual_tone or ai.recommended_palette or ai.key_visual_elements:
+            lines.append("\n## Animation / Atmosphere Guidance")
+            if ai.visual_tone:
+                lines.append(f"**Visual Tone:** {ai.visual_tone}")
+            if ai.recommended_palette:
+                lines.append(f"**Palette:** {', '.join(ai.recommended_palette[:4])}")
+            if ai.key_visual_elements:
+                for el in ai.key_visual_elements[:4]:
+                    lines.append(f"  - {el}")
+            if ai.forbidden_visuals:
+                lines.append(f"**Avoid:** {'; '.join(ai.forbidden_visuals[:3])}")
+
+        # === PROFILE DNA ===
+        if profile.dna:
+            lines.append("\n## Narrative DNA")
+            for key, value in list(profile.dna.items())[:6]:
+                label = key.replace('_', ' ').replace('vs', '↔').title()
+                lines.append(f"  - {label}: {value}/10")
+
+        return "\n".join(lines)
