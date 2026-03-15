@@ -10,31 +10,23 @@ Last updated: 2026-03-15
 |-------|-------|--------|-------|
 | 0 | Foundation and Contracts | ✅ DONE | DB schemas, artifact persistence, feature flags, `OpeningStatePackage` contract |
 | 1 | Handoff Compiler MVP | ✅ DONE | 4-pass compiler (extraction → entity resolution → gap analysis → assembly), Director contract, opening scene path |
-| 2 | Handoff Compiler Enrichment | 🔄 IN PROGRESS | Adding relationship_graph, contradictions_summary, orphan_facts, lore_synthesis to package |
-| 3 | Session Zero Orchestrator MVP | ⬜ NOT STARTED | Rewrite `SessionZeroAgent` into per-turn orchestrated pipeline |
-| 4 | Session Zero Orchestrator Hardening | ⬜ NOT STARTED | Resumability, richer traces, error recovery |
+| 2 | Handoff Compiler Enrichment | ✅ DONE | `relationship_graph`, `contradictions_summary`, `orphan_facts`, `lore_synthesis_notes` compiler-stamped into package |
+| 3 | Session Zero Orchestrator MVP | ⬜ NOT STARTED | Per-turn pipeline, live extraction, memory integration, handoff reorg |
+| 4 | Session Zero Orchestrator Hardening | ⬜ NOT STARTED | Resumability, specific error recovery, trace coverage |
 | 5 | Frontend/Handoff Semantics Cleanup | ✅ DONE | `opening_scene_status` field, `opening_scene_failed` UI branch, no more conflation of phase-change with scene-ready |
-| 6 | Cleanup and Migration | ⬜ NOT STARTED | Remove compat shims, deprecate `detected_info` |
+| 6 | Cleanup and Migration | ⬜ NOT STARTED | Remove compat shims, deprecate `detected_info`, remove feature flags |
 
-### What is deployed and tested (as of last update)
+### What is deployed and tested
 
 - `HandoffCompiler` with 4 passes: `sz_extractor`, `sz_entity_resolver`, `sz_gap_analyzer`, `sz_handoff`
-- `OpeningStatePackage` briefing contract consumed by Director + Key Animator
+- `OpeningStatePackage` briefing contract consumed by Director + Key Animator — including Phase 2 enrichment fields
 - `SESSION_ZERO_COMPILER_ENABLED` and `SESSION_ZERO_DEDICATED_OPENING_SCENE_ENABLED` feature flags
 - Artifact versioning + content-hash dedup in `session_zero_artifacts` / `session_zero_runs` tables
 - `HandoffStatus` enum with full state machine
 - `opening_scene_status` field in `SessionZeroResponse` + frontend handling
-- 531 offline tests, ~4.5s, zero live LLM calls
-- Committed: `1625b8f` (2026-03-15)
-
-### What Phase 2 adds (current work)
-
-- `relationship_graph` list stamped into `OpeningStatePackage` from entity resolver output
-- `contradictions_summary` list stamped from gap analyzer output
-- `orphan_facts` — fact_records with no canonical entity match
-- `lore_synthesis_notes` — hybrid/custom profile cross-setting synthesis
-- Updated `sz_handoff.md` prompt to reference enrichment fields
-- Tests for all of the above
+- `MockLLMProvider` with separate queues, underflow errors, type validation, error simulation, auto-teardown (in `tests/mock_llm.py`)
+- 565 offline tests, ~5s, zero live LLM calls
+- Committed: `ebcac5d` (2026-03-15)
 
 ---
 
@@ -2962,43 +2954,178 @@ Deliverables:
 
 ## Phase 3 — Session Zero Orchestrator MVP
 
-Deliverables:
+### Overview
 
-- convert `SessionZeroAgent` into orchestrated turn pipeline owner
-- add extractor + gap analyzer + entity resolver passes per turn
-- incremental entity graph updates during Session Zero
-- follow-up question prioritization
-- better phase progression policy
+Convert `SessionZeroAgent` from a single conversation loop into a proper per-turn orchestrated pipeline, add live extraction and entity resolution during the session, wire memory integration, and reorganize the handoff sequence so the Handoff Compiler runs after `reset_orchestrator()` with clean injected dependencies.
 
-Definition of done:
+### Deliverables
 
-- dense user input is meaningfully captured before handoff, not only at compiler time
+#### 3.1 Per-turn pipeline
+
+- Convert `SessionZeroAgent` into a turn pipeline owner (analogous to `TurnPipelineMixin`)
+- Each turn: run `SessionZeroExtractorAgent` → `SessionZeroEntityResolverAgent` → `SessionZeroGapAnalyzerAgent` → `SessionZeroConductor` response generation
+- `SessionZeroConductor` consumes gap analyzer output to decide follow-up question and phase progression
+
+#### 3.2 Settings config for new agents
+
+Every new first-class agent requires a settings store entry following the same pattern as existing agents:
+
+- `sz_extractor` — model + provider selection (thinking tier recommended; default: same provider as `session_zero`)
+- `sz_gap_analyzer` — model + provider selection (thinking tier; separate entry so extraction quality can be tuned independently)
+- `sz_entity_resolver` — model + provider selection (thinking tier)
+- All three appear in `SettingsStore` under the `agent_models` section and are resolved by `LLMManager.get_provider_for_agent()`
+
+#### 3.3 Incremental entity graph persistence
+
+- Per-turn entity graph state persisted to `session_zero_artifacts` with `artifact_type='sz_entity_graph'`
+- Each turn upserts the artifact (new version) so the incremental graph survives server restarts
+- Entity resolver reads the prior artifact on startup rather than rebuilding from scratch each turn
+- Reuses existing versioning/locking infrastructure — no new DB table needed
+
+#### 3.4 Safe early memory writes during Session Zero
+
+Per §11.5.16: certain facts should reach `MemoryStore` immediately during SZ, not waiting for handoff.
+
+Write to `MemoryStore` after each turn when extractor finds:
+
+- Characters with named relationships to the player character → `memory_type='character_state'`, `decay_rate='none'`
+- Plot-critical facts flagged by extractor (`is_plot_critical=True` in `FactRecord`) → `memory_type='session_zero'`, flags `['plot_critical', 'session_zero_in_progress']`
+- These are **provisional** — at handoff the compiler produces the authoritative overwrite (see 3.5)
+
+#### 3.5 Memory integration at handoff
+
+At handoff, after the Handoff Compiler produces the final `OpeningStatePackage`, write distilled stable facts to `MemoryStore` using existing `add_memory()` API:
+
+| What | `memory_type` | `decay_rate` | Notes |
+|------|---------------|--------------|-------|
+| Canonical player character identity and backstory | `'core'` | `'none'` | Never decays; central to all gameplay |
+| Canonical NPC entries (name, role, relationship) | `'character_state'` | `'none'` | Overwrites any provisional SZ writes |
+| Canonical relationships from `relationship_graph` | `'relationship'` | `'none'` | e.g. “Spike owes Julia a debt” |
+| Stable world/setting facts (non-canonical setting, custom lore) | `'session_zero'` | `'none'` | Already a defined category in `CATEGORY_DECAY` |
+| Active quest/thread seeds from gap analyzer | `'quest'` | `'normal'` | |
+| Location facts | `'location'` | `'slow'` | |
+
+**Rule:** Do NOT dump raw compiler artifacts into `MemoryStore`. Only distilled, gameplay-relevant stable facts. Raw compiler output lives in `session_zero_artifacts`.
+
+**Timing:** memory writes happen in step 3 of the 7-step handoff sequence (see 3.6), before Director startup.
+
+#### 3.6 Handoff sequence reorganization
+
+Reorganize `_handle_gameplay_handoff()` to follow the architecture-specified 7-step sequence (§12.4.27):
+
+1. Settings sync, profile resolution, campaign ID resolution
+2. `reset_orchestrator()` → fresh singleton with correct profile/campaign
+3. Memory indexing: provisional SZ memories upgraded to permanent; orphan/unresolved items flagged
+4. **Handoff Compiler** runs — receives `memory_store` and `state_manager` as explicit injected deps (not singleton import)
+5. Compiler export applies to gameplay SQL tables (transactional)
+6. Director startup (consumes `OpeningStatePackage`)
+7. Opening-scene generation (dedicated path)
+
+**Current problem:** `reset_orchestrator()` is called partway through with inconsistent dependency flow. This reorg is required before Phase 4 hardening is coherent.
+
+### Definition of done
+
+- Dense user input is captured before handoff, not only at compiler time
+- Post-handoff: canonical entities appear in `MemoryStore` with correct `memory_type` (verifiable in tests via `MemoryStore.search()`)
+- Handoff sequence follows the 7-step order; Handoff Compiler receives `memory_store`/`state_manager` as injected deps
+- `sz_extractor`, `sz_gap_analyzer`, `sz_entity_resolver` all appear in settings store and resolve through `LLMManager`
+
+---
 
 ## Phase 4 — Session Zero Orchestrator Hardening
 
-Deliverables:
+### Overview
 
-- tool-assisted research where needed
-- resumability/checkpointing
-- better error recovery
-- more explicit phase/handoff status surface to frontend
-- richer Langfuse traces
+Harden the Phase 3 pipeline against real-world failure modes, add resumability so a crashed SZ can continue rather than restart, cover the new pipeline with Langfuse traces, and expose more granular status to the frontend.
+
+### Deliverables
+
+#### 4.1 Specific error recovery behaviors
+
+| Failure | Recovery |
+|---------|----------|
+| `sz_extractor` fails on a turn | Log and continue — conductor responds without new extraction data |
+| `sz_entity_resolver` fails on a turn | Log and continue — use prior entity graph unchanged |
+| `sz_gap_analyzer` fails on a turn | Fall back to default phase progression (advance if minimum requirements met) |
+| Handoff Compiler pass fails | Mark run as `failed`, surface `opening_scene_status='failed'` to frontend; do NOT silently fall back to uncompiled state |
+| Compiler produces empty package | Retry with simplified prompt before failing hard |
+| Memory indexing fails at handoff | Log warning, continue — memory is best-effort; gameplay proceeds without it |
+
+#### 4.2 Resumability and checkpointing
+
+- On turn start, check for existing `sz_entity_graph` artifact for this session — if found, restore state
+- On server restart mid-SZ, `SessionZeroAgent` reconstructs internal state from artifact table
+- Handoff Compiler run that fails mid-way reuses the existing `session_zero_runs` row to avoid duplicate artifact output
+
+#### 4.3 Langfuse trace coverage
+
+Add spans for:
+
+- Per-turn: extractor output summary (entity count, fact count, new vs updated)
+- Per-turn: entity resolver diff (merged count, conflict count)
+- Per-turn: gap analyzer priority list (top 3 follow-up candidates)
+- Per-turn: conductor decision (phase, follow-up question selected)
+- At handoff: each compiler pass (name, duration, artifact version produced)
+- At handoff: memory indexing (facts written by type, any failures)
+
+#### 4.4 Tool-assisted research
+
+- `SessionZeroConductor` or gap analyzer can invoke `wiki_scout` / `world_builder` for profile/setting research during SZ
+- Gated behind `SESSION_ZERO_RESEARCH_ENABLED` feature flag (default False)
+
+#### 4.5 Frontend status surface
+
+- Per-turn `SessionZeroResponse` includes extraction summary counts (entity count, unresolved count)
+- Expose current entity graph summary for optional debug/detail panel in frontend
+
+### Definition of done
+
+- Each failure in 4.1 has a test using `MockLLMProvider.queue_error()` demonstrating the specified behavior
+- A simulated server-restart test shows state is restored from artifacts
+- Langfuse spans exist for all items in 4.3
+
+---
 
 ## Phase 5 — Frontend/Handoff Semantics Cleanup
 
-Deliverables:
+**Status: ✅ DONE** (completed in `1625b8f`)
 
-- frontend no longer conflates “phase changed” with “opening scene ready”
-- better handoff status states
-- debug UI surfaces for compiler/orchestrator status if desired
+Deliverables completed:
 
-## Phase 6 — Cleanup and migration
+- Frontend no longer conflates “phase changed” with “opening scene ready”
+- `opening_scene_status` field in `SessionZeroResponse` with full state machine
+- `opening_scene_failed` UI branch with user-facing fallback message
 
-Deliverables:
+---
 
-- remove obsolete one-shot handoff assumptions
-- remove compatibility shims that are no longer needed
-- document final architecture
+## Phase 6 — Cleanup and Migration
+
+### Deliverables
+
+#### 6.1 `detected_info` deprecation (§7.2.6)
+
+- Audit all callers of `detected_info` in `SessionZeroAgent` and related routes
+- Migrate surviving callers to read from `OpeningStatePackage` / compiler artifacts
+- Remove `detected_info` field from `SessionZeroState` and related schemas
+- DB migration to drop `detected_info` columns
+
+#### 6.2 Feature flag removal
+
+Once compiler and orchestrator pipeline are stable and on by default:
+
+- Remove `SESSION_ZERO_COMPILER_ENABLED` — compiler always runs
+- Remove `SESSION_ZERO_DEDICATED_OPENING_SCENE_ENABLED` — dedicated path always used
+- Remove all `if SESSION_ZERO_COMPILER_ENABLED:` conditional branches
+
+#### 6.3 Compatibility shim removal
+
+- Remove one-shot handoff assumptions from `_handle_gameplay_handoff()` once the 7-step sequence (3.6) is stable
+- Remove any `session_zero_states` writes that duplicate compiler output
+
+#### 6.4 Architecture documentation
+
+- Update `README.md` with final SZ architecture summary
+- Document the handoff sequence, memory integration policy, and artifact lifecycle
 
 ## 16.1 Focused fifth pass: milestone sequencing, dependency ordering, and first delivery slice
 
@@ -3238,13 +3365,19 @@ Acceptance criteria:
 Scope:
 
 - live per-turn extractor/gap-analysis/resolution pipeline
-- incremental graph updates
+- incremental graph updates persisted to artifact table
 - improved follow-up question selection
+- settings config for `sz_extractor`, `sz_gap_analyzer`, `sz_entity_resolver`
+- handoff sequence reorganization (7-step order)
+- memory integration: provisional writes per-turn + authoritative writes at handoff
 
 Acceptance criteria:
 
 - dense freeform user answers are captured earlier, not only at handoff
 - phase progression quality improves on complex Session Zero transcripts
+- post-handoff: canonical entities appear in `MemoryStore` with correct `memory_type` (tested with `MemoryStore.search()`)
+- plot-critical facts from mid-SZ turns appear in `MemoryStore` before handoff
+- Handoff Compiler receives `memory_store` and `state_manager` as injected dependencies (no singleton import inside compiler)
 
 #### Milestone M7 — Full hardening and cleanup
 
@@ -3252,7 +3385,9 @@ Scope:
 
 - broader settings/UI exposure for stabilized new agents
 - resumability/checkpointing hardening
-- compatibility-path removal
+- specific error recovery behaviors per 4.1
+- Langfuse trace coverage per 4.3
+- compatibility-path removal and `detected_info` deprecation
 - docs and final architecture cleanup
 
 ### 16.1.4 Recommended first real implementation slice
