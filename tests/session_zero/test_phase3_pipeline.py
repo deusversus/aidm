@@ -287,7 +287,7 @@ class TestSessionZeroPipeline:
              patch.object(pipeline._resolver, '_get_provider_and_model', return_value=(provider, "mock")), \
              patch.object(pipeline._gap_analyzer, '_get_provider_and_model', return_value=(provider, "mock")), \
              patch.object(pipeline.conductor, '_get_provider_and_model', return_value=(provider, "mock")), \
-             patch('src.core.session_zero_pipeline.SessionZeroPipeline._persist_entity_graph', new_callable=AsyncMock), \
+             patch('src.core.session_zero_pipeline.SessionZeroPipeline._persist_pipeline_state', new_callable=AsyncMock), \
              patch('src.agents._session_zero_research.get_profile_context_for_agent', return_value="Profile: Cowboy Bebop"):
 
             result = await pipeline.process_turn(mock_session, "A bounty hunter named Kai")
@@ -319,7 +319,7 @@ class TestSessionZeroPipeline:
         pipeline._extractor.call = AsyncMock(side_effect=RuntimeError("LLM failed"))
 
         with patch.object(pipeline.conductor, '_get_provider_and_model', return_value=(provider, "mock")), \
-             patch('src.core.session_zero_pipeline.SessionZeroPipeline._persist_entity_graph', new_callable=AsyncMock), \
+             patch('src.core.session_zero_pipeline.SessionZeroPipeline._persist_pipeline_state', new_callable=AsyncMock), \
              patch('src.agents._session_zero_research.get_profile_context_for_agent', return_value=""):
 
             result = await pipeline.process_turn(mock_session, "hello")

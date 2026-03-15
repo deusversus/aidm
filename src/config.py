@@ -58,6 +58,10 @@ class Config:
     # When False, the current monolithic SessionZeroAgent handles all turns.
     SESSION_ZERO_ORCHESTRATOR_ENABLED: bool = os.getenv("SESSION_ZERO_ORCHESTRATOR_ENABLED", "false").lower() == "true"
 
+    # Enable tool-assisted research (wiki_scout, world_builder) during SZ turns.
+    # When False, pipeline relies only on profile context and player input.
+    SESSION_ZERO_RESEARCH_ENABLED: bool = os.getenv("SESSION_ZERO_RESEARCH_ENABLED", "false").lower() == "true"
+
     @classmethod
     def validate(cls) -> list[str]:
         """Validate configuration, return list of issues."""

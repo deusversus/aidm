@@ -36,6 +36,7 @@ from src.agents.session_zero_schemas import (
 from src.agents.sz_extractor import SZExtractorAgent
 from src.agents.sz_entity_resolver import SZEntityResolverAgent
 from src.agents.sz_gap_analyzer import SZGapAnalyzerAgent
+from src.observability import log_span
 
 if TYPE_CHECKING:
     from src.agents.session_zero import SessionZeroAgent, SessionZeroOutput
@@ -137,8 +138,8 @@ class SessionZeroPipeline:
         # ── Step 4: Conductor response with gap context ───────────────────
         result = await self._run_conductor(session, player_input)
 
-        # ── Step 5: Persist entity graph ──────────────────────────────────
-        await self._persist_entity_graph(session)
+        # ── Step 5: Persist pipeline state ─────────────────────────────────
+        await self._persist_pipeline_state(session)
 
         return result
 
@@ -150,6 +151,24 @@ class SessionZeroPipeline:
     def restore_state(self, state: SZPipelineState) -> None:
         """Restore pipeline state from a previous checkpoint."""
         self._state = state
+
+    def build_extraction_summary(self) -> dict | None:
+        """Build extraction summary dict for SessionZeroResponse."""
+        if not self._state.extraction_passes:
+            return None
+
+        latest = self._state.extraction_passes[-1]
+        gap = self._state.gap_analysis
+        er = self._state.entity_resolution
+
+        return {
+            "entity_count": len(er.canonical_entities) if er else 0,
+            "fact_count": len(latest.fact_records),
+            "relationship_count": len(er.canonical_relationships) if er else 0,
+            "unresolved_count": len(gap.unresolved_items) if gap else 0,
+            "handoff_safe": gap.handoff_safe if gap else None,
+            "turn_count": self._state.turn_count,
+        }
 
     # ── Step implementations ──────────────────────────────────────────────────
 
@@ -197,6 +216,15 @@ class SessionZeroPipeline:
                 len(result.fact_records),
                 len(result.relationship_records),
             )
+            log_span(
+                "sz_pipeline.extraction",
+                input={"chunk_start": window_start, "chunk_end": total + 1},
+                output={
+                    "entity_count": len(result.entity_records),
+                    "fact_count": len(result.fact_records),
+                    "relationship_count": len(result.relationship_records),
+                },
+            )
             return result
 
         except Exception:
@@ -220,6 +248,14 @@ class SessionZeroPipeline:
                 "SZ entity resolution: %d canonical entities, %d merges",
                 len(result.canonical_entities),
                 len(result.merges_performed),
+            )
+            log_span(
+                "sz_pipeline.entity_resolution",
+                output={
+                    "canonical_entity_count": len(result.canonical_entities),
+                    "merges_performed": len(result.merges_performed),
+                    "alias_count": len(result.alias_map),
+                },
             )
             return result
 
@@ -245,6 +281,15 @@ class SessionZeroPipeline:
                 len(result.unresolved_items),
                 len(result.recommended_player_followups),
             )
+            log_span(
+                "sz_pipeline.gap_analysis",
+                output={
+                    "handoff_safe": result.handoff_safe,
+                    "unresolved_count": len(result.unresolved_items),
+                    "blocking_issues": result.blocking_issues,
+                    "top_followups": result.recommended_player_followups[:3],
+                },
+            )
             return result
 
         except Exception:
@@ -257,11 +302,20 @@ class SessionZeroPipeline:
         player_input: str,
     ) -> SessionZeroOutput:
         """Run the conductor (existing SZ agent) with gap context injected."""
-        return await self.conductor.process_turn(
+        result = await self.conductor.process_turn(
             session,
             player_input,
             gap_context=self._build_gap_context(),
         )
+        log_span(
+            "sz_pipeline.conductor",
+            input={"has_gap_context": self._state.gap_analysis is not None},
+            output={
+                "phase": getattr(session, "phase", None) and session.phase.value,
+                "ready_for_gameplay": result.ready_for_gameplay,
+            },
+        )
+        return result
 
     # ── Gap context formatting ────────────────────────────────────────────────
 
@@ -311,9 +365,9 @@ class SessionZeroPipeline:
 
     # ── Persistence ───────────────────────────────────────────────────────────
 
-    async def _persist_entity_graph(self, session: Session) -> None:
-        """Save the entity graph to session_zero_artifacts for crash recovery."""
-        if not self._state.entity_resolution or not self.session_id:
+    async def _persist_pipeline_state(self, session: Session) -> None:
+        """Save entity graph and pipeline metadata for crash recovery."""
+        if not self.session_id:
             return
 
         try:
@@ -322,22 +376,42 @@ class SessionZeroPipeline:
 
             db = get_session()
             try:
+                # Persist entity graph (for entity resolution recovery)
+                if self._state.entity_resolution:
+                    save_artifact(
+                        db,
+                        self.session_id,
+                        "sz_entity_graph",
+                        self._state.entity_resolution,
+                    )
+
+                # Persist pipeline metadata (turn count, extraction pass count)
+                from pydantic import BaseModel as _BM
+
+                class _PipelineMeta(_BM):
+                    turn_count: int = 0
+                    extraction_pass_count: int = 0
+
                 save_artifact(
                     db,
                     self.session_id,
-                    "sz_entity_graph",
-                    self._state.entity_resolution,
+                    "sz_pipeline_meta",
+                    _PipelineMeta(
+                        turn_count=self._state.turn_count,
+                        extraction_pass_count=len(self._state.extraction_passes),
+                    ),
                 )
+
                 db.commit()
-                logger.debug("SZ entity graph persisted for session %s", self.session_id)
+                logger.debug("SZ pipeline state persisted for session %s", self.session_id)
             finally:
                 db.close()
 
         except Exception:
-            logger.exception("Failed to persist entity graph — non-fatal")
+            logger.exception("Failed to persist pipeline state — non-fatal")
 
-    def load_prior_entity_graph(self, session_id: str) -> bool:
-        """Attempt to restore entity graph from artifacts. Returns True if restored."""
+    def load_prior_state(self, session_id: str) -> bool:
+        """Attempt to restore pipeline state from artifacts. Returns True if restored."""
         try:
             from src.db.session import get_session
             from src.db.session_zero_artifacts import (
@@ -347,6 +421,9 @@ class SessionZeroPipeline:
 
             db = get_session()
             try:
+                restored = False
+
+                # Restore entity graph
                 artifact = get_active_artifact(db, session_id, "sz_entity_graph")
                 if artifact:
                     self._state.entity_resolution = load_artifact_content(
@@ -358,11 +435,29 @@ class SessionZeroPipeline:
                         artifact.version,
                         session_id,
                     )
-                    return True
+                    restored = True
+
+                # Restore pipeline metadata (turn count)
+                meta_artifact = get_active_artifact(db, session_id, "sz_pipeline_meta")
+                if meta_artifact:
+                    import json
+                    meta = json.loads(meta_artifact.content) if isinstance(meta_artifact.content, str) else meta_artifact.content
+                    self._state.turn_count = meta.get("turn_count", 0)
+                    logger.info(
+                        "Restored pipeline meta: turn_count=%d for session %s",
+                        self._state.turn_count,
+                        session_id,
+                    )
+                    restored = True
+
+                return restored
             finally:
                 db.close()
 
         except Exception:
-            logger.exception("Failed to restore entity graph — starting fresh")
+            logger.exception("Failed to restore pipeline state — starting fresh")
 
         return False
+
+    # Backward-compatible alias
+    load_prior_entity_graph = load_prior_state

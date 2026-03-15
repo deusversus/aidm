@@ -56,6 +56,8 @@ class SessionZeroResponse(BaseModel):
     progress_stage: str | None = None  # Current pipeline stage name
     progress_message: str | None = None  # Human-readable progress description
     progress_percent: float | None = None  # 0-100
+    # SZ Pipeline extraction summary (Phase 4 — orchestrator enabled only)
+    extraction_summary: dict[str, Any] | None = None  # entity_count, fact_count, unresolved_count, handoff_safe
 
 
 class ContextResponse(BaseModel):

@@ -297,12 +297,17 @@ async def _handle_gameplay_handoff(session, session_id: str, result, agent) -> t
     if _compiler_package is not None:
         try:
             from src.core.session_zero_memory import write_authoritative
+            from src.observability import log_span
             written = write_authoritative(
                 orchestrator.memory,
                 _compiler_package,
                 turn_number=0,
             )
             logger.info("[Handoff] Authoritative memory write: %d facts indexed", written)
+            log_span(
+                "sz_handoff.authoritative_memory",
+                output={"memories_written": written},
+            )
         except Exception as auth_mem_err:
             logger.warning("[Handoff] Authoritative memory write failed (non-fatal): %s", auth_mem_err)
 
@@ -562,6 +567,7 @@ async def session_zero_turn(session_id: str, request: TurnRequest):
 
             pipeline = _get_or_create_pipeline(agent, session.session_id)
             result = await pipeline.process_turn(session, request.player_input)
+            _extraction_summary = pipeline.build_extraction_summary()
 
             # Write provisional memories from the latest extraction
             if pipeline.state.extraction_passes:
@@ -579,6 +585,7 @@ async def session_zero_turn(session_id: str, request: TurnRequest):
                     logger.warning("SZ provisional memory write failed — non-fatal")
         else:
             result = await agent.process_turn(session, request.player_input)
+            _extraction_summary = None
 
         # Initialize opening scene vars (only populated during handoff)
         opening_narrative = None
@@ -984,6 +991,7 @@ async def session_zero_turn(session_id: str, request: TurnRequest):
             compiler_task_id=_compiler_task_id_outer if result.ready_for_gameplay else None,
             compiler_artifact_version=_compiler_artifact_version_outer if result.ready_for_gameplay else None,
             opening_scene_status=_opening_scene_status_outer if result.ready_for_gameplay else None,
+            extraction_summary=_extraction_summary,
         )
 
     except Exception as e:
