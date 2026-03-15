@@ -11,7 +11,7 @@ Last updated: 2026-03-15
 | 0 | Foundation and Contracts | ✅ DONE | DB schemas, artifact persistence, feature flags, `OpeningStatePackage` contract |
 | 1 | Handoff Compiler MVP | ✅ DONE | 4-pass compiler (extraction → entity resolution → gap analysis → assembly), Director contract, opening scene path |
 | 2 | Handoff Compiler Enrichment | ✅ DONE | `relationship_graph`, `contradictions_summary`, `orphan_facts`, `lore_synthesis_notes` compiler-stamped into package |
-| 3 | Session Zero Orchestrator MVP | ⬜ NOT STARTED | Per-turn pipeline, live extraction, memory integration, handoff reorg |
+| 3 | Session Zero Orchestrator MVP | ✅ DONE | Per-turn pipeline, memory integration (provisional + authoritative), handoff reorg, 24 new tests |
 | 4 | Session Zero Orchestrator Hardening | ⬜ NOT STARTED | Resumability, specific error recovery, trace coverage |
 | 5 | Frontend/Handoff Semantics Cleanup | ✅ DONE | `opening_scene_status` field, `opening_scene_failed` UI branch, no more conflation of phase-change with scene-ready |
 | 6 | Cleanup and Migration | ⬜ NOT STARTED | Remove compat shims, deprecate `detected_info`, remove feature flags |
@@ -25,8 +25,8 @@ Last updated: 2026-03-15
 - `HandoffStatus` enum with full state machine
 - `opening_scene_status` field in `SessionZeroResponse` + frontend handling
 - `MockLLMProvider` with separate queues, underflow errors, type validation, error simulation, auto-teardown (in `tests/mock_llm.py`)
-- 565 offline tests, ~5s, zero live LLM calls
-- Committed: `ebcac5d` (2026-03-15)
+- 642 offline tests, ~5.5s, zero live LLM calls
+- Committed: `b3e9a3f` (Phase 3 complete)
 
 ---
 
