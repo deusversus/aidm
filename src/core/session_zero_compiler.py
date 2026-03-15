@@ -44,6 +44,7 @@ from ..agents.session_zero_schemas import (
     OpeningStatePackage,
     PackageMetadata,
     PackageReadiness,
+    FactRecord,
 )
 from ..db.session_zero_artifacts import (
     compute_draft_hash,
@@ -62,6 +63,58 @@ logger = logging.getLogger(__name__)
 # Chunk size for transcript extraction passes (messages per chunk)
 # Keeps each LLM call well within context window limits
 _EXTRACTION_CHUNK_SIZE = 20
+
+
+def _compute_orphan_facts(
+    extraction_passes: list[ExtractionPassOutput],
+    entity_resolution: EntityResolutionOutput | None,
+) -> list[FactRecord]:
+    """Return fact_records whose subject entity was not resolved to a canonical entity.
+
+    A fact is "orphaned" when the entity it describes (subject_entity_id) either
+    was not extracted as a named entity or was not preserved in the resolver's
+    canonical entity list (e.g., because it was merged into another entity and
+    the fact was not reassigned).
+    """
+    if entity_resolution is None:
+        return []
+
+    canonical_ids = {e.canonical_id for e in entity_resolution.canonical_entities}
+
+    orphans: list[FactRecord] = []
+    seen: set[str] = set()
+    for pass_output in extraction_passes:
+        for fact in pass_output.fact_records:
+            key = f"{fact.subject_entity_id}::{fact.content}"
+            if key in seen:
+                continue
+            seen.add(key)
+            # Orphaned if no subject or subject not in canonical set
+            if not fact.subject_entity_id or fact.subject_entity_id not in canonical_ids:
+                orphans.append(fact)
+    return orphans
+
+
+def _extract_lore_synthesis_notes(
+    extraction_passes: list[ExtractionPassOutput],
+) -> list[str]:
+    """Build lore synthesis notes from canonicality signals across all extraction passes.
+
+    Collects hybrid/custom timeline details so Director is aware of world
+    operating rules that differ from canon.
+    """
+    notes: list[str] = []
+    seen: set[str] = set()
+    for pass_output in extraction_passes:
+        for signal in pass_output.canonicality_signals:
+            mode = signal.timeline_mode or ""
+            if mode in ("hybrid", "custom", "alternate") or signal.is_forbidden_contradiction:
+                prefix = f"[{mode or signal.signal_type}]" if (mode or signal.signal_type) else ""
+                note = f"{prefix} {signal.content}".strip()
+                if note and note not in seen:
+                    seen.add(note)
+                    notes.append(note)
+    return notes
 
 
 @dataclass
@@ -330,6 +383,20 @@ class HandoffCompiler:
         package.package_metadata.transcript_hash = self._ctx.transcript_hash
         package.package_metadata.character_draft_hash = self._ctx.draft_hash
         package.package_metadata.created_at = datetime.utcnow().isoformat()
+
+        # Phase 2: stamp enrichment fields directly from resolver/analyzer output
+        if self._ctx.entity_resolution:
+            package.relationship_graph = self._ctx.entity_resolution.canonical_relationships
+
+        if self._ctx.gap_analysis:
+            package.contradictions_summary = self._ctx.gap_analysis.contradictions
+
+        package.lore_synthesis_notes = _extract_lore_synthesis_notes(self._ctx.extraction_passes)
+
+        package.orphan_facts = _compute_orphan_facts(
+            self._ctx.extraction_passes,
+            self._ctx.entity_resolution,
+        )
 
         self._ctx.opening_package = package
 

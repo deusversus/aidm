@@ -100,3 +100,16 @@ Copy `handoff_status: OPENING_PACKAGE_READY`. Copy `blocking_issues` and `warnin
 Return a fully populated `OpeningStatePackage`. Omit no sections — use empty lists and empty strings instead of null where data is absent. The package must be complete enough that Director and Key Animator can generate the opening scene without referring back to the raw transcript.
 
 Quality bar: After reading your `opening_situation` section, a skilled author should be able to write the first paragraph of the story immediately.
+
+---
+
+## Phase 2 Enrichment Fields (compiler-stamped, not your responsibility)
+
+The following fields on `OpeningStatePackage` are **stamped by the HandoffCompiler after your response** — you do not need to populate them:
+
+- `relationship_graph` — copied directly from `EntityResolutionOutput.canonical_relationships`
+- `contradictions_summary` — copied directly from `GapAnalysisOutput.contradictions`
+- `orphan_facts` — computed from fact_records with no canonical entity match
+- `lore_synthesis_notes` — derived from `GapAnalysisOutput.canonicality_signals` with hybrid/custom/alternate modes
+
+Your job is to assemble the **prose and judgment fields** (`opening_situation`, `player_character`, `director_inputs`, `animation_inputs`, `canon_rules`, `uncertainties`, `hard_constraints`, `soft_targets`, etc.). The compiler handles the structured entity/relationship/contradiction data automatically.
