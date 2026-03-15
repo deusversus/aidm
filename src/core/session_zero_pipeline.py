@@ -374,8 +374,7 @@ class SessionZeroPipeline:
             from src.db.session import get_session
             from src.db.session_zero_artifacts import save_artifact
 
-            db = get_session()
-            try:
+            with get_session() as db:
                 # Persist entity graph (for entity resolution recovery)
                 if self._state.entity_resolution:
                     save_artifact(
@@ -402,10 +401,7 @@ class SessionZeroPipeline:
                     ),
                 )
 
-                db.commit()
                 logger.debug("SZ pipeline state persisted for session %s", self.session_id)
-            finally:
-                db.close()
 
         except Exception:
             logger.exception("Failed to persist pipeline state — non-fatal")
@@ -419,8 +415,7 @@ class SessionZeroPipeline:
                 load_artifact_content,
             )
 
-            db = get_session()
-            try:
+            with get_session() as db:
                 restored = False
 
                 # Restore entity graph
@@ -451,8 +446,6 @@ class SessionZeroPipeline:
                     restored = True
 
                 return restored
-            finally:
-                db.close()
 
         except Exception:
             logger.exception("Failed to restore pipeline state — starting fresh")
