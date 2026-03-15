@@ -34,6 +34,26 @@ from .session_mgmt import (
 
 logger = logging.getLogger(__name__)
 
+# SZ pipeline singleton (per-session, lazily created when orchestrator flag is on)
+_sz_pipelines: dict[str, "SessionZeroPipeline"] = {}
+
+
+def _get_or_create_pipeline(agent, session_id: str):
+    """Get or create a SessionZeroPipeline for this session."""
+    from src.core.session_zero_pipeline import SessionZeroPipeline
+
+    if session_id not in _sz_pipelines:
+        pipeline = SessionZeroPipeline(conductor=agent, session_id=session_id)
+        # Attempt to restore prior entity graph (crash recovery)
+        pipeline.load_prior_entity_graph(session_id)
+        _sz_pipelines[session_id] = pipeline
+    return _sz_pipelines[session_id]
+
+
+def _clear_pipeline(session_id: str) -> None:
+    """Remove the pipeline for a session (called at handoff)."""
+    _sz_pipelines.pop(session_id, None)
+
 
 def _default_attributes_for_tier(world_tier: str, concept: str | None = None) -> dict:
     """Generate a balanced 75-point attribute fallback when the LLM failed to commit stats.
@@ -270,6 +290,24 @@ async def _handle_gameplay_handoff(session, session_id: str, result, agent) -> t
         except Exception as compiler_err:
             _handoff_status = "compiler_failed"
             logger.error("[Handoff] HandoffCompiler error (non-blocking): %s", compiler_err, exc_info=True)
+
+    # --- Authoritative memory write from compiler package ---
+    # Write canonical, distilled facts from the compiler to MemoryStore.
+    # This overwrites any provisional mid-SZ memories written by the pipeline.
+    if _compiler_package is not None:
+        try:
+            from src.core.session_zero_memory import write_authoritative
+            written = write_authoritative(
+                orchestrator.memory,
+                _compiler_package,
+                turn_number=0,
+            )
+            logger.info("[Handoff] Authoritative memory write: %d facts indexed", written)
+        except Exception as auth_mem_err:
+            logger.warning("[Handoff] Authoritative memory write failed (non-fatal): %s", auth_mem_err)
+
+    # Clean up SZ pipeline state now that handoff is done
+    _clear_pipeline(session_id)
 
     # --- 1. Update Character ---
     # (final_tier already computed above before HandoffCompiler)
@@ -516,7 +554,31 @@ async def session_zero_turn(session_id: str, request: TurnRequest):
     _early_campaign_id: int = session.phase_state["campaign_id"]
 
     try:
-        result = await agent.process_turn(session, request.player_input)
+        # When the SZ orchestrator pipeline is enabled, run the full
+        # extraction → resolution → gap → conductor pipeline per turn.
+        # Otherwise, use the existing monolithic SessionZeroAgent.
+        if Config.SESSION_ZERO_ORCHESTRATOR_ENABLED:
+            from src.core.session_zero_pipeline import SessionZeroPipeline
+
+            pipeline = _get_or_create_pipeline(agent, session.session_id)
+            result = await pipeline.process_turn(session, request.player_input)
+
+            # Write provisional memories from the latest extraction
+            if pipeline.state.extraction_passes:
+                try:
+                    from src.context.memory import MemoryStore
+                    from src.core.session_zero_memory import write_provisional
+
+                    mem_store = MemoryStore(campaign_id=_early_campaign_id)
+                    latest_extraction = pipeline.state.extraction_passes[-1]
+                    write_provisional(
+                        mem_store, latest_extraction,
+                        turn_number=len(session.messages or []),
+                    )
+                except Exception:
+                    logger.warning("SZ provisional memory write failed — non-fatal")
+        else:
+            result = await agent.process_turn(session, request.player_input)
 
         # Initialize opening scene vars (only populated during handoff)
         opening_narrative = None

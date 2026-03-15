@@ -85,7 +85,9 @@ class SessionZeroAgent(BaseAgent):
     async def process_turn(
         self,
         session: Session,
-        player_input: str
+        player_input: str,
+        *,
+        gap_context: str | None = None,
     ) -> SessionZeroOutput:
         """
         Process a player's input during Session Zero.
@@ -93,15 +95,22 @@ class SessionZeroAgent(BaseAgent):
         Args:
             session: The current session state
             player_input: What the player said
+            gap_context: Optional gap analysis context from the SZ pipeline
             
         Returns:
             SessionZeroOutput with response and any detected info
         """
-        context = self._build_context(session, player_input)
+        context = self._build_context(session, player_input, gap_context=gap_context)
         result = await self.call(context)
         return result
 
-    def _build_context(self, session: Session, player_input: str) -> str:
+    def _build_context(
+        self,
+        session: Session,
+        player_input: str,
+        *,
+        gap_context: str | None = None,
+    ) -> str:
         """Build the context string to send to the LLM."""
         from ._session_zero_research import get_profile_context_for_agent
 
@@ -121,6 +130,17 @@ class SessionZeroAgent(BaseAgent):
             for m in recent_messages
         ])
 
+        # Gap analysis context (when SZ pipeline is active)
+        gap_section = ""
+        if gap_context:
+            gap_section = f"""
+## Pipeline Analysis (extraction + entity resolution + gap analysis):
+{gap_context}
+
+Use the recommended follow-up questions above to guide your next question.
+Prioritize questions that resolve blocking issues or high-priority gaps.
+"""
+
         # Current player input
         context = f"""## Current Phase: {session.phase.value}
 
@@ -132,7 +152,7 @@ class SessionZeroAgent(BaseAgent):
 
 ## Recent Conversation:
 {messages_str}
-
+{gap_section}
 ## Player's Current Input:
 {player_input}
 
