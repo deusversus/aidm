@@ -9,8 +9,6 @@ Provides:
 """
 
 import os
-from collections import deque
-from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -19,127 +17,17 @@ import pytest
 os.environ.setdefault("DATABASE_URL", "sqlite:///:memory:")
 os.environ.setdefault("ANTHROPIC_API_KEY", "test-key")
 
-from pydantic import BaseModel
-
 from src.agents.intent_classifier import IntentOutput
 from src.agents.outcome_judge import OutcomeOutput
 from src.db.models import Base
 from src.db.session import get_engine, init_db
 from src.db.state_manager import StateManager
-from src.llm.provider import LLMProvider, LLMResponse
 
-# ---------------------------------------------------------------------------
-# MockLLMProvider — deterministic stub
-# ---------------------------------------------------------------------------
+# MockLLMProvider lives in its own module so it can be imported directly
+# without going through conftest fixture machinery.
+from tests.mock_llm import MockLLMProvider
 
-class MockLLMProvider(LLMProvider):
-    """LLM provider that returns canned responses from a queue.
-
-    Usage:
-        provider = MockLLMProvider()
-        provider.queue_response("Hello world")
-        resp = await provider.complete(messages=[...])
-        assert resp.content == "Hello world"
-    """
-
-    def __init__(self):
-        super().__init__(api_key="mock-key", default_model="mock-model")
-        self._response_queue: deque[LLMResponse] = deque()
-        self._schema_queue: deque[BaseModel] = deque()
-        self._call_history: list[dict[str, Any]] = []
-
-    # --- Queue helpers ---
-
-    def queue_response(self, content: str = "", **kwargs):
-        """Queue a text response."""
-        self._response_queue.append(
-            LLMResponse(content=content, model="mock-model", **kwargs)
-        )
-
-    def queue_schema_response(self, instance: BaseModel):
-        """Queue a structured (Pydantic) response."""
-        self._schema_queue.append(instance)
-
-    @property
-    def call_history(self) -> list[dict[str, Any]]:
-        return self._call_history
-
-    # --- LLMProvider interface ---
-
-    @property
-    def name(self) -> str:
-        return "mock"
-
-    def get_default_model(self) -> str:
-        return "mock-model"
-
-    def get_fast_model(self) -> str:
-        return "mock-fast"
-
-    def get_creative_model(self) -> str:
-        return "mock-creative"
-
-    async def complete(
-        self,
-        messages,
-        system=None,
-        model=None,
-        max_tokens=1024,
-        temperature=0.7,
-        extended_thinking=False,
-    ) -> LLMResponse:
-        self._call_history.append({
-            "method": "complete",
-            "messages": messages,
-            "system": system,
-            "model": model,
-        })
-        if self._response_queue:
-            return self._response_queue.popleft()
-        return LLMResponse(content="mock response", model="mock-model")
-
-    async def complete_with_schema(
-        self,
-        messages,
-        schema,
-        system=None,
-        model=None,
-        max_tokens=1024,
-        extended_thinking=False,
-    ) -> BaseModel:
-        self._call_history.append({
-            "method": "complete_with_schema",
-            "messages": messages,
-            "schema": schema,
-            "system": system,
-            "model": model,
-        })
-        if self._schema_queue:
-            return self._schema_queue.popleft()
-        # Build a minimal instance from schema defaults
-        return schema.model_construct()
-
-    async def complete_with_tools(
-        self,
-        messages,
-        tools,
-        system=None,
-        model=None,
-        max_tokens=4096,
-        max_tool_rounds=5,
-    ) -> LLMResponse:
-        self._call_history.append({
-            "method": "complete_with_tools",
-            "messages": messages,
-            "system": system,
-            "model": model,
-        })
-        if self._response_queue:
-            return self._response_queue.popleft()
-        return LLMResponse(content="mock tool response", model="mock-model")
-
-    def _init_client(self):
-        pass  # No real client needed
+__all__ = ["MockLLMProvider"]
 
 
 # ---------------------------------------------------------------------------
@@ -148,8 +36,15 @@ class MockLLMProvider(LLMProvider):
 
 @pytest.fixture
 def mock_provider():
-    """Fresh MockLLMProvider instance."""
-    return MockLLMProvider()
+    """Fresh MockLLMProvider instance.
+
+    Auto-asserts that all queued responses were consumed at test teardown.
+    If a test queues responses that never get called, the test will fail with
+    a clear message listing the unconsumed items.
+    """
+    provider = MockLLMProvider()
+    yield provider
+    provider.assert_queue_empty()
 
 
 @pytest.fixture

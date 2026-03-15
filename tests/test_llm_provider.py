@@ -7,11 +7,16 @@ retry logic, and manager provider resolution.
 import os
 from unittest.mock import MagicMock
 
+import pytest
+
 os.environ.setdefault("DATABASE_URL", "sqlite:///:memory:")
 os.environ.setdefault("ANTHROPIC_API_KEY", "test-key")
 
 from src.llm.manager import LLMManager, get_llm_manager, reset_llm_manager
 from src.llm.provider import LLMProvider, LLMResponse
+
+# Import MockLLMProvider for standalone use (also available via conftest fixture)
+from tests.mock_llm import MockLLMProvider
 
 # ---------------------------------------------------------------------------
 # Tests: LLMResponse
@@ -55,10 +60,11 @@ class TestMockProvider:
         resp = await mock_provider.complete(messages=[{"role": "user", "content": "Hi"}])
         assert resp.content == "Hello from mock"
 
-    async def test_complete_default_response(self, mock_provider):
-        """When no response is queued, should return default."""
-        resp = await mock_provider.complete(messages=[{"role": "user", "content": "Hi"}])
-        assert resp.content == "mock response"
+    async def test_complete_underflow_raises(self, mock_provider):
+        """Empty queue should raise RuntimeError, not silently return a default."""
+        import pytest
+        with pytest.raises(RuntimeError, match="response queue is empty"):
+            await mock_provider.complete(messages=[{"role": "user", "content": "Hi"}])
 
     async def test_complete_with_schema_returns_queued(self, mock_provider):
         from pydantic import BaseModel
@@ -82,10 +88,90 @@ class TestMockProvider:
         assert resp.content == "Tool result"
 
     async def test_call_history(self, mock_provider):
+        mock_provider.queue_response("A response")
+        mock_provider.queue_response("B response")
         await mock_provider.complete(messages=[{"role": "user", "content": "A"}])
         await mock_provider.complete(messages=[{"role": "user", "content": "B"}])
         assert len(mock_provider.call_history) == 2
         assert mock_provider.call_history[0]["method"] == "complete"
+        assert mock_provider.call_history[0]["call_index"] == 0
+        assert mock_provider.call_history[1]["call_index"] == 1
+
+    async def test_schema_underflow_raises(self, mock_provider):
+        """Empty schema queue raises RuntimeError with helpful message."""
+        from pydantic import BaseModel
+        class S(BaseModel):
+            v: str = "x"
+        with pytest.raises(RuntimeError, match="schema queue is empty"):
+            await mock_provider.complete_with_schema(messages=[], schema=S)
+
+    async def test_schema_type_mismatch_raises(self, mock_provider):
+        """Queuing wrong schema type raises TypeError at dequeue time."""
+        from pydantic import BaseModel
+        class Expected(BaseModel):
+            v: str = "x"
+        class Wrong(BaseModel):
+            w: int = 1
+        mock_provider.queue_schema_response(Wrong(w=42))
+        with pytest.raises(TypeError, match="type mismatch"):
+            await mock_provider.complete_with_schema(messages=[], schema=Expected)
+
+    async def test_queue_error_raises_on_next_call(self, mock_provider):
+        """queue_error() causes the next complete_with_schema call to raise."""
+        from pydantic import BaseModel
+        class S(BaseModel):
+            v: str = "x"
+        mock_provider.queue_error(ValueError("LLM unavailable"))
+        with pytest.raises(ValueError, match="LLM unavailable"):
+            await mock_provider.complete_with_schema(messages=[], schema=S)
+
+    def test_assert_queue_empty_passes_when_consumed(self, mock_provider):
+        mock_provider.assert_queue_empty()  # nothing queued → should pass
+
+    def test_assert_queue_empty_fails_when_leftover(self, mock_provider):
+        from pydantic import BaseModel
+        class S(BaseModel):
+            v: str = "x"
+        # Bypass the fixture's auto-assert by using a standalone provider
+        p = MockLLMProvider()
+        p.queue_schema_response(S())
+        with pytest.raises(AssertionError, match="never consumed"):
+            p.assert_queue_empty()
+
+    async def test_schema_call_history_records_schema_name(self, mock_provider):
+        """Schema name is recorded in call_history for debugging."""
+        from pydantic import BaseModel
+        class MySpecialSchema(BaseModel):
+            v: str = "x"
+        mock_provider.queue_schema_response(MySpecialSchema())
+        await mock_provider.complete_with_schema(messages=[], schema=MySpecialSchema)
+        call = mock_provider.last_schema_call()
+        assert call is not None
+        assert call["schema_name"] == "MySpecialSchema"
+        assert call["response_type"] == "MySpecialSchema"
+
+    async def test_tools_queue_separate_from_complete_queue(self, mock_provider):
+        """complete_with_tools uses its own queue, not the complete queue."""
+        mock_provider.queue_response("complete result")
+        mock_provider.queue_tools_response("tools result")
+        from unittest.mock import MagicMock
+        tools_resp = await mock_provider.complete_with_tools(messages=[], tools=MagicMock())
+        complete_resp = await mock_provider.complete(messages=[{"role": "user", "content": "x"}])
+        assert tools_resp.content == "tools result"
+        assert complete_resp.content == "complete result"
+
+    def test_call_count_by_method(self, mock_provider):
+        assert mock_provider.call_count() == 0
+        assert mock_provider.call_count("complete") == 0
+
+    def test_reset_clears_all_state(self, mock_provider):
+        from pydantic import BaseModel
+        class S(BaseModel):
+            v: str = "x"
+        mock_provider.queue_schema_response(S())
+        mock_provider.reset()
+        mock_provider.assert_queue_empty()  # should pass after reset
+        assert mock_provider.call_history == []
 
     def test_provider_name(self, mock_provider):
         assert mock_provider.name == "mock"
@@ -94,6 +180,7 @@ class TestMockProvider:
         assert mock_provider.get_default_model() == "mock-model"
         assert mock_provider.get_fast_model() == "mock-fast"
         assert mock_provider.get_creative_model() == "mock-creative"
+
 
 
 # ---------------------------------------------------------------------------
