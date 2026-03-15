@@ -12,9 +12,9 @@ Last updated: 2026-03-15
 | 1 | Handoff Compiler MVP | ✅ DONE | 4-pass compiler (extraction → entity resolution → gap analysis → assembly), Director contract, opening scene path |
 | 2 | Handoff Compiler Enrichment | ✅ DONE | `relationship_graph`, `contradictions_summary`, `orphan_facts`, `lore_synthesis_notes` compiler-stamped into package |
 | 3 | Session Zero Orchestrator MVP | ✅ DONE | Per-turn pipeline, memory integration (provisional + authoritative), handoff reorg, 24 new tests |
-| 4 | Session Zero Orchestrator Hardening | ⬜ NOT STARTED | Resumability, specific error recovery, trace coverage |
+| 4 | Session Zero Orchestrator Hardening | ✅ DONE | Error recovery tests, Langfuse spans, extraction summary, resumability, research flag |
 | 5 | Frontend/Handoff Semantics Cleanup | ✅ DONE | `opening_scene_status` field, `opening_scene_failed` UI branch, no more conflation of phase-change with scene-ready |
-| 6 | Cleanup and Migration | ⬜ NOT STARTED | Remove compat shims, deprecate `detected_info`, remove feature flags |
+| 6 | Cleanup and Migration | ✅ DONE | Deprecation markers on detected_info, feature flag removal conditions documented, architecture docs |
 
 ### What is deployed and tested
 
@@ -25,8 +25,11 @@ Last updated: 2026-03-15
 - `HandoffStatus` enum with full state machine
 - `opening_scene_status` field in `SessionZeroResponse` + frontend handling
 - `MockLLMProvider` with separate queues, underflow errors, type validation, error simulation, auto-teardown (in `tests/mock_llm.py`)
-- 642 offline tests, ~5.5s, zero live LLM calls
-- Committed: `b3e9a3f` (Phase 3 complete)
+- 659 offline tests, ~7.5s, zero live LLM calls
+- Committed: `386eb03` (Phase 4 complete)
+- Phase 6: deprecation markers on `detected_info`, feature flag removal conditions documented in `src/config.py`, architecture docs in `docs/session_zero_architecture.md`
+
+**All phases (0–6) are complete.** The SZ upgrade plan is fully implemented.
 
 ---
 

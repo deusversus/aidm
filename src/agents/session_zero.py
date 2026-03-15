@@ -48,8 +48,13 @@ class SessionZeroOutput(BaseModel):
         description="True when all hard requirements met AND player confirmed"
     )
 
-    # Existing fields (phase_complete deprecated, use ready_for_gameplay)
-    detected_info: dict[str, Any] = Field(default_factory=dict, description="Character data extracted from player input")
+    # DEPRECATED (Phase 6): Use structured schemas (session_zero_schemas.py) instead.
+    # detected_info is a freeform dict used by apply_detected_info() and
+    # process_session_zero_state() to update CharacterDraft and create memories.
+    # When SESSION_ZERO_ORCHESTRATOR_ENABLED is True, the pipeline's structured
+    # extraction replaces this for entity/fact/relationship data. Remove this
+    # field once the orchestrator is enabled by default and all callers are migrated.
+    detected_info: dict[str, Any] = Field(default_factory=dict, description="DEPRECATED: Character data extracted from player input")
     phase_complete: bool = Field(default=False, description="DEPRECATED: Use ready_for_gameplay instead")
     suggested_next_phase: str | None = Field(default=None, description="Phase to skip to if player requests")
 
@@ -214,10 +219,12 @@ Welcome the player warmly and ask if they have an anime/manga reference in mind.
 
 
 def apply_detected_info(session: Session, detected: dict[str, Any]) -> None:
-    """
-    Apply detected information from the agent's response to the character draft.
+    """Apply detected information from the agent's response to the character draft.
 
-    This maps field names from the agent's output to the CharacterDraft.
+    DEPRECATED (Phase 6): When SESSION_ZERO_ORCHESTRATOR_ENABLED is True, the
+    pipeline's SZExtractorAgent produces structured ExtractionPassOutput that
+    replaces this freeform dict mapping. Remove this function once the
+    orchestrator is enabled by default.
     """
     draft = session.character_draft
 
@@ -322,19 +329,25 @@ async def process_session_zero_state(
     session_id: str,
     campaign_id: int = None
 ) -> dict[str, int]:
-    """
-    Process Session Zero detected_info using the same systems as gameplay.
-    
-    This is called each turn after apply_detected_info() to:
+    """Process Session Zero detected_info using the same systems as gameplay.
+
+    DEPRECATED (Phase 6): When SESSION_ZERO_ORCHESTRATOR_ENABLED is True, the
+    pipeline handles entity extraction (SZExtractorAgent), entity resolution
+    (SZEntityResolverAgent), and provisional memory writes (write_provisional()
+    in session_zero_memory.py) per turn. At handoff, write_authoritative()
+    replaces this bulk memory creation.
+    Remove this function once the orchestrator is enabled by default.
+
+    Called each turn after apply_detected_info() to:
     - Add memories for character facts, backstory, abilities
     - Create NPC records when NPCs are mentioned
     - Store canonicality choices as plot-critical memories
-    
+
     Args:
         session: The current session
         detected_info: Info extracted by the Session Zero agent
         session_id: The unique session ID for memory isolation
-        
+
     Returns:
         Dict with counts: {"memories_added": N, "npcs_created": N}
     """

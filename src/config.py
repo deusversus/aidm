@@ -48,18 +48,31 @@ class Config:
     # ── Session Zero Compiler feature flags ──────────────────────────────────
     # Enable the HandoffCompiler to run at SZ→gameplay handoff.
     # When False, the legacy _build_session_zero_summary() path is used.
+    # REMOVAL CONDITION: Remove once HandoffCompiler is proven stable in
+    # production (>50 successful handoffs, zero critical failures). Compiler
+    # always runs; remove all `if SESSION_ZERO_COMPILER_ENABLED:` branches.
     SESSION_ZERO_COMPILER_ENABLED: bool = os.getenv("SESSION_ZERO_COMPILER_ENABLED", "false").lower() == "true"
 
     # Enable the dedicated opening-scene generation path (SZ§12.4).
     # When False, the legacy synthetic-turn path is used.
+    # REMOVAL CONDITION: Remove after dedicated path is default for 2+ weeks
+    # with zero scene generation failures. The synthetic-turn fallback stays
+    # as an error-recovery path, not a feature flag branch.
     SESSION_ZERO_DEDICATED_OPENING_SCENE_ENABLED: bool = os.getenv("SESSION_ZERO_DEDICATED_OPENING_SCENE_ENABLED", "false").lower() == "true"
 
     # Enable the full SZ Orchestrator (M6 — turn-level extraction during SZ).
     # When False, the current monolithic SessionZeroAgent handles all turns.
+    # REMOVAL CONDITION: Remove after orchestrator is stable in production.
+    # This also gates the removal of detected_info (Phase 6.1) — once this
+    # flag is removed, apply_detected_info() and process_session_zero_state()
+    # can be replaced by pipeline extraction + memory writes.
     SESSION_ZERO_ORCHESTRATOR_ENABLED: bool = os.getenv("SESSION_ZERO_ORCHESTRATOR_ENABLED", "false").lower() == "true"
 
     # Enable tool-assisted research (wiki_scout, world_builder) during SZ turns.
     # When False, pipeline relies only on profile context and player input.
+    # REMOVAL CONDITION: Opt-in feature. Remove flag when research is proven
+    # to always improve SZ quality (measured via handoff compiler gap counts).
+    # At that point, research becomes always-on within the orchestrator pipeline.
     SESSION_ZERO_RESEARCH_ENABLED: bool = os.getenv("SESSION_ZERO_RESEARCH_ENABLED", "false").lower() == "true"
 
     @classmethod
