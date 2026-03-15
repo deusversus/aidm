@@ -84,9 +84,9 @@ def mock_state():
 
 @pytest.fixture
 def mock_profile_library():
-    """Mock ProfileLibrary with search_lore."""
+    """Mock ProfileLibrary with search_lore_multi."""
     lib = MagicMock()
-    lib.search_lore.return_value = [
+    lib.search_lore_multi.return_value = [
         "Ashura is the legendary blade forged in the fires of Mt. Fury.",
         "Only those with a pure heart can awaken its true power.",
     ]
@@ -154,10 +154,10 @@ class TestSearchMemory:
 class TestSearchLore:
     def test_basic_lore_search(self, mock_profile_library):
         from src.agents.gameplay_tools import _search_lore
-        results = _search_lore(mock_profile_library, "profile_123", "Blade of Ashura")
+        results = _search_lore(mock_profile_library, ["profile_123"], "Blade of Ashura")
 
-        mock_profile_library.search_lore.assert_called_once_with(
-            profile_id="profile_123",
+        mock_profile_library.search_lore_multi.assert_called_once_with(
+            profile_ids=["profile_123"],
             query="Blade of Ashura",
             limit=3,
             page_type=None,
@@ -168,29 +168,29 @@ class TestSearchLore:
     def test_lore_with_page_type(self, mock_profile_library):
         from src.agents.gameplay_tools import _search_lore
         _search_lore(
-            mock_profile_library, "profile_123", "Mt. Fury",
+            mock_profile_library, ["profile_123"], "Mt. Fury",
             page_type="locations", limit=2,
         )
 
-        mock_profile_library.search_lore.assert_called_once_with(
-            profile_id="profile_123",
+        mock_profile_library.search_lore_multi.assert_called_once_with(
+            profile_ids=["profile_123"],
             query="Mt. Fury",
             limit=2,
             page_type="locations",
         )
 
     def test_lore_no_results(self, mock_profile_library):
-        mock_profile_library.search_lore.return_value = []
+        mock_profile_library.search_lore_multi.return_value = []
         from src.agents.gameplay_tools import _search_lore
-        results = _search_lore(mock_profile_library, "profile_123", "nonexistent")
+        results = _search_lore(mock_profile_library, ["profile_123"], "nonexistent")
 
         assert len(results) == 1
         assert "info" in results[0]
 
     def test_lore_error_handling(self, mock_profile_library):
-        mock_profile_library.search_lore.side_effect = RuntimeError("DB error")
+        mock_profile_library.search_lore_multi.side_effect = RuntimeError("DB error")
         from src.agents.gameplay_tools import _search_lore
-        results = _search_lore(mock_profile_library, "profile_123", "test")
+        results = _search_lore(mock_profile_library, ["profile_123"], "test")
 
         assert len(results) == 1
         assert "error" in results[0]
@@ -249,7 +249,7 @@ class TestBuildGameplayTools:
             memory=mock_memory,
             state=mock_state,
             profile_library=mock_profile_library,
-            profile_id="test_profile",
+            profile_ids=["test_profile"],
         )
 
         tool_names = [t.name for t in registry.all_tools()]
@@ -287,7 +287,7 @@ class TestBuildDirectorTools:
             foreshadowing=foreshadowing,
             current_turn=5,
             profile_library=mock_profile_library,
-            profile_id="test_profile",
+            profile_ids=["test_profile"],
         )
 
         tool_names = [t.name for t in registry.all_tools()]

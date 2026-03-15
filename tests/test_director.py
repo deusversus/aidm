@@ -3,6 +3,8 @@
 import sys
 from pathlib import Path
 
+import pytest
+
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "aidm_v3"))
 
@@ -17,6 +19,7 @@ from src.profiles.loader import load_profile
 # Load environment variables
 load_dotenv()
 
+pytestmark = pytest.mark.live
 
 def test_director_initialization():
     """Test that Director can be initialized."""

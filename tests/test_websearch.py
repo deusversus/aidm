@@ -3,6 +3,9 @@ import asyncio
 import os
 
 import anthropic
+import pytest
+
+pytestmark = pytest.mark.live
 
 
 async def test():

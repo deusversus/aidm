@@ -25,6 +25,17 @@ def _is_reasoning_model(model_name: str) -> bool:
     return "gpt-5" in low or bool(re.search(r"\bo[134]", low))
 
 
+def _supports_structured_outputs(model_name: str) -> bool:
+    """True for models that support the response_format: json_schema API.
+
+    OpenAI's structured outputs API (response_format: json_schema) is supported by
+    all modern gpt-4o+, gpt-5+, and o-series models.  Non-OpenAI models served via
+    the Copilot proxy (Claude, Gemini, Grok) use function-calling instead.
+    """
+    low = model_name.lower()
+    return not low.startswith(("claude", "gemini", "grok", "oswe"))
+
+
 class OpenAIProvider(LLMProvider):
     """OpenAI ChatGPT provider implementation.
     
@@ -280,77 +291,88 @@ class OpenAIProvider(LLMProvider):
         schema: type[BaseModel],
         system: str | None = None,
         model: str | None = None,
-        max_tokens: int = 1024,
+        max_tokens: int = 4096,
         extended_thinking: bool = False,
     ) -> BaseModel:
-        """Generate a structured completion using function calling."""
+        """Generate a structured completion.
+
+        Uses the modern response_format: json_schema API for OpenAI-native models
+        (gpt-4o+, gpt-5+, o-series).  Falls back to function-calling for non-OpenAI
+        models served via the Copilot proxy (Claude, Gemini, Grok).
+        """
         self._ensure_client()
 
         model_name = model or self.default_model
-
-        # Get JSON schema from Pydantic model
         json_schema = schema.model_json_schema()
 
-        # Build messages with system prompt
         full_messages = []
         if system:
             full_messages.append({"role": "system", "content": self._flatten_system(system)})
         full_messages.extend(messages)
 
-        # Create function for structured output
-        tools = [{
-            "type": "function",
-            "function": {
-                "name": "respond",
-                "description": f"Provide your response as a {schema.__name__}",
-                "parameters": json_schema
-            }
-        }]
+        is_reasoning = _is_reasoning_model(model_name)
+        use_structured_outputs = _supports_structured_outputs(model_name)
 
-        # Generate response with function calling using streaming
-        try:
-            if _is_reasoning_model(model_name):
-                kwargs = {
-                    "model": model_name,
-                    "messages": full_messages,
-                    "max_completion_tokens": max_tokens,
-                    "tools": tools,
-                    "tool_choice": {"type": "function", "function": {"name": "respond"}},
-                    "stream": True,
-                    "stream_options": {"include_usage": True}
-                }
+        # ── Build kwargs ───────────────────────────────────────────────────
+        if use_structured_outputs:
+            # Modern OpenAI structured outputs — response arrives as content JSON
+            kwargs: dict[str, Any] = {
+                "model": model_name,
+                "messages": full_messages,
+                "response_format": {
+                    "type": "json_schema",
+                    "json_schema": {
+                        "name": schema.__name__,
+                        "schema": json_schema,
+                        "strict": False,
+                    },
+                },
+                "stream": True,
+                "stream_options": {"include_usage": True},
+            }
+            if is_reasoning:
+                kwargs["max_completion_tokens"] = max(max_tokens, 8192) if extended_thinking else max_tokens
                 if extended_thinking:
                     kwargs["reasoning_effort"] = "medium"
-                    kwargs["max_completion_tokens"] = max(max_tokens, 8192)
             else:
-                kwargs = {
-                    "model": model_name,
-                    "messages": full_messages,
-                    "max_tokens": max_tokens,
-                    "tools": tools,
-                    "tool_choice": {"type": "function", "function": {"name": "respond"}},
-                    "stream": True,
-                    "stream_options": {"include_usage": True}
-                }
+                kwargs["max_tokens"] = max_tokens
+        else:
+            # Function-calling path for Claude/Gemini/Grok via Copilot proxy
+            tools = [{
+                "type": "function",
+                "function": {
+                    "name": "respond",
+                    "description": f"Provide your response as a {schema.__name__}",
+                    "parameters": json_schema,
+                },
+            }]
+            kwargs = {
+                "model": model_name,
+                "messages": full_messages,
+                "max_tokens": max_tokens,
+                "tools": tools,
+                "tool_choice": {"type": "function", "function": {"name": "respond"}},
+                "stream": True,
+                "stream_options": {"include_usage": True},
+            }
 
+        # ── Stream & collect ───────────────────────────────────────────────
+        try:
             def _stream_and_collect():
                 stream = self._client.chat.completions.create(**kwargs)
+                content = ""
                 tool_args = ""
                 tool_name = ""
-                content = ""
                 final_usage = None
 
                 for chunk in stream:
-                    # Capture usage from final chunk
                     if hasattr(chunk, 'usage') and chunk.usage:
                         final_usage = chunk.usage
-
                     if not chunk.choices:
                         continue
-
                     delta = chunk.choices[0].delta
-
-                    # Accumulate tool call arguments
+                    if delta.content:
+                        content += delta.content
                     if hasattr(delta, 'tool_calls') and delta.tool_calls:
                         tc = delta.tool_calls[0]
                         if hasattr(tc, 'function'):
@@ -359,18 +381,12 @@ class OpenAIProvider(LLMProvider):
                             if tc.function.arguments:
                                 tool_args += tc.function.arguments
 
-                    # Also capture content if present
-                    if delta.content:
-                        content += delta.content
-
-                # If the stream completed without any tool call or content,
-                # the connection was silently truncated — treat as retryable.
-                if not tool_name and not tool_args and not content:
+                if not content and not tool_args:
                     raise ConnectionError("Stream ended with no data (silent truncation)")
 
-                return tool_name, tool_args, content, final_usage
+                return content, tool_name, tool_args, final_usage
 
-            tool_name, tool_args, content, final_usage = await self._run_with_retry(_stream_and_collect)
+            content, tool_name, tool_args, final_usage = await self._run_with_retry(_stream_and_collect)
 
         except Exception as e:
             if self._is_retryable(e):
@@ -388,49 +404,33 @@ class OpenAIProvider(LLMProvider):
             except Exception:
                 pass
 
-        # Parse the streamed tool call response
-        if tool_name == "respond" and tool_args:
+        # ── Parse ──────────────────────────────────────────────────────────
+        # Primary: structured outputs content, or function-call args
+        raw = content if use_structured_outputs else tool_args
+        if raw:
             try:
-                data = json.loads(tool_args)
-                return schema.model_validate(data)
+                return schema.model_validate(json.loads(raw))
             except (json.JSONDecodeError, Exception) as e:
-                # Function call returned invalid JSON - try to repair
                 try:
                     from ..agents.validator import get_validator
-                    validator = get_validator()
-                    repaired = await validator.repair_json(
-                        broken_json=tool_args,
+                    repaired = await get_validator().repair_json(
+                        broken_json=raw,
                         target_schema=schema,
-                        error_msg=f"Function call returned invalid JSON: {e}"
+                        error_msg=str(e),
                     )
                     if repaired:
                         return repaired
                 except Exception as repair_error:
                     logger.error(f"Validator repair failed: {repair_error}")
 
-        # Fallback: try to parse content as JSON
-        if content:
+        # Fallback: if function-calling returned content instead of tool_args
+        if not use_structured_outputs and content:
             try:
-                data = json.loads(content)
-                return schema.model_validate(data)
-            except (json.JSONDecodeError, Exception):
+                return schema.model_validate(json.loads(content))
+            except Exception:
                 pass
 
-            # Last resort: validator repair on content
-            try:
-                from ..agents.validator import get_validator
-                validator = get_validator()
-                repaired = await validator.repair_json(
-                    broken_json=content,
-                    target_schema=schema,
-                    error_msg="Function call did not return structured data"
-                )
-                if repaired:
-                    return repaired
-            except Exception as repair_error:
-                logger.error(f"Validator repair failed: {repair_error}")
-
-        raise ValueError("Could not parse structured response from OpenAI")
+        raise ValueError(f"Could not parse structured response from OpenAI (model: {model_name})")
 
     async def complete_with_schema_and_search(
         self,

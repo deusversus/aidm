@@ -1,6 +1,9 @@
 import asyncio
 import os
 import sys
+import pytest
+
+pytestmark = pytest.mark.live
 
 # Add src to path
 sys.path.append(os.getcwd())

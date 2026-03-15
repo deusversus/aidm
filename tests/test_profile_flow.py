@@ -1,25 +1,15 @@
 """
 Profile Generation Flow Test Script
-
-Tests the complete profile generation pipeline:
-1. Generates a profile for a test anime
-2. Verifies YAML file creation
-3. Verifies lore text file creation
-4. Verifies ChromaDB chunk ingestion
-
-Usage:
-    cd c:\\Users\\admin\\Downloads\\animerpg\\aidm_v3
-    .\\venv313\\Scripts\\python tests\\test_profile_flow.py [anime_name]
-    
-Examples:
-    .\\venv313\\Scripts\\python tests\\test_profile_flow.py "Princess Mononoke"
-    .\\venv313\\Scripts\\python tests\\test_profile_flow.py "Cowboy Bebop"
+...
 """
 
 import asyncio
 import sys
+import pytest
 from datetime import datetime
 from pathlib import Path
+
+pytestmark = pytest.mark.live
 
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent))

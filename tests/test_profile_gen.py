@@ -4,6 +4,9 @@ Tests Cowboy Bebop (expected: STANDARD) and One Piece (expected: EPIC)
 """
 
 import asyncio
+import pytest
+
+pytestmark = pytest.mark.live
 
 from src.agents.anime_research import AnimeResearchAgent
 

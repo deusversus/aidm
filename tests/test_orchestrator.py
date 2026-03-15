@@ -5,6 +5,9 @@ Run: python test_orchestrator.py "your action here"
 import asyncio
 import sys
 import time
+import pytest
+
+pytestmark = pytest.mark.live
 
 
 async def test_turn(action: str):
