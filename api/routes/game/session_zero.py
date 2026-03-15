@@ -598,6 +598,14 @@ async def session_zero_turn(session_id: str, request: TurnRequest):
         _opening_scene_status_outer: str | None = None
 
         # Apply any detected information to the character draft
+        #
+        # When the orchestrator pipeline is active, extraction/entity-resolution
+        # already handled state updates and provisional memory writes.  Skip the
+        # legacy detected_info + fluid-state path to avoid duplicate memories and
+        # wasted LLM calls (e.g. resolve_media_intent re-running intent resolution).
+        # The legacy path ONLY runs for the monolithic SessionZeroAgent fallback.
+
+        _pipeline_active = Config.SESSION_ZERO_ORCHESTRATOR_ENABLED
 
         logger.debug(f"DEBUG: Raw result.detected_info = {result.detected_info}")
         # Also enter this block when a disambiguation/media-form/merge choice is pending,
@@ -608,7 +616,7 @@ async def session_zero_turn(session_id: str, request: TurnRequest):
             or (session.phase_state.get('media_form_options') and not session.phase_state.get('media_form_chosen'))
             or session.phase_state.get('merge_questions_pending')
         )
-        if result.detected_info or _pending_resolution:
+        if (result.detected_info or _pending_resolution) and not _pipeline_active:
             # DEBUG: Log what the LLM returned
             try:
                 safe_detected_info = {

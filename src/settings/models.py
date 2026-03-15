@@ -29,9 +29,13 @@ class AgentSettings(BaseModel):
       combat, progression, scale_selector, relationship_analyzer,
       world_builder, compactor, scope, pacing, recap,
       wiki_scout, production
+    - FAST: intent_classifier, outcome_judge, validator, memory_ranker,
+      combat, progression, scale_selector, compactor, scope, pacing,
+      recap, production, beat_extractor, relationship_analyzer,
+      world_builder, wiki_scout, sz_extractor, sz_gap_analyzer,
+      sz_entity_resolver
     - THINKING: director, research, profile_merge, intent_resolution,
-      session_zero, sz_extractor, sz_gap_analyzer, sz_entity_resolver,
-      sz_handoff
+      session_zero, sz_handoff
     - CREATIVE: key_animator (prose generation)
     
     The 'base_fast', 'base_thinking', and 'base_creative' fields serve as 
@@ -44,12 +48,14 @@ class AgentSettings(BaseModel):
         "combat", "progression", "scale_selector", "relationship_analyzer",
         "world_builder", "wiki_scout", "compactor",
         "scope", "pacing", "recap", "production", "beat_extractor",
+        # SZ pipeline analysis agents — fast structured extraction, not prose
+        "sz_extractor", "sz_gap_analyzer", "sz_entity_resolver",
     })
     THINKING_TIER: ClassVar[frozenset[str]] = frozenset({
         "director", "research", "profile_merge", "intent_resolution",
         "session_zero",
-        # Session Zero Compiler agents
-        "sz_extractor", "sz_gap_analyzer", "sz_entity_resolver", "sz_handoff",
+        # Session Zero handoff uses thinking for quality
+        "sz_handoff",
     })
     CREATIVE_TIER: ClassVar[frozenset[str]] = frozenset({
         "key_animator",
