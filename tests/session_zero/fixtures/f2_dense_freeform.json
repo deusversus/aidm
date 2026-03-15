@@ -1,0 +1,21 @@
+{
+  "description": "F2 - Dense freeform: user dumps lots of backstory at once, overlapping details",
+  "messages": [
+    {"role": "assistant", "content": "Tell me about your character and the world."},
+    {"role": "user", "content": "I want to play in One Piece. My character is Roronoa Zoro but reimagined — instead of three swords he uses a single ancient blade called Void Cutter that absorbs the kills of enemies. He left the pirate life after Luffy died. He's 24, scarred, trains obsessively, doesn't talk much. He blames himself for not being strong enough. His goal is to become strong enough that no one he cares about dies again. He lives alone on a small island called Shiver Rock in the New World. The island has no government, occasional pirate raids. He has a small house, a forge where he maintains Void Cutter, and a graveyard he keeps for people he couldn't save. He knows marine captain Tashigi who still tries to recruit him once a year. He refuses every time. His power tier should be very high — legendary swordsman level."},
+    {"role": "assistant", "content": "That's a rich setup! When does your story begin — what happens today that starts the adventure?"},
+    {"role": "user", "content": "A small girl washes ashore holding a treasure map that multiple factions are already hunting. She's the only survivor of a ship attack. Zoro finds her on the beach at dawn."}
+  ],
+  "character_draft": {
+    "name": "Roronoa Zoro (reimagined)",
+    "concept": "Legendary swordsman in self-imposed exile, haunted by failure",
+    "starting_location": "Shiver Rock, New World — dawn beach",
+    "power_tier": "T3"
+  },
+  "expected": {
+    "has_player_character": true,
+    "has_opening_situation": true,
+    "has_opening_cast": true,
+    "handoff_safe_acceptable": true
+  }
+}

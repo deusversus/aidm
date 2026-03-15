@@ -1,0 +1,25 @@
+{
+  "description": "F9 - Opening scene sensitive: package must provide rich cues for cinematic opening",
+  "messages": [
+    {"role": "assistant", "content": "Let's set the stage for your story. What anime and character?"},
+    {"role": "user", "content": "Fullmetal Alchemist: Brotherhood. I'm playing Edward Elric, but five years after canon ended — after he regained his arm but before any major event. He's on a solo research trip in a remote Drachman mountain town."},
+    {"role": "assistant", "content": "What's the emotional tone you want for the opening scene?"},
+    {"role": "user", "content": "Something quiet and introspective at first. Ed is sitting in a small inn, writing in his journal, when he hears alchemy — the wrong kind — from down the street. The kind that sounds like human transmutation. That pull he can't ignore."},
+    {"role": "assistant", "content": "Perfect. What does Ed look like right now — how has five years changed him?"},
+    {"role": "user", "content": "He's taller (finally, don't tell him). Still the red coat. His automail arm is different now — slimmer, better engineered. His eyes carry something heavier. He smiles less. But when kids are around he's still warm."},
+    {"role": "assistant", "content": "One last thing — what's the journal entry he's writing when the scene opens?"},
+    {"role": "user", "content": "He's writing about equivalent exchange and whether the principle still holds now that he's seen the truth. He's not sure it does. He's not sure that's a good thing."}
+  ],
+  "character_draft": {
+    "name": "Edward Elric",
+    "concept": "Alchemist-scholar post-canon, carrying the weight of having seen the truth",
+    "starting_location": "Remote Drachman mountain inn, private room",
+    "power_tier": "T6"
+  },
+  "expected": {
+    "has_player_character": true,
+    "has_opening_situation": true,
+    "has_opening_cues": true,
+    "handoff_safe_acceptable": true
+  }
+}

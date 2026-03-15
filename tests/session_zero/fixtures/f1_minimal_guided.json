@@ -1,0 +1,24 @@
+{
+  "description": "F1 - Minimal guided SZ: just enough to produce a valid package",
+  "messages": [
+    {"role": "assistant", "content": "Welcome to Session Zero! What anime world would you like to play in?"},
+    {"role": "user", "content": "I want to play in the Cowboy Bebop universe."},
+    {"role": "assistant", "content": "Great choice! Tell me about your character — who are they?"},
+    {"role": "user", "content": "My character is Jet Black, an ex-cop bounty hunter. He's gruff but principled. He flies the Bebop and works with Spike."},
+    {"role": "assistant", "content": "Excellent! What drives Jet — what does he want most?"},
+    {"role": "user", "content": "He wants to understand why his partner betrayed him years ago. That's his core wound."},
+    {"role": "assistant", "content": "Where does your story begin?"},
+    {"role": "user", "content": "On the Bebop, docked at Ganymede after a failed bounty. Short on food and fuel."}
+  ],
+  "character_draft": {
+    "name": "Jet Black",
+    "concept": "Ex-cop bounty hunter haunted by betrayal",
+    "starting_location": "Bebop spaceship, Ganymede dock",
+    "power_tier": "T8"
+  },
+  "expected": {
+    "has_player_character": true,
+    "has_opening_situation": true,
+    "handoff_safe_acceptable": true
+  }
+}

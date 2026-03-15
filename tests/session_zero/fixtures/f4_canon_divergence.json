@@ -1,0 +1,25 @@
+{
+  "description": "F4 - Canon divergence: player explicitly diverges from source canon",
+  "messages": [
+    {"role": "assistant", "content": "What anime world and character are you envisioning?"},
+    {"role": "user", "content": "Attack on Titan, but I want to play in a timeline where the Rumbling never happened. Eren Yeager found a third option — he sealed the titans in an alternate dimension permanently, but at the cost of his titan powers. He's now just a regular human, living under a false name in Marley, trying to build a quiet life."},
+    {"role": "assistant", "content": "Interesting divergence! What does Eren want in this timeline?"},
+    {"role": "user", "content": "He wants to just be left alone. He's done with history-making. But people keep finding him — some to thank him, some to kill him. The world thinks he's dead."},
+    {"role": "assistant", "content": "Where does the story start?"},
+    {"role": "user", "content": "A small bakery in an ordinary Marleyan town. He runs it as 'Ren'. It's been three years since the dimensional sealing. Today a Paradis intelligence officer walks through the door."}
+  ],
+  "character_draft": {
+    "name": "Eren Yeager (as Ren)",
+    "concept": "Former world-shaper hiding as a baker, hunted by his own history",
+    "starting_location": "Small bakery, Marleyan town",
+    "power_tier": "T9",
+    "timeline_mode": "alternate",
+    "event_fidelity": "background_only"
+  },
+  "expected": {
+    "has_player_character": true,
+    "has_opening_situation": true,
+    "canon_divergence_noted": true,
+    "handoff_safe_acceptable": true
+  }
+}

@@ -73,7 +73,7 @@ async def _handle_gameplay_handoff(session, session_id: str, result, agent) -> t
     Returns:
         Tuple of (opening_narrative, opening_portrait_map, handoff_status,
                   handoff_warnings, gap_follow_up_prompt, compiler_task_id,
-                  compiler_artifact_version).
+                  compiler_artifact_version, opening_scene_status).
         narrative and portrait_map may be None if opening scene generation fails.
     """
     opening_narrative = None
@@ -83,6 +83,7 @@ async def _handle_gameplay_handoff(session, session_id: str, result, agent) -> t
     _gap_follow_up_prompt: str | None = None
     _compiler_task_id: str | None = None
     _compiler_artifact_version: int | None = None
+    _opening_scene_status: str | None = None
 
     # --- Settings Sync & Profile Resolution ---
     draft = session.character_draft
@@ -411,6 +412,7 @@ async def _handle_gameplay_handoff(session, session_id: str, result, agent) -> t
     # --- 6. Server-side Opening Scene ---
     try:
         logger.info("Generating opening scene server-side...")
+        _opening_scene_status = "opening_scene_generating"
         if Config.SESSION_ZERO_DEDICATED_OPENING_SCENE_ENABLED and _compiler_package is not None:
             logger.info("Using dedicated opening scene pathway (OpeningStatePackage available)")
             opening_narrative, opening_portrait_map = await orchestrator.generate_opening_scene(
@@ -428,8 +430,10 @@ async def _handle_gameplay_handoff(session, session_id: str, result, agent) -> t
         session.add_message("assistant", opening_narrative)
         session_store = get_session_store()
         session_store.save(session)
+        _opening_scene_status = "opening_scene_ready"
         logger.info(f"Opening scene generated ({len(opening_narrative)} chars)")
     except Exception as scene_err:
+        _opening_scene_status = "opening_scene_failed"
         logger.error(f"Opening scene generation failed (non-critical): {scene_err}")
         import traceback
         traceback.print_exc()
@@ -442,6 +446,7 @@ async def _handle_gameplay_handoff(session, session_id: str, result, agent) -> t
         _gap_follow_up_prompt,
         _compiler_task_id,
         _compiler_artifact_version,
+        _opening_scene_status,
     )
 
 
@@ -521,6 +526,7 @@ async def session_zero_turn(session_id: str, request: TurnRequest):
         _gap_follow_up_prompt_outer: str | None = None
         _compiler_task_id_outer: str | None = None
         _compiler_artifact_version_outer: int | None = None
+        _opening_scene_status_outer: str | None = None
 
         # Apply any detected information to the character draft
 
@@ -794,6 +800,7 @@ async def session_zero_turn(session_id: str, request: TurnRequest):
                     _gap_follow_up_prompt_outer,
                     _compiler_task_id_outer,
                     _compiler_artifact_version_outer,
+                    _opening_scene_status_outer,
                 ) = await _handle_gameplay_handoff(
                     session, session_id, result, agent
                 )
@@ -914,6 +921,7 @@ async def session_zero_turn(session_id: str, request: TurnRequest):
             gap_follow_up_prompt=_gap_follow_up_prompt_outer if result.ready_for_gameplay else None,
             compiler_task_id=_compiler_task_id_outer if result.ready_for_gameplay else None,
             compiler_artifact_version=_compiler_artifact_version_outer if result.ready_for_gameplay else None,
+            opening_scene_status=_opening_scene_status_outer if result.ready_for_gameplay else None,
         )
 
     except Exception as e:

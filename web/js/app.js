@@ -328,9 +328,20 @@ async function handlePlayerAction() {
                 isSessionZero = false;
                 console.log('[Handoff] Transition confirmed! Phase:', result.phase, 'ready_for_gameplay:', result.ready_for_gameplay);
 
-                // Display the server-side stitched opening scene (no reload needed)
-                if (result.opening_scene) {
-                    // Insert scene break divider
+                const openingSceneStatus = result.opening_scene_status || null;
+                console.log('[Handoff] opening_scene_status:', openingSceneStatus, '| handoff_status:', result.handoff_status);
+
+                if (openingSceneStatus === 'opening_scene_failed') {
+                    // Opening scene failed — show fallback message and retry option
+                    const failEl = document.createElement('div');
+                    failEl.className = 'handoff-scene-failed';
+                    failEl.innerHTML =
+                        '<span class="handoff-warnings-icon">⚠️</span>' +
+                        '<span>The opening scene could not be generated. Your adventure begins — type your first action to start.</span>';
+                    document.getElementById('narrative-display').appendChild(failEl);
+                    console.warn('[Handoff] Opening scene generation failed — continuing to gameplay');
+                } else if (result.opening_scene) {
+                    // Display the server-side stitched opening scene (no reload needed)
                     const divider = document.createElement('div');
                     divider.className = 'scene-break';
                     divider.innerHTML = '<span>— The Adventure Begins —</span>';
