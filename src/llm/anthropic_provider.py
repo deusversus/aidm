@@ -48,8 +48,9 @@ class AnthropicProvider(LLMProvider):
 
         When both are provided, OAuth is preferred.
         """
-        # Pass api_key to base class (it stores it as self.api_key)
-        super().__init__(api_key=api_key or oauth_token or "dummy")
+        # Pass a non-empty string to base class to satisfy its contract.
+        # We never use self.api_key from the base — _init_client handles auth.
+        super().__init__(api_key=api_key or "oauth")
 
         self._api_key = api_key
         self._oauth_token = oauth_token
@@ -84,12 +85,19 @@ class AnthropicProvider(LLMProvider):
     def _get_betas(self, model_name: str, base_betas: list[str] | None = None) -> list[str]:
         """Return the beta features list for the given model.
 
-        Appends context-1m-2025-08-07 for models that support the 1M token
-        context window (Opus 4.6, Sonnet 4.6, Sonnet 4.5).
+        - OAuth tokens require the ``oauth-2025-04-20`` beta header.
+        - The ``context-1m`` beta is incompatible with OAuth tokens,
+          so it's only added for API key auth.
         """
         betas = list(base_betas or [])
-        if any(slug in model_name for slug in self._1M_CONTEXT_MODELS):
-            betas.append("context-1m-2025-08-07")
+
+        if self._using_oauth:
+            betas.append("oauth-2025-04-20")
+            # context-1m is rejected when using OAuth — skip it
+        else:
+            if any(slug in model_name for slug in self._1M_CONTEXT_MODELS):
+                betas.append("context-1m-2025-08-07")
+
         return betas
 
     def get_research_model(self) -> str:
@@ -183,13 +191,32 @@ class AnthropicProvider(LLMProvider):
         logger.info(f"[anthropic] OAuth token refreshed, expires in {expires_in}s")
 
     def _init_client(self):
-        """Initialize the Anthropic client with either API key or OAuth token."""
+        """Initialize the Anthropic client with either API key or OAuth token.
+
+        For OAuth:
+        - Temporarily mask ``ANTHROPIC_API_KEY`` env var so the SDK doesn't
+          auto-read it and add an invalid ``X-Api-Key`` header.
+        - ``auth_token`` sends ``Authorization: Bearer <token>``
+        - ``anthropic-beta: oauth-2025-04-20`` header is required
+        """
+        import os
+
         import anthropic
 
         if self._using_oauth and self._oauth_token:
-            self._client = anthropic.AsyncAnthropic(
-                auth_token=self._oauth_token,
-            )
+            # The SDK reads ANTHROPIC_API_KEY from the environment even when
+            # api_key=None is passed. Temporarily remove it so the client
+            # only sends Authorization: Bearer.
+            saved_key = os.environ.pop("ANTHROPIC_API_KEY", None)
+            try:
+                self._client = anthropic.AsyncAnthropic(
+                    api_key=None,
+                    auth_token=self._oauth_token,
+                    default_headers={"anthropic-beta": "oauth-2025-04-20"},
+                )
+            finally:
+                if saved_key is not None:
+                    os.environ["ANTHROPIC_API_KEY"] = saved_key
         else:
             self._client = anthropic.AsyncAnthropic(api_key=self._api_key)
 

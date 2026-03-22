@@ -668,22 +668,33 @@ async def anthropic_auth_callback(request: AnthropicAuthCallbackRequest):
             status_code=400,
             detail="No pending OAuth flow. Start a new flow via /anthropic/auth/start.",
         )
-    if request.state != stored_state:
+
+    # The callback page may return code as "code#state" — split if needed
+    raw_code = request.code.strip()
+    if "#" in raw_code:
+        auth_code, callback_state = raw_code.split("#", 1)
+    else:
+        auth_code = raw_code
+        callback_state = request.state
+
+    if callback_state != stored_state:
         raise HTTPException(status_code=400, detail="State mismatch — possible CSRF. Try again.")
 
     # Exchange code for tokens
     try:
+        payload = {
+            "grant_type": "authorization_code",
+            "code": auth_code,
+            "state": stored_state,
+            "code_verifier": code_verifier,
+            "client_id": _ANTHROPIC_CLIENT_ID,
+            "redirect_uri": _ANTHROPIC_REDIRECT_URI,
+        }
+
         async with httpx.AsyncClient(timeout=15) as client:
             resp = await client.post(
                 _ANTHROPIC_TOKEN_URL,
-                json={
-                    "grant_type": "authorization_code",
-                    "code": request.code,
-                    "code_verifier": code_verifier,
-                    "client_id": _ANTHROPIC_CLIENT_ID,
-                    "redirect_uri": _ANTHROPIC_REDIRECT_URI,
-                },
-                headers={"Content-Type": "application/json"},
+                json=payload,
             )
             resp.raise_for_status()
             data = resp.json()
@@ -691,9 +702,9 @@ async def anthropic_auth_callback(request: AnthropicAuthCallbackRequest):
         detail = f"Token exchange failed (HTTP {exc.response.status_code})"
         try:
             err_body = exc.response.json()
-            detail += f": {err_body.get('error_description', err_body.get('error', ''))}"
+            detail += f": {err_body}"
         except Exception:
-            pass
+            detail += f": {exc.response.text[:300]}"
         raise HTTPException(status_code=400, detail=detail)
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Token exchange error: {exc}")
