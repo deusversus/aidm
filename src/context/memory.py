@@ -188,6 +188,18 @@ class MemoryStore:
             flags=flags or ["recent_event"],
         )
 
+    def delete_by_flag(self, flag: str) -> int:
+        """Delete all memories with a given flag. Returns count deleted."""
+        with self._conn() as conn:
+            result = conn.execute(sa.text(
+                "DELETE FROM campaign_memories "
+                "WHERE campaign_id = :cid AND flags @> CAST(:flag AS jsonb) "
+                "RETURNING id"
+            ), {"cid": self._campaign_id, "flag": _json([flag])})
+            deleted = len(result.fetchall())
+            conn.commit()
+        return deleted
+
     def search(
         self,
         query: str,

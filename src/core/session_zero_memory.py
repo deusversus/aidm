@@ -135,6 +135,14 @@ def write_authoritative(
     Returns:
         Number of memories written.
     """
+    # Clean up provisional memories before writing canonical ones
+    try:
+        deleted = memory_store.delete_by_flag("session_zero_in_progress")
+        if deleted:
+            logger.info("SZ authoritative: deleted %d provisional memories", deleted)
+    except Exception:
+        logger.warning("Failed to delete provisional memories (continuing)")
+
     written = 0
 
     # 1. Player character identity and backstory
@@ -203,6 +211,7 @@ def write_authoritative(
             flags=["session_zero_canonical"],
             metadata={
                 "relationship_id": rel.relationship_id,
+                "confidence": getattr(rel, "confidence", None),
                 "source": "sz_handoff_compiler",
             },
         )
@@ -256,6 +265,33 @@ def write_authoritative(
             flags=["session_zero_canonical"],
             metadata={"source": "sz_handoff_compiler"},
         )
+
+    # 7. Orphan facts (unresolved entity references — Director should follow up)
+    if hasattr(package, "orphan_facts") and package.orphan_facts:
+        for fact in package.orphan_facts:
+            content = fact.content if hasattr(fact, "content") else str(fact)
+            written += _write_safe(
+                memory_store,
+                content=f"[Unresolved fact] {content}",
+                memory_type="fact",
+                turn_number=turn_number,
+                decay_rate="slow",
+                flags=["session_zero_canonical", "orphan_entity"],
+                metadata={"source": "sz_handoff_compiler"},
+            )
+
+    # 8. Safe assumptions (system guesses the Director should be aware of)
+    if hasattr(package, "uncertainties") and package.uncertainties:
+        for assumption in (package.uncertainties.safe_assumptions or []):
+            written += _write_safe(
+                memory_store,
+                content=f"[Assumption] {assumption}",
+                memory_type="session_zero",
+                turn_number=turn_number,
+                decay_rate="slow",
+                flags=["session_zero_canonical", "safe_assumption"],
+                metadata={"source": "sz_handoff_compiler"},
+            )
 
     logger.info(
         "SZ authoritative: wrote %d canonical memories from OpeningStatePackage",

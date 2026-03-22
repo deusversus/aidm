@@ -479,7 +479,16 @@ async def process_session_zero_state(
                     npc_appearance = npc.get("appearance", {})
                     npc_visual_tags = npc.get("visual_tags", [])
 
-                    # 1. Create NPC in SQLite database (if StateManager available)
+                    # 1. Create NPC in database (if StateManager available)
+                    # Map SZ disposition strings to initial affinity so NPCs
+                    # start gameplay with the relationship established during SZ.
+                    _affinity_map = {
+                        "ally": 40, "friend": 40, "mentor": 50, "companion": 40,
+                        "rival": -20, "enemy": -50, "antagonist": -50,
+                        "neutral": 0, "acquaintance": 10, "unknown": 0,
+                    }
+                    _init_affinity = _affinity_map.get(disposition.lower(), 0)
+
                     if state is not None:
                         try:
                             state.create_npc(
@@ -488,8 +497,10 @@ async def process_session_zero_state(
                                 relationship_notes=f"{disposition}. {background}",
                                 appearance=npc_appearance,
                                 visual_tags=npc_visual_tags,
+                                affinity=_init_affinity,
+                                disposition=_init_affinity,
                             )
-                            logger.info(f"[SessionZero→State] Created NPC in DB: {npc_name} (visual_tags={npc_visual_tags})")
+                            logger.info(f"[SessionZero→State] Created NPC in DB: {npc_name} (affinity={_init_affinity}, visual_tags={npc_visual_tags})")
                         except Exception as e:
                             logger.error(f"[SessionZero→State] NPC DB creation failed: {e}")
 

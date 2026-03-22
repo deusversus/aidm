@@ -225,7 +225,17 @@ async def _handle_gameplay_handoff(session, session_id: str, result, agent) -> t
                 f"created={npc_stats.get('npcs_created', 0)}"
             )
         except Exception as npc_err:
-            logger.error(f"[Handoff] Pending NPC flush failed (non-fatal): {npc_err}")
+            logger.error(f"[Handoff] Pending NPC flush failed, retrying once: {npc_err}")
+            try:
+                npc_stats = await process_session_zero_state(
+                    session=session,
+                    detected_info={"npcs": pending_npcs},
+                    session_id=session.session_id,
+                    campaign_id=orchestrator.state.campaign_id,
+                )
+                logger.info(f"[Handoff] Retry succeeded: {npc_stats.get('npcs_created', 0)} NPCs")
+            except Exception as retry_err:
+                logger.error(f"[Handoff] Pending NPC flush retry also failed: {retry_err}")
 
     # --- HandoffCompiler (SESSION_ZERO_COMPILER_ENABLED) ---
     # Resolve final_tier first — the compiler uses it for tone_composition.
@@ -335,6 +345,10 @@ async def _handle_gameplay_handoff(session, session_id: str, result, agent) -> t
         level=1,
         hp_current=draft.resources.get("HP", 100),
         hp_max=draft.resources.get("HP", 100),
+        mp_current=draft.resources.get("MP"),
+        mp_max=draft.resources.get("MP"),
+        sp_current=draft.resources.get("SP"),
+        sp_max=draft.resources.get("SP"),
         power_tier=final_tier,
         abilities=draft.skills,
         concept=draft.concept,
@@ -374,7 +388,8 @@ async def _handle_gameplay_handoff(session, session_id: str, result, agent) -> t
     if draft.starting_location:
         orchestrator.state.update_world_state(
             location=draft.starting_location,
-            situation="The journey begins."
+            situation="The journey begins.",
+            time_of_day="evening",  # Sensible default; Director will adjust
         )
 
     # --- 3. Transfer OP Mode ---
@@ -412,9 +427,10 @@ async def _handle_gameplay_handoff(session, session_id: str, result, agent) -> t
 
         situation_text = "Continuing from Session Zero opening scene."
         if last_assistant_msg:
-            situation_text = last_assistant_msg[:300]
-            if len(last_assistant_msg) > 300:
-                situation_text += "..."
+            # Use the full opening context — truncating to 300 chars loses
+            # critical scene-setting details that every gameplay agent reads.
+            # Cap at 2000 chars to stay reasonable for the context window.
+            situation_text = last_assistant_msg[:2000]
 
         orchestrator.state.update_world_state(
             location=draft.starting_location or "Unknown Location",

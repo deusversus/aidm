@@ -265,6 +265,10 @@ class CharacterMixin:
         name: str | None = None,
         hp_current: int | None = None,
         hp_max: int | None = None,
+        mp_current: int | None = None,
+        mp_max: int | None = None,
+        sp_current: int | None = None,
+        sp_max: int | None = None,
         level: int | None = None,
         power_tier: str | None = None,
         abilities: list[str] | None = None,
@@ -296,6 +300,14 @@ class CharacterMixin:
                 character.hp_current = hp_current
             if hp_max is not None:
                 character.hp_max = hp_max
+            if mp_current is not None:
+                character.mp_current = mp_current
+            if mp_max is not None:
+                character.mp_max = mp_max
+            if sp_current is not None:
+                character.sp_current = sp_current
+            if sp_max is not None:
+                character.sp_max = sp_max
             if level is not None:
                 character.level = level
             if power_tier is not None:
