@@ -391,6 +391,49 @@ class BackgroundMixin:
                 except Exception as e:
                     logger.error(f"Memory heat decay failed (non-fatal): {e}")
 
+                # =============================================================
+                # 11. STATE SNAPSHOT (after Director review, level-up, or quest completion)
+                # Versioned artifact for gameplay state recovery/rewind.
+                # =============================================================
+                try:
+                    snapshot_trigger = (
+                        self._last_director_turn == db_context.turn_number  # Director just ran
+                        or (progression_result and getattr(progression_result, 'level_up', False))
+                    )
+                    if snapshot_trigger:
+                        await self._bg_save_state_snapshot(db_context)
+                except Exception as e:
+                    logger.error(f"State snapshot failed (non-fatal): {e}")
+
+                # =============================================================
+                # 12. ENTITY GRAPH VERSIONING
+                # Save current NPC/location state as versioned artifact.
+                # =============================================================
+                try:
+                    if narrative and db_context.turn_number % 5 == 0:
+                        await self._bg_save_entity_graph(db_context)
+                except Exception as e:
+                    logger.error(f"Entity graph snapshot failed (non-fatal): {e}")
+
+                # =============================================================
+                # 13. MARK CHECKPOINT COMPLETE (Gap 9)
+                # =============================================================
+                try:
+                    from src.db.session import get_session
+                    from src.db.session_zero_artifacts import save_artifact
+                    with get_session() as _db:
+                        save_artifact(
+                            _db,
+                            str(self.state.campaign_id),
+                            "gameplay_turn_checkpoint",
+                            {
+                                "turn_number": db_context.turn_number,
+                                "background_completed": True,
+                            },
+                        )
+                except Exception:
+                    pass  # Non-fatal
+
                 bg_elapsed = int((time.time() - bg_start) * 1000)
                 logger.info(f"Post-narrative processing complete ({bg_elapsed}ms)")
 
@@ -840,3 +883,81 @@ class BackgroundMixin:
             return ContextBlockStore(self.state.campaign_id).get_for_session_start()
         except Exception:
             return None
+
+    # ── State snapshot & entity graph (Gaps 7, 10) ─────────────────────────
+
+    async def _bg_save_state_snapshot(self, db_context) -> None:
+        """Save a versioned gameplay state snapshot after critical moments."""
+        from src.db.session import get_session
+        from src.db.session_zero_artifacts import save_artifact
+
+        snapshot = {
+            "turn_number": db_context.turn_number,
+            "arc_phase": getattr(db_context, "arc_phase", None),
+            "tension_level": getattr(db_context, "tension_level", None),
+            "location": getattr(db_context, "location", None),
+            "situation": getattr(db_context, "situation", None),
+        }
+
+        # Add character stats if available
+        try:
+            char = self.state.get_character()
+            if char:
+                snapshot["character"] = {
+                    "name": char.name,
+                    "level": getattr(char, "level", None),
+                    "hp": getattr(char, "hp", None),
+                    "power_tier": getattr(char, "power_tier", None),
+                }
+        except Exception:
+            pass
+
+        with get_session() as db:
+            save_artifact(
+                db,
+                str(self.state.campaign_id),
+                "gameplay_state_snapshot",
+                snapshot,
+            )
+        logger.info(
+            "State snapshot saved at turn %d", db_context.turn_number
+        )
+
+    async def _bg_save_entity_graph(self, db_context) -> None:
+        """Save versioned entity graph (NPC/location state) as artifact."""
+        from src.db.session import get_session
+        from src.db.session_zero_artifacts import save_artifact
+
+        entity_snapshot = {"turn_number": db_context.turn_number, "npcs": [], "locations": []}
+
+        try:
+            npcs = self.state.get_all_npcs()
+            entity_snapshot["npcs"] = [
+                {"name": n.name, "role": getattr(n, "role", None), "alive": getattr(n, "alive", True)}
+                for n in (npcs or [])
+            ]
+        except Exception:
+            pass
+
+        try:
+            locations = self.state.get_all_locations()
+            entity_snapshot["locations"] = [
+                {"name": loc.name, "discovered": getattr(loc, "discovered", True)}
+                for loc in (locations or [])
+            ]
+        except Exception:
+            pass
+
+        with get_session() as db:
+            save_artifact(
+                db,
+                str(self.state.campaign_id),
+                "gameplay_entity_graph",
+                entity_snapshot,
+            )
+        logger.info(
+            "Entity graph snapshot saved at turn %d (%d NPCs, %d locations)",
+            db_context.turn_number,
+            len(entity_snapshot["npcs"]),
+            len(entity_snapshot["locations"]),
+        )

@@ -154,6 +154,31 @@ class Orchestrator(TurnPipelineMixin, BackgroundMixin):
         # Meta conversation state (out-of-character dialogue with player)
         self._in_meta_conversation = False
 
+        # Crash recovery check (Gap 9): detect incomplete prior turns
+        self._check_incomplete_turns()
+
+    def _check_incomplete_turns(self) -> None:
+        """Check for turns where background processing didn't complete (crash recovery)."""
+        try:
+            from src.db.session import get_session
+            from src.db.session_zero_artifacts import get_active_artifact
+
+            with get_session() as db:
+                checkpoint = get_active_artifact(
+                    db, str(self.campaign_id), "gameplay_turn_checkpoint"
+                )
+                if checkpoint:
+                    import json
+                    data = json.loads(checkpoint.content) if isinstance(checkpoint.content, str) else checkpoint.content
+                    if not data.get("background_completed", True):
+                        logger.warning(
+                            "CRASH RECOVERY: Turn %d background processing was incomplete. "
+                            "Some bookkeeping (memory, progression, foreshadowing) may be missing.",
+                            data.get("turn_number", "?"),
+                        )
+        except Exception:
+            pass  # Non-fatal — don't block init
+
     def close(self):
         """Release resources held by the orchestrator.
 

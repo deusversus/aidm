@@ -1,20 +1,25 @@
 """Session Zero per-turn pipeline.
 
 Wraps the existing SessionZeroAgent (conductor) with per-turn extraction,
-entity resolution, and gap analysis.  Runs behind the
-``SESSION_ZERO_ORCHESTRATOR_ENABLED`` feature flag.
+entity resolution, gap analysis, memory retrieval, and compaction.
+Runs behind the ``SESSION_ZERO_ORCHESTRATOR_ENABLED`` feature flag.
 
 When the flag is off, SessionZeroAgent handles all turns directly (legacy).
 When on, each player turn triggers:
 
 1. **Extraction** — ``SZExtractorAgent.extract_chunk()`` on the latest
    user message (plus a small context window)
-2. **Entity resolution** — ``SZEntityResolverAgent.resolve()`` merging new
-   extraction into the cumulative entity graph
-3. **Gap analysis** — ``SZGapAnalyzerAgent.analyze()`` identifying missing
+   *(runs in parallel with gap analysis on turn 2+)*
+2. **Gap analysis** — ``SZGapAnalyzerAgent.analyze()`` identifying missing
    info and recommending follow-up questions
-4. **Conductor** — ``SessionZeroAgent.process_turn()`` with gap context
-   injected so it can pick smarter follow-ups
+3. **Entity resolution** — ``SZEntityResolverAgent.resolve()`` merging new
+   extraction into the cumulative entity graph
+4. **Validation** — consistency check on resolution output (retry once if
+   extraction found entities but resolution returned zero)
+5. **Memory retrieval** — pgvector queries for prior SZ context (no LLM call)
+6. **Compaction** — summarize dropped messages via CompactorAgent
+7. **Conductor** — ``SessionZeroAgent.process_turn()`` with gap context,
+   retrieved memories, and compaction text injected
 
 The cumulative entity graph is persisted to ``session_zero_artifacts``
 (type ``sz_entity_graph``) after every turn so the pipeline can resume
@@ -23,10 +28,11 @@ after a server restart.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from src.agents.session_zero_schemas import (
     EntityResolutionOutput,
@@ -36,10 +42,11 @@ from src.agents.session_zero_schemas import (
 from src.agents.sz_extractor import SZExtractorAgent
 from src.agents.sz_entity_resolver import SZEntityResolverAgent
 from src.agents.sz_gap_analyzer import SZGapAnalyzerAgent
-from src.observability import log_span
+from src.observability import end_trace, log_span, start_trace
 
 if TYPE_CHECKING:
     from src.agents.session_zero import SessionZeroAgent, SessionZeroOutput
+    from src.context.memory import MemoryStore
     from src.core.session import Session
 
 logger = logging.getLogger(__name__)
@@ -58,6 +65,8 @@ class SZPipelineState:
     entity_resolution: EntityResolutionOutput | None = None
     gap_analysis: GapAnalysisOutput | None = None
     turn_count: int = 0
+    compaction_text: str = ""
+    last_compacted_index: int = 0
 
 
 # ── Pipeline ──────────────────────────────────────────────────────────────────
@@ -78,14 +87,19 @@ class SessionZeroPipeline:
     # How many recent messages to include in the extraction window
     EXTRACTION_CONTEXT_WINDOW = 6
 
+    # Messages in the conductor's sliding window before compaction kicks in
+    COMPACTION_THRESHOLD = 30
+
     def __init__(
         self,
         conductor: SessionZeroAgent,
         *,
         session_id: str | None = None,
+        memory_store: MemoryStore | None = None,
     ) -> None:
         self.conductor = conductor
         self.session_id = session_id
+        self._memory_store = memory_store
 
         # Sub-agents (instantiated lazily so settings are fresh)
         self._extractor = SZExtractorAgent()
@@ -104,12 +118,14 @@ class SessionZeroPipeline:
     ) -> SessionZeroOutput:
         """Run the full per-turn pipeline and return the conductor's response.
 
-        Steps:
-            1. Extract from latest turn (+ context window)
-            2. Resolve entities incrementally
-            3. Analyze gaps
-            4. Generate conductor response with gap context
-            5. Persist entity graph (for crash recovery)
+        Steps (parallel where possible):
+            1. [Extraction ‖ Gap analysis(prior state)] — run in parallel
+            2. Entity resolution (needs extraction output)
+            3. Validation — consistency check on resolution (retry once if needed)
+            4. Memory retrieval — pgvector search for prior SZ context (no LLM)
+            5. Compaction — summarize dropped messages if window exceeded
+            6. Conductor response — with gap context + memories + compaction
+            7. Persist pipeline state — entity graph + metadata
 
         The entire pipeline runs inside a ``TurnTokenBudget`` context.
         If any step exceeds the configured token limits, a
@@ -125,16 +141,55 @@ class SessionZeroPipeline:
             self.session_id or "unknown",
         )
 
+        start_trace(
+            "sz_process_turn",
+            session_id=self.session_id,
+            metadata={"turn_count": self._state.turn_count},
+            tags=[f"session:{self.session_id}"] if self.session_id else [],
+            input=player_input,
+        )
+
         max_in, max_out, max_calls = Config.get_turn_limits()
         async with TurnTokenBudget(
             max_input=max_in,
             max_output=max_out,
             max_calls=max_calls,
         ) as budget:
-            # ── Step 1: Extraction ────────────────────────────────────────
-            extraction = await self._run_extraction(session, player_input)
-            if extraction:
+            # ── Step 1: Extraction ‖ Gap analysis (parallel) ──────────────
+            # Gap analysis runs on the PRIOR turn's resolution output,
+            # so it's independent of this turn's extraction.
+            extraction = None
+            tasks: list[asyncio.Task] = []
+
+            extraction_task = asyncio.ensure_future(
+                self._run_extraction(session, player_input)
+            )
+            tasks.append(extraction_task)
+
+            gap_task = None
+            if self._state.entity_resolution:
+                gap_task = asyncio.ensure_future(
+                    self._run_gap_analysis(session)
+                )
+                tasks.append(gap_task)
+
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+
+            # Unpack extraction result
+            ext_result = results[0]
+            if isinstance(ext_result, Exception):
+                logger.error("Extraction raised: %s", ext_result)
+            elif ext_result is not None:
+                extraction = ext_result
                 self._state.extraction_passes.append(extraction)
+
+            # Unpack gap analysis result (if run)
+            if gap_task is not None:
+                gap_result = results[1]
+                if isinstance(gap_result, Exception):
+                    logger.error("Gap analysis raised: %s", gap_result)
+                elif gap_result is not None:
+                    self._state.gap_analysis = gap_result
 
             # ── Step 2: Entity resolution ─────────────────────────────────
             if self._state.extraction_passes:
@@ -142,16 +197,24 @@ class SessionZeroPipeline:
                 if resolution:
                     self._state.entity_resolution = resolution
 
-            # ── Step 3: Gap analysis ──────────────────────────────────────
-            if self._state.entity_resolution:
-                gap = await self._run_gap_analysis(session)
-                if gap:
-                    self._state.gap_analysis = gap
+            # ── Step 3: Validation — retry resolution if inconsistent ─────
+            if extraction and self._state.entity_resolution:
+                await self._validate_resolution(session, extraction)
 
-            # ── Step 4: Conductor response with gap context ───────────────
-            result = await self._run_conductor(session, player_input)
+            # ── Step 4: Memory retrieval (no LLM call) ────────────────────
+            retrieved_memories = self._run_memory_retrieval(
+                player_input, extraction
+            )
 
-            # ── Step 5: Persist pipeline state ─────────────────────────────
+            # ── Step 5: Compaction ────────────────────────────────────────
+            await self._run_compaction(session)
+
+            # ── Step 6: Conductor response with enriched context ──────────
+            result = await self._run_conductor(
+                session, player_input, retrieved_memories
+            )
+
+            # ── Step 7: Persist pipeline state ────────────────────────────
             await self._persist_pipeline_state(session)
 
             logger.info(
@@ -161,6 +224,18 @@ class SessionZeroPipeline:
                 budget.accumulated_input,
                 budget.accumulated_output,
             )
+
+        end_trace(
+            output={
+                "phase": getattr(session, "phase", None) and session.phase.value,
+                "ready_for_gameplay": result.ready_for_gameplay,
+            },
+            metadata={
+                "calls": budget.call_count,
+                "input_tokens": budget.accumulated_input,
+                "output_tokens": budget.accumulated_output,
+            },
+        )
 
         return result
 
@@ -321,12 +396,13 @@ class SessionZeroPipeline:
         self,
         session: Session,
         player_input: str,
+        retrieved_memories: list[dict[str, Any]] | None = None,
     ) -> SessionZeroOutput:
-        """Run the conductor (existing SZ agent) with gap context injected."""
+        """Run the conductor (existing SZ agent) with enriched context."""
         result = await self.conductor.process_turn(
             session,
             player_input,
-            gap_context=self._build_gap_context(),
+            gap_context=self._build_gap_context(retrieved_memories),
         )
         log_span(
             "sz_pipeline.conductor",
@@ -338,33 +414,174 @@ class SessionZeroPipeline:
         )
         return result
 
+    # ── Memory retrieval (no LLM call) ─────────────────────────────────────
+
+    def _run_memory_retrieval(
+        self,
+        player_input: str,
+        extraction: ExtractionPassOutput | None,
+    ) -> list[dict[str, Any]]:
+        """Search prior SZ memories for relevant context. Zero LLM calls."""
+        if not self._memory_store:
+            return []
+
+        try:
+            # Query 1: semantic match against player input
+            results = self._memory_store.search(
+                player_input, limit=3, boost_on_access=False
+            )
+
+            # Query 2: entity name keyword search (if extraction found entities)
+            if extraction and extraction.entity_records:
+                for entity in extraction.entity_records[:3]:
+                    name = entity.display_name
+                    hybrid_results = self._memory_store.search_hybrid(
+                        query=name, keyword=name, limit=2,
+                        boost_on_access=False,
+                    )
+                    results.extend(hybrid_results)
+
+            # Dedup by content prefix
+            seen: dict[str, dict] = {}
+            for mem in results:
+                key = mem.get("content", "")[:100]
+                existing = seen.get(key)
+                if not existing or mem.get("score", 0) > existing.get("score", 0):
+                    seen[key] = mem
+
+            final = sorted(
+                seen.values(), key=lambda m: m.get("score", 0), reverse=True
+            )[:5]
+
+            if final:
+                log_span(
+                    "sz_pipeline.memory_retrieval",
+                    output={"memory_count": len(final)},
+                )
+            return final
+
+        except Exception:
+            logger.exception("SZ memory retrieval failed — continuing without")
+            return []
+
+    # ── Compaction ─────────────────────────────────────────────────────────
+
+    async def _run_compaction(self, session: Session) -> None:
+        """Summarize dropped messages when the transcript exceeds the window."""
+        messages = session.messages or []
+        total = len(messages)
+
+        if total <= self.COMPACTION_THRESHOLD:
+            return
+
+        # Only compact messages that are newly dropped since last compaction
+        new_drop_end = total - self.COMPACTION_THRESHOLD
+        if new_drop_end <= self._state.last_compacted_index:
+            return  # Already compacted up to this point
+
+        dropped = messages[self._state.last_compacted_index:new_drop_end]
+        if not dropped:
+            return
+
+        try:
+            from src.agents.compactor import CompactorAgent
+
+            compactor = CompactorAgent()
+            summary = await compactor.compact(
+                dropped_messages=dropped,
+                prior_context=self._state.compaction_text,
+            )
+            self._state.compaction_text += f"\n{summary}" if self._state.compaction_text else summary
+            self._state.last_compacted_index = new_drop_end
+
+            log_span(
+                "sz_pipeline.compaction",
+                output={
+                    "messages_compacted": len(dropped),
+                    "compaction_length": len(self._state.compaction_text),
+                },
+            )
+            logger.info(
+                "SZ compaction: summarized %d dropped messages",
+                len(dropped),
+            )
+
+        except Exception:
+            logger.exception("SZ compaction failed — continuing without summary")
+
+    # ── Resolution validation ──────────────────────────────────────────────
+
+    async def _validate_resolution(
+        self,
+        session: Session,
+        extraction: ExtractionPassOutput,
+    ) -> None:
+        """Retry entity resolution once if extraction found entities but resolution returned zero."""
+        resolution = self._state.entity_resolution
+        if not resolution:
+            return
+
+        extracted_count = len(extraction.entity_records)
+        resolved_count = len(resolution.canonical_entities)
+
+        if extracted_count > 0 and resolved_count == 0:
+            logger.warning(
+                "SZ validation: extraction found %d entities but resolution returned 0 — retrying",
+                extracted_count,
+            )
+            log_span(
+                "sz_pipeline.resolution_retry",
+                input={"extracted_count": extracted_count},
+            )
+            retry = await self._run_entity_resolution(session)
+            if retry and len(retry.canonical_entities) > 0:
+                self._state.entity_resolution = retry
+                logger.info(
+                    "SZ resolution retry succeeded: %d canonical entities",
+                    len(retry.canonical_entities),
+                )
+
     # ── Gap context formatting ────────────────────────────────────────────────
 
-    def _build_gap_context(self) -> str | None:
-        """Format gap analysis results for injection into conductor prompt."""
-        gap = self._state.gap_analysis
-        if not gap:
-            return None
-
+    def _build_gap_context(
+        self,
+        retrieved_memories: list[dict[str, Any]] | None = None,
+    ) -> str | None:
+        """Format gap analysis + memories + compaction for conductor prompt."""
         parts = []
 
-        if gap.recommended_player_followups:
-            parts.append("## Recommended Follow-Up Questions (from gap analysis)")
-            for i, q in enumerate(gap.recommended_player_followups[:5], 1):
-                parts.append(f"{i}. {q}")
+        # Compaction text (accumulated summaries of dropped messages)
+        if self._state.compaction_text:
+            parts.append("## Prior Conversation Summary")
+            parts.append(self._state.compaction_text)
 
-        if gap.unresolved_items:
-            parts.append(f"\n## Unresolved Items: {len(gap.unresolved_items)}")
-            for item in gap.unresolved_items[:3]:
-                parts.append(f"- [{item.priority}] {item.description}")
+        # Retrieved memories from prior SZ turns
+        if retrieved_memories:
+            parts.append("\n## Relevant Prior Context (from memory)")
+            for mem in retrieved_memories:
+                content = mem.get("content", "")[:200]
+                parts.append(f"- {content}")
 
-        if gap.contradictions:
-            parts.append(f"\n## Contradictions Detected: {len(gap.contradictions)}")
-            for c in gap.contradictions[:2]:
-                parts.append(f"- {c.issue_type.value}: {'; '.join(c.statements[:2])}")
+        # Gap analysis
+        gap = self._state.gap_analysis
+        if gap:
+            if gap.recommended_player_followups:
+                parts.append("\n## Recommended Follow-Up Questions (from gap analysis)")
+                for i, q in enumerate(gap.recommended_player_followups[:5], 1):
+                    parts.append(f"{i}. {q}")
 
-        if gap.blocking_issues:
-            parts.append(f"\n## Blocking Issues: {', '.join(gap.blocking_issues)}")
+            if gap.unresolved_items:
+                parts.append(f"\n## Unresolved Items: {len(gap.unresolved_items)}")
+                for item in gap.unresolved_items[:3]:
+                    parts.append(f"- [{item.priority}] {item.description}")
+
+            if gap.contradictions:
+                parts.append(f"\n## Contradictions Detected: {len(gap.contradictions)}")
+                for c in gap.contradictions[:2]:
+                    parts.append(f"- {c.issue_type.value}: {'; '.join(c.statements[:2])}")
+
+            if gap.blocking_issues:
+                parts.append(f"\n## Blocking Issues: {', '.join(gap.blocking_issues)}")
 
         entity_summary = self._build_entity_summary()
         if entity_summary:
@@ -411,6 +628,8 @@ class SessionZeroPipeline:
                 class _PipelineMeta(_BM):
                     turn_count: int = 0
                     extraction_pass_count: int = 0
+                    compaction_text: str = ""
+                    last_compacted_index: int = 0
 
                 save_artifact(
                     db,
@@ -419,6 +638,8 @@ class SessionZeroPipeline:
                     _PipelineMeta(
                         turn_count=self._state.turn_count,
                         extraction_pass_count=len(self._state.extraction_passes),
+                        compaction_text=self._state.compaction_text,
+                        last_compacted_index=self._state.last_compacted_index,
                     ),
                 )
 
@@ -456,9 +677,10 @@ class SessionZeroPipeline:
                 # Restore pipeline metadata (turn count)
                 meta_artifact = get_active_artifact(db, session_id, "sz_pipeline_meta")
                 if meta_artifact:
-                    import json
                     meta = json.loads(meta_artifact.content) if isinstance(meta_artifact.content, str) else meta_artifact.content
                     self._state.turn_count = meta.get("turn_count", 0)
+                    self._state.compaction_text = meta.get("compaction_text", "")
+                    self._state.last_compacted_index = meta.get("last_compacted_index", 0)
                     logger.info(
                         "Restored pipeline meta: turn_count=%d for session %s",
                         self._state.turn_count,

@@ -271,6 +271,12 @@ class TurnPipelineMixin:
             intent=intent  # Pass intent for tiered memory retrieval
         )
 
+        # Capture memory provenance (Gap 8) — top 3 memories that informed this turn
+        _memory_provenance = [
+            {"id": m.get("id", ""), "score": round(m.get("score", 0), 3), "preview": m.get("content", "")[:80]}
+            for m in (rag_base.get("raw_memories") or [])[:3]
+        ]
+
         # Initialize Turn object
         from .turn import Turn
         current_turn = Turn(input_text=player_input, intent=intent)
@@ -891,6 +897,30 @@ class TurnPipelineMixin:
             narrative, portrait_map = resolve_portraits(narrative, self.campaign_id)
         except Exception as e:
             logger.error(f"Portrait resolution failed (non-fatal): {e}")
+
+        # =====================================================================
+        # CRASH RECOVERY CHECKPOINT (Gap 9)
+        # Save a checkpoint artifact before background launch so we can
+        # detect incomplete turns on restart.
+        # =====================================================================
+        try:
+            from src.db.session import get_session
+            from src.db.session_zero_artifacts import save_artifact
+            with get_session() as _db:
+                save_artifact(
+                    _db,
+                    str(self.campaign_id),
+                    "gameplay_turn_checkpoint",
+                    {
+                        "turn_number": db_context.turn_number,
+                        "background_completed": False,
+                        "narrative_hash": hash(narrative) if narrative else 0,
+                        "intent": intent.intent if intent else None,
+                        "memory_provenance": _memory_provenance,
+                    },
+                )
+        except Exception:
+            logger.debug("Checkpoint save failed (non-fatal)")
 
         # =====================================================================
         # FIRE-AND-FORGET: All post-narrative processing runs in background

@@ -39,12 +39,25 @@ logger = logging.getLogger(__name__)
 _sz_pipelines: dict[str, "SessionZeroPipeline"] = {}
 
 
-def _get_or_create_pipeline(agent, session_id: str):
+def _get_or_create_pipeline(agent, session_id: str, campaign_id: int | None = None):
     """Get or create a SessionZeroPipeline for this session."""
     from src.core.session_zero_pipeline import SessionZeroPipeline
 
     if session_id not in _sz_pipelines:
-        pipeline = SessionZeroPipeline(conductor=agent, session_id=session_id)
+        # Create MemoryStore if campaign_id is available
+        memory_store = None
+        if campaign_id:
+            try:
+                from src.context.memory import MemoryStore
+                memory_store = MemoryStore(campaign_id=str(campaign_id))
+            except Exception:
+                pass  # Memory retrieval is optional
+
+        pipeline = SessionZeroPipeline(
+            conductor=agent,
+            session_id=session_id,
+            memory_store=memory_store,
+        )
         # Attempt to restore prior entity graph (crash recovery)
         pipeline.load_prior_entity_graph(session_id)
         _sz_pipelines[session_id] = pipeline
@@ -577,7 +590,9 @@ async def session_zero_turn(session_id: str, request: TurnRequest):
         if Config.SESSION_ZERO_ORCHESTRATOR_ENABLED:
             from src.core.session_zero_pipeline import SessionZeroPipeline
 
-            pipeline = _get_or_create_pipeline(agent, session.session_id)
+            pipeline = _get_or_create_pipeline(
+                agent, session.session_id, campaign_id=_early_campaign_id
+            )
             result = await pipeline.process_turn(session, request.player_input)
             _extraction_summary = pipeline.build_extraction_summary()
 
