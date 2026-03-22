@@ -10,6 +10,7 @@ This file retains only initialization and lifecycle methods.
 
 import asyncio
 import logging
+import os
 
 from ..agents.combat import CombatAgent
 from ..agents.context_selector import ContextSelector
@@ -134,6 +135,13 @@ class Orchestrator(TurnPipelineMixin, BackgroundMixin):
         # Session recap (#18)
         self.recap_agent = RecapAgent()
         self._recap_generated = False  # True after first turn's recap
+        self._last_turn_time: float = 0.0  # epoch seconds of last completed turn
+
+        # Minimum gap (seconds) since last turn before recap activates.
+        # Prevents recap on rapid successive turns (e.g. during testing).
+        self.RECAP_MIN_GAP_SECONDS: float = float(
+            os.environ.get("RECAP_MIN_GAP_SECONDS", "3600")
+        )
 
         # Relationship Analyzer (NPC Intelligence, fast model)
         self.relationship_analyzer = RelationshipAnalyzer()

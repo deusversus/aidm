@@ -371,7 +371,10 @@ class TurnPipelineMixin:
             recap_task = None
 
             # #18: Session recap on first gameplay turn (non-blocking)
-            if not self._recap_generated and db_context.turn_number <= 2:
+            # Only activate if enough time has passed since the last turn
+            # (prevents recap on rapid successive turns during testing).
+            _elapsed = (time.time() - self._last_turn_time) if self._last_turn_time > 0 else float("inf")
+            if not self._recap_generated and db_context.turn_number <= 2 and _elapsed >= self.RECAP_MIN_GAP_SECONDS:
                 bible = self.state.get_campaign_bible()
                 arc_history = []
                 if bible and bible.planning_data:
@@ -948,6 +951,8 @@ class TurnPipelineMixin:
                       "outcome": outcome.success_level if outcome else None},
         )
 
+        self._last_turn_time = time.time()
+
         return TurnResult(
             narrative=narrative,
             intent=intent,
@@ -1042,6 +1047,8 @@ class TurnPipelineMixin:
 
         latency = int((time.time() - start_time) * 1000)
         logger.info(f"Meta conversation turn completed ({latency}ms)")
+
+        self._last_turn_time = time.time()
 
         return TurnResult(
             narrative=narrative,
