@@ -640,6 +640,16 @@ async def session_zero_turn(session_id: str, request: TurnRequest):
         _pipeline_active = Config.SESSION_ZERO_ORCHESTRATOR_ENABLED
 
         logger.debug(f"DEBUG: Raw result.detected_info = {result.detected_info}")
+
+        # ALWAYS apply detected_info to CharacterDraft, even when the pipeline is
+        # active.  The pipeline handles entity extraction / resolution / gap analysis
+        # and provisional memory writes, but the conductor still returns basic
+        # character-creation fields (name, concept, backstory, starting_location,
+        # media_reference, etc.) via detected_info — those must be mapped onto the
+        # draft so that get_missing_requirements() sees them at handoff time.
+        if result.detected_info:
+            apply_detected_info(session, result.detected_info)
+
         # Also enter this block when a disambiguation/media-form/merge choice is pending,
         # even if the LLM returned empty detected_info (e.g. Claude returning {} for "1").
         # Without this, numeric selections are silently swallowed and disambiguation loops.
@@ -660,7 +670,7 @@ async def session_zero_turn(session_id: str, request: TurnRequest):
                 logger.error(f"DEBUG: Failed to safely encode detected_info: {e}")
                 logger.debug(f"DEBUG: Raw detected_info: {result.detected_info}")
 
-            apply_detected_info(session, result.detected_info)
+            # NOTE: apply_detected_info already called unconditionally above.
 
             # FLUID STATE INTEGRATION: Index character facts and create NPC records
             # in real-time using the campaign that was created at turn start.

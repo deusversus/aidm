@@ -625,7 +625,7 @@ class SessionZeroPipeline:
                 # Restore pipeline metadata (turn count)
                 meta_artifact = get_active_artifact(db, session_id, "sz_pipeline_meta")
                 if meta_artifact:
-                    meta = json.loads(meta_artifact.content) if isinstance(meta_artifact.content, str) else meta_artifact.content
+                    meta = json.loads(meta_artifact.content_json) if isinstance(meta_artifact.content_json, str) else meta_artifact.content_json
                     self._state.turn_count = meta.get("turn_count", 0)
                     self._state.compaction_text = meta.get("compaction_text", "")
                     self._state.last_compacted_index = meta.get("last_compacted_index", 0)
