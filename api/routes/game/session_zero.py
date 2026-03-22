@@ -12,7 +12,7 @@ from src.agents.session_zero import (
 )
 from src.agents.intent_resolution_handler import resolve_media_intent
 from src.config import Config
-from src.observability import TokenBudgetExceeded
+from src.observability import TokenBudgetExceeded, end_trace, start_trace
 from src.core.session import (
     PHASE_ORDER,
     SessionPhase,
@@ -515,6 +515,17 @@ async def session_zero_turn(session_id: str, request: TurnRequest):
             status_code=400,
             detail="Session Zero is complete. Use /turn for gameplay."
         )
+
+    start_trace(
+        "session_zero_turn",
+        session_id=session_id,
+        metadata={
+            "phase": session.phase.value,
+            "campaign_id": session.phase_state.get("campaign_id"),
+        },
+        tags=["session-zero"],
+        input=request.player_input,
+    )
 
     # Record player input
     session.add_message("user", request.player_input)
@@ -1019,6 +1030,7 @@ async def session_zero_turn(session_id: str, request: TurnRequest):
         raise HTTPException(status_code=500, detail=f"Session Zero error: {str(e)}")
 
     finally:
+        end_trace()
         # Always save session after processing
         store = get_session_store()
         store.save(session)
