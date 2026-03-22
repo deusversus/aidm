@@ -3,6 +3,7 @@
 import json
 import logging
 import os
+import time
 from typing import Any
 
 from pydantic import BaseModel
@@ -11,6 +12,12 @@ from .provider import LLMProvider, LLMResponse
 from ..observability import get_current_agent, log_generation
 
 logger = logging.getLogger(__name__)
+
+# Anthropic OAuth constants
+_ANTHROPIC_TOKEN_URL = "https://console.anthropic.com/v1/oauth/token"
+_ANTHROPIC_CLIENT_ID = "9d1c250a-e61b-44d9-88ed-5944d1962f5e"
+_ANTHROPIC_REDIRECT_URI = "https://console.anthropic.com/oauth/code/callback"
+
 
 class AnthropicProvider(LLMProvider):
     """Anthropic Claude provider implementation.
@@ -23,7 +30,32 @@ class AnthropicProvider(LLMProvider):
     - Opus 4.6: Latest Opus — highest quality, nearly Sonnet pricing
 
     Also supports web search via the Anthropic API (May 2025+).
+
+    Supports two auth methods:
+    - API key (sk-ant-api03-*): Standard, via X-Api-Key header
+    - OAuth token (sk-ant-oat01-*): Via Authorization: Bearer header,
+      with automatic token refresh
     """
+
+    def __init__(
+        self,
+        api_key: str = "",
+        oauth_token: str = "",
+        refresh_token: str = "",
+        oauth_expires_at: float = 0.0,
+    ):
+        """Initialize with either API key or OAuth credentials.
+
+        When both are provided, OAuth is preferred.
+        """
+        # Pass api_key to base class (it stores it as self.api_key)
+        super().__init__(api_key=api_key or oauth_token or "dummy")
+
+        self._api_key = api_key
+        self._oauth_token = oauth_token
+        self._refresh_token = refresh_token
+        self._oauth_expires_at = oauth_expires_at
+        self._using_oauth = bool(oauth_token)
 
     @property
     def name(self) -> str:
@@ -68,10 +100,98 @@ class AnthropicProvider(LLMProvider):
         """Anthropic Tier 2+ can handle more concurrent requests."""
         return 10
 
+    # ── Token management ───────────────────────────────────────────────────
+
+    def _ensure_client(self):
+        """Override: refresh OAuth token if needed, then init client.
+
+        For API key auth, this is a no-op (token never expires).
+        For OAuth auth, proactively refresh before expiry.
+        """
+        if self._using_oauth:
+            needs_refresh = (
+                self._oauth_expires_at > 0
+                and time.time() >= self._oauth_expires_at - 120  # 120s buffer
+            )
+            if needs_refresh:
+                try:
+                    self._refresh_oauth_token()
+                except Exception:
+                    self._client = None
+                    raise
+                self._client = None  # force reinit with new token
+
+        if self._client is None:
+            self._init_client()
+
+    def _refresh_oauth_token(self):
+        """Synchronously refresh the OAuth access token using the refresh token."""
+        import urllib.request
+        import urllib.error
+
+        if not self._refresh_token:
+            raise RuntimeError(
+                "Anthropic OAuth token expired and no refresh token available — "
+                "please reconnect Anthropic in Settings."
+            )
+
+        logger.info("[anthropic] Refreshing OAuth token...")
+
+        req = urllib.request.Request(
+            _ANTHROPIC_TOKEN_URL,
+            data=json.dumps({
+                "grant_type": "refresh_token",
+                "refresh_token": self._refresh_token,
+                "client_id": _ANTHROPIC_CLIENT_ID,
+            }).encode(),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=15) as response:
+                data = json.loads(response.read())
+        except urllib.error.HTTPError as exc:
+            if exc.code in (401, 403):
+                raise RuntimeError(
+                    "Anthropic OAuth refresh failed (authorization revoked) — "
+                    "please reconnect Anthropic in Settings."
+                ) from exc
+            raise RuntimeError(
+                f"Anthropic OAuth refresh failed (HTTP {exc.code})"
+            ) from exc
+
+        new_access = data.get("access_token", "")
+        new_refresh = data.get("refresh_token", self._refresh_token)
+        expires_in = data.get("expires_in", 3600)
+
+        if not new_access:
+            raise RuntimeError("Anthropic OAuth refresh returned no access_token")
+
+        self._oauth_token = new_access
+        self._refresh_token = new_refresh
+        self._oauth_expires_at = time.time() + expires_in
+
+        # Persist updated tokens
+        try:
+            from ..settings import get_settings_store
+            get_settings_store().set_anthropic_oauth(
+                new_access, new_refresh, self._oauth_expires_at
+            )
+        except Exception as e:
+            logger.warning(f"[anthropic] Failed to persist refreshed tokens: {e}")
+
+        logger.info(f"[anthropic] OAuth token refreshed, expires in {expires_in}s")
+
     def _init_client(self):
-        """Initialize the Anthropic client."""
+        """Initialize the Anthropic client with either API key or OAuth token."""
         import anthropic
-        self._client = anthropic.AsyncAnthropic(api_key=self.api_key)
+
+        if self._using_oauth and self._oauth_token:
+            self._client = anthropic.AsyncAnthropic(
+                auth_token=self._oauth_token,
+            )
+        else:
+            self._client = anthropic.AsyncAnthropic(api_key=self._api_key)
 
     @staticmethod
     def _build_system_blocks(system) -> list:

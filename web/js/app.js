@@ -794,6 +794,9 @@ async function loadSettings() {
         // Load API keys
         await loadApiKeys();
 
+        // Check OAuth status
+        await checkAnthropicOAuthStatus();
+
         // Check for provider misconfigurations
         await checkProviderWarnings();
     } catch (error) {
@@ -970,6 +973,115 @@ async function disconnectCopilot() {
         showStatus('GitHub Copilot disconnected.', 'success');
     } catch (err) {
         showStatus(`Error: ${err.message}`, 'error');
+    }
+}
+
+// ── Anthropic OAuth ──────────────────────────────────────────────────────────
+
+let _anthropicAuthState = null;
+
+async function connectAnthropicOAuth() {
+    const btn = document.getElementById('anthropic-oauth-btn');
+    try {
+        btn.disabled = true;
+        btn.textContent = '⏳ Starting...';
+
+        const result = await API.Settings.startAnthropicAuth();
+        _anthropicAuthState = result.state;
+
+        // Set up modal
+        const modal = document.getElementById('anthropic-auth-modal');
+        const authLink = document.getElementById('anthropic-auth-url');
+        authLink.href = result.auth_url;
+        document.getElementById('anthropic-auth-code-input').value = '';
+        document.getElementById('anthropic-auth-error').style.display = 'none';
+
+        // Show modal
+        modal.style.display = 'flex';
+
+        // Open auth URL in new tab
+        window.open(result.auth_url, '_blank');
+    } catch (err) {
+        showStatus(`Error: ${err.message}`, 'error');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = '🔗 Connect with OAuth';
+    }
+}
+
+async function submitAnthropicCode() {
+    const code = document.getElementById('anthropic-auth-code-input').value.trim();
+    const errorEl = document.getElementById('anthropic-auth-error');
+
+    if (!code) {
+        errorEl.textContent = 'Please paste the authorization code.';
+        errorEl.style.display = 'block';
+        return;
+    }
+
+    try {
+        errorEl.style.display = 'none';
+        const result = await API.Settings.submitAnthropicCode(code, _anthropicAuthState);
+
+        // Success — close modal, refresh UI
+        document.getElementById('anthropic-auth-modal').style.display = 'none';
+        _anthropicAuthState = null;
+
+        await loadApiKeys();
+        await loadSettings();
+        showStatus('Anthropic OAuth connected!', 'success');
+    } catch (err) {
+        errorEl.textContent = err.message;
+        errorEl.style.display = 'block';
+    }
+}
+
+function cancelAnthropicAuth() {
+    document.getElementById('anthropic-auth-modal').style.display = 'none';
+    _anthropicAuthState = null;
+}
+
+async function disconnectAnthropicOAuth() {
+    if (!confirm('Disconnect Anthropic OAuth? API key auth will still work if configured.')) return;
+    try {
+        await API.Settings.disconnectAnthropicOAuth();
+        await loadApiKeys();
+        showStatus('Anthropic OAuth disconnected.', 'success');
+    } catch (err) {
+        showStatus(`Error: ${err.message}`, 'error');
+    }
+}
+
+async function checkAnthropicOAuthStatus() {
+    try {
+        const status = await API.Settings.anthropicOAuthStatus();
+        const oauthStatus = document.getElementById('anthropic-oauth-status');
+        const oauthBtn = document.getElementById('anthropic-oauth-btn');
+        const disconnectBtn = document.getElementById('anthropic-oauth-disconnect-btn');
+        const expirySpan = document.getElementById('anthropic-oauth-expiry');
+
+        if (status.is_configured) {
+            oauthStatus.style.display = 'block';
+            oauthBtn.style.display = 'none';
+            disconnectBtn.style.display = 'inline-block';
+
+            if (status.is_expired) {
+                expirySpan.textContent = '⚠️ Expired — reconnect';
+                expirySpan.style.color = '#ef5350';
+            } else if (status.is_expiring_soon) {
+                const mins = Math.round(status.remaining_seconds / 60);
+                expirySpan.textContent = `⚠️ expires in ~${mins} min`;
+                expirySpan.style.color = 'var(--warning, #f0a500)';
+            } else {
+                expirySpan.textContent = '';
+            }
+        } else {
+            oauthStatus.style.display = 'none';
+            oauthBtn.style.display = 'inline-block';
+            disconnectBtn.style.display = 'none';
+        }
+    } catch (err) {
+        // Silently ignore — non-critical
     }
 }
 

@@ -140,6 +140,26 @@ const SettingsAPI = {
     async copilotStatus() {
         return apiRequest('/settings/copilot/status');
     },
+
+    // Anthropic OAuth
+    async startAnthropicAuth() {
+        return apiRequest('/settings/anthropic/auth/start', { method: 'POST' });
+    },
+
+    async submitAnthropicCode(code, state) {
+        return apiRequest('/settings/anthropic/auth/callback', {
+            method: 'POST',
+            body: JSON.stringify({ code, state }),
+        });
+    },
+
+    async disconnectAnthropicOAuth() {
+        return apiRequest('/settings/anthropic/auth', { method: 'DELETE' });
+    },
+
+    async anthropicOAuthStatus() {
+        return apiRequest('/settings/anthropic/auth/status');
+    },
 };
 
 /**

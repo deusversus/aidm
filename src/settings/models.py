@@ -235,6 +235,19 @@ class APIKeySettings(BaseModel):
         default=0.0,
         description="Unix timestamp when the GitHub OAuth token expires (0 = unknown/non-expiring)"
     )
+    # Anthropic OAuth (PKCE) — alternative to API key
+    anthropic_oauth_token: str = Field(
+        default="",
+        description="Anthropic OAuth access token (stored encrypted)"
+    )
+    anthropic_refresh_token: str = Field(
+        default="",
+        description="Anthropic OAuth refresh token (stored encrypted)"
+    )
+    anthropic_oauth_expires_at: float = Field(
+        default=0.0,
+        description="Unix timestamp when the Anthropic OAuth token expires"
+    )
 
 
 class UserSettings(BaseModel):

@@ -272,7 +272,7 @@ class SettingsStore:
 
         return {
             "google": is_key_configured(settings.api_keys.google_api_key) or env_key_configured("GOOGLE_API_KEY"),
-            "anthropic": is_key_configured(settings.api_keys.anthropic_api_key) or env_key_configured("ANTHROPIC_API_KEY"),
+            "anthropic": is_key_configured(settings.api_keys.anthropic_api_key) or env_key_configured("ANTHROPIC_API_KEY") or is_key_configured(settings.api_keys.anthropic_oauth_token),
             "openai": is_key_configured(settings.api_keys.openai_api_key) or env_key_configured("OPENAI_API_KEY"),
             "copilot": is_key_configured(settings.api_keys.copilot_github_token),
         }
@@ -296,6 +296,59 @@ class SettingsStore:
         """
         settings = self.load()
         return settings.api_keys.copilot_github_token_expires_at
+
+    # ── Anthropic OAuth ─────────────────────────────────────────────────
+
+    def set_anthropic_oauth(
+        self, access_token: str, refresh_token: str, expires_at: float
+    ) -> None:
+        """Store Anthropic OAuth tokens (encrypted).
+
+        Args:
+            access_token: The OAuth access token (sk-ant-oat01-...)
+            refresh_token: The refresh token for token renewal
+            expires_at: Unix timestamp when the access token expires
+        """
+        settings = self.load()
+        settings.api_keys.anthropic_oauth_token = (
+            encrypt_api_key(access_token) if access_token else ""
+        )
+        settings.api_keys.anthropic_refresh_token = (
+            encrypt_api_key(refresh_token) if refresh_token else ""
+        )
+        settings.api_keys.anthropic_oauth_expires_at = expires_at
+        self.save()
+        self._settings = None
+
+    def get_anthropic_oauth(self) -> tuple[str, str, float]:
+        """Get decrypted Anthropic OAuth tokens.
+
+        Returns:
+            (access_token, refresh_token, expires_at)
+        """
+        settings = self.load()
+        access = ""
+        refresh = ""
+        try:
+            if settings.api_keys.anthropic_oauth_token:
+                access = decrypt_api_key(settings.api_keys.anthropic_oauth_token)
+        except Exception:
+            pass
+        try:
+            if settings.api_keys.anthropic_refresh_token:
+                refresh = decrypt_api_key(settings.api_keys.anthropic_refresh_token)
+        except Exception:
+            pass
+        return access, refresh, settings.api_keys.anthropic_oauth_expires_at
+
+    def clear_anthropic_oauth(self) -> None:
+        """Clear all Anthropic OAuth tokens."""
+        settings = self.load()
+        settings.api_keys.anthropic_oauth_token = ""
+        settings.api_keys.anthropic_refresh_token = ""
+        settings.api_keys.anthropic_oauth_expires_at = 0.0
+        self.save()
+        self._settings = None
 
     def set_copilot_models(self, models: list[dict]) -> None:
         """Cache the model list fetched from the Copilot API.

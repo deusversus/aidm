@@ -49,25 +49,41 @@ class LLMManager:
         self._openai_key = openai_api_key or settings_keys.get("openai", "") or os.getenv("OPENAI_API_KEY", "")
         self._copilot_token = settings_keys.get("copilot", "")
 
+        # Anthropic OAuth (alternative to API key)
+        self._anthropic_oauth_token = settings_keys.get("anthropic_oauth_token", "")
+        self._anthropic_refresh_token = settings_keys.get("anthropic_refresh_token", "")
+        self._anthropic_oauth_expires_at = float(settings_keys.get("anthropic_oauth_expires_at", 0))
+
         # Determine primary provider
         self._primary = self._resolve_primary(primary_provider)
 
         # Cache providers
         self._providers: dict[str, LLMProvider] = {}
 
-    def _load_keys_from_settings(self) -> dict[str, str]:
-        """Load decrypted API keys from settings store."""
+    def _load_keys_from_settings(self) -> dict:
+        """Load decrypted API keys and OAuth tokens from settings store."""
         try:
             from ..settings import get_settings_store
             store = get_settings_store()
-            return {
+            result = {
                 "google": store.get_api_key("google"),
                 "anthropic": store.get_api_key("anthropic"),
                 "openai": store.get_api_key("openai"),
                 "copilot": store.get_api_key("copilot"),
             }
+            # Also load Anthropic OAuth tokens
+            oauth_token, refresh_token, expires_at = store.get_anthropic_oauth()
+            result["anthropic_oauth_token"] = oauth_token
+            result["anthropic_refresh_token"] = refresh_token
+            result["anthropic_oauth_expires_at"] = expires_at
+            return result
         except Exception:
             return {}
+
+    @property
+    def _anthropic_available(self) -> bool:
+        """True if Anthropic is usable via API key or OAuth."""
+        return bool(self._anthropic_key or self._anthropic_oauth_token)
 
     def _resolve_primary(self, requested: str | None) -> str:
         """Resolve the primary provider based on availability."""
@@ -76,7 +92,7 @@ class LLMManager:
             requested = requested.lower()
             if requested == "google" and self._google_key:
                 return "google"
-            elif requested == "anthropic" and self._anthropic_key:
+            elif requested == "anthropic" and self._anthropic_available:
                 return "anthropic"
             elif requested == "openai" and self._openai_key:
                 return "openai"
@@ -88,7 +104,7 @@ class LLMManager:
         if env_provider:
             if env_provider == "google" and self._google_key:
                 return "google"
-            elif env_provider == "anthropic" and self._anthropic_key:
+            elif env_provider == "anthropic" and self._anthropic_available:
                 return "anthropic"
             elif env_provider == "openai" and self._openai_key:
                 return "openai"
@@ -98,7 +114,7 @@ class LLMManager:
         # Auto-detect based on available keys (prefer Google for affordability)
         if self._google_key:
             return "google"
-        elif self._anthropic_key:
+        elif self._anthropic_available:
             return "anthropic"
         elif self._openai_key:
             return "openai"
@@ -137,9 +153,14 @@ class LLMManager:
             return GoogleProvider(api_key=self._google_key)
 
         elif name == "anthropic":
-            if not self._anthropic_key:
-                raise ValueError("Anthropic API key not configured")
-            return AnthropicProvider(api_key=self._anthropic_key)
+            if not self._anthropic_key and not self._anthropic_oauth_token:
+                raise ValueError("Anthropic API key or OAuth not configured")
+            return AnthropicProvider(
+                api_key=self._anthropic_key,
+                oauth_token=self._anthropic_oauth_token,
+                refresh_token=self._anthropic_refresh_token,
+                oauth_expires_at=self._anthropic_oauth_expires_at,
+            )
 
         elif name == "openai":
             if not self._openai_key:
@@ -174,7 +195,7 @@ class LLMManager:
         # Validate the provider has a key configured; fall back to primary if not
         key_map = {
             "google": self._google_key,
-            "anthropic": self._anthropic_key,
+            "anthropic": self._anthropic_key or self._anthropic_oauth_token,
             "openai": self._openai_key,
             "copilot": self._copilot_token,
         }
@@ -212,7 +233,7 @@ class LLMManager:
         available = []
         if self._google_key:
             available.append("google")
-        if self._anthropic_key:
+        if self._anthropic_available:
             available.append("anthropic")
         if self._openai_key:
             available.append("openai")

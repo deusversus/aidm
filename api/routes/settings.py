@@ -91,6 +91,13 @@ async def update_settings(settings: UserSettings):
     # Copilot token is never sent by the frontend — always preserve it
     if not settings.api_keys.copilot_github_token:
         settings.api_keys.copilot_github_token = current.api_keys.copilot_github_token
+    # Anthropic OAuth tokens — never sent by frontend, always preserve
+    if not settings.api_keys.anthropic_oauth_token:
+        settings.api_keys.anthropic_oauth_token = current.api_keys.anthropic_oauth_token
+    if not settings.api_keys.anthropic_refresh_token:
+        settings.api_keys.anthropic_refresh_token = current.api_keys.anthropic_refresh_token
+    if settings.api_keys.anthropic_oauth_expires_at == 0.0:
+        settings.api_keys.anthropic_oauth_expires_at = current.api_keys.anthropic_oauth_expires_at
 
     # Preserve the cached Copilot model list — it's populated by the background
     # fetch after auth and should never be cleared by a plain settings save
@@ -565,3 +572,192 @@ async def disconnect_copilot():
     reset_orchestrator()
 
     return CopilotAuthStatusResponse(status="ok")
+
+
+# ── Anthropic OAuth (PKCE Authorization Code flow) ────────────────────────────
+
+import base64
+import hashlib
+import secrets
+import urllib.parse
+
+_ANTHROPIC_CLIENT_ID = "9d1c250a-e61b-44d9-88ed-5944d1962f5e"
+_ANTHROPIC_REDIRECT_URI = "https://console.anthropic.com/oauth/code/callback"
+_ANTHROPIC_AUTH_URL = "https://claude.ai/oauth/authorize"
+_ANTHROPIC_TOKEN_URL = "https://console.anthropic.com/v1/oauth/token"
+
+# In-memory state for the PKCE flow (single-user local app)
+_anthropic_auth_state: dict[str, str] = {}
+
+
+class AnthropicAuthStartResponse(BaseModel):
+    """Response from Anthropic auth/start."""
+    auth_url: str
+    state: str
+
+
+class AnthropicAuthCallbackRequest(BaseModel):
+    """Request body for Anthropic auth/callback."""
+    code: str
+    state: str
+
+
+class AnthropicAuthStatusResponse(BaseModel):
+    """Response from Anthropic auth status/disconnect."""
+    status: str
+    message: str = ""
+    is_configured: bool = False
+    expires_at: float = 0.0
+    remaining_seconds: float = 0.0
+    is_expired: bool = False
+    is_expiring_soon: bool = False
+
+
+@router.post("/anthropic/auth/start", response_model=AnthropicAuthStartResponse)
+async def start_anthropic_auth():
+    """Initiate Anthropic OAuth PKCE flow.
+
+    Generates a PKCE code verifier/challenge and returns the authorization URL.
+    The user opens this URL in their browser, authorizes, and pastes the
+    resulting code back via /anthropic/auth/callback.
+    """
+    # Generate PKCE pair
+    code_verifier = secrets.token_urlsafe(64)  # 86 chars, well within 43-128 range
+    code_challenge = (
+        base64.urlsafe_b64encode(hashlib.sha256(code_verifier.encode()).digest())
+        .rstrip(b"=")
+        .decode()
+    )
+    state = secrets.token_urlsafe(32)
+
+    # Store for callback validation
+    _anthropic_auth_state.clear()
+    _anthropic_auth_state["code_verifier"] = code_verifier
+    _anthropic_auth_state["state"] = state
+
+    # Build authorization URL
+    params = {
+        "response_type": "code",
+        "client_id": _ANTHROPIC_CLIENT_ID,
+        "redirect_uri": _ANTHROPIC_REDIRECT_URI,
+        "scope": "user:profile user:inference",
+        "code_challenge": code_challenge,
+        "code_challenge_method": "S256",
+        "state": state,
+        "code": "true",
+    }
+    auth_url = f"{_ANTHROPIC_AUTH_URL}?{urllib.parse.urlencode(params)}"
+
+    return AnthropicAuthStartResponse(auth_url=auth_url, state=state)
+
+
+@router.post("/anthropic/auth/callback")
+async def anthropic_auth_callback(request: AnthropicAuthCallbackRequest):
+    """Exchange authorization code for OAuth tokens.
+
+    Called after the user authorizes in the browser and pastes the code.
+    """
+    import httpx
+
+    # Validate state
+    stored_state = _anthropic_auth_state.get("state")
+    code_verifier = _anthropic_auth_state.get("code_verifier")
+
+    if not stored_state or not code_verifier:
+        raise HTTPException(
+            status_code=400,
+            detail="No pending OAuth flow. Start a new flow via /anthropic/auth/start.",
+        )
+    if request.state != stored_state:
+        raise HTTPException(status_code=400, detail="State mismatch — possible CSRF. Try again.")
+
+    # Exchange code for tokens
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            resp = await client.post(
+                _ANTHROPIC_TOKEN_URL,
+                json={
+                    "grant_type": "authorization_code",
+                    "code": request.code,
+                    "code_verifier": code_verifier,
+                    "client_id": _ANTHROPIC_CLIENT_ID,
+                    "redirect_uri": _ANTHROPIC_REDIRECT_URI,
+                },
+                headers={"Content-Type": "application/json"},
+            )
+            resp.raise_for_status()
+            data = resp.json()
+    except httpx.HTTPStatusError as exc:
+        detail = f"Token exchange failed (HTTP {exc.response.status_code})"
+        try:
+            err_body = exc.response.json()
+            detail += f": {err_body.get('error_description', err_body.get('error', ''))}"
+        except Exception:
+            pass
+        raise HTTPException(status_code=400, detail=detail)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Token exchange error: {exc}")
+
+    access_token = data.get("access_token", "")
+    refresh_token = data.get("refresh_token", "")
+    expires_in = data.get("expires_in", 3600)
+
+    if not access_token:
+        raise HTTPException(status_code=400, detail="No access_token in response")
+
+    import time
+    expires_at = time.time() + expires_in
+
+    # Store tokens
+    store = get_settings_store()
+    store.set_anthropic_oauth(access_token, refresh_token, expires_at)
+
+    # Clear auth state
+    _anthropic_auth_state.clear()
+
+    # Reset LLM manager to pick up new auth
+    from src.llm import reset_llm_manager
+    reset_llm_manager()
+    from api.routes.game import reset_orchestrator, reset_session_zero_agent
+    reset_session_zero_agent()
+    reset_orchestrator()
+
+    return {"status": "complete", "expires_in": expires_in}
+
+
+@router.get("/anthropic/auth/status", response_model=AnthropicAuthStatusResponse)
+async def anthropic_auth_status():
+    """Check Anthropic OAuth connection health."""
+    import time
+
+    store = get_settings_store()
+    access, refresh, expires_at = store.get_anthropic_oauth()
+
+    is_configured = bool(access)
+    remaining = max(0, expires_at - time.time()) if expires_at > 0 else 0
+
+    return AnthropicAuthStatusResponse(
+        status="connected" if is_configured else "disconnected",
+        is_configured=is_configured,
+        expires_at=expires_at,
+        remaining_seconds=remaining,
+        is_expired=is_configured and expires_at > 0 and remaining <= 0,
+        is_expiring_soon=is_configured and 0 < remaining < 7200,  # < 2 hours
+    )
+
+
+@router.delete("/anthropic/auth", response_model=AnthropicAuthStatusResponse)
+async def disconnect_anthropic_oauth():
+    """Disconnect Anthropic OAuth — clears stored tokens."""
+    _anthropic_auth_state.clear()
+
+    store = get_settings_store()
+    store.clear_anthropic_oauth()
+
+    from src.llm import reset_llm_manager
+    reset_llm_manager()
+    from api.routes.game import reset_orchestrator, reset_session_zero_agent
+    reset_session_zero_agent()
+    reset_orchestrator()
+
+    return AnthropicAuthStatusResponse(status="ok")

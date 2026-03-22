@@ -921,12 +921,16 @@
                                 </div>
                             </div>
 
-                            <!-- Anthropic API Key -->
+                            <!-- Anthropic API Key + OAuth -->
                             <div class="setting-card" id="anthropic-key-card">
                                 <h3>🤖 Anthropic Claude</h3>
                                 <div class="key-status">
                                     <span class="status-badge" id="anthropic-status">Not configured</span>
                                     <span class="masked-key" id="anthropic-masked"></span>
+                                </div>
+                                <div id="anthropic-oauth-status" style="display:none; margin-top:0.5rem;">
+                                    <span class="status-badge" style="background:rgba(76,175,80,0.2); color:#4caf50;">OAuth Connected</span>
+                                    <span id="anthropic-oauth-expiry" style="font-size:0.8rem; opacity:0.7; margin-left:0.5rem;"></span>
                                 </div>
                                 <div class="setting-inputs">
                                     <input type="password" id="anthropic-key-input" placeholder="sk-ant-..."
@@ -934,6 +938,10 @@
                                     <button class="btn-small save-key-btn" data-provider="anthropic">Save</button>
                                     <button class="btn-small btn-danger clear-key-btn" data-provider="anthropic"
                                         title="Clear saved key">❌</button>
+                                </div>
+                                <div class="setting-inputs" style="margin-top:0.5rem;">
+                                    <button id="anthropic-oauth-btn" class="btn-small save-key-btn" onclick="connectAnthropicOAuth()">🔗 Connect with OAuth</button>
+                                    <button id="anthropic-oauth-disconnect-btn" class="btn-small btn-danger" style="display:none" onclick="disconnectAnthropicOAuth()">Disconnect OAuth</button>
                                 </div>
                             </div>
 
@@ -984,6 +992,27 @@
                                     <span id="copilot-auth-msg" style="margin-left:0.5rem; font-size:0.85rem; color:var(--text-secondary);">Waiting for authorization...</span>
                                 </div>
                                 <button class="btn-small btn-danger" onclick="cancelCopilotAuth()">Cancel</button>
+                            </div>
+                        </div>
+
+                        <!-- Anthropic OAuth Modal -->
+                        <div id="anthropic-auth-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.75); z-index:9999; align-items:center; justify-content:center;">
+                            <div style="background:var(--surface-elevated,#1e1e2e); border:1px solid rgba(255,255,255,0.1); border-radius:12px; padding:2rem; max-width:420px; width:90%; text-align:center;">
+                                <h3 style="margin:0 0 1rem;">🤖 Connect Anthropic OAuth</h3>
+                                <p style="color:var(--text-secondary); margin-bottom:1rem; font-size:0.9rem;">Click below to authorize with your Claude account, then paste the code.</p>
+                                <div style="margin-bottom:1.25rem;">
+                                    <a id="anthropic-auth-url" href="#" target="_blank" style="color:var(--accent-primary,#7c6af5); font-size:0.95rem;">Open Authorization Page ↗</a>
+                                </div>
+                                <div style="background:rgba(255,255,255,0.07); border-radius:8px; padding:1rem; margin-bottom:1.25rem;">
+                                    <div style="font-size:0.75rem; color:var(--text-muted); margin-bottom:0.5rem;">Paste the authorization code here</div>
+                                    <input type="text" id="anthropic-auth-code-input" placeholder="Paste code from Anthropic..."
+                                        style="width:100%; padding:8px 12px; background:var(--surface); border:1px solid var(--border); border-radius:6px; color:var(--text-primary); font-size:0.9rem; font-family:monospace; text-align:center;">
+                                </div>
+                                <div style="display:flex; gap:0.75rem; justify-content:center;">
+                                    <button class="btn-small save-key-btn" onclick="submitAnthropicCode()">Submit Code</button>
+                                    <button class="btn-small btn-danger" onclick="cancelAnthropicAuth()">Cancel</button>
+                                </div>
+                                <div id="anthropic-auth-error" style="display:none; margin-top:1rem; color:#ef5350; font-size:0.85rem;"></div>
                             </div>
                         </div>
 
