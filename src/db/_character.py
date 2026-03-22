@@ -151,7 +151,42 @@ class CharacterMixin:
             c.active = False
         if expired:
             logger.info(f"Expired {len(expired)} consequences at turn {current_turn}")
+            self._rebuild_situation(db)
         return len(expired)
+
+    def _rebuild_situation(self, db=None):
+        """Rebuild WorldState.situation from only active consequences.
+
+        Prevents dead consequence text from accumulating in the situation
+        field, which is included in every agent's context window.
+        """
+        if db is None:
+            db = self._get_db()
+
+        active = (
+            db.query(Consequence)
+            .filter(
+                Consequence.campaign_id == self.campaign_id,
+                Consequence.active == True,
+            )
+            .order_by(Consequence.turn.desc())
+            .limit(10)
+            .all()
+        )
+
+        ws = db.query(WorldState).filter(
+            WorldState.campaign_id == self.campaign_id
+        ).first()
+        if not ws:
+            return
+
+        # Preserve the base situation (first line, set by Director/arc context)
+        base = (ws.situation or "").split("\n\n")[0]
+        if active:
+            consequence_lines = [f"- {c.description}" for c in active]
+            ws.situation = f"{base}\n\nActive consequences:\n" + "\n".join(consequence_lines)
+        else:
+            ws.situation = base
 
     def update_world_state(
         self,

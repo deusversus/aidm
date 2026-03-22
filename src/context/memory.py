@@ -43,6 +43,7 @@ CATEGORY_DECAY = {
     "event": "normal",
     "fact": "slow",
     "npc_state": "normal",
+    "npc_interaction": "slow",  # What NPCs remember about the player
     "location": "slow",
     "episode": "very_fast",
     "narrative_beat": "slow",

@@ -106,7 +106,7 @@ def build_gameplay_tools(
         parameters=[
             ToolParam("name", "str", "NPC name (fuzzy match supported)", required=True),
         ],
-        handler=lambda name: _get_npc_details(state, name)
+        handler=lambda name: _get_npc_details(state, name, memory=memory)
     ))
 
     registry.register(ToolDefinition(
@@ -194,6 +194,18 @@ def build_gameplay_tools(
             ToolParam("name", "str", "NPC name", required=True),
         ],
         handler=lambda name: _dismiss_npc(state, name)
+    ))
+
+    registry.register(ToolDefinition(
+        name="get_npcs_at_location",
+        description=(
+            "List all NPCs whose last known position is a given location. "
+            "Useful for discovering who is present somewhere the player isn't."
+        ),
+        parameters=[
+            ToolParam("location_name", "string", "The location to query", required=True),
+        ],
+        handler=lambda location_name: _get_npcs_at_location(state, location_name)
     ))
 
     # -----------------------------------------------------------------
@@ -414,8 +426,8 @@ def _get_recent_episodes(memory, count: int = 5) -> list[dict]:
     return episodes[:count]
 
 
-def _get_npc_details(state, name: str) -> dict:
-    """Get full NPC card as a dict."""
+def _get_npc_details(state, name: str, memory=None) -> dict:
+    """Get full NPC card as a dict, including shared interaction history."""
     npc = state.get_npc_by_name(name)
     if not npc:
         return {"error": f"No NPC found matching '{name}'"}
@@ -429,7 +441,7 @@ def _get_npc_details(state, name: str) -> dict:
     elif disp >= -60: disp_label = "unfriendly"
     else: disp_label = "hostile"
 
-    return {
+    result = {
         "name": npc.name,
         "role": npc.role or "unknown",
         "affinity": npc.affinity or 0,
@@ -447,7 +459,24 @@ def _get_npc_details(state, name: str) -> dict:
         "faction": npc.faction,
         "ensemble_archetype": npc.ensemble_archetype,
         "growth_stage": npc.growth_stage,
+        "current_location": npc.current_location,
     }
+
+    # Attach shared interaction history from memory (no LLM call — pgvector query)
+    if memory:
+        try:
+            interactions = memory.search(
+                query=npc.name,
+                memory_type="npc_interaction",
+                limit=5,
+                boost_on_access=False,
+            )
+            if interactions:
+                result["shared_history"] = [m["content"] for m in interactions]
+        except Exception:
+            pass  # Memory search is best-effort
+
+    return result
 
 
 def _list_known_npcs(state) -> list[dict]:
@@ -471,9 +500,21 @@ def _list_known_npcs(state) -> list[dict]:
             "scene_count": npc.scene_count or 0,
             "last_appeared": npc.last_appeared,
             "intelligence": npc.intelligence_stage or NPCIntelligenceStage.REACTIVE,
+            "current_location": npc.current_location,
         })
 
     return result
+
+
+def _get_npcs_at_location(state, location_name: str) -> list[dict]:
+    """Return NPCs whose last known position is at the given location."""
+    npcs = state.get_npcs_at_location(location_name)
+    if not npcs:
+        return [{"info": f"No NPCs known at '{location_name}'"}]
+    return [
+        {"name": npc.name, "role": npc.role or "unknown", "affinity": npc.affinity or 0}
+        for npc in npcs
+    ]
 
 
 def _update_npc(state, name: str, **kwargs) -> dict:
@@ -501,12 +542,12 @@ def _get_turn_narrative(state, turn_number: int) -> dict:
 
 
 def _get_world_state(state) -> dict:
-    """Get current world state as a dict."""
+    """Get current world state as a dict, enriched with Location model data."""
     ws = state.get_world_state()
     if not ws:
         return {"error": "No world state found"}
 
-    return {
+    result = {
         "location": ws.location or "Unknown",
         "time_of_day": ws.time_of_day or "Unknown",
         "situation": ws.situation or "No current situation",
@@ -517,6 +558,26 @@ def _get_world_state(state) -> dict:
         "canon_cast_mode": ws.canon_cast_mode,
         "event_fidelity": ws.event_fidelity,
     }
+
+    # Enrich with Location model data (atmosphere, exits, history)
+    if ws.location:
+        try:
+            loc = state.get_location_by_name(ws.location)
+            if loc:
+                result["location_detail"] = {
+                    "atmosphere": loc.atmosphere,
+                    "lighting": loc.lighting,
+                    "scale": loc.scale,
+                    "current_state": loc.current_state or "intact",
+                    "connected_locations": loc.connected_locations or [],
+                    "known_npcs": loc.known_npcs or [],
+                    "times_visited": loc.times_visited or 0,
+                    "notable_events": loc.notable_events or [],
+                }
+        except Exception:
+            pass  # Location enrichment is best-effort
+
+    return result
 
 
 def _get_character_sheet(state) -> dict:

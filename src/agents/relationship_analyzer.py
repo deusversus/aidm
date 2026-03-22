@@ -70,24 +70,41 @@ class RelationshipAnalyzer(BaseAgent):
         npc_names: list[str],
         action: str,
         outcome: str,
-        narrative_excerpt: str
+        narrative_excerpt: str,
+        npc_context: dict[str, dict] | None = None,
     ) -> list[RelationshipOutput]:
         """Analyze relationship changes for multiple NPCs in a single LLM call.
-        
+
         Args:
             npc_names: List of NPC names present in the scene
             action: The player's action
             outcome: The outcome of the action
             narrative_excerpt: Excerpt from the generated narrative
-            
+            npc_context: Optional per-NPC context dict keyed by name, with
+                keys: affinity, disposition_label, intelligence_stage,
+                growth_stage, interaction_count.
+
         Returns:
             List of RelationshipOutput, one per NPC
         """
         if not npc_names:
             return []
 
-        # Build NPC list for prompt
-        npc_list = "\n".join([f"- {name}" for name in npc_names])
+        # Build NPC list with context for better-informed judgments
+        npc_lines = []
+        for name in npc_names:
+            ctx = (npc_context or {}).get(name)
+            if ctx:
+                npc_lines.append(
+                    f"- {name} (affinity: {ctx.get('affinity', 0)}, "
+                    f"disposition: {ctx.get('disposition_label', 'neutral')}, "
+                    f"intelligence: {ctx.get('intelligence_stage', 'reactive')}, "
+                    f"growth: {ctx.get('growth_stage', 'introduction')}, "
+                    f"interactions: {ctx.get('interaction_count', 0)})"
+                )
+            else:
+                npc_lines.append(f"- {name}")
+        npc_list = "\n".join(npc_lines)
 
         prompt = f"""Analyze the following interaction for EACH NPC present.
 
@@ -97,10 +114,11 @@ OUTCOME: {outcome}
 NARRATIVE:
 {narrative_excerpt}
 
-NPCS PRESENT:
+NPCS PRESENT (with current relationship context):
 {npc_list}
 
 For EACH NPC listed above, determine their affinity change and any emotional milestone.
+Consider their current disposition and intelligence stage when judging reactions.
 Return a result for every NPC, even if the delta is 0."""
 
         try:

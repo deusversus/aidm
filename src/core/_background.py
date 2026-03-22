@@ -181,11 +181,22 @@ class BackgroundMixin:
                         if npc_lookup:
                             try:
                                 logger.info(f"Batch NPC analysis for {len(npc_lookup)} NPCs")
+                                # Build per-NPC context for informed analysis
+                                _npc_ctx = {}
+                                for _name, _npc in npc_lookup.items():
+                                    _npc_ctx[_name] = {
+                                        "affinity": _npc.affinity or 0,
+                                        "disposition_label": self.state.get_disposition_label(_npc.disposition or 0),
+                                        "intelligence_stage": _npc.intelligence_stage or "reactive",
+                                        "growth_stage": _npc.growth_stage or "introduction",
+                                        "interaction_count": _npc.interaction_count or 0,
+                                    }
                                 batch_results = await self.relationship_analyzer.analyze_batch(
                                     npc_names=list(npc_lookup.keys()),
                                     action=intent.action,
                                     outcome=outcome.consequence or "No specific outcome",
-                                    narrative_excerpt=narrative[:400]
+                                    narrative_excerpt=narrative[:400],
+                                    npc_context=_npc_ctx,
                                 )
 
                                 for rel_result in batch_results:
@@ -210,6 +221,18 @@ class BackgroundMixin:
                                             )
                                             logger.info(f"Disposition threshold crossed: {milestone['event']}")
 
+                                    # Faction reputation ripple: significant NPC affinity
+                                    # changes propagate to their faction's PC reputation
+                                    if abs(rel_result.affinity_delta) >= 3 and npc.faction:
+                                        try:
+                                            faction_delta = rel_result.affinity_delta // 2
+                                            self.state.update_faction_reputation(
+                                                npc.faction, faction_delta,
+                                                f"Via {npc.name} (turn {db_context.turn_number})"
+                                            )
+                                        except Exception:
+                                            pass  # Faction rep is best-effort
+
                                     if rel_result.emotional_milestone:
                                         event = self.state.record_emotional_milestone(
                                             npc.id,
@@ -225,6 +248,18 @@ class BackgroundMixin:
 
                                     if rel_result.affinity_delta != 0 or rel_result.emotional_milestone:
                                         logger.info(f"{rel_result.npc_name}: delta={rel_result.affinity_delta}, milestone={rel_result.emotional_milestone}")
+
+                                    # Write NPC-scoped interaction memory for shared history
+                                    if rel_result.affinity_delta != 0 or rel_result.emotional_milestone:
+                                        try:
+                                            self.memory.add_memory(
+                                                content=f"{npc.name}: {rel_result.reasoning}",
+                                                memory_type="npc_interaction",
+                                                turn_number=db_context.turn_number,
+                                                metadata={"npc_name": npc.name},
+                                            )
+                                        except Exception:
+                                            pass  # Non-fatal
 
                             except Exception as e:
                                 logger.error(f"Batch error: {e}")

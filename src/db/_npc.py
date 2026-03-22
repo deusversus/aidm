@@ -987,14 +987,35 @@ class NPCMixin:
             db.commit()
 
     def add_to_scene_cast(self, npc_name: str):
-        """Add a permanent NPC to the active scene cast."""
-        from .models import WorldState
+        """Add a permanent NPC to the active scene cast.
+
+        Also updates the NPC's ``current_location`` to the player's
+        current location so spatial queries work.
+        """
+        from .models import NPC, WorldState
+        from .models import Location
         db = self._get_db()
         state = db.query(WorldState).filter(WorldState.campaign_id == self.campaign_id).first()
         if state:
             cast = state.active_scene_cast or []
             if npc_name not in cast:
                 state.active_scene_cast = cast + [npc_name]
+                # Track NPC's spatial position
+                npc = db.query(NPC).filter(
+                    NPC.campaign_id == self.campaign_id,
+                    NPC.name == npc_name,
+                ).first()
+                if npc and state.location:
+                    npc.current_location = state.location
+                    # Record NPC as associated with this location
+                    loc = db.query(Location).filter(
+                        Location.campaign_id == self.campaign_id,
+                        Location.name == state.location,
+                    ).first()
+                    if loc:
+                        known = loc.known_npcs or []
+                        if npc_name not in known:
+                            loc.known_npcs = known + [npc_name]
                 db.commit()
 
     def remove_from_scene_cast(self, npc_name: str):
@@ -1008,6 +1029,15 @@ class NPCMixin:
                 cast.remove(npc_name)
                 state.active_scene_cast = list(cast)
                 db.commit()
+
+    def get_npcs_at_location(self, location_name: str) -> list:
+        """Return all NPCs whose last known location matches *location_name*."""
+        from .models import NPC
+        db = self._get_db()
+        return db.query(NPC).filter(
+            NPC.campaign_id == self.campaign_id,
+            NPC.current_location == location_name,
+        ).all()
 
     def spawn_transient(self, name: str, description: str, spawned_turn: int):
         """Add a transient entity to the current scene. Does NOT create an NPC record."""

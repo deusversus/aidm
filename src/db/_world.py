@@ -666,9 +666,13 @@ class WorldMixin:
 
     def set_current_location(self, name: str) -> Location | None:
         """Mark a location as the current location (clears others).
-        
+
         Called when the player moves to a new location.
+        Also updates ``current_location`` on all NPCs in the active
+        scene cast — they travel with the player.
         """
+        from .models import NPC, WorldState
+
         db = self._get_db()
         # Clear current from all locations
         db.query(Location).filter(
@@ -685,6 +689,20 @@ class WorldMixin:
             location.is_current = True
             location.times_visited = (location.times_visited or 0) + 1
             location.last_visited_turn = self._turn_number
+
+        # Move present NPCs to the new location
+        state = db.query(WorldState).filter(
+            WorldState.campaign_id == self.campaign_id
+        ).first()
+        if state and state.active_scene_cast:
+            for npc_name in state.active_scene_cast:
+                npc = db.query(NPC).filter(
+                    NPC.campaign_id == self.campaign_id,
+                    NPC.name == npc_name,
+                ).first()
+                if npc:
+                    npc.current_location = name
+
         return location
 
     # ── Media Asset CRUD ──────────────────────────────────────────────
