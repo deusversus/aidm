@@ -285,6 +285,7 @@ class CharacterMixin:
         short_term_goal: str | None = None,
         long_term_goal: str | None = None,
         inventory: list | None = None,
+        faction: str | None = None,
         # Stats (Layer 1 + Layer 2)
         stats: dict | None = None,
         stat_presentation: dict | None = None,
@@ -339,6 +340,8 @@ class CharacterMixin:
                 character.long_term_goal = long_term_goal
             if inventory is not None:
                 character.inventory = inventory
+            if faction is not None:
+                character.faction = faction
             if stats is not None:
                 character.stats = stats
             if stat_presentation is not None:

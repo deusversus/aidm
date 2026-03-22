@@ -285,6 +285,19 @@ async def _handle_gameplay_handoff(session, session_id: str, result, agent) -> t
             if _compiler_result.success:
                 _compiler_package = _compiler_result.opening_state_package
                 _compiler_artifact_version = _compiler_result.artifact_version
+
+                # Gap 10: Validate required fields — fall back to no-package
+                # if the compiler produced an incomplete package
+                if _compiler_package is not None:
+                    _pkg_pc = _compiler_package.player_character
+                    _pkg_sit = _compiler_package.opening_situation
+                    if not (_pkg_pc.name and _pkg_sit.starting_location):
+                        logger.warning(
+                            "[Handoff] Package missing required fields "
+                            "(pc.name=%r, sit.location=%r) — treating as degraded",
+                            _pkg_pc.name, _pkg_sit.starting_location,
+                        )
+                        _handoff_warnings.append("Package incomplete — using legacy path for missing fields")
                 gap = _compiler_result.gap_analysis
                 n_gaps = len(gap.unresolved_items) if gap else 0
                 _handoff_status = "complete" if (gap and gap.handoff_safe) else "degraded"
@@ -363,12 +376,30 @@ async def _handle_gameplay_handoff(session, session_id: str, result, agent) -> t
         short_term_goal=draft.goals.get("short_term") if draft.goals else None,
         long_term_goal=draft.goals.get("long_term") if draft.goals else None,
         inventory=draft.inventory,
+        faction=draft.faction if hasattr(draft, "faction") else None,
         stats=draft.attributes or {},
         stat_presentation=draft.stat_presentation,
     )
     logger.info(f"Power tier set to: {final_tier}")
 
-    # 1b. Fire-and-forget: Generate player character media
+    # 1b. Set NPC current_location to starting location (Gap 7)
+    # NPCs created during SZ have null current_location — set them all
+    # to the starting location so spatial tracking works from turn 1.
+    if draft.starting_location:
+        try:
+            all_npcs = orchestrator.state.get_all_npcs()
+            for npc in all_npcs:
+                if not npc.current_location:
+                    npc.current_location = draft.starting_location
+            if all_npcs:
+                from src.db.database import get_db
+                db = get_db()
+                db.commit()
+                logger.info(f"[Handoff] Set current_location for {len(all_npcs)} NPCs → {draft.starting_location}")
+        except Exception as loc_err:
+            logger.warning(f"[Handoff] NPC location init failed (non-fatal): {loc_err}")
+
+    # 1c. Fire-and-forget: Generate player character media
     if draft.appearance or draft.visual_tags:
         try:
             safe_create_task(
@@ -389,7 +420,6 @@ async def _handle_gameplay_handoff(session, session_id: str, result, agent) -> t
         orchestrator.state.update_world_state(
             location=draft.starting_location,
             situation="The journey begins.",
-            time_of_day="evening",  # Sensible default; Director will adjust
         )
 
     # --- 3. Transfer OP Mode ---
@@ -432,9 +462,17 @@ async def _handle_gameplay_handoff(session, session_id: str, result, agent) -> t
             # Cap at 2000 chars to stay reasonable for the context window.
             situation_text = last_assistant_msg[:2000]
 
+        # Extract time_of_day from package if available (Gap 5)
+        _time_of_day = "evening"  # sensible default
+        if _compiler_package is not None:
+            _pkg_time = getattr(_compiler_package.opening_situation, "time_context", "")
+            if _pkg_time:
+                _time_of_day = _pkg_time
+
         orchestrator.state.update_world_state(
             location=draft.starting_location or "Unknown Location",
             situation=situation_text,
+            time_of_day=_time_of_day,
             arc_phase="setup",
             tension_level=0.4,
             # Sync canonicality from Session Zero

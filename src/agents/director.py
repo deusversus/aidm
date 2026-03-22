@@ -504,6 +504,35 @@ Provide a CONCISE investigation report structured as:
                     for n in notes:
                         lines.append(f"  - {n}")
 
+            # === CONTRADICTIONS (Gap 2) ===
+            if hasattr(pkg, "contradictions_summary") and pkg.contradictions_summary:
+                lines.append("\n## ⚡ Contradictions Detected (MUST resolve before arc planning)")
+                for c in pkg.contradictions_summary[:5]:
+                    desc = c.description if hasattr(c, "description") else str(c)
+                    lines.append(f"  - {desc}")
+
+            # === ORPHAN FACTS (Gap 8) ===
+            if hasattr(pkg, "orphan_facts") and pkg.orphan_facts:
+                lines.append("\n## 🔮 Unresolved Entities (follow up in early arcs)")
+                for f in pkg.orphan_facts[:5]:
+                    content = f.content if hasattr(f, "content") else str(f)
+                    lines.append(f"  - {content}")
+
+            # === FACTION CONTEXT (Gap 6) ===
+            if hasattr(pkg, "faction_context") and pkg.faction_context:
+                fc = pkg.faction_context
+                if fc.relevant_factions:
+                    lines.append("\n## 🏴 Faction Landscape")
+                    for fname in fc.relevant_factions[:5]:
+                        alignment = fc.current_alignment_map.get(fname, "unknown")
+                        lines.append(f"  - **{fname}** — alignment: {alignment}")
+                    if fc.visible_pressure:
+                        lines.append(f"**Visible Pressure:** {fc.visible_pressure}")
+                    if fc.faction_conflicts_already_in_play:
+                        lines.append("**Active Conflicts:**")
+                        for conf in fc.faction_conflicts_already_in_play[:3]:
+                            lines.append(f"  - {conf}")
+
             # === NARRATIVE PROFILE DNA ===
             self._append_profile_dna(lines, profile)
 

@@ -1294,6 +1294,33 @@ Add your creative execution perspective — agree, push back, or offer a differe
             if ai.must_not_end_on:
                 lines.append(f"**Avoid Ending On:** {ai.must_not_end_on}")
 
+        # === UNCERTAINTIES (Gap 3) ===
+        unc = getattr(pkg, "uncertainties", None)
+        if unc:
+            unconfirmed = list(unc.safe_assumptions or [])[:3]
+            if unconfirmed:
+                lines.append("\n## ⚠️ Unconfirmed Details (treat as tentative)")
+                for a in unconfirmed:
+                    lines.append(f"  - {a}")
+
+        # === LORE SYNTHESIS NOTES (Gap 9) ===
+        lsn = getattr(pkg, "lore_synthesis_notes", None)
+        if lsn:
+            lines.append("\n## 📜 World Rules (from lore synthesis)")
+            if isinstance(lsn, list):
+                for note in lsn[:4]:
+                    lines.append(f"  - {note}")
+            elif isinstance(lsn, str) and lsn.strip():
+                lines.append(lsn[:500])
+
+        # === CONTRADICTIONS (Gap 2) ===
+        contras = getattr(pkg, "contradictions_summary", None)
+        if contras:
+            lines.append("\n## ⚡ Contradictions (DO NOT reproduce in scene)")
+            for c in contras[:3]:
+                desc = c.description if hasattr(c, "description") else str(c)
+                lines.append(f"  - {desc}")
+
         # === PROFILE DNA ===
         if profile.dna:
             lines.append("\n## Narrative DNA")
