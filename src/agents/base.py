@@ -32,6 +32,12 @@ class BaseAgent(ABC):
     # Defaults to agent_name if not overridden.
     prompt_name: str | None = None
 
+    # When True, the system prompt is wrapped in cache-aware blocks
+    # so Anthropic's prompt caching can reuse it across turns.
+    # Only effective on providers that support caching (Anthropic).
+    # Other providers receive the prompt as a plain string (no-op).
+    cache_system_prompt: bool = False
+
     def __init__(self, model_override: str | None = None):
         """Initialize the agent.
         
@@ -145,6 +151,13 @@ class BaseAgent(ABC):
 
         # Use override if provided, otherwise use default
         system = system_prompt_override if system_prompt_override is not None else self.system_prompt
+
+        # Wrap system prompt for caching when opted in.
+        # Converts "prompt text" → [("prompt text", True)] which providers
+        # that support caching (Anthropic) will use to set cache_control
+        # breakpoints.  Other providers flatten it back to a plain string.
+        if self.cache_system_prompt and isinstance(system, str) and system:
+            system = [(system, True)]
 
         # Increase token limit for thinking models
         max_tokens = 16384 if use_extended_thinking else 8192

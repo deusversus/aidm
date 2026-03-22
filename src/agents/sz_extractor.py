@@ -17,6 +17,7 @@ class SZExtractorAgent(BaseAgent):
 
     agent_name = "sz_extractor"
     prompt_name = "sz_extractor"
+    cache_system_prompt = True
 
     @property
     def output_schema(self):

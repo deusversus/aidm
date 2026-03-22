@@ -1,7 +1,7 @@
 """Session Zero per-turn pipeline.
 
 Wraps the existing SessionZeroAgent (conductor) with per-turn extraction,
-entity resolution, gap analysis, memory retrieval, and compaction.
+entity resolution + gap analysis, memory retrieval, and compaction.
 Runs behind the ``SESSION_ZERO_ORCHESTRATOR_ENABLED`` feature flag.
 
 When the flag is off, SessionZeroAgent handles all turns directly (legacy).
@@ -9,16 +9,14 @@ When on, each player turn triggers:
 
 1. **Extraction** — ``SZExtractorAgent.extract_chunk()`` on the latest
    user message (plus a small context window)
-   *(runs in parallel with gap analysis on turn 2+)*
-2. **Gap analysis** — ``SZGapAnalyzerAgent.analyze()`` identifying missing
-   info and recommending follow-up questions
-3. **Entity resolution** — ``SZEntityResolverAgent.resolve()`` merging new
-   extraction into the cumulative entity graph
-4. **Validation** — consistency check on resolution output (retry once if
+2. **Resolution + Gap Analysis** — ``SZResolverAndGapAgent.resolve_and_analyze()``
+   merging the latest extraction into the entity graph incrementally AND
+   identifying gaps/contradictions in a single pass
+3. **Validation** — consistency check on resolution output (retry once if
    extraction found entities but resolution returned zero)
-5. **Memory retrieval** — pgvector queries for prior SZ context (no LLM call)
-6. **Compaction** — summarize dropped messages via CompactorAgent
-7. **Conductor** — ``SessionZeroAgent.process_turn()`` with gap context,
+4. **Memory retrieval** — pgvector queries for prior SZ context (no LLM call)
+5. **Compaction** — summarize dropped messages via CompactorAgent
+6. **Conductor** — ``SessionZeroAgent.process_turn()`` with gap context,
    retrieved memories, and compaction text injected
 
 The cumulative entity graph is persisted to ``session_zero_artifacts``
@@ -28,7 +26,6 @@ after a server restart.
 
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
 from dataclasses import dataclass, field
@@ -38,10 +35,10 @@ from src.agents.session_zero_schemas import (
     EntityResolutionOutput,
     ExtractionPassOutput,
     GapAnalysisOutput,
+    ResolverAndGapOutput,
 )
 from src.agents.sz_extractor import SZExtractorAgent
-from src.agents.sz_entity_resolver import SZEntityResolverAgent
-from src.agents.sz_gap_analyzer import SZGapAnalyzerAgent
+from src.agents.sz_resolver_and_gap import SZResolverAndGapAgent
 from src.observability import end_trace, log_span, start_trace
 
 if TYPE_CHECKING:
@@ -103,8 +100,7 @@ class SessionZeroPipeline:
 
         # Sub-agents (instantiated lazily so settings are fresh)
         self._extractor = SZExtractorAgent()
-        self._resolver = SZEntityResolverAgent()
-        self._gap_analyzer = SZGapAnalyzerAgent()
+        self._resolver_and_gap = SZResolverAndGapAgent()
 
         # Pipeline state
         self._state = SZPipelineState()
@@ -155,49 +151,20 @@ class SessionZeroPipeline:
             max_output=max_out,
             max_calls=max_calls,
         ) as budget:
-            # ── Step 1: Extraction ‖ Gap analysis (parallel) ──────────────
-            # Gap analysis runs on the PRIOR turn's resolution output,
-            # so it's independent of this turn's extraction.
-            extraction = None
-            tasks: list[asyncio.Task] = []
-
-            extraction_task = asyncio.ensure_future(
-                self._run_extraction(session, player_input)
-            )
-            tasks.append(extraction_task)
-
-            gap_task = None
-            if self._state.entity_resolution:
-                gap_task = asyncio.ensure_future(
-                    self._run_gap_analysis(session)
-                )
-                tasks.append(gap_task)
-
-            results = await asyncio.gather(*tasks, return_exceptions=True)
-
-            # Unpack extraction result
-            ext_result = results[0]
-            if isinstance(ext_result, Exception):
-                logger.error("Extraction raised: %s", ext_result)
-            elif ext_result is not None:
-                extraction = ext_result
+            # ── Step 1: Extraction ────────────────────────────────────────
+            extraction = await self._run_extraction(session, player_input)
+            if extraction:
                 self._state.extraction_passes.append(extraction)
 
-            # Unpack gap analysis result (if run)
-            if gap_task is not None:
-                gap_result = results[1]
-                if isinstance(gap_result, Exception):
-                    logger.error("Gap analysis raised: %s", gap_result)
-                elif gap_result is not None:
-                    self._state.gap_analysis = gap_result
+            # ── Step 2: Resolution + Gap Analysis (merged, incremental) ───
+            # Sends only the LATEST extraction + prior graph (O(1), not O(n))
+            if extraction:
+                combined = await self._run_resolution_and_gap(session, extraction)
+                if combined:
+                    self._state.entity_resolution = combined.as_entity_resolution()
+                    self._state.gap_analysis = combined.as_gap_analysis()
 
-            # ── Step 2: Entity resolution ─────────────────────────────────
-            if self._state.extraction_passes:
-                resolution = await self._run_entity_resolution(session)
-                if resolution:
-                    self._state.entity_resolution = resolution
-
-            # ── Step 3: Validation — retry resolution if inconsistent ─────
+            # ── Step 3: Validation — retry if inconsistent ────────────────
             if extraction and self._state.entity_resolution:
                 await self._validate_resolution(session, extraction)
 
@@ -327,59 +294,39 @@ class SessionZeroPipeline:
             logger.exception("SZ extraction failed — continuing without new extraction")
             return None
 
-    async def _run_entity_resolution(
+    async def _run_resolution_and_gap(
         self,
         session: Session,
-    ) -> EntityResolutionOutput | None:
-        """Merge all extraction passes into a canonical entity graph."""
+        latest_extraction: ExtractionPassOutput,
+    ) -> ResolverAndGapOutput | None:
+        """Resolve entities and analyze gaps in a single merged pass.
+
+        Sends only the LATEST extraction + prior entity graph (incremental,
+        O(1) input size instead of O(n) with turn count).
+        """
         try:
             from src.agents._session_zero_research import get_profile_context_for_agent
 
-            result = await self._resolver.resolve(
-                extraction_passes=self._state.extraction_passes,
+            result = await self._resolver_and_gap.resolve_and_analyze(
+                latest_extraction=latest_extraction,
                 character_draft=session.character_draft.to_dict(),
+                session_messages_count=len(session.messages or []),
+                prior_resolution=self._state.entity_resolution,
                 profile_context=get_profile_context_for_agent(session),
             )
             logger.info(
-                "SZ entity resolution: %d canonical entities, %d merges",
+                "SZ resolve+gap: %d entities, %d merges, handoff_safe=%s, %d unresolved",
                 len(result.canonical_entities),
                 len(result.merges_performed),
+                result.handoff_safe,
+                len(result.unresolved_items),
             )
             log_span(
-                "sz_pipeline.entity_resolution",
+                "sz_pipeline.resolution_and_gap",
                 output={
                     "canonical_entity_count": len(result.canonical_entities),
                     "merges_performed": len(result.merges_performed),
                     "alias_count": len(result.alias_map),
-                },
-            )
-            return result
-
-        except Exception:
-            logger.exception("SZ entity resolution failed — using prior graph")
-            return None
-
-    async def _run_gap_analysis(
-        self,
-        session: Session,
-    ) -> GapAnalysisOutput | None:
-        """Identify gaps and recommend follow-up questions."""
-        try:
-            result = await self._gap_analyzer.analyze(
-                entity_resolution=self._state.entity_resolution,
-                extraction_passes=self._state.extraction_passes,
-                character_draft=session.character_draft.to_dict(),
-                session_messages_count=len(session.messages or []),
-            )
-            logger.info(
-                "SZ gap analysis: handoff_safe=%s, %d unresolved, %d followups recommended",
-                result.handoff_safe,
-                len(result.unresolved_items),
-                len(result.recommended_player_followups),
-            )
-            log_span(
-                "sz_pipeline.gap_analysis",
-                output={
                     "handoff_safe": result.handoff_safe,
                     "unresolved_count": len(result.unresolved_items),
                     "blocking_issues": result.blocking_issues,
@@ -389,7 +336,7 @@ class SessionZeroPipeline:
             return result
 
         except Exception:
-            logger.exception("SZ gap analysis failed — continuing with default progression")
+            logger.exception("SZ resolution+gap failed — using prior state")
             return None
 
     async def _run_conductor(
@@ -516,7 +463,7 @@ class SessionZeroPipeline:
         session: Session,
         extraction: ExtractionPassOutput,
     ) -> None:
-        """Retry entity resolution once if extraction found entities but resolution returned zero."""
+        """Retry resolution once if extraction found entities but resolution returned zero."""
         resolution = self._state.entity_resolution
         if not resolution:
             return
@@ -533,9 +480,10 @@ class SessionZeroPipeline:
                 "sz_pipeline.resolution_retry",
                 input={"extracted_count": extracted_count},
             )
-            retry = await self._run_entity_resolution(session)
+            retry = await self._run_resolution_and_gap(session, extraction)
             if retry and len(retry.canonical_entities) > 0:
-                self._state.entity_resolution = retry
+                self._state.entity_resolution = retry.as_entity_resolution()
+                self._state.gap_analysis = retry.as_gap_analysis()
                 logger.info(
                     "SZ resolution retry succeeded: %d canonical entities",
                     len(retry.canonical_entities),

@@ -314,6 +314,73 @@ class GapAnalysisOutput(BaseModel):
     schema_version: int = Field(default=1)
 
 
+class ResolverAndGapOutput(BaseModel):
+    """Combined output from the merged resolver + gap analyzer pass.
+
+    Contains all fields from EntityResolutionOutput (entity graph)
+    and GapAnalysisOutput (quality assessment) in a single response,
+    eliminating one LLM call and the duplicated extraction_passes payload.
+    """
+
+    # ── Entity Resolution fields ──
+    canonical_entities: list[EntityRecord] = Field(
+        default_factory=list,
+        description="Merged, deduplicated entity list — each entity is fully resolved",
+    )
+    canonical_relationships: list[RelationshipRecord] = Field(default_factory=list)
+    merges_performed: list[MergeHistoryEntry] = Field(default_factory=list)
+    alias_map: dict[str, str] = Field(
+        default_factory=dict,
+        description="Maps every alias/variant name -> canonical_id for quick lookup",
+    )
+
+    # ── Gap Analysis fields ──
+    unresolved_items: list[UnresolvedItem] = Field(default_factory=list)
+    contradictions: list[ContradictionRecord] = Field(default_factory=list)
+    handoff_safe: bool = Field(
+        default=False,
+        description="True if handoff can proceed without player intervention",
+    )
+    blocking_issues: list[str] = Field(
+        default_factory=list,
+        description="Summary of blocking issues that prevent handoff",
+    )
+    warnings: list[str] = Field(
+        default_factory=list,
+        description="Non-blocking concerns worth surfacing",
+    )
+    recommended_player_followups: list[str] = Field(
+        default_factory=list,
+        description="Ordered list of most valuable questions to ask the player",
+    )
+
+    schema_version: int = Field(default=1)
+
+    # ── Convenience accessors for pipeline compatibility ──
+
+    def as_entity_resolution(self) -> EntityResolutionOutput:
+        """Extract the resolution portion for persistence/pipeline state."""
+        return EntityResolutionOutput(
+            canonical_entities=self.canonical_entities,
+            canonical_relationships=self.canonical_relationships,
+            merges_performed=self.merges_performed,
+            alias_map=self.alias_map,
+            schema_version=self.schema_version,
+        )
+
+    def as_gap_analysis(self) -> GapAnalysisOutput:
+        """Extract the gap analysis portion for pipeline state."""
+        return GapAnalysisOutput(
+            unresolved_items=self.unresolved_items,
+            contradictions=self.contradictions,
+            handoff_safe=self.handoff_safe,
+            blocking_issues=self.blocking_issues,
+            warnings=self.warnings,
+            recommended_player_followups=self.recommended_player_followups,
+            schema_version=self.schema_version,
+        )
+
+
 # ─────────────────────────────────────────────
 # Opening-state package (full contract)
 # ─────────────────────────────────────────────

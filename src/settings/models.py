@@ -32,8 +32,7 @@ class AgentSettings(BaseModel):
     - FAST: intent_classifier, outcome_judge, validator, memory_ranker,
       combat, progression, scale_selector, compactor, scope, pacing,
       recap, production, beat_extractor, relationship_analyzer,
-      world_builder, wiki_scout, sz_extractor, sz_gap_analyzer,
-      sz_entity_resolver
+      world_builder, wiki_scout, sz_extractor, sz_resolver_and_gap
     - THINKING: director, research, profile_merge, intent_resolution,
       session_zero, sz_handoff
     - CREATIVE: key_animator (prose generation)
@@ -49,7 +48,9 @@ class AgentSettings(BaseModel):
         "world_builder", "wiki_scout", "compactor",
         "scope", "pacing", "recap", "production", "beat_extractor",
         # SZ pipeline analysis agents — fast structured extraction, not prose
-        "sz_extractor", "sz_gap_analyzer", "sz_entity_resolver",
+        "sz_extractor", "sz_resolver_and_gap",
+        # Legacy (kept for testing; not called from pipeline)
+        "sz_gap_analyzer", "sz_entity_resolver",
     })
     THINKING_TIER: ClassVar[frozenset[str]] = frozenset({
         "director", "research", "profile_merge", "intent_resolution",
@@ -157,13 +158,18 @@ class AgentSettings(BaseModel):
         default=None,
         description="Extracts entities, facts, and cues from the SZ transcript (thinking model preferred)"
     )
+    sz_resolver_and_gap: ModelConfig | None = Field(
+        default=None,
+        description="Merged entity resolution + gap analysis in a single pass (fast model preferred)"
+    )
+    # Legacy — kept for backward compat with existing settings.json files
     sz_gap_analyzer: ModelConfig | None = Field(
         default=None,
-        description="Identifies narrative gaps, contradictions, and ambiguities in extracted data (thinking model preferred)"
+        description="(Legacy, unused) Gap analyzer — merged into sz_resolver_and_gap"
     )
     sz_entity_resolver: ModelConfig | None = Field(
         default=None,
-        description="Deduplicates and canonicalizes extracted entities and relationships (thinking model preferred)"
+        description="(Legacy, unused) Entity resolver — merged into sz_resolver_and_gap"
     )
     sz_handoff: ModelConfig | None = Field(
         default=None,
