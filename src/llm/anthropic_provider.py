@@ -44,19 +44,28 @@ class AnthropicProvider(LLMProvider):
         refresh_token: str = "",
         oauth_expires_at: float = 0.0,
     ):
-        """Initialize with either API key or OAuth credentials.
+        """Initialize with either API key, OAuth credentials, or both.
 
-        When both are provided, OAuth is preferred.
+        When both are provided:
+        - OAuth is tried first (free via subscription)
+        - Non-Haiku models skip OAuth (gated by OAUTH_ALL_MODELS)
+          and go straight to API key
+        - If OAuth fails, falls back to API key
         """
-        # Pass a non-empty string to base class to satisfy its contract.
-        # We never use self.api_key from the base — _init_client handles auth.
         super().__init__(api_key=api_key or "oauth")
 
         self._api_key = api_key
         self._oauth_token = oauth_token
         self._refresh_token = refresh_token
         self._oauth_expires_at = oauth_expires_at
-        self._using_oauth = bool(oauth_token)
+        self._has_oauth = bool(oauth_token)
+        self._has_api_key = bool(api_key)
+        # Default: OAuth if available, API key otherwise
+        self._using_oauth = self._has_oauth
+
+        # Cached clients for each auth method (created lazily)
+        self._oauth_client = None
+        self._apikey_client = None
 
     @property
     def name(self) -> str:
@@ -81,6 +90,15 @@ class AnthropicProvider(LLMProvider):
 
     # Models that support the 1M token context window via beta header.
     _1M_CONTEXT_MODELS = frozenset({"opus-4-6", "sonnet-4-6", "sonnet-4-5"})
+
+    # ── OAuth model gate ──────────────────────────────────────────────────
+    # When False: OAuth is only used for Haiku models (confirmed working).
+    # When True:  OAuth is attempted for ALL models (flip this if Anthropic
+    #             opens up Sonnet/Opus access for third-party OAuth).
+    OAUTH_ALL_MODELS: bool = False
+
+    # Models that always work with OAuth regardless of the gate above.
+    _OAUTH_ALLOWED_MODELS = frozenset({"claude-haiku-4-5", "claude-haiku-4-5-20251001"})
 
     def _get_betas(self, model_name: str, base_betas: list[str] | None = None) -> list[str]:
         """Return the beta features list for the given model.
@@ -110,16 +128,41 @@ class AnthropicProvider(LLMProvider):
 
     # ── Token management ───────────────────────────────────────────────────
 
-    def _ensure_client(self):
-        """Override: refresh OAuth token if needed, then init client.
+    def _should_use_oauth(self, model: str | None) -> bool:
+        """Decide whether to use OAuth for this model."""
+        if not self._has_oauth:
+            return False
+        if self.OAUTH_ALL_MODELS:
+            return True
+        # Gate: only use OAuth for explicitly allowed models
+        return (model or self.default_model) in self._OAUTH_ALLOWED_MODELS
 
-        For API key auth, this is a no-op (token never expires).
-        For OAuth auth, proactively refresh before expiry.
+    def _ensure_client(self, model: str | None = None):
+        """Select auth method based on model, refresh OAuth if needed.
+
+        Routing logic:
+        - If OAUTH_ALL_MODELS is True: try OAuth for everything
+        - If False: OAuth only for Haiku, API key for everything else
+        - Always falls back to whatever auth is available
         """
+        want_oauth = self._should_use_oauth(model)
+
+        # If we want OAuth but don't have it, fall back to API key
+        if want_oauth and not self._has_oauth:
+            want_oauth = False
+        # If we want API key but don't have it, fall back to OAuth
+        if not want_oauth and not self._has_api_key:
+            want_oauth = self._has_oauth
+
+        # Switch client if auth method changed
+        if want_oauth != self._using_oauth:
+            self._using_oauth = want_oauth
+            self._client = None
+
         if self._using_oauth:
             needs_refresh = (
                 self._oauth_expires_at > 0
-                and time.time() >= self._oauth_expires_at - 120  # 120s buffer
+                and time.time() >= self._oauth_expires_at - 120
             )
             if needs_refresh:
                 try:
@@ -127,7 +170,7 @@ class AnthropicProvider(LLMProvider):
                 except Exception:
                     self._client = None
                     raise
-                self._client = None  # force reinit with new token
+                self._client = None
 
         if self._client is None:
             self._init_client()
@@ -262,9 +305,8 @@ class AnthropicProvider(LLMProvider):
         extended_thinking: bool = False,
     ) -> LLMResponse:
         """Generate a text completion using Claude."""
-        self._ensure_client()
-
         model_name = model or self.default_model
+        self._ensure_client(model_name)
 
         # Prepare request args
         kwargs = {
@@ -349,9 +391,8 @@ class AnthropicProvider(LLMProvider):
         Claude will automatically search the web for relevant information
         and synthesize results with citations.
         """
-        self._ensure_client()
-
         model_name = model or self.get_research_model()
+        self._ensure_client(model_name)
 
         # Enable web search tool - use web_search_20250305 type per Anthropic docs
         tools = [{
@@ -439,9 +480,8 @@ class AnthropicProvider(LLMProvider):
         extended_thinking: bool = False,
     ) -> BaseModel:
         """Generate a structured completion using tool use."""
-        self._ensure_client()
-
         model_name = model or self.default_model
+        self._ensure_client(model_name)
 
         # Get JSON schema from Pydantic model
         json_schema = schema.model_json_schema()
@@ -583,9 +623,8 @@ class AnthropicProvider(LLMProvider):
         
         Claude will search the web, then provide a structured response.
         """
-        self._ensure_client()
-
         model_name = model or self.get_research_model()
+        self._ensure_client(model_name)
 
         json_schema = schema.model_json_schema()
 
@@ -679,9 +718,8 @@ Your response must match the required JSON schema.
         Beta: advanced-tool-use-2025-11-20
         Requires: code_execution_20250825 server tool
         """
-        self._ensure_client()
-
         model_name = model or self.get_fast_model()
+        self._ensure_client(model_name)
 
         # Try programmatic tool calling first, fall back to standard
         try:
