@@ -67,7 +67,14 @@ async def process_turn(request: TurnRequest):
             logger.info(f"Processing turn: '{safe_input}...'")
         except Exception:
             logger.error("Processing turn: (encoding failed)")
-        result = await orchestrator.process_turn(player_input=request.player_input, recent_messages=recent_messages, compaction_text=compaction_text)
+        from src.config import Config
+        from src.observability import TurnTokenBudget, TokenBudgetExceeded
+
+        max_in, max_out, max_calls = Config.get_turn_limits()
+        async with TurnTokenBudget(
+            max_input=max_in, max_output=max_out, max_calls=max_calls,
+        ):
+            result = await orchestrator.process_turn(player_input=request.player_input, recent_messages=recent_messages, compaction_text=compaction_text)
 
         # DEBUG: Log the actual narrative value
         logger.info("Result received:")
@@ -114,6 +121,12 @@ async def process_turn(request: TurnRequest):
         logger.info(f"Returning TurnResponse with narrative length: {len(response.narrative)}")
 
         return response
+    except TokenBudgetExceeded as e:
+        logger.critical("CIRCUIT BREAKER on gameplay turn: %s", e)
+        raise HTTPException(
+            status_code=429,
+            detail=f"Turn aborted to prevent runaway token spend: {e.reason}",
+        )
     except Exception as e:
         import traceback
         logger.error(f"ERROR in process_turn: {e}")

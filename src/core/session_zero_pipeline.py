@@ -110,7 +110,14 @@ class SessionZeroPipeline:
             3. Analyze gaps
             4. Generate conductor response with gap context
             5. Persist entity graph (for crash recovery)
+
+        The entire pipeline runs inside a ``TurnTokenBudget`` context.
+        If any step exceeds the configured token limits, a
+        ``TokenBudgetExceeded`` error is raised and the turn aborts.
         """
+        from src.config import Config
+        from src.observability import TurnTokenBudget
+
         self._state.turn_count += 1
         logger.info(
             "SZ pipeline turn %d — session=%s",
@@ -118,28 +125,42 @@ class SessionZeroPipeline:
             self.session_id or "unknown",
         )
 
-        # ── Step 1: Extraction ────────────────────────────────────────────
-        extraction = await self._run_extraction(session, player_input)
-        if extraction:
-            self._state.extraction_passes.append(extraction)
+        max_in, max_out, max_calls = Config.get_turn_limits()
+        async with TurnTokenBudget(
+            max_input=max_in,
+            max_output=max_out,
+            max_calls=max_calls,
+        ) as budget:
+            # ── Step 1: Extraction ────────────────────────────────────────
+            extraction = await self._run_extraction(session, player_input)
+            if extraction:
+                self._state.extraction_passes.append(extraction)
 
-        # ── Step 2: Entity resolution ─────────────────────────────────────
-        if self._state.extraction_passes:
-            resolution = await self._run_entity_resolution(session)
-            if resolution:
-                self._state.entity_resolution = resolution
+            # ── Step 2: Entity resolution ─────────────────────────────────
+            if self._state.extraction_passes:
+                resolution = await self._run_entity_resolution(session)
+                if resolution:
+                    self._state.entity_resolution = resolution
 
-        # ── Step 3: Gap analysis ──────────────────────────────────────────
-        if self._state.entity_resolution:
-            gap = await self._run_gap_analysis(session)
-            if gap:
-                self._state.gap_analysis = gap
+            # ── Step 3: Gap analysis ──────────────────────────────────────
+            if self._state.entity_resolution:
+                gap = await self._run_gap_analysis(session)
+                if gap:
+                    self._state.gap_analysis = gap
 
-        # ── Step 4: Conductor response with gap context ───────────────────
-        result = await self._run_conductor(session, player_input)
+            # ── Step 4: Conductor response with gap context ───────────────
+            result = await self._run_conductor(session, player_input)
 
-        # ── Step 5: Persist pipeline state ─────────────────────────────────
-        await self._persist_pipeline_state(session)
+            # ── Step 5: Persist pipeline state ─────────────────────────────
+            await self._persist_pipeline_state(session)
+
+            logger.info(
+                "SZ pipeline turn %d complete — %d calls, %d input tokens, %d output tokens",
+                self._state.turn_count,
+                budget.call_count,
+                budget.accumulated_input,
+                budget.accumulated_output,
+            )
 
         return result
 

@@ -323,6 +323,42 @@
                             </div>
                         </div>
 
+                        <!-- Cost Protection (Circuit Breaker) -->
+                        <div class="setting-card"
+                            style="margin-bottom: 1.5rem; background: linear-gradient(135deg, rgba(76, 175, 80, 0.1), rgba(33, 150, 243, 0.1));">
+                            <div>
+                                <h3 style="margin: 0;">🛡️ Cost Protection</h3>
+                                <p class="setting-desc" style="margin: 0.5rem 0 0;">Per-turn circuit breaker limits.
+                                    If a turn exceeds these limits it aborts automatically to prevent runaway API spend.</p>
+                            </div>
+
+                            <div style="margin-top: 0.75rem; display: flex; flex-wrap: wrap; gap: 1rem 1.5rem;">
+                                <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+                                    <label style="font-size: 0.8rem; opacity: 0.7;">Max Input Tokens / Turn</label>
+                                    <input type="number" id="max-turn-input-tokens" value="500000" min="50000"
+                                        max="2000000" step="50000"
+                                        style="width: 110px; padding: 4px 8px; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary); font-size: 0.85rem; font-family: monospace;">
+                                </div>
+                                <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+                                    <label style="font-size: 0.8rem; opacity: 0.7;">Max Output Tokens / Turn</label>
+                                    <input type="number" id="max-turn-output-tokens" value="100000" min="10000"
+                                        max="500000" step="10000"
+                                        style="width: 110px; padding: 4px 8px; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary); font-size: 0.85rem; font-family: monospace;">
+                                </div>
+                                <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+                                    <label style="font-size: 0.8rem; opacity: 0.7;">Max LLM Calls / Turn</label>
+                                    <input type="number" id="max-turn-llm-calls" value="25" min="3" max="50" step="1"
+                                        style="width: 70px; padding: 4px 8px; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary); font-size: 0.85rem; font-family: monospace;">
+                                </div>
+                                <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+                                    <label style="font-size: 0.8rem; opacity: 0.7;">Rate Limit (req/min)</label>
+                                    <input type="number" id="rate-limit-per-minute" value="30" min="5" max="120"
+                                        step="5"
+                                        style="width: 70px; padding: 4px 8px; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary); font-size: 0.85rem; font-family: monospace;">
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- Base Defaults Section -->
                         <h3 style="margin: 1rem 0 0.5rem; color: var(--accent-secondary);">📌 Base Defaults</h3>
                         <p class="setting-desc" style="margin-bottom: 1rem;">Default models for unconfigured agents.

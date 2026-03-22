@@ -4,19 +4,31 @@
 
 const API_BASE = '/api';
 
+// Optional API key for authenticated access.
+// Set via <meta name="aidm-api-key" content="..."> in index.html,
+// or fetched from /api/health to detect if auth is required.
+let _apiKey = (() => {
+    const meta = document.querySelector('meta[name="aidm-api-key"]');
+    return meta ? meta.getAttribute('content') : '';
+})();
+
 /**
  * Generic fetch wrapper with error handling
  */
 async function apiRequest(endpoint, options = {}) {
     const url = `${API_BASE}${endpoint}`;
 
-    const defaultOptions = {
-        headers: {
-            'Content-Type': 'application/json',
-        },
+    const headers = {
+        'Content-Type': 'application/json',
+        ...(options.headers || {}),
     };
 
-    const response = await fetch(url, { ...defaultOptions, ...options });
+    // Attach API key if configured
+    if (_apiKey) {
+        headers['X-API-Key'] = _apiKey;
+    }
+
+    const response = await fetch(url, { ...options, headers });
 
     if (!response.ok) {
         const error = await response.json().catch(() => ({ detail: 'Unknown error' }));

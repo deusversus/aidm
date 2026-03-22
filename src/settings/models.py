@@ -309,6 +309,26 @@ class UserSettings(BaseModel):
         description="Auto-play generated cutscene videos (muted)"
     )
 
+    # ── Cost Protection (Circuit Breaker) ──────────────────────────────
+    # Per-turn limits that abort a turn if exceeded, preventing runaway spend.
+    # These override the env-var defaults in Config when set here.
+    max_turn_input_tokens: int = Field(
+        default=500_000,
+        description="Max input tokens per turn across all LLM calls before circuit breaker trips"
+    )
+    max_turn_output_tokens: int = Field(
+        default=100_000,
+        description="Max output tokens per turn across all LLM calls before circuit breaker trips"
+    )
+    max_turn_llm_calls: int = Field(
+        default=25,
+        description="Max LLM calls per turn before circuit breaker trips"
+    )
+    rate_limit_per_minute: int = Field(
+        default=30,
+        description="Max requests per minute on expensive endpoints (turn, session-zero)"
+    )
+
     # Dynamically fetched Copilot model list (cached after first auth)
     copilot_models: list[dict] | None = Field(
         default=None,

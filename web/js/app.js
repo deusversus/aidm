@@ -781,6 +781,16 @@ async function loadSettings() {
             mediaAutoplay.checked = settings.media_auto_play !== false;  // default true
         }
 
+        // Cost protection settings
+        const maxInputTokens = document.getElementById('max-turn-input-tokens');
+        if (maxInputTokens) maxInputTokens.value = settings.max_turn_input_tokens || 500000;
+        const maxOutputTokens = document.getElementById('max-turn-output-tokens');
+        if (maxOutputTokens) maxOutputTokens.value = settings.max_turn_output_tokens || 100000;
+        const maxLlmCalls = document.getElementById('max-turn-llm-calls');
+        if (maxLlmCalls) maxLlmCalls.value = settings.max_turn_llm_calls || 25;
+        const rateLimit = document.getElementById('rate-limit-per-minute');
+        if (rateLimit) rateLimit.value = settings.rate_limit_per_minute || 30;
+
         // Load API keys
         await loadApiKeys();
 
@@ -1141,6 +1151,11 @@ async function saveAdvancedSettings() {
             media_image_model: document.getElementById('media-image-model')?.textContent || 'gemini-3-pro-image-preview',
             media_video_model: document.getElementById('media-video-model')?.textContent || 'veo-3.1-generate-preview',
             media_auto_play: document.getElementById('media-autoplay-toggle')?.checked !== false,
+            // Cost protection
+            max_turn_input_tokens: parseInt(document.getElementById('max-turn-input-tokens')?.value) || 500000,
+            max_turn_output_tokens: parseInt(document.getElementById('max-turn-output-tokens')?.value) || 100000,
+            max_turn_llm_calls: parseInt(document.getElementById('max-turn-llm-calls')?.value) || 25,
+            rate_limit_per_minute: parseInt(document.getElementById('rate-limit-per-minute')?.value) || 30,
         };
 
         await API.Settings.update(settings);

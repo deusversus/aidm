@@ -75,6 +75,55 @@ class Config:
     # At that point, research becomes always-on within the orchestrator pipeline.
     SESSION_ZERO_RESEARCH_ENABLED: bool = os.getenv("SESSION_ZERO_RESEARCH_ENABLED", "false").lower() == "true"
 
+    # ── Token Budget / Circuit Breaker ───────────────────────────────────────
+    # Per-turn limits to prevent runaway token burn.
+    # Env vars serve as fallback; UI settings (settings.json) take priority
+    # when accessed via get_turn_limits().
+    MAX_TURN_INPUT_TOKENS: int = int(os.getenv("MAX_TURN_INPUT_TOKENS", "500000"))
+    MAX_TURN_OUTPUT_TOKENS: int = int(os.getenv("MAX_TURN_OUTPUT_TOKENS", "100000"))
+    MAX_TURN_LLM_CALLS: int = int(os.getenv("MAX_TURN_LLM_CALLS", "25"))
+
+    # ── Network Security ─────────────────────────────────────────────────────
+    # Bind address for the server (default: localhost only).
+    BIND_HOST: str = os.getenv("AIDM_BIND_HOST", "127.0.0.1")
+
+    # Optional API key gate. When set, all /api/* routes require this key.
+    # When empty, no auth is enforced (local development default).
+    AIDM_API_KEY: str = os.getenv("AIDM_API_KEY", "")
+
+    # CORS allowed origins (comma-separated). Empty = localhost only.
+    CORS_ORIGINS: str = os.getenv("CORS_ORIGINS", "")
+
+    # Rate limit: max requests per minute on expensive endpoints.
+    RATE_LIMIT_PER_MINUTE: int = int(os.getenv("RATE_LIMIT_PER_MINUTE", "30"))
+
+    @classmethod
+    def get_turn_limits(cls) -> tuple[int, int, int]:
+        """Get per-turn token budget limits (settings.json > env vars).
+
+        Returns:
+            (max_input_tokens, max_output_tokens, max_llm_calls)
+        """
+        try:
+            from .settings import get_settings_store
+            s = get_settings_store().load()
+            return (
+                s.max_turn_input_tokens,
+                s.max_turn_output_tokens,
+                s.max_turn_llm_calls,
+            )
+        except Exception:
+            return (cls.MAX_TURN_INPUT_TOKENS, cls.MAX_TURN_OUTPUT_TOKENS, cls.MAX_TURN_LLM_CALLS)
+
+    @classmethod
+    def get_rate_limit(cls) -> int:
+        """Get rate limit per minute (settings.json > env var)."""
+        try:
+            from .settings import get_settings_store
+            return get_settings_store().load().rate_limit_per_minute
+        except Exception:
+            return cls.RATE_LIMIT_PER_MINUTE
+
     @classmethod
     def validate(cls) -> list[str]:
         """Validate configuration, return list of issues."""

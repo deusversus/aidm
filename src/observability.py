@@ -1,7 +1,9 @@
-"""Langfuse observability integration.
+"""Langfuse observability integration + per-turn token budget circuit breaker.
 
 Opt-in: all functions are no-ops when LANGFUSE_PUBLIC_KEY / LANGFUSE_SECRET_KEY
 are not set. Nothing outside this module imports langfuse directly.
+
+The TurnTokenBudget is always active regardless of Langfuse.
 """
 
 import logging
@@ -14,6 +16,96 @@ logger = logging.getLogger(__name__)
 _client = None
 _current_trace: ContextVar = ContextVar("langfuse_trace", default=None)
 _current_agent: ContextVar = ContextVar("langfuse_agent", default=None)
+
+
+# ── Per-Turn Token Budget (Circuit Breaker) ──────────────────────────────────
+
+class TokenBudgetExceeded(RuntimeError):
+    """Raised when a turn exceeds its token budget."""
+
+    def __init__(self, reason: str, budget: "TurnTokenBudget"):
+        self.reason = reason
+        self.accumulated_input = budget.accumulated_input
+        self.accumulated_output = budget.accumulated_output
+        self.call_count = budget.call_count
+        super().__init__(
+            f"CIRCUIT BREAKER: {reason} — "
+            f"{budget.call_count} calls, "
+            f"{budget.accumulated_input:,} input tokens, "
+            f"{budget.accumulated_output:,} output tokens"
+        )
+
+
+_current_budget: ContextVar["TurnTokenBudget | None"] = ContextVar(
+    "turn_token_budget", default=None
+)
+
+
+class TurnTokenBudget:
+    """Track cumulative token usage across all LLM calls in a single turn.
+
+    Usage::
+
+        async with TurnTokenBudget(max_input=500_000):
+            # All LLM calls made in this scope are tracked.
+            # If limits are exceeded, TokenBudgetExceeded is raised.
+            result = await agent.call(...)
+
+    The budget is automatically registered via ``log_generation()``
+    which every LLM provider already calls.
+    """
+
+    def __init__(
+        self,
+        max_input: int = 500_000,
+        max_output: int = 100_000,
+        max_calls: int = 25,
+    ):
+        self.max_input = max_input
+        self.max_output = max_output
+        self.max_calls = max_calls
+        self.accumulated_input = 0
+        self.accumulated_output = 0
+        self.call_count = 0
+        self._token: object | None = None
+
+    def record(self, input_tokens: int, output_tokens: int) -> None:
+        """Record token usage from a single LLM call and check limits."""
+        self.accumulated_input += input_tokens
+        self.accumulated_output += output_tokens
+        self.call_count += 1
+
+        if self.call_count > self.max_calls:
+            raise TokenBudgetExceeded(
+                f"Too many LLM calls ({self.call_count} > {self.max_calls})", self
+            )
+        if self.accumulated_input > self.max_input:
+            raise TokenBudgetExceeded(
+                f"Input token limit exceeded "
+                f"({self.accumulated_input:,} > {self.max_input:,})",
+                self,
+            )
+        if self.accumulated_output > self.max_output:
+            raise TokenBudgetExceeded(
+                f"Output token limit exceeded "
+                f"({self.accumulated_output:,} > {self.max_output:,})",
+                self,
+            )
+
+    async def __aenter__(self) -> "TurnTokenBudget":
+        self._token = _current_budget.set(self)
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb) -> bool:
+        if self._token is not None:
+            _current_budget.reset(self._token)
+            self._token = None
+        return False  # don't suppress exceptions
+
+
+def get_current_budget() -> "TurnTokenBudget | None":
+    """Get the active turn token budget, if any."""
+    return _current_budget.get(None)
 
 
 def init_langfuse() -> bool:
@@ -104,7 +196,16 @@ def log_generation(
     output: Any = None,
     metadata: dict | None = None,
 ):
-    """Log an LLM generation (with token usage) on the current trace."""
+    """Log an LLM generation (with token usage) on the current trace.
+
+    Also records usage against the active TurnTokenBudget (if any),
+    raising ``TokenBudgetExceeded`` if limits are breached.
+    """
+    # Record against circuit breaker (always, regardless of Langfuse)
+    budget = get_current_budget()
+    if budget is not None:
+        budget.record(input_tokens, output_tokens)
+
     trace = get_trace()
     if not trace:
         return

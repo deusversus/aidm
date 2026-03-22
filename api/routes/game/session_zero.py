@@ -12,6 +12,7 @@ from src.agents.session_zero import (
 )
 from src.agents.intent_resolution_handler import resolve_media_intent
 from src.config import Config
+from src.observability import TokenBudgetExceeded
 from src.core.session import (
     PHASE_ORDER,
     SessionPhase,
@@ -584,7 +585,12 @@ async def session_zero_turn(session_id: str, request: TurnRequest):
                 except Exception:
                     logger.warning("SZ provisional memory write failed — non-fatal")
         else:
-            result = await agent.process_turn(session, request.player_input)
+            from src.observability import TurnTokenBudget
+            max_in, max_out, max_calls = Config.get_turn_limits()
+            async with TurnTokenBudget(
+                max_input=max_in, max_output=max_out, max_calls=max_calls,
+            ):
+                result = await agent.process_turn(session, request.player_input)
             _extraction_summary = None
 
         # Initialize opening scene vars (only populated during handoff)
@@ -1002,6 +1008,12 @@ async def session_zero_turn(session_id: str, request: TurnRequest):
             extraction_summary=_extraction_summary,
         )
 
+    except TokenBudgetExceeded as e:
+        logger.critical("CIRCUIT BREAKER on SZ turn: %s", e)
+        raise HTTPException(
+            status_code=429,
+            detail=f"Turn aborted to prevent runaway token spend: {e.reason}",
+        )
     except Exception as e:
         logger.error(f"Session Zero error: {str(e)}\n{traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"Session Zero error: {str(e)}")

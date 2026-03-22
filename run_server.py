@@ -97,8 +97,13 @@ env["PYTHONIOENCODING"] = "utf-8"
 
 log_path = SCRIPT_DIR / "server.log"
 with open(log_path, "w", encoding="utf-8") as log_file:
+    # Bind to AIDM_BIND_HOST (default 127.0.0.1 — localhost only).
+    # Set AIDM_BIND_HOST=0.0.0.0 in .env to expose to the network.
+    bind_host = os.getenv("AIDM_BIND_HOST", "127.0.0.1")
+    print(f"[run_server] Binding to {bind_host}:8000")
+
     proc = subprocess.Popen(
-        [sys.executable, "-u", "-m", "uvicorn", "api.main:app", "--reload", "--host", "0.0.0.0", "--port", "8000"],
+        [sys.executable, "-u", "-m", "uvicorn", "api.main:app", "--reload", "--host", bind_host, "--port", "8000"],
         stdout=log_file,
         stderr=subprocess.STDOUT,
         bufsize=0,
