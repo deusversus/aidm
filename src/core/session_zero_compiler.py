@@ -21,6 +21,7 @@ Usage:
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 import logging
@@ -63,6 +64,12 @@ logger = logging.getLogger(__name__)
 # Chunk size for transcript extraction passes (messages per chunk)
 # Keeps each LLM call well within context window limits
 _EXTRACTION_CHUNK_SIZE = 20
+
+# Max extraction chunks processed concurrently. Bound keeps us inside LLM
+# rate limits while still eliminating serial-latency tax on long transcripts.
+# Pass 2 (entity resolution) deduplicates any redundant extractions that
+# result from chunks running without visibility into each other's canonicals.
+_EXTRACTION_MAX_CONCURRENCY = 4
 
 
 def _compute_orphan_facts(
@@ -273,32 +280,43 @@ class HandoffCompiler:
     # ──────────────────────────────────────────────────────────────────────
 
     async def _run_extraction_pass(self) -> None:
-        """Run extraction in chunks across the full transcript."""
+        """Run extraction in chunks across the full transcript.
+
+        Chunks run concurrently (bounded by ``_EXTRACTION_MAX_CONCURRENCY``).
+        Because parallel chunks can't share freshly-extracted canonical IDs,
+        some redundancy is possible; Pass 2 (entity resolution) dedupes it.
+        Results are stored in original transcript order.
+        """
         messages = self._ctx.messages
         chunk_size = _EXTRACTION_CHUNK_SIZE
         total = len(messages)
-        all_canonical_ids: list[str] = []
 
-        for chunk_start in range(0, total, chunk_size):
-            chunk_end = min(chunk_start + chunk_size, total)
-            chunk = messages[chunk_start:chunk_end]
+        chunk_ranges = [
+            (start, min(start + chunk_size, total))
+            for start in range(0, total, chunk_size)
+        ]
+        logger.debug(
+            "[HandoffCompiler] Extracting %d chunk(s) concurrently (max %d in flight)",
+            len(chunk_ranges), _EXTRACTION_MAX_CONCURRENCY,
+        )
 
-            logger.debug(
-                "[HandoffCompiler] Extraction chunk %d-%d / %d",
-                chunk_start, chunk_end, total,
+        sem = asyncio.Semaphore(_EXTRACTION_MAX_CONCURRENCY)
+
+        async def _extract_one(start: int, end: int) -> ExtractionPassOutput:
+            async with sem:
+                return await self._extractor.extract_chunk(
+                    transcript_chunk=messages[start:end],
+                    chunk_start_index=start,
+                    chunk_end_index=end,
+                    previously_extracted_canonical_ids=[],
+                    profile_context=self._ctx.profile_context,
+                )
+
+        if chunk_ranges:
+            outputs = await asyncio.gather(
+                *(_extract_one(s, e) for s, e in chunk_ranges)
             )
-
-            pass_output = await self._extractor.extract_chunk(
-                transcript_chunk=chunk,
-                chunk_start_index=chunk_start,
-                chunk_end_index=chunk_end,
-                previously_extracted_canonical_ids=all_canonical_ids,
-                profile_context=self._ctx.profile_context,
-            )
-            self._ctx.extraction_passes.append(pass_output)
-
-            # Track canonical IDs to avoid re-extraction in later chunks
-            all_canonical_ids.extend(e.canonical_id for e in pass_output.entity_records)
+            self._ctx.extraction_passes.extend(outputs)
 
         stats = self._ctx.extraction_stats()
         self._ctx.checkpoints.append(CompilerCheckpoint(

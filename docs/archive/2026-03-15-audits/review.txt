@@ -1,0 +1,108 @@
+ ---
+  Overall Assessment
+
+  This is an exceptionally thorough design doc. The problem diagnosis is accurate, the layered architecture is sound, and
+  the implementation sequencing (handoff compiler first, orchestrator second) is the right call. The level of detail on
+  persistence boundaries, artifact versioning, and idempotency rules will save you from painful debugging later. A few
+  concerns and suggestions:
+
+  ---
+  Things I'd Push Back On
+
+  1. Four new first-class agents may be premature
+
+  The plan advocates for sz_extractor, sz_gap_analyzer, sz_entity_resolver, and sz_handoff as separate configurable agents
+  from the start (Wave 2). That's a lot of new settings surface area for something that hasn't been battle-tested yet.
+
+  Recommendation: Start with Wave 1 (only session_zero + sz_handoff exposed). Keep extractor/gap/resolver as internal passes
+   inside the handoff compiler that share the sz_handoff model config. Promote them to first-class only after you've seen
+  real transcripts where independent tuning actually matters. The plan acknowledges this option but then defaults to Wave 2
+  — I'd flip that default.
+
+  2. All five new agents at "thinking" tier is expensive
+
+  Every new agent is recommended for thinking tier. That means a dense Session Zero with multiple turns will run 3-4
+  thinking-tier calls per turn (extractor + gap analyzer + entity resolver + conductor). For providers like Anthropic or
+  OpenAI, that's significant cost and latency.
+
+  Recommendation: Start sz_entity_resolver at fast tier. Entity dedup/alias resolution is more pattern-matching than deep
+  reasoning — structured output with a clear schema should perform well on fast models. Promote to thinking only if quality
+  proves insufficient.
+
+  3. The session_zero_runs table adds complexity without clear early payoff
+
+  The optional session_zero_runs table (section 11.5.4) adds operational debugging support, but in the early milestones you
+  won't have enough operational experience to know what to query. Meanwhile, Langfuse traces already capture run-level
+  metadata.
+
+  Recommendation: Skip this table entirely for now. Langfuse traces + artifact versioning give you sufficient debuggability.
+   Add it later if you find yourself wanting queries that traces can't answer.
+
+  4. The opening-state package schema is over-specified
+
+  Sections 12.4.4 through 12.4.18 define ~15 top-level sections with dozens of fields each. That's a lot of contract surface
+   to get right before you've seen what Director/KA actually need in practice.
+
+  Recommendation: Start with a flatter, less granular package. Something like: player_character, scene_setup (combining
+  situation + cast + location), world_rules (combining canon + lore + factions), narrative_guidance (combining tone +
+  director inputs + animation inputs), constraints (hard + soft + uncertainties). Evolve the structure as Director/KA
+  consumption patterns emerge.
+
+  5. Six feature flags is too many
+
+  The plan proposes sz_handoff_compiler_enabled, sz_opening_package_enabled, sz_director_package_input_enabled,
+  sz_dedicated_opening_scene_enabled, sz_frontend_handoff_status_enabled, sz_orchestrator_enabled. That's a combinatorial
+  explosion of states to test.
+
+  Recommendation: Two flags: SZ_COMPILER_ENABLED (covers the handoff compiler + opening package) and SZ_ORCHESTRATOR_ENABLED
+   (covers the live turn pipeline). The opening-scene path migration is better handled by code evolution within the compiler
+   flag boundary, not a separate flag.
+
+  ---
+  Things I'd Add
+
+  1. Latency budget and user feedback during compilation
+
+  The plan mentions handoff_status=compiling but doesn't address what the user actually sees. A multi-pass compiler with 3-5
+   thinking-tier LLM calls could take 30-60 seconds. The frontend needs a progress indicator or at least a "preparing your
+  adventure..." state.
+
+  2. Graceful degradation strategy
+
+  What happens when the compiler produces a degraded package? The plan defines the status but doesn't specify the policy.
+  Should the system proceed with warnings? Ask the player to fill gaps? Auto-resolve with lower confidence? This needs a
+  concrete default before M1.
+
+  3. Transcript size limits
+
+  Dense freeform Session Zero conversations can get long. The plan doesn't address what happens when the transcript exceeds
+  a single LLM context window. The extractor should probably work on chunks, but that needs explicit design — especially for
+   entity resolution across chunks.
+
+  4. A concrete extraction schema
+
+  The plan is detailed about what to extract but doesn't propose a concrete Pydantic/dataclass schema for the extraction
+  output. Given that extraction quality is the core value proposition, defining this schema early (in M0) would ground the
+  whole project.
+
+  ---
+  Questions to Resolve
+
+  The plan's section 22 lists good open questions. My answers:
+
+  1. First-class vs internal? — Start with only sz_handoff as new first-class. Internal everything else initially.
+  2. Sync vs async compilation? — Synchronous for M1. The compiler should target <30s. Add async with progress polling only
+  if latency proves unacceptable.
+  3. Dedicated opening-scene path? — Yes, but not until M3. The synthetic turn is ugly but functional and low-risk to keep
+  temporarily.
+  4. Storage? — New session_zero_artifacts table. The plan's Option A is correct.
+  5. Auto-resolve vs preserve ambiguity? — Default to preserving ambiguity with a safe_assumptions list. Auto-resolve only
+  for trivially inferrable facts (e.g., alias dedup with high confidence).
+
+  ---
+  Bottom Line
+
+  The architecture is right. The sequencing is right. The main risk is over-building before validating with real
+  transcripts. I'd trim the first slice to be even more minimal: one new table, one new agent config key (sz_handoff), a
+  compiler that produces a simple opening-state package, and 2-3 transcript fixtures. Get that working end-to-end, see what
+  Director/KA actually do with the package, then expand.

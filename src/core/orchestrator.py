@@ -165,27 +165,45 @@ class Orchestrator(TurnPipelineMixin, BackgroundMixin):
         # Crash recovery check (Gap 9): detect incomplete prior turns
         self._check_incomplete_turns()
 
-    def _check_incomplete_turns(self) -> None:
-        """Check for turns where background processing didn't complete (crash recovery)."""
+    def _check_incomplete_turns(self) -> dict | None:
+        """Check for turns where background processing didn't complete (crash recovery).
+
+        Reads the latest ``gameplay_turn_checkpoint`` artifact. If the most recent
+        turn did not finish its post-narrative bookkeeping, logs a warning and
+        stores the incomplete-turn info on ``self.incomplete_turn`` so callers
+        (UI, admin endpoints, tests) can surface or act on it.
+
+        Returns the incomplete-turn dict when one is detected, else ``None``.
+        """
+        self.incomplete_turn: dict | None = None
         try:
             from src.db.session import get_session
-            from src.db.session_zero_artifacts import get_active_artifact
+            from src.db.session_zero_artifacts import (
+                get_active_artifact,
+                load_artifact_content,
+            )
 
             with get_session() as db:
                 checkpoint = get_active_artifact(
                     db, str(self.campaign_id), "gameplay_turn_checkpoint"
                 )
-                if checkpoint:
-                    import json
-                    data = json.loads(checkpoint.content) if isinstance(checkpoint.content, str) else checkpoint.content
-                    if not data.get("background_completed", True):
-                        logger.warning(
-                            "CRASH RECOVERY: Turn %d background processing was incomplete. "
-                            "Some bookkeeping (memory, progression, foreshadowing) may be missing.",
-                            data.get("turn_number", "?"),
-                        )
-        except Exception:
-            pass  # Non-fatal — don't block init
+                if not checkpoint:
+                    return None
+                data = load_artifact_content(checkpoint)
+                if data.get("background_completed", True):
+                    return None
+                self.incomplete_turn = data
+                logger.warning(
+                    "CRASH RECOVERY: Turn %s background processing was incomplete. "
+                    "Intent=%s. Memory/progression/foreshadowing writes for that turn "
+                    "may be missing; subsequent turns will proceed normally.",
+                    data.get("turn_number", "?"),
+                    data.get("intent", "?"),
+                )
+                return data
+        except Exception as e:
+            logger.debug("Crash-recovery check failed (non-fatal): %s", e)
+            return None
 
     def close(self):
         """Release resources held by the orchestrator.

@@ -63,3 +63,4 @@ Thumbs.db
 
 # === Generated profiles (auto-regenerated from DB) ===
 src/profiles/catalog/*.yaml
+.copilot/

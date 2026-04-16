@@ -1,0 +1,117 @@
+================================================================================
+MockLLMProvider Testing Infrastructure - AUDIT SUMMARY
+================================================================================
+
+IMPLEMENTATION LOCATION:
+  File: /home/jcettison/aidm/tests/conftest.py (lines 35-143)
+  
+KEY FINDINGS:
+
+1. CURRENT CAPABILITIES ✓
+   ✓ Text response queuing (queue_response)
+   ✓ Schema response queuing (queue_schema_response)
+   ✓ Call history inspection (call_history property)
+   ✓ Support for complete(), complete_with_schema(), complete_with_tools()
+   ✓ Default fallback responses to prevent crashes
+
+2. CRITICAL GAPS (HIGH SEVERITY) ✗
+   ✗ NO schema validation - queued instances never checked against expected types
+   ✗ NO queue underflow detection - silent defaults hide missing responses
+   ✗ NO queue overflow warning - extra queued responses never reported
+   ✗ NO per-method queue separation - complete() and complete_with_tools() share queue
+   ✗ NO response tracking in call_history - can't verify what was actually returned
+
+3. SPECIFIC BUGS IDENTIFIED:
+
+   BUG #1: Mixed Queue for Text Methods (MEDIUM)
+   - Both complete() and complete_with_tools() pop from _response_queue
+   - Can consume response intended for wrong method
+   - Example: Queued "Agent answer" for call() consumed by call_with_tools()
+
+   BUG #2: model_construct() Called Without Args (MEDIUM)
+   - Creates instances with unset required fields on underflow
+   - Can cause KeyError or AttributeError downstream
+   - No validation that required fields are present
+
+   BUG #3: No Per-Call Schema Tracking (MEDIUM)
+   - call_history stores only the schema CLASS, not instances
+   - Impossible to detect queued ExtractionPassOutput returned as EntityResolutionOutput
+
+   BUG #4: Fragile Pipeline Ordering (HIGH)
+   - Multi-pass tests queue 4 schema responses in precise order
+   - If agents called out of sequence, queues become misaligned
+   - No error; test silently uses wrong schemas for wrong agents
+
+   BUG #5: Direct Private Attribute Access (FRAGILE)
+   - Tests access _schema_queue.clear() directly
+   - Breaks encapsulation; future refactoring breaks tests
+   - Example: mock_provider._schema_queue.clear() in test_sz_compiler.py:294
+
+   BUG #6: call_history Missing Response Data (LOW)
+   - Can inspect what was requested but not what was returned
+   - No per-call record of actual response content
+
+4. TEST USAGE PATTERNS IDENTIFIED:
+
+   Pattern 1: Simple tests
+   - Queue response, call agent, assert content
+   - Low risk: single queued item
+
+   Pattern 2: Schema tests  
+   - Queue Pydantic instances, call agent
+   - Medium risk: no validation of schema match
+
+   Pattern 3: Multi-pass pipelines (FRAGILE)
+   - Queue 4+ schema responses in order for HandoffCompiler
+   - High risk: relies on perfect call sequencing
+   - No sync mechanism if agents called out of order
+   - Used in: test_sz_compiler.py, test_handoff_compiler.py, test_phase2_enrichment.py
+
+   Pattern 4: Error simulation (WORKAROUND)
+   - Monkey-patch complete_with_schema = failing_async_func
+   - Works but not integrated into MockLLMProvider
+   - Used in: test_pacing_directive.py
+
+5. MISSING CAPABILITIES FOR ROBUST TESTS:
+
+   HIGH PRIORITY:
+   [ ] queue_schema_response validation - check isinstance before queuing
+   [ ] Underflow detection - raise instead of silent defaults
+   [ ] Overflow detection - warn about leftover responses
+   [ ] Separate queues per method - avoid cross-method pollution
+   [ ] Response tracking - store what was actually returned
+
+   MEDIUM PRIORITY:
+   [ ] Error simulation - integrated queue_error() method
+   [ ] Latency simulation - add delay capability
+   [ ] Malformed response - queue unparseable JSON
+   [ ] Helper methods - calls_to_method(), get_call_count(), assert_queue_empty()
+   [ ] Schema mismatch detection - auto-check queued vs expected
+
+   LOW PRIORITY:
+   [ ] Detailed response tracking in call_history
+   [ ] Debug mode with logging
+   [ ] Public queue_size() and clear_queues() methods
+
+6. RECOMMENDATIONS (PRIORITY ORDER):
+
+   IMMEDIATE:
+   - Add schema validation to queue_schema_response
+   - Replace silent underflow with RuntimeError
+   - Create separate _complete_queue, _schema_queue, _tools_queue
+   - Add assert_queue_empty() for end-of-test verification
+
+   SHORT TERM:
+   - Track returned schema type in call_history
+   - Add public helper methods (calls_to_method, get_call_count)
+   - Document expected call sequences in multi-pass tests
+   - Remove direct private attribute access (_schema_queue.clear → clear_queues)
+
+   MEDIUM TERM:
+   - Error/latency/malformed response simulation
+   - Pytest plugin for auto queue verification
+   - Fixture that detects call sequence from agent definitions
+
+================================================================================
+Full detailed audit report: /home/jcettison/aidm/MockLLMProvider_Audit.md
+================================================================================
