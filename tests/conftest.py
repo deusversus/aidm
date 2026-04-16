@@ -65,11 +65,34 @@ def mock_llm_manager(mock_provider):
 
 @pytest.fixture
 def fresh_db():
-    """Create an in-memory SQLite database with all tables."""
+    """Provide a clean-data DB, preserving schema across tests.
+
+    On SQLite (the default in-memory test URL), dropping everything is fine
+    because the next fixture call recreates the schema. On Postgres (shared
+    dev DB), dropping would destroy alembic-managed tables that have no
+    ORM class — and re-running ``init_db`` only creates ORM-known tables.
+    So instead of drop_all, we TRUNCATE all ORM-known tables with CASCADE,
+    which resets data AND the legacy tables that reference them, without
+    touching schema.
+    """
     init_db()
-    yield get_engine()
-    # Teardown: drop all tables
-    Base.metadata.drop_all(bind=get_engine())
+    engine = get_engine()
+    yield engine
+    try:
+        if engine.dialect.name == "postgresql":
+            import sqlalchemy as sa
+            names = ", ".join(f'"{t.name}"' for t in Base.metadata.sorted_tables)
+            if names:
+                with engine.begin() as conn:
+                    conn.execute(sa.text(
+                        f"TRUNCATE TABLE {names} RESTART IDENTITY CASCADE"
+                    ))
+        else:
+            Base.metadata.drop_all(bind=engine)
+    except Exception:
+        # Teardown is best-effort; leaking data between tests is better
+        # than blocking the suite on a teardown failure.
+        pass
 
 
 @pytest.fixture

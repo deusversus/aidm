@@ -452,19 +452,39 @@ class BackgroundMixin:
 
                 # =============================================================
                 # 13. MARK CHECKPOINT COMPLETE (Gap 9)
+                # Preserve the diagnostic fields from the pre-background
+                # checkpoint so the latest artifact row is a full record
+                # of the turn, not a stub.
                 # =============================================================
                 try:
+                    import time as _time
                     from src.db.session import get_session
-                    from src.db.session_zero_artifacts import save_artifact
+                    from src.db.session_zero_artifacts import (
+                        get_active_artifact,
+                        load_artifact_content,
+                        save_artifact,
+                    )
                     with get_session() as _db:
+                        prior = get_active_artifact(
+                            _db,
+                            str(self.state.campaign_id),
+                            "gameplay_turn_checkpoint",
+                        )
+                        prior_data = load_artifact_content(prior) if prior else {}
+                        payload = {
+                            **prior_data,
+                            "turn_number": db_context.turn_number,
+                            "background_completed": True,
+                            "completed_at": _time.time(),
+                            "background_latency_ms": int(
+                                (time.time() - bg_start) * 1000
+                            ),
+                        }
                         save_artifact(
                             _db,
                             str(self.state.campaign_id),
                             "gameplay_turn_checkpoint",
-                            {
-                                "turn_number": db_context.turn_number,
-                                "background_completed": True,
-                            },
+                            payload,
                         )
                 except Exception:
                     pass  # Non-fatal
@@ -959,29 +979,85 @@ class BackgroundMixin:
         )
 
     async def _bg_save_entity_graph(self, db_context) -> None:
-        """Save versioned entity graph (NPC/location state) as artifact."""
+        """Save a versioned, rich entity-graph snapshot as a SessionZeroArtifact.
+
+        ``save_artifact`` is content-hash-deduplicated, so calling this every
+        five turns only produces a new version when world state actually
+        changed — giving us an audit trail of NPC disposition, location state,
+        faction standing, and PC-faction relationships without version churn.
+
+        Captures the fields that mutate during gameplay and matter for
+        reconstructing "what did the world look like at turn N?":
+          - NPC: location, disposition, affinity, alive, faction, last_appeared
+          - Location: current_state, is_current, times_visited, last_visited_turn
+          - Faction: relationships, pc_reputation, pc_rank, influence_score
+        """
         from src.db.session import get_session
         from src.db.session_zero_artifacts import save_artifact
 
-        entity_snapshot = {"turn_number": db_context.turn_number, "npcs": [], "locations": []}
+        npc_rows: list[dict] = []
+        location_rows: list[dict] = []
+        faction_rows: list[dict] = []
 
         try:
-            npcs = self.state.get_all_npcs()
-            entity_snapshot["npcs"] = [
-                {"name": n.name, "role": getattr(n, "role", None), "alive": getattr(n, "alive", True)}
-                for n in (npcs or [])
-            ]
-        except Exception:
-            pass
+            for n in (self.state.get_all_npcs() or []):
+                npc_rows.append({
+                    "id": n.id,
+                    "name": n.name,
+                    "role": n.role,
+                    "faction": n.faction,
+                    "alive": True,  # NPC model has no alive column yet; placeholder
+                    "affinity": n.affinity,
+                    "disposition": n.disposition,
+                    "current_location": n.current_location,
+                    "last_appeared": n.last_appeared,
+                    "scene_count": n.scene_count,
+                    "growth_stage": n.growth_stage,
+                    "intelligence_stage": n.intelligence_stage,
+                })
+        except Exception as e:
+            logger.debug("Entity graph: NPC capture failed: %s", e)
 
         try:
-            locations = self.state.get_all_locations()
-            entity_snapshot["locations"] = [
-                {"name": loc.name, "discovered": getattr(loc, "discovered", True)}
-                for loc in (locations or [])
-            ]
-        except Exception:
-            pass
+            # StateManager exposes get_locations(); the old get_all_locations()
+            # shim was never added, so calls must use the canonical name.
+            for loc in (self.state.get_locations() or []):
+                location_rows.append({
+                    "id": loc.id,
+                    "name": loc.name,
+                    "location_type": loc.location_type,
+                    "current_state": loc.current_state,
+                    "is_current": loc.is_current,
+                    "times_visited": loc.times_visited,
+                    "last_visited_turn": loc.last_visited_turn,
+                    "parent_location": loc.parent_location,
+                })
+        except Exception as e:
+            logger.debug("Entity graph: location capture failed: %s", e)
+
+        try:
+            for f in (self.state.get_all_factions() or []):
+                faction_rows.append({
+                    "id": f.id,
+                    "name": f.name,
+                    "alignment": f.alignment,
+                    "power_level": f.power_level,
+                    "influence_score": f.influence_score,
+                    "relationships": f.relationships,
+                    "pc_is_member": f.pc_is_member,
+                    "pc_rank": f.pc_rank,
+                    "pc_reputation": f.pc_reputation,
+                    "pc_controls": f.pc_controls,
+                })
+        except Exception as e:
+            logger.debug("Entity graph: faction capture failed: %s", e)
+
+        entity_snapshot = {
+            "turn_number": db_context.turn_number,
+            "npcs": npc_rows,
+            "locations": location_rows,
+            "factions": faction_rows,
+        }
 
         with get_session() as db:
             save_artifact(
@@ -991,8 +1067,9 @@ class BackgroundMixin:
                 entity_snapshot,
             )
         logger.info(
-            "Entity graph snapshot saved at turn %d (%d NPCs, %d locations)",
+            "Entity graph snapshot saved at turn %d (%d NPCs, %d locations, %d factions)",
             db_context.turn_number,
-            len(entity_snapshot["npcs"]),
-            len(entity_snapshot["locations"]),
+            len(npc_rows),
+            len(location_rows),
+            len(faction_rows),
         )

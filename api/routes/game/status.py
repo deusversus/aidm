@@ -30,7 +30,7 @@ from .models import (
     QuestObjectiveInfo,
     QuestTrackerResponse,
 )
-from .session_mgmt import get_orchestrator
+from .session_mgmt import get_orchestrator, get_orchestrator_optional
 
 logger = logging.getLogger(__name__)
 
@@ -39,12 +39,27 @@ router = APIRouter()
 
 @router.get("/session/{session_id}/status")
 async def get_session_status(session_id: str):
-    """Get the current status of a session."""
+    """Get the current status of a session.
+
+    Includes an ``incomplete_turn`` field when the active orchestrator
+    detected that the last gameplay turn crashed before its post-narrative
+    bookkeeping (memory, progression, foreshadowing) could complete.
+    The frontend should surface a recovery banner so the player knows
+    subsequent state may be slightly stale for that one turn.
+    """
     manager = get_session_manager()
     session = manager.get_session(session_id)
 
     if session is None:
         raise HTTPException(status_code=404, detail=f"Session not found: {session_id}")
+
+    # Surface crash-recovery info when the active orchestrator matches
+    # this session. `incomplete_turn` is set by Orchestrator._check_incomplete_turns
+    # at init time and is either a dict or None.
+    incomplete_turn = None
+    orch = get_orchestrator_optional()
+    if orch is not None and getattr(orch, "session_id", None) == session_id:
+        incomplete_turn = getattr(orch, "incomplete_turn", None)
 
     return {
         "session_id": session_id,
@@ -53,7 +68,8 @@ async def get_session_status(session_id: str):
         "message_count": len(session.messages),
         "character_name": session.character_draft.name,
         "created_at": session.created_at.isoformat(),
-        "last_activity": session.last_activity.isoformat()
+        "last_activity": session.last_activity.isoformat(),
+        "incomplete_turn": incomplete_turn,
     }
 
 

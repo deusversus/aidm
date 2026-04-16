@@ -31,6 +31,7 @@ from src.agents.session_zero_schemas import (
     PackageReadiness,
     PlayerCharacterBrief,
     RelationshipRecord,
+    ResolverAndGapOutput,
     UnresolvedCategory,
     UnresolvedItem,
     WorldContextBrief,
@@ -265,13 +266,31 @@ class TestSessionZeroPipeline:
     async def test_pipeline_full_turn(
         self, mock_session, mock_extraction, mock_entity_resolution, mock_gap_analysis
     ):
-        """Test that a full pipeline turn runs extractor → resolver → gap → conductor."""
+        """Test that a full pipeline turn runs extractor → resolver_and_gap → conductor.
+
+        Since commit 4b306bb merged the resolver and gap analyzer into a single
+        agent (SZResolverAndGapAgent), the pipeline makes 3 LLM calls per turn
+        instead of 4.
+        """
         provider = MockLLMProvider()
+
+        # Combined resolver+gap output from the merged agent
+        combined = ResolverAndGapOutput(
+            canonical_entities=mock_entity_resolution.canonical_entities,
+            canonical_relationships=mock_entity_resolution.canonical_relationships,
+            merges_performed=mock_entity_resolution.merges_performed,
+            alias_map=mock_entity_resolution.alias_map,
+            unresolved_items=mock_gap_analysis.unresolved_items,
+            contradictions=mock_gap_analysis.contradictions,
+            handoff_safe=mock_gap_analysis.handoff_safe,
+            blocking_issues=mock_gap_analysis.blocking_issues,
+            warnings=mock_gap_analysis.warnings,
+            recommended_player_followups=mock_gap_analysis.recommended_player_followups,
+        )
 
         # Queue responses for each pipeline step
         provider.queue_schema_response(mock_extraction)       # extractor
-        provider.queue_schema_response(mock_entity_resolution)  # resolver
-        provider.queue_schema_response(mock_gap_analysis)      # gap analyzer
+        provider.queue_schema_response(combined)               # resolver + gap analyzer (merged)
         conductor_output = SessionZeroOutput(
             response="Great! Where does Kai usually hang out?",
             missing_requirements=["starting_location"],
@@ -284,8 +303,7 @@ class TestSessionZeroPipeline:
 
         # Patch all agent providers to use our mock
         with patch.object(pipeline._extractor, '_get_provider_and_model', return_value=(provider, "mock")), \
-             patch.object(pipeline._resolver, '_get_provider_and_model', return_value=(provider, "mock")), \
-             patch.object(pipeline._gap_analyzer, '_get_provider_and_model', return_value=(provider, "mock")), \
+             patch.object(pipeline._resolver_and_gap, '_get_provider_and_model', return_value=(provider, "mock")), \
              patch.object(pipeline.conductor, '_get_provider_and_model', return_value=(provider, "mock")), \
              patch('src.core.session_zero_pipeline.SessionZeroPipeline._persist_pipeline_state', new_callable=AsyncMock), \
              patch('src.agents._session_zero_research.get_profile_context_for_agent', return_value="Profile: Cowboy Bebop"):

@@ -134,8 +134,14 @@ class TestErrorRecovery:
         assert len(pipeline.state.extraction_passes) == 0
         assert pipeline.state.turn_count == 1
 
-    async def test_resolver_failure_uses_prior_graph(self, mock_session):
-        """When entity resolver fails, prior entity graph is preserved."""
+    async def test_resolver_and_gap_failure_uses_prior_graph(self, mock_session):
+        """When the merged resolver+gap agent fails, prior entity graph is preserved.
+
+        Since commit 4b306bb merged SZEntityResolverAgent + SZGapAnalyzerAgent
+        into SZResolverAndGapAgent, both "resolver failure" and "gap analyzer
+        failure" now collapse to a single failure mode: _run_resolution_and_gap
+        returns None on exception, pipeline state stays untouched.
+        """
         provider = MockLLMProvider()
 
         extraction = _make_extraction(entity_records=[
@@ -154,9 +160,9 @@ class TestErrorRecovery:
         ])
         pipeline._state.entity_resolution = prior_graph
 
-        # Make resolver raise
-        pipeline._resolver.resolve = AsyncMock(
-            side_effect=RuntimeError("Resolution failed")
+        # Make the merged resolver+gap agent raise
+        pipeline._resolver_and_gap.resolve_and_analyze = AsyncMock(
+            side_effect=RuntimeError("Resolution+gap failed")
         )
 
         with patch.object(pipeline._extractor, '_get_provider_and_model', return_value=(provider, "mock")), \
@@ -169,41 +175,9 @@ class TestErrorRecovery:
         # Prior graph should be preserved
         assert pipeline.state.entity_resolution is prior_graph
         assert pipeline.state.entity_resolution.canonical_entities[0].canonical_id == "npc_old"
+        # Gap analysis stays at whatever it was (None initially)
+        assert pipeline.state.gap_analysis is None
         assert result.response == "Tell me more!"
-
-    async def test_gap_analyzer_failure_no_gap_context(self, mock_session):
-        """When gap analyzer fails, conductor runs without gap context."""
-        provider = MockLLMProvider()
-
-        extraction = _make_extraction()
-        provider.queue_schema_response(extraction)
-        resolution = _make_resolution()
-        provider.queue_schema_response(resolution)
-        conductor_output = _make_conductor_output()
-        provider.queue_schema_response(conductor_output)
-
-        conductor = SessionZeroAgent()
-        pipeline = SessionZeroPipeline(conductor=conductor, session_id="err-test")
-
-        # Give it a prior entity resolution so gap analysis runs
-        pipeline._state.entity_resolution = _make_resolution()
-        pipeline._state.extraction_passes.append(_make_extraction())
-
-        # Make gap analyzer raise
-        pipeline._gap_analyzer.analyze = AsyncMock(
-            side_effect=RuntimeError("Gap analysis crashed")
-        )
-
-        with patch.object(pipeline._extractor, '_get_provider_and_model', return_value=(provider, "mock")), \
-             patch.object(pipeline._resolver, '_get_provider_and_model', return_value=(provider, "mock")), \
-             patch.object(conductor, '_get_provider_and_model', return_value=(provider, "mock")), \
-             patch('src.core.session_zero_pipeline.SessionZeroPipeline._persist_pipeline_state', new_callable=AsyncMock), \
-             patch('src.agents._session_zero_research.get_profile_context_for_agent', return_value=""):
-
-            result = await pipeline.process_turn(mock_session, "hello")
-
-        assert result.response == "Tell me more!"
-        assert pipeline.state.gap_analysis is None  # No gap analysis due to failure
 
     async def test_conductor_failure_propagates(self, mock_session):
         """Conductor failure should propagate (not silently swallowed)."""
@@ -440,10 +414,12 @@ class TestResumability:
 
         mock_artifact = MagicMock()
         mock_artifact.version = 3
-        mock_artifact.content = '{"canonical_entities": [], "canonical_relationships": [], "merges_performed": [], "alias_map": {}, "schema_version": 1}'
+        # Real attribute is content_json (see SessionZeroArtifact model);
+        # the old `.content` attribute never existed.
+        mock_artifact.content_json = '{"canonical_entities": [], "canonical_relationships": [], "merges_performed": [], "alias_map": {}, "schema_version": 1}'
 
         mock_meta_artifact = MagicMock()
-        mock_meta_artifact.content = '{"turn_count": 7, "extraction_pass_count": 5}'
+        mock_meta_artifact.content_json = '{"turn_count": 7, "extraction_pass_count": 5}'
 
         def side_effect_get_artifact(db, session_id, artifact_type):
             if artifact_type == "sz_entity_graph":

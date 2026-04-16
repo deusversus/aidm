@@ -291,7 +291,7 @@ class TestHandoffCompiler:
         from src.db.session import get_engine
         Base.metadata.create_all(bind=get_engine())
 
-        mock_provider._schema_queue.clear()
+        mock_provider.reset()
 
         with patch("src.agents.base.get_llm_manager") as mock_mgr:
             mock_mgr.return_value.get_provider_for_agent.return_value = (mock_provider, "mock-model")

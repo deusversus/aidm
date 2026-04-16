@@ -679,8 +679,20 @@ class SessionZeroRun(Base):
     # JSON checkpoints from each pass
     checkpoints_json = Column(Text, nullable=True)  # JSON list of CompilerCheckpoint
 
-    # FK to the artifact produced (nullable — set after artifact is written)
-    artifact_id = Column(Integer, sa.ForeignKey("session_zero_artifacts.id"), nullable=True)
+    # FK to the artifact produced (nullable — set after artifact is written).
+    # use_alter=True breaks the circular dependency with SessionZeroArtifact
+    # (which FKs back to session_zero_runs.id via source_run_id). SQLAlchemy
+    # will emit this FK as a separate ALTER TABLE statement, allowing
+    # Base.metadata.drop_all() to topologically sort the tables.
+    artifact_id = Column(
+        Integer,
+        sa.ForeignKey(
+            "session_zero_artifacts.id",
+            use_alter=True,
+            name="fk_sz_runs_artifact_id",
+        ),
+        nullable=True,
+    )
 
     artifact = relationship("SessionZeroArtifact", foreign_keys=[artifact_id])
 

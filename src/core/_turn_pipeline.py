@@ -904,11 +904,17 @@ class TurnPipelineMixin:
         # =====================================================================
         # CRASH RECOVERY CHECKPOINT (Gap 9)
         # Save a checkpoint artifact before background launch so we can
-        # detect incomplete turns on restart.
+        # detect incomplete turns on restart. Fields are chosen to let the
+        # frontend render a meaningful recovery banner without exposing
+        # internals: when the user sees "your last turn's bookkeeping didn't
+        # finish", they know what turn/intent/action it refers to.
         # =====================================================================
         try:
+            import time as _time
             from src.db.session import get_session
             from src.db.session_zero_artifacts import save_artifact
+            _narrative_preview = (narrative or "")[:300]
+            _player_preview = (player_input or "")[:300]
             with get_session() as _db:
                 save_artifact(
                     _db,
@@ -919,6 +925,14 @@ class TurnPipelineMixin:
                         "background_completed": False,
                         "narrative_hash": hash(narrative) if narrative else 0,
                         "intent": intent.intent if intent else None,
+                        "action": getattr(intent, "action", None) if intent else None,
+                        "outcome_success_level": (
+                            outcome.success_level if outcome else None
+                        ),
+                        "narrative_preview": _narrative_preview,
+                        "player_input_preview": _player_preview,
+                        "latency_ms": latency,
+                        "started_at": _time.time(),
                         "memory_provenance": _memory_provenance,
                     },
                 )
