@@ -497,9 +497,16 @@ class TurnPipelineMixin:
                     )
                     logger.info(f"Pre-narrative resolution: {combat_result.damage_dealt} damage, hit={combat_result.hit}")
 
-        # Store for _post_narrative_processing bookkeeping
+        # Store for _post_narrative_processing bookkeeping. We capture the
+        # target NAME separately because CombatResult (Pydantic) has no such
+        # field — attempts to read combat_result.target_name via getattr
+        # previously returned None, causing post-narrative combat bookkeeping
+        # to silently no-op (HP deltas never applied).
         self._last_combat_occurred = combat_occurred
         self._last_combat_result = combat_result
+        self._last_combat_target_name = (
+            combat_action.target if combat_occurred else None
+        )
 
         # Assemble final RAG context
         rag_context = {
@@ -915,6 +922,22 @@ class TurnPipelineMixin:
             from src.db.session_zero_artifacts import save_artifact
             _narrative_preview = (narrative or "")[:300]
             _player_preview = (player_input or "")[:300]
+            # Serialize the full outcome and combat payloads so a cold-start
+            # replay (fresh process, no in-memory self._last_combat_*) can
+            # rehydrate and safely re-apply them under the per-turn idempotency
+            # guards on the character row.
+            _outcome_payload = None
+            if outcome is not None and hasattr(outcome, "model_dump"):
+                try:
+                    _outcome_payload = outcome.model_dump()
+                except Exception:
+                    _outcome_payload = None
+            _combat_payload = None
+            if combat_occurred and combat_result is not None and hasattr(combat_result, "model_dump"):
+                try:
+                    _combat_payload = combat_result.model_dump()
+                except Exception:
+                    _combat_payload = None
             with get_session() as _db:
                 save_artifact(
                     _db,
@@ -934,6 +957,14 @@ class TurnPipelineMixin:
                         "latency_ms": latency,
                         "started_at": _time.time(),
                         "memory_provenance": _memory_provenance,
+                        # Replayable payloads (cold-start recovery):
+                        "outcome_payload": _outcome_payload,
+                        "combat_occurred": combat_occurred,
+                        "combat_result_payload": _combat_payload,
+                        "combat_target_name": (
+                            self._last_combat_target_name if combat_occurred else None
+                        ),
+                        "use_sakuga": use_sakuga,
                     },
                 )
         except Exception:

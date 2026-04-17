@@ -52,29 +52,30 @@ logger = logging.getLogger(__name__)
 
 
 # Steps we can safely re-run on an already-partially-applied turn.
-# Each of these either writes a dedup-keyed artifact or a dedup-keyed
-# memory row, or stamps a terminal-value field (heat decay).
+# Each of these either writes a dedup-keyed artifact, a dedup-keyed
+# memory row, stamps a terminal-value field (heat decay), or rehydrates
+# a persisted payload under a per-turn idempotency marker.
 _IDEMPOTENT_STEPS: tuple[str, ...] = (
     "entity_graph_snapshot",
     "memory_heat_decay",
     "episodic_memory",
+    # Cold-start replay: rehydrate the serialized CombatResult from the
+    # checkpoint and apply it via state.apply_combat_result. Guarded by
+    # character.last_combat_applied_turn so a same-turn retry is a no-op.
+    "combat_bookkeeping",
 )
 
 # Steps whose DB mutations are guarded against double-apply by a per-turn
-# marker on ``characters`` (see ``last_combat_applied_turn`` /
-# ``last_progression_applied_turn``), but whose INPUT payload
-# (combat_result, outcome) isn't persisted in the checkpoint — so replay
-# from a fresh process can't actually rerun them.
+# marker on ``characters`` (see ``last_progression_applied_turn``), but
+# whose full input set (outcome + profile + turn_result_data) still
+# requires reconstruction beyond what the checkpoint carries today. Safe
+# against double-apply in the current process; not replayed from cold
+# start yet.
 _GUARDED_SKIP_REASON: dict[str, str] = {
-    "combat_bookkeeping": (
-        "Guarded by character.last_combat_applied_turn so a same-process "
-        "retry is safe, but the CombatResult payload isn't persisted; "
-        "skipping from cold-start replay."
-    ),
     "consequence_and_progression": (
         "Guarded by character.last_progression_applied_turn so a same-process "
-        "retry is safe, but the Outcome payload isn't persisted; skipping "
-        "from cold-start replay."
+        "retry is safe. Cold-start replay not yet wired (would need the "
+        "profile + quest/sakuga context reconstructed from checkpoint)."
     ),
 }
 
@@ -111,6 +112,82 @@ class ReplayResult:
             "errors": self.errors,
             "checkpoint_updated": self.checkpoint_updated,
         }
+
+
+def _replay_combat_bookkeeping(orchestrator, turn_number: int) -> bool:
+    """Rehydrate CombatResult from the checkpoint and apply it.
+
+    Returns True when the state was actually mutated (damage applied,
+    marker stamped), False on a safe no-op:
+      - no combat happened this turn;
+      - CombatResult payload missing (no checkpoint to rehydrate);
+      - target name missing;
+      - damage_dealt <= 0;
+      - the guard (character.last_combat_applied_turn == turn_number) says
+        the mutation already landed.
+    """
+    incomplete = orchestrator.incomplete_turn or {}
+    if not incomplete.get("combat_occurred"):
+        return False
+    payload = incomplete.get("combat_result_payload")
+    if not payload:
+        logger.warning(
+            "Combat marked occurred for turn %d but no combat_result_payload "
+            "in checkpoint — older checkpoint format, skipping replay",
+            turn_number,
+        )
+        return False
+    target_name = incomplete.get("combat_target_name")
+    if not target_name:
+        logger.warning(
+            "Combat marked occurred for turn %d but no target_name in "
+            "checkpoint — skipping replay",
+            turn_number,
+        )
+        return False
+
+    from src.agents.combat import CombatResult
+    try:
+        combat_result = CombatResult.model_validate(payload)
+    except Exception as e:
+        logger.exception("Failed to rehydrate CombatResult from checkpoint: %s", e)
+        return False
+
+    if combat_result.damage_dealt <= 0:
+        return False
+
+    character = orchestrator.state.get_character()
+    target = orchestrator.state.get_target(target_name)
+    if not character or not target:
+        logger.warning(
+            "Combat replay: missing %s for turn %d",
+            "character" if not character else "target",
+            turn_number,
+        )
+        return False
+
+    if getattr(character, "last_combat_applied_turn", None) == turn_number:
+        logger.info(
+            "Combat replay: already applied for turn %d (guard hit)",
+            turn_number,
+        )
+        return False
+
+    orchestrator.state.apply_combat_result(combat_result, target)
+    character.last_combat_applied_turn = turn_number
+    # Commit the marker update. apply_combat_result may or may not commit;
+    # we cheap-commit via a fresh session flush to be sure the guard is
+    # durable before returning.
+    try:
+        db = orchestrator.state._get_db()
+        db.commit()
+    except Exception:
+        pass
+    logger.info(
+        "Combat replay: applied %d dmg to %s at turn %d",
+        combat_result.damage_dealt, target_name, turn_number,
+    )
+    return True
 
 
 async def replay_safe_bookkeeping(orchestrator) -> ReplayResult | None:
@@ -161,6 +238,13 @@ async def replay_safe_bookkeeping(orchestrator) -> ReplayResult | None:
                         location="Unknown",  # Full location not in checkpoint
                         summary=f"{player_preview[:150]} — {narrative_preview[:400]}",
                     )
+            elif step == "combat_bookkeeping":
+                applied = _replay_combat_bookkeeping(orchestrator, turn_number)
+                if not applied:
+                    # Nothing to do (either no combat this turn, or guard
+                    # says it's already applied). Not an error — treat as
+                    # a successful no-op so we stop re-attempting.
+                    pass
             replayed.append(step)
         except Exception as e:
             errors[step] = str(e)[:200]

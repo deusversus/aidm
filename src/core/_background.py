@@ -90,10 +90,11 @@ class BackgroundMixin:
                     # =============================================================
                     combat_occurred = getattr(self, '_last_combat_occurred', False)
                     combat_result = getattr(self, '_last_combat_result', None)
+                    combat_target_name = getattr(self, '_last_combat_target_name', None)
                     if combat_occurred and combat_result:
                         if combat_result.damage_dealt > 0:
                             character = self.state.get_character()
-                            target = self.state.get_target(getattr(combat_result, 'target_name', None))
+                            target = self.state.get_target(combat_target_name)
                             if character and target:
                                 already_applied = (
                                     getattr(character, "last_combat_applied_turn", None)
@@ -121,6 +122,7 @@ class BackgroundMixin:
                         # Clear instance state
                         self._last_combat_occurred = False
                         self._last_combat_result = None
+                        self._last_combat_target_name = None
                         completed_steps.append("combat_bookkeeping")
 
                     # =============================================================
