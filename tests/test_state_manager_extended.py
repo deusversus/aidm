@@ -2,13 +2,17 @@
 
 Supplements the existing test_core_loop.py and test_deferred_commit.py
 with coverage for the mixin methods added in Phase 5.
+
+The teardown calls ``Base.metadata.drop_all``, which would destroy the
+shared Postgres dev DB if this file ever ran against it. The ``reset_db``
+fixture below pins DATABASE_URL to an in-memory SQLite database for the
+duration of each test and restores the original engine on teardown.
 """
 
 import os
 
 import pytest
 
-os.environ.setdefault("DATABASE_URL", "sqlite:///:memory:")
 os.environ.setdefault("ANTHROPIC_API_KEY", "test-key")
 
 from src.db.models import Base
@@ -20,11 +24,32 @@ from src.db.state_manager import GameContext, StateManager
 # ---------------------------------------------------------------------------
 
 @pytest.fixture(autouse=True)
-def reset_db():
-    """Each test gets a fresh in-memory DB."""
+def reset_db(monkeypatch):
+    """Each test gets a fresh in-memory SQLite DB.
+
+    Resets the engine singleton so the SQLite override actually takes
+    effect, then restores the original engine on teardown so subsequent
+    tests in the session continue using whatever DATABASE_URL they were
+    originally configured with (usually Postgres in the container).
+    """
+    monkeypatch.setenv("DATABASE_URL", "sqlite:///:memory:")
+    import src.db.session as session_module
+    previous_engine = session_module._engine
+    previous_session_local = session_module._SessionLocal
+    if previous_engine is not None:
+        previous_engine.dispose()
+    session_module._engine = None
+    session_module._SessionLocal = None
+
     init_db()
-    yield
-    Base.metadata.drop_all(bind=get_engine())
+    try:
+        yield
+    finally:
+        Base.metadata.drop_all(bind=get_engine())
+        if session_module._engine is not None:
+            session_module._engine.dispose()
+        session_module._engine = previous_engine
+        session_module._SessionLocal = previous_session_local
 
 
 @pytest.fixture

@@ -2,8 +2,8 @@
 
 When ``Orchestrator._check_incomplete_turns`` detects that the last gameplay
 turn's background processing crashed before completion, we expose a narrow
-replay path that re-runs ONLY the steps whose side effects are safe to
-re-apply:
+replay path that re-runs the steps whose side effects are safe to re-apply
+for the same ``(campaign_id, turn_number)`` pair:
 
   - ``entity_graph_snapshot``: writes a versioned ``gameplay_entity_graph``
     artifact. ``save_artifact`` is content-hash-deduplicated, so a repeat
@@ -11,16 +11,28 @@ re-apply:
   - ``memory_heat_decay``: decays per-memory heat by a fixed rate keyed on
     turn number; re-running for the same turn simply lands at the same
     terminal value (decay to zero is absorbed).
+  - ``episodic_memory``: ``MemoryStore.add_memory`` dedup-skips any write
+    whose first 200 chars match an existing row, and the episode content
+    is deterministic for a given (turn, location, summary) tuple.
 
-The following steps are **NOT** replayed because they mutate absolute state
-and have no per-turn idempotency guard:
+The following steps are **NOT** replayed from this module because replay
+would need inputs that aren't persisted in the checkpoint (e.g. the full
+``combat_result`` object or the ``outcome`` pydantic model). The underlying
+DB mutations are nevertheless safe against double-apply within a running
+process thanks to per-turn markers on the character:
 
-  - ``combat_bookkeeping``: HP/MP deltas. Re-applying would double-damage.
-  - ``consequence_and_progression``: XP awards, level-up, cooldowns.
-  - ``entity_extraction`` / ``relationship_analysis``: may create duplicate
-    entities when the LLM paraphrases the same content twice.
-  - ``episodic_memory``: writes a turn-keyed episode, but without a
-    content-hash check it can accumulate.
+  - ``combat_bookkeeping``: guarded by ``character.last_combat_applied_turn``.
+  - ``consequence_and_progression``: guarded by
+    ``character.last_progression_applied_turn``.
+
+And these remain skipped because their inputs (full narrative text, LLM
+outputs) aren't persisted and re-running would call the LLM again with
+potentially different results:
+
+  - ``entity_extraction`` / ``relationship_analysis`` / ``production_check``
+  - ``memory_compression``
+  - ``state_snapshot`` (gated on director/level-up triggers, not meaningful
+    outside the turn that triggered it)
 
 Callers receive a dict describing which steps ran and which were skipped,
 so an operator or the player-facing banner can decide whether a human retry
@@ -40,20 +52,43 @@ logger = logging.getLogger(__name__)
 
 
 # Steps we can safely re-run on an already-partially-applied turn.
+# Each of these either writes a dedup-keyed artifact or a dedup-keyed
+# memory row, or stamps a terminal-value field (heat decay).
 _IDEMPOTENT_STEPS: tuple[str, ...] = (
     "entity_graph_snapshot",
     "memory_heat_decay",
+    "episodic_memory",
 )
 
-# Steps that mutate absolute state; skipped during replay.
+# Steps whose DB mutations are guarded against double-apply by a per-turn
+# marker on ``characters`` (see ``last_combat_applied_turn`` /
+# ``last_progression_applied_turn``), but whose INPUT payload
+# (combat_result, outcome) isn't persisted in the checkpoint — so replay
+# from a fresh process can't actually rerun them.
+_GUARDED_SKIP_REASON: dict[str, str] = {
+    "combat_bookkeeping": (
+        "Guarded by character.last_combat_applied_turn so a same-process "
+        "retry is safe, but the CombatResult payload isn't persisted; "
+        "skipping from cold-start replay."
+    ),
+    "consequence_and_progression": (
+        "Guarded by character.last_progression_applied_turn so a same-process "
+        "retry is safe, but the Outcome payload isn't persisted; skipping "
+        "from cold-start replay."
+    ),
+}
+
+# Steps whose inputs aren't persisted and whose outputs aren't dedup-keyed;
+# re-running would either hit the LLM with potentially different results
+# or drop fresh state.
 _NON_IDEMPOTENT_SKIP_REASON: dict[str, str] = {
-    "transactional_block": "Covers combat/consequence/progression — absolute deltas",
-    "entity_extraction": "May create duplicate entities from paraphrased content",
-    "relationship_analysis": "Re-writes relationship scores; not dedup-keyed",
-    "production_check": "Quest/location discovery side effects aren't dedup-keyed",
+    "transactional_block": "Umbrella marker — individual steps handled above",
+    "entity_extraction": "LLM call; outputs not cached per-turn",
+    "relationship_analysis": "LLM call; outputs not cached per-turn",
+    "production_check": "LLM call; outputs not cached per-turn",
     "memory_compression": "Summarizes+deletes; re-running could drop fresh memories",
-    "episodic_memory": "Episode writes are not content-hashed",
     "state_snapshot": "Tied to director/level-up trigger; not meaningful outside that",
+    **_GUARDED_SKIP_REASON,
 }
 
 
@@ -113,6 +148,19 @@ async def replay_safe_bookkeeping(orchestrator) -> ReplayResult | None:
                 await orchestrator._bg_save_entity_graph(db_context)
             elif step == "memory_heat_decay":
                 orchestrator.memory.decay_heat(turn_number)
+            elif step == "episodic_memory":
+                # Rebuild a minimal episode from checkpoint fields. The
+                # MemoryStore dedups on first-200-char content match, so
+                # a repeat write with identical text is a no-op.
+                incomplete_data = orchestrator.incomplete_turn or {}
+                player_preview = (incomplete_data.get("player_input_preview") or "").strip()
+                narrative_preview = (incomplete_data.get("narrative_preview") or "").strip()
+                if player_preview or narrative_preview:
+                    orchestrator.memory.add_episode(
+                        turn=turn_number,
+                        location="Unknown",  # Full location not in checkpoint
+                        summary=f"{player_preview[:150]} — {narrative_preview[:400]}",
+                    )
             replayed.append(step)
         except Exception as e:
             errors[step] = str(e)[:200]

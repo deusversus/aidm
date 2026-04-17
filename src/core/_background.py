@@ -84,7 +84,9 @@ class BackgroundMixin:
                 with self.state.deferred_commit():
                     # =============================================================
                     # 2. COMBAT BOOKKEEPING (#23: resolution moved pre-narrative)
-                    # Apply HP/state changes from pre-resolved combat result
+                    # Apply HP/state changes from pre-resolved combat result.
+                    # Guarded by character.last_combat_applied_turn so a replay
+                    # never double-applies damage for the same turn (Gap 9).
                     # =============================================================
                     combat_occurred = getattr(self, '_last_combat_occurred', False)
                     combat_result = getattr(self, '_last_combat_result', None)
@@ -93,21 +95,33 @@ class BackgroundMixin:
                             character = self.state.get_character()
                             target = self.state.get_target(getattr(combat_result, 'target_name', None))
                             if character and target:
-                                self.state.apply_combat_result(combat_result, target)
+                                already_applied = (
+                                    getattr(character, "last_combat_applied_turn", None)
+                                    == db_context.turn_number
+                                )
+                                if already_applied:
+                                    logger.info(
+                                        "Combat already applied for turn %d — skipping (replay guard)",
+                                        db_context.turn_number,
+                                    )
+                                else:
+                                    self.state.apply_combat_result(combat_result, target)
+                                    character.last_combat_applied_turn = db_context.turn_number
 
-                                char_state = {
-                                    "hp_current": character.hp_current,
-                                    "hp_max": character.hp_max,
-                                    "mp_current": getattr(character, 'mp_current', 50),
-                                    "mp_max": getattr(character, 'mp_max', 50),
-                                }
-                                post_validation = self.validator.validate_state_integrity(char_state)
-                                if not post_validation.is_valid:
-                                    for error in post_validation.errors:
-                                        logger.error(f"{error.severity.value}: {error.description}")
+                                    char_state = {
+                                        "hp_current": character.hp_current,
+                                        "hp_max": character.hp_max,
+                                        "mp_current": getattr(character, 'mp_current', 50),
+                                        "mp_max": getattr(character, 'mp_max', 50),
+                                    }
+                                    post_validation = self.validator.validate_state_integrity(char_state)
+                                    if not post_validation.is_valid:
+                                        for error in post_validation.errors:
+                                            logger.error(f"{error.severity.value}: {error.description}")
                         # Clear instance state
                         self._last_combat_occurred = False
                         self._last_combat_result = None
+                        completed_steps.append("combat_bookkeeping")
 
                     # =============================================================
                     # 3. CONSEQUENCE + PROGRESSION
@@ -139,22 +153,34 @@ class BackgroundMixin:
                     )
 
                     if character and should_calculate_progression:
-                        quest_names = ", ".join(q.title for q in recently_completed) if recently_completed else None
-                        turn_result_data = {
-                            "combat_occurred": combat_occurred,
-                            "boss_fight": combat_result.narrative_weight == NarrativeWeight.CLIMACTIC if combat_result else False,
-                            "sakuga_moment": combat_result.sakuga_moment if combat_result else use_sakuga,
-                            "quest_completed": bool(recently_completed),
-                            "quest_name": quest_names,
-                            "significant_roleplay": outcome.narrative_weight in [NarrativeWeight.SIGNIFICANT, NarrativeWeight.CLIMACTIC],
-                        }
-                        progression_result = await self.progression.calculate_progression(
-                            character=character,
-                            turn_result=turn_result_data,
-                            profile=self.profile
+                        already_applied = (
+                            getattr(character, "last_progression_applied_turn", None)
+                            == db_context.turn_number
                         )
-                        if progression_result.xp_awarded > 0:
-                            self.state.apply_progression(progression_result)
+                        if already_applied:
+                            logger.info(
+                                "Progression already applied for turn %d — skipping (replay guard)",
+                                db_context.turn_number,
+                            )
+                        else:
+                            quest_names = ", ".join(q.title for q in recently_completed) if recently_completed else None
+                            turn_result_data = {
+                                "combat_occurred": combat_occurred,
+                                "boss_fight": combat_result.narrative_weight == NarrativeWeight.CLIMACTIC if combat_result else False,
+                                "sakuga_moment": combat_result.sakuga_moment if combat_result else use_sakuga,
+                                "quest_completed": bool(recently_completed),
+                                "quest_name": quest_names,
+                                "significant_roleplay": outcome.narrative_weight in [NarrativeWeight.SIGNIFICANT, NarrativeWeight.CLIMACTIC],
+                            }
+                            progression_result = await self.progression.calculate_progression(
+                                character=character,
+                                turn_result=turn_result_data,
+                                profile=self.profile
+                            )
+                            if progression_result.xp_awarded > 0:
+                                self.state.apply_progression(progression_result)
+                                character.last_progression_applied_turn = db_context.turn_number
+                            completed_steps.append("consequence_and_progression")
                     elif character and not should_calculate_progression:
                         logger.warning("Skipping progression: no XP-worthy events")
 

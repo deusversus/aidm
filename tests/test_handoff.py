@@ -1,14 +1,26 @@
 """
 Extended handoff test - simulates full Session Zero handoff and tests orchestrator responses.
+
+This file is a live CLI-style script. The ``test_orchestrator_responses``
+function takes a plain ``orchestrator`` argument built at runtime by
+``main()``; it is NOT a pytest fixture consumer. Running this file under
+the default pytest suite would otherwise fail at fixture resolution, so
+we mark the module ``live`` and key off pytest collection.
 """
 import asyncio
 import os
 import sys
 
+import pytest
+
 sys.path.insert(0, os.getcwd())
 
 from src.db.session import init_db
 from src.settings import get_settings_store, reset_settings_store
+
+# Run only when the live marker is explicitly requested; otherwise pytest
+# collects the async function and errors on the missing fixture.
+pytestmark = pytest.mark.live
 
 
 def setup_spoofed_profile():

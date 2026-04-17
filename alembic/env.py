@@ -32,6 +32,37 @@ from src.db.models import Base  # noqa: E402
 target_metadata = Base.metadata
 
 
+# Tables whose schema is intentionally not fully mirrored in the ORM
+# (pgvector-backed; their ``embedding_vec vector(1536)`` column has no
+# native SQLAlchemy type, and ``alembic 005/006`` already manage those
+# columns via raw SQL). We still want the ORM class registered so that
+# ``Base.metadata.drop_all()`` sees the FK to campaigns, but we want
+# autogenerate to skip these tables entirely to avoid proposing spurious
+# ``DROP COLUMN embedding_vec`` or ``ADD COLUMN embedding Text`` diffs.
+_AUTOGEN_IGNORE_TABLES = frozenset({
+    "campaign_memories",
+    "context_blocks",
+    "profile_lore_chunks",
+    "custom_profile_lore_chunks",
+    "rule_library_chunks",
+})
+
+
+def _include_object(object_, name, type_, reflected, compare_to):
+    """Filter hook for autogenerate.
+
+    Returning ``False`` tells alembic to treat the object as if it didn't
+    exist. We skip the pgvector-backed tables and any column inside them,
+    preserving ``Base.metadata.drop_all()`` behavior while keeping
+    ``alembic revision --autogenerate`` diffs clean.
+    """
+    if type_ == "table" and name in _AUTOGEN_IGNORE_TABLES:
+        return False
+    if type_ == "column" and object_.table.name in _AUTOGEN_IGNORE_TABLES:
+        return False
+    return True
+
+
 def get_url() -> str:
     """Get database URL from environment, falling back to alembic.ini."""
     return os.getenv("DATABASE_URL", config.get_main_option("sqlalchemy.url"))
@@ -46,6 +77,7 @@ def run_migrations_offline() -> None:
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
         render_as_batch=True,  # SQLite compat (batch ALTER TABLE)
+        include_object=_include_object,
     )
 
     with context.begin_transaction():
@@ -71,6 +103,7 @@ def run_migrations_online() -> None:
             connection=connection,
             target_metadata=target_metadata,
             render_as_batch=True,  # SQLite compat (batch ALTER TABLE)
+            include_object=_include_object,
         )
 
         with context.begin_transaction():

@@ -6,15 +6,21 @@ Validates:
 3. Standalone mutations still commit immediately
 4. StateTransaction composes with deferred commit
 5. Reentrant deferred_commit is safe
+
+Historical note: this file used to set ``DATABASE_URL=sqlite:///:memory:``
+at module import time, which mutated the shared ``os.environ`` for every
+subsequent test collected by pytest. On the Docker test image (where
+``DATABASE_URL`` points at the Postgres dev DB) that import-time flip
+flipped the cached engine to SQLite for the whole session, making other
+tests fail with ``no such table: session_zero_artifacts``. The fixture
+below scopes the env override to these tests only.
 """
 
 import os
 
 import pytest
 
-# Set test environment before imports
-os.environ["DATABASE_URL"] = "sqlite:///:memory:"
-os.environ["ANTHROPIC_API_KEY"] = "test-key"
+os.environ.setdefault("ANTHROPIC_API_KEY", "test-key")
 
 from src.db.models import WorldState
 from src.db.session import init_db
@@ -22,18 +28,34 @@ from src.db.state_manager import StateManager
 
 
 @pytest.fixture(autouse=True)
-def fresh_db():
-    """Reset the in-memory database before each test."""
+def fresh_db(monkeypatch):
+    """Give each test a fresh in-memory SQLite database.
+
+    Uses ``monkeypatch`` to scope the DATABASE_URL override to the test's
+    lifetime — the pre-test container env (often pointing at Postgres) is
+    restored on teardown. Also resets the engine singleton so the override
+    actually takes effect.
+    """
+    monkeypatch.setenv("DATABASE_URL", "sqlite:///:memory:")
+
     import src.db.session as session_module
-    # Reset the singleton engine and session factory so each test
-    # gets a completely fresh in-memory SQLite database
-    if session_module._engine is not None:
-        session_module._engine.dispose()
+    previous_engine = session_module._engine
+    previous_session_local = session_module._SessionLocal
+    if previous_engine is not None:
+        previous_engine.dispose()
     session_module._engine = None
     session_module._SessionLocal = None
 
     init_db()
-    yield
+    try:
+        yield
+    finally:
+        # Tear down this test's engine, then restore the original so later
+        # tests see the DB URL they were configured with at process start.
+        if session_module._engine is not None:
+            session_module._engine.dispose()
+        session_module._engine = previous_engine
+        session_module._SessionLocal = previous_session_local
 
 
 @pytest.fixture

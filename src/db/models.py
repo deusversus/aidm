@@ -156,6 +156,15 @@ class Character(Base):
     faction = Column(String(100), nullable=True)  # PC's primary faction
     faction_reputations = Column(JSON, default=dict)  # {"faction_name": reputation_score}
 
+    # Crash-recovery / replay idempotency markers (Gap 9).
+    # When a turn's post-narrative bookkeeping applies absolute deltas
+    # (combat HP change, XP/progression), we stamp the turn_number here
+    # AFTER the mutation commits. On replay, the turn_replay module compares
+    # the checkpoint's turn_number to these fields: if they match, the
+    # mutation is already applied and must NOT be repeated.
+    last_combat_applied_turn = Column(Integer, nullable=True)
+    last_progression_applied_turn = Column(Integer, nullable=True)
+
     campaign = relationship("Campaign", back_populates="characters")
 
 

@@ -41,6 +41,7 @@ def _make_stub_orchestrator(campaign_id: int, incomplete_turn: dict | None):
     stub._bg_save_entity_graph = AsyncMock()
     stub.memory = MagicMock()
     stub.memory.decay_heat = MagicMock()
+    stub.memory.add_episode = MagicMock(return_value="mock-id")
     return stub
 
 
@@ -53,7 +54,7 @@ async def test_returns_none_when_no_incomplete_turn():
 async def test_replays_missing_idempotent_steps(fresh_db):
     campaign_id = 91102
     # Pretend the prior checkpoint finished the transactional block but
-    # crashed before the two idempotent tail steps ran.
+    # crashed before the idempotent tail steps ran.
     with get_session() as db:
         save_artifact(
             db, str(campaign_id), "gameplay_turn_checkpoint",
@@ -62,6 +63,8 @@ async def test_replays_missing_idempotent_steps(fresh_db):
                 "background_completed": False,
                 "completed_steps": ["transactional_block"],
                 "intent": "EXPLORE",
+                "player_input_preview": "I investigate the chest",
+                "narrative_preview": "The chest creaks open...",
             },
         )
 
@@ -70,6 +73,8 @@ async def test_replays_missing_idempotent_steps(fresh_db):
         incomplete_turn={
             "turn_number": 4,
             "completed_steps": ["transactional_block"],
+            "player_input_preview": "I investigate the chest",
+            "narrative_preview": "The chest creaks open...",
         },
     )
 
@@ -82,6 +87,11 @@ async def test_replays_missing_idempotent_steps(fresh_db):
     assert result.checkpoint_updated is True
     stub._bg_save_entity_graph.assert_awaited_once()
     stub.memory.decay_heat.assert_called_once_with(4)
+    # Episode write happens with the checkpoint previews collapsed into a summary.
+    stub.memory.add_episode.assert_called_once()
+    kwargs = stub.memory.add_episode.call_args.kwargs
+    assert kwargs["turn"] == 4
+    assert "chest" in kwargs["summary"]
 
     # Checkpoint now reflects the merged completed_steps and flips to done
     # because the idempotent cover set is now complete.

@@ -1,12 +1,37 @@
-"""Tests for the AIDM v3 core loop."""
+"""Tests for the AIDM v3 core loop.
+
+Formerly set ``DATABASE_URL=sqlite:///:memory:`` at import time, which
+leaked into every subsequent test's env and flipped the engine singleton
+mid-suite. The ``_sqlite_env`` fixture below scopes the override so other
+test files keep whichever DATABASE_URL was configured at process start.
+"""
 
 import os
 
 import pytest
 
-# Set test environment before imports
-os.environ["DATABASE_URL"] = "sqlite:///:memory:"
-os.environ["ANTHROPIC_API_KEY"] = "test-key"
+os.environ.setdefault("ANTHROPIC_API_KEY", "test-key")
+
+
+@pytest.fixture(autouse=True)
+def _sqlite_env(monkeypatch):
+    """Scope DATABASE_URL override to this file only, resetting the cached engine."""
+    monkeypatch.setenv("DATABASE_URL", "sqlite:///:memory:")
+    import src.db.session as session_module
+    previous_engine = session_module._engine
+    previous_session_local = session_module._SessionLocal
+    if previous_engine is not None:
+        previous_engine.dispose()
+    session_module._engine = None
+    session_module._SessionLocal = None
+    try:
+        yield
+    finally:
+        if session_module._engine is not None:
+            session_module._engine.dispose()
+        session_module._engine = previous_engine
+        session_module._SessionLocal = previous_session_local
+
 
 from src.agents.intent_classifier import IntentClassifier, IntentOutput
 from src.agents.outcome_judge import OutcomeJudge, OutcomeOutput
