@@ -41,6 +41,12 @@ class BackgroundMixin:
         """
         async with self._bg_lock:
             bg_start = time.time()
+            # Per-step completion markers — written into the checkpoint at the
+            # end of this method so the crash-recovery reader (and the
+            # replay-safe-bookkeeping endpoint) can see exactly which
+            # post-narrative steps made it to commit before a crash.
+            completed_steps: list[str] = []
+
             try:
                 # =============================================================
                 # 1. ENTITY EXTRACTION + RELATIONSHIP ANALYSIS + PRODUCTION (PARALLEL)
@@ -60,7 +66,15 @@ class BackgroundMixin:
                         outcome=outcome,
                         db_context=db_context,
                     ))
-                    await asyncio.gather(entity_task, rel_task, prod_task, return_exceptions=True)
+                    results = await asyncio.gather(
+                        entity_task, rel_task, prod_task, return_exceptions=True
+                    )
+                    if not isinstance(results[0], Exception):
+                        completed_steps.append("entity_extraction")
+                    if not isinstance(results[1], Exception):
+                        completed_steps.append("relationship_analysis")
+                    if not isinstance(results[2], Exception):
+                        completed_steps.append("production_check")
 
                 # =============================================================
                 # TRANSACTIONAL BLOCK: Steps 2-7
@@ -387,6 +401,8 @@ class BackgroundMixin:
                             logger.info(f"Checkpoint at turn {db_context.turn_number}: {director_output.arc_phase} (tension: {director_output.tension_level:.1f})")
 
                 # END deferred_commit block — single atomic SQL commit here
+                completed_steps.append("transactional_block")
+
                 # =============================================================
                 # 8. MEMORY COMPRESSION (every 10 turns)
                 # ChromaDB error recovery (#29): independent try/except
@@ -396,6 +412,7 @@ class BackgroundMixin:
                         compression_result = await self.memory.compress_cold_memories()
                         if compression_result.get("compressed"):
                             logger.info(f"Compressed {compression_result['memories_removed']} memories into {compression_result['summaries_created']} summaries")
+                    completed_steps.append("memory_compression")
                 except Exception as e:
                     logger.error(f"Memory compression failed (will retry next cycle): {e}")
 
@@ -414,6 +431,7 @@ class BackgroundMixin:
                         summary=f"{action_summary} — {outcome_summary}"
                     )
                     logger.info(f"Episodic memory written for turn {turn_number}")
+                    completed_steps.append("episodic_memory")
                 except Exception as e:
                     logger.error(f"Episodic write failed (idempotent, will retry): {e}")
 
@@ -423,6 +441,7 @@ class BackgroundMixin:
                 try:
                     self.memory.decay_heat(db_context.turn_number)
                     logger.debug(f"Memory heat decayed for turn {db_context.turn_number}")
+                    completed_steps.append("memory_heat_decay")
                 except Exception as e:
                     logger.error(f"Memory heat decay failed (non-fatal): {e}")
 
@@ -437,6 +456,7 @@ class BackgroundMixin:
                     )
                     if snapshot_trigger:
                         await self._bg_save_state_snapshot(db_context)
+                        completed_steps.append("state_snapshot")
                 except Exception as e:
                     logger.error(f"State snapshot failed (non-fatal): {e}")
 
@@ -447,6 +467,7 @@ class BackgroundMixin:
                 try:
                     if narrative and db_context.turn_number % 5 == 0:
                         await self._bg_save_entity_graph(db_context)
+                        completed_steps.append("entity_graph_snapshot")
                 except Exception as e:
                     logger.error(f"Entity graph snapshot failed (non-fatal): {e}")
 
@@ -479,6 +500,7 @@ class BackgroundMixin:
                             "background_latency_ms": int(
                                 (time.time() - bg_start) * 1000
                             ),
+                            "completed_steps": completed_steps,
                         }
                         save_artifact(
                             _db,
@@ -496,6 +518,36 @@ class BackgroundMixin:
                 logger.error(f"Post-narrative processing FAILED: {e}")
                 import traceback
                 traceback.print_exc()
+                # Persist whatever steps DID complete before the crash so the
+                # replay endpoint can avoid re-running them.
+                try:
+                    from src.db.session import get_session
+                    from src.db.session_zero_artifacts import (
+                        get_active_artifact,
+                        load_artifact_content,
+                        save_artifact,
+                    )
+                    with get_session() as _db:
+                        prior = get_active_artifact(
+                            _db,
+                            str(self.state.campaign_id),
+                            "gameplay_turn_checkpoint",
+                        )
+                        prior_data = load_artifact_content(prior) if prior else {}
+                        save_artifact(
+                            _db,
+                            str(self.state.campaign_id),
+                            "gameplay_turn_checkpoint",
+                            {
+                                **prior_data,
+                                "turn_number": db_context.turn_number,
+                                "background_completed": False,
+                                "completed_steps": completed_steps,
+                                "crash_error": str(e)[:500],
+                            },
+                        )
+                except Exception:
+                    pass
 
     async def _bg_production_check(
         self,

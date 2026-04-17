@@ -134,6 +134,13 @@ async function startSessionZero() {
 
                 console.log('[Session] Resumed session:', savedSessionId);
 
+                // Crash-recovery check — surface a banner if the orchestrator
+                // detected that the last turn's background bookkeeping
+                // didn't finish. Safe to ignore in SZ (no gameplay turns yet).
+                if (!isSessionZero) {
+                    checkIncompleteTurn().catch(e => console.warn('[Recovery] Check failed:', e));
+                }
+
                 // Load sidebar data and media for gameplay sessions
                 if (!isSessionZero) {
                     console.log('[DEBUG] Resume: isSessionZero is false, calling loadAllTrackers');
@@ -205,6 +212,103 @@ async function startSessionZero() {
             </div>
         `;
     }
+}
+
+/**
+ * Check whether the orchestrator flagged an incomplete prior turn
+ * (background bookkeeping crashed before finishing). If so, prepend
+ * a non-blocking banner to the narrative so the player knows why some
+ * state might look stale on just that one turn.
+ */
+async function checkIncompleteTurn() {
+    let status;
+    try {
+        status = await API.Game.getSessionStatus();
+    } catch (e) {
+        return;  // Best-effort; never block gameplay
+    }
+    if (!status || !status.incomplete_turn) return;
+
+    const incomplete = status.incomplete_turn;
+    const dismissedKey = `aidm_incomplete_dismissed_${status.session_id}_${incomplete.turn_number}`;
+    if (localStorage.getItem(dismissedKey)) return;  // Respect prior dismissal
+
+    const display = document.getElementById('narrative-display');
+    if (!display) return;
+
+    const banner = document.createElement('div');
+    banner.className = 'recovery-banner';
+    banner.setAttribute('role', 'status');
+    banner.setAttribute('aria-live', 'polite');
+
+    const turn = incomplete.turn_number ?? '?';
+    const intent = incomplete.intent || 'an action';
+    const action = incomplete.action ? ` — "${escapeHtml(incomplete.action)}"` : '';
+    const playerText = incomplete.player_input_preview
+        ? `<div class="recovery-banner-detail">Your input: “${escapeHtml(incomplete.player_input_preview)}”</div>`
+        : '';
+
+    banner.innerHTML = `
+        <span class="recovery-banner-icon">⚠️</span>
+        <div class="recovery-banner-body">
+            <div class="recovery-banner-title">Turn ${turn} didn't finish bookkeeping cleanly</div>
+            <div>Intent: ${escapeHtml(intent)}${action}. Memory, progression, and foreshadowing
+            writes for that turn may be missing. Subsequent turns will proceed normally.</div>
+            ${playerText}
+            <div class="recovery-banner-status" style="margin-top: 0.4rem;"></div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 0.35rem;">
+            <button type="button" class="recovery-banner-dismiss recovery-banner-replay">Replay safe steps</button>
+            <button type="button" class="recovery-banner-dismiss">Dismiss</button>
+        </div>
+    `;
+
+    const statusEl = banner.querySelector('.recovery-banner-status');
+    const replayBtn = banner.querySelector('.recovery-banner-replay');
+    const dismissBtn = banner.querySelectorAll('.recovery-banner-dismiss')[1];
+
+    replayBtn.addEventListener('click', async () => {
+        replayBtn.disabled = true;
+        replayBtn.textContent = 'Replaying…';
+        try {
+            const result = await API.Game.replayBookkeeping();
+            const replayed = (result.replayed_steps || []).join(', ') || '(none needed)';
+            const errs = result.errors && Object.keys(result.errors).length
+                ? ` Errors: ${Object.keys(result.errors).join(', ')}.`
+                : '';
+            statusEl.innerHTML = `<span class="recovery-banner-detail">
+                Replayed: ${escapeHtml(replayed)}.${escapeHtml(errs)}
+                Non-idempotent steps (combat HP, XP, episodic writes) were not re-applied.
+            </span>`;
+            replayBtn.textContent = 'Replayed';
+            replayBtn.style.opacity = '0.6';
+        } catch (e) {
+            console.error('[Recovery] Replay failed:', e);
+            statusEl.innerHTML = `<span class="recovery-banner-detail">Replay failed: ${escapeHtml(e.message || String(e))}</span>`;
+            replayBtn.disabled = false;
+            replayBtn.textContent = 'Retry replay';
+        }
+    });
+
+    dismissBtn.addEventListener('click', () => {
+        localStorage.setItem(dismissedKey, '1');
+        banner.remove();
+    });
+
+    display.insertBefore(banner, display.firstChild);
+}
+
+/**
+ * Minimal HTML escape for banner fields. The narrative/action/intent
+ * strings are player- or LLM-authored and never belong in raw innerHTML.
+ */
+function escapeHtml(s) {
+    return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
 }
 
 /**

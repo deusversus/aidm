@@ -67,13 +67,12 @@ def mock_llm_manager(mock_provider):
 def fresh_db():
     """Provide a clean-data DB, preserving schema across tests.
 
-    On SQLite (the default in-memory test URL), dropping everything is fine
-    because the next fixture call recreates the schema. On Postgres (shared
-    dev DB), dropping would destroy alembic-managed tables that have no
-    ORM class — and re-running ``init_db`` only creates ORM-known tables.
-    So instead of drop_all, we TRUNCATE all ORM-known tables with CASCADE,
-    which resets data AND the legacy tables that reference them, without
-    touching schema.
+    On SQLite (the default in-memory test URL), we drop + recreate — cheap.
+    On Postgres (shared dev DB), we TRUNCATE all ORM-known tables with
+    CASCADE so data resets without nuking the schema that alembic owns.
+    All tables with FKs to ``campaigns`` (including previously ORM-less
+    ``campaign_memories``, ``context_blocks``, etc.) have ORM classes now,
+    so the sorted_tables list is complete.
     """
     init_db()
     engine = get_engine()

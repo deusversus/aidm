@@ -73,6 +73,33 @@ async def get_session_status(session_id: str):
     }
 
 
+@router.post("/session/{session_id}/replay-bookkeeping")
+async def replay_bookkeeping(session_id: str):
+    """Re-run the idempotent subset of post-narrative bookkeeping.
+
+    Used by the crash-recovery banner to repair what's safely repairable on
+    a turn where the original background run crashed. See
+    ``src/core/turn_replay.py`` for the exact list of steps replayed vs
+    skipped and why. Returns a JSON summary the frontend can render.
+    """
+    orch = get_orchestrator_optional()
+    if orch is None or getattr(orch, "session_id", None) != session_id:
+        raise HTTPException(
+            status_code=409,
+            detail="Replay requires the active orchestrator session to match this session_id",
+        )
+    incomplete = getattr(orch, "incomplete_turn", None)
+    if not incomplete:
+        return {"status": "nothing_to_replay", "turn_number": None}
+
+    from src.core.turn_replay import replay_safe_bookkeeping
+
+    result = await replay_safe_bookkeeping(orch)
+    if result is None:
+        return {"status": "nothing_to_replay", "turn_number": None}
+    return {"status": "replayed", **result.as_dict()}
+
+
 @router.get("/research/status")
 async def get_research_status():
     """Check research capabilities.

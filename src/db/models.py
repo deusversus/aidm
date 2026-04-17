@@ -752,3 +752,149 @@ class SessionZeroArtifact(Base):
         ),
     )
 
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# pgvector-backed tables (created by alembic 005/006)
+#
+# These tables are written via raw SQL elsewhere (src/context/context_blocks.py,
+# src/core/session_export.py, etc.) and their embedding columns use the pgvector
+# ``vector(1536)`` type. The ORM classes below are registered in Base.metadata
+# so that schema-wide helpers (``drop_all``, migration autogenerate, test
+# teardown) can see every FK dependency — without them, ``campaign_memories``
+# and ``context_blocks`` held dangling ``campaigns.id`` FKs that blocked
+# ``Base.metadata.drop_all()`` from succeeding.
+#
+# The ``embedding_vec vector(1536)`` column is intentionally NOT declared on the
+# ORM class: SQLAlchemy has no native vector type, and the pgvector Python
+# package is not a runtime dep. Reads/writes of that column already use raw SQL.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class CampaignMemory(Base):
+    """Memory fragments for a campaign, one row per fragment.
+
+    Heat/decay/retrieval logic lives in ``src/context/memory.py`` (raw SQL +
+    pgvector). This ORM class exists so Base.metadata sees the FK to campaigns.
+    """
+
+    __tablename__ = "campaign_memories"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    campaign_id = Column(
+        Integer,
+        ForeignKey("campaigns.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    content = Column(Text, nullable=False)
+    memory_type = Column(String(50), nullable=False, server_default="episodic")
+    heat = Column(Float, nullable=False, server_default="100.0")
+    decay_rate = Column(String(20), nullable=False, server_default="normal")
+    turn_number = Column(Integer, nullable=True)
+    flags = Column(JSON, server_default="[]")
+    extra_meta = Column(JSON, server_default="{}")
+    # Text-encoded legacy embedding; the canonical pgvector column
+    # (``embedding_vec``) is managed outside the ORM.
+    embedding = Column(Text, nullable=True)
+    created_at = Column(DateTime, server_default=sa.func.now())
+
+
+class ContextBlock(Base):
+    """Living prose summary of an arc/thread/quest/NPC/faction for LLM context."""
+
+    __tablename__ = "context_blocks"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    campaign_id = Column(
+        Integer,
+        ForeignKey("campaigns.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    block_type = Column(String(20), nullable=False)   # arc|thread|quest|npc|faction
+    entity_id = Column(String(100), nullable=True)
+    entity_name = Column(String(255), nullable=False)
+
+    status = Column(String(20), nullable=False, server_default="active")
+    first_turn = Column(Integer, nullable=True)
+    last_updated_turn = Column(Integer, nullable=True)
+    version = Column(Integer, nullable=False, server_default="1")
+
+    content = Column(Text, nullable=False)
+    continuity_checklist = Column(JSON, server_default='{"entities":[]}')
+    # Alembic named the column "metadata" in raw SQL. That name collides with
+    # SQLAlchemy's Declarative Base.metadata attribute, so we alias the Python
+    # attribute to "meta" while keeping the underlying column name "metadata".
+    meta = Column("metadata", JSON, server_default="{}")
+
+    created_at = Column(DateTime, server_default=sa.func.now())
+    updated_at = Column(DateTime, server_default=sa.func.now(), onupdate=sa.func.now())
+
+    __table_args__ = (
+        sa.UniqueConstraint(
+            "campaign_id", "block_type", "entity_id",
+            name="uq_context_blocks_entity",
+        ),
+        sa.Index("ix_context_blocks_campaign", "campaign_id"),
+        sa.Index("ix_context_blocks_type", "campaign_id", "block_type"),
+        sa.Index("ix_context_blocks_entity", "campaign_id", "block_type", "entity_id"),
+        sa.Index("ix_context_blocks_status", "campaign_id", "status"),
+    )
+
+
+class ProfileLoreChunk(Base):
+    """Wiki lore fragments tied to a canonical narrative profile (scraped)."""
+
+    __tablename__ = "profile_lore_chunks"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    profile_id = Column(String(100), nullable=False, index=True)
+    chunk_id = Column(String(255), nullable=False)
+    page_title = Column(String(500), nullable=True)
+    page_type = Column(String(50), nullable=True)
+    content = Column(Text, nullable=False)
+    word_count = Column(Integer, server_default="0")
+    created_at = Column(DateTime, server_default=sa.func.now())
+
+    __table_args__ = (
+        sa.UniqueConstraint(
+            "profile_id", "chunk_id",
+            name="ix_profile_lore_chunks_uid",
+        ),
+    )
+
+
+class CustomProfileLoreChunk(Base):
+    """Session-scoped custom profile content (player-defined world additions)."""
+
+    __tablename__ = "custom_profile_lore_chunks"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    session_id = Column(String(64), nullable=False, index=True)
+    chunk_id = Column(String(255), nullable=False)
+    category = Column(String(50), nullable=True)
+    tags = Column(JSON, server_default="[]")
+    content = Column(Text, nullable=False)
+    created_at = Column(DateTime, server_default=sa.func.now())
+
+    __table_args__ = (
+        sa.UniqueConstraint(
+            "session_id", "chunk_id",
+            name="ix_custom_lore_chunks_uid",
+        ),
+    )
+
+
+class RuleLibraryChunk(Base):
+    """Static narrative guidance chunks (Module 12/13 YAML content)."""
+
+    __tablename__ = "rule_library_chunks"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    chunk_id = Column(String(255), nullable=False, unique=True)
+    category = Column(String(50), nullable=True)
+    source_module = Column(String(50), nullable=True)
+    tags = Column(JSON, server_default="[]")
+    retrieve_conditions = Column(JSON, server_default="[]")
+    content = Column(Text, nullable=False)
+    created_at = Column(DateTime, server_default=sa.func.now())
+

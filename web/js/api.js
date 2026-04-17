@@ -202,6 +202,19 @@ const GameAPI = {
     },
 
     /**
+     * Replay the idempotent subset of post-narrative bookkeeping for
+     * an incomplete prior turn. Called from the recovery banner.
+     */
+    async replayBookkeeping() {
+        if (!this.currentSessionId) {
+            return null;
+        }
+        return apiRequest(`/game/session/${this.currentSessionId}/replay-bookkeeping`, {
+            method: 'POST',
+        });
+    },
+
+    /**
      * Check if we're in Session Zero
      */
     isInSessionZero() {

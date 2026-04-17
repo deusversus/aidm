@@ -28,7 +28,7 @@ from src.db.session_zero_artifacts import (
 
 # ── Checkpoint dedup / completion preservation ───────────────────────────────
 
-def test_checkpoint_completion_preserves_diagnostic_fields():
+def test_checkpoint_completion_preserves_diagnostic_fields(fresh_db):
     """Saving a 'completed' checkpoint on top of a pre-background stub should
     preserve the diagnostic fields by merging the prior payload first."""
     campaign_id = "91001"
@@ -72,7 +72,7 @@ def test_checkpoint_completion_preserves_diagnostic_fields():
 
 # ── Entity graph snapshot ─────────────────────────────────────────────────────
 
-def test_entity_graph_dedup_when_state_unchanged():
+def test_entity_graph_dedup_when_state_unchanged(fresh_db):
     """Identical snapshot content should NOT create a new artifact version."""
     campaign_id = "91002"
     snapshot = {
@@ -96,7 +96,7 @@ def test_entity_graph_dedup_when_state_unchanged():
     )
 
 
-def test_entity_graph_new_version_when_state_changes():
+def test_entity_graph_new_version_when_state_changes(fresh_db):
     """Real state drift should produce a new versioned artifact."""
     campaign_id = "91003"
     base = {
@@ -133,7 +133,7 @@ def test_entity_graph_new_version_when_state_changes():
     assert active_payload["npcs"][0]["disposition"] == 75
 
 
-def test_entity_graph_captures_all_three_sections():
+def test_entity_graph_captures_all_three_sections(fresh_db):
     """Snapshot must include NPCs, locations, AND factions — not just NPCs."""
     campaign_id = "91004"
     snapshot = {

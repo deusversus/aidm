@@ -292,6 +292,44 @@ body {
 .handoff-warnings ul { margin: 0; padding-left: 1.2rem; }
 .handoff-warnings li { margin-bottom: 0.25rem; }
 
+/* Crash-recovery banner — shown when the orchestrator detects an incomplete
+   previous turn (background bookkeeping didn't finish). Non-blocking, dismissable. */
+.recovery-banner {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    margin: 0 0 1rem 0;
+    padding: 0.85rem 1rem;
+    background: rgba(245, 158, 11, 0.08);
+    border-left: 3px solid var(--warning, #f59e0b);
+    border-radius: 4px;
+    font-size: 0.9rem;
+    color: var(--text-primary);
+    line-height: 1.5;
+}
+
+.recovery-banner-icon { font-size: 1.15rem; flex-shrink: 0; padding-top: 0.1rem; }
+.recovery-banner-body { flex: 1; }
+.recovery-banner-title { font-weight: 600; margin-bottom: 0.2rem; }
+.recovery-banner-detail {
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+    margin-top: 0.25rem;
+}
+.recovery-banner-dismiss {
+    flex-shrink: 0;
+    background: transparent;
+    border: 1px solid var(--warning, #f59e0b);
+    color: var(--warning, #f59e0b);
+    border-radius: 3px;
+    padding: 0.2rem 0.6rem;
+    font-size: 0.8rem;
+    cursor: pointer;
+}
+.recovery-banner-dismiss:hover {
+    background: rgba(245, 158, 11, 0.12);
+}
+
 .narrative-entry ul,
 .narrative-entry ol {
     margin: 0.75rem 0 1rem 1.5rem;
