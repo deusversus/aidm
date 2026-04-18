@@ -1,0 +1,54 @@
+# dependencies
+node_modules/
+.pnpm-store/
+
+# next.js
+.next/
+out/
+next-env.d.ts
+
+# production
+build/
+dist/
+
+# misc
+.DS_Store
+*.pem
+Thumbs.db
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# env
+.env
+.env*.local
+.env.development
+.env.production
+
+# typescript
+*.tsbuildinfo
+
+# vercel / railway
+.vercel
+.railway/
+
+# drizzle
+drizzle/meta/
+
+# testing
+coverage/
+.vitest-cache/
+
+# editors
+.vscode/
+.idea/
+*.swp
+
+# v3 reference — lives on the v3 branch of this repo; not mirrored on master
+reference/
+
+# local tooling
+.claude/
