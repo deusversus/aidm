@@ -5,6 +5,14 @@
 **Target duration:** 2–3 focused evenings.
 **Acceptance:** clone → setup → deploy → sign in → see welcome message, in under 30 minutes for a fresh contributor.
 
+**Deploy model (per user's established workflow from hvmsite + DDD):**
+- **No Docker on dev machines.** Dev runs against Railway Postgres directly via its public URL.
+- **GitHub push → Railway autodeploy** is the deploy loop. Every commit to `master` rebuilds.
+- **Migrations run from dev machine** against the Railway DB (`pnpm db:push` locally). Migration files commit to git; Railway's rebuild does not re-run them (idempotent on next start).
+- **One Railway project (`aidm`)**, one service (Next.js monolith), one Postgres plugin.
+
+This collapses what the original draft treated as separate "local dev" and "production deploy" milestones into a single deploy target from commit 1. Ship-to-prod-from-week-one (ROADMAP §0.1 principle) applies literally.
+
 ---
 
 ## 1. Scope
@@ -47,20 +55,26 @@
 
 ## 2. Prerequisites
 
-Before commit 1, you (jcettison) will want these in hand. I'll flag when each first becomes load-bearing.
+Before commit 2, you (jcettison) will want these in hand. I'll flag when each first becomes load-bearing.
 
 | Account / tool | Tier | Needed at commit | Env vars |
 |---|---|---|---|
-| Docker Desktop | — | 1 (local dev) | — |
-| Anthropic API | pay-as-you-go | 3 (smoke ping) | `ANTHROPIC_API_KEY` |
-| Google AI Studio | free | 3 (optional fast-tier ping) | `GOOGLE_API_KEY` |
-| Clerk | free dev | 2 | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`, `CLERK_WEBHOOK_SECRET` |
-| Langfuse Cloud | free | 4 | `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_HOST` |
-| PostHog Cloud | free | 4 | `NEXT_PUBLIC_POSTHOG_KEY`, `NEXT_PUBLIC_POSTHOG_HOST` |
-| Railway | Hobby ($5/mo) | 5 | `DATABASE_URL` provided by Railway Postgres plugin |
+| **Railway project + Postgres plugin** | Hobby ($5/mo) | **1 (DB is load-bearing immediately)** | `DATABASE_URL` from Postgres plugin |
+| Anthropic API | pay-as-you-go | 4 (smoke ping) | `ANTHROPIC_API_KEY` |
+| Google AI Studio | free | 4 (optional fast-tier ping) | `GOOGLE_API_KEY` |
+| Clerk | free dev | 3 | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`, `CLERK_WEBHOOK_SECRET` |
+| Langfuse Cloud | free | 5 | `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_HOST` |
+| PostHog Cloud | free | 5 | `NEXT_PUBLIC_POSTHOG_KEY`, `NEXT_PUBLIC_POSTHOG_HOST` |
 | GitHub repo access | already have | 0 (done) | — |
 
-**Recommended account setup order:** Clerk and Anthropic first (they unblock the most commits); Langfuse and PostHog together (observability pair); Railway last (nothing in Railway is useful until local dev is green).
+**Critical path:** Railway first (blocks everything else — without the Postgres plugin, commit 2's migration has nowhere to land). Then Clerk and Anthropic in parallel (they unblock the bulk of work). Langfuse and PostHog together.
+
+**Railway setup (one-time, ~10 min):**
+1. `railway login` (already done per user).
+2. From `C:/Users/admin/Downloads/aidm_v4`: `railway init` → name the project `aidm`, link to the `deusversus/aidm` GitHub repo, enable autodeploy on `master`.
+3. Add the Postgres plugin: `railway add --plugin postgresql` (or via dashboard).
+4. In Railway dashboard → Postgres → Variables tab: copy `DATABASE_PUBLIC_URL`, paste into local `.env.local` as `DATABASE_URL`.
+5. One-time extension enablement: `railway connect postgres` (opens psql), run `CREATE EXTENSION IF NOT EXISTS vector;`, exit.
 
 ---
 
@@ -74,30 +88,57 @@ Scaffold, deps, configs. No behavior. See commit [`77b64f4`](https://github.com/
 
 ---
 
-### Commit 1 — `feat(db): initial migration with pgvector extension`
+### Commit 1 — `chore: align with railway-native workflow (no local docker)`
 
-**Goal:** Drizzle can generate and apply a migration that creates `users` + `campaigns` and enables the `vector` extension. Works against local Docker Postgres.
+**Goal:** align repo with the user's established Railway deploy pattern from hvmsite + DDD. No Docker on dev machine; dev DB is the Railway Postgres public URL; GitHub push is the deploy trigger.
 
 **Files touched:**
-- `drizzle/0000_init.sql` — generated via `pnpm db:generate`, then hand-edited to add `CREATE EXTENSION IF NOT EXISTS vector` at the top. Hand-reviewed per ROADMAP §4.6.
-- `drizzle/meta/_journal.json` — generated.
-- `src/lib/state/schema.ts` — no functional change; verify FK ordering.
+- **Delete** `docker-compose.yml` — not part of the workflow.
+- `.env.example` — `DATABASE_URL` comment rewritten to point at Railway public URL pattern, with note distinguishing public (dev) from internal (Railway runtime).
+- `README.md` — "Local dev" section rewritten. Replaces `docker compose up` with "paste Railway `DATABASE_PUBLIC_URL` into `.env.local`." Adds a "Deploy topology" section describing one-Railway-project / one-service / GitHub-push-deploy.
+- `src/lib/db.ts` — adds graceful shutdown handler: on SIGTERM/SIGINT, `pool.end()` drains connections before `process.exit`. Guarded by `globalThis.__aidmShutdownRegistered` flag to survive dev hot reload without duplicate registration.
+- `docs/plans/M0-walking-skeleton.md` — this file; reorders commits and adds the Railway-first prerequisite.
 
 **Verification (local):**
-1. `docker compose up -d` — Postgres + pgvector container up.
-2. `pnpm db:migrate` — applies the migration.
-3. `docker exec aidm-postgres psql -U postgres -d aidm -c "SELECT extname FROM pg_extension WHERE extname='vector'"` — confirms extension.
-4. `docker exec aidm-postgres psql -U postgres -d aidm -c "\dt"` — shows `users` + `campaigns`.
+1. `pnpm typecheck` — still green.
+2. `pnpm lint` — still green.
+3. `git status` — confirms `docker-compose.yml` deleted, 4 files modified, 0 files added.
 
-**Acceptance:** both tables exist, `vector` extension present, `pnpm typecheck` and `pnpm lint` still green.
+**Acceptance:** Repo state reflects Railway-native workflow. `.env.example` and README unambiguously describe the expected dev setup. Graceful shutdown compiles and has no lint warnings.
+
+**In parallel (you):** provision the `aidm` Railway project per §2's setup checklist. Paste `DATABASE_PUBLIC_URL` into `.env.local`. Enable `vector` extension via `railway connect postgres` → `CREATE EXTENSION vector;`.
 
 **Risks:**
-- pgvector container image tag drift. Pinned to `pgvector/pgvector:pg16` — safe for now.
-- Drizzle generates migration SQL that doesn't include extension creation. Expected; we edit by hand. Documented in this commit's body so future-me remembers.
+- Global shutdown registration pattern via `globalThis` is a mild anti-pattern but necessary for Next.js hot reload. Alternative patterns (module-level flag) don't survive HMR re-imports. Documented in the commit.
 
 ---
 
-### Commit 2 — `feat(auth): wire Clerk end-to-end`
+### Commit 2 — `feat(db): initial migration with pgvector`
+
+**Goal:** Drizzle can generate and apply a migration that creates `users` + `campaigns` and relies on the `vector` extension. Applied to the Railway-managed Postgres.
+
+**Files touched:**
+- `drizzle/0000_init.sql` — generated via `pnpm db:generate`, hand-reviewed per ROADMAP §4.6. Adds `CREATE EXTENSION IF NOT EXISTS vector` at the top as a safety net (already enabled via psql in commit 1's setup; SQL is idempotent).
+- `drizzle/meta/_journal.json` + `drizzle/meta/0000_snapshot.json` — generated.
+- `src/lib/state/schema.ts` — no functional change expected; verify FK ordering.
+
+**Verification:**
+1. `pnpm db:generate` — produces `drizzle/0000_init.sql`.
+2. Hand-review the SQL, commit.
+3. `pnpm db:push` — applies against Railway Postgres (uses `DATABASE_URL` from `.env.local`).
+4. `railway connect postgres` → `\dt` shows `users` + `campaigns`; `SELECT extname FROM pg_extension WHERE extname='vector';` returns a row.
+5. `curl http://localhost:3000/api/ready` (after `pnpm dev`) returns `200` with `db: ok`.
+6. `git push origin master` — Railway rebuilds; production `/api/ready` returns `200`.
+
+**Acceptance:** both tables exist in Railway Postgres, `vector` extension present, `/api/ready` green locally AND on production URL after push.
+
+**Risks:**
+- **pgvector on Railway-managed Postgres.** Needs one-time `CREATE EXTENSION vector;` via psql (done in commit 1 setup). If Railway's default image doesn't include pgvector, fallback: deploy Railway's "pgvector" template or use a Postgres plugin with pgvector pre-installed. Decided live at setup time.
+- Drizzle-generated SQL may not include extension creation — so the hand-added `CREATE EXTENSION` is important as a belt-and-suspenders safety net.
+
+---
+
+### Commit 3 — `feat(auth): wire Clerk end-to-end`
 
 **Goal:** magic-link sign-in → `/campaigns` page shows `hello, {user.email}`. Webhook creates/updates a row in `users`.
 
@@ -133,7 +174,7 @@ Scaffold, deps, configs. No behavior. See commit [`77b64f4`](https://github.com/
 
 ---
 
-### Commit 3 — `feat(llm): provider clients + anthropic smoke ping in /api/ready`
+### Commit 4 — `feat(llm): provider clients + anthropic smoke ping in /api/ready`
 
 **Goal:** `/api/ready` pings Anthropic and returns `anthropic: "ok"` (or `"fail"`) alongside the DB check.
 
@@ -158,7 +199,7 @@ Scaffold, deps, configs. No behavior. See commit [`77b64f4`](https://github.com/
 
 ---
 
-### Commit 4 — `feat(observability): langfuse + posthog wired`
+### Commit 5 — `feat(observability): langfuse + posthog wired`
 
 **Goal:** Langfuse captures one trace from a manual Anthropic call; PostHog captures page views and a test exception.
 
@@ -185,45 +226,13 @@ Scaffold, deps, configs. No behavior. See commit [`77b64f4`](https://github.com/
 
 ---
 
-### Commit 5 — `feat(deploy): railway preDeploy migration + health checks`
-
-**Goal:** `git push origin master` deploys to Railway; prod URL serves the landing page; `/api/health` = 200; `/api/ready` = 200 after env vars are set in Railway.
-
-**Prerequisites you'll handle (10–15 min):**
-1. Create Railway project named `aidm`, link to `deusversus/aidm` GitHub repo (autodeploy on `master`).
-2. Add Postgres plugin; Railway injects `DATABASE_URL`.
-3. In the Postgres shell: `CREATE EXTENSION vector;` — Railway-managed Postgres may require a one-time manual enable.
-4. Paste all other env vars into the service's environment (Anthropic, Clerk, Langfuse, PostHog, Google).
-5. Set `NEXT_PUBLIC_APP_URL` to the Railway-issued domain.
-
-**Files touched:**
-- `railway.json` — already has `preDeployCommand: pnpm db:migrate` and healthcheck. Verify + adjust timeout if needed.
-- `next.config.ts` — add `output: "standalone"` so the Dockerfile's `COPY --from=builder .../standalone` works.
-- `Dockerfile` — minor adjustments if standalone output path differs in Next 15.
-
-**Verification:**
-1. Push a trivial change to `master`.
-2. Railway build + deploy succeeds (watch the build log).
-3. `curl https://<railway-domain>/api/health` → 200.
-4. `curl https://<railway-domain>/api/ready` → 200 with DB + Anthropic ok.
-5. Sign in on the live domain — land on `/campaigns`, greeted by email.
-
-**Acceptance:** full round trip works on the public URL.
-
-**Risks:**
-- **pgvector on Railway Postgres.** Railway's managed Postgres supports pgvector but the extension may need a one-time `CREATE EXTENSION` from the psql shell. If not available, fallback: Railway lets you use a custom Postgres image (pgvector/pgvector:pg16) via a raw TCP plugin. Documented here; we'll find out at deploy time.
-- **Clerk redirect URLs.** Clerk needs the production domain added to allowed redirects. 2-min fix in Clerk dashboard; flagged in the Railway setup checklist.
-- **Build-time env vars.** `NEXT_PUBLIC_*` values are baked at build time, not runtime. They must be set in Railway before the first build. Railway does this automatically once env vars are added and the service is redeployed.
-
----
-
 ### Commit 6 — `feat(ci): railway preview per PR + vitest smoke test`
 
 **Goal:** opening a PR triggers lint + typecheck + test + a Railway preview env with its own `/api/health` URL posted as a PR comment.
 
 **Files touched:**
 - `.github/workflows/ci.yml` — already exists; ensure it runs on PRs.
-- `.github/workflows/deploy-preview.yml` — new. Uses `railwayapp/action-deploy-preview@v1` or a direct `railway up --detach` invocation.
+- `.github/workflows/deploy-preview.yml` — new. Uses Railway's PR-preview-environments feature (enabled in project settings). Railway creates a per-PR environment with its own Postgres; the workflow comments the preview URL on the PR.
 - `tests/setup.ts` — minimal Vitest setup (loads `.env.test`).
 - `src/lib/env.test.ts` — first real unit test: env parsing with a known-good input fixture and a known-bad one.
 - `vitest.config.ts` — config.
@@ -242,6 +251,8 @@ Scaffold, deps, configs. No behavior. See commit [`77b64f4`](https://github.com/
 ---
 
 ### Commit 7 — `feat(types): core Zod schemas committed (unused at M0)`
+
+*(Numbering unchanged — commit 7 remains the final M0 commit.)*
 
 **Goal:** the soul-contracts from ROADMAP §5, §7, §10 live in `lib/types.ts` so M1 and M2 have something to import. Intentionally unused at M0.
 
@@ -298,7 +309,7 @@ Consolidated from per-commit risk notes; mitigations planned.
 
 | # | Risk | Impact | Likelihood | Mitigation |
 |---|---|---|---|---|
-| 1 | pgvector extension not auto-enabled on Railway Postgres | high (blocks deploy) | medium | Manual `CREATE EXTENSION vector` via Railway psql; fallback to custom pgvector image plugin |
+| 1 | pgvector extension not auto-enabled on Railway Postgres | high (blocks commit 2) | medium | Manual `CREATE EXTENSION vector` via `railway connect postgres` at setup (commit 1 sidebar task); fallback to custom pgvector image plugin if not supported |
 | 2 | Clerk middleware quirks on Next 15 App Router | medium (blocks sign-in) | medium | Pin `@clerk/nextjs@^6.0.0`; follow current `clerkMiddleware()` pattern; test on localhost before deploy |
 | 3 | Tailwind 4 + PostCSS edge cases (brand-new at publish time) | low (cosmetic) | low | Vanilla `@tailwindcss/postcss` plugin; no custom PostCSS pipeline at M0 |
 | 4 | Next 15 standalone output path diverges from Dockerfile | medium (build fails) | low | Verify `output: "standalone"` in `next.config.ts` and `.next/standalone/` layout on first local Docker build |
