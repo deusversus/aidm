@@ -22,9 +22,32 @@ const envSchema = z.object({
   NEXT_PUBLIC_APP_URL: z.string().url().default("http://localhost:3000"),
 });
 
-export const env = envSchema.parse(process.env);
-
 export type Env = z.infer<typeof envSchema>;
+
+// Lazy validation. Parsing at module import breaks Next.js production builds,
+// which import route handlers during page-data collection without runtime env
+// set. Instead, validate on first property access — which only happens at
+// request time for dynamic routes, long after the build phase.
+let cached: Env | undefined;
+
+export const env = new Proxy({} as Env, {
+  get(_target, prop) {
+    cached ??= envSchema.parse(process.env);
+    return cached[prop as keyof Env];
+  },
+  has(_target, prop) {
+    cached ??= envSchema.parse(process.env);
+    return prop in cached;
+  },
+  ownKeys() {
+    cached ??= envSchema.parse(process.env);
+    return Reflect.ownKeys(cached);
+  },
+  getOwnPropertyDescriptor(_target, prop) {
+    cached ??= envSchema.parse(process.env);
+    return Reflect.getOwnPropertyDescriptor(cached, prop);
+  },
+});
 
 export const tiers = {
   fast: { provider: "google", model: "gemini-3.1-flash" },
