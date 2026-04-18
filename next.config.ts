@@ -6,7 +6,6 @@ const nextConfig: NextConfig = {
   output: "standalone",
   // Next 15 promoted typedRoutes from experimental to stable.
   typedRoutes: true,
-  serverExternalPackages: ["@anthropic-ai/sdk", "openai", "@google/genai"],
 };
 
 export default nextConfig;

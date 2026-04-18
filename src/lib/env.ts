@@ -1,24 +1,10 @@
 import { z } from "zod";
 
+// Minimal env schema for M0. Auth (Clerk), observability (Langfuse/PostHog), and
+// provider keys (Anthropic/OpenAI/Google) land in their respective M0+ commits.
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
   DATABASE_URL: z.string().url(),
-
-  ANTHROPIC_API_KEY: z.string().optional(),
-  OPENAI_API_KEY: z.string().optional(),
-  GOOGLE_API_KEY: z.string().optional(),
-  OPENROUTER_API_KEY: z.string().optional(),
-
-  NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: z.string().optional(),
-  CLERK_SECRET_KEY: z.string().optional(),
-
-  LANGFUSE_PUBLIC_KEY: z.string().optional(),
-  LANGFUSE_SECRET_KEY: z.string().optional(),
-  LANGFUSE_HOST: z.string().url().default("https://cloud.langfuse.com"),
-
-  NEXT_PUBLIC_POSTHOG_KEY: z.string().optional(),
-  NEXT_PUBLIC_POSTHOG_HOST: z.string().url().default("https://us.i.posthog.com"),
-
   NEXT_PUBLIC_APP_URL: z.string().url().default("http://localhost:3000"),
 });
 
@@ -28,6 +14,10 @@ export type Env = z.infer<typeof envSchema>;
 // which import route handlers during page-data collection without runtime env
 // set. Instead, validate on first property access — which only happens at
 // request time for dynamic routes, long after the build phase.
+//
+// Note: spread/JSON.stringify/Object.keys on `env` will force a full parse
+// via ownKeys. Current codebase has no such callers; if one lands, either
+// avoid the spread or expose an explicit load() function.
 let cached: Env | undefined;
 
 export const env = new Proxy({} as Env, {
@@ -49,6 +39,7 @@ export const env = new Proxy({} as Env, {
   },
 });
 
+// Model tiers — current 2026 defaults, user-confirmed.
 export const tiers = {
   fast: { provider: "google", model: "gemini-3.1-flash" },
   thinking: { provider: "anthropic", model: "claude-opus-4-7" },
