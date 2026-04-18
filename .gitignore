@@ -35,8 +35,8 @@ pnpm-debug.log*
 .vercel
 .railway/
 
-# drizzle
-drizzle/meta/
+# drizzle: commit migrations AND meta/ — the journal + snapshots track
+# migration state across environments. Drizzle fails on missing meta.
 
 # testing
 coverage/
