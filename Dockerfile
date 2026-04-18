@@ -9,7 +9,10 @@ RUN corepack enable
 FROM base AS deps
 WORKDIR /app
 COPY package.json pnpm-lock.yaml ./
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
+# No BuildKit cache mount — Railway rejects cache mount IDs that aren't prefixed with
+# the service cache key. First build is slow; subsequent builds still benefit from
+# Railway's layer cache on the COPY + RUN pair above.
+RUN pnpm install --frozen-lockfile
 
 FROM base AS builder
 WORKDIR /app
