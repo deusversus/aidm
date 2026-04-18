@@ -48,6 +48,20 @@ Internal `DATABASE_URL` (with `postgres.railway.internal`) is set automatically 
 | `pnpm eval` | Run eval harness (full) |
 | `pnpm eval:fast` | Run eval smoke subset |
 
+### Migration workflow
+
+Migrations run from the **dev machine** against the Railway Postgres, not on Railway itself. After editing `src/lib/state/schema.ts`:
+
+```sh
+pnpm db:generate      # produces drizzle/NNNN_<name>.sql + meta/ updates
+# hand-review the generated SQL per ROADMAP §4.6
+pnpm db:migrate       # applies against the DATABASE_URL in .env.local
+git add drizzle/ && git commit -m "feat(db): <change>"
+git push              # Railway rebuilds; migration state already in prod
+```
+
+Reasoning: the runner image is minimal (no drizzle-kit, no devDeps); `pnpm` isn't wired for the `nextjs` user; and running schema changes ahead of the push lets you verify the state before the rebuild spins down old revisions. Matches the pattern from `hvmsite` and `DDD`.
+
 ## Repository layout
 
 See [ROADMAP §3.3](./ROADMAP.md#33-repo-layout).
