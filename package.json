@@ -24,11 +24,13 @@
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
+    "@clerk/nextjs": "^7.2.3",
     "drizzle-orm": "^0.36.0",
     "next": "^15.1.0",
     "pg": "^8.13.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "svix": "^1.90.0",
     "zod": "^3.23.0"
   },
   "devDependencies": {

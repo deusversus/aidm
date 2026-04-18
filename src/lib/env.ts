@@ -1,11 +1,21 @@
 import { z } from "zod";
 
-// Minimal env schema for M0. Auth (Clerk), observability (Langfuse/PostHog), and
-// provider keys (Anthropic/OpenAI/Google) land in their respective M0+ commits.
+// Env schema grows commit-by-commit. Each integration adds its own fields.
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
   DATABASE_URL: z.string().url(),
   NEXT_PUBLIC_APP_URL: z.string().url().default("http://localhost:3000"),
+
+  // --- Clerk auth (commit 3) ---
+  // Publishable key inlined into client bundle at build time. Must be set in
+  // Railway's BUILD env, not just runtime, or Clerk throws in the browser.
+  NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: z.string().optional(),
+  CLERK_SECRET_KEY: z.string().optional(),
+  CLERK_WEBHOOK_SECRET: z.string().optional(),
+  NEXT_PUBLIC_CLERK_SIGN_IN_URL: z.string().default("/sign-in"),
+  NEXT_PUBLIC_CLERK_SIGN_UP_URL: z.string().default("/sign-up"),
+  NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL: z.string().default("/campaigns"),
+  NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL: z.string().default("/campaigns"),
 });
 
 export type Env = z.infer<typeof envSchema>;
