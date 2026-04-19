@@ -21,16 +21,20 @@
     "db:generate": "drizzle-kit generate",
     "db:push": "drizzle-kit push",
     "db:migrate": "drizzle-kit migrate",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "hello:trace": "tsx scripts/langfuse-hello.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.90.0",
     "@clerk/nextjs": "^7.2.3",
     "@google/genai": "^1.50.1",
     "drizzle-orm": "^0.36.0",
+    "langfuse": "^3.38.20",
     "next": "^15.1.0",
     "openai": "^6.34.0",
     "pg": "^8.13.0",
+    "posthog-js": "^1.369.3",
+    "posthog-node": "^5.29.2",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "svix": "^1.90.0",

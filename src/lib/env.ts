@@ -22,6 +22,13 @@ const envSchema = z.object({
   GOOGLE_API_KEY: z.string().optional(),
   OPENAI_API_KEY: z.string().optional(),
   OPENROUTER_API_KEY: z.string().optional(),
+
+  // --- Observability (commit 5) ---
+  LANGFUSE_PUBLIC_KEY: z.string().optional(),
+  LANGFUSE_SECRET_KEY: z.string().optional(),
+  LANGFUSE_HOST: z.string().url().default("https://us.cloud.langfuse.com"),
+  NEXT_PUBLIC_POSTHOG_KEY: z.string().optional(),
+  NEXT_PUBLIC_POSTHOG_HOST: z.string().url().default("https://us.i.posthog.com"),
 });
 
 export type Env = z.infer<typeof envSchema>;

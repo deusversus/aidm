@@ -1,3 +1,4 @@
+import { PostHogProvider } from "@/components/posthog-provider";
 import { ClerkProvider } from "@clerk/nextjs";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
@@ -12,7 +13,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <ClerkProvider>
       <html lang="en">
-        <body className="min-h-screen bg-background text-foreground antialiased">{children}</body>
+        <body className="min-h-screen bg-background text-foreground antialiased">
+          <PostHogProvider>{children}</PostHogProvider>
+        </body>
       </html>
     </ClerkProvider>
   );
