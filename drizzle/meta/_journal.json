@@ -8,6 +8,13 @@
       "when": 1776548788630,
       "tag": "0000_shiny_post",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1776630609213,
+      "tag": "0001_demonic_jackpot",
+      "breakpoints": true
     }
   ]
 }

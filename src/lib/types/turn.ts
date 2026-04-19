@@ -32,6 +32,7 @@ export const IntentOutput = z.object({
 export type IntentOutput = z.infer<typeof IntentOutput>;
 
 export const NarrativeWeight = z.enum(["MINOR", "SIGNIFICANT", "CLIMACTIC"]);
+export type NarrativeWeight = z.infer<typeof NarrativeWeight>;
 export const SuccessLevel = z.enum([
   "critical_failure",
   "failure",
