@@ -1,8 +1,10 @@
 import { tiers } from "@/lib/env";
 import { type RenderBlocksInput, renderKaBlocks } from "@/lib/ka/blocks";
+import { getPrompt } from "@/lib/prompts";
 import { buildMcpServers } from "@/lib/tools";
 import type { AidmToolContext } from "@/lib/tools";
 import {
+  type AgentDefinition,
   type Options,
   type SDKMessage,
   SYSTEM_PROMPT_DYNAMIC_BOUNDARY,
@@ -10,6 +12,83 @@ import {
 } from "@anthropic-ai/claude-agent-sdk";
 import type { AgentDeps } from "./types";
 import { defaultLogger } from "./types";
+
+const HAIKU_MODEL = "claude-haiku-4-5-20251001";
+
+/**
+ * Consultants KA can spawn via the Agent tool. Each entry is an
+ * AgentDefinition — KA's Agent SDK session discovers them and can
+ * delegate when its judgment dictates.
+ *
+ * This is the "KA as orchestrator" wiring: OJ / Validator / Pacing /
+ * Combat / MemoryRanker / Recap / ScaleSelector are all available
+ * inside KA's session, not pushed into a pipeline that runs before or
+ * after it. KA decides WHICH specialists to consult and WHEN based on
+ * the scene, intent, and Block 4 context.
+ *
+ * Prompts load from the shared registry so edits to `agents/*.md`
+ * propagate here without code changes. Each prompt already contains the
+ * agent's output-contract instructions; KA parses the returned text as
+ * JSON per the agent's schema on its own.
+ *
+ * Model selection: Agent SDK subagents inherit the Anthropic API
+ * interface. Our `fast` tier is Gemini (different provider) so for
+ * fast-tier consultants we substitute Haiku 4.5 as the closest-tier
+ * Anthropic model. Same cognitive work; different backing.
+ */
+function buildKaConsultants(): Record<string, AgentDefinition> {
+  return {
+    "outcome-judge": {
+      description:
+        "Consult before narrating consequences of a consequential action. Returns JSON verdict: success_level, difficulty_class, narrative_weight (MINOR/SIGNIFICANT/CLIMACTIC), consequence, cost, rationale. Describe the intent + situation + character; the judge returns mechanical truth for you to narrate.",
+      prompt: getPrompt("agents/outcome-judge").content,
+      model: tiers.thinking.model,
+      tools: [],
+    },
+    validator: {
+      description:
+        "Review an OutcomeJudge verdict for consistency against canon, character capability, composition mode, and player overrides. Call after OJ when a verdict seems off. Returns { valid, correction }.",
+      prompt: getPrompt("agents/validator").content,
+      model: tiers.thinking.model,
+      tools: [],
+    },
+    pacing: {
+      description:
+        "Advise on beat rhythm — should this beat escalate, hold, release, pivot, set up, pay off, or detour? Returns { directive, toneTarget, escalationTarget, rationale }. Consult when the arc plan guidance matters for how you write this beat.",
+      prompt: getPrompt("agents/pacing-agent").content,
+      model: tiers.thinking.model,
+      tools: [],
+    },
+    "memory-ranker": {
+      description:
+        "Rerank semantic memory candidates by scene relevance when raw retrieval returns more than 3 hits. Returns a ranked list with relevance scores. Skip for META/OVERRIDE turns.",
+      prompt: getPrompt("agents/memory-ranker").content,
+      model: HAIKU_MODEL,
+      tools: [],
+    },
+    recap: {
+      description:
+        "First turn of a session only — produces a short in-character recap of last session's cliffhanger + active threads. Not needed on subsequent turns.",
+      prompt: getPrompt("agents/recap-agent").content,
+      model: HAIKU_MODEL,
+      tools: [],
+    },
+    combat: {
+      description:
+        "For COMBAT intents — resolves hit/miss/damage/facts/status/resource-cost BEFORE you narrate, so you narrate facts rather than inventing mechanics. Returns JSON with resolution, damage, facts (2-4 concrete truths you must honor).",
+      prompt: getPrompt("agents/combat-agent").content,
+      model: tiers.thinking.model,
+      tools: [],
+    },
+    "scale-selector": {
+      description:
+        "For combat exchanges — returns the effective composition mode (standard | blended | op_dominant | not_applicable) based on attacker/defender tier gap. Consult when tier differential is wide enough to reframe stakes onto cost vs survival.",
+      prompt: getPrompt("agents/scale-selector-agent").content,
+      model: HAIKU_MODEL,
+      tools: [],
+    },
+  };
+}
 
 /**
  * KeyAnimator — the author-intelligence.
@@ -145,6 +224,7 @@ export async function* runKeyAnimator(
     systemPrompt,
     tools: [],
     mcpServers,
+    agents: buildKaConsultants(),
     permissionMode: "bypassPermissions",
     allowDangerouslySkipPermissions: true,
     settingSources: [],

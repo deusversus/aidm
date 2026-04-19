@@ -1,5 +1,6 @@
 import { getDb } from "@/lib/db";
 import { env } from "@/lib/env";
+import { seedBebopCampaign } from "@/lib/seed/bebop";
 import { users } from "@/lib/state/schema";
 import type { WebhookEvent } from "@clerk/nextjs/server";
 import { eq } from "drizzle-orm";
@@ -43,7 +44,8 @@ export async function POST(req: Request) {
     if (!email) {
       return new Response("User has no email address", { status: 400 });
     }
-    await getDb()
+    const db = getDb();
+    await db
       .insert(users)
       .values({ id: clerkUser.id, email })
       .onConflictDoUpdate({
@@ -51,6 +53,22 @@ export async function POST(req: Request) {
         // Resurrect soft-deleted users if they re-sign-up with the same Clerk id.
         set: { email, deletedAt: null },
       });
+    // Auto-seed the Bebop campaign on first sign-in so the player can hit
+    // /campaigns and play immediately. `seedBebopCampaign` is idempotent —
+    // if the user already has a Bebop campaign, it leaves it alone. This
+    // path replaces Session Zero for M1 (SZ lands in M2).
+    if (evt.type === "user.created") {
+      try {
+        await seedBebopCampaign(db, clerkUser.id);
+      } catch (err) {
+        // Don't fail the webhook on seed error — the user row is already
+        // in; they can sign in and the seed script can be run manually.
+        console.error("auto-seed failed", {
+          userId: clerkUser.id,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
   }
 
   if (evt.type === "user.deleted") {
