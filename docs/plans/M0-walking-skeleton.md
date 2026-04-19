@@ -226,7 +226,9 @@ Scaffold, deps, configs. No behavior. See commit [`77b64f4`](https://github.com/
 
 ---
 
-### Commit 6 — `feat(ci): railway preview per PR + vitest smoke test`
+### Commit 6 — `feat(ci): vitest smoke test + hardened workflow`
+
+TODO(M1): enable Railway PR previews from the project's dashboard (Settings → Environments → enable PR Environments). Native Railway feature; no repo workflow needed. Deferred from M0 because it's a one-click dashboard toggle with no code impact.
 
 **Goal:** opening a PR triggers lint + typecheck + test + a Railway preview env with its own `/api/health` URL posted as a PR comment.
 
