@@ -118,7 +118,7 @@ Success at one year looks like: the author is still playing long-running campaig
 | Package manager | `pnpm` | fast, disk-efficient, strict |
 | Framework | Next.js 15 (App Router) | one service for web + API; Route Handlers do SSE cleanly; Server Actions for mutations; React Server Components for dashboard |
 | Agent orchestration | Mastra | workflows + agents + memory + RAG + tools + evals + telemetry as one coherent framework |
-| Inner agent SDK | Claude Agent SDK (TS) | native prompt caching, subagent spawning, Claude tool-loop — used inside Mastra workflow steps for KA, Director, SZ conductor |
+| Inner agent SDK | Claude Agent SDK (TS) | tool-loop convergence, subagent primitive, per-query cost cap — used for tool-heavy agents (SessionZeroConductor M2, research subagents inside KA/Director M4+, ForeshadowingLedger M6). Not used for KA's per-turn path (see [M1 spike](../docs/spikes/M1-mastra-agent-sdk.md) — its one-boundary caching is too coarse for KA's 4-block structure). |
 | LLM providers | Anthropic + Google + OpenAI direct; OpenRouter for long-tail models | provider-native SDKs capture real differentiators (Anthropic prompt caching + subagents, Google AI plan credits, OpenAI reasoning); OpenRouter rides on the OpenAI SDK with a different base URL for DeepSeek / Qwen / Mistral / etc. |
 | Provider SDKs | `@anthropic-ai/sdk` + Claude Agent SDK; `openai` (for OpenAI + OpenRouter); `@google/genai` | three SDKs, one does double duty |
 | Structured output | Zod + Anthropic SDK tool-use / structured-output | Zod is the Pydantic equivalent; Anthropic SDK accepts Zod schemas directly |
@@ -229,8 +229,8 @@ aidm/
         base.ts                     # Mastra Agent wrapper + Claude SDK adapter
         intent-classifier.ts
         outcome-judge.ts
-        key-animator.ts             # uses Claude Agent SDK for subagents + caching
-        session-zero-conductor.ts   # uses Claude Agent SDK
+        key-animator.ts             # raw @anthropic-ai/sdk (4-block cache + streaming); Agent SDK at M4+ when research subagents land
+        session-zero-conductor.ts   # uses Claude Agent SDK (M2 — tool-loop convergence)
         handoff-compiler.ts
         director.ts                 # M4
 
@@ -495,14 +495,16 @@ Organized by role and milestone. Tiers are per §7.5 (fast / thinking / creative
 - **MemoryRanker → native rerank or one call.** v3's LLM-ranker still has a role but simpler: structured output returns a ranked list in one call rather than candidate-by-candidate scoring.
 - **Compactor defer.** v3 needed aggressive compaction to fit Opus 4.6's context. Opus 4.7's 1M context + native prompt caching defers the Compactor to M7+, possibly eliminates it.
 
-### 5.3 Two-model pattern (KA, Director, SZ Conductor, Foreshadowing)
+### 5.3 Two-model pattern (KA research phase, Director, SZ Conductor, Foreshadowing)
 
-Smart agents use the research → synthesis pattern, now trivially implemented via Claude Agent SDK subagents:
+Smart agents use the research → synthesis pattern inside a Mastra workflow step. The research-phase spawning primitive is Claude Agent SDK, landing when tool-loop agents do (M2 SessionZeroConductor, M4+ research subagents for KA and Director, M6 ForeshadowingLedger). **At M1, KA has no research phase** — it's a single structured-output call on the raw `@anthropic-ai/sdk` with 4-block cache (see [M1 spike](../docs/spikes/M1-mastra-agent-sdk.md)).
 
-1. **Research phase:** parent agent spawns fast-tier subagents (Haiku or Gemini 3.1 Flash) with tools. Parallel tool calls gather context. Returns compressed `Research Findings` (TIGHT format: RELEVANT FACTS / NPC INTELLIGENCE / CONTINUITY / TACTICAL NOTE — v3's schema, preserved).
+Flow when research is in play:
+
+1. **Research phase:** parent spawns a fast-tier subagent (Haiku 4.5 or Gemini 3.1 Flash) with tools. Parallel tool calls gather context. Returns compressed `Research Findings` (TIGHT format: RELEVANT FACTS / NPC INTELLIGENCE / CONTINUITY / TACTICAL NOTE — v3's schema, preserved).
 2. **Synthesis phase:** parent (thinking or creative tier, often with extended thinking) consumes findings + structured inputs, produces final output.
 
-KA's research phase uses **intent-adaptive strategies** (v3 verbatim):
+KA's research phase (M4+) uses **intent-adaptive strategies** (v3 verbatim):
 - **COMBAT:** character sheet → NPC details → prior encounters → recent episodes
 - **SOCIAL:** NPC details → shared history → present NPCs → relationship impacts
 - **EXPLORATION:** world state → area lore → recent episodes → NPC associations
@@ -512,20 +514,13 @@ KA's research phase uses **intent-adaptive strategies** (v3 verbatim):
 
 Max 3 tool rounds; fast tier; surgical approach (skip tools whose answer is already obvious from context).
 
+Other agents (IntentClassifier, OutcomeJudge) use Mastra's Agent primitive with Zod-structured output — no subagents, no tool loop.
+
 ### 5.4 Addition order and acceptance gates
 
 Agents ship on the milestone where their absence demonstrably hurts play, not on a calendar. The acceptance signal is **the author playing it and finding the lack** — eval harness catches regressions but does not drive agent introduction.
 
-### 5.3 Two-model pattern
-
-Smart agents (KA, Director, SZ conductor, ForeshadowingLedger) are implemented via Claude Agent SDK inside a Mastra workflow step. Flow:
-
-1. **Research phase:** parent spawns a Haiku subagent (via Claude Agent SDK's subagent primitive) with tools. Parallel tool calls gather context. Returns a compressed findings object.
-2. **Synthesis phase:** parent (Opus, often with extended thinking) ingests findings + structured inputs, produces final output.
-
-Other agents (IntentClassifier, OutcomeJudge) use Mastra's Agent primitive with Zod-structured output — no subagents, no tool loop.
-
-### 5.4 Per-agent spec (MVP agents)
+### 5.5 Per-agent spec (MVP agents)
 
 Every agent declares: input schema (Zod), output schema (Zod), model tier, latency target, cost target, failure modes, and fallback policy.
 
@@ -557,7 +552,7 @@ Every agent declares: input schema (Zod), output schema (Zod), model tier, laten
 **KeyAnimator**
 - Input: `{ intent, outcome, memoryContext, sceneContext, pacingDirective?, npcCards, foreshadowingActive? }`
 - Output: streaming prose + `portraitMap: Record<string, string>`
-- Tier: `creative` (extended thinking budget 3K); implemented via Claude Agent SDK for native prompt caching + research subagent spawning
+- Tier: `creative` (extended thinking budget 3K). M1: raw `@anthropic-ai/sdk` with per-block `cache_control` for the 4-block structure (see [M1 spike](../docs/spikes/M1-mastra-agent-sdk.md)) and `stream: true` for SSE. M4+: wrap in a Claude Agent SDK query when the research-subagent phase lands.
 - Latency: TTFT <3s p95, completion <12s p95
 - Cost: ~$0.025/call (cache warm, ~800–1500 output tokens)
 - Failure modes:
@@ -833,7 +828,7 @@ Effective = `{ ...active, ...arc_override?.dna }`. Arc overrides are partials �
 
 **Delta.** `dnaDelta(canonical, active)` tells the Director how far from source a run is diverging. Strict DBZ → all zeros; Dark-Pokemon → `{optimism: -6, darkness: +7, cruelty: +5}`. Director uses this to decide whether to lean into canonical tropes or signal dissonance.
 
-Claude Agent SDK handles `cache_control` placement from a declarative block list; v4 does not hand-build the system array.
+KA builds the 4-block `system` array by hand and sets `cache_control: { type: 'ephemeral' }` on blocks 1–3 using the raw `@anthropic-ai/sdk`. Claude Agent SDK's `systemPrompt: string[]` primitive supports only one cache boundary (`SYSTEM_PROMPT_DYNAMIC_BOUNDARY`) — too coarse for the three-group pattern (see [M1 spike](../docs/spikes/M1-mastra-agent-sdk.md)). Agent SDK is used at M2+ where its tool-loop convergence pays (SessionZeroConductor) and for M4+ research subagents, not in the per-turn gameplay path.
 
 **Target cache hit rate** after turn 5: ≥80%. Tracked in Langfuse. Block 1 is the single biggest cache win; keep it immutable within a session.
 
@@ -1677,7 +1672,7 @@ Each milestone ends with a deploy to production, a brief written retro (`docs/re
 
 **Deliverables:**
 - `IntentClassifier`, `OutcomeJudge`, `KeyAnimator` with Zod I/O.
-- KA implemented via Claude Agent SDK with 4-block cache structure.
+- KA implemented on raw `@anthropic-ai/sdk` with 4-block cache structure (see [M1 spike](../docs/spikes/M1-mastra-agent-sdk.md)); Claude Agent SDK deferred to M2+ where tool-loop convergence matters.
 - Mastra workflow for the turn state machine (§6).
 - SSE streaming Route Handler; client hook with typewriter rendering.
 - One hardcoded campaign + character (seed script).
@@ -1689,7 +1684,7 @@ Each milestone ends with a deploy to production, a brief written retro (`docs/re
 
 **Acceptance:** play 10 turns on prod, narrative coherent, cache hit rate ≥80% after turn 3, eval suite green, p95 TTFT <3s.
 
-**Risks:** KA prompt quality at MVP; Opus 4.7 thinking-budget tuning; cache block structure off on first attempt; Claude Agent SDK + Mastra interop patterns.
+**Risks:** KA prompt quality at MVP; Opus 4.7 thinking-budget tuning; cache block structure off on first attempt (resolved by [M1 spike](../docs/spikes/M1-mastra-agent-sdk.md) — using raw `@anthropic-ai/sdk` instead of Agent SDK for per-block `cache_control`); real TTFT p95 on Opus streaming vs. the <3s target.
 
 ### M2 — Session Zero (1 week)
 
