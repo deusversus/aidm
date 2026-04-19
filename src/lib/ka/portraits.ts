@@ -9,10 +9,10 @@
  * portrait retrieval failure never blocks or alters narration. Per
  * v3's pattern (`resolve_portraits()` in `key_animator.py`).
  *
- * At M1 the URL lookup is a stub — no NPC portraits are generated yet
- * (ProductionAgent media wiring lands at M4+). We return the name
- * set so persistence records WHO appeared, which enables later
- * production runs to fill URLs retroactively.
+ * The URL lookup defaults to a stub — no NPC portraits are generated
+ * yet (ProductionAgent's media wiring populates the URLs). We return
+ * the name set so persistence records WHO appeared, which enables
+ * later production runs to fill URLs retroactively.
  */
 
 const BOLD_NAME_RE = /\*\*([A-Z][A-Za-z'\-]*(?:\s+[A-Z][A-Za-z'\-]*)*)\*\*/g;

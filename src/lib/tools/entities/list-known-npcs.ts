@@ -3,7 +3,7 @@ import { registerTool } from "../registry";
 
 /**
  * List every NPC catalogued in this campaign with a brief summary. Stub
- * until the `npcs` table lands (M4). Returns an empty array — a valid
+ * until the `npcs` table lands. Returns an empty array — a valid
  * state for campaigns that haven't catalogued anyone yet.
  */
 const InputSchema = z.object({});

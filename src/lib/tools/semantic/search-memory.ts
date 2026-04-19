@@ -4,7 +4,7 @@ import { registerTool } from "../registry";
 /**
  * Semantic search over distilled cross-turn memories. Queries the
  * semantic-memory layer (pgvector + category decay + heat boost). Stub
- * until M4's memory writer populates content. Returns an empty `memories`
+ * until the memory writer populates content. Returns an empty `memories`
  * array — KA treats that as "no relevant memory yet" rather than error.
  */
 const InputSchema = z.object({

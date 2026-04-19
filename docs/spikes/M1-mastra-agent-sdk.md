@@ -164,3 +164,18 @@ For KA's streaming, the step's `execute` returns the stream descriptor (trace ID
 ---
 
 *Spike closed. M1 Commit 2 (prompt registry) cleared to start.*
+
+---
+
+## 2026-04-19 update — the spike's architectural recommendation was reversed
+
+The spike recommended raw `@anthropic-ai/sdk` for KA based on one decisive concern: Agent SDK's `systemPrompt: string[]` supports a single `SYSTEM_PROMPT_DYNAMIC_BOUNDARY` marker (two cache groups), which I argued was too coarse for the 4-block structure. The user pushed back on two fronts:
+
+1. **The cache-cost delta was inflated.** Real Block 2 invalidation cadence (Compactor every ~10–20 turns) means the effective cost ratio is closer to 2×, not 10×. Not decisive.
+2. **The broader point: Claude Code isn't a worse Claude.** Agent SDK carries a year of Anthropic agentic investment — tool-loop convergence, subagent primitive, MCP integration, context self-management. KA on Agent SDK inherits all of that; KA on raw SDK doesn't.
+
+**Decision updated:** KA runs on Claude Agent SDK, not raw SDK. The one-boundary cache is acceptable given the capability uplift; the 4-block structure maps to `[block1, block2, block3, SYSTEM_PROMPT_DYNAMIC_BOUNDARY, block4]` with blocks 1–3 treated as the cached prefix.
+
+Commit 6 (`src/lib/agents/key-animator.ts`) ships KA on Agent SDK with the eight MCP servers mounted + seven consultants wired as `AgentDefinition`s (the `agents:` config specified in the M1 plan — originally deferred with "follow-up refit" framing, corrected in commit `fd24cd7`).
+
+Leaving the spike findings above as-is because the *reasoning* remains useful — and the user pushed back on it, which is also part of the record worth preserving. Read the original recommendation as context, then this update as the landed decision.

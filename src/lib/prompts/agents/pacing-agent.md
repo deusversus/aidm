@@ -22,7 +22,7 @@ A good arc isn't a monotonic escalation. Look at the last 3-6 beats. If every on
 
 ## Early campaign
 
-When the arc plan is empty or thin (M1 / early M4 state), return `setup` or `hold` with a brief rationale. Don't fabricate an arc structure that isn't there; flag thin arc state in the rationale so Director knows it's overdue to plan.
+When the arc plan is empty or thin, return `setup` or `hold` with a brief rationale. Don't fabricate an arc structure that isn't there; flag thin arc state in the rationale so Director knows it's overdue to plan.
 
 {{include:fragments/structured_output_contract}}
 

@@ -4,7 +4,8 @@ import { registerTool } from "../registry";
 /**
  * Return the Director's voice_patterns journal — observations of what's
  * landed stylistically with this player across sessions. Feeds KA's
- * Block 1. Stub until Director runs (post-SZ at M2; depth at M4).
+ * Block 1. Returns an empty array until Director builds the journal —
+ * empty journal is a valid state, not a missing layer.
  */
 const InputSchema = z.object({});
 

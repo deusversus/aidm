@@ -1,16 +1,13 @@
+import { characters } from "@/lib/state/schema";
+import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { registerTool } from "../registry";
 
 /**
- * Return the player character's sheet for this campaign. Currently stubbed —
- * the `characters` table lands with Commit 6's seed migration. Returns a
- * typed null result so callers can probe without branching on undefined.
- *
- * When Commit 6 lands:
- *   - migration creates `characters` table keyed on campaignId
- *   - this tool queries it, returns the real sheet
- *   - the schema below is the shape KA learns to expect, so the swap is
- *     internal to execute() — downstream code doesn't change.
+ * Return the player character's sheet for this campaign. Reads the
+ * `characters` row keyed on campaignId. Returns `available: false`
+ * with a typed empty shape when no character row exists (e.g. during
+ * Session Zero before character creation completes).
  */
 const InputSchema = z.object({});
 
@@ -54,6 +51,18 @@ const OutputSchema = z.object({
     .nullable(),
 });
 
+const EMPTY_OUTPUT: z.infer<typeof OutputSchema> = {
+  available: false,
+  name: null,
+  concept: null,
+  power_tier: null,
+  stats: null,
+  abilities: [],
+  inventory: [],
+  stat_mapping: null,
+  current_state: null,
+};
+
 export const getCharacterSheetTool = registerTool({
   name: "get_character_sheet",
   description:
@@ -61,20 +70,33 @@ export const getCharacterSheetTool = registerTool({
   layer: "entities",
   inputSchema: InputSchema,
   outputSchema: OutputSchema,
-  execute: async (_input, _ctx) => {
-    // Stub until Commit 6 seeds characters. Returns a well-typed empty
-    // shape — KA sees `available: false` and knows to treat character
-    // details as unknown rather than absent-but-queried.
+  execute: async (_input, ctx) => {
+    const [row] = await ctx.db
+      .select({
+        name: characters.name,
+        concept: characters.concept,
+        powerTier: characters.powerTier,
+        sheet: characters.sheet,
+      })
+      .from(characters)
+      .where(eq(characters.campaignId, ctx.campaignId))
+      .limit(1);
+    if (!row) return EMPTY_OUTPUT;
+
+    // The sheet jsonb is whatever seed wrote. We trust the shape
+    // loosely — Zod validates at the tool boundary in the registry
+    // wrapper, so a malformed sheet surfaces there rather than here.
+    const sheet = (row.sheet ?? {}) as Partial<z.infer<typeof OutputSchema>>;
     return {
-      available: false,
-      name: null,
-      concept: null,
-      power_tier: null,
-      stats: null,
-      abilities: [],
-      inventory: [],
-      stat_mapping: null,
-      current_state: null,
+      available: true,
+      name: sheet.name ?? row.name,
+      concept: sheet.concept ?? row.concept,
+      power_tier: sheet.power_tier ?? row.powerTier,
+      stats: sheet.stats ?? null,
+      abilities: sheet.abilities ?? [],
+      inventory: sheet.inventory ?? [],
+      stat_mapping: sheet.stat_mapping ?? null,
+      current_state: sheet.current_state ?? null,
     };
   },
 });

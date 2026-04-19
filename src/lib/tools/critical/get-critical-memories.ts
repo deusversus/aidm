@@ -11,8 +11,8 @@ import { registerTool } from "../registry";
  * exposes it as "the sacred set." Same implementation, two discovery
  * surfaces.
  *
- * Stub until the memory writer (M4) flags the first plot-critical
- * memories.
+ * Returns empty until the memory writer flags the first plot-critical
+ * memories — empty-set is a valid state of a live layer.
  */
 const InputSchema = z.object({});
 

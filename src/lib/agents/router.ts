@@ -30,15 +30,16 @@ import {
  *   - Consume a turn on meta / worldbuilder-reject (same — workflow step)
  *
  * This function is deterministic given its deps: swap providers in tests,
- * get predictable verdicts. Production turn pipeline (Commit 6) wraps
- * this as a Mastra step.
+ * get predictable verdicts. The turn workflow (`src/lib/workflow/turn.ts`)
+ * calls it directly as the pre-pass that annotates and routes before KA
+ * starts orchestrating the scene.
  *
- * Span hierarchy: at M1, the router's span and its sub-agents' spans all
+ * Span hierarchy: the router's span and its sub-agents' spans currently
  * share the same `trace` handle (the root). True parent/child nesting is
- * a Langfuse-native concern — when Commit 6 wires a real Langfuse trace,
- * revisit whether `AidmSpanHandle` needs `.span()` as well as `.end()`
- * to model the hierarchy. Siblings-on-one-trace is readable in the
- * Langfuse UI today; don't over-engineer until it stops being.
+ * a Langfuse-native concern — revisit whether `AidmSpanHandle` needs
+ * `.span()` as well as `.end()` to model hierarchy when the Langfuse UI
+ * surface the flat layout becomes unwieldy. Siblings-on-one-trace is
+ * readable today; don't over-engineer until it stops being.
  */
 
 export const RouterInput = z.object({

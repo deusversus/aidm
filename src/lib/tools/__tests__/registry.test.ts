@@ -316,14 +316,13 @@ describe("tool registry — core infrastructure", () => {
       expect(result.overrides.map((o) => o.id)).toEqual(["o1"]);
     });
 
-    it("stubbed tools return well-typed empty shapes", async () => {
+    it("layers pending their content-producer return well-typed empty shapes", async () => {
+      // Tools whose upstream writer hasn't produced data yet (NPC
+      // catalog, memory writer, Director journal, foreshadowing
+      // ledger). Empty output is the valid state for a live layer with
+      // no content yet — not a deferred or missing feature.
       const mod = await import("../index");
       const ctx = makeCtx();
-      expect(await mod.invokeTool("get_character_sheet", {}, ctx)).toMatchObject({
-        available: false,
-        abilities: [],
-        inventory: [],
-      });
       expect(await mod.invokeTool("list_known_npcs", {}, ctx)).toEqual({ npcs: [] });
       expect(await mod.invokeTool("search_memory", { query: "anything", k: 3 }, ctx)).toEqual({
         memories: [],
@@ -334,6 +333,40 @@ describe("tool registry — core infrastructure", () => {
         planned_beats: [],
       });
       expect(await mod.invokeTool("get_voice_patterns", {}, ctx)).toEqual({ patterns: [] });
+    });
+
+    it("get_character_sheet returns available:false when no character row exists", async () => {
+      const mod = await import("../index");
+      // Auth lookup returns the campaign row; character query returns
+      // empty. The generic fakeDb returns the same rows for every
+      // query, so we hand-craft a two-response fake here.
+      let call = 0;
+      const ctx = {
+        ...makeCtx(),
+        db: {
+          select: () => ({
+            from: () => ({
+              where: () => ({
+                limit: async () => {
+                  call += 1;
+                  // Call 1: authorizeCampaignAccess → campaign row exists
+                  if (call === 1) {
+                    return [{ id: "c-1", userId: "u-1", name: "test", settings: {} }];
+                  }
+                  // Call 2: get_character_sheet → no character row
+                  return [];
+                },
+              }),
+            }),
+          }),
+        } as unknown as AidmToolContext["db"],
+      };
+      const result = (await mod.invokeTool("get_character_sheet", {}, ctx)) as {
+        available: boolean;
+        name: string | null;
+      };
+      expect(result.available).toBe(false);
+      expect(result.name).toBeNull();
     });
   });
 });

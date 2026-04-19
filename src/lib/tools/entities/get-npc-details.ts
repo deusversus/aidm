@@ -4,7 +4,7 @@ import { registerTool } from "../registry";
 /**
  * Full NPC profile: disposition, emotional milestones, secrets, faction
  * ties, recent interactions. Stub until the `npcs` catalog populates
- * (M4+). Returns `available: false` with an empty shape so KA can probe
+ * populates. Returns `available: false` with an empty shape so KA can probe
  * a name and know whether the NPC is catalog-known yet.
  */
 const InputSchema = z.object({

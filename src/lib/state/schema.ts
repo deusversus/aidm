@@ -119,7 +119,7 @@ export const turns = pgTable(
     turnNumber: integer("turn_number").notNull(),
     playerMessage: text("player_message").notNull(),
     narrativeText: text("narrative_text").notNull().default(""),
-    /** Summary populated by memory writer at M4+. Null at M1. */
+    /** Short summary, populated by the memory writer post-turn. Null on turns that haven't been summarized yet. */
     summary: text("summary"),
     /** IntentOutput from classifier (jsonb). */
     intent: jsonb("intent"),
