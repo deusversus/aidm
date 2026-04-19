@@ -1,0 +1,43 @@
+## This turn
+
+### Player action
+**Intent:** {{intent_type}} — `{{intent_action}}`
+**Target:** {{intent_target}}
+**Epicness:** {{intent_epicness}}
+**Special conditions:** {{intent_special_conditions}}
+
+**Player message:**
+> {{player_message}}
+
+### Scene context
+- Location: {{scene_location}}
+- Situation: {{scene_situation}}
+- Time context: {{scene_time_context}}
+- NPCs present: {{scene_present_npcs}}
+
+### Arc state
+**Current arc:** {{arc_current}}
+**Arc phase:** {{arc_phase}}
+**Tension level:** {{arc_tension}}
+**Active foreshadowing seeds that could surface:**
+{{active_foreshadowing}}
+
+### Director notes (if any)
+{{director_notes}}
+
+### Player overrides (must be enforced)
+{{player_overrides}}
+
+---
+
+{{sakuga_injection}}
+
+{{style_drift_directive}}
+
+{{vocabulary_freshness_advisory}}
+
+---
+
+## Write the scene
+
+Consult whatever specialists and memory layers the scene wants. When you have what you need, write. Respect the Profile's voice. End the scene when the scene is done, not when you've hit a length target.
