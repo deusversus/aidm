@@ -415,96 +415,134 @@ Schema declared in `lib/state/schema.ts`; indexes declared alongside with Drizzl
 
 ## 5. Agent roster & judgment cascade
 
-v3's agent roster (~42 agents composed across gameplay, Session Zero, and background processing) is the starting point, not an anti-pattern to collapse away. Each agent in v3 earned its keep through actual play. v4 ports them — consolidating only where 2026 primitives (Claude Agent SDK subagents, native structured output) genuinely replace hand-rolled scaffolding rather than behavior.
+v3's agent roster (~42 agents composed across gameplay, Session Zero, and background processing) is accumulated play-tested wisdom — each agent earned its keep through actual play. **v4's structural change from v3 is that the cascade inverts.** In v3, a sequential pipeline called KA at the end because 2024 models couldn't hold the orchestrator's job. In 2026, Claude Opus 4.7 running on Claude Agent SDK can hold it. KA is the author-intelligence; the cascade's specialists are consultants KA invokes when its judgment calls for them.
 
-### 5.1 The per-turn judgment cascade (non-negotiable)
+The specialists don't dissolve. They sharpen.
 
-Every gameplay turn runs this shape, faithful to v3's `_turn_pipeline.py`:
+### 5.1 The per-turn shape (non-negotiable)
+
+Every gameplay turn runs this shape:
 
 ```
-IntentClassifier
-  → (META_FEEDBACK → meta loop, END)
-  → (OVERRIDE_COMMAND → apply, END)
-  → (WORLD_BUILDING → WorldBuilder → accept | clarify | reject)
-  → RAG base retrieval (ContextSelector, intent determines tier)
-  → Tier 0 fast-path? → synthetic auto-success → KA → END
-  → parallel gather:
-       OutcomeJudge         (thinking)
-       MemoryRanker         (fast)
-       PacingAgent          (thinking, M5+)
-       RecapAgent           (fast, first turn of session)
-  → Validator (retry Outcome once if invalid)
-  → Pre-narrative CombatAgent resolution (if COMBAT)  [M5+]
-  → Build rag_context (20+ possible keys)
-  → KeyAnimator (creative, streaming, optional research phase)
-  → post-narrative background (parallel):
-       ProductionAgent (quests, locations, media)
-       RelationshipAnalyzer (affinity deltas, milestones)
-       Memory writer (turn → embeddings)
-       Director (session-boundary trigger only, not per-turn)
-       ForeshadowingLedger update
+Player message
+  → IntentClassifier (fast pre-pass — annotates the message with intent,
+                      epicness, target, special_conditions, confidence)
+  → Route:
+       META_FEEDBACK    → meta loop, END
+       OVERRIDE_COMMAND → override handler, persist, END
+       WORLD_BUILDING   → WorldBuilder (validates assertion; accept|clarify|reject
+                          in-character) — if rejected/clarified, short-circuit
+       otherwise        → continue
+  →
+  ╔══════════════════════════════════════════════════════════════╗
+  ║  KEYANIMATOR  ·  Claude Agent SDK  ·  creative tier          ║
+  ║  Opus 4.7 · extended thinking · streaming · open-ended       ║
+  ║                                                              ║
+  ║  KA is the author. It has:                                   ║
+  ║    • 4-block cached system prompt (Profile DNA, compaction   ║
+  ║      buffer, working memory, dynamic context)                ║
+  ║    • Seven memory-layer MCP servers (§9.2)                   ║
+  ║    • Tool access (direct, interleaved with prose generation) ║
+  ║    • Subagent primitive (spawns fast-tier researchers        ║
+  ║      with intent-adaptive strategies as needed)              ║
+  ║    • Consultants it invokes via the Agent tool or            ║
+  ║      Mastra step calls:                                      ║
+  ║        OutcomeJudge    (thinking) — mechanical resolution    ║
+  ║        Validator       (thinking) — consistency review       ║
+  ║        CombatAgent     (thinking) — combat pre-resolution    ║
+  ║        ScaleSelector   (fast)     — power differential       ║
+  ║        PacingAgent     (thinking) — arc-beat guidance        ║
+  ║        MemoryRanker    (fast)     — re-rank candidates       ║
+  ║        RecapAgent      (fast)     — first turn of session    ║
+  ║                                                              ║
+  ║  The Tier-0 fast-path (epicness < 0.2): KA synthesizes an    ║
+  ║  auto-success outcome itself and skips the heavier consults. ║
+  ║                                                              ║
+  ║  Output: streaming prose → SSE → client typewriter           ║
+  ╚══════════════════════════════════════════════════════════════╝
+  →
+  persist_turn (commands → DB, fingerprints, trace_id, cost, TTFT)
+  → schedule_background (Next.js after(), parallel):
+       ProductionAgent       (quests, locations, media fire-and-forget)
+       RelationshipAnalyzer  (affinity deltas, emotional milestones)
+       Memory writer         (turn → storyboarded fragments + facts,
+                              seven-layer routing)
+       ForeshadowingLedger   (seed lifecycle, callback detection)
+       Director              (session-boundary review, hybrid trigger
+                              every 3+ turns at epicness ≥ 2.0)
+       Compactor             (if working memory overflows)
+       mark_turn_complete
 ```
 
-Each agent produces Zod-validated structured output that the next stage consumes. This pipeline is v3's — and is the shape that proved out in play. v4 inherits it.
+**Why inversion.** OutcomeJudge's job is to hold KA honest against mechanical reality. In v3 the pipeline enforced this by running OJ before KA; in v4 KA invokes OJ before narrating consequences because KA knows when a beat needs mechanical grounding (and the model is now smart enough to never skip that consult for consequential actions — and fast-pass it for trivial ones). Same enforcement, earned through judgment rather than orchestration. Scales better because KA can consult MULTIPLE specialists in parallel when the scene demands, not just the ones a pre-wired pipeline budgeted for.
 
-### 5.2 Agent roster — v3-derived, Mastra-orchestrated
+Each specialist produces Zod-validated structured output. KA consumes structured output and produces streaming prose.
 
-Organized by role and milestone. Tiers are per §7.5 (fast / thinking / creative).
+### 5.2 Agent roster — scaffolded whole, sharpened over time
 
-**Per-turn pipeline (M1 unless noted)**
+All gameplay agents are **scaffolded from day one.** "Milestone" means when the agent's output becomes rich enough to noticeably change play, not when the agent first exists. A PacingAgent that returns a minimal arc beat is still a PacingAgent KA can consult — its consults get better as arc-planning matures. The shape is fixed; the depth fills in.
+
+Tiers are per §7.5 (fast / thinking / creative).
+
+**Per-turn agents** (KA invokes these via the Agent tool or Mastra step calls):
+
+| Agent | Tier | Role | Depth ramp |
+|---|---|---|---|
+| IntentClassifier | fast | 10 intent types (DEFAULT, COMBAT, SOCIAL, EXPLORATION, ABILITY, INVENTORY, WORLD_BUILDING, META_FEEDBACK, OVERRIDE_COMMAND, OP_COMMAND); returns intent + action + target + epicness + special_conditions + confidence | Full at launch — it's a classification job |
+| WorldBuilderAgent | thinking | Validates player in-fiction assertions against canon mode, power tier, narrative consistency; rejection phrased in-character | Full at launch; canon-mode library grows with play |
+| OverrideHandler | fast | Routes `/meta` and `/override` commands; auto-detects override category | Full at launch |
+| OutcomeJudge | thinking | Success level, difficulty class, narrative weight (MINOR/SIGNIFICANT/CLIMACTIC), consequence, cost | Full at launch |
+| Validator | thinking | Consistency check on intent/outcome; can retry OutcomeJudge once with correction feedback | Full at launch |
+| MemoryRanker | fast | LLM re-scoring of top-k candidates when >3 (skipped for system commands) | Sharpens as semantic + episodic memory populate |
+| PacingAgent | thinking | Arc beat validity, tone consistency, escalation target | Sharpens as arc_plan (Director) accumulates history |
+| CombatAgent | thinking | Pre-narrative combat resolution (hit/miss/damage) before KA narrates the result | Scaffolded from day one; rules tuning through play |
+| ScaleSelectorAgent | fast | Power differential between combatants; feeds tension-scaling to KA | Scaffolded from day one |
+| KeyAnimator | creative | **The author.** 4-block cache (§7.2); intent-adaptive research subagents; sakuga mode detection; streaming prose. Invokes all other agents as consultants via tools/Agent SDK. | Full shape at launch; prose quality grows with prompts + play |
+| RecapAgent | fast | First-turn-of-session summary of prior sessions | Scaffolded from day one; matters more as campaigns lengthen |
+| ProductionAgent | fast | Post-narrative reactor: quest updates, location discovery, media generation (portraits, cutscenes, location art) via fire-and-forget | Scaffolded; media generation wiring comes online with budget |
+| RelationshipAnalyzer | fast | NPC affinity deltas + emotional milestones (first_humor, first_sacrifice, etc.) | Sharpens as NPC catalog populates |
+| Compactor | fast | Summarizes dropped messages when working window overflows; writes into Block 2 (compaction buffer) | Rarely fires early; essential as campaigns pass 50+ turns |
+
+**Session Zero subsystem**
+
+SZ is one conductor conversation, not a pipeline. The conductor holds the judgment-heavy job of hearing a premise ("sequel to Berserk") and resolving it into a playable artifact. Specialists are subagents the conductor invokes when its own judgment calls for them.
 
 | Agent | Tier | Role |
 |---|---|---|
-| IntentClassifier | fast | 10 intent types (DEFAULT, COMBAT, SOCIAL, EXPLORATION, ABILITY, INVENTORY, WORLD_BUILDING, META_FEEDBACK, OVERRIDE_COMMAND, OP_COMMAND); returns intent + action + target + epicness + special_conditions + confidence |
-| WorldBuilderAgent | thinking | Validates player in-fiction assertions against canon mode, power tier, narrative consistency; rejection phrased in-character |
-| OverrideHandler | fast | Routes `/meta` and `/override` commands; auto-detects override category |
-| OutcomeJudge | thinking | Success level, difficulty class, narrative weight (MINOR/SIGNIFICANT/CLIMACTIC), consequence, cost |
-| Validator | thinking | Consistency check on intent/outcome; can retry OutcomeJudge once with correction feedback |
-| MemoryRanker | fast | LLM re-scoring of top-k candidates when >3 (skipped for system commands) |
-| PacingAgent *(M5)* | thinking | Arc beat validity, tone consistency, escalation target |
-| CombatAgent *(M5)* | thinking | Pre-narrative combat resolution (hit/miss/damage) before KA; KA narrates the result |
-| ScaleSelectorAgent *(M5)* | fast | Power differential between combatants; feeds tension-scaling to KA |
-| KeyAnimator | creative | Narrative prose; 4-block cache (§7.2); optional research subagent phase (intent-adaptive tool strategies); sakuga mode detection |
-| RecapAgent *(M7)* | fast | First-turn-of-session summary of prior sessions |
-| ProductionAgent | fast | Post-narrative reactor: quest updates, location discovery, media generation (portraits, cutscenes, location art) via fire-and-forget |
-| RelationshipAnalyzer | fast | NPC affinity deltas + emotional milestones (first_humor, first_sacrifice, etc.) |
-| Compactor *(M7)* | fast | Summarizes dropped messages when working window overflows |
-
-**Session Zero subsystem (M2)**
-
-| Agent | Tier | Role |
-|---|---|---|
-| SessionZeroConductor | thinking | Per-turn character creation conductor; uses Claude Agent SDK with tools (`proposeCharacterOption`, `commitField`, `askClarifyingQuestion`, `finalizeSessionZero`); spawns subagents for extraction / gap analysis as needed |
-| ProfileResolver | thinking | Disambiguation (AniList franchise graph), profile selection, hybrid blending intent |
-| AnimeResearcher | thinking | Produces `AnimeResearchOutput`: 11 DNA scales, power system, canonical stat mapping, 15 trope flags, voice cards, author voice, visual style, power distribution. Uses native web search; scrapers still in the loop (see §10) until the M2 eval says otherwise |
-| ProfileGenerator | thinking | Composes profile from research; handles hybrid/custom profiles via LLM synthesis (see §10.3) |
+| SessionZeroConductor | thinking | The conversation. Runs on Opus 4.7 + extended thinking via Claude Agent SDK. Tools: `proposeCharacterOption`, `commitField`, `askClarifyingQuestion`, `finalizeSessionZero`. Invokes ProfileResolver / AnimeResearcher / ProfileGenerator as subagents when research or disambiguation is needed. |
+| ProfileResolver | thinking | Subagent — disambiguation via AniList franchise graph; profile selection; hybrid blending intent |
+| AnimeResearcher | thinking | Subagent — produces `AnimeResearchOutput`: 24 DNA scales, 13 composition axes, power system, canonical stat mapping, 15 trope flags, voice cards, author voice, visual style, power distribution. Uses native web search; AniList for metadata |
+| ProfileGenerator | thinking | Subagent — composes profile from research; handles hybrid/custom profiles via LLM synthesis (see §10.3) |
 | HandoffCompiler | thinking | Produces `OpeningStatePackage` artifact; compiles player_character, opening_situation, world_context, opening_cast, canon_rules, director_inputs, hard_constraints, soft_targets, uncertainties, relationship_graph |
 
-**Strategic / background (M4+)**
+**Strategic / background (scaffolded from day one, depth ramps with play)**
 
-| Agent | Tier | Role | Milestone |
+| Agent | Tier | Role | Depth ramp |
 |---|---|---|---|
-| Director | thinking | Arc conductor: 6 arc modes (main/ensemble/adversary_ensemble/ally_ensemble/investigator/faction), spotlight debt, foreshadowing surveillance, voice patterns journal. Runs at startup briefing + session boundaries (not per-turn); extended-thinking budget 8K+. | M4 startup; M7 hybrid trigger |
-| ForeshadowingLedger | thinking | DB-backed causal graph (depends_on / triggers / conflicts_with); seed lifecycle PLANTED → GROWING → CALLBACK → RESOLVED → ABANDONED → OVERDUE | M6 |
-| ProgressionAgent | fast | XP, leveling, stat growth tied to narrative outcomes | M5 |
+| Director | thinking | Arc conductor: 6 arc modes (main/ensemble/adversary_ensemble/ally_ensemble/investigator/faction), spotlight debt, foreshadowing surveillance, voice patterns journal. Runs at campaign startup briefing + session boundaries + hybrid trigger every 3+ turns at epicness ≥ 2.0. Extended thinking budget 8K+. | Scaffolded at launch; voice_patterns journal populates with play; arc_plan sharpens with run history |
+| ForeshadowingLedger | thinking | DB-backed causal graph (depends_on / triggers / conflicts_with); seed lifecycle PLANTED → GROWING → CALLBACK → RESOLVED → ABANDONED → OVERDUE | Scaffolded at launch; Director plants seeds from campaign start |
+| ProgressionAgent | fast | XP, leveling, stat growth tied to narrative outcomes | Scaffolded at launch; growth tables fill as play surfaces edge cases |
 
-**Consolidations enabled by 2026 primitives (vs. v3)**
+**Structural evolutions from v3 (2026 substrate upgrades, not simplifications):**
 
-- **SZ pipeline → one conductor with subagents.** v3's Extractor → Resolver → GapAnalyzer → Conductor pipeline (a workaround for 2024 lacking proper subagent primitives) collapses into a single Opus conductor using Claude Agent SDK's subagent primitive to delegate extraction/gap analysis when needed. Behavior preserved; orchestration code shrinks to a fraction.
-- **ExtractionSchemas → Zod inline.** v3's `extraction_schemas.py` Pydantic bloat (~600 lines) is replaced by inline Zod schemas wherever structured output is used. No separate schemas module.
-- **MemoryRanker → native rerank or one call.** v3's LLM-ranker still has a role but simpler: structured output returns a ranked list in one call rather than candidate-by-candidate scoring.
-- **Compactor defer.** v3 needed aggressive compaction to fit Opus 4.6's context. Opus 4.7's 1M context + native prompt caching defers the Compactor to M7+, possibly eliminates it.
+- **SZ collapses from pipeline to single conductor conversation.** v3's Extractor → Resolver → GapAnalyzer → Conductor existed because 2024 models couldn't hold the task. 2026 Opus 4.7 with extended thinking + Claude Agent SDK's subagent primitive can. The specialists are still there — they're invoked by the conductor's judgment instead of orchestrated by a pipeline.
+- **Cascade inverts.** KA (2026 Opus 4.7 on Agent SDK) holds the orchestrator's job. OutcomeJudge / Validator / Pacing / etc. are consultants it invokes. Same enforcement as v3's pipeline; the load-bearing discipline moves from the framework to KA's judgment.
+- **ExtractionSchemas → Zod inline.** v3's `extraction_schemas.py` (~600 lines) collapses to per-agent inline Zod schemas via structured output.
+- **MemoryRanker → one ranked-list call.** Structured output returns a ranked list in one call instead of candidate-by-candidate scoring. Same mechanism, simpler API.
+- **Compactor scaffolded but less loaded.** Opus 4.7's 1M context + prompt caching means Compactor fires much later in a campaign than v3's Compactor had to. Still part of the system from day one for the campaigns that earn it.
 
-### 5.3 Two-model pattern (KA research phase, Director, SZ Conductor, Foreshadowing)
+### 5.3 Two-model pattern (KA, Director, SZ Conductor, Foreshadowing)
 
-Smart agents use the research → synthesis pattern inside a Mastra workflow step. The research-phase spawning primitive is Claude Agent SDK, landing when tool-loop agents do (M2 SessionZeroConductor, M4+ research subagents for KA and Director, M6 ForeshadowingLedger). **At M1, KA has no research phase** — it's a single structured-output call on the raw `@anthropic-ai/sdk` with 4-block cache (see [M1 spike](../docs/spikes/M1-mastra-agent-sdk.md)).
+Smart agents use the research → synthesis pattern. On 2026 primitives this runs as **one Agent SDK query with interleaved tool calls + subagent spawning**, not as a hand-rolled pre-phase. KA starts writing, calls tools when it needs a fact (recall_scene, get_npc_details, search_memory), spawns a fast-tier research subagent when it needs a bundle of facts (e.g., "disposition + shared history + current tensions for this NPC"), and continues writing. The "research phase" isn't a separate step; it's KA thinking.
 
-Flow when research is in play:
+Two-mode invocation pattern when deeper research is warranted:
 
-1. **Research phase:** parent spawns a fast-tier subagent (Haiku 4.5 or Gemini 3.1 Flash) with tools. Parallel tool calls gather context. Returns compressed `Research Findings` (TIGHT format: RELEVANT FACTS / NPC INTELLIGENCE / CONTINUITY / TACTICAL NOTE — v3's schema, preserved).
-2. **Synthesis phase:** parent (thinking or creative tier, often with extended thinking) consumes findings + structured inputs, produces final output.
+1. **Subagent spawn (via Agent SDK's `Agent` tool):** KA spawns a fast-tier subagent (Haiku 4.5 or Gemini 3.1 Flash) with a focused brief + tool access. Parallel tool calls gather context. Returns compressed `Research Findings` (TIGHT format: RELEVANT FACTS / NPC INTELLIGENCE / CONTINUITY / TACTICAL NOTE — v3's schema, preserved).
+2. **Synthesis continues:** KA consumes findings + its already-cached context, produces prose.
 
-KA's research phase (M4+) uses **intent-adaptive strategies** (v3 verbatim):
+Subagents earn their keep when the research is multi-step and a specialized prompt helps. For single-tool lookups, KA just calls the tool directly.
+
+KA's subagent dispatch uses **intent-adaptive strategies** (v3 verbatim):
 - **COMBAT:** character sheet → NPC details → prior encounters → recent episodes
 - **SOCIAL:** NPC details → shared history → present NPCs → relationship impacts
 - **EXPLORATION:** world state → area lore → recent episodes → NPC associations
@@ -589,37 +627,45 @@ Per-agent specs for M4+ agents (Director, Pacing, Combat, Foreshadowing, Relatio
 
 ## 6. Turn state machine
 
-### 6.1 Graph structure (Mastra workflow, faithful to v3's `_turn_pipeline.py`)
+### 6.1 Graph structure (Mastra workflow; thin wrapper around KA)
+
+The Mastra workflow for a turn is a **thin envelope** around a KA-orchestrated conversation. It handles routing (META/OVERRIDE short-circuits), the WorldBuilder path for in-fiction assertions, persistence, and background scheduling. The narrative work itself — outcome resolution, memory consultation, pacing consultation, combat pre-resolution, prose generation — happens inside KA's Agent SDK session via tool calls and subagent spawning.
 
 ```
 START
-  → classify_intent
+  → classify_intent (fast pre-pass — annotates message)
   → route:
-      META_FEEDBACK   → meta_conversation_loop (no turn consumed) → END
+      META_FEEDBACK    → meta_conversation_loop (no turn consumed) → END
       OVERRIDE_COMMAND → override_handler (persist) → END
-      WORLD_BUILDING  → world_builder → accept | clarify | reject
-                         (reject/clarify short-circuits; no outcome/KA)
-      DEFAULT / other → continue
-  → rag_base_retrieval (ContextSelector; intent → memory tier)
-  → Tier 0 fast-path? (trivial action, epicness<0.2)
-        → synthetic auto-success outcome
-        → key_animator (skip outcome/memory-rank/pacing)
-        → END
-  → parallel gather {                          [v3 latency win; preserve]
-        outcome_judge        (thinking)
-        memory_rank          (fast; LLM rerank of top-k when >3)
-        pacing               (thinking, M5+)
-        recap                (fast; first turn of session only, non-blocking)
-     }
-  → validator (retry outcome once if invalid)
-  → pre_narrative_combat (if COMBAT intent)    [M5]
-        → CombatAgent resolves hit/miss/damage/crit/resource-cost
-        → ScaleSelectorAgent computes power differential
-        → results fed to KA as facts to narrate (not fiction to invent)
-  → build_rag_context (20+ keys possible; see §6.3)
-  → key_animator (streaming; optional research subagent phase)
-        → portrait map resolved post-hoc by scanning **Name** mentions
-  → persist_turn (commands → DB; fingerprint + trace link captured)
+      WORLD_BUILDING   → world_builder → accept | clarify | reject
+                          (reject/clarify short-circuits; no KA call)
+      otherwise        → continue to KA
+
+  → key_animator (Claude Agent SDK session; streaming; extended thinking)
+        │
+        │  During the session, KA calls tools + subagents as judgment dictates:
+        │
+        │    • OutcomeJudge      — before narrating consequences of a risky action
+        │    • Validator          — when OJ's verdict needs a consistency pass
+        │    • CombatAgent        — for COMBAT intents, to resolve hit/miss/damage
+        │                          before narration (KA narrates results as facts)
+        │    • ScaleSelectorAgent — power differential between combatants
+        │    • PacingAgent        — when arc-plan guidance is needed
+        │    • MemoryRanker       — if the RAG candidate set is large
+        │    • RecapAgent         — first turn of a session
+        │    • search_memory / get_critical_memories / recall_scene /
+        │      get_turn_narrative / get_npc_details / etc. (§8 tool layer,
+        │      §9.2 seven-layer memory MCP)
+        │    • Fast-tier research subagents with intent-adaptive strategies
+        │      (§5.3) — when a multi-step research bundle is warranted
+        │
+        │  Tier-0 fast-path (epicness < 0.2): KA synthesizes an auto-success
+        │  outcome itself and skips the heavier consults. Same shape, fewer calls.
+        │
+        │  Output: streaming text_delta → SSE → client typewriter.
+        │  Portrait map resolved post-hoc by scanning **Name** mentions.
+
+  → persist_turn (commands → DB; fingerprints, trace_id, cost, TTFT captured)
   → schedule_background
   → END (return narrative + portrait_map)
 ```
@@ -629,13 +675,17 @@ Background subgraph (Next.js `after()`, runs post-response, parallel where possi
 ```
   → production_agent              (quests, locations, media fire-and-forget)
   → relationship_analyzer          (affinity deltas, emotional milestones)
-  → memory_writer                  (turn → embeddings, dedup, heat init)
-  → foreshadowing_update           [M6] seed status / callback detection
-  → director_session_review        [M4 startup; M7 session-boundary trigger]
+  → memory_writer                  (turn → storyboarded fragments + facts,
+                                    routed to appropriate memory layer (§9.2))
+  → foreshadowing_update           (seed status, callback detection)
+  → director_session_review        (session-boundary + hybrid trigger every
+                                    3+ turns at epicness ≥ 2.0)
   → mark_turn_complete
 ```
 
 Background runs via Next.js 15 `after()`. Per-campaign Postgres advisory lock prevents turn-overlap corruption; if a second turn arrives before background completes, it waits up to 15s for the lock.
+
+**Why KA orchestrates instead of a pipeline.** In v3, the pipeline ran OutcomeJudge → MemoryRank → Pacing → KA because 2024 models couldn't hold orchestration. In 2026, Opus 4.7 on Agent SDK can — and the quality of decisions improves when the orchestrator has full context (intent, scene, voice, arc, DNA axes, available tools, time budget) and can choose which specialists to consult with what framing. KA in 2024 would over-consult or under-consult without a pipeline forcing the shape. KA in 2026 can be trusted to judge. The pipeline's role — ensuring mechanical rigor on consequential actions — is preserved by KA's prompt + the availability of OJ as a callable consultant, not by framework-enforced ordering.
 
 ### 6.2 Memory tiering by epicness (v3 verbatim)
 
@@ -974,9 +1024,39 @@ Tools are promoted to a standalone MCP server when a second consumer appears (ex
 
 ## 9. Memory strategy
 
-v3's memory system is one of its most proven subsystems: 15 categories with asymmetric decay, tiered retrieval by epicness, heat-based visibility, multi-query decomposition, LLM reranker. v4 inherits it wholesale; 2026 primitives modernize the plumbing, not the behavior.
+Human memory isn't a flat search surface — it's layered by cognitive function. You don't "search your brain"; you *reach for* something specific (a fact, a scene, a voice, a thread), and the reaching itself is selective. Storing everything in one vector index and searching it with one query is a 2023 shape. 2026 memory earns its keep by mirroring the cognitive structure that actually works.
 
-### 9.1 Categories and decay (v3 verbatim)
+### 9.0 The seven cognitive memory layers
+
+AIDM memory is **seven layers, each exposed as an MCP server**, each with its own retrieval shape. KA doesn't have one `search_memory` tool — it has seven access surfaces, and the act of choosing which layer to query is itself creative judgment.
+
+| Layer | What it holds | Retrieval shape | MCP server |
+|---|---|---|---|
+| **1. Ambient** | What's always present — Profile DNA, composition, rules, author's voice, session-stable guidance | Prompt cache (Anthropic ephemeral) — always in Block 1; free at read after first use | `aidm-ambient` (trivial surface; mostly manifests via Block 1 rendering) |
+| **2. Working** | What you just did — the current scene, last N exchanges | Block 3 sliding window, no explicit query | `aidm-working` (read current window; write new exchange) |
+| **3. Episodic** | Turn transcripts as *scenes* — the actual prose of what happened | Keyword / tsvector search + full-text retrieval of the scene prose (not a summary) | `aidm-episodic` (`recall_scene`, `get_turn_narrative`, `get_recent_episodes`) |
+| **4. Semantic** | Distilled cross-turn *facts* — NPC dispositions, faction standings, established canon, consequence chains | pgvector cosine similarity with 15-category decay + heat + reranker (§9.1–9.4 detail the implementation) | `aidm-semantic` (`search_memory`, `get_critical_memories`) |
+| **5. Voice** | Director's journal — cadences, phrasings, openings that resonated with this player | Exemplar/pattern matching — find prior moves that fit the current beat | `aidm-voice` (`get_voice_patterns`, `get_voice_exemplars_by_beat_type`) |
+| **6. Arc** | Where the story is going — arc plan, foreshadowing seeds, threads planted, threads due | Graph traversal + lifecycle filter (PLANTED / GROWING / CALLBACK / RESOLVED / ABANDONED / OVERDUE) | `aidm-arc` (`get_arc_state`, `list_active_seeds`, `plantForeshadowingSeed`, `resolveSeed`) |
+| **7. Critical** | What's sacred — Session Zero facts, player overrides, hard constraints | Always present / flagged; never decays | `aidm-critical` (`get_critical_memories`, `get_overrides`) |
+
+**Why MCP per layer.** Each layer has its own schema, its own index, its own retrieval semantics. Exposing each as its own MCP server means (a) KA (running on Claude Agent SDK) can discover and call them cleanly, (b) new tools within a layer don't pollute other layers' surface, (c) external agents (Claude Code sessions, third-party integrations) can participate in a campaign by subscribing to the relevant MCP servers — one source of truth for game state.
+
+**Memory is written narrated.** The memory writer doesn't just store "NPC Julia betrayed Spike in turn 47." It writes a **storyboarded fragment** alongside the fact: *"the sound of the coffee cup hitting the counter an instant before the gun, the look the waitress didn't quite finish giving, Spike's line that he half-meant."* Episodic memory stores the prose of the turn (that's the turn narrative); semantic memory stores the distilled fact plus a short fragment that captures the *way* it felt. When KA recalls the betrayal, it gets both — the fact for grounding, the fragment for voice. Human memory is already narrated; AIDM stores it narrated. 2024 token budgets couldn't afford this; 2026 can.
+
+**How KA uses all this.** During a turn, KA chooses which surface to query based on what it's writing:
+
+- About to write a callback to turn 47? → `aidm-episodic.recall_scene("betrayal")` → pull the prose; weave a phrase from it.
+- Need to check Julia's current disposition? → `aidm-semantic.search_memory(query="Julia disposition")`.
+- Trying to decide the cadence of this paragraph? → `aidm-voice.get_voice_exemplars_by_beat_type("frozen_moment")` → see what worked last time.
+- Need to confirm a foreshadowing seed is due for callback? → `aidm-arc.list_active_seeds()`.
+- Player overrode "Lloyd cannot die" three sessions ago? → `aidm-critical.get_overrides()`.
+
+Each query's shape fits the cognitive act. The seven-layer surface is what makes that possible.
+
+The subsections below (§9.1–§9.7) specify the implementation of the **semantic memory layer** (layer 4) — the deepest and most mechanism-heavy of the seven. Ambient (layer 1) is specified in §7.2 (Block 1). Working (layer 2) is specified in §7.2 (Block 3). Voice (layer 5) is tied to the Director spec. Arc (layer 6) is specified in §9.5 and the foreshadowing section. Critical (layer 7) is a flag-and-filter overlay on semantic. Episodic (layer 3) is specified in §9.8 (new).
+
+### 9.1 Semantic memory — categories and decay (v3 verbatim)
 
 Fifteen categories with per-category decay multipliers applied per turn (`heat_new = heat_old * multiplier ^ turns_elapsed`):
 
@@ -1057,7 +1137,19 @@ Injection: session-stable chunks → KA Block 1; query-driven chunks → Block 4
 - Memories per-campaign, never cross-campaign.
 - Account deletion: hard-delete all memories within 24h (nightly cron).
 - Export: `/api/users/export` includes all memories as JSON.
-- Compaction of working-memory window defers to M7; Opus 4.7's 1M context + native caching makes aggressive compaction unnecessary at MVP (v3 needed it for Opus 4.6's 200K window).
+- Compaction of the working-memory window is scaffolded from day one. It fires later in 2026 than it did in v3 (Opus 4.7's 1M context + prompt caching pushes the threshold out), but every long-horizon campaign eventually crosses it. When it fires, Compactor reads the evicted working-memory exchanges and writes compressed micro-summaries into Block 2 (compaction buffer) — preserving continuity across the slide without blowing Block 1's cache.
+
+### 9.8 Episodic memory — turn transcripts as scenes
+
+Turn transcripts live in the `turns` table: turn number, player message, narrative text, intent, outcome, prompt fingerprints, trace id, cost, timing. The `narrative_text` column plus a tsvector index is the retrieval surface for `aidm-episodic`:
+
+- **`recall_scene(keyword, optional_turn_range)`** — tsvector match over `narrative_text`; returns turn numbers + score + a short excerpt.
+- **`get_turn_narrative(turn_number)`** — pulls the full prose of a specific turn.
+- **`get_recent_episodes(n, campaign_id)`** — returns the last n turn summaries (a separate `summary` column populated by the memory writer on turn persist).
+
+Episodic memory is what lets KA write *"Spike remembered what Julia had said to him three winters ago, in the same bar, and the words arrived in his mouth before he decided to say them"* — and mean it. It's the campaign's own canon, searchable as prose.
+
+Storage is cheap (text in Postgres); the tsvector index is small; no vector embeddings needed for keyword recall. When future features want semantic recall over transcripts, we add embeddings on `narrative_text` — but keyword recall is what preserves voice callbacks, because you're looking for *the specific phrase* that matters.
 
 ## 10. Session Zero
 
@@ -1065,7 +1157,7 @@ Session Zero is the full onboarding flow that takes a brand-new player from "not
 
 ### 10.1 Conversation phase
 
-**One conductor, not a pipeline.** v3 had two paths (monolithic `SessionZeroAgent` + orchestrator `session_zero_pipeline.py` with Extractor → Resolver → GapAnalyzer → Conductor). v4 collapses these into a **single Opus-with-extended-thinking conductor** using Claude Agent SDK's subagent primitive to delegate extraction and gap analysis when needed — the pipeline-vs-monolithic split was a 2024 workaround for missing subagent primitives.
+**One conductor, not a pipeline.** v3 broke SZ into Extractor → Resolver → GapAnalyzer → Conductor because 2024 models couldn't hold the whole job. In 2026, the conductor runs on Opus 4.7 with extended thinking via Claude Agent SDK, and the specialists (ProfileResolver, AnimeResearcher, ProfileGenerator) are subagents the conductor spawns when its judgment calls for them. The conductor is the conversation — a thoughtful collaborator hearing "sequel to Berserk" and knowing to ask whether Guts is alive, whether the player is a new apostle arriving after the Eclipse or a child who grew up in Falconia hearing the legends, how sacred canon is. Those are judgment-heavy questions; they don't decompose into a pipeline.
 
 Tools available to the conductor:
 - `proposeCharacterOption({field, options})` — offer the player choices
@@ -1646,7 +1738,11 @@ Templates from standard SaaS boilerplate + adapted; lawyer review before paid ti
 
 ## 23. Milestones
 
-Each milestone ends with a deploy to production, a brief written retro (`docs/retros/M<n>.md`), and a green eval run.
+**Milestones are depth milestones, not feature-additions.** The full system shape — KA orchestrating, all specialists scaffolded, all seven memory layers present, Session Zero conductor, Director, Foreshadowing, Production — is in place from the first playable turn. What changes between milestones is **how rich the content inside that shape becomes**. A PacingAgent that returns "scene bends toward escalation" at M1 is the same PacingAgent returning nuanced arc-plan-informed guidance at M4; the shape is identical, the context it's reading sharpens with play and scaffolding fill-in.
+
+Scaffolding empty is still scaffolding. An `aidm-arc` MCP server that returns `[]` for active seeds at M1 is a working layer KA can query; by M4 it returns seeds Director has planted; by M6 it returns a full causal graph. KA's code path doesn't change — the world populating does.
+
+Each milestone ends with a deploy to production, a written retro (`docs/retros/M<n>.md`), and a green eval run.
 
 ### M0 — Walking skeleton (2–3 evenings)
 
@@ -1666,43 +1762,48 @@ Each milestone ends with a deploy to production, a brief written retro (`docs/re
 
 **Risks:** Clerk middleware quirks; Railway + pgvector extension; Drizzle + pgvector types on first setup.
 
-### M1 — Playable single turn (1 week)
+### M1 — First playable turn, full shape
 
-**Goal:** 3-agent cascade producing streamed narrative.
+**Goal:** KA orchestrates a full turn end-to-end on Claude Agent SDK. All specialists exist as callable consultants. All seven memory MCP servers exist (some returning empty sets). A seed campaign is playable.
 
-**Deliverables:**
-- `IntentClassifier`, `OutcomeJudge`, `KeyAnimator` with Zod I/O.
-- KA implemented on raw `@anthropic-ai/sdk` with 4-block cache structure (see [M1 spike](../docs/spikes/M1-mastra-agent-sdk.md)); Claude Agent SDK deferred to M2+ where tool-loop convergence matters.
-- Mastra workflow for the turn state machine (§6).
-- SSE streaming Route Handler; client hook with typewriter rendering.
-- One hardcoded campaign + character (seed script).
-- `/campaigns/[id]/play` screen with input + narrative feed.
-- Eval harness with 5 golden turns (intent, outcome, narrative), Haiku judge, PR gate.
-- Rate limiter (Postgres counter).
-- Cost counter per turn, per-user daily cap.
-- Prompt registry with SHA-256 fingerprints + hot reload.
-
-**Acceptance:** play 10 turns on prod, narrative coherent, cache hit rate ≥80% after turn 3, eval suite green, p95 TTFT <3s.
-
-**Risks:** KA prompt quality at MVP; Opus 4.7 thinking-budget tuning; cache block structure off on first attempt (resolved by [M1 spike](../docs/spikes/M1-mastra-agent-sdk.md) — using raw `@anthropic-ai/sdk` instead of Agent SDK for per-block `cache_control`); real TTFT p95 on Opus streaming vs. the <3s target.
-
-### M2 — Session Zero (1 week)
-
-**Goal:** full onboarding from nothing to a playable opening scene.
+**The shape is the whole shape.** Not "a subset of the pipeline." KA runs on Agent SDK with 4-block cache, extended thinking, streaming, tool access, subagent primitive. It invokes IntentClassifier, OutcomeJudge, Validator, WorldBuilder, CombatAgent, ScaleSelectorAgent, PacingAgent, MemoryRanker, RecapAgent as consultants. It queries episodic / semantic / voice / arc / critical MCP servers as judgment dictates. This is the shape it'll have at M8 and every milestone in between.
 
 **Deliverables:**
-- `SessionZeroConductor` with tools (via Claude Agent SDK).
-- `HandoffCompiler` producing `OpeningStatePackage`.
-- SZ UI distinct from gameplay (chat style + progress indicator).
-- Handoff flow: SZ → opening scene generation → playable state.
-- SZ resume on partial completion.
-- Redo-SZ (once per campaign).
-- 5 golden SZ transcripts in eval harness.
+- Prompt registry (`src/lib/prompts/`) with fragment composition + SHA-256 fingerprints + hot-reload in dev.
+- Full agent roster scaffolded (see §5.2 table). Zod I/O for each. Consultants reachable via Agent SDK's Agent tool or direct Mastra step calls.
+- KA on Claude Agent SDK with `includePartialMessages: true` for streaming, `thinking: { type: 'adaptive' }` or budgeted, 4-block `systemPrompt` with `SYSTEM_PROMPT_DYNAMIC_BOUNDARY` marker.
+- All seven memory-layer MCP servers registered (see §9.0 table). Empty-set returns are valid for the layers whose content populates later (arc, voice). Episodic and working have real content from turn one; semantic populates as the memory writer runs.
+- Mastra workflow envelope (routing, persistence, background scheduling).
+- SSE streaming Route Handler; client typewriter hook.
+- Seed campaign + character (Spike Spiegel + Cowboy Bebop or Sung Jinwoo + Solo Leveling fixture).
+- `/campaigns/[id]/play` screen.
+- Eval harness with 5 golden turns + Haiku judge + PR gate.
+- Rate limiter (Postgres counter); per-turn cost + per-user daily cap.
+- Turn persistence with prompt fingerprints and trace links from day one (Episodic layer depends on it).
+
+**Acceptance:** play 10 turns on prod, narrative coherent, KA visibly consulting specialists (traces show OutcomeJudge + tool calls), cache hit rate ≥ 80% after turn 3, eval suite green, p95 TTFT < 3s.
+
+**Risks:** Agent SDK subprocess overhead vs. TTFT target (mitigable via `effort: 'medium'` and warm subprocess pool if needed); KA prompt quality on first real runs; cache boundary placement giving Block 1 stable caching across turns.
+
+### M2 — Premise resolution (Session Zero)
+
+**Goal:** any premise becomes a playable campaign. "Sequel to Berserk." "Miyazaki makes Pokemon." "Cowboy Bebop as isekai space opera." The SZ conductor takes the premise and produces the canonical artifact (Profile + Campaign + opening scene) that M1's turn pipeline plays.
+
+**Deliverables:**
+- `SessionZeroConductor` on Claude Agent SDK with extended thinking + tool loop (§10.1 tool list).
+- `AnimeResearcher` subagent producing full `AnimeResearchOutput` (24 DNA axes, 13 composition axes, stat mapping, tropes, voice cards, etc.) via web_search + structured output.
+- `ProfileResolver` subagent for disambiguation via AniList franchise graph.
+- `ProfileGenerator` subagent for hybrid synthesis when `profile_refs.length > 1`.
+- `HandoffCompiler` producing `OpeningStatePackage` artifact; flips `campaigns.phase` to `playing`.
+- SZ UI distinct from gameplay (conversation style + progress indicator).
+- SZ resume on partial completion; redo-SZ once per campaign.
+- 5 golden SZ transcripts in eval harness (including at least one hybrid premise).
+- Profile-calibration step: after research, player sees the DNA/composition/tropes/power-distribution and can adjust before handoff.
 - Waitlist form on landing.
 
-**Acceptance:** new user completes SZ in <10 min; receives a playable opening scene. SZ completion rate >70%.
+**Acceptance:** new player completes SZ in < 10 min for a single-IP premise; hybrid premises resolve coherently. SZ completion rate > 70%. Opening scene feels like the premise.
 
-**Risks:** conductor tool-loop convergence; handoff compiler output quality; wall-clock time.
+**Risks:** conductor tool-loop convergence on hybrid premises; handoff compiler output quality; wall-clock time under extended thinking budgets.
 
 ### M3 — Persistent campaigns (3–4 days)
 
@@ -1720,73 +1821,70 @@ Each milestone ends with a deploy to production, a brief written retro (`docs/re
 
 **Risks:** Server Action patterns for complex mutations; migration rehearsal.
 
-### M4 — Director + memory (1–2 weeks)
+### M4 — Memory depth + Director voice
 
-**Goal:** narrative that remembers and has an arc.
-
-**Deliverables:**
-- `Director` runs at campaign start, produces `arc_plan` artifact.
-- Memory retriever with pgvector (embedder decision: voyage-3-lite vs. text-embedding-3-small via head-to-head).
-- KA consumes memories in block 4.
-- Background memory writer (via `after()`) with dedup.
-- Tools: `getCampaignState`, `searchMemory`, `getCharacterSheet`, `getArcState`.
-- `npcs`, `factions`, `locations` entities.
-- `RelationshipAnalyzer` lightweight (background only; full at M7).
-- Eval dimension: memory relevance.
-
-**Acceptance:** 30-turn campaign, narrative references earlier events correctly ≥90%; NPCs persist across turns; arc plan traceable in the narrative.
-
-**Risks:** embedding model choice; memory dedup tuning; arc plan staleness.
-
-### M5 — Combat & progression (1–2 weeks)
-
-**Goal:** combat-capable, progression-aware narrative engine.
+**Goal:** the system remembers like it means it. KA's memory consults return rich, layered, storyboarded content. Director's voice_patterns journal has real entries shaping KA's voice across sessions. NPC catalog is populating; faction catalog has entries; locations have depth. The seven memory MCP servers — scaffolded at M1 — are now playing their full role.
 
 **Deliverables:**
-- `CombatAgent` with pre-narrative resolution and idempotency marker on Character.
-- `Validator` for OP-mode feasibility.
-- `PacingAgent` added to cascade (post-memory, pre-KA).
-- Progression (XP, levels) in background.
-- Consequence and Quest entities.
-- Eval dimensions: pacing discipline, combat correctness.
+- Memory writer (background, post-turn) writes to all relevant layers: episodic (turn transcript already persisted at M1, now adds `summary` column), semantic (distilled facts per §9.1 categories), voice (voice_patterns + voice_exemplars by beat type), arc (Director's updates).
+- pgvector embedding for semantic layer. Embedder decided by golden-memory recall eval (voyage-3.5 vs. text-embedding-004 vs. text-embedding-3-small head-to-head).
+- **Memory written narrated.** Writer produces storyboarded fragments alongside facts per §9.0 write path.
+- `npcs`, `factions`, `locations` entity tables populated by ProductionAgent + KA's tool calls (`register_catalog_npc`, `spawn_transient`, etc.).
+- Director's `voice_patterns` journal captures cadences that resonated per session; KA's Block 1 reads the current voice journal entries.
+- `RelationshipAnalyzer` running in background with full milestone detection (first_humor, first_sacrifice, first_vulnerability, etc.).
+- Eval dimension: memory relevance + callback quality.
 
-**Acceptance:** combat-focused session plays coherently; character grows meaningfully across 20 turns; no OP-mode violations in 50 turns; validator retry rate <10%.
+**Acceptance:** 30-turn campaign; KA-initiated callbacks to earlier turns are specific and accurate ≥ 90%; NPCs evolve visibly across turns; Director's voice journal produces stylistic continuity measurable across sessions.
 
-**Risks:** combat rule tuning; pacing vs. KA coordination.
+**Risks:** embedding model choice; storyboarded-fragment quality under the memory writer's fast tier; Director's voice journal signal-to-noise ratio.
 
-### M6 — Foreshadowing (1–2 weeks)
+### M5 — Combat + progression depth
 
-**Goal:** long-horizon plot threading.
+**Goal:** combat-heavy play is coherent, consequential, and feels like the premise's combat style (tactical / spectacle / comedy / spirit / narrative). Character progression is visible and earned. CombatAgent's rules tables + stat mapping + power-tier differential produce mechanical truth that KA narrates.
 
 **Deliverables:**
-- `ForeshadowingLedger` with DB-backed causal graph.
-- Tools: `plantForeshadowingSeed`, `resolveSeed`, `listActiveSeeds`.
-- Director plants at startup and hybrid trigger.
-- KA references active seeds in block 4.
-- Seed status lifecycle (PLANTED/GROWING/CALLBACK/RESOLVED/ABANDONED/OVERDUE).
-- Eval dimension: foreshadowing callback rate.
+- `CombatAgent` rules depth: hit/miss/damage/crit/resource-cost tables per combat_style, idempotency markers on Character state mutations.
+- `Validator` OP-mode feasibility rules (Tier 3 protagonist vs Tier 9 mook → narrative reframes to cost/meaning, not survival).
+- Progression: XP curves per IP's power_distribution, leveling tables, stat growth via `ProgressionAgent` (background).
+- `Consequence` entity (ripple effects of past actions) + `Quest` entity (active objectives, progress).
+- `PacingAgent` consumes full arc_plan + spotlight debt; returns rich beat guidance.
+- Eval dimensions: pacing discipline (scene-to-scene tonal consistency), combat correctness (rules adherence).
+
+**Acceptance:** combat-heavy session plays coherently over 20+ turns; character growth is noticeable in narration without being mechanically intrusive; zero OP-mode violations in 50 turns; Validator retry rate < 10%.
+
+**Risks:** combat rule tuning (too mechanical vs too vague); progression curves feeling earned; Pacing's arc-beat vocabulary matching what KA does with it.
+
+### M6 — Foreshadowing depth
+
+**Goal:** the story threads plant, grow, and resolve. Scenes three sessions apart feel connected. Director's hybrid-trigger foreshadowing plants seeds that pay off later. KA actively weaves active seeds into scenes at appropriate beats.
+
+**Deliverables:**
+- `ForeshadowingLedger` with DB-backed causal graph: `depends_on`, `triggers`, `conflicts_with` edges.
+- Seed lifecycle automation: PLANTED → GROWING → CALLBACK → RESOLVED | ABANDONED | OVERDUE transitions by turn-distance + detection.
+- Director plants seeds at campaign start and on hybrid-trigger (every 3+ turns, epicness ≥ 2.0). Hybrid trigger is a full Director consult, not a lightweight check.
+- KA's `aidm-arc` MCP surface returns active seeds with payoff windows; KA decides when a seed wants to surface.
+- Convergence-point detection: when two independent seeds' payoffs want to land in the same scene, Director gets a consult to choose.
+- Eval dimension: foreshadowing callback rate, overdue-seed rate.
 
 **Acceptance:** across 50 turns, ≥60% of planted seeds reach callback or resolution within window. No OVERDUE past 2× payoffWindowMax without Director attention.
 
 **Risks:** seed planting cadence; Director tool discipline.
 
-### M7 — Relationships, compaction, recap (2 weeks)
+### M7 — Long-horizon polish
 
-**Goal:** multi-session campaigns that feel warm on return.
+**Goal:** multi-session campaigns that feel warm on return. 50+ turn campaigns stay coherent. The compaction / recap / decay machinery — scaffolded from M1 — is now actively carrying long-horizon weight.
 
 **Deliverables:**
-- Full `RelationshipAnalyzer` in background.
-- `Compactor` for working memory overflow.
-- `Recap` on session resume.
-- Memory heat decay by category.
-- Director hybrid trigger (every 3+ turns, epicness ≥2.0).
-- State snapshot artifacts every 10 turns.
-- Eval dimension: NPC voice consistency.
-- Backup & DR runbook drilled.
+- `Compactor` tuned on real long-horizon campaigns: summarization quality for the Block 2 compaction buffer as working memory slides past old exchanges.
+- `Recap` on session resume, tuned to hit the right notes (last session's cliffhanger, active threads, NPCs likely to appear).
+- Memory heat decay (§9.1) running with empirical tuning from observed long-horizon play.
+- State snapshot artifacts every 10 turns for replay-from-artifact testing.
+- Eval dimension: NPC voice consistency across sessions, session-resume quality.
+- Backup & DR runbook drilled end-to-end.
 
-**Acceptance:** 5-session multi-session campaign stays coherent; NPCs evolve; returning sessions feel warm; recap quality ≥4/5 in evals.
+**Acceptance:** 5-session multi-session campaign stays coherent; NPCs evolve in visible ways; returning sessions feel warm via Recap; recap quality ≥ 4/5 in evals.
 
-**Risks:** compaction losing detail; recap calibration; Director over-triggering.
+**Risks:** compaction losing detail the campaign later needed; recap tone calibration; Director over-triggering on hybrid.
 
 ### M8 — Production (stretch)
 
