@@ -54,8 +54,9 @@ You will receive:
 
 Return a JSON object with:
 - `intent` — one of the intent types above (exact string)
-- `action` — short description of what the player is trying to do (1 sentence)
-- `target` — string or null (who/what the action is directed at)
+- `action` — short description of what the player is trying to do (1 sentence, optional)
+- `target` — string (omit field if no target)
 - `epicness` — number, 0.0 to 1.0
-- `specialConditions` — array of strings from the list above (or empty array)
+- `special_conditions` — array of strings from the list above (or empty array)
 - `confidence` — number, 0.0 to 1.0, how sure you are of the intent classification
+- `secondary_intent` — one of the intent types if the message carries a second intent (omit if single-intent)

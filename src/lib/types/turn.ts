@@ -42,7 +42,10 @@ export const SuccessLevel = z.enum([
 
 export const OutcomeOutput = z.object({
   success_level: SuccessLevel,
-  difficulty_class: z.number().int().nonnegative(),
+  // D&D-ish bound. Prompt documents 1–30; Zod enforces it so a
+  // hallucinated "difficulty_class: 999" fails parse and triggers
+  // retry/fallback rather than poisoning the turn record.
+  difficulty_class: z.number().int().min(1).max(30),
   modifiers: z.array(z.string()).default([]),
   narrative_weight: NarrativeWeight,
   consequence: z.string().optional(),

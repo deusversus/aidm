@@ -1,3 +1,13 @@
+// --- Runner (internal utility; exported for advanced callers) ---
+export {
+  extractJson,
+  runStructuredAgent,
+  type AgentRunnerConfig,
+  type AgentRunnerDeps,
+  type AgentTier,
+} from "./_runner";
+
+// --- Routing pre-pass (Commit 4) ---
 export {
   classifyIntent,
   IntentClassifierInput,
@@ -19,12 +29,6 @@ export {
   type RouterVerdict,
 } from "./router";
 export {
-  defaultLogger,
-  type AgentDeps,
-  type AgentLogger,
-  type AgentLogLevel,
-} from "./types";
-export {
   Canonicality,
   EntityUpdate,
   validateAssertion,
@@ -33,3 +37,49 @@ export {
   WorldBuilderOutput,
   type WorldBuilderDeps,
 } from "./world-builder";
+
+// --- Judgment consultants (Commit 5) ---
+export {
+  CombatAgentInput,
+  CombatAgentOutput,
+  CombatResolution,
+  CombatStyle,
+  resolveCombat,
+} from "./combat-agent";
+export {
+  MemoryRankerInput,
+  MemoryRankerOutput,
+  rankMemories,
+} from "./memory-ranker";
+export { judgeOutcome, OutcomeJudgeInput } from "./outcome-judge";
+export {
+  advisePacing,
+  BeatDirective,
+  PacingAgentInput,
+  PacingAgentOutput,
+} from "./pacing-agent";
+export {
+  produceRecap,
+  RecapAgentInput,
+  RecapAgentOutput,
+} from "./recap-agent";
+export {
+  CompositionMode,
+  ScaleSelectorInput,
+  ScaleSelectorOutput,
+  selectScale,
+} from "./scale-selector-agent";
+export {
+  judgeOutcomeWithValidation,
+  validateOutcome,
+  ValidatorInput,
+  ValidatorOutput,
+} from "./validator";
+
+// --- Shared types ---
+export {
+  defaultLogger,
+  type AgentDeps,
+  type AgentLogger,
+  type AgentLogLevel,
+} from "./types";

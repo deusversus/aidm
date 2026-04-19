@@ -38,10 +38,10 @@ You will receive:
 
 ## Output schema
 
-- `successLevel` — one of: `botched | partial_failure | partial_success | success | exceptional_success`
-- `difficultyClass` — number 1–30 (D&D-ish scale; for audit trail, not narration)
+- `success_level` — one of: `critical_failure | failure | partial_success | success | critical_success`
+- `difficulty_class` — integer 1–30 (D&D-ish scale; for audit trail, not narration)
 - `modifiers` — array of strings describing what raised or lowered the DC
-- `narrativeWeight` — one of: `MINOR | SIGNIFICANT | CLIMACTIC`
-- `consequence` — string or null — a specific ripple this action creates that later turns should remember
-- `cost` — string or null — what the protagonist pays for this outcome
+- `narrative_weight` — one of: `MINOR | SIGNIFICANT | CLIMACTIC`
+- `consequence` — string (omit field if there's no specific ripple worth tracking)
+- `cost` — string (omit field if there's no cost)
 - `rationale` — one to three sentences explaining the judgment
