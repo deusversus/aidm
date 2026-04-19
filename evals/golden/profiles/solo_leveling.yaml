@@ -1,0 +1,213 @@
+# Hand-authored v4 profile fixture — Solo Leveling (Na Jin-Woo arc)
+# Scoring by jcettison + Claude, 2026-04-19.
+# Notable: exercises canonical_stat_mapping — the crown jewel of the IP-mechanics schema.
+# Solo Leveling's Hunter System shows STR/AGI/VIT/INT/SENSE as on-screen stats plus LUK as a
+# meta-resource. This maps cleanly to D&D's STR/DEX/CON/INT/WIS with CHA hidden.
+
+id: al_151807
+title: Solo Leveling
+alternate_titles:
+  - 나 혼자만 레벨업
+  - Ore Dake Level Up na Ken
+anilist_id: 151807
+media_type: manhwa
+status: completed
+relation_type: canonical
+
+ip_mechanics:
+  power_system:
+    name: "Hunter System"
+    mechanics: |
+      Hunters are awakened humans who can enter gates (portals to other
+      dimensions) and fight monsters. Ranked E through S by the Awakening
+      System. Jin-Woo gains a unique System that lets him level infinitely,
+      shadow-extract defeated enemies, and access job change quests. Stats
+      (STR/AGI/VIT/INT/SENSE) increase via quest rewards and level-ups; free
+      points can be allocated.
+    limitations: |
+      Mana regeneration is bounded. Shadow army has capacity limits.
+      Penalty quests carry lethal failure consequences. Jin-Woo's System
+      is unique among hunters — it cannot be replicated.
+    tiers:
+      - "E-Rank (lowest)"
+      - "D-Rank"
+      - "C-Rank"
+      - "B-Rank"
+      - "A-Rank"
+      - "S-Rank"
+      - "National-Level (rarest)"
+      - "Monarch-tier (post-System)"
+
+  power_distribution:
+    peak_tier: T4
+    typical_tier: T9
+    floor_tier: T10
+    gradient: top_heavy
+
+  stat_mapping:
+    has_canonical_stats: true
+    confidence: 98
+    system_name: "Hunter System"
+    aliases:
+      STR:
+        base: [STR]
+        method: direct
+      AGI:
+        base: [DEX]
+        method: direct
+      VIT:
+        base: [CON]
+        method: direct
+      INT:
+        base: [INT]
+        method: direct
+      SENSE:
+        base: [WIS]
+        method: direct
+    meta_resources:
+      LUK: "Luck pool — reroll resource for crit confirmations and loot rolls, not a linear modifier"
+    hidden: [CHA]
+    display_order: [STR, AGI, VIT, INT, SENSE, LUK]
+    display_scale:
+      multiplier: 1
+      offset: 0
+
+  combat_style: tactical
+
+  storytelling_tropes:
+    tournament_arc: false
+    training_montage: true
+    power_of_friendship: false
+    mentor_death: false
+    chosen_one: true
+    tragic_backstory: true
+    redemption_arc: false
+    betrayal: true
+    sacrifice: true
+    transformation: true
+    forbidden_technique: true
+    time_loop: false
+    false_identity: false
+    ensemble_focus: false
+    slow_burn_romance: false
+
+  world_setting:
+    genre:
+      - "power fantasy"
+      - "dungeon action"
+      - "isekai-adjacent (gates, not transport)"
+    locations:
+      - "Seoul"
+      - "Jeju Island"
+      - "dungeon gates (global)"
+      - "Shadow Realm"
+    factions:
+      - "Korean Hunters Association"
+      - "major Korean guilds (White Tiger, Hunters, Knights)"
+      - "Monarchs"
+      - "Rulers"
+    time_period: "contemporary (2010s–2020s), post-Gate incident world"
+
+  voice_cards:
+    - name: "Sung Jin-Woo"
+      speech_patterns: "Short, declarative, commanding once post-System. Pre-System: hesitant, polite, submissive."
+      humor_type: "none"
+      signature_phrases:
+        - "Arise"
+      dialogue_rhythm: "Terse. Power is implied in brevity."
+      emotional_expression: "Restrained"
+    - name: "Cha Hae-In"
+      speech_patterns: "Formal, competent, professionally reserved."
+      humor_type: "none"
+      signature_phrases: []
+      dialogue_rhythm: "Measured."
+      emotional_expression: "Restrained"
+    - name: "Go Gun-Hee"
+      speech_patterns: "Authoritative, paternal, weight of age in every sentence."
+      humor_type: "Deadpan"
+      signature_phrases: []
+      dialogue_rhythm: "Slow, deliberate."
+      emotional_expression: "Direct"
+
+  author_voice:
+    sentence_patterns:
+      - "Short command-form sentences during combat."
+      - "Quest windows rendered as terse system-text with brackets and caps."
+      - "Long introspective paragraphs during planning phases."
+    structural_motifs:
+      - "System notification windows as diegetic UI."
+      - "Level-up moments as inflection points marked by stat changes."
+      - "Shadow extraction as narrative punctuation."
+    dialogue_quirks:
+      - "Jin-Woo uses minimal dialogue; the System window does the talking."
+      - "Commanding tone emerges only after post-System growth."
+    emotional_rhythm:
+      - "Steady mechanical progression punctuated by family-moment warmth."
+      - "Climactic power-reveals carry triumphalist weight."
+    example_voice: |
+      The quest window appeared. [New Quest: Kill 100 low-rank goblins — reward: skill book]
+      Jin-Woo didn't hesitate. He didn't have the luxury. His mother was still in the hospital.
+      He drew the dagger, and the dungeon light caught it cold.
+
+  visual_style:
+    art_style: "dark fantasy action manhwa"
+    color_palette: "deep purples, shadow blacks, gold accents on System UI, crimson for combat"
+    line_work: "sharp, dynamic — heavy emphasis on motion lines"
+    shading: "high-contrast, cinematic"
+    character_rendering: "idealized proportions, detailed armor/weapons"
+    atmosphere: "moody dungeon corridors, System glow, urban-Seoul grounding"
+    composition_style: "panel layouts emphasize scale — Jin-Woo vs. boss silhouettes"
+    studio_reference: "A-1 Pictures (anime adaptation)"
+    reference_descriptors:
+      - "dark fantasy dungeon action"
+      - "system-window UI overlays"
+      - "shadow monarchy aesthetic"
+      - "Seoul-noir with supernatural overlay"
+
+canonical_dna:
+  pacing: 8
+  continuity: 9
+  density: 5
+  temporal_structure: 3
+  optimism: 7
+  darkness: 5
+  comedy: 2
+  emotional_register: 5
+  intimacy: 4
+  fidelity: 5
+  reflexivity: 3
+  avant_garde: 2
+  epistemics: 7
+  moral_complexity: 4
+  didacticism: 4
+  cruelty: 7
+  power_treatment: 9
+  scope: 8
+  agency: 9
+  interiority: 5
+  conflict_style: 7
+  register: 5
+  empathy: 3
+  accessibility: 9
+
+canonical_composition:
+  tension_source: consequence
+  power_expression: conditional
+  narrative_focus: internal
+  mode: op_dominant
+  antagonist_origin: cosmic
+  antagonist_multiplicity: shifting
+  arc_shape: rising
+  resolution_trajectory: triumph
+  escalation_pattern: exponential
+  status_quo_stability: transformative
+  player_role: protagonist
+  choice_weight: world_shaping
+  story_time_density: years
+
+director_personality: |
+  You are a systems architect running a power fantasy. Every beat should
+  make the protagonist's growth visible and earned in the numbers. Let the
+  System windows punctuate like drum hits. Protect Jin-Woo's family — their
+  warmth is the counterweight to the cold escalation. When he says "Arise,"
+  the prose stops. The reader feels the weight of it.

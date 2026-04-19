@@ -1,0 +1,195 @@
+# Hand-authored v4 profile fixture — Cowboy Bebop (1998)
+# Scoring by jcettison + Claude, 2026-04-19.
+# This fixture serves two purposes:
+#   1. Schema validation for commit 7's round-trip tests
+#   2. Canonical ground truth for M2's profile-research A/B eval
+# Values are subjective reads anchored to specific scenes/episodes; revisions welcome.
+
+id: al_1
+title: Cowboy Bebop
+alternate_titles:
+  - カウボーイビバップ
+anilist_id: 1
+mal_id: 1
+media_type: anime
+status: completed
+relation_type: canonical
+
+ip_mechanics:
+  # Bebop has no formal power system — combat is skill + firearms + banter.
+  power_system:
+    name: "mundane combat"
+    mechanics: "Physical prowess, firearms, hand-to-hand. No supernatural elements beyond one-off episodic oddities (Pierrot le Fou's psychic abilities)."
+    limitations: "Real-world physics. Bullets kill. Spike is competent but not superhuman."
+    tiers: []
+
+  power_distribution:
+    peak_tier: T9
+    typical_tier: T9
+    floor_tier: T10
+    gradient: compressed
+
+  stat_mapping:
+    has_canonical_stats: false
+    confidence: 0
+    aliases: {}
+    meta_resources: {}
+    hidden: []
+    display_order: []
+
+  combat_style: narrative
+
+  storytelling_tropes:
+    tournament_arc: false
+    training_montage: false
+    power_of_friendship: false
+    mentor_death: false
+    chosen_one: false
+    tragic_backstory: true
+    redemption_arc: false
+    betrayal: true
+    sacrifice: true
+    transformation: false
+    forbidden_technique: false
+    time_loop: false
+    false_identity: true
+    ensemble_focus: true
+    slow_burn_romance: true
+
+  world_setting:
+    genre:
+      - "space western"
+      - "neo-noir"
+      - "jazz-influenced"
+    locations:
+      - "Bebop (ship)"
+      - "Mars"
+      - "Earth"
+      - "Ganymede"
+      - "Venus"
+      - "Tijuana"
+    factions:
+      - "Red Dragon Syndicate"
+      - "ISSP (police)"
+      - "bounty hunters"
+    time_period: "2071, after the hyperspace gate accident"
+
+  voice_cards:
+    - name: "Spike Spiegel"
+      speech_patterns: "Casual, laconic, dismissive. Trailing fragments more than complete sentences."
+      humor_type: "Sardonic"
+      signature_phrases:
+        - "Whatever happens, happens"
+        - "Bang"
+      dialogue_rhythm: "Clipped, with pregnant pauses. Says less than he could."
+      emotional_expression: "Deflecting"
+    - name: "Jet Black"
+      speech_patterns: "Gruff, paternal, direct. Longer sentences than Spike."
+      humor_type: "Deadpan"
+      signature_phrases: []
+      dialogue_rhythm: "Weighty, considered."
+      emotional_expression: "Restrained"
+    - name: "Faye Valentine"
+      speech_patterns: "Sharp, flirtatious, defensive. Switches registers to manipulate."
+      humor_type: "Sardonic"
+      signature_phrases: []
+      dialogue_rhythm: "Quick, sometimes theatrical."
+      emotional_expression: "Explosive"
+    - name: "Edward"
+      speech_patterns: "Singsong, nonsensical, childlike. Often third-person self-reference."
+      humor_type: "Slapstick"
+      signature_phrases:
+        - "Edward!"
+      dialogue_rhythm: "Unpredictable bursts."
+      emotional_expression: "Direct"
+
+  author_voice:
+    sentence_patterns:
+      - "Short declarative punches during action."
+      - "Long drifting sentences during introspection, often ending on trailing ellipses."
+      - "Environmental beats used as emotional substitution — the cigarette, the rain, the jazz."
+    structural_motifs:
+      - "Cold opens with disconnected imagery."
+      - "Flashback intrusions mid-scene."
+      - "Jazz track as episode title AND emotional anchor."
+    dialogue_quirks:
+      - "Characters rarely say what they mean."
+      - "Jazz vocabulary as inside language between Spike and Jet."
+    emotional_rhythm:
+      - "Extended cool detachment, then one sudden gut punch."
+      - "Melancholy carries even the comedy."
+    example_voice: |
+      He lit a cigarette. The ash fell too fast — the way it always did on Mars. Somewhere
+      a saxophone started up, late and too slow, and Spike listened the way a man listens
+      when he's already decided to walk into something.
+
+  visual_style:
+    art_style: "retro cyberpunk noir anime"
+    color_palette: "muted warm tones — amber, rust, navy, shadow black. Saturated accent on neon signs and blood."
+    line_work: "clean, architectural — Kanno's grid-like framing"
+    shading: "cel-shaded with noir-deep shadows"
+    character_rendering: "slim, angular, realistic proportions"
+    atmosphere: "smoky, neon-lit, jazz club at 3am"
+    composition_style: "wide angles, silhouettes against windows, long takes"
+    studio_reference: "Sunrise (Watanabe)"
+    reference_descriptors:
+      - "retro sci-fi noir anime"
+      - "jazz-era space western aesthetic"
+      - "Watanabe framing"
+      - "yokohama smoke-gold lighting"
+
+# --- Canonical DNA (how the source IS told) ---
+canonical_dna:
+  # Tempo / structure
+  pacing: 6
+  continuity: 3
+  density: 4
+  temporal_structure: 4
+  # Emotional valence
+  optimism: 3
+  darkness: 7
+  comedy: 4
+  emotional_register: 6
+  intimacy: 6
+  # Realism / formal
+  fidelity: 7
+  reflexivity: 3
+  avant_garde: 6
+  # Moral / epistemic
+  epistemics: 6
+  moral_complexity: 8
+  didacticism: 3
+  cruelty: 5
+  # Power / stakes
+  power_treatment: 6
+  scope: 5
+  agency: 6
+  # Focus / style
+  interiority: 6
+  conflict_style: 5
+  register: 7
+  # Reader relationship
+  empathy: 8
+  accessibility: 7
+
+# --- Canonical composition (source's default narrative framing) ---
+canonical_composition:
+  tension_source: existential
+  power_expression: balanced
+  narrative_focus: ensemble
+  mode: standard
+  antagonist_origin: interpersonal
+  antagonist_multiplicity: episodic
+  arc_shape: fragmented
+  resolution_trajectory: tragedy
+  escalation_pattern: stable
+  status_quo_stability: gradual
+  player_role: ensemble_member
+  choice_weight: local
+  story_time_density: months
+
+director_personality: |
+  You are a jazz musician directing a noir film. You improvise, you digress,
+  you let the smoke fill the frame longer than it should. Conflict is never
+  about who wins the fight — it's about what it costs, what it haunts, what
+  it echoes. Let the silence do the work. Leave the question open. Bang.
