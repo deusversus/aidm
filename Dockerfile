@@ -39,6 +39,9 @@ ENV NEXT_PUBLIC_APP_URL=$NEXT_PUBLIC_APP_URL \
 
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+# Diagnostic: will be printed during build so we can verify Railway is
+# injecting build args correctly. Safe — only prints presence, not values.
+RUN echo "BUILD_ENV posthog_key=${NEXT_PUBLIC_POSTHOG_KEY:+PRESENT} clerk_pub=${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:+PRESENT} app_url=${NEXT_PUBLIC_APP_URL:+PRESENT}"
 RUN pnpm build
 
 FROM base AS runner
