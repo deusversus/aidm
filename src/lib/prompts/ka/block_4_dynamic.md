@@ -9,6 +9,12 @@
 **Player message:**
 > {{player_message}}
 
+### Mechanical verdict (from OutcomeJudge, if pre-judged)
+{{outcome_verdict}}
+
+### Retrieval budget for this turn
+{{retrieval_budget}}
+
 ### Scene context
 - Location: {{scene_location}}
 - Situation: {{scene_situation}}

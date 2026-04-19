@@ -38,6 +38,17 @@ export {
   type WorldBuilderDeps,
 } from "./world-builder";
 
+// --- Director (arc conductor; called by post-turn workers) ---
+export {
+  ArcMode,
+  ArcPhase,
+  DirectorInput,
+  DirectorOutput,
+  DirectorTrigger,
+  renderVoicePatternsJournal,
+  runDirector,
+} from "./director";
+
 // --- Judgment consultants (Commit 5) ---
 export {
   CombatAgentInput,

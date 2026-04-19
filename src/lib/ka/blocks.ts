@@ -41,6 +41,12 @@ export interface CompactionEntry {
 export interface Block4Context {
   intent: IntentOutput;
   outcome?: OutcomeOutput;
+  /**
+   * Tiered semantic-memory retrieval budget (§9). 0/3/6/9 by epicness.
+   * Rendered as an advisory directive in Block 4 — KA decides how
+   * aggressively to query `search_memory` given the budget.
+   */
+  retrieval_budget?: 0 | 3 | 6 | 9;
   sakuga_injection?: string;
   style_drift_directive?: string;
   vocabulary_freshness_advisory?: string;
@@ -201,6 +207,28 @@ function formatSpecialConditions(conds: string[]): string {
   return conds.length ? conds.join(", ") : "(none)";
 }
 
+function formatOutcome(outcome: OutcomeOutput | undefined): string {
+  if (!outcome) {
+    return "(not mechanically judged — narrate consistently with the scene, consult OutcomeJudge yourself if a mechanical verdict would clarify consequences)";
+  }
+  const lines = [
+    `  success_level: ${outcome.success_level}`,
+    `  difficulty_class: ${outcome.difficulty_class}`,
+    `  narrative_weight: ${outcome.narrative_weight}`,
+  ];
+  if (outcome.consequence) lines.push(`  consequence: ${outcome.consequence}`);
+  if (outcome.cost) lines.push(`  cost: ${outcome.cost}`);
+  if (outcome.rationale) lines.push(`  rationale: ${outcome.rationale}`);
+  return lines.join("\n");
+}
+
+function formatRetrievalBudget(budget: 0 | 3 | 6 | 9 | undefined): string {
+  if (budget === undefined || budget === 0) {
+    return "0 — this beat does not warrant reaching into semantic memory; rely on Blocks 2-3 and scene context";
+  }
+  return `${budget} — you may consult up to ${budget} semantic-memory hits via \`search_memory\` this turn`;
+}
+
 /**
  * Render all four KA blocks. Returns strings ready to pass into Agent
  * SDK's `systemPrompt: string[]`. Caller assembles the final array
@@ -268,6 +296,8 @@ export function renderKaBlocks(input: RenderBlocksInput): RenderedBlocks {
     intent_target: block4.intent.target ?? "(none)",
     intent_epicness: block4.intent.epicness.toFixed(2),
     intent_special_conditions: formatSpecialConditions(block4.intent.special_conditions),
+    outcome_verdict: formatOutcome(block4.outcome),
+    retrieval_budget: formatRetrievalBudget(block4.retrieval_budget),
     player_message: block4.player_message,
     scene_location: block4.scene?.location ?? "(unknown)",
     scene_situation: block4.scene?.situation ?? "(unknown)",

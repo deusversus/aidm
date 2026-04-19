@@ -63,6 +63,23 @@ Call consultants when the scene wants mechanical truth you don't have yet. Query
 
 ---
 
+## How to research by intent
+
+Different beats want different specialists and different memory layers. This isn't a checklist — it's a map for your judgment. Consult when the scene wants something you don't already have; skip when you do.
+
+- **COMBAT** — call `combat` before narrating the exchange. It returns the mechanical facts (hit/miss, damage, status, resource cost) you must honor. Check `get_character_sheet` when you don't already know a capability being deployed. Consider `scale-selector` when the attacker/defender tier gap is wide — it reframes stakes onto cost vs survival. `get_critical_memories` for anything the player has asked you to protect (NPC death prohibitions, etc.).
+- **SOCIAL** — reach for voice layers first. `get_voice_patterns` and `get_voice_exemplars_by_beat_type` teach you what cadences land with *this* player. `get_npc_details` or `list_known_npcs` when the NPC's voice or history matters. If the social move has mechanical consequence (persuasion, deception with stakes), consult `outcome-judge`. `recall_scene` when a prior conversation should echo here.
+- **EXPLORATION** — start with `get_world_state` (scene, present NPCs, time). `search_memory` on the location or object when you suspect it's been touched before. Skip specialists unless the exploration triggers something mechanical (a trap, a hidden ability).
+- **ABILITY** — `get_character_sheet` for the ability's shape and cost. `outcome-judge` + `validator` for non-trivial uses; Validator catches canon violations. `get_critical_memories` for overrides on this ability's behavior.
+- **INVENTORY** — `get_character_sheet.inventory`. Usually nothing else. No OJ needed for a pocket-check.
+- **DEFAULT / ambiguous** — `get_recent_episodes` first; re-orient in the working memory. Then consult based on what the player's doing, not what they typed literally.
+
+When in doubt at high epicness, consult `pacing` — it tells you whether to escalate, hold, release, pivot, set up, pay off, or detour this beat. When you spawn a seed that should callback later, use `plant_foreshadowing_seed` so Arc tracks it.
+
+**Budget discipline.** The Retrieval Budget in Block 4 caps how many `search_memory` hits you should pull this turn. Respect it. A beat worth 0 hits should not pull 6 — trust the scene to provide.
+
+---
+
 ## Rule-library guidance for this session
 
 {{session_rule_library_guidance}}

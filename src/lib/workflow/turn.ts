@@ -1,6 +1,8 @@
 import { type RouterDeps, type RouterInput, routePlayerMessage } from "@/lib/agents";
+import { renderVoicePatternsJournal } from "@/lib/agents/director";
 import { type KeyAnimatorEvent, runKeyAnimator } from "@/lib/agents/key-animator";
 import { type AgentLogger, defaultLogger } from "@/lib/agents/types";
+import { judgeOutcomeWithValidation } from "@/lib/agents/validator";
 import type { Db } from "@/lib/db";
 import {
   detectStaleConstructions,
@@ -13,6 +15,7 @@ import { selectSakugaMode } from "@/lib/ka/sakuga";
 import { campaigns, characters, profiles, turns } from "@/lib/state/schema";
 import type { AidmSpanHandle, AidmToolContext } from "@/lib/tools";
 import { Profile } from "@/lib/types/profile";
+import type { IntentOutput, OutcomeOutput } from "@/lib/types/turn";
 import { and, desc, eq, isNull, sql } from "drizzle-orm";
 
 /**
@@ -48,6 +51,43 @@ import { and, desc, eq, isNull, sql } from "drizzle-orm";
 
 const WORKING_MEMORY_TURNS = 6;
 const ADVISORY_LOCK_TIMEOUT_MS = 15_000;
+
+/**
+ * Tiered memory retrieval budget (§9 — v3 0/3/6/9 ladder).
+ *
+ * KA's semantic retrieval gets progressively larger as epicness rises.
+ * Low-stakes turns (epicness < 0.25) don't pull from semantic memory at
+ * all; pivotal turns (≥ 0.75) pull up to nine candidates. This is an
+ * advisory — KA sees the budget in Block 4 and chooses how aggressively
+ * to query the semantic layer itself via MCP. Pre-retrieval would
+ * invert the KA-as-orchestrator design.
+ */
+export function retrievalBudget(epicness: number): 0 | 3 | 6 | 9 {
+  if (epicness >= 0.75) return 9;
+  if (epicness >= 0.5) return 6;
+  if (epicness >= 0.25) return 3;
+  return 0;
+}
+
+/**
+ * Decide whether to pre-call OutcomeJudge before KA for this turn.
+ *
+ * v3's cascade ran OJ for every consequential action. v4 KA is the
+ * orchestrator and could call OJ itself, but giving it a mechanical
+ * verdict up-front means (a) sakuga's CLIMACTIC fallback can fire,
+ * (b) Block 4 renders the actual outcome for KA to narrate rather
+ * than inventing one, (c) the trace shows the outcome before narration
+ * so regressions are traceable to verdict vs prose. We still skip for
+ * trivial turns — there's no mechanical truth to decide when the
+ * player is just looking around or checking their pack.
+ */
+export function shouldPreJudgeOutcome(intent: IntentOutput): boolean {
+  if (intent.intent === "COMBAT" || intent.intent === "ABILITY") return true;
+  if (intent.intent === "SOCIAL" && intent.epicness >= 0.4) return true;
+  if (intent.intent === "EXPLORATION" && intent.epicness >= 0.6) return true;
+  if (intent.intent === "DEFAULT" && intent.epicness >= 0.6) return true;
+  return false;
+}
 
 export interface TurnWorkflowInput {
   campaignId: string;
@@ -292,7 +332,53 @@ export async function* runTurn(
       turnNumber: ctx.nextTurnNumber,
     };
 
-    const sakuga = selectSakugaMode(verdict.intent, undefined);
+    // -------------------------------------------------------------------
+    // OutcomeJudge pre-pass (consequential intents only).
+    // Runs BEFORE sakuga selection so the CLIMACTIC-weight fallback can
+    // fire when OJ returns it. Falls back to `undefined` on skip so
+    // sakuga's priority ladder still governs non-consequential turns.
+    // -------------------------------------------------------------------
+    let outcome: OutcomeOutput | undefined;
+    if (shouldPreJudgeOutcome(verdict.intent)) {
+      const canonRules = Array.isArray(settings.canon_rules)
+        ? (settings.canon_rules as string[])
+        : [];
+      const { outcome: judgedOutcome } = await judgeOutcomeWithValidation(
+        {
+          intent: verdict.intent,
+          playerMessage: input.playerMessage,
+          characterSummary: ctx.characterRow
+            ? {
+                name: ctx.characterRow.name,
+                power_tier: ctx.characterRow.powerTier,
+                summary: ctx.characterRow.concept,
+              }
+            : {},
+          situation: routerInput.recentTurnsSummary,
+          activeConsequences: [],
+        },
+        {
+          characterSummary: ctx.characterRow
+            ? {
+                name: ctx.characterRow.name,
+                power_tier: ctx.characterRow.powerTier,
+                summary: ctx.characterRow.concept,
+              }
+            : {},
+          canonRules,
+          compositionMode: "standard",
+          activeOverrides:
+            routerInput.priorOverrides?.map((o) => ({
+              category: o.category,
+              value: o.value,
+            })) ?? [],
+        },
+        { trace: deps.trace, logger },
+      );
+      outcome = judgedOutcome;
+    }
+
+    const sakuga = selectSakugaMode(verdict.intent, outcome);
 
     // Narrative diversity machinery (§7.4). Both outputs land in Block 4
     // as soft advisories. Style-drift convergence check skips the
@@ -302,7 +388,7 @@ export async function* runTurn(
     const styleDrift = pickStyleDrift({
       recentNarrations,
       intent: verdict.intent,
-      narrativeWeight: undefined,
+      narrativeWeight: outcome?.narrative_weight,
       recentlyUsed: [],
     });
     const staleConstructions = detectStaleConstructions({ recentNarrations });
@@ -321,6 +407,27 @@ export async function* runTurn(
       trace: deps.trace,
     };
 
+    const voicePatternsArray = Array.isArray(
+      (settings.voice_patterns as { patterns?: unknown } | undefined)?.patterns,
+    )
+      ? (settings.voice_patterns as { patterns: string[] }).patterns.filter(
+          (p): p is string => typeof p === "string",
+        )
+      : [];
+    const voicePatternsJournal = renderVoicePatternsJournal(voicePatternsArray);
+    const directorNotes = Array.isArray(settings.director_notes)
+      ? (settings.director_notes as unknown[])
+          .filter((n): n is string => typeof n === "string")
+          .map((n) => `- ${n}`)
+          .join("\n")
+      : "";
+    const arcPlan = (settings.arc_plan ?? {}) as {
+      current_arc?: string | null;
+      arc_phase?: string | null;
+      tension_level?: number | null;
+    };
+    const budget = retrievalBudget(verdict.intent.epicness);
+
     const runKa = deps.runKa ?? runKeyAnimator;
     const kaIter = runKa(
       {
@@ -335,16 +442,17 @@ export async function* runTurn(
         block4: {
           player_message: input.playerMessage,
           intent: verdict.intent,
-          outcome: undefined,
+          outcome,
+          retrieval_budget: budget,
           sakuga_injection: sakuga?.fragment,
           style_drift_directive: renderStyleDriftDirective(styleDrift),
           vocabulary_freshness_advisory: renderVocabFreshnessAdvisory(staleConstructions),
-          director_notes: "",
+          director_notes: directorNotes,
           player_overrides: routerInput.priorOverrides?.map((o) => o.value) ?? [],
           arc_state: {
-            current_arc: null,
-            arc_phase: null,
-            tension_level: 0.3,
+            current_arc: arcPlan.current_arc ?? null,
+            arc_phase: arcPlan.arc_phase ?? null,
+            tension_level: arcPlan.tension_level ?? 0.3,
           },
           active_foreshadowing: [],
           scene: {
@@ -354,6 +462,7 @@ export async function* runTurn(
             present_npcs: scene.present_npcs ?? [],
           },
         },
+        voicePatternsJournal: voicePatternsJournal || undefined,
         toolContext,
         abortController: input.abort,
       },
@@ -390,7 +499,7 @@ export async function* runTurn(
         narrativeText: narrative,
         intent: verdict.intent,
         verdictKind: "continue",
-        outcome: null,
+        outcome: outcome ?? null,
         promptFingerprints: {},
         portraitMap,
         costUsd: costUsd === null ? null : costUsd.toFixed(6),
