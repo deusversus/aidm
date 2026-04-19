@@ -1,15 +1,29 @@
 import { getCurrentUser } from "@/lib/auth";
 import { getDb } from "@/lib/db";
+import { ensureUserSeeded } from "@/lib/seed/ensure-seeded";
 import { campaigns } from "@/lib/state/schema";
 import { and, desc, eq, isNull } from "drizzle-orm";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 export default async function CampaignsPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/sign-in");
+
+  // Backfill users-row + Bebop campaign for accounts that slipped past
+  // the Clerk webhook. Idempotent — fresh webhook-seeded users no-op
+  // through here. See src/lib/seed/ensure-seeded.ts for rationale.
+  try {
+    await ensureUserSeeded(user);
+  } catch (err) {
+    console.error("ensureUserSeeded failed on /campaigns load", {
+      userId: user.id,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
 
   const rows = await getDb()
     .select({ id: campaigns.id, name: campaigns.name, phase: campaigns.phase })
