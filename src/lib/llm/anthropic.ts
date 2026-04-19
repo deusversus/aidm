@@ -1,4 +1,4 @@
-import { env } from "@/lib/env";
+import { env, tiers } from "@/lib/env";
 import Anthropic from "@anthropic-ai/sdk";
 
 let _client: Anthropic | undefined;
@@ -12,8 +12,9 @@ export function getAnthropic(): Anthropic {
 }
 
 /**
- * Minimal-cost reachability probe. Haiku 4.5, 1 input token, 1 output token.
- * Returns true if the call completes within `timeoutMs`. Never throws.
+ * Minimal-cost reachability probe. Uses the `probe` tier (Haiku 4.5), 1 input
+ * token, 1 output token. Returns true if the call completes within
+ * `timeoutMs`. Never throws.
  */
 export async function pingAnthropic(timeoutMs = 3000): Promise<boolean> {
   if (!env.ANTHROPIC_API_KEY) return false;
@@ -21,7 +22,7 @@ export async function pingAnthropic(timeoutMs = 3000): Promise<boolean> {
     const client = getAnthropic();
     await client.messages.create(
       {
-        model: "claude-haiku-4-5-20251001",
+        model: tiers.probe.model,
         max_tokens: 1,
         messages: [{ role: "user", content: "." }],
       },

@@ -1152,8 +1152,9 @@ The Profile is canonical static data about a source. v4 split this into three ca
 - **Voice cards** (5–7 main cast): `{name, speech_patterns, humor_type, signature_phrases[], dialogue_rhythm, emotional_expression}`.
 - **Author's voice**: `{sentence_patterns[], structural_motifs[], dialogue_quirks[], emotional_rhythm[], example_voice}`.
 - **Visual style**: `{art_style, color_palette, line_work, shading, character_rendering, atmosphere, composition_style, studio_reference, reference_descriptors[]}`. Drives ProductionAgent media prompts.
-- **Tone**: `{comedy_level, darkness_level, optimism}`.
 - **Combat style**: tactical | spectacle | comedy | spirit | narrative.
+
+(Tonal data — comedy, darkness, optimism, etc. — lives in `canonical_dna` per group 3 below, not under ip_mechanics. The M0 re-architecture replaced v3's flat tone blob with the 24-axis DNA scale so that tone can be overridden at the campaign layer independently of IP world-rules.)
 
 **3. Canonical tonal/framing (how the source is NATURALLY told — serves as defaults for campaigns):**
 

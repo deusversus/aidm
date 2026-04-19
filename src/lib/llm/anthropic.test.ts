@@ -37,4 +37,12 @@ describe("getAnthropic", () => {
     const { getAnthropic } = await import("./anthropic");
     expect(() => getAnthropic()).toThrow(/ANTHROPIC_API_KEY/);
   });
+
+  it("returns the same client instance on repeated calls", async () => {
+    process.env.ANTHROPIC_API_KEY = "sk-ant-test-singleton-key";
+    const { getAnthropic } = await import("./anthropic");
+    const a = getAnthropic();
+    const b = getAnthropic();
+    expect(a).toBe(b);
+  });
 });

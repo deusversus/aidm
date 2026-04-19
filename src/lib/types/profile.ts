@@ -6,12 +6,16 @@ import { DNAScales } from "./dna";
  * Profile — canonical descriptive data about a source anime/manga/manhwa.
  * Static for the campaign's lifetime.
  *
- * Three categories of data:
+ * Four top-level groups:
  *   1. Identification — title, IDs, aliases, series relationships
- *   2. IP mechanics — world rules (power system, stat mapping, cast, tropes)
+ *   2. IP mechanics — world rules (power system, stat mapping, cast, tropes,
+ *      visual style, power distribution)
  *   3. Canonical tonal/framing — how the source is NATURALLY told
  *      (canonical_dna + canonical_composition). Used as defaults when a
  *      campaign is created; player can diverge from these.
+ *   4. Director personality — IP-specific directing voice. Logically part of
+ *      group 3 (it shapes tone at session boundaries) but kept as a top-level
+ *      field because it's a free-form string, not a structured axis set.
  *
  * Profile schemas match v3's AnimeResearchOutput where IP-mechanics shape
  * is stable (power_system, stat_mapping, voice_cards, visual_style, etc.)

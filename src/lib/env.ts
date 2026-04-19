@@ -63,7 +63,14 @@ export const env = new Proxy({} as Env, {
 });
 
 // Model tiers — current 2026 defaults, user-confirmed.
+//
+// `fast` is the production fast-tier (IntentClassifier, rerankers, research
+// subagents). `probe` is a separate cheapest-possible tier used only for
+// reachability checks (`/api/ready`); it defaults to Haiku so the probe stays
+// inside Anthropic's infra and doesn't conflate "LLM availability" with
+// "Google availability". Agents don't route through `probe`.
 export const tiers = {
+  probe: { provider: "anthropic", model: "claude-haiku-4-5-20251001" },
   fast: { provider: "google", model: "gemini-3.1-flash" },
   thinking: { provider: "anthropic", model: "claude-opus-4-7" },
   creative: { provider: "anthropic", model: "claude-opus-4-7" },

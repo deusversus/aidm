@@ -5,21 +5,19 @@
  *
  * Usage (with .env.local env vars loaded):
  *   pnpm tsx scripts/langfuse-hello.ts
+ *
+ * Uses the same lazy singletons production code uses (`getAnthropic`,
+ * `getLangfuse`) so this script stays aligned with the rest of the app —
+ * one place to fix if SDK init changes.
  */
-import Anthropic from "@anthropic-ai/sdk";
-import { Langfuse } from "langfuse";
+import { getAnthropic } from "@/lib/llm/anthropic";
+import { flushLangfuse, getLangfuse } from "@/lib/observability/langfuse";
+import type Anthropic from "@anthropic-ai/sdk";
 
 async function main() {
-  const anthropicKey = process.env.ANTHROPIC_API_KEY;
-  const lfPublic = process.env.LANGFUSE_PUBLIC_KEY;
-  const lfSecret = process.env.LANGFUSE_SECRET_KEY;
-  const lfHost = process.env.LANGFUSE_HOST ?? "https://us.cloud.langfuse.com";
-
-  if (!anthropicKey) throw new Error("ANTHROPIC_API_KEY missing");
-  if (!lfPublic || !lfSecret) throw new Error("LANGFUSE_PUBLIC_KEY / LANGFUSE_SECRET_KEY missing");
-
-  const anthropic = new Anthropic({ apiKey: anthropicKey });
-  const langfuse = new Langfuse({ publicKey: lfPublic, secretKey: lfSecret, baseUrl: lfHost });
+  const anthropic = getAnthropic(); // throws if ANTHROPIC_API_KEY missing
+  const langfuse = getLangfuse();
+  if (!langfuse) throw new Error("LANGFUSE_PUBLIC_KEY / LANGFUSE_SECRET_KEY missing");
 
   const trace = langfuse.trace({
     name: "hello-world",
@@ -58,7 +56,7 @@ async function main() {
 
   trace.update({ output });
 
-  await langfuse.flushAsync();
+  await flushLangfuse();
 
   console.log(
     JSON.stringify(

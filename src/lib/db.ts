@@ -13,6 +13,16 @@ let _pool: Pool | undefined;
 
 export function getDb(): Db {
   if (_db) return _db;
+  // Explicit check before touching the env Proxy so the failure reads as
+  // a configuration problem, not a Zod schema failure. `env.DATABASE_URL`
+  // would also throw, but with a less direct message.
+  const connectionString = process.env.DATABASE_URL;
+  if (!connectionString) {
+    throw new Error("DATABASE_URL not configured — check .env.local or Railway env vars");
+  }
+  // Route through the env Proxy so the URL is Zod-validated (checks it's a
+  // real URL, not just non-empty). The process.env check above is just for
+  // error-message quality on the missing case.
   _pool = new Pool({
     connectionString: env.DATABASE_URL,
     max: 10,

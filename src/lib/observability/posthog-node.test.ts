@@ -17,4 +17,15 @@ describe("getPostHog (server)", () => {
     const { getPostHog } = await import("./posthog-node");
     expect(getPostHog()).toBeNull();
   });
+
+  it("returns the same client instance on repeated calls when key is set", async () => {
+    process.env.NEXT_PUBLIC_POSTHOG_KEY = "phc_test_singleton_key";
+    const { getPostHog } = await import("./posthog-node");
+    const a = getPostHog();
+    const b = getPostHog();
+    expect(a).not.toBeNull();
+    expect(a).toBe(b);
+    // posthog-node starts background timers — shut it down so Vitest exits cleanly.
+    await a?.shutdown();
+  });
 });

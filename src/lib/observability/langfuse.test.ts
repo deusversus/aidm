@@ -25,4 +25,14 @@ describe("getLangfuse", () => {
     const { getLangfuse } = await import("./langfuse");
     expect(getLangfuse()).toBeNull();
   });
+
+  it("returns the same client instance on repeated calls when keys are set", async () => {
+    process.env.LANGFUSE_PUBLIC_KEY = "pk-lf-test";
+    process.env.LANGFUSE_SECRET_KEY = "sk-lf-test";
+    const { getLangfuse } = await import("./langfuse");
+    const a = getLangfuse();
+    const b = getLangfuse();
+    expect(a).not.toBeNull();
+    expect(a).toBe(b);
+  });
 });
