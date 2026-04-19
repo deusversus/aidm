@@ -71,7 +71,7 @@ export const env = new Proxy({} as Env, {
 // "Google availability". Agents don't route through `probe`.
 export const tiers = {
   probe: { provider: "anthropic", model: "claude-haiku-4-5-20251001" },
-  fast: { provider: "google", model: "gemini-3.1-flash" },
+  fast: { provider: "google", model: "gemini-3.1-flash-lite-preview" },
   thinking: { provider: "anthropic", model: "claude-opus-4-7" },
   creative: { provider: "anthropic", model: "claude-opus-4-7" },
 } as const satisfies Record<string, { provider: string; model: string }>;
