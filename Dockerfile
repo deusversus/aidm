@@ -52,6 +52,18 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 
+# Claude Agent SDK ships its Claude Code CLI native binary as optional
+# per-platform packages (one per OS/arch/libc combo). Next's standalone
+# output uses node-file-tracer, which can't see optional deps that are
+# resolved dynamically at runtime — so they get pruned out of
+# .next/standalone/node_modules. Copy the alpine (musl) linux-x64
+# variant explicitly. If we ever switch the base image off alpine,
+# update this to the matching variant (e.g. -linux-x64 for glibc,
+# -linux-arm64-musl for ARM alpine).
+COPY --from=builder --chown=nextjs:nodejs \
+  /app/node_modules/@anthropic-ai/claude-agent-sdk-linux-x64-musl \
+  ./node_modules/@anthropic-ai/claude-agent-sdk-linux-x64-musl
+
 USER nextjs
 EXPOSE 3000
 CMD ["node", "server.js"]
