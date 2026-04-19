@@ -796,16 +796,42 @@ Four blocks in the Anthropic system array, ordered static → dynamic to maximiz
 | 4 | Dynamic scene context (everything else — see §6.3) | **no** | ~4–8K | every turn |
 
 **Block 1 — what goes in Profile DNA (the static voice authority):**
-- **11 DNA scales** (0–10 each): introspection_vs_action, comedy_vs_drama, simple_vs_complex, power_fantasy_vs_struggle, explained_vs_mysterious, fast_paced_vs_slow_burn, episodic_vs_serialized, grounded_vs_absurd, tactical_vs_instinctive, hopeful_vs_cynical, ensemble_vs_solo.
+
+v4 re-architected DNA and composition during M0 (see [M0 retro](../docs/retros/M0.md) and Zod schemas in `src/lib/types/`). What follows is v4's system — the numbers have changed from v3 but the principle (Profile DNA as Block 1's cache-stable voice authority) is preserved.
+
+- **24 DNA scales** (0–10 each, 7 groups — all tonal TREATMENT of the story, not source description):
+  - *Tempo / structure:* pacing, continuity, density, temporal_structure
+  - *Emotional valence:* optimism, darkness, comedy, emotional_register, intimacy
+  - *Realism / formal:* fidelity, reflexivity, avant_garde
+  - *Moral / epistemic:* epistemics, moral_complexity, didacticism, cruelty
+  - *Power / stakes:* power_treatment, scope, agency
+  - *Focus / style:* interiority, conflict_style, register
+  - *Reader relationship:* empathy, accessibility
+- **13 composition axes** (categorical enums — discrete story archetypes, not interpolable scales):
+  - v3-inherited: tension_source (7 values), power_expression (9 values), narrative_focus (9 values), mode (standard | blended | op_dominant | not_applicable)
+  - v4 additions: antagonist_origin, antagonist_multiplicity, arc_shape, resolution_trajectory, escalation_pattern, status_quo_stability, player_role, choice_weight, story_time_density
 - **Active / inactive tropes** (15 bool flags): tournament_arc, training_montage, power_of_friendship, mentor_death, chosen_one, tragic_backstory, redemption_arc, betrayal, sacrifice, transformation, forbidden_technique, time_loop, false_identity, ensemble_focus, slow_burn_romance.
 - **Combat style** (one of: tactical | spectacle | comedy | spirit | narrative).
 - **Power system**: name, mechanics, **limitations** (the most important part — KA must respect these), tiers[].
-- **Tone**: `{comedy_level, darkness_level, optimism}` (0–10).
-- **Narrative composition (3 axes + mode)**: `tension_source` (7 values), `power_expression` (8 values), `narrative_focus` (9 values), plus `mode` (standard | blended | op_dominant) and `differential` recomputed per turn against current threat tier.
+- **Power distribution**: peak_tier × typical_tier × floor_tier × gradient (spike | top_heavy | flat | compressed). Maps the power ceiling of the world.
 - **Genre scene guidance**: per-genre canned prose for primary + 1 secondary detected genre (shonen tournament ceremony, seinen restraint, etc.).
 - **Author's voice**: sentence_patterns[], structural_motifs[], dialogue_quirks[], emotional_rhythm[], example_voice.
-- **Session-stable rule library guidance**: large pre-fetched block (~500–800 tokens) covering OP axis guidance, DNA guidance, genre guidance, scale guidance, compatibility guidance. Called once per session via `setStaticRuleGuidance()`.
+- **Session-stable rule library guidance**: large pre-fetched block (~500–800 tokens) covering genre guidance, scale guidance, compatibility guidance. Called once per session via `setStaticRuleGuidance()`.
 - **Voice calibration from prior session** (optional): Director's `voice_patterns` field, carried forward as voice journal.
+
+**Three-layer model.** Block 1 reads from the **effective** tonal state, which is the flattened overlay of three layers:
+
+| Layer | Where it lives | Lifetime | Author |
+|---|---|---|---|
+| Canonical | Profile (`canonical_dna`, `canonical_composition`) | Static | IP research |
+| Active | Campaign (`active_dna`, `active_composition`) | Persistent | Player / Session Zero |
+| Arc override | Campaign (`arc_override`) | Until transition_signal fires | Director |
+
+Effective = `{ ...active, ...arc_override?.dna }`. Arc overrides are partials — only the axes Director shifted; everything else falls through to active.
+
+**DNA is prescriptive, not descriptive.** A Pokemon campaign told with Berserk's DNA is a legitimate configuration: the Profile (Pokemon) supplies the world data; the active_dna (Berserk's scores) supplies the tone. Canonical DNA on a Profile is a *suggested default* during campaign creation, not a constraint. See §10.3.
+
+**Delta.** `dnaDelta(canonical, active)` tells the Director how far from source a run is diverging. Strict DBZ → all zeros; Dark-Pokemon → `{optimism: -6, darkness: +7, cruelty: +5}`. Director uses this to decide whether to lean into canonical tropes or signal dissonance.
 
 Claude Agent SDK handles `cache_control` placement from a declarative block list; v4 does not hand-build the system array.
 
@@ -1068,15 +1094,21 @@ When the player names a media reference ("Hunter x Hunter", "Solo Leveling", "He
 
 No decision on which path wins — the M2 eval decides.
 
-### 10.3 Hybrid and custom profiles — dialectic, not merge
+### 10.3 Hybrid and custom profiles — `profile_refs: string[]`
 
-When the player wants a hybrid ("HxH with Hellsing vibes") or custom ("original, mecha + slice-of-life"), ProfileGenerator does **not** perform weighted arithmetic on two profile YAMLs (v3's approach). Instead, it asks Opus 4.7 with extended thinking:
+v4's campaign model supports hybrids natively via `Campaign.profile_refs: string[]`. One entry = strict single-source adaptation. Two or more entries = hybrid. The Session Zero conductor authors the blend at campaign creation — not through weighted arithmetic on profile fields, but by producing a coherent `active_ip` synthesized from the source profiles plus the player's intent.
 
-> "The player wants a campaign that blends HxH's Nen power system with Hellsing's grimdark horror tone. Produce a unified profile that honors both. Where there's tension (shonen optimism vs seinen nihilism), make a creative synthesis decision and explain it in author_voice.example_voice."
+Example for "Cowboy Bebop + Solo Leveling as a space opera gate hunter dungeon drama":
 
-The result is a coherent fiction, not a mathematical average. This extends the dialectic — profile authoring becomes a synthesis act, consistent with the product's theme of co-authorship.
+- Campaign carries `profile_refs: ["al_1", "al_151807"]`
+- Conductor synthesizes `active_ip`: "Solo Leveling's Hunter System operates via portals scattered across Bebop's solar system; bounties and dungeon raids are overlapping economies; Awakened hunters compete with classic bounty hunters..."
+- `active_dna` and `active_composition` get defaulted from a blend of both canonical profiles, informed by the player's stated intent
+- `hybrid_synthesis_notes` captures the conductor's rationale for audit trail
+- Player can override any DNA axis or composition enum before first gameplay turn; overrides modify `active_*` directly (no separate customization layer)
 
-For custom profiles, the conductor asks the player to pin the 4–5 most important axes (tone darkness, power fantasy vs. struggle, ensemble vs. solo, genre mix) and generates the rest from genre defaults.
+The conductor-as-author approach matches the product's co-authorship philosophy: hybrids are creative synthesis decisions the Session Zero conductor makes with player input, not mechanical merges. For custom/original campaigns, the conductor asks the player to pin the most important axes (tone darkness, power fantasy vs. struggle, genre mix) and generates the rest from genre defaults.
+
+**Schema location:** `src/lib/types/campaign.ts` (`Campaign`, `ResolvedIP`, `CampaignCreationRequest`).
 
 ### 10.4 Canonicality modes
 
@@ -1089,12 +1121,14 @@ Inherited from v3. The conductor establishes one at research time, drives WorldB
 
 Mode is stored on the campaign and injected into WorldBuilder prompts.
 
-### 10.5 AnimeResearchOutput schema (preserved from v3)
+### 10.5 Profile schema (v4 re-architected — see `src/lib/types/profile.ts`)
 
-Every field below earns its place. v4 schema is Zod in `lib/types.ts`:
+The Profile is canonical static data about a source. v4 split this into three categories of data, each with its own field:
 
-- **Identification**: title, anilist_id, mal_id, alternate_titles, media_type, status, series_group, series_position, related_franchise, relation_type.
-- **11 DNA scales** (0–10): see §7.2 Block 1 enumeration.
+**1. Identification:** title, anilist_id, mal_id, alternate_titles, media_type, status, series_group, series_position, related_franchise, relation_type.
+
+**2. `ip_mechanics` (the world — unchanged by how you tell stories in it):**
+
 - **Power system**: name, mechanics, **limitations** (KA MUST respect), tiers[].
 - **Canonical stat mapping** (the crown jewel — only populated if IP has on-screen stats, confidence ≥ 90):
   ```ts
@@ -1120,9 +1154,14 @@ Every field below earns its place. v4 schema is Zod in `lib/types.ts`:
 - **Visual style**: `{art_style, color_palette, line_work, shading, character_rendering, atmosphere, composition_style, studio_reference, reference_descriptors[]}`. Drives ProductionAgent media prompts.
 - **Tone**: `{comedy_level, darkness_level, optimism}`.
 - **Combat style**: tactical | spectacle | comedy | spirit | narrative.
+
+**3. Canonical tonal/framing (how the source is NATURALLY told — serves as defaults for campaigns):**
+
+- **`canonical_dna`**: the full 24-axis DNA scored against the source. Used as a default for `campaign.active_dna` at creation. Player can diverge arbitrarily.
+- **`canonical_composition`**: the source's default 13-axis composition. Used as a default for `campaign.active_composition`. Arc overrides can shift any axis transiently.
 - **Director personality**: 3–5 sentence directing style prompt, IP-specific.
 
-Profiles are versioned rows in Postgres (not YAML files on disk). Re-queryable when new seasons ship; hot-reloadable at turn boundaries.
+Profiles are versioned rows in Postgres (not YAML files on disk). Re-queryable when new seasons ship; hot-reloadable at turn boundaries. The canonical YAML fixtures in `evals/golden/profiles/` are test-time artifacts, not runtime data.
 
 ### 10.6 Profile generation eval (M2)
 
@@ -1837,7 +1876,7 @@ v3 is a working masterpiece the author plays and loves. It is the spec for v4, n
 
 Listed roughly by soul-density (most to least). Losing any of these would be a regression:
 
-- **Profile DNA + 3-axis composition.** 11 DNA scales, 15 trope flags, tension × expression × focus with mode/differential recomputed per turn. The campaign's identity.
+- **Profile DNA + multi-axis composition.** 24 DNA scales (v3 had 11; re-architected at M0 — see [M0 retro](../docs/retros/M0.md)), 15 trope flags, 13-axis composition (v3 had 4) with mode/differential recomputed per turn. The campaign's identity. DNA is prescriptive tonal treatment, not source description — "Pokemon + Berserk DNA" is a legitimate config.
 - **4-block cache-aware KA prompt structure.** Block 1 Profile DNA + rule guidance, Block 2 compaction, Block 3 working memory, Block 4 dynamic scene context.
 - **Sakuga priority ladder + 4 sub-modes.** The reason the prose hits anime beats.
 - **Authority gradient (dialectic).** DM narrative / player in-fiction assertion / meta channel / override — each with different binding strength. This is the product identity, not a feature.

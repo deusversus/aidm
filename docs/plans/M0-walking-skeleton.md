@@ -1,8 +1,10 @@
 # M0 — Walking Skeleton: Implementation Plan
 
 **Milestone:** M0 (first of ten; see [ROADMAP §23](../../ROADMAP.md#23-milestones))
+**Status:** ✅ **CLOSED 2026-04-19.** See [retro](../retros/M0.md).
 **Goal:** every piece of the v4 stack wired end-to-end and deployed to a live Railway URL. Sign-in works, DB is reachable, one Langfuse trace and one PostHog event captured. Nothing playable yet.
 **Target duration:** 2–3 focused evenings.
+**Actual duration:** ~2 days wall clock.
 **Acceptance:** clone → setup → deploy → sign in → see welcome message, in under 30 minutes for a fresh contributor.
 
 **Deploy model (per user's established workflow from hvmsite + DDD):**
