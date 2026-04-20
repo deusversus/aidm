@@ -1,28 +1,28 @@
-import type { GoogleGenAI } from "@google/genai";
+import type Anthropic from "@anthropic-ai/sdk";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
- * Intent classifier tests. The agent's only external I/O is the Google
- * GenAI client, which we inject as a mock via deps. Everything else
- * (prompt registry, schema) we use for real so we catch template or
- * schema drift.
+ * Intent classifier tests. Routes through the shared runStructuredAgent
+ * (as of M1.5 Commit C). Default modelContext is Anthropic fallback, so
+ * these tests inject an Anthropic fake. Provider-dispatch behavior is
+ * covered in _runner.test.ts.
  */
 
-function fakeGoogle(
+function fakeAnthropic(
   responses: Array<{ text?: string; error?: unknown }>,
-): () => Pick<GoogleGenAI, "models"> {
+): () => Pick<Anthropic, "messages"> {
   let i = 0;
   return () =>
     ({
-      models: {
-        generateContent: async () => {
+      messages: {
+        create: async () => {
           const next = responses[i++];
           if (!next) throw new Error("no more mock responses");
           if (next.error) throw next.error;
-          return { text: next.text };
+          return { content: [{ type: "text", text: next.text ?? "" }] };
         },
       },
-    }) as unknown as Pick<GoogleGenAI, "models">;
+    }) as unknown as Pick<Anthropic, "messages">;
 }
 
 describe("classifyIntent", () => {
@@ -32,7 +32,7 @@ describe("classifyIntent", () => {
 
   it("returns a validated IntentOutput on a well-formed response", async () => {
     const { classifyIntent } = await import("../intent-classifier");
-    const google = fakeGoogle([
+    const anthropic = fakeAnthropic([
       {
         text: JSON.stringify({
           intent: "COMBAT",
@@ -46,7 +46,7 @@ describe("classifyIntent", () => {
     ]);
     const result = await classifyIntent(
       { playerMessage: "I attack the goblin", recentTurnsSummary: "", campaignPhase: "playing" },
-      { google },
+      { anthropic },
     );
     expect(result.intent).toBe("COMBAT");
     expect(result.target).toBe("goblin");
@@ -61,15 +61,15 @@ describe("classifyIntent", () => {
       special_conditions: [],
       confidence: 0.8,
     });
-    const google = fakeGoogle([{ text: `\`\`\`json\n${body}\n\`\`\`` }]);
-    const result = await classifyIntent({ playerMessage: "greet the vendor" }, { google });
+    const anthropic = fakeAnthropic([{ text: `\`\`\`json\n${body}\n\`\`\`` }]);
+    const result = await classifyIntent({ playerMessage: "greet the vendor" }, { anthropic });
     expect(result.intent).toBe("SOCIAL");
     expect(result.confidence).toBeCloseTo(0.8);
   });
 
   it("retries once on malformed JSON, returns valid output on retry", async () => {
     const { classifyIntent } = await import("../intent-classifier");
-    const google = fakeGoogle([
+    const anthropic = fakeAnthropic([
       { text: "not valid json at all" },
       {
         text: JSON.stringify({
@@ -80,18 +80,18 @@ describe("classifyIntent", () => {
         }),
       },
     ]);
-    const result = await classifyIntent({ playerMessage: "look around" }, { google });
+    const result = await classifyIntent({ playerMessage: "look around" }, { anthropic });
     expect(result.intent).toBe("EXPLORATION");
   });
 
   it("falls back to DEFAULT after exhausting retries", async () => {
     const { classifyIntent } = await import("../intent-classifier");
     const logged: Array<[string, string]> = [];
-    const google = fakeGoogle([{ text: "garbage" }, { text: "still garbage" }]);
+    const anthropic = fakeAnthropic([{ text: "garbage" }, { text: "still garbage" }]);
     const result = await classifyIntent(
       { playerMessage: "mystery action" },
       {
-        google,
+        anthropic,
         logger: (level, msg) => logged.push([level, msg]),
       },
     );
@@ -104,18 +104,18 @@ describe("classifyIntent", () => {
 
   it("falls back to DEFAULT on network errors", async () => {
     const { classifyIntent } = await import("../intent-classifier");
-    const google = fakeGoogle([
+    const anthropic = fakeAnthropic([
       { error: new Error("ECONNRESET") },
       { error: new Error("ECONNRESET") },
     ]);
-    const result = await classifyIntent({ playerMessage: "x" }, { google });
+    const result = await classifyIntent({ playerMessage: "x" }, { anthropic });
     expect(result.intent).toBe("DEFAULT");
   });
 
   it("logs a warning on low confidence but returns the classification as-is", async () => {
     const { classifyIntent } = await import("../intent-classifier");
     const logged: Array<[string, string]> = [];
-    const google = fakeGoogle([
+    const anthropic = fakeAnthropic([
       {
         text: JSON.stringify({
           intent: "ABILITY",
@@ -127,7 +127,7 @@ describe("classifyIntent", () => {
     ]);
     const result = await classifyIntent(
       { playerMessage: "do the thing" },
-      { google, logger: (level, msg) => logged.push([level, msg]) },
+      { anthropic, logger: (level, msg) => logged.push([level, msg]) },
     );
     expect(result.intent).toBe("ABILITY");
     expect(result.confidence).toBe(0.4);
@@ -139,17 +139,17 @@ describe("classifyIntent", () => {
   it("rejects malformed input before hitting the provider", async () => {
     const { classifyIntent } = await import("../intent-classifier");
     let called = false;
-    const google = () =>
+    const anthropic = () =>
       ({
-        models: {
-          generateContent: async () => {
+        messages: {
+          create: async () => {
             called = true;
-            return { text: "{}" };
+            return { content: [{ type: "text", text: "{}" }] };
           },
         },
-      }) as unknown as Pick<GoogleGenAI, "models">;
+      }) as unknown as Pick<Anthropic, "messages">;
     // Empty playerMessage should fail the input Zod schema.
-    await expect(classifyIntent({ playerMessage: "" }, { google })).rejects.toThrow();
+    await expect(classifyIntent({ playerMessage: "" }, { anthropic })).rejects.toThrow();
     expect(called).toBe(false);
   });
 
@@ -167,7 +167,7 @@ describe("classifyIntent", () => {
         };
       },
     };
-    const google = fakeGoogle([
+    const anthropic = fakeAnthropic([
       {
         text: JSON.stringify({
           intent: "DEFAULT",
@@ -177,7 +177,7 @@ describe("classifyIntent", () => {
         }),
       },
     ]);
-    await classifyIntent({ playerMessage: "hi" }, { google, trace });
+    await classifyIntent({ playerMessage: "hi" }, { anthropic, trace });
     expect(spans).toHaveLength(1);
     expect(spans[0]?.name).toBe("agent:intent-classifier");
     expect(spans[0]?.endedWith).toMatchObject({

@@ -1,13 +1,19 @@
+import type { CampaignProviderConfig } from "@/lib/providers";
 import type Anthropic from "@anthropic-ai/sdk";
 import type { GoogleGenAI } from "@google/genai";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
 /**
- * Runner tests. All 7 Commit-5 agents go through this runner, so
- * coverage here is the test surface for retry/fallback/span behavior
- * across the cascade. Per-agent tests only verify their schemas and
- * user-content rendering, not the runner's infra.
+ * Runner tests. Every structured-output consultant routes through
+ * runStructuredAgent, so retry / fallback / span coverage here is the
+ * test surface for the whole cascade. Per-agent tests verify their
+ * schemas and user-content rendering, not the runner's infra.
+ *
+ * M1.5 inversion: provider dispatch now comes from `deps.modelContext`
+ * (or `anthropicFallbackConfig()` when absent), NOT from `config.tier`.
+ * These tests verify both branches — default (Anthropic fallback) and
+ * explicit (modelContext with provider=google).
  */
 
 const OutSchema = z.object({ value: z.string() });
@@ -23,23 +29,6 @@ function baseConfig(overrides: Partial<Record<string, unknown>> = {}) {
     fallback: { value: "fallback" } as Out,
     ...overrides,
   };
-}
-
-function fakeGoogle(
-  responses: Array<{ text?: string; error?: unknown }>,
-): () => Pick<GoogleGenAI, "models"> {
-  let i = 0;
-  return () =>
-    ({
-      models: {
-        generateContent: async () => {
-          const next = responses[i++];
-          if (!next) throw new Error("no more mock responses");
-          if (next.error) throw next.error;
-          return { text: next.text };
-        },
-      },
-    }) as unknown as Pick<GoogleGenAI, "models">;
 }
 
 function fakeAnthropic(
@@ -60,73 +49,157 @@ function fakeAnthropic(
     }) as unknown as Pick<Anthropic, "messages">;
 }
 
+function fakeGoogle(
+  responses: Array<{ text?: string; error?: unknown }>,
+): () => Pick<GoogleGenAI, "models"> {
+  let i = 0;
+  return () =>
+    ({
+      models: {
+        generateContent: async () => {
+          const next = responses[i++];
+          if (!next) throw new Error("no more mock responses");
+          if (next.error) throw next.error;
+          return { text: next.text };
+        },
+      },
+    }) as unknown as Pick<GoogleGenAI, "models">;
+}
+
+const googleContext: CampaignProviderConfig = {
+  provider: "google",
+  tier_models: {
+    probe: "claude-haiku-4-5-20251001",
+    fast: "gemini-3.1-flash-lite-preview",
+    thinking: "gemini-3.1-pro-preview",
+    creative: "gemini-3.1-pro-preview",
+  },
+};
+
 describe("runStructuredAgent", () => {
   beforeEach(() => {
     vi.resetModules();
   });
 
-  describe("tier dispatch", () => {
-    it("routes fast tier to Gemini", async () => {
+  describe("provider dispatch", () => {
+    it("routes to Anthropic by default (no modelContext → anthropicFallbackConfig)", async () => {
+      const { runStructuredAgent } = await import("../_runner");
+      const anthropic = fakeAnthropic([{ text: JSON.stringify({ value: "ok" }) }]);
+      const result = await runStructuredAgent<Out>(baseConfig() as never, { anthropic });
+      expect(result.value).toBe("ok");
+    });
+
+    it("routes to Google when modelContext provider='google'", async () => {
       const { runStructuredAgent } = await import("../_runner");
       const google = fakeGoogle([{ text: JSON.stringify({ value: "ok" }) }]);
-      const result = await runStructuredAgent<Out>(baseConfig({ tier: "fast" }) as never, {
+      const result = await runStructuredAgent<Out>(baseConfig() as never, {
+        modelContext: googleContext,
         google,
       });
       expect(result.value).toBe("ok");
     });
 
-    it("routes thinking tier to Anthropic", async () => {
+    it("uses the tier-appropriate model from modelContext.tier_models", async () => {
       const { runStructuredAgent } = await import("../_runner");
-      const anthropic = fakeAnthropic([{ text: JSON.stringify({ value: "ok" }) }]);
-      const result = await runStructuredAgent<Out>(baseConfig({ tier: "thinking" }) as never, {
+      let seenModel: string | undefined;
+      const anthropic = fakeAnthropic([
+        {
+          text: JSON.stringify({ value: "ok" }),
+          echoParams: (p) => {
+            seenModel = (p as { model: string }).model;
+          },
+        },
+      ]);
+      await runStructuredAgent<Out>(baseConfig({ tier: "thinking" }) as never, { anthropic });
+      expect(seenModel).toBe("claude-opus-4-7"); // from anthropicFallbackConfig thinking default
+    });
+
+    it("honors an explicit Anthropic modelContext with a non-default creative model", async () => {
+      const { runStructuredAgent } = await import("../_runner");
+      let seenModel: string | undefined;
+      const anthropic = fakeAnthropic([
+        {
+          text: JSON.stringify({ value: "ok" }),
+          echoParams: (p) => {
+            seenModel = (p as { model: string }).model;
+          },
+        },
+      ]);
+      const customContext: CampaignProviderConfig = {
+        provider: "anthropic",
+        tier_models: {
+          probe: "claude-haiku-4-5-20251001",
+          fast: "claude-haiku-4-5-20251001",
+          thinking: "claude-opus-4-5-20251101", // snapshot pin
+          creative: "claude-sonnet-4-6", // cost-down creative
+        },
+      };
+      await runStructuredAgent<Out>(baseConfig({ tier: "creative" }) as never, {
+        modelContext: customContext,
         anthropic,
       });
-      expect(result.value).toBe("ok");
+      expect(seenModel).toBe("claude-sonnet-4-6");
+    });
+
+    it("throws when provider is openai (not yet available)", async () => {
+      const { runStructuredAgent } = await import("../_runner");
+      const openaiContext: CampaignProviderConfig = {
+        provider: "openai",
+        tier_models: {
+          probe: "x",
+          fast: "x",
+          thinking: "x",
+          creative: "x",
+        },
+      };
+      await expect(
+        runStructuredAgent<Out>(baseConfig() as never, { modelContext: openaiContext }),
+      ).rejects.toThrow(/M5\.5/);
     });
   });
 
   describe("retry + fallback", () => {
     it("retries once on malformed JSON and recovers", async () => {
       const { runStructuredAgent } = await import("../_runner");
-      const google = fakeGoogle([
+      const anthropic = fakeAnthropic([
         { text: "not json" },
         { text: JSON.stringify({ value: "recovered" }) },
       ]);
-      const result = await runStructuredAgent<Out>(baseConfig() as never, { google });
+      const result = await runStructuredAgent<Out>(baseConfig() as never, { anthropic });
       expect(result.value).toBe("recovered");
     });
 
     it("falls back when retries exhaust", async () => {
       const { runStructuredAgent } = await import("../_runner");
-      const google = fakeGoogle([{ text: "garbage" }, { text: "still garbage" }]);
-      const result = await runStructuredAgent<Out>(baseConfig() as never, { google });
+      const anthropic = fakeAnthropic([{ text: "garbage" }, { text: "still garbage" }]);
+      const result = await runStructuredAgent<Out>(baseConfig() as never, { anthropic });
       expect(result.value).toBe("fallback");
     });
 
     it("falls back on network errors", async () => {
       const { runStructuredAgent } = await import("../_runner");
-      const google = fakeGoogle([
+      const anthropic = fakeAnthropic([
         { error: new Error("ECONNRESET") },
         { error: new Error("ECONNRESET") },
       ]);
-      const result = await runStructuredAgent<Out>(baseConfig() as never, { google });
+      const result = await runStructuredAgent<Out>(baseConfig() as never, { anthropic });
       expect(result.value).toBe("fallback");
     });
 
     it("strips markdown fences", async () => {
       const { runStructuredAgent } = await import("../_runner");
       const body = JSON.stringify({ value: "fenced" });
-      const google = fakeGoogle([{ text: `\`\`\`json\n${body}\n\`\`\`` }]);
-      const result = await runStructuredAgent<Out>(baseConfig() as never, { google });
+      const anthropic = fakeAnthropic([{ text: `\`\`\`json\n${body}\n\`\`\`` }]);
+      const result = await runStructuredAgent<Out>(baseConfig() as never, { anthropic });
       expect(result.value).toBe("fenced");
     });
 
     it("logs warn on each attempt failure and error on fallback", async () => {
       const { runStructuredAgent } = await import("../_runner");
       const logs: Array<[string, string]> = [];
-      const google = fakeGoogle([{ text: "garbage" }, { text: "still garbage" }]);
+      const anthropic = fakeAnthropic([{ text: "garbage" }, { text: "still garbage" }]);
       await runStructuredAgent<Out>(baseConfig() as never, {
-        google,
+        anthropic,
         logger: (level, msg) => logs.push([level, msg]),
       });
       expect(logs.filter(([l]) => l === "warn")).toHaveLength(2);
@@ -179,14 +252,15 @@ describe("runStructuredAgent", () => {
       expect(max).toBeGreaterThan(4096);
     });
 
-    it("omits thinking param when tier is fast even if thinkingBudget is set", async () => {
+    it("omits thinking param on Google path even if thinkingBudget is set", async () => {
       const { runStructuredAgent } = await import("../_runner");
       const google = fakeGoogle([{ text: JSON.stringify({ value: "ok" }) }]);
-      await runStructuredAgent<Out>(baseConfig({ tier: "fast", thinkingBudget: 2048 }) as never, {
-        google,
-      });
-      // Just assert no crash + correct output — fast tier routes to
-      // Gemini which ignores thinking entirely.
+      const result = await runStructuredAgent<Out>(
+        baseConfig({ tier: "fast", thinkingBudget: 2048 }) as never,
+        { modelContext: googleContext, google },
+      );
+      // Google path silently ignores thinkingBudget (different mechanism).
+      expect(result.value).toBe("ok");
     });
   });
 
@@ -205,8 +279,8 @@ describe("runStructuredAgent", () => {
           };
         },
       };
-      const google = fakeGoogle([{ text: JSON.stringify({ value: "traced" }) }]);
-      await runStructuredAgent<Out>(baseConfig() as never, { google, trace });
+      const anthropic = fakeAnthropic([{ text: JSON.stringify({ value: "traced" }) }]);
+      await runStructuredAgent<Out>(baseConfig() as never, { anthropic, trace });
       expect(spans[0]?.name).toBe("agent:test-agent");
       expect(spans[0]?.endedWith).toMatchObject({
         output: { value: "traced" },
@@ -228,11 +302,33 @@ describe("runStructuredAgent", () => {
           };
         },
       };
-      const google = fakeGoogle([{ text: "x" }, { text: "y" }]);
-      await runStructuredAgent<Out>(baseConfig() as never, { google, trace });
+      const anthropic = fakeAnthropic([{ text: "x" }, { text: "y" }]);
+      await runStructuredAgent<Out>(baseConfig() as never, { anthropic, trace });
       expect(spans[0]?.endedWith).toMatchObject({
         output: { value: "fallback" },
         metadata: { fallback: true },
+      });
+    });
+
+    it("span metadata includes provider + resolved model", async () => {
+      const { runStructuredAgent } = await import("../_runner");
+      const spans: Array<{ metadata?: Record<string, unknown> }> = [];
+      const trace = {
+        span(opts: { name: string; metadata?: Record<string, unknown> }) {
+          const entry = { metadata: opts.metadata };
+          spans.push(entry);
+          return { end() {} };
+        },
+      };
+      const anthropic = fakeAnthropic([{ text: JSON.stringify({ value: "ok" }) }]);
+      await runStructuredAgent<Out>(baseConfig({ tier: "thinking" }) as never, {
+        anthropic,
+        trace,
+      });
+      expect(spans[0]?.metadata).toMatchObject({
+        provider: "anthropic",
+        model: "claude-opus-4-7",
+        tier: "thinking",
       });
     });
   });

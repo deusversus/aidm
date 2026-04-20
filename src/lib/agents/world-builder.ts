@@ -1,9 +1,6 @@
-import { tiers } from "@/lib/env";
-import { getAnthropic } from "@/lib/llm";
 import { getPrompt } from "@/lib/prompts";
-import type Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
-import { type AgentDeps, defaultLogger } from "./types";
+import { type AgentRunnerDeps, runStructuredAgent } from "./_runner";
 
 /**
  * WorldBuilder — thinking-tier validator for player in-fiction assertions.
@@ -17,12 +14,22 @@ import { type AgentDeps, defaultLogger } from "./types";
  * modal or error. The caller (the router) renders `response` verbatim to
  * the player on reject/clarify paths.
  *
- * Tier: thinking (Opus 4.7 with extended thinking).
+ * Routes through the shared runner so provider dispatch follows the
+ * campaign's `modelContext` (M1.5). Anthropic-provider campaigns hit
+ * Opus via `@anthropic-ai/sdk`; Google-provider campaigns (M3.5+) hit
+ * Gemini Pro via `@google/genai`.
+ *
  * Failure policy:
- *   - JSON/schema parse failure → retry once with stricter reminder,
- *     then fallback to a generic CLARIFY that asks the player to rephrase
- *     in-character (never blocks; never surfaces the failure)
- *   - 5xx → one retry, then the same CLARIFY fallback
+ *   - JSON/schema parse failure → runner retries once with stricter
+ *     reminder, then falls back to a generic CLARIFY that asks the
+ *     player to rephrase in-character (never blocks; never surfaces
+ *     the failure).
+ *   - Verdict / voice concerns (2026-04-20 review): the current
+ *     CLARIFY phrasing breaks scene voice ("Tell me more — when,
+ *     where, how?"). WB is being reframed from gatekeeper to editor —
+ *     drop REJECT, default ACCEPT, CLARIFY only for local physical
+ *     ambiguity. That reshape is tracked separately and applies at
+ *     prompt + schema level; this file is the transport shim only.
  */
 
 export const Canonicality = z.enum(["full_cast", "replaced_protagonist", "npcs_only", "inspired"]);
@@ -54,8 +61,6 @@ export const WorldBuilderOutput = z.object({
 });
 export type WorldBuilderOutput = z.infer<typeof WorldBuilderOutput>;
 
-const MAX_ATTEMPTS = 2;
-
 const CLARIFY_FALLBACK: WorldBuilderOutput = {
   decision: "CLARIFY",
   response:
@@ -64,13 +69,7 @@ const CLARIFY_FALLBACK: WorldBuilderOutput = {
   rationale: "WorldBuilder fallback: retry budget exhausted; asking the player to rephrase.",
 };
 
-export interface WorldBuilderDeps extends AgentDeps {
-  anthropic?: () => Pick<Anthropic, "messages">;
-}
-
-function renderPrompt(): string {
-  return getPrompt("agents/world-builder").content;
-}
+export type WorldBuilderDeps = AgentRunnerDeps;
 
 function buildUserContent(input: z.output<typeof WorldBuilderInput>): string {
   return [
@@ -84,72 +83,22 @@ function buildUserContent(input: z.output<typeof WorldBuilderInput>): string {
   ].join("\n");
 }
 
-function extractJson(text: string): string {
-  // Strip markdown fences the model sometimes emits despite instructions.
-  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
-  if (fenced?.[1]) return fenced[1].trim();
-  return text.trim();
-}
-
 export async function validateAssertion(
   input: WorldBuilderInput,
   deps: WorldBuilderDeps = {},
 ): Promise<WorldBuilderOutput> {
   const parsed = WorldBuilderInput.parse(input);
-  const logger = deps.logger ?? defaultLogger;
-  const anthropic = deps.anthropic ?? getAnthropic;
-  const model = tiers.thinking.model;
-  const span = deps.trace?.span({
-    name: "agent:world-builder",
-    input: parsed,
-    metadata: { model, tier: "thinking" },
-  });
-
-  const systemPrompt = renderPrompt();
-  const userContent = buildUserContent(parsed);
-
-  let lastError: unknown;
-  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-    try {
-      const reminder =
-        attempt > 1
-          ? "\n\nYour prior response was not valid JSON against the schema. Return ONLY the JSON object — no prose, no markdown fences. Every required field must be present."
-          : "";
-      const client = anthropic();
-      const response = await client.messages.create({
-        model,
-        max_tokens: 1024,
-        system: systemPrompt,
-        messages: [{ role: "user", content: `${userContent}${reminder}` }],
-      });
-
-      const textBlocks = response.content.filter(
-        (b): b is Anthropic.TextBlock => b.type === "text",
-      );
-      const raw = textBlocks.map((b) => b.text).join("");
-      if (!raw.trim()) throw new Error("empty response");
-
-      const validated = WorldBuilderOutput.parse(JSON.parse(extractJson(raw)));
-      span?.end({ output: validated, metadata: { attempt } });
-      return validated;
-    } catch (err) {
-      lastError = err;
-      logger("warn", "WorldBuilder attempt failed", {
-        attempt,
-        error: err instanceof Error ? err.message : String(err),
-      });
-    }
-  }
-
-  logger("error", "WorldBuilder fell back to CLARIFY after retry", {
-    error: lastError instanceof Error ? lastError.message : String(lastError),
-  });
-  span?.end({
-    output: CLARIFY_FALLBACK,
-    metadata: {
-      fallback: true,
-      error: lastError instanceof Error ? lastError.message : String(lastError),
+  return runStructuredAgent(
+    {
+      agentName: "world-builder",
+      tier: "thinking",
+      systemPrompt: getPrompt("agents/world-builder").content,
+      userContent: buildUserContent(parsed),
+      outputSchema: WorldBuilderOutput,
+      fallback: CLARIFY_FALLBACK,
+      maxTokens: 1024,
+      spanInput: parsed,
     },
-  });
-  return CLARIFY_FALLBACK;
+    deps,
+  );
 }

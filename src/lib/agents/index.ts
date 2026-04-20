@@ -4,7 +4,6 @@ export {
   runStructuredAgent,
   type AgentRunnerConfig,
   type AgentRunnerDeps,
-  type AgentTier,
 } from "./_runner";
 
 // --- Routing pre-pass (Commit 4) ---

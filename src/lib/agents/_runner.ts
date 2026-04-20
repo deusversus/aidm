@@ -1,5 +1,6 @@
-import { tiers } from "@/lib/env";
 import { getAnthropic, getGoogle } from "@/lib/llm";
+import { anthropicFallbackConfig } from "@/lib/providers";
+import type { CampaignProviderConfig, TierName } from "@/lib/providers";
 import type Anthropic from "@anthropic-ai/sdk";
 import type { GoogleGenAI } from "@google/genai";
 import type { z } from "zod";
@@ -15,24 +16,29 @@ import { type AgentDeps, type AgentLogger, defaultLogger } from "./types";
  * of that shape. Each agent becomes: schemas + user-content builder +
  * fallback + one call to `runStructuredAgent`.
  *
- * Tier dispatch:
- *   - "fast"     → Gemini 3.1 Flash via @google/genai
- *   - "thinking" → Opus 4.7 via @anthropic-ai/sdk, optional extended
- *                  thinking budget
- *   - "probe"    → Haiku (reachability only; not used for agents)
+ * **Per-campaign provider dispatch (M1.5).** The runner reads
+ * `deps.modelContext` — the campaign's `{ provider, tier_models }` — to
+ * decide which provider SDK to hit and which model to ask for. When
+ * modelContext is absent (scripts, `/api/ready`, tests that don't care
+ * about provider), it falls back to `anthropicFallbackConfig()`. Never
+ * reads `env.ts` tiers globally in the hot path.
  *
- * The runner does NOT know about tools, streaming, or MCP. Agents that
- * need those capabilities (KA) bypass this runner and use Claude Agent
- * SDK directly.
+ * Provider support status at M1.5:
+ *   - "anthropic" → live
+ *   - "google"    → throws until M3.5 Google-KA lands
+ *   - "openai"    → throws until M5.5
+ *   - "openrouter"→ throws until M5.5
+ *
+ * KA does NOT use this runner — it runs on Claude Agent SDK with its
+ * own streaming + tool loop. This runner is for structured-output
+ * consultants only.
  */
-
-export type AgentTier = "fast" | "thinking";
 
 export interface AgentRunnerConfig<TOutput> {
   /** Agent name for span + log identification (e.g. `outcome-judge`). */
   agentName: string;
-  /** Model tier — selects provider + model. */
-  tier: AgentTier;
+  /** Which tier's model to pull from `modelContext.tier_models`. */
+  tier: TierName;
   /** Fully-rendered system prompt (caller resolves via prompt registry). */
   systemPrompt: string;
   /** Fully-rendered user message for this invocation. */
@@ -43,13 +49,30 @@ export interface AgentRunnerConfig<TOutput> {
   fallback: TOutput;
   /** Max output tokens. Defaults are reasonable for structured JSON. */
   maxTokens?: number;
-  /** Extended-thinking budget for Opus. Ignored on fast tier. */
+  /**
+   * Extended-thinking budget for Anthropic thinking-capable models.
+   * Silently ignored when the selected model doesn't support it or
+   * the provider path doesn't model thinking this way.
+   */
   thinkingBudget?: number;
   /** Sampling temperature for first attempt. Retry forces temp 0. */
   temperature?: number;
+  /**
+   * Optional input payload attached to the Langfuse span on open.
+   * Helps debugging — Langfuse renders it as the span body. Keep
+   * small (a few KB at most); large payloads inflate trace storage.
+   */
+  spanInput?: unknown;
 }
 
 export interface AgentRunnerDeps extends AgentDeps {
+  /**
+   * Per-campaign provider + tier_models. When absent, falls back to
+   * `anthropicFallbackConfig()` — for scripts, `/api/ready`, and tests
+   * that don't need per-campaign routing. The turn workflow builds
+   * one from `campaign.settings` and threads it through (Commit D).
+   */
+  modelContext?: CampaignProviderConfig;
   /** Inject a mock Gemini client in tests. */
   google?: () => Pick<GoogleGenAI, "models">;
   /** Inject a mock Anthropic client in tests. */
@@ -67,35 +90,15 @@ export function extractJson(text: string): string {
   return text.trim();
 }
 
-async function callFast(
+async function callAnthropic(
   config: AgentRunnerConfig<unknown>,
   userMessage: string,
-  temperature: number,
-  google: () => Pick<GoogleGenAI, "models">,
-): Promise<string> {
-  const client = google();
-  const response = await client.models.generateContent({
-    model: tiers.fast.model,
-    contents: [{ role: "user", parts: [{ text: userMessage }] }],
-    config: {
-      systemInstruction: config.systemPrompt,
-      responseMimeType: "application/json",
-      temperature,
-    },
-  });
-  const text = response.text?.trim();
-  if (!text) throw new Error("empty response");
-  return text;
-}
-
-async function callThinking(
-  config: AgentRunnerConfig<unknown>,
-  userMessage: string,
+  model: string,
   anthropic: () => Pick<Anthropic, "messages">,
 ): Promise<string> {
   const client = anthropic();
   const params: Anthropic.Messages.MessageCreateParamsNonStreaming = {
-    model: tiers.thinking.model,
+    model,
     max_tokens: config.maxTokens ?? 1024,
     system: config.systemPrompt,
     messages: [{ role: "user", content: userMessage }],
@@ -114,6 +117,28 @@ async function callThinking(
   return raw;
 }
 
+async function callGoogle(
+  config: AgentRunnerConfig<unknown>,
+  userMessage: string,
+  model: string,
+  temperature: number,
+  google: () => Pick<GoogleGenAI, "models">,
+): Promise<string> {
+  const client = google();
+  const response = await client.models.generateContent({
+    model,
+    contents: [{ role: "user", parts: [{ text: userMessage }] }],
+    config: {
+      systemInstruction: config.systemPrompt,
+      responseMimeType: "application/json",
+      temperature,
+    },
+  });
+  const text = response.text?.trim();
+  if (!text) throw new Error("empty response");
+  return text;
+}
+
 /**
  * Run a structured-output agent call with retry + fallback.
  * Returns the validated output, or the configured fallback if retries
@@ -126,15 +151,41 @@ export async function runStructuredAgent<TOutput>(
   deps: AgentRunnerDeps = {},
 ): Promise<TOutput> {
   const logger: AgentLogger = deps.logger ?? defaultLogger;
-  const google = deps.google ?? getGoogle;
-  const anthropic = deps.anthropic ?? getAnthropic;
+  const ctx = deps.modelContext ?? anthropicFallbackConfig();
+  const model = ctx.tier_models[config.tier];
+
   const span = deps.trace?.span({
     name: `agent:${config.agentName}`,
+    input: config.spanInput,
     metadata: {
       tier: config.tier,
-      model: config.tier === "fast" ? tiers.fast.model : tiers.thinking.model,
+      provider: ctx.provider,
+      model,
     },
   });
+
+  // Provider dispatch — resolve the caller function once, outside the
+  // retry loop. Providers that don't yet have a KA substrate throw
+  // immediately (helpful error, no silent fallback to anthropic —
+  // that would mask misconfiguration).
+  let invoke: (userMessage: string, temperature: number) => Promise<string>;
+  switch (ctx.provider) {
+    case "anthropic": {
+      const anthropic = deps.anthropic ?? getAnthropic;
+      invoke = (msg) => callAnthropic(config, msg, model, anthropic);
+      break;
+    }
+    case "google": {
+      const google = deps.google ?? getGoogle;
+      invoke = (msg, temp) => callGoogle(config, msg, model, temp, google);
+      break;
+    }
+    case "openai":
+    case "openrouter":
+      throw new Error(
+        `Provider "${ctx.provider}" is not yet available — OpenAI-KA + OpenRouter shim land at M5.5. See src/lib/providers/${ctx.provider}.ts.`,
+      );
+  }
 
   let lastError: unknown;
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
@@ -143,10 +194,7 @@ export async function runStructuredAgent<TOutput>(
       const message = `${config.userContent}${reminder}`;
       const temperature = attempt === 1 ? (config.temperature ?? 0.2) : 0;
 
-      const raw =
-        config.tier === "fast"
-          ? await callFast(config, message, temperature, google)
-          : await callThinking(config, message, anthropic);
+      const raw = await invoke(message, temperature);
 
       const parsed = config.outputSchema.parse(JSON.parse(extractJson(raw)));
       span?.end({ output: parsed, metadata: { attempt } });

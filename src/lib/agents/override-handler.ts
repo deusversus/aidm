@@ -1,9 +1,6 @@
-import { tiers } from "@/lib/env";
-import { getGoogle } from "@/lib/llm";
 import { getPrompt } from "@/lib/prompts";
-import type { GoogleGenAI } from "@google/genai";
 import { z } from "zod";
-import { type AgentDeps, defaultLogger } from "./types";
+import { type AgentRunnerDeps, runStructuredAgent } from "./_runner";
 
 /**
  * OverrideHandler — classifies `/meta` and `/override` commands.
@@ -19,9 +16,11 @@ import { type AgentDeps, defaultLogger } from "./types";
  * and the handler fills in category, scope, conflicts, and an
  * acknowledgement the player sees.
  *
- * Tier: fast (Gemini 3.1 Flash). Simple classification + short ack.
- * Failure policy: parse fail → retry once → fallback that surfaces the raw
- * command as a NARRATIVE_DEMAND override (never silently drop).
+ * Tier: fast. Provider follows the campaign's modelContext (M1.5).
+ * Failure policy: parse fail → runner retries once → fallback that
+ * surfaces the raw command as a NARRATIVE_DEMAND override (never
+ * silently drops). The fallback is input-dependent, computed at call
+ * time from the parsed command.
  */
 
 export const OverrideMode = z.enum(["override", "meta"]);
@@ -62,15 +61,7 @@ export const OverrideHandlerOutput = z.object({
 });
 export type OverrideHandlerOutput = z.infer<typeof OverrideHandlerOutput>;
 
-const MAX_ATTEMPTS = 2;
-
-export interface OverrideHandlerDeps extends AgentDeps {
-  google?: () => Pick<GoogleGenAI, "models">;
-}
-
-function renderPrompt(): string {
-  return getPrompt("agents/override-handler").content;
-}
+export type OverrideHandlerDeps = AgentRunnerDeps;
 
 function buildUserContent(input: z.output<typeof OverrideHandlerInput>): string {
   const priors = input.prior_overrides.length
@@ -84,12 +75,6 @@ function buildUserContent(input: z.output<typeof OverrideHandlerInput>): string 
     "",
     "Return the JSON object now.",
   ].join("\n");
-}
-
-function extractJson(text: string): string {
-  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
-  if (fenced?.[1]) return fenced[1].trim();
-  return text.trim();
 }
 
 function buildFallback(input: z.output<typeof OverrideHandlerInput>): OverrideHandlerOutput {
@@ -112,61 +97,18 @@ export async function handleOverride(
   deps: OverrideHandlerDeps = {},
 ): Promise<OverrideHandlerOutput> {
   const parsed = OverrideHandlerInput.parse(input);
-  const logger = deps.logger ?? defaultLogger;
-  const google = deps.google ?? getGoogle;
-  const model = tiers.fast.model;
-  const span = deps.trace?.span({
-    name: "agent:override-handler",
-    input: parsed,
-    metadata: { model, tier: "fast" },
-  });
-
-  const systemPrompt = renderPrompt();
-  const userContent = buildUserContent(parsed);
-
-  let lastError: unknown;
-  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-    try {
-      const reminder =
-        attempt > 1
-          ? "\n\nYour prior response was not valid JSON against the schema. Return ONLY the JSON object — no prose, no markdown fences. Every required field must be present."
-          : "";
-      const client = google();
-      const response = await client.models.generateContent({
-        model,
-        contents: [{ role: "user", parts: [{ text: `${userContent}${reminder}` }] }],
-        config: {
-          systemInstruction: systemPrompt,
-          responseMimeType: "application/json",
-          temperature: 0.1,
-        },
-      });
-
-      const text = response.text?.trim();
-      if (!text) throw new Error("empty response");
-      const validated = OverrideHandlerOutput.parse(JSON.parse(extractJson(text)));
-      span?.end({ output: validated, metadata: { attempt } });
-      return validated;
-    } catch (err) {
-      lastError = err;
-      logger("warn", "OverrideHandler attempt failed", {
-        attempt,
-        error: err instanceof Error ? err.message : String(err),
-      });
-    }
-  }
-
-  const fallback = buildFallback(parsed);
-  logger("error", "OverrideHandler fell back after retry", {
-    error: lastError instanceof Error ? lastError.message : String(lastError),
-    fallback_mode: fallback.mode,
-  });
-  span?.end({
-    output: fallback,
-    metadata: {
-      fallback: true,
-      error: lastError instanceof Error ? lastError.message : String(lastError),
+  return runStructuredAgent(
+    {
+      agentName: "override-handler",
+      tier: "fast",
+      systemPrompt: getPrompt("agents/override-handler").content,
+      userContent: buildUserContent(parsed),
+      outputSchema: OverrideHandlerOutput,
+      fallback: buildFallback(parsed),
+      maxTokens: 512,
+      temperature: 0.1,
+      spanInput: parsed,
     },
-  });
-  return fallback;
+    deps,
+  );
 }

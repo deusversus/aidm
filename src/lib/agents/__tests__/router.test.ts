@@ -1,32 +1,17 @@
 import type Anthropic from "@anthropic-ai/sdk";
-import type { GoogleGenAI } from "@google/genai";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
  * Router tests — verify that intents route to the correct sub-agent and
- * that the verdict shape is correct for each branch. Sub-agents are mocked
- * at the provider-SDK layer, so the router's composition logic is tested
- * without any real LLM calls.
+ * that the verdict shape is correct for each branch. Sub-agents are
+ * mocked at the provider-SDK layer, so the router's composition logic
+ * is tested without any real LLM calls.
+ *
+ * As of M1.5 Commit C, every consultant routes through
+ * runStructuredAgent with provider dispatch from `deps.modelContext`.
+ * Tests don't pass modelContext here, so everything falls back to the
+ * Anthropic default — inject Anthropic fakes throughout.
  */
-
-function googleReturning(text: string): () => Pick<GoogleGenAI, "models"> {
-  return () =>
-    ({
-      models: {
-        generateContent: async () => ({ text }),
-      },
-    }) as unknown as Pick<GoogleGenAI, "models">;
-}
-
-function googleSequence(texts: string[]): () => Pick<GoogleGenAI, "models"> {
-  let i = 0;
-  return () =>
-    ({
-      models: {
-        generateContent: async () => ({ text: texts[i++] ?? texts[texts.length - 1] }),
-      },
-    }) as unknown as Pick<GoogleGenAI, "models">;
-}
 
 function anthropicReturning(text: string): () => Pick<Anthropic, "messages"> {
   return () =>
@@ -34,6 +19,18 @@ function anthropicReturning(text: string): () => Pick<Anthropic, "messages"> {
       messages: {
         create: async () => ({
           content: [{ type: "text", text }],
+        }),
+      },
+    }) as unknown as Pick<Anthropic, "messages">;
+}
+
+function anthropicSequence(texts: string[]): () => Pick<Anthropic, "messages"> {
+  let i = 0;
+  return () =>
+    ({
+      messages: {
+        create: async () => ({
+          content: [{ type: "text", text: texts[i++] ?? texts[texts.length - 1] }],
         }),
       },
     }) as unknown as Pick<Anthropic, "messages">;
@@ -56,7 +53,7 @@ describe("routePlayerMessage", () => {
       "OP_COMMAND",
     ] as const;
     for (const intent of intents) {
-      const google = googleReturning(
+      const anthropic = anthropicReturning(
         JSON.stringify({
           intent,
           epicness: 0.3,
@@ -66,7 +63,7 @@ describe("routePlayerMessage", () => {
       );
       const verdict = await routePlayerMessage(
         { playerMessage: "some action", canonicalityMode: "inspired" },
-        { intentClassifier: { google } },
+        { intentClassifier: { anthropic } },
       );
       expect(verdict.kind).toBe("continue");
       expect(verdict.intent.intent).toBe(intent);
@@ -75,28 +72,29 @@ describe("routePlayerMessage", () => {
 
   it("routes WORLD_BUILDING to WorldBuilder and surfaces its decision", async () => {
     const { routePlayerMessage } = await import("../router");
-    const google = googleReturning(
+    // One shared anthropic fake handles both IntentClassifier's classification
+    // and WorldBuilder's decision because both route through the Anthropic
+    // path by default. Sequence: classification first, then WB decision.
+    const anthropic = anthropicSequence([
       JSON.stringify({
         intent: "WORLD_BUILDING",
         epicness: 0.4,
         special_conditions: [],
         confidence: 0.95,
       }),
-    );
-    const anthropic = anthropicReturning(
       JSON.stringify({
         decision: "ACCEPT",
         response: "It is so.",
         entityUpdates: [],
         rationale: "ok",
       }),
-    );
+    ]);
     const verdict = await routePlayerMessage(
       {
         playerMessage: "I pull the amulet from my satchel.",
         canonicalityMode: "inspired",
       },
-      { intentClassifier: { google }, worldBuilder: { anthropic } },
+      { intentClassifier: { anthropic }, worldBuilder: { anthropic } },
     );
     expect(verdict.kind).toBe("worldbuilder");
     if (verdict.kind === "worldbuilder") {
@@ -106,7 +104,7 @@ describe("routePlayerMessage", () => {
 
   it("routes OVERRIDE_COMMAND to OverrideHandler in override mode", async () => {
     const { routePlayerMessage } = await import("../router");
-    const google = googleSequence([
+    const anthropic = anthropicSequence([
       JSON.stringify({
         intent: "OVERRIDE_COMMAND",
         epicness: 0.0,
@@ -127,7 +125,7 @@ describe("routePlayerMessage", () => {
         playerMessage: "/override Lloyd cannot die",
         canonicalityMode: "inspired",
       },
-      { intentClassifier: { google }, overrideHandler: { google } },
+      { intentClassifier: { anthropic }, overrideHandler: { anthropic } },
     );
     expect(verdict.kind).toBe("override");
     if (verdict.kind === "override") {
@@ -138,7 +136,7 @@ describe("routePlayerMessage", () => {
 
   it("routes META_FEEDBACK to OverrideHandler in meta mode", async () => {
     const { routePlayerMessage } = await import("../router");
-    const google = googleSequence([
+    const anthropic = anthropicSequence([
       JSON.stringify({
         intent: "META_FEEDBACK",
         epicness: 0.0,
@@ -159,7 +157,7 @@ describe("routePlayerMessage", () => {
         playerMessage: "/meta less torture please",
         canonicalityMode: "inspired",
       },
-      { intentClassifier: { google }, overrideHandler: { google } },
+      { intentClassifier: { anthropic }, overrideHandler: { anthropic } },
     );
     expect(verdict.kind).toBe("meta");
     if (verdict.kind === "meta") {
@@ -169,17 +167,17 @@ describe("routePlayerMessage", () => {
 
   it("surfaces IntentClassifier fallback (DEFAULT) when classification fails hard", async () => {
     const { routePlayerMessage } = await import("../router");
-    const google = () =>
+    const anthropic = () =>
       ({
-        models: {
-          generateContent: async () => {
+        messages: {
+          create: async () => {
             throw new Error("upstream down");
           },
         },
-      }) as unknown as Pick<GoogleGenAI, "models">;
+      }) as unknown as Pick<Anthropic, "messages">;
     const verdict = await routePlayerMessage(
       { playerMessage: "uncertain action", canonicalityMode: "inspired" },
-      { intentClassifier: { google } },
+      { intentClassifier: { anthropic } },
     );
     expect(verdict.kind).toBe("continue");
     expect(verdict.intent.intent).toBe("DEFAULT");

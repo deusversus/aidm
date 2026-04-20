@@ -1,21 +1,21 @@
-import type { GoogleGenAI } from "@google/genai";
+import type Anthropic from "@anthropic-ai/sdk";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-function fakeGoogle(
+function fakeAnthropic(
   responses: Array<{ text?: string; error?: unknown }>,
-): () => Pick<GoogleGenAI, "models"> {
+): () => Pick<Anthropic, "messages"> {
   let i = 0;
   return () =>
     ({
-      models: {
-        generateContent: async () => {
+      messages: {
+        create: async () => {
           const next = responses[i++];
           if (!next) throw new Error("no more mock responses");
           if (next.error) throw next.error;
-          return { text: next.text };
+          return { content: [{ type: "text", text: next.text ?? "" }] };
         },
       },
-    }) as unknown as Pick<GoogleGenAI, "models">;
+    }) as unknown as Pick<Anthropic, "messages">;
 }
 
 describe("handleOverride", () => {
@@ -25,7 +25,7 @@ describe("handleOverride", () => {
 
   it("classifies an /override NPC_PROTECTION command", async () => {
     const { handleOverride } = await import("../override-handler");
-    const google = fakeGoogle([
+    const anthropic = fakeAnthropic([
       {
         text: JSON.stringify({
           mode: "override",
@@ -39,7 +39,7 @@ describe("handleOverride", () => {
     ]);
     const result = await handleOverride(
       { command: "/override Lloyd cannot die", prior_overrides: [] },
-      { google },
+      { anthropic },
     );
     expect(result.mode).toBe("override");
     expect(result.category).toBe("NPC_PROTECTION");
@@ -48,7 +48,7 @@ describe("handleOverride", () => {
 
   it("classifies a /meta calibration with null category", async () => {
     const { handleOverride } = await import("../override-handler");
-    const google = fakeGoogle([
+    const anthropic = fakeAnthropic([
       {
         text: JSON.stringify({
           mode: "meta",
@@ -62,7 +62,7 @@ describe("handleOverride", () => {
     ]);
     const result = await handleOverride(
       { command: "/meta less torture, more mystery", prior_overrides: [] },
-      { google },
+      { anthropic },
     );
     expect(result.mode).toBe("meta");
     expect(result.category).toBeNull();
@@ -70,7 +70,7 @@ describe("handleOverride", () => {
 
   it("surfaces conflict with prior overrides", async () => {
     const { handleOverride } = await import("../override-handler");
-    const google = fakeGoogle([
+    const anthropic = fakeAnthropic([
       {
         text: JSON.stringify({
           mode: "override",
@@ -94,14 +94,14 @@ describe("handleOverride", () => {
           },
         ],
       },
-      { google },
+      { anthropic },
     );
     expect(result.conflicts_with).toContain("o-prev-1");
   });
 
   it("retries once on malformed JSON then recovers", async () => {
     const { handleOverride } = await import("../override-handler");
-    const google = fakeGoogle([
+    const anthropic = fakeAnthropic([
       { text: "not json" },
       {
         text: JSON.stringify({
@@ -116,17 +116,20 @@ describe("handleOverride", () => {
     ]);
     const result = await handleOverride(
       { command: "/meta lighter", prior_overrides: [] },
-      { google },
+      { anthropic },
     );
     expect(result.mode).toBe("meta");
   });
 
   it("fallback preserves the command as a NARRATIVE_DEMAND override when /override prefix present", async () => {
     const { handleOverride } = await import("../override-handler");
-    const google = fakeGoogle([{ error: new Error("upstream") }, { error: new Error("upstream") }]);
+    const anthropic = fakeAnthropic([
+      { error: new Error("upstream") },
+      { error: new Error("upstream") },
+    ]);
     const result = await handleOverride(
       { command: "/override make sure Aria returns in the finale", prior_overrides: [] },
-      { google },
+      { anthropic },
     );
     expect(result.mode).toBe("override");
     expect(result.category).toBe("NARRATIVE_DEMAND");
@@ -135,10 +138,13 @@ describe("handleOverride", () => {
 
   it("fallback classifies /meta command as meta with null category", async () => {
     const { handleOverride } = await import("../override-handler");
-    const google = fakeGoogle([{ error: new Error("upstream") }, { error: new Error("upstream") }]);
+    const anthropic = fakeAnthropic([
+      { error: new Error("upstream") },
+      { error: new Error("upstream") },
+    ]);
     const result = await handleOverride(
       { command: "/meta bring Faye back into the spotlight", prior_overrides: [] },
-      { google },
+      { anthropic },
     );
     expect(result.mode).toBe("meta");
     expect(result.category).toBeNull();

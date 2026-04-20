@@ -1,33 +1,17 @@
 import type Anthropic from "@anthropic-ai/sdk";
-import type { GoogleGenAI } from "@google/genai";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
  * Thin tests for Commit-5 agents. Runner behavior (retry, fallback,
  * span) is covered exhaustively in _runner.test.ts; these tests verify
- * each agent routes to the right provider, renders input/output against
- * the right schema, and returns a sensible fallback.
+ * each agent renders input/output against the right schema and returns
+ * a sensible fallback.
+ *
+ * As of M1.5 Commit C, every consultant routes through runStructuredAgent
+ * with provider dispatch from `deps.modelContext`. Tests don't pass
+ * modelContext, so every call falls back to the Anthropic default —
+ * inject Anthropic fakes for all tiers.
  */
-
-function fakeGoogle(text: string): () => Pick<GoogleGenAI, "models"> {
-  return () =>
-    ({
-      models: {
-        generateContent: async () => ({ text }),
-      },
-    }) as unknown as Pick<GoogleGenAI, "models">;
-}
-
-function failingGoogle(): () => Pick<GoogleGenAI, "models"> {
-  return () =>
-    ({
-      models: {
-        generateContent: async () => {
-          throw new Error("upstream");
-        },
-      },
-    }) as unknown as Pick<GoogleGenAI, "models">;
-}
 
 function fakeAnthropic(text: string): () => Pick<Anthropic, "messages"> {
   return () =>
@@ -54,7 +38,7 @@ describe("MemoryRanker", () => {
 
   it("returns validated ranking on well-formed response", async () => {
     const { rankMemories } = await import("../memory-ranker");
-    const google = fakeGoogle(
+    const anthropic = fakeAnthropic(
       JSON.stringify({
         ranked: [
           { id: "m1", relevanceScore: 0.9, reason: "direct NPC match" },
@@ -91,7 +75,7 @@ describe("MemoryRanker", () => {
           },
         ],
       },
-      { google },
+      { anthropic },
     );
     expect(result.ranked).toHaveLength(2);
     expect(result.ranked[0]?.id).toBe("m1");
@@ -109,7 +93,7 @@ describe("MemoryRanker", () => {
           { id: "b", content: "y", category: "fact", heat: 50, baseScore: 0.6 },
         ],
       },
-      { google: failingGoogle() },
+      { anthropic: failingAnthropic() },
     );
     expect(result.ranked.map((r) => r.id)).toEqual(["a", "b"]);
     expect(result.dropped).toEqual([]);
@@ -122,23 +106,23 @@ describe("RecapAgent", () => {
   it("returns null recap when there are no prior turns (short-circuit, no provider call)", async () => {
     const { produceRecap } = await import("../recap-agent");
     let called = false;
-    const google = () =>
+    const anthropic = () =>
       ({
-        models: {
-          generateContent: async () => {
+        messages: {
+          create: async () => {
             called = true;
-            return { text: "{}" };
+            return { content: [{ type: "text", text: "{}" }] };
           },
         },
-      }) as unknown as Pick<GoogleGenAI, "models">;
-    const result = await produceRecap({ priorSessionTurns: [] }, { google });
+      }) as unknown as Pick<Anthropic, "messages">;
+    const result = await produceRecap({ priorSessionTurns: [] }, { anthropic });
     expect(result.recap).toBeNull();
     expect(called).toBe(false);
   });
 
   it("returns recap prose from the model", async () => {
     const { produceRecap } = await import("../recap-agent");
-    const google = fakeGoogle(
+    const anthropic = fakeAnthropic(
       JSON.stringify({
         recap: "Spike had just walked away from Julia's message. The ship was half empty.",
         hooksMentioned: ["julia_message", "ship_status"],
@@ -146,7 +130,7 @@ describe("RecapAgent", () => {
     );
     const result = await produceRecap(
       { priorSessionTurns: [{ turn: 50, summary: "Spike hears Julia's recording." }] },
-      { google },
+      { anthropic },
     );
     expect(result.recap).toContain("Spike");
     expect(result.hooksMentioned).toHaveLength(2);
@@ -156,7 +140,7 @@ describe("RecapAgent", () => {
     const { produceRecap } = await import("../recap-agent");
     const result = await produceRecap(
       { priorSessionTurns: [{ turn: 1, summary: "something" }] },
-      { google: failingGoogle() },
+      { anthropic: failingAnthropic() },
     );
     expect(result.recap).toBeNull();
   });
@@ -167,14 +151,14 @@ describe("ScaleSelectorAgent", () => {
 
   it("returns composition mode with tension scaling", async () => {
     const { selectScale } = await import("../scale-selector-agent");
-    const google = fakeGoogle(
+    const anthropic = fakeAnthropic(
       JSON.stringify({
         effectiveMode: "op_dominant",
         tensionScaling: 0.25,
         rationale: "T3 vs T9 — reframe stakes",
       }),
     );
-    const result = await selectScale({ attackerTier: "T3", defenderTier: "T9" }, { google });
+    const result = await selectScale({ attackerTier: "T3", defenderTier: "T9" }, { anthropic });
     expect(result.effectiveMode).toBe("op_dominant");
     expect(result.tensionScaling).toBeCloseTo(0.25);
   });
@@ -187,7 +171,7 @@ describe("ScaleSelectorAgent", () => {
         defenderTier: "T5",
         profileCompositionMode: "blended",
       },
-      { google: failingGoogle() },
+      { anthropic: failingAnthropic() },
     );
     expect(result.effectiveMode).toBe("blended");
     expect(result.tensionScaling).toBe(0.5);
