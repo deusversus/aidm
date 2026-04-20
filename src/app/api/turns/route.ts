@@ -53,6 +53,16 @@ export async function POST(req: Request) {
 
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
+      // Prime the connection through Railway's reverse proxy. Small
+      // SSE streams (router short-circuit path: ~2 tiny events, no
+      // token-deltas in between) can sit buffered upstream until the
+      // stream closes, so the client sees nothing live and events
+      // only surface via DB-backed page refresh. Sending a leading
+      // comment line with padding immediately flushes through any
+      // buffer threshold. Comment lines (`:<text>\n`) are ignored by
+      // SSE parsers per the spec.
+      controller.enqueue(new TextEncoder().encode(`: stream open${" ".repeat(2048)}\n\n`));
+
       try {
         const db = getDb();
         const iter = runTurn(
@@ -88,6 +98,11 @@ export async function POST(req: Request) {
     headers: {
       "Content-Type": "text/event-stream; charset=utf-8",
       "Cache-Control": "no-cache, no-transform",
+      // Explicit identity encoding — blocks any upstream gzip/deflate
+      // that would batch tiny SSE payloads before sending. Pairs with
+      // the padding priming comment above for a belt-and-suspenders
+      // anti-buffering posture.
+      "Content-Encoding": "identity",
       Connection: "keep-alive",
       "X-Accel-Buffering": "no",
     },
