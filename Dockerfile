@@ -55,20 +55,33 @@ COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 # Claude Agent SDK ships its Claude Code CLI native binary as
 # per-platform optional npm packages. Next's standalone output uses
 # node-file-tracer, which can't follow dynamically-resolved optional
-# deps, so they're pruned from .next/standalone/node_modules. Copying
-# from the builder is brittle because pnpm's symlink layout (via
-# node_modules/.pnpm/...) makes the COPY --from path resolution fail
-# with "failed to calculate checksum" errors. Installing the single
-# needed package directly with npm in the runner stage is the clean
-# answer: flat node_modules, no transitive tree, works regardless of
-# the dep-stage package manager. If the base image ever changes off
-# alpine, update the -musl suffix (e.g. remove for glibc, switch to
-# -linux-arm64-musl for ARM alpine).
+# deps, so they're pruned from .next/standalone/node_modules. Two
+# other approaches were tried and failed:
+#   1. COPY --from=builder of pnpm's resolved path → Docker BuildKit
+#      couldn't checksum the symlink (pnpm stores the real package
+#      under node_modules/.pnpm/... and exposes it via symlink).
+#   2. `npm install` directly in /app → npm walked Next's standalone
+#      package.json which references @next/font@<ver> (a Next-internal
+#      not on the public registry) and ETARGET'd.
+# Working approach: install into a throwaway /tmp directory with a
+# blank package.json so npm has nothing bogus to resolve, then move
+# just the one resolved package into /app/node_modules. Clean-up the
+# tmp dir in the same RUN so no image bloat.
+#
+# If the base image ever changes off alpine, update the -musl suffix
+# (e.g. remove for glibc linux, switch to -linux-arm64-musl for ARM
+# alpine).
 USER root
-RUN cd /app \
+RUN mkdir -p /tmp/aidm-native \
+ && cd /tmp/aidm-native \
+ && echo '{}' > package.json \
  && npm install --no-save --no-package-lock --no-audit --no-fund \
       @anthropic-ai/claude-agent-sdk-linux-x64-musl@0.2.114 \
- && chown -R nextjs:nodejs /app/node_modules
+ && mkdir -p /app/node_modules/@anthropic-ai \
+ && mv /tmp/aidm-native/node_modules/@anthropic-ai/claude-agent-sdk-linux-x64-musl \
+       /app/node_modules/@anthropic-ai/claude-agent-sdk-linux-x64-musl \
+ && rm -rf /tmp/aidm-native \
+ && chown -R nextjs:nodejs /app/node_modules/@anthropic-ai
 
 USER nextjs
 EXPOSE 3000
