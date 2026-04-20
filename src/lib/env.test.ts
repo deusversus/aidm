@@ -54,17 +54,22 @@ describe("env Proxy", () => {
   });
 });
 
-describe("tiers config", () => {
+describe("anthropicDefaults (fallback-only; authoritative config is per-campaign tier_models)", () => {
   beforeEach(() => {
     vi.resetModules();
   });
 
-  it("declares fast, thinking, creative tiers", async () => {
-    const { tiers } = await import("./env");
-    expect(tiers.fast.provider).toBe("google");
-    expect(tiers.fast.model).toBe("gemini-3.1-flash-lite-preview");
-    expect(tiers.thinking.provider).toBe("anthropic");
-    expect(tiers.thinking.model).toBe("claude-opus-4-7");
-    expect(tiers.creative.model).toBe("claude-opus-4-7");
+  it("declares probe / fast / thinking / creative keys with Anthropic model strings", async () => {
+    const { anthropicDefaults } = await import("./env");
+    expect(anthropicDefaults.probe).toBe("claude-haiku-4-5-20251001");
+    expect(anthropicDefaults.fast).toBe("claude-haiku-4-5-20251001");
+    expect(anthropicDefaults.thinking).toBe("claude-opus-4-7");
+    expect(anthropicDefaults.creative).toBe("claude-opus-4-7");
+  });
+
+  it("matches ANTHROPIC_DEFAULTS from the providers registry (single source of truth)", async () => {
+    const { anthropicDefaults } = await import("./env");
+    const { ANTHROPIC_DEFAULTS } = await import("./providers");
+    expect(anthropicDefaults).toEqual(ANTHROPIC_DEFAULTS);
   });
 });

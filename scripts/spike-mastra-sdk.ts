@@ -19,7 +19,7 @@
  * This script is intentionally throwaway. It will be deleted when M1 Commit 3
  * (IntentClassifier) lands real agent code exercising the same patterns.
  */
-import { tiers } from "@/lib/env";
+import { anthropicDefaults } from "@/lib/env";
 import { getAnthropic } from "@/lib/llm/anthropic";
 import type Anthropic from "@anthropic-ai/sdk";
 import { createStep, createWorkflow } from "@mastra/core/workflows";
@@ -39,7 +39,7 @@ import { z } from "zod";
 async function spikeFourBlockCache() {
   const anthropic = getAnthropic();
   const resp = await anthropic.messages.create({
-    model: tiers.probe.model,
+    model: anthropicDefaults.probe,
     max_tokens: 32,
     // Four distinct cache breakpoints. In real KA these would be:
     //   block 1: Profile DNA + rule-library guidance (~8-12K)
@@ -102,7 +102,7 @@ async function spikeStreaming() {
   let deltaCount = 0;
 
   const stream = await anthropic.messages.create({
-    model: tiers.probe.model,
+    model: anthropicDefaults.probe,
     max_tokens: 48,
     system: "Respond with exactly three short words, comma-separated.",
     messages: [{ role: "user", content: "Three colors." }],

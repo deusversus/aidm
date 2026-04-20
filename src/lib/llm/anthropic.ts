@@ -1,4 +1,4 @@
-import { env, tiers } from "@/lib/env";
+import { anthropicDefaults, env } from "@/lib/env";
 import Anthropic from "@anthropic-ai/sdk";
 
 let _client: Anthropic | undefined;
@@ -22,7 +22,7 @@ export async function pingAnthropic(timeoutMs = 3000): Promise<boolean> {
     const client = getAnthropic();
     await client.messages.create(
       {
-        model: tiers.probe.model,
+        model: anthropicDefaults.probe,
         max_tokens: 1,
         messages: [{ role: "user", content: "." }],
       },

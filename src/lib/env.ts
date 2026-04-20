@@ -62,18 +62,33 @@ export const env = new Proxy({} as Env, {
   },
 });
 
-// Model tiers — current 2026 defaults, user-confirmed.
-//
-// `fast` is the production fast-tier (IntentClassifier, rerankers, research
-// subagents). `probe` is a separate cheapest-possible tier used only for
-// reachability checks (`/api/ready`); it defaults to Haiku so the probe stays
-// inside Anthropic's infra and doesn't conflate "LLM availability" with
-// "Google availability". Agents don't route through `probe`.
-export const tiers = {
-  probe: { provider: "anthropic", model: "claude-haiku-4-5-20251001" },
-  fast: { provider: "google", model: "gemini-3.1-flash-lite-preview" },
-  thinking: { provider: "anthropic", model: "claude-opus-4-7" },
-  creative: { provider: "anthropic", model: "claude-opus-4-7" },
-} as const satisfies Record<string, { provider: string; model: string }>;
-
-export type Tier = keyof typeof tiers;
+/**
+ * Fallback-only model defaults — NOT the global source of truth.
+ *
+ * In the per-campaign multi-provider world (M1.5 Commit A onwards), the
+ * authoritative `{ provider, tier_models }` config lives on each
+ * campaign row at `settings.provider` + `settings.tier_models`. The
+ * turn workflow reads it via `resolveModelContext` and threads it
+ * through every LLM call on the turn.
+ *
+ * This constant is the narrow fallback for callers that don't have a
+ * campaign context:
+ *   - `/api/ready` reachability probe (see `pingAnthropic`)
+ *   - CLI scripts that don't target a specific campaign
+ *   - Tests that don't need per-campaign routing
+ *
+ * The runtime hot path (router → consultants → KA) must NOT read from
+ * here. If you're reaching for `anthropicDefaults` from code that runs
+ * during a turn, you've missed the modelContext threading in Commit D —
+ * that's a bug, not a convenience.
+ *
+ * Kept identical to `src/lib/providers/anthropic.ts` ANTHROPIC_DEFAULTS
+ * (single source of truth for Anthropic's baseline). If they diverge,
+ * fix it here — the providers registry is authoritative.
+ */
+export const anthropicDefaults = {
+  probe: "claude-haiku-4-5-20251001",
+  fast: "claude-haiku-4-5-20251001",
+  thinking: "claude-opus-4-7",
+  creative: "claude-opus-4-7",
+} as const;
