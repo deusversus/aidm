@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Db } from "@/lib/db";
+import { anthropicFallbackConfig } from "@/lib/providers";
 import { campaigns, characters, profiles } from "@/lib/state/schema";
 import { Profile } from "@/lib/types/profile";
 import { and, eq, isNull } from "drizzle-orm";
@@ -116,7 +117,14 @@ export async function seedBebopCampaign(db: Db, userId: string): Promise<SeedRes
     )
     .limit(1);
 
+  // New-campaign seed includes the M1.5 multi-provider fields — provider
+  // + tier_models — so every campaign created after M1.5 lands with a
+  // well-formed provider config. Defaults to Anthropic via
+  // anthropicFallbackConfig(); user retunes via settings UI (Commit F).
+  const providerConfig = anthropicFallbackConfig();
   const settings = {
+    provider: providerConfig.provider,
+    tier_models: providerConfig.tier_models,
     active_dna: bebop.canonical_dna,
     active_composition: bebop.canonical_composition,
     world_state: {

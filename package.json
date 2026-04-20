@@ -24,7 +24,8 @@
     "db:studio": "drizzle-kit studio",
     "hello:trace": "tsx scripts/langfuse-hello.ts",
     "prompts:dump": "tsx scripts/prompts-dump.ts",
-    "seed:campaign": "tsx scripts/seed-campaign.ts"
+    "seed:campaign": "tsx scripts/seed-campaign.ts",
+    "migrate:campaign-providers": "tsx scripts/migrate-campaign-providers.ts"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.114",
