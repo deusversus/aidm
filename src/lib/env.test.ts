@@ -62,7 +62,7 @@ describe("tiers config", () => {
   it("declares fast, thinking, creative tiers", async () => {
     const { tiers } = await import("./env");
     expect(tiers.fast.provider).toBe("google");
-    expect(tiers.fast.model).toBe("gemini-3.1-flash");
+    expect(tiers.fast.model).toBe("gemini-3.1-flash-lite-preview");
     expect(tiers.thinking.provider).toBe("anthropic");
     expect(tiers.thinking.model).toBe("claude-opus-4-7");
     expect(tiers.creative.model).toBe("claude-opus-4-7");
