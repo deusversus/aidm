@@ -3,15 +3,18 @@ import { z } from "zod";
 import { registerTool } from "../registry";
 
 /**
- * Plant a new foreshadowing seed — KA entrypoint for deliberate
- * mid-scene planting. Referenced in KA's Block 1 prompt. Chronicler has
- * its own `plant_foreshadowing_candidate` for retrospective spotting;
- * both write the same PLANTED status to the same table. Two call sites,
- * one artifact.
+ * Plant a foreshadowing seed with status PLANTED. Chronicler calls this
+ * post-turn when KA's narration contains an element that should pay off
+ * later — a secret name dropped, an unexplained artifact, a hesitation
+ * that hinted at backstory. Director's session-boundary review (later
+ * milestone) ratifies PLANTED → GROWING and eventually marks them
+ * RESOLVED or ABANDONED via `resolve_seed`.
  *
- * Director's session-boundary review (later milestone) ratifies PLANTED
- * → GROWING and eventually marks them RESOLVED or ABANDONED via
- * `resolve_seed`.
+ * KA has its own `plant_foreshadowing_seed` entrypoint for seeds it
+ * plants deliberately mid-scene. Both write to the same table with the
+ * same PLANTED status — two call sites, one artifact. The "candidate"
+ * framing signals: Chronicler spotted this retrospectively, not
+ * pre-planned.
  */
 const InputSchema = z.object({
   name: z.string().min(1),
@@ -24,14 +27,14 @@ const InputSchema = z.object({
 });
 
 const OutputSchema = z.object({
-  seed_id: z.string().uuid(),
+  id: z.string().uuid(),
   status: z.literal("PLANTED"),
 });
 
-export const plantForeshadowingSeedTool = registerTool({
-  name: "plant_foreshadowing_seed",
+export const plantForeshadowingCandidateTool = registerTool({
+  name: "plant_foreshadowing_candidate",
   description:
-    "Plant a new foreshadowing seed in the causal graph. Called by KA when it plants something mid-scene that deserves tracking (e.g., dropping a name that should callback later). Returns the seed id.",
+    "Retrospectively plant a foreshadowing seed Chronicler spotted in KA's narration. Status PLANTED; Director's session-boundary review may ratify later.",
   layer: "arc",
   inputSchema: InputSchema,
   outputSchema: OutputSchema,
@@ -50,7 +53,7 @@ export const plantForeshadowingSeedTool = registerTool({
         plantedTurn: input.planted_turn,
       })
       .returning({ id: foreshadowingSeeds.id });
-    if (!row) throw new Error("plant_foreshadowing_seed: insert returned no row");
-    return { seed_id: row.id, status: "PLANTED" as const };
+    if (!row) throw new Error("plant_foreshadowing_candidate: insert returned no row");
+    return { id: row.id, status: "PLANTED" as const };
   },
 });

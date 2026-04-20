@@ -44,13 +44,32 @@ function makeCtx(overrides: Partial<AidmToolContext> = {}): AidmToolContext {
 
 describe("tool registry — core infrastructure", () => {
   describe("registerTool / listTools", () => {
-    it("all 16 production tools register when the registry bootstraps", async () => {
+    it("all production tools register when the registry bootstraps", async () => {
       // Importing the index triggers ./all which registers every tool.
       await import("../index");
       const names = listTools().map((t) => t.name);
       expect(names).toEqual(
         [
+          // Arc (read + KA write path)
           "get_arc_state",
+          "list_active_seeds",
+          "plant_foreshadowing_seed",
+          "resolve_seed",
+          // Chronicler write tools (post-turn archivist)
+          "adjust_spotlight_debt",
+          "plant_foreshadowing_candidate",
+          "record_relationship_event",
+          "register_faction",
+          "register_location",
+          "register_npc",
+          "trigger_compactor",
+          "update_arc_plan",
+          "update_npc",
+          "update_voice_patterns",
+          "write_director_note",
+          "write_episodic_summary",
+          "write_semantic_memory",
+          // Critical / Entities / Episodic / Semantic / Voice reads
           "get_character_sheet",
           "get_critical_memories",
           "get_npc_details",
@@ -60,11 +79,8 @@ describe("tool registry — core infrastructure", () => {
           "get_voice_exemplars_by_beat_type",
           "get_voice_patterns",
           "get_world_state",
-          "list_active_seeds",
           "list_known_npcs",
-          "plant_foreshadowing_seed",
           "recall_scene",
-          "resolve_seed",
           "search_memory",
         ].sort(),
       );
@@ -76,12 +92,34 @@ describe("tool registry — core infrastructure", () => {
         listToolsByLayer("entities")
           .map((t) => t.name)
           .sort(),
-      ).toEqual(["get_character_sheet", "get_npc_details", "get_world_state", "list_known_npcs"]);
+      ).toEqual(
+        [
+          "get_character_sheet",
+          "get_npc_details",
+          "get_world_state",
+          "list_known_npcs",
+          // Chronicler write tools on the entities layer
+          "record_relationship_event",
+          "register_faction",
+          "register_location",
+          "register_npc",
+          "update_npc",
+        ].sort(),
+      );
       expect(
         listToolsByLayer("episodic")
           .map((t) => t.name)
           .sort(),
-      ).toEqual(["get_recent_episodes", "get_turn_narrative", "recall_scene"]);
+      ).toEqual(
+        [
+          "get_recent_episodes",
+          "get_turn_narrative",
+          "recall_scene",
+          // Chronicler write + trigger tools on the episodic layer
+          "trigger_compactor",
+          "write_episodic_summary",
+        ].sort(),
+      );
       expect(listToolsByLayer("ambient")).toEqual([]);
       expect(listToolsByLayer("working")).toEqual([]);
     });

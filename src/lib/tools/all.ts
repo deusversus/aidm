@@ -14,6 +14,23 @@ import "./arc/get-arc-state";
 import "./arc/list-active-seeds";
 import "./arc/plant-foreshadowing-seed";
 import "./arc/resolve-seed";
+// Chronicler write tools (post-turn archivist). Same registry; different
+// call sites — KA doesn't call these from its prompt, but they share the
+// MCP surface so the authorization gate is the only thing keeping KA
+// out of the write path by convention.
+import "./chronicler/adjust-spotlight-debt";
+import "./chronicler/plant-foreshadowing-candidate";
+import "./chronicler/record-relationship-event";
+import "./chronicler/register-faction";
+import "./chronicler/register-location";
+import "./chronicler/register-npc";
+import "./chronicler/trigger-compactor";
+import "./chronicler/update-arc-plan";
+import "./chronicler/update-npc";
+import "./chronicler/update-voice-patterns";
+import "./chronicler/write-director-note";
+import "./chronicler/write-episodic-summary";
+import "./chronicler/write-semantic-memory";
 import "./critical/get-critical-memories";
 import "./critical/get-overrides";
 import "./entities/get-character-sheet";
