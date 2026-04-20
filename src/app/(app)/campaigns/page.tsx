@@ -45,15 +45,25 @@ export default async function CampaignsPage() {
       ) : (
         <ul className="flex flex-col gap-2">
           {rows.map((c) => (
-            <li key={c.id}>
+            <li
+              key={c.id}
+              className="flex items-stretch gap-2 rounded-lg border hover:border-foreground/20"
+            >
               <Link
                 href={`/campaigns/${c.id}/play`}
-                className="flex items-center justify-between rounded-lg border p-4 hover:bg-muted/40"
+                className="flex flex-1 items-center justify-between p-4 hover:bg-muted/40"
               >
                 <span className="font-medium">{c.name}</span>
                 <span className="text-muted-foreground text-xs uppercase tracking-wider">
                   {c.phase}
                 </span>
+              </Link>
+              <Link
+                href={`/campaigns/${c.id}/settings`}
+                className="flex items-center border-l px-4 text-muted-foreground text-xs hover:bg-muted/40 hover:text-foreground"
+                aria-label={`Settings for ${c.name}`}
+              >
+                settings
               </Link>
             </li>
           ))}

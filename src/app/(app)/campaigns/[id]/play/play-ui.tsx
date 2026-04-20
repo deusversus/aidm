@@ -1,6 +1,7 @@
 "use client";
 
 import { useTurnStream } from "@/hooks/use-turn-stream";
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
 interface PriorTurn {
@@ -79,9 +80,17 @@ export default function PlayUI({ campaignId, campaignName, priorTurns }: Props) 
     <div className="flex h-[calc(100vh-8rem)] flex-col gap-4">
       <header className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold tracking-tight">{campaignName}</h1>
-        <span className="text-muted-foreground text-sm">
-          {committed.length} turn{committed.length === 1 ? "" : "s"} played
-        </span>
+        <div className="flex items-center gap-4">
+          <Link
+            href={`/campaigns/${campaignId}/settings`}
+            className="text-muted-foreground text-sm hover:text-foreground"
+          >
+            settings
+          </Link>
+          <span className="text-muted-foreground text-sm">
+            {committed.length} turn{committed.length === 1 ? "" : "s"} played
+          </span>
+        </div>
       </header>
 
       <div ref={feedRef} className="flex-1 overflow-y-auto rounded-lg border bg-background/40 p-4">
