@@ -15,6 +15,13 @@
       "when": 1776630609213,
       "tag": "0001_demonic_jackpot",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1776721338574,
+      "tag": "0002_puzzling_nico_minoru",
+      "breakpoints": true
     }
   ]
 }
