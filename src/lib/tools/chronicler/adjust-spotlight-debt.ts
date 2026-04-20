@@ -2,6 +2,7 @@ import { spotlightDebt } from "@/lib/state/schema";
 import { sql } from "drizzle-orm";
 import { z } from "zod";
 import { registerTool } from "../registry";
+import { assertNpcBelongsToCampaign } from "./_npc-guard";
 
 /**
  * Adjust an NPC's spotlight debt by `delta`. Negative debt = NPC is
@@ -33,6 +34,7 @@ export const adjustSpotlightDebtTool = registerTool({
   inputSchema: InputSchema,
   outputSchema: OutputSchema,
   execute: async (input, ctx) => {
+    await assertNpcBelongsToCampaign(ctx, input.npc_id, "adjust_spotlight_debt");
     const [row] = await ctx.db
       .insert(spotlightDebt)
       .values({

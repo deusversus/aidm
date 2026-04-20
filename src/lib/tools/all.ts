@@ -20,10 +20,12 @@ import "./arc/resolve-seed";
 // out of the write path by convention.
 import "./chronicler/adjust-spotlight-debt";
 import "./chronicler/plant-foreshadowing-candidate";
+import "./chronicler/ratify-foreshadowing-seed";
 import "./chronicler/record-relationship-event";
 import "./chronicler/register-faction";
 import "./chronicler/register-location";
 import "./chronicler/register-npc";
+import "./chronicler/retire-foreshadowing-seed";
 import "./chronicler/trigger-compactor";
 import "./chronicler/update-arc-plan";
 import "./chronicler/update-npc";

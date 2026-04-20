@@ -256,7 +256,11 @@ describe("Chronicler tools", () => {
     it("appends with npc_id + milestone_type + evidence + turn_number", async () => {
       const mod = await freshRegistry();
       const captured = makeCaptured();
-      const db = fakeDb(captured, { insertReturning: [{ id: UUID }] });
+      const db = fakeDb(captured, {
+        insertReturning: [{ id: UUID }],
+        // selectQueueAfterAuth[0] = NPC guard (must find row)
+        selectQueueAfterAuth: [[{ id: NPC_ID }]],
+      });
       const out = await mod.invokeTool(
         "record_relationship_event",
         {
@@ -285,6 +289,26 @@ describe("Chronicler tools", () => {
           makeCtx(db),
         ),
       ).rejects.toThrow();
+    });
+
+    it("cross-campaign FK guard: rejects npc_id that belongs to another campaign", async () => {
+      const mod = await freshRegistry();
+      const captured = makeCaptured();
+      // NPC guard select returns empty → guard throws before insert
+      const db = fakeDb(captured, { selectQueueAfterAuth: [[]] });
+      await expect(
+        mod.invokeTool(
+          "record_relationship_event",
+          {
+            npc_id: NPC_ID,
+            milestone_type: "first_trust",
+            evidence: "x",
+            turn_number: 1,
+          },
+          makeCtx(db),
+        ),
+      ).rejects.toThrow(/not found in this campaign/i);
+      expect(captured.inserts).toHaveLength(0); // insert never fired
     });
   });
 
@@ -479,6 +503,7 @@ describe("Chronicler tools", () => {
       const captured = makeCaptured();
       const db = fakeDb(captured, {
         insertReturning: [{ npcId: NPC_ID, debt: -3 }],
+        selectQueueAfterAuth: [[{ id: NPC_ID }]], // NPC guard passes
       });
       const out = await mod.invokeTool(
         "adjust_spotlight_debt",
@@ -487,6 +512,65 @@ describe("Chronicler tools", () => {
       );
       expect(out).toEqual({ npc_id: NPC_ID, debt: -3 });
       expect(captured.conflictTargets[0]).toMatchObject({ kind: "doUpdate" });
+    });
+
+    it("cross-campaign FK guard: rejects npc_id from another campaign", async () => {
+      const mod = await freshRegistry();
+      const captured = makeCaptured();
+      const db = fakeDb(captured, { selectQueueAfterAuth: [[]] });
+      await expect(
+        mod.invokeTool(
+          "adjust_spotlight_debt",
+          { npc_id: NPC_ID, delta: 1, updated_at_turn: 5 },
+          makeCtx(db),
+        ),
+      ).rejects.toThrow(/not found in this campaign/i);
+      expect(captured.inserts).toHaveLength(0);
+    });
+  });
+
+  describe("ratify_foreshadowing_seed", () => {
+    it("transitions PLANTED → GROWING and returns status GROWING", async () => {
+      const mod = await freshRegistry();
+      const captured = makeCaptured();
+      const db = fakeDb(captured, { updateReturning: [{ id: UUID }] });
+      const out = await mod.invokeTool("ratify_foreshadowing_seed", { seed_id: UUID }, makeCtx(db));
+      expect(out).toEqual({ seed_id: UUID, status: "GROWING" });
+      const patch = captured.updates[0]?.patch as Record<string, unknown>;
+      expect(patch.status).toBe("GROWING");
+      expect(patch).toHaveProperty("updatedAt");
+    });
+
+    it("throws when seed isn't in PLANTED state (no row matched)", async () => {
+      const mod = await freshRegistry();
+      const db = fakeDb(makeCaptured(), { updateReturning: [] });
+      await expect(
+        mod.invokeTool("ratify_foreshadowing_seed", { seed_id: UUID }, makeCtx(db)),
+      ).rejects.toThrow(/no PLANTED seed/i);
+    });
+  });
+
+  describe("retire_foreshadowing_seed", () => {
+    it("transitions active seed → ABANDONED", async () => {
+      const mod = await freshRegistry();
+      const captured = makeCaptured();
+      const db = fakeDb(captured, { updateReturning: [{ id: UUID }] });
+      const out = await mod.invokeTool(
+        "retire_foreshadowing_seed",
+        { seed_id: UUID, reason: "Plot moved past it" },
+        makeCtx(db),
+      );
+      expect(out).toEqual({ seed_id: UUID, status: "ABANDONED" });
+      const patch = captured.updates[0]?.patch as Record<string, unknown>;
+      expect(patch.status).toBe("ABANDONED");
+    });
+
+    it("throws when seed is already terminal (no active row matched)", async () => {
+      const mod = await freshRegistry();
+      const db = fakeDb(makeCaptured(), { updateReturning: [] });
+      await expect(
+        mod.invokeTool("retire_foreshadowing_seed", { seed_id: UUID }, makeCtx(db)),
+      ).rejects.toThrow(/no active seed/i);
     });
   });
 

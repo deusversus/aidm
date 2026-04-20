@@ -58,10 +58,12 @@ describe("tool registry — core infrastructure", () => {
           // Chronicler write tools (post-turn archivist)
           "adjust_spotlight_debt",
           "plant_foreshadowing_candidate",
+          "ratify_foreshadowing_seed",
           "record_relationship_event",
           "register_faction",
           "register_location",
           "register_npc",
+          "retire_foreshadowing_seed",
           "trigger_compactor",
           "update_arc_plan",
           "update_npc",

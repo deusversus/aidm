@@ -1,6 +1,7 @@
 import { relationshipEvents } from "@/lib/state/schema";
 import { z } from "zod";
 import { registerTool } from "../registry";
+import { assertNpcBelongsToCampaign } from "./_npc-guard";
 
 /**
  * Append a relationship milestone to the event log. Called by
@@ -32,6 +33,9 @@ export const recordRelationshipEventTool = registerTool({
   inputSchema: InputSchema,
   outputSchema: OutputSchema,
   execute: async (input, ctx) => {
+    // Defense-in-depth: the FK on npc_id points at npcs.id (single column),
+    // so the DB won't catch a cross-campaign id by itself.
+    await assertNpcBelongsToCampaign(ctx, input.npc_id, "record_relationship_event");
     const [row] = await ctx.db
       .insert(relationshipEvents)
       .values({
