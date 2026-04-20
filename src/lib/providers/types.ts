@@ -1,6 +1,19 @@
 import { z } from "zod";
 
 /**
+ * Universal probe-tier default.
+ *
+ * Probe tier is the `/api/ready` reachability check — not in the
+ * creative path, not audible to the player. We keep it on Anthropic
+ * Haiku across every provider because (a) it's the cheapest reliable
+ * option we know, (b) conflating "LLM reachability" with "your chosen
+ * provider's availability" would make reachability flap whenever a
+ * specific provider hiccups. Single const imported by every provider
+ * entry so a future Haiku deprecation is one edit, not four.
+ */
+export const PROBE_DEFAULT = "claude-haiku-4-5-20251001";
+
+/**
  * Provider registry types.
  *
  * Each provider gets a `ProviderDefinition` describing its identity,

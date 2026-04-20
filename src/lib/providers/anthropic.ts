@@ -1,4 +1,4 @@
-import type { ProviderDefinition } from "./types";
+import { PROBE_DEFAULT, type ProviderDefinition } from "./types";
 
 /**
  * Anthropic provider definition.
@@ -23,11 +23,7 @@ import type { ProviderDefinition } from "./types";
  * cheap + reliable + not in the creative path.
  */
 
-const LATEST_MODELS = [
-  "claude-opus-4-7",
-  "claude-sonnet-4-6",
-  "claude-haiku-4-5-20251001",
-] as const;
+const LATEST_MODELS = ["claude-opus-4-7", "claude-sonnet-4-6", PROBE_DEFAULT] as const;
 
 const SNAPSHOTS = [
   "claude-opus-4-6",
@@ -55,8 +51,8 @@ export const ANTHROPIC_ROSTER: readonly string[] = [...LATEST_MODELS, ...SNAPSHO
  * picks when defaults shift; only new campaigns prefill from here.
  */
 export const ANTHROPIC_DEFAULTS = {
-  probe: "claude-haiku-4-5-20251001",
-  fast: "claude-haiku-4-5-20251001",
+  probe: PROBE_DEFAULT,
+  fast: PROBE_DEFAULT,
   thinking: "claude-opus-4-7",
   creative: "claude-opus-4-7",
 } as const;
@@ -68,7 +64,7 @@ export const anthropic: ProviderDefinition = {
   tiers: {
     probe: {
       defaultModel: ANTHROPIC_DEFAULTS.probe,
-      selectableModels: ["claude-haiku-4-5-20251001"],
+      selectableModels: [PROBE_DEFAULT],
     },
     fast: {
       defaultModel: ANTHROPIC_DEFAULTS.fast,

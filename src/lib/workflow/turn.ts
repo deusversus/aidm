@@ -84,12 +84,37 @@ export function retrievalBudget(epicness: number): 0 | 3 | 6 | 9 {
  * invalid (e.g. a model the provider doesn't support), the throw
  * surfaces immediately — silent fallback on invalid config would mask
  * a misconfiguration.
+ *
+ * Silent-fallback logging: the two fallback paths (parse failure +
+ * half-migrated row) each emit a `warn` log via the injected logger.
+ * Otherwise a Sonnet-configured campaign with a corrupted
+ * `overrides` field would quietly narrate on Opus with nothing in the
+ * trace explaining the regression.
  */
-export function resolveModelContext(settingsJson: unknown): CampaignProviderConfig {
+export function resolveModelContext(
+  settingsJson: unknown,
+  logger: AgentLogger = defaultLogger,
+): CampaignProviderConfig {
   const parsed = CampaignSettings.safeParse(settingsJson ?? {});
-  if (!parsed.success) return anthropicFallbackConfig();
+  if (!parsed.success) {
+    logger(
+      "warn",
+      "resolveModelContext: settings parse failed; falling back to Anthropic defaults",
+      {
+        issues: parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`),
+      },
+    );
+    return anthropicFallbackConfig();
+  }
   const { provider, tier_models } = parsed.data;
-  if (!provider || !tier_models) return anthropicFallbackConfig();
+  if (!provider || !tier_models) {
+    logger(
+      "warn",
+      "resolveModelContext: settings lacks provider or tier_models; falling back to Anthropic defaults",
+      { has_provider: !!provider, has_tier_models: !!tier_models },
+    );
+    return anthropicFallbackConfig();
+  }
   const config: CampaignProviderConfig = { provider, tier_models };
   validateCampaignProviderConfig(config); // throws if misconfigured
   return config;
@@ -279,7 +304,7 @@ export async function* runTurn(
     // through every sub-agent call on this turn. A misconfigured
     // campaign (e.g. selecting Google before M3.5) throws here and
     // surfaces as a terminal turn error to the player.
-    const modelContext = resolveModelContext(ctx.campaignRow.settings);
+    const modelContext = resolveModelContext(ctx.campaignRow.settings, logger);
 
     // -------------------------------------------------------------------
     // Route pre-pass

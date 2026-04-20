@@ -86,9 +86,16 @@ export const env = new Proxy({} as Env, {
  * (single source of truth for Anthropic's baseline). If they diverge,
  * fix it here — the providers registry is authoritative.
  */
+// Import via a string re-export path so env.ts can be consumed by
+// Next's build-time page-data collection without pulling in zod. The
+// PROBE_DEFAULT const lives in providers/types alongside its registry
+// use; single-source + small enough to duplicate literally if
+// providers/types ever grows transitive weight here.
+import { PROBE_DEFAULT } from "@/lib/providers/types";
+
 export const anthropicDefaults = {
-  probe: "claude-haiku-4-5-20251001",
-  fast: "claude-haiku-4-5-20251001",
+  probe: PROBE_DEFAULT,
+  fast: PROBE_DEFAULT,
   thinking: "claude-opus-4-7",
   creative: "claude-opus-4-7",
 } as const;

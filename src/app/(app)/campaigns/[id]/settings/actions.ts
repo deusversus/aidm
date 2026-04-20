@@ -74,9 +74,19 @@ export async function saveCampaignModelContext(
   await db.update(campaigns).set({ settings: nextSettings }).where(eq(campaigns.id, campaignId));
 
   // Invalidate the play and settings pages so SSR picks up the new
-  // provider on the next navigation.
-  revalidatePath(`/campaigns/${campaignId}/play`);
-  revalidatePath(`/campaigns/${campaignId}/settings`);
+  // provider on the next navigation. The write has already committed
+  // above — if revalidate throws here, we still return ok: true so
+  // the user isn't shown an error for a successful save. Stale
+  // caches recover on the next real navigation anyway.
+  try {
+    revalidatePath(`/campaigns/${campaignId}/play`);
+    revalidatePath(`/campaigns/${campaignId}/settings`);
+  } catch (err) {
+    console.warn("saveCampaignModelContext: revalidatePath failed (write already committed)", {
+      campaignId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
 
   return { ok: true };
 }

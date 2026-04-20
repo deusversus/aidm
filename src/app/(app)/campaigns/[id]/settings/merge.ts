@@ -33,8 +33,19 @@ export function mergeSettingsWithProviderConfig(
   }
   validateCampaignProviderConfig(configParsed.data); // throws on invalid
 
+  // Passthrough existing settings when parse succeeds. When it fails
+  // (one corrupted field taints the whole blob under safeParse), fall
+  // back to the RAW existing object cast to Record so we don't wipe
+  // 95% of a campaign's state (active_dna, world_state, voice_patterns,
+  // etc.) just because a single legacy field doesn't match the current
+  // schema. The provider/tier_models overwrite still wins. Empty-object
+  // only when existingSettings is genuinely null/undefined/not-an-object.
   const existingParsed = CampaignSettings.safeParse(existingSettings ?? {});
-  const existing = existingParsed.success ? (existingParsed.data as Record<string, unknown>) : {};
+  const existing: Record<string, unknown> = existingParsed.success
+    ? (existingParsed.data as Record<string, unknown>)
+    : existingSettings && typeof existingSettings === "object"
+      ? (existingSettings as Record<string, unknown>)
+      : {};
 
   return {
     ...existing,

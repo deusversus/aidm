@@ -127,16 +127,26 @@ describe("mergeSettingsWithProviderConfig", () => {
     }
   });
 
-  it("gracefully handles existing settings that fail CampaignSettings.parse (corrupted row)", () => {
-    // `overrides: "not-an-array"` makes CampaignSettings.parse fail. The
-    // helper's safeParse → empty-dict fallback means we don't lose the
-    // provider save even when pre-existing settings are malformed.
-    const corrupt = { overrides: "not-an-array" };
+  it("passes through raw existing when CampaignSettings.parse fails (don't amplify one bad field into mass wipe)", () => {
+    // `overrides: "not-an-array"` taints CampaignSettings.parse. Under
+    // the stricter prior behavior this would wipe every OTHER field.
+    // Under the current safer passthrough, all other fields survive.
+    const corrupt = {
+      active_dna: { violence: 7 }, // valid
+      world_state: { location: "Mars" }, // valid
+      overrides: "not-an-array", // INVALID — taints the whole parse
+      voice_patterns: { patterns: ["terse"] }, // valid
+    };
     const next = mergeSettingsWithProviderConfig(corrupt, validAnthropicConfig);
     expect(next.provider).toBe("anthropic");
     expect(next.tier_models).toEqual(validAnthropicConfig.tier_models);
-    // Corrupted `overrides` is discarded because parse failed. Intentional:
-    // a clean slate beats a corrupted field surviving mid-form.
-    expect(next.overrides).toBeUndefined();
+    // Unrelated valid fields survive despite the failing parse.
+    expect(next.active_dna).toEqual({ violence: 7 });
+    expect(next.world_state).toEqual({ location: "Mars" });
+    expect(next.voice_patterns).toEqual({ patterns: ["terse"] });
+    // The corrupted field itself is passed through unchanged — we're
+    // not validating OR repairing existing state; just adding
+    // provider + tier_models on top of whatever's there.
+    expect(next.overrides).toBe("not-an-array");
   });
 });

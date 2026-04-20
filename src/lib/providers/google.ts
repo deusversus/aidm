@@ -1,4 +1,4 @@
-import type { ProviderDefinition } from "./types";
+import { PROBE_DEFAULT, type ProviderDefinition } from "./types";
 
 /**
  * Google provider — stub until Google-KA lands at M3.5.
@@ -35,8 +35,8 @@ export const google: ProviderDefinition = {
       // Probe stays Haiku universally until revisited per-provider.
       // Kept here so the shape is consistent; not used while Google
       // is unavailable.
-      defaultModel: "claude-haiku-4-5-20251001",
-      selectableModels: ["claude-haiku-4-5-20251001"],
+      defaultModel: PROBE_DEFAULT,
+      selectableModels: [PROBE_DEFAULT],
     },
     fast: {
       defaultModel: "gemini-3.1-flash-lite-preview",

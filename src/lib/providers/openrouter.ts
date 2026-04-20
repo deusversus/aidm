@@ -1,4 +1,4 @@
-import type { ProviderDefinition } from "./types";
+import { PROBE_DEFAULT, type ProviderDefinition } from "./types";
 
 /**
  * OpenRouter provider — stub until M5.5.
@@ -26,8 +26,8 @@ export const openrouter: ProviderDefinition = {
     "OpenRouter (thin shim over OpenAI-KA) lands at M5.5. Currently available: Anthropic.",
   tiers: {
     probe: {
-      defaultModel: "claude-haiku-4-5-20251001",
-      selectableModels: ["claude-haiku-4-5-20251001"],
+      defaultModel: PROBE_DEFAULT,
+      selectableModels: [PROBE_DEFAULT],
     },
     fast: { defaultModel: "", selectableModels: [] },
     thinking: { defaultModel: "", selectableModels: [] },
