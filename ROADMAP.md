@@ -118,9 +118,11 @@ Success at one year looks like: the author is still playing long-running campaig
 | Package manager | `pnpm` | fast, disk-efficient, strict |
 | Framework | Next.js 15 (App Router) | one service for web + API; Route Handlers do SSE cleanly; Server Actions for mutations; React Server Components for dashboard |
 | Agent orchestration | Mastra | workflows + agents + memory + RAG + tools + evals + telemetry as one coherent framework |
-| Inner agent SDK | Claude Agent SDK (TS) | tool-loop convergence, subagent primitive, per-query cost cap — used for tool-heavy agents (SessionZeroConductor M2, research subagents inside KA/Director M4+, ForeshadowingLedger M6). Not used for KA's per-turn path (see [M1 spike](../docs/spikes/M1-mastra-agent-sdk.md) — its one-boundary caching is too coarse for KA's 4-block structure). |
-| LLM providers | Anthropic + Google + OpenAI direct; OpenRouter for long-tail models | provider-native SDKs capture real differentiators (Anthropic prompt caching + subagents, Google AI plan credits, OpenAI reasoning); OpenRouter rides on the OpenAI SDK with a different base URL for DeepSeek / Qwen / Mistral / etc. |
-| Provider SDKs | `@anthropic-ai/sdk` + Claude Agent SDK; `openai` (for OpenAI + OpenRouter); `@google/genai` | three SDKs, one does double duty |
+| Inner agent SDK (Anthropic) | Claude Agent SDK (TS) | tool-loop convergence, subagent primitive, native MCP, 4-block DYNAMIC_BOUNDARY caching. Substrate for the **Anthropic KA** (and other Anthropic tool-heavy agents: SessionZeroConductor M2, research subagents, ForeshadowingLedger M6). The M1 spike originally recommended against CAS for KA on cache-cost grounds; decision reversed in-session when the agentic-scaffolding value was measured against the real alternative (building it ourselves per-provider). See [spike doc](../docs/spikes/M1-mastra-agent-sdk.md) for the 2026-04-19 decision-update note. |
+| Inner agent SDK (Google) | TBD — ADK vs Gemini-native SDK vs custom | Researched and chosen when Google-KA lands (M3.5 per §23). Gemini's caching model (context-by-ID) differs from Anthropic's; the Google-KA is a native implementation of the same cognitive layout, not a thin adapter over CAS. |
+| Inner agent SDK (OpenAI) | TBD — Responses API / Assistants API / custom | Researched and chosen when OpenAI-KA lands. OpenAI's prompt caching is system-prompt-automatic; reasoning tokens replace extended thinking. OpenAI-KA doubles as the OpenRouter shim (same HTTP surface, different base URL). |
+| LLM providers | Anthropic + Google + OpenAI + OpenRouter; per-campaign user-selectable | Hosted: we own all provider API keys. Users never bring keys. Per campaign, the user picks a provider and the model per tier within that provider's bounded roster. OpenRouter is the escape hatch for everything outside the Big 3 (older snapshots Anthropic has sunset, Groq/Cerebras cheap inference, DeepSeek/Qwen/Mistral, etc.). See §7.5, §7.7. |
+| Provider SDKs | `@anthropic-ai/sdk` + Claude Agent SDK; `openai` (for OpenAI + OpenRouter); `@google/genai` (+ ADK TBD) | Provider-native SDKs per KA implementation; `openai` SDK does double duty for OpenAI direct and OpenRouter. |
 | Structured output | Zod + Anthropic SDK tool-use / structured-output | Zod is the Pydantic equivalent; Anthropic SDK accepts Zod schemas directly |
 | DB | Postgres 16 + pgvector | single durable substrate; Railway-managed |
 | ORM | Drizzle ORM | type-safe SQL, no runtime cost, pgvector support, plays nicely with Zod |
@@ -134,7 +136,7 @@ Success at one year looks like: the author is still playing long-running campaig
 | Observability (product) | PostHog Cloud | product analytics + session replay + feature flags + error tracking (absorbs Sentry) |
 | Eval harness | Mastra evals + custom Haiku judges | golden transcripts + dimensional scores |
 | Testing | Vitest (unit/integration) + Playwright (e2e/smoke) | modern, fast, TS-native |
-| Payments | Stripe (via Clerk Billing) | deferred to M9 |
+| Payments | Stripe (via Clerk Billing) | billing substrate lands M2.5 (credits + metered + per-turn debit + abuse caps); M9 is UX polish on an already-operational stack. See §20, §23. |
 | Deploy | Railway, GitHub autodeploy on `main` | already fluent; already paid; long-running Node process fits the SSE workload |
 
 ### 3.2 Explicitly avoided
@@ -947,57 +949,115 @@ Both injections go in Block 4 as soft nudges — they don't override Profile DNA
 
 ### 7.5 Model routing policy
 
-Three tiers, not per-agent overrides. Each agent declares a tier; the tier → `{ provider, model }` mapping is config in `lib/env.ts` (v3's pattern). Change a tier's backing and every agent in that tier moves with it.
+Four tiers (`probe`, `fast`, `thinking`, `creative`), per-campaign provider + tier_models, bounded-by-provider model selection. This replaces the v3-style global tier mapping in `lib/env.ts`; env.ts narrows to `anthropicDefaults` — the fallback table for scripts, `/api/ready`, and new-campaign seed values.
 
 **Tiers:**
 
-- **`fast`** — cheap, quick, schema-reliable. Classification, structured extraction, light tool-use.
-- **`thinking`** — reasoning-heavy. Judgment, validation, planning. Extended thinking budget attached.
-- **`creative`** — prose quality, narrative voice, streaming.
+- **`probe`** — reachability check only (`/api/ready`). Not in the creative path. Default: `claude-haiku-4-5-20251001` universally across all campaign providers (technical decision; cheap; reliable). Revisited per-provider if Anthropic reachability becomes noisy.
+- **`fast`** — cheap, quick, schema-reliable. Classification, structured extraction, light tool-use. IntentClassifier, OverrideHandler, MemoryRanker, RecapAgent, ScaleSelector.
+- **`thinking`** — reasoning-heavy. Judgment, validation, planning. Extended thinking budget where the provider supports it. OutcomeJudge, Validator, PacingAgent, Director, SessionZeroConductor, HandoffCompiler.
+- **`creative`** — prose quality, narrative voice, streaming. KeyAnimator. This is where voice preference matters most.
 
-**Starting defaults (as of 2026-04-18, user-confirmed):**
+**Per-campaign model config:**
 
-| Tier | Provider | Model |
-|---|---|---|
-| `fast` | Google | Gemini 3.1 Flash |
-| `thinking` | Anthropic | Claude Opus 4.7 (extended thinking, budget per-agent) |
-| `creative` | Anthropic | Claude Opus 4.7 (extended thinking, budget 3K for KA) |
+Each campaign carries `provider` + `tier_models` in `settings`:
 
-Alternates routed via the tier mapping:
-- `fast` alternates: GPT 5.4 mini, Claude Haiku 4.5, OpenRouter → DeepSeek V3 / Qwen (for research subagents where cost matters most)
-- `thinking` alternates: GPT 5.4 (for judging prompts written in Claude, per §12's different-provider judge rule)
-- `creative` alternates: Claude Sonnet 4.6 (cost-down experiments)
+```ts
+provider: "anthropic" | "google" | "openai" | "openrouter"
+tier_models: {
+  probe: string,     // always claude-haiku-4-5-20251001 until revisited
+  fast: string,
+  thinking: string,
+  creative: string,
+}
+```
 
-Exact API model strings are resolved in `lib/env.ts` against the provider SDK version at build time; never hardcoded outside that module.
+Model strings are validated against the campaign's provider's bounded roster (the provider registry at `src/lib/providers/*`). Cross-provider selection within one campaign is not supported — you're "in Anthropic" or you're "in Google." Cross-model access to snapshots Anthropic has sunset or to DeepSeek / Qwen / Mistral / Groq / Cerebras is available through the OpenRouter provider slot, which has a more permissive ID field (their roster moves too fast to hard-enumerate).
+
+**Provider rosters (bounded by the user-selects-models rule — user picks from the provider's full list for each tier, including earlier snapshots):**
+
+- **Anthropic:** full current roster — `claude-opus-4-7`, `claude-sonnet-4-6`, `claude-haiku-4-5-20251001`, plus snapshots `claude-opus-4-6`, `claude-opus-4-5-20251101`, `claude-sonnet-4-5-20250929`, `claude-opus-4-1-20250805`, `claude-opus-4-20250514`, `claude-sonnet-4-20250514`, `claude-3-haiku-20240307`. All selectable for all non-probe tiers; some combinations are incoherent (e.g. Haiku on thinking tier with extended thinking budget is ignored) — soft UI warnings, never hard validation blocks. User agency absolute.
+- **Google:** `gemini-3.1-flash-lite-preview`, `gemini-3-flash-preview`, `gemini-3.1-pro-preview`. Populated when Google-KA lands (M3.5).
+- **OpenAI:** TBD; populated when OpenAI-KA lands (M5.5).
+- **OpenRouter:** free-form model ID field; minimal validation. Populated when OpenRouter shim lands (M5.5, same commit as OpenAI-KA).
 
 **Agent → tier:**
 
 | Agent | Tier |
 |---|---|
 | IntentClassifier | fast |
-| Compactor, Recap | fast |
+| OverrideHandler | fast |
+| MemoryRanker | fast |
+| RecapAgent | fast |
+| ScaleSelector | fast |
+| Compactor | fast |
 | Memory writer, background entity extraction | fast |
 | Research subagents (inside KA, Director) | fast |
 | OutcomeJudge | thinking |
 | Validator | thinking |
 | PacingAgent | thinking |
+| CombatAgent | thinking |
+| WorldBuilder | thinking |
 | Director | thinking |
 | SessionZeroConductor | thinking |
 | HandoffCompiler | thinking |
 | KeyAnimator | creative |
 
-Research subagents shift to OpenRouter → DeepSeek V3 / Qwen by changing the `fast` tier's mapping; no agent-level change needed. Eval judges (§12) route to a different provider than the agent under test via tier override in the eval harness — not a separate tier. Multi-route evals challenge every default; move the config when the numbers disagree.
+**Resolution path at runtime:**
+
+1. Route handler loads the campaign row; reads `settings.provider` + `settings.tier_models`.
+2. Turn workflow passes `{ provider, tier_models }` context into router, consultants, KA.
+3. Each agent resolves its tier → model via the passed context (no global env read in the hot path).
+4. Callers without campaign context (scripts, `/api/ready`, tests) fall back to `anthropicDefaults` from env.ts.
+
+Eval judges (§12) continue to route to a different provider than the agent under test — via per-eval-run config, not a tier override on the campaign.
+
+### 7.5.1 Why per-campaign, not per-user
+
+Voice preference is premise-dependent. A Cowboy Bebop campaign may sound best on Opus 4.5 snapshot; a Solo Leveling campaign on the same user's account may sound best on Gemini 3.1 Pro for the cleaner action choreography. Forcing one global setting per user collapses that into a compromise. User-level "default for new campaigns" prefill exists as a convenience, but the runtime source of truth is always the campaign row.
 
 ### 7.6 Model upgrade strategy
 
-When Anthropic ships a new model:
-1. Add model to config with a feature flag, defaulting off.
-2. Run full eval suite; record per-dimension scores.
-3. If all dimensions ≥ current and at least one > +5%, flip to canary: 10% of new campaigns, monitored for 7 days.
-4. If canary holds (no regression, no cost spike, no latency regression >20%), roll to 100%.
-5. Keep prior model available via flag for 30+ days (regression debugging).
+When any provider ships a new model:
+1. Add model to the provider's registry roster (`src/lib/providers/*`) as selectable. Existing campaigns unaffected unless the user opts in.
+2. Run full eval suite with the new model at the campaign slot under test; record per-dimension scores.
+3. If the model beats the provider's current default on ≥ all dimensions and at least one by +5%, promote it to the new-campaign prefill default for that provider.
+4. Existing campaigns do NOT auto-upgrade. Writers in a mid-arc campaign keep their snapshot even across default-model shifts; voice consistency across a narrative arc is load-bearing. Opt-in upgrade is surfaced in settings ("your campaign is on Opus 4.5; Opus 4.8 scored +8% on narrative depth in our evals — switch?").
+5. Keep prior model snapshots available indefinitely in the registry. When a provider sunsets a snapshot, expose an OpenRouter route for it (if OpenRouter hosts) or pin a deprecation notice on affected campaigns.
 
 No production prompt tuning during a model canary; isolate variables.
+
+**Why no auto-upgrade even for strict improvements:** writers whose voice-ear has tuned to a specific model snapshot across 100+ turns experience model upgrades as *voice drift*, even when the benchmark says "better." The 2026 frontier LLM market has high release velocity and non-monotonic quality movement for creative workloads — version number is not an ordering. Respect the choice the writer made.
+
+### 7.7 Multi-provider KA architecture
+
+**Three KAs, not one KA with adapters.** Each provider's KA is a native implementation of the same cognitive layout, built on the best substrate that provider offers. A shared provider-agnostic layer produces the 4-block rendered prompts, sakuga selection, diversity directives, portrait extraction, and retrieval budget. Each KA plugs those rendered blocks into its provider's agentic runtime.
+
+```
+src/lib/agents/ka/
+  anthropic.ts   — CAS-native. 4-block DYNAMIC_BOUNDARY, Agent tool subagents, MCP servers native, extended thinking.
+  google.ts      — Gemini-native (ADK or direct SDK, decided by spike). Context caching by ID, Gemini function calling, thinking mode.
+  openai.ts      — OpenAI-native. Responses API or Assistants API (decided by spike), system-prompt auto-caching, reasoning tokens.
+  openrouter.ts  — thin shim over openai.ts: same HTTP surface, different base URL, normalized auth.
+  shared/        — renderKaBlocks, sakuga, diversity, portraits, retrieval-budget. Provider-agnostic cognitive layout.
+  dispatch.ts    — reads campaign.provider → dispatches to the right KA.
+```
+
+**Sequencing:**
+
+1. **Anthropic-KA first** (current M1 work; ~70% done). Ships, playtests, measures.
+2. **Google-KA research spike** (M3.5 kickoff). Evaluate Google ADK vs Gemini CLI vs direct `@google/genai` with custom orchestration. Pick the substrate that gives us the Gemini-native cognitive layout — don't force Anthropic's shape onto Gemini's substrate.
+3. **Google-KA build** (M3.5). Native implementation. Joins the dispatch.
+4. **OpenAI-KA research spike** (M5.5 kickoff). Responses API vs Assistants API vs direct Chat Completions with tool loop. Same evaluation lens.
+5. **OpenAI-KA build** (M5.5). Native implementation.
+6. **OpenRouter shim** (M5.5, same commit). Thin shim over OpenAI-KA — OpenRouter speaks OpenAI-compatible HTTP, so the shim is a base-URL flip + model-ID validation loosening. Free 4th provider.
+7. **Compat / feature-gap layer** (M6.5). With two or three KAs built, the real gaps are visible. Not designed prospectively.
+
+**Why native-per-provider instead of one abstract runtime:**
+
+Each provider has unique features that are load-bearing for KA's quality: Anthropic's DYNAMIC_BOUNDARY cache + Agent tool + native MCP; Google's 2M+ context window + free-tier API credits on AI plans; OpenAI's fine-tuning story + the largest writer user base with their own accounts. Abstracting over providers with a lowest-common-denominator runtime throws away the features you picked each provider for. Native-per-provider with a shared cognitive-layout layer keeps the best of each at the cost of duplicated orchestration code — manageable cost, given the ~70% of KA's value (the cognitive layout) is shared.
+
+**Resilience story:** when one provider has an outage, campaigns configured for it can failover (manual swap in UI, or automatic if configured) to a secondary provider — voice shifts, but the session continues. Writers who value voice consistency can pin their campaign to a specific provider + model and accept outage risk; writers who value uptime can opt into auto-failover. Multi-provider is the structural answer to "what happens when Anthropic is down for the fifth time this month."
 
 ## 8. Tool layer
 
@@ -1658,30 +1718,45 @@ See §14.6. Enforced at turn intake, before any LLM call. Blocked turn → frien
 
 ## 20. Cost model
 
-Rough targets at current Anthropic pricing, post-M7:
+**Business model: hosted, cost-forward + service fee.** We own all provider API keys on the operational substrate. Users never bring keys. Every turn's LLM cost is metered from Langfuse per-span data, debited from the user's credit balance (cost × markup), and surfaced in the UI. See §17.2 for billing-critical abuse guardrails; §23 M2.5 for the billing substrate milestone.
 
-- **Per turn (steady state, cache warm):** ~$0.04–$0.07
-  - IntentClassifier (Gemini 3.1 Flash): ~$0.0002
-  - OutcomeJudge (Opus, ~4K input, ~500 output): ~$0.025
-  - KA (Opus, ~2K uncached + 15K cached + 800 output streaming): ~$0.025
-  - Background (Gemini Flash fan-out, memory writer): ~$0.001
-  - Director trigger (amortized, every 3+ turns): ~$0.008–0.015 (research subagents on DeepSeek V3 via OpenRouter; Opus synthesis direct)
-- **Per session (20 turns):** ~$0.80–$1.40
-- **Per campaign (200 turns across 10 sessions):** ~$8–$14
+**Markup structure (provisional; revisit at M2.5):**
+- Credits purchased via Stripe. Credits decrement per turn based on observed cost × markup.
+- Markup: ~20–30% on top of upstream provider cost. Enough margin to fund infrastructure, abuse-eat (disputed charges, jailbreak attempts, free-tier abuse) and ongoing dev; low enough that the product reads as "we run it for you" rather than "we tax your inference."
+- Free trial: small starter credit balance ($2–5 of inference) on signup for evaluation without payment barrier.
+- No fixed "turns per month" — metered from cost directly. Cheap providers + cheap models (Haiku consultants on Anthropic campaigns, Flash-Lite on Google campaigns) mean more turns per dollar, automatically.
 
-Multi-provider routing is baked into the per-turn numbers above from Day 1, not a future optimization.
+**Per-turn cost varies by campaign config.** Each campaign's provider + tier_models picks determine cost. Rough bands:
 
-Stress scenarios:
+| Campaign config | Per-turn cost (cache warm) | Per 20-turn session |
+|---|---|---|
+| Anthropic, Opus creative + Opus thinking + Haiku fast | $0.04–$0.10 | $0.80–$2.00 |
+| Anthropic, Sonnet creative + Sonnet thinking + Haiku fast (cost-down) | $0.015–$0.04 | $0.30–$0.80 |
+| Google (M3.5+), Pro creative + Pro thinking + Flash-Lite fast | $0.008–$0.025 (estimate) | $0.16–$0.50 |
+| OpenRouter (M5.5+), DeepSeek / Qwen budget config | $0.003–$0.010 (estimate) | $0.06–$0.20 |
+
+Per-turn breakdown for the current Anthropic-Opus reference config:
+- IntentClassifier + OverrideHandler (Haiku-substitute until M3.5 brings Gemini back into fast-tier via Google-KA): ~$0.002
+- OutcomeJudge pre-call when fires (~50% of turns, thinking budget 2K): ~$0.015
+- KA Opus (~2K uncached + 15K cached + 800 output streaming, extended thinking adaptive): ~$0.025–$0.060
+- Background (memory writer + director hybrid triggers, amortized): ~$0.003–$0.010
+- Embeds (M4+ semantic memory writes, amortized per turn): ~$0.001
+
+**Multi-provider cost-arbitrage is a product feature.** Users who want premium voice on a landmark arc run on Opus; cost-conscious users run the same session on Sonnet or Gemini Pro. Fast-tier defaults to the cheapest provider-appropriate model. Future optimization: route individual consultants (IntentClassifier, MemoryRanker) to a cheaper provider than the campaign's creative-tier provider when the user opts in — not M1, noted for later.
+
+Stress scenarios (hosted context: bad numbers hit our margin before they hit the user):
 
 | Scenario | Per-turn cost | Action |
 |---|---|---|
 | Cache hit rate drops to 40% | ~$0.12 | Audit Block 3 (working memory churn); shrink window |
 | Extended thinking budget 2× | ~$0.10 | Tighten thinking budget per agent; gate on epicness |
-| Sustained Anthropic 429s | neutral (retries) | Lower concurrency semaphore |
+| Sustained Anthropic 429s | neutral (retries); multi-provider failover when M3.5+ lands | Lower concurrency semaphore; surface provider-swap prompt to user |
 | Player spams long inputs | +$0.01–0.02 | Input length cap (2000 chars), rate limiter |
 | Director triggers every turn (bug) | 3–5× | Alert on agent_calls{agent="director"} > expected |
+| Jailbreak burns extended thinking indefinitely | 5–10× | Hard thinking-budget caps per-call; per-session cost alarm; freeze session at 10× expected |
+| Disputed Stripe charge | full eat | Credit-card-verification barrier; cost-anomaly detection tuned; ToS cost-cap language |
 
-Validate at M4. If real numbers diverge >2×, revisit model routing and cache structure before shipping M5.
+Validate Anthropic-reference numbers at the end of M1 playtest. If real numbers diverge >2×, revisit thinking budgets + cache structure before committing markup percentages at M2.5.
 
 ## 21. Launch & GTM
 
@@ -1785,6 +1860,24 @@ Each milestone ends with a deploy to production, a written retro (`docs/retros/M
 
 **Risks:** Agent SDK subprocess overhead vs. TTFT target (mitigable via `effort: 'medium'` and warm subprocess pool if needed); KA prompt quality on first real runs; cache boundary placement giving Block 1 stable caching across turns.
 
+### M1.5 — Multi-provider foundation
+
+**Goal:** per-campaign provider + tier_models architecture shipped with Anthropic populated. Future providers (Google, OpenAI, OpenRouter) plug into slots this milestone creates without architectural rework. See `docs/plans/M1.5-multi-provider-foundation.md` for the commit-level plan.
+
+**Deliverables:**
+- Provider registry (`src/lib/providers/`) with Anthropic entry populated (full roster per tier), Google / OpenAI / OpenRouter entries stubbed with empty rosters + feature-flag declarations.
+- Campaign schema extension: `provider` + `tier_models` in `settings`. Drizzle migration + backfill of existing campaigns to Anthropic defaults.
+- Runner refit: `_runner.ts` + IntentClassifier take `{ provider, model }` per call; no global env read in the hot path.
+- Turn pipeline threading: router + consultants + KA receive campaign's `{ provider, tier_models }` from the turn workflow.
+- KA reads per-campaign: `tiers.creative.model` → `campaign.tier_models.creative`. Subagent definitions pick tier models from campaign.
+- `src/lib/env.ts` `tiers` table renamed to `anthropicDefaults`; purpose narrowed to fallback + new-campaign-seed only.
+- Settings UI: per-campaign provider dropdown (Anthropic only for now) + three tier-model dropdowns that repopulate on provider change. Lives at `/campaigns/[id]/settings` or folded into campaign create flow.
+- Playtest after M1.5: same Anthropic campaign, vary creative model across Opus 4.7 / 4.6 / 4.5 / Sonnet 4.6 and compare prose quality + cost.
+
+**Acceptance:** existing Bebop campaign plays unchanged on Anthropic defaults. New campaign created with Sonnet-creative plays to completion and reads as lower-cost / voice-differentiated. Switching a campaign's creative model between turns is supported and the next turn uses the new model. Google / OpenAI / OpenRouter registry slots validate as not-yet-available (helpful error, not crash) when selected.
+
+**Risks:** migration of existing campaigns (only the one Bebop campaign exists today, so low); runner-refit scope touching ~15 call sites across agents/workflow; UI dropdown repopulation state management.
+
 ### M2 — Premise resolution (Session Zero)
 
 **Goal:** any premise becomes a playable campaign. "Sequel to Berserk." "Miyazaki makes Pokemon." "Cowboy Bebop as isekai space opera." The SZ conductor takes the premise and produces the canonical artifact (Profile + Campaign + opening scene) that M1's turn pipeline plays.
@@ -1805,6 +1898,24 @@ Each milestone ends with a deploy to production, a written retro (`docs/retros/M
 
 **Risks:** conductor tool-loop convergence on hybrid premises; handoff compiler output quality; wall-clock time under extended thinking budgets.
 
+### M2.5 — Hosted billing substrate
+
+**Goal:** real users can pay real money for real turns. The hosted, cost-forward + service fee business model (see §20) becomes operational. This has to land before any user-visible beta — a hosted service without metered billing is either free forever (unsustainable) or locked to the dev (pointless).
+
+**Deliverables:**
+- Stripe integration via Clerk Billing or direct: credit purchase + card-on-file.
+- `credits` entity: user balance in cents, transactions log (top-ups + per-turn debits + refunds).
+- Per-turn cost capture: Langfuse per-span cost → aggregated to turn row (already instrumented at M1) → markup applied → debited from credit balance in the post-turn subgraph.
+- Balance guard: turns refuse to start if balance < estimated turn cost × 2 safety factor. Soft-warn UI at 80% runway, hard-block at 100% with top-up CTA.
+- Abuse guardrails: credit-card verification on first purchase, cost-anomaly detection (turn cost > 5× campaign mean alerts), per-session cost cap, per-day user cost cap, thinking-budget hard caps (prevents indefinite-thinking jailbreak).
+- Admin surface: view user balance, manual credit/debit, suspend user, cost-anomaly dashboard.
+- Free-trial credit: $2–5 of starter credit on signup (enough for 20–100 turns depending on campaign config).
+- ToS additions: metered billing, dispute policy, cost-cap language.
+
+**Acceptance:** real credit card purchase → credit balance → play 10 turns → balance decrements accurately (within 5% of Langfuse spans) → top-up works → hitting hard-block pauses campaign gracefully. Abuse drill: simulated 100-turn jailbreak session triggers cost-anomaly alert and auto-pauses within 10 turns.
+
+**Risks:** Stripe webhook reliability (idempotency keys); Langfuse cost-span lag (aggregation timing); disputed-charges policy as a solo dev (consult + cap exposure); abuse-detection false-positive rate annoying real users.
+
 ### M3 — Persistent campaigns (3–4 days)
 
 **Goal:** durable, exportable campaigns with proper persistence.
@@ -1820,6 +1931,22 @@ Each milestone ends with a deploy to production, a written retro (`docs/retros/M
 **Acceptance:** create two campaigns, play both, resume across browser close, data survives Railway redeploy, export round-trips, delete works end-to-end.
 
 **Risks:** Server Action patterns for complex mutations; migration rehearsal.
+
+### M3.5 — Google-KA (Gemini-native)
+
+**Goal:** Google becomes a real, selectable provider for campaigns. Gemini-native KA implementation joins the dispatch in `src/lib/agents/ka/`. The provider registry's Google slot populates with a real roster; campaigns can run end-to-end on Google.
+
+**Deliverables:**
+- Spike first: `docs/spikes/M3.5-google-ka.md` evaluating ADK vs Gemini CLI vs `@google/genai` with custom orchestration. Picks substrate based on: caching mechanism fit to 4-block cognitive layout, tool-use protocol maturity, streaming quality, MCP support or adequate substitute, extended-thinking parity.
+- `src/lib/agents/ka/google.ts` — Gemini-native KA. Uses Gemini's context caching (context-by-ID, different shape than Anthropic's breakpoint caching). Function calling instead of Anthropic tool blocks. Gemini thinking mode where applicable.
+- Provider registry's Google entry populated with roster + feature flags (nativeMCP: false, promptCaching: 'context-id', thinking: 'native').
+- Consultants: fast-tier agents can now route to Gemini Flash-Lite when the campaign's provider is Google (fast tier follows campaign provider). Thinking-tier consultants (OJ, Validator, Pacing) get Gemini Pro equivalents in the Google path.
+- Settings UI: Google dropdown now populated; tier-model selection surfaces real options.
+- Eval harness: add Google campaign fixtures to the golden set; measure prose quality + cost vs Anthropic reference.
+
+**Acceptance:** a campaign created with provider=Google plays 10 turns end-to-end. Eval harness scores the same fixture turn on Gemini Pro vs Opus 4.7 and produces defensible numeric comparison. Cost per turn tracks within predicted range (§20 estimate).
+
+**Risks:** ADK vs Gemini CLI substrate choice locks in significant code; Gemini function-calling semantics vs Anthropic tool blocks have real differences at the fringe; context caching operational shape (cache ID lifecycle) vs Anthropic breakpoint model has different tuning; MCP absence on Gemini means our 8 MCP servers need an adapter path (inlined tools) for the Google-KA.
 
 ### M4 — Memory depth + Director voice
 
@@ -1854,6 +1981,21 @@ Each milestone ends with a deploy to production, a written retro (`docs/retros/M
 
 **Risks:** combat rule tuning (too mechanical vs too vague); progression curves feeling earned; Pacing's arc-beat vocabulary matching what KA does with it.
 
+### M5.5 — OpenAI-KA + OpenRouter shim
+
+**Goal:** OpenAI becomes selectable; OpenRouter rides the OpenAI shim for the long tail (sunset Anthropic snapshots, Groq/Cerebras cheap inference, DeepSeek / Qwen / Mistral). Dispatch now serves all four provider slots.
+
+**Deliverables:**
+- Spike first: `docs/spikes/M5.5-openai-ka.md` evaluating Responses API vs Assistants API vs direct Chat Completions with custom tool loop. Same evaluation lens as M3.5 (cache fit, tool loop, streaming, thinking/reasoning parity).
+- `src/lib/agents/ka/openai.ts` — OpenAI-native KA. System-prompt auto-caching. OpenAI tool calling. Reasoning tokens where the selected model supports them (o-series).
+- `src/lib/agents/ka/openrouter.ts` — thin shim over `openai.ts`. Same HTTP surface; base URL override; model-ID validation loosened; auth-header swap.
+- Provider registry: OpenAI entry populated with roster; OpenRouter entry with free-form model-ID field.
+- Eval harness: OpenAI fixtures added. OpenRouter spot-check against 2–3 representative long-tail models (a cheap DeepSeek route; a Groq route for speed; one sunset Anthropic snapshot).
+
+**Acceptance:** campaign on OpenAI plays 10 turns. Campaign on OpenRouter pointing at a DeepSeek V3 route plays 10 turns. The four provider slots are all real. Eval harness produces numeric comparison across all four.
+
+**Risks:** OpenAI's API surface has pivoted multiple times (Chat Completions → Assistants → Responses) — substrate choice needs to bet on stability; OpenRouter rate limits and upstream-provider quirks (some routes drop tool calls, some don't stream cleanly); auth model differences.
+
 ### M6 — Foreshadowing depth
 
 **Goal:** the story threads plant, grow, and resolve. Scenes three sessions apart feel connected. Director's hybrid-trigger foreshadowing plants seeds that pay off later. KA actively weaves active seeds into scenes at appropriate beats.
@@ -1869,6 +2011,21 @@ Each milestone ends with a deploy to production, a written retro (`docs/retros/M
 **Acceptance:** across 50 turns, ≥60% of planted seeds reach callback or resolution within window. No OVERDUE past 2× payoffWindowMax without Director attention.
 
 **Risks:** seed planting cadence; Director tool discipline.
+
+### M6.5 — Compat / feature-gap layer
+
+**Goal:** normalize the gaps between provider capabilities so the rest of the codebase doesn't have to know which provider is running. With three KAs built (Anthropic, Google, OpenAI) and one shim (OpenRouter), the real gaps are visible and can be addressed with evidence rather than prospectively. Premature abstraction is the failure mode we're avoiding by placing this late.
+
+**Deliverables:**
+- Gap audit: document the feature delta between providers (caching mechanism shapes, tool-use protocol differences, thinking/reasoning behavior, streaming fidelity, MCP vs inlined-tool fallback, function-calling concurrency limits).
+- Feature-flag query API: `providerRegistry.supports(providerId, feature)` returns boolean; consumers query before relying on a feature.
+- Graceful-degradation shims where gaps bite: e.g., an MCP-to-inlined-tool adapter so the Google-KA can consume the same 8 MCP servers as Anthropic-KA; a thinking-budget-to-reasoning-tokens mapper for OpenAI; a breakpoint-cache-to-context-id adapter so the 4-block rendered prompts cache correctly per provider.
+- Failover orchestration (optional, opt-in): if a campaign's primary provider returns 5xx or hits rate limits, auto-retry on a configured secondary provider. User surface: "this turn ran on Gemini because Anthropic was down; voice may feel different."
+- Eval dimension: cross-provider-consistency — the same campaign turn on different providers should reach comparable narrative weight and outcome, with acceptable voice-shift latitude.
+
+**Acceptance:** a feature the roadmap adds in M7+ that depends on MCP-style tool access works on all four providers without per-KA forks. Failover drill: kill the Anthropic path mid-turn, turn completes on Google with a user-visible banner.
+
+**Risks:** the compat layer growing into the abstraction we said we'd avoid (guardrail: only normalize gaps that bite a real downstream feature, not prospective ones); failover-induced voice shift confusing writers mid-arc.
 
 ### M7 — Long-horizon polish
 
@@ -1900,23 +2057,23 @@ Each milestone ends with a deploy to production, a written retro (`docs/retros/M
 
 **Risks:** image-gen cost; visual style consistency; storage and bandwidth.
 
-### M9 — Polish + paid tier (2 weeks)
+### M9 — Launch polish (2 weeks)
 
-**Goal:** launchable product.
+**Goal:** launchable product. Billing substrate already shipped at M2.5 — this milestone is UX polish on a running system, not a standup of new infrastructure.
 
 **Deliverables:**
-- Clerk Billing + Stripe integration.
-- Free tier limits (50 turns total).
-- Paid tier (~$15–20/mo, 500 turns/mo).
-- Onboarding improvements (tooltips, sample transcript on signup).
-- Pricing page, ToS, privacy policy, content policy pages.
-- Refund flow.
+- Credits-based pricing page: starter credit, top-up tiers, per-turn cost transparency ("your Opus 4.7 Bebop campaign averages $0.06/turn").
+- Subscription option (optional, revisit at M2.5): monthly credit allotment with rollover vs pure-metered. Product decision, not tech.
+- Onboarding improvements (tooltips, sample transcript on signup, per-provider voice-preview).
+- Pricing page, ToS, privacy policy, content policy pages — final legal review.
+- Refund flow: Stripe-backed refunds to credit balance or card.
 - Age gate.
-- Public launch.
+- Provider/model-upgrade consent UX: when a provider ships a new default, existing campaigns see "switch to X? it scored Y% better on evals, your cost would be Z" — never auto-upgraded.
+- Public launch readiness: 3 green eval weeks, burn-rate monitoring, on-call rota (solo dev = you, so: alert thresholds + response playbook).
 
-**Acceptance:** first paying customer; no SEV-1s in launch week.
+**Acceptance:** first paying customer completes a full arc; no SEV-1s in launch week; credit reconciliation error rate < 1% vs Langfuse ground truth.
 
-**Risks:** Stripe + Clerk Billing quirks; launch traffic and cost spike.
+**Risks:** launch traffic overwhelming cost-anomaly thresholds; pricing page framing confusing users accustomed to flat subscriptions; provider outage during launch week.
 
 ## 24. Stretch goals
 
