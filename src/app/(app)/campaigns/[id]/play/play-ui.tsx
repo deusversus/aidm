@@ -32,14 +32,17 @@ export default function PlayUI({ campaignId, campaignName, priorTurns }: Props) 
   // input-as-effect-dep bug (effect re-firing on every keystroke and
   // double-committing the same turn row with shifting text).
   const pendingMessageRef = useRef<string>("");
-  const committedTurnIdsRef = useRef<Set<string>>(new Set());
+  // Dedup on turn_number, not turnId — a failed DB insert yields
+  // turnId="" and would collide on subsequent turns, silently
+  // dropping them. turn_number is assigned before insert and is
+  // unique per campaign.
+  const committedTurnNumbersRef = useRef<Set<number>>(new Set());
 
   // When a turn completes, move it from "live" to "committed" once.
-  // Guard against re-commits by tracking seen turn ids.
   useEffect(() => {
     if (!lastTurn) return;
-    if (committedTurnIdsRef.current.has(lastTurn.turnId)) return;
-    committedTurnIdsRef.current.add(lastTurn.turnId);
+    if (committedTurnNumbersRef.current.has(lastTurn.turnNumber)) return;
+    committedTurnNumbersRef.current.add(lastTurn.turnNumber);
     setCommitted((prev) => [
       ...prev,
       {
@@ -103,9 +106,9 @@ export default function PlayUI({ campaignId, campaignName, priorTurns }: Props) 
             </div>
           ))}
 
-          {(streaming || displayedLive) && (
+          {streaming && (
             <div className="flex flex-col gap-2">
-              {pendingMessageRef.current && streaming ? (
+              {pendingMessageRef.current ? (
                 <p className="whitespace-pre-wrap text-muted-foreground text-sm">
                   <span className="mr-2 font-mono text-xs opacity-60">you</span>
                   {pendingMessageRef.current}
@@ -113,9 +116,7 @@ export default function PlayUI({ campaignId, campaignName, priorTurns }: Props) 
               ) : null}
               <p className="whitespace-pre-wrap leading-relaxed">
                 {displayedLive}
-                {streaming ? (
-                  <span className="ml-0.5 inline-block h-4 w-1.5 animate-pulse bg-current opacity-60" />
-                ) : null}
+                <span className="ml-0.5 inline-block h-4 w-1.5 animate-pulse bg-current opacity-60" />
               </p>
             </div>
           )}
