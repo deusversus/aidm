@@ -52,17 +52,23 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 
-# Claude Agent SDK ships its Claude Code CLI native binary as optional
-# per-platform packages (one per OS/arch/libc combo). Next's standalone
-# output uses node-file-tracer, which can't see optional deps that are
-# resolved dynamically at runtime — so they get pruned out of
-# .next/standalone/node_modules. Copy the alpine (musl) linux-x64
-# variant explicitly. If we ever switch the base image off alpine,
-# update this to the matching variant (e.g. -linux-x64 for glibc,
+# Claude Agent SDK ships its Claude Code CLI native binary as
+# per-platform optional npm packages. Next's standalone output uses
+# node-file-tracer, which can't follow dynamically-resolved optional
+# deps, so they're pruned from .next/standalone/node_modules. Copying
+# from the builder is brittle because pnpm's symlink layout (via
+# node_modules/.pnpm/...) makes the COPY --from path resolution fail
+# with "failed to calculate checksum" errors. Installing the single
+# needed package directly with npm in the runner stage is the clean
+# answer: flat node_modules, no transitive tree, works regardless of
+# the dep-stage package manager. If the base image ever changes off
+# alpine, update the -musl suffix (e.g. remove for glibc, switch to
 # -linux-arm64-musl for ARM alpine).
-COPY --from=builder --chown=nextjs:nodejs \
-  /app/node_modules/@anthropic-ai/claude-agent-sdk-linux-x64-musl \
-  ./node_modules/@anthropic-ai/claude-agent-sdk-linux-x64-musl
+USER root
+RUN cd /app \
+ && npm install --no-save --no-package-lock --no-audit --no-fund \
+      @anthropic-ai/claude-agent-sdk-linux-x64-musl@0.2.114 \
+ && chown -R nextjs:nodejs /app/node_modules
 
 USER nextjs
 EXPOSE 3000
