@@ -70,6 +70,7 @@ export async function validateOutcome(
       agentName: "validator",
       tier: "thinking",
       systemPrompt: getPrompt("agents/validator").content,
+      promptId: "agents/validator",
       userContent: buildUserContent(parsed),
       outputSchema: ValidatorOutput,
       fallback,

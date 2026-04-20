@@ -64,6 +64,7 @@ export async function selectScale(
       agentName: "scale-selector-agent",
       tier: "fast",
       systemPrompt: getPrompt("agents/scale-selector-agent").content,
+      promptId: "agents/scale-selector-agent",
       userContent: buildUserContent(parsed),
       outputSchema: ScaleSelectorOutput,
       fallback,

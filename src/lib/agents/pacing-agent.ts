@@ -105,6 +105,7 @@ export async function advisePacing(
       agentName: "pacing-agent",
       tier: "thinking",
       systemPrompt: getPrompt("agents/pacing-agent").content,
+      promptId: "agents/pacing-agent",
       userContent: buildUserContent(parsed),
       outputSchema: PacingAgentOutput,
       fallback,

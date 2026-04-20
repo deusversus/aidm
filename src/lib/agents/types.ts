@@ -21,6 +21,16 @@ export interface AgentDeps {
   logger?: AgentLogger;
   /** Per-campaign provider + tier_models. Propagates into every LLM call. */
   modelContext?: CampaignProviderConfig;
+  /**
+   * Per-turn prompt-fingerprint recorder. Every agent that resolves a
+   * prompt via the registry calls this with its agent name + the
+   * composed prompt's SHA-256 fingerprint. The turn workflow
+   * aggregates into a map and persists to `turns.prompt_fingerprints`
+   * so voice regressions caused by prompt edits are traceable to the
+   * exact commit that changed any prompt file. Null-safe — callers
+   * without a recorder just don't get the audit trail.
+   */
+  recordPrompt?: (agentName: string, fingerprint: string) => void;
 }
 
 export type AgentLogLevel = "info" | "warn" | "error";

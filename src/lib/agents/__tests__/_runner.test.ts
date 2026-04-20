@@ -264,6 +264,77 @@ describe("runStructuredAgent", () => {
     });
   });
 
+  describe("prompt fingerprint recording (Commit 7.0)", () => {
+    it("records fingerprint when promptId + recordPrompt are both set", async () => {
+      const { runStructuredAgent } = await import("../_runner");
+      const recorded: Array<[string, string]> = [];
+      const anthropic = fakeAnthropic([{ text: JSON.stringify({ value: "ok" }) }]);
+      // Use an actual registry id so getPrompt returns a real fingerprint.
+      await runStructuredAgent<Out>(baseConfig({ promptId: "agents/outcome-judge" }) as never, {
+        anthropic,
+        recordPrompt: (name, fp) => recorded.push([name, fp]),
+      });
+      expect(recorded).toHaveLength(1);
+      expect(recorded[0]?.[0]).toBe("test-agent");
+      expect(recorded[0]?.[1]).toMatch(/^[0-9a-f]{64}$/);
+    });
+
+    it("skips recording when promptId is absent (literal systemPrompt path)", async () => {
+      const { runStructuredAgent } = await import("../_runner");
+      const recorded: Array<[string, string]> = [];
+      const anthropic = fakeAnthropic([{ text: JSON.stringify({ value: "ok" }) }]);
+      await runStructuredAgent<Out>(baseConfig() as never, {
+        anthropic,
+        recordPrompt: (name, fp) => recorded.push([name, fp]),
+      });
+      expect(recorded).toHaveLength(0);
+    });
+
+    it("skips recording when recordPrompt is absent (null-safe)", async () => {
+      const { runStructuredAgent } = await import("../_runner");
+      const anthropic = fakeAnthropic([{ text: JSON.stringify({ value: "ok" }) }]);
+      // No recordPrompt in deps — should not throw.
+      const result = await runStructuredAgent<Out>(
+        baseConfig({ promptId: "agents/outcome-judge" }) as never,
+        { anthropic },
+      );
+      expect(result.value).toBe("ok");
+    });
+
+    it("swallows getPrompt throws when promptId is bogus — agent still runs", async () => {
+      const { runStructuredAgent } = await import("../_runner");
+      const recorded: Array<[string, string]> = [];
+      const anthropic = fakeAnthropic([{ text: JSON.stringify({ value: "ok" }) }]);
+      const result = await runStructuredAgent<Out>(
+        baseConfig({ promptId: "does/not/exist" }) as never,
+        {
+          anthropic,
+          recordPrompt: (name, fp) => recorded.push([name, fp]),
+        },
+      );
+      // Call succeeded; nothing recorded (lookup threw, swallowed).
+      expect(result.value).toBe("ok");
+      expect(recorded).toHaveLength(0);
+    });
+
+    it("records once, not per retry attempt", async () => {
+      const { runStructuredAgent } = await import("../_runner");
+      const recorded: Array<[string, string]> = [];
+      // First attempt fails parse; second succeeds. Recording should happen
+      // exactly once — reflecting the prompt the agent intended to run,
+      // not a per-attempt duplicate.
+      const anthropic = fakeAnthropic([
+        { text: "not json" },
+        { text: JSON.stringify({ value: "recovered" }) },
+      ]);
+      await runStructuredAgent<Out>(baseConfig({ promptId: "agents/outcome-judge" }) as never, {
+        anthropic,
+        recordPrompt: (name, fp) => recorded.push([name, fp]),
+      });
+      expect(recorded).toHaveLength(1);
+    });
+  });
+
   describe("span wrapping", () => {
     it("creates a span named agent:<name> and ends with output on success", async () => {
       const { runStructuredAgent } = await import("../_runner");

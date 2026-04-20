@@ -44,6 +44,14 @@ export interface SakugaSelection {
   mode: SakugaMode;
   reason: string;
   fragment: string;
+  /**
+   * Prompt-registry id of the fragment that was injected. Exposed so
+   * turn.ts can record its fingerprint on the turn row — the fragment
+   * is pulled at render-time (not `{{include:}}`'d), so editing
+   * `sakuga_choreographic.md` doesn't change Block 4's fingerprint;
+   * we need to track it separately.
+   */
+  promptId: string;
 }
 
 /**
@@ -59,10 +67,12 @@ export function selectSakugaMode(
   // fallback when a specific trigger names the treatment.
   for (const entry of SAKUGA_PRIORITY) {
     if (intent.special_conditions.includes(entry.condition)) {
+      const promptId = FRAGMENT_ID[entry.mode];
       return {
         mode: entry.mode,
         reason: `special_condition: ${entry.condition}`,
-        fragment: getPrompt(FRAGMENT_ID[entry.mode]).content,
+        fragment: getPrompt(promptId).content,
+        promptId,
       };
     }
   }
@@ -73,9 +83,11 @@ export function selectSakugaMode(
   }
 
   const mode: SakugaMode = intent.intent === "SOCIAL" ? "frozen_moment" : "choreographic";
+  const promptId = FRAGMENT_ID[mode];
   return {
     mode,
     reason: `fallback: CLIMACTIC weight, intent=${intent.intent}`,
-    fragment: getPrompt(FRAGMENT_ID[mode]).content,
+    fragment: getPrompt(promptId).content,
+    promptId,
   };
 }

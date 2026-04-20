@@ -70,6 +70,7 @@ export async function classifyIntent(
       agentName: "intent-classifier",
       tier: "fast",
       systemPrompt: getPrompt("agents/intent-classifier").content,
+      promptId: "agents/intent-classifier",
       userContent: buildUserContent(parsedInput),
       outputSchema: IntentOutput,
       fallback: DEFAULT_FALLBACK,

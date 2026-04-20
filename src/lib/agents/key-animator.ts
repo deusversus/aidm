@@ -218,6 +218,44 @@ export async function* runKeyAnimator(
   }
   const creativeModel = input.modelContext.tier_models.creative;
 
+  // Record fingerprints for KA's four blocks + every consultant prompt.
+  // The turn workflow aggregates these into turns.prompt_fingerprints so
+  // a voice regression is traceable to the exact prompt commit. Null-safe
+  // — tests that don't pass recordPrompt just skip the audit trail.
+  if (deps.recordPrompt) {
+    const blockIds = [
+      "ka/block_1_ambient",
+      "ka/block_2_compaction",
+      "ka/block_3_working",
+      "ka/block_4_dynamic",
+    ] as const;
+    for (const id of blockIds) {
+      try {
+        deps.recordPrompt(`key-animator:${id}`, getPrompt(id).fingerprint);
+      } catch {
+        /* prompt-registry lookup failure is non-fatal; narration still runs */
+      }
+    }
+    // Consultants' fingerprints too — KA may spawn any of them inside
+    // the query, and if one runs we want its prompt in the audit trail.
+    const consultantIds: Array<[string, string]> = [
+      ["key-animator:consultant:outcome-judge", "agents/outcome-judge"],
+      ["key-animator:consultant:validator", "agents/validator"],
+      ["key-animator:consultant:pacing", "agents/pacing-agent"],
+      ["key-animator:consultant:combat", "agents/combat-agent"],
+      ["key-animator:consultant:memory-ranker", "agents/memory-ranker"],
+      ["key-animator:consultant:recap", "agents/recap-agent"],
+      ["key-animator:consultant:scale-selector", "agents/scale-selector-agent"],
+    ];
+    for (const [agentName, promptId] of consultantIds) {
+      try {
+        deps.recordPrompt(agentName, getPrompt(promptId).fingerprint);
+      } catch {
+        /* non-fatal */
+      }
+    }
+  }
+
   const blocks = renderKaBlocks(input);
   const systemPrompt = buildSystemPrompt(
     blocks.block1,

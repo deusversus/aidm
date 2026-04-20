@@ -99,6 +99,7 @@ export async function routePlayerMessage(
     trace: deps.trace,
     logger: deps.logger,
     modelContext: deps.modelContext,
+    recordPrompt: deps.recordPrompt,
   };
 
   const intent = await classifyIntent(

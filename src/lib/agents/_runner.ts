@@ -1,4 +1,5 @@
 import { getAnthropic, getGoogle } from "@/lib/llm";
+import { getPrompt } from "@/lib/prompts";
 import { anthropicFallbackConfig } from "@/lib/providers";
 import type { TierName } from "@/lib/providers";
 import type Anthropic from "@anthropic-ai/sdk";
@@ -41,6 +42,14 @@ export interface AgentRunnerConfig<TOutput> {
   tier: TierName;
   /** Fully-rendered system prompt (caller resolves via prompt registry). */
   systemPrompt: string;
+  /**
+   * Optional prompt-registry id that produced `systemPrompt`. When
+   * present, the runner records the prompt's SHA-256 fingerprint via
+   * `deps.recordPrompt(agentName, fingerprint)` so the turn workflow
+   * can persist it to `turns.prompt_fingerprints`. Absent for tests
+   * that pass a literal systemPrompt string — they skip recording.
+   */
+  promptId?: string;
   /** Fully-rendered user message for this invocation. */
   userContent: string;
   /** Zod schema the parsed response must satisfy. */
@@ -146,6 +155,21 @@ export async function runStructuredAgent<TOutput>(
   const logger: AgentLogger = deps.logger ?? defaultLogger;
   const ctx = deps.modelContext ?? anthropicFallbackConfig();
   const model = ctx.tier_models[config.tier];
+
+  // Record the prompt fingerprint for this turn's audit trail. Done
+  // once, before any retries, so the fingerprint reflects the prompt
+  // the agent intended to run — not whatever got mangled mid-retry.
+  if (config.promptId && deps.recordPrompt) {
+    try {
+      const { fingerprint } = getPrompt(config.promptId);
+      deps.recordPrompt(config.agentName, fingerprint);
+    } catch {
+      // Prompt-id lookup failure is non-fatal here — the LLM call
+      // uses config.systemPrompt directly. Log path will catch it
+      // via the normal agent-failure surface if systemPrompt is
+      // actually wrong.
+    }
+  }
 
   const span = deps.trace?.span({
     name: `agent:${config.agentName}`,

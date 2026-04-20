@@ -102,6 +102,7 @@ export async function handleOverride(
       agentName: "override-handler",
       tier: "fast",
       systemPrompt: getPrompt("agents/override-handler").content,
+      promptId: "agents/override-handler",
       userContent: buildUserContent(parsed),
       outputSchema: OverrideHandlerOutput,
       fallback: buildFallback(parsed),

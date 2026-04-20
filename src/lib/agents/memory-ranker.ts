@@ -87,6 +87,7 @@ export async function rankMemories(
       agentName: "memory-ranker",
       tier: "fast",
       systemPrompt: getPrompt("agents/memory-ranker").content,
+      promptId: "agents/memory-ranker",
       userContent: buildUserContent(parsed),
       outputSchema: MemoryRankerOutput,
       fallback,

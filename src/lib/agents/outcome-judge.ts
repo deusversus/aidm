@@ -100,6 +100,7 @@ export async function judgeOutcome(
       agentName: "outcome-judge",
       tier: "thinking",
       systemPrompt: getPrompt("agents/outcome-judge").content,
+      promptId: "agents/outcome-judge",
       userContent: buildUserContent(parsed),
       outputSchema: OutcomeOutput,
       fallback: fallbackOutcome(),

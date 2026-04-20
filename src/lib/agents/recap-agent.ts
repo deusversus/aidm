@@ -64,6 +64,7 @@ export async function produceRecap(
       agentName: "recap-agent",
       tier: "fast",
       systemPrompt: getPrompt("agents/recap-agent").content,
+      promptId: "agents/recap-agent",
       userContent: buildUserContent(parsed),
       outputSchema: RecapAgentOutput,
       fallback,

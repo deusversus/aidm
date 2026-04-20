@@ -179,6 +179,7 @@ export async function runDirector(
       agentName: "director",
       tier: "thinking",
       systemPrompt: getPrompt("agents/director").content,
+      promptId: "agents/director",
       userContent: buildUserContent(parsed),
       outputSchema: DirectorOutput,
       fallback: fallbackDirectorOutput(),

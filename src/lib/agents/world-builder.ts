@@ -93,6 +93,7 @@ export async function validateAssertion(
       agentName: "world-builder",
       tier: "thinking",
       systemPrompt: getPrompt("agents/world-builder").content,
+      promptId: "agents/world-builder",
       userContent: buildUserContent(parsed),
       outputSchema: WorldBuilderOutput,
       fallback: CLARIFY_FALLBACK,

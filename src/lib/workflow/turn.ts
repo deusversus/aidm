@@ -12,6 +12,7 @@ import {
 } from "@/lib/ka/diversity";
 import { extractNames } from "@/lib/ka/portraits";
 import { selectSakugaMode } from "@/lib/ka/sakuga";
+import { getPrompt } from "@/lib/prompts";
 import {
   type CampaignProviderConfig,
   anthropicFallbackConfig,
@@ -306,6 +307,15 @@ export async function* runTurn(
     // surfaces as a terminal turn error to the player.
     const modelContext = resolveModelContext(ctx.campaignRow.settings, logger);
 
+    // Per-turn prompt-fingerprint accumulator. Every agent call that
+    // passes a `promptId` records its composed-prompt fingerprint here.
+    // Persisted on the turn row at the end so voice regressions are
+    // traceable to the exact commit that changed any prompt file.
+    const promptFingerprints: Record<string, string> = {};
+    const recordPrompt = (agentName: string, fingerprint: string): void => {
+      promptFingerprints[agentName] = fingerprint;
+    };
+
     // -------------------------------------------------------------------
     // Route pre-pass
     // -------------------------------------------------------------------
@@ -338,6 +348,7 @@ export async function* runTurn(
       trace: deps.trace,
       logger,
       modelContext,
+      recordPrompt,
       ...deps.routerDeps,
     });
 
@@ -362,7 +373,7 @@ export async function* runTurn(
           intent: verdict.intent,
           verdictKind: verdict.kind,
           outcome: null,
-          promptFingerprints: {},
+          promptFingerprints,
           portraitMap: {},
         })
         .returning({ id: turns.id });
@@ -430,12 +441,24 @@ export async function* runTurn(
               value: o.value,
             })) ?? [],
         },
-        { trace: deps.trace, logger, modelContext },
+        { trace: deps.trace, logger, modelContext, recordPrompt },
       );
       outcome = judgedOutcome;
     }
 
     const sakuga = selectSakugaMode(verdict.intent, outcome);
+    // Sakuga fragments are pulled at render-time (not {{include:}}'d
+    // into Block 4), so editing sakuga_choreographic.md wouldn't
+    // change block_4_dynamic's fingerprint. Record separately so the
+    // audit trail actually catches voice regressions caused by
+    // fragment edits.
+    if (sakuga) {
+      try {
+        recordPrompt(`sakuga:${sakuga.mode}`, getPrompt(sakuga.promptId).fingerprint);
+      } catch {
+        /* non-fatal — narration proceeds with fragment content already loaded */
+      }
+    }
 
     // Narrative diversity machinery (§7.4). Both outputs land in Block 4
     // as soft advisories. Style-drift convergence check skips the
@@ -524,7 +547,7 @@ export async function* runTurn(
         toolContext,
         abortController: input.abort,
       },
-      { trace: deps.trace, logger },
+      { trace: deps.trace, logger, recordPrompt },
     );
 
     let narrative = "";
@@ -558,7 +581,7 @@ export async function* runTurn(
         intent: verdict.intent,
         verdictKind: "continue",
         outcome: outcome ?? null,
-        promptFingerprints: {},
+        promptFingerprints,
         portraitMap,
         costUsd: costUsd === null ? null : costUsd.toFixed(6),
         ttftMs,

@@ -114,6 +114,7 @@ export async function resolveCombat(
       agentName: "combat-agent",
       tier: "thinking",
       systemPrompt: getPrompt("agents/combat-agent").content,
+      promptId: "agents/combat-agent",
       userContent: buildUserContent(parsed),
       outputSchema: CombatAgentOutput,
       fallback,

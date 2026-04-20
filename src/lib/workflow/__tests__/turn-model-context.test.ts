@@ -217,4 +217,85 @@ describe("runTurn — modelContext threading (FU-A)", () => {
     expect(capturedInput?.modelContext.tier_models.creative).toBe("claude-sonnet-4-6");
     expect(capturedInput?.modelContext.tier_models.thinking).toBe("claude-opus-4-5-20251101");
   });
+
+  it("records prompt fingerprints for every agent invoked during the turn (Commit 7.0)", async () => {
+    // Run a minimal turn and capture the persisted values that turn.ts
+    // wrote to the `turns` row. promptFingerprints should be a populated
+    // map — at minimum the IntentClassifier's fingerprint — not the
+    // legacy `{}` sentinel.
+    const campaignRow: CampaignRow = {
+      id: "c-fp",
+      userId: "u-1",
+      name: "Bebop — test fp",
+      phase: "playing",
+      profileRefs: ["cowboy-bebop"],
+      settings: { active_dna: {}, world_state: { location: "here" } },
+      createdAt: new Date(),
+      deletedAt: null,
+    };
+    const profileRow: ProfileRow = {
+      id: "p-fp",
+      slug: "cowboy-bebop",
+      title: "Cowboy Bebop",
+      mediaType: "anime",
+      content: loadBebopProfileContent(),
+      version: 1,
+      createdAt: new Date(),
+    };
+
+    // Capture what turn.ts inserts into the turns table.
+    let insertedValues: Record<string, unknown> | undefined;
+    const db = makeDb({
+      campaign: campaignRow,
+      profile: profileRow,
+      character: null,
+      existingTurns: [],
+      onInsertTurn: (values) => {
+        insertedValues = values as Record<string, unknown>;
+        return { id: "t-fp-new" };
+      },
+    });
+
+    const mockRunKa = async function* (
+      _input: KeyAnimatorInput,
+    ): AsyncGenerator<KeyAnimatorEvent, void, void> {
+      yield {
+        kind: "final",
+        narrative: "A beat happens.",
+        ttftMs: 50,
+        totalMs: 100,
+        costUsd: 0.005,
+        sessionId: "s-fp",
+        stopReason: "end_turn",
+      };
+    };
+
+    const intentClassifierAnthropic = fakeAnthropic(
+      JSON.stringify({
+        intent: "DEFAULT",
+        epicness: 0.1, // below all pre-judge thresholds
+        special_conditions: [],
+        confidence: 0.9,
+      }),
+    );
+
+    for await (const ev of runTurn(
+      { campaignId: "c-fp", userId: "u-1", playerMessage: "sit" },
+      {
+        db,
+        runKa: mockRunKa as never,
+        routerDeps: { intentClassifier: { anthropic: intentClassifierAnthropic } },
+      },
+    )) {
+      if ((ev as { type: string }).type === "done" || (ev as { type: string }).type === "error") {
+        break;
+      }
+    }
+
+    const fingerprints = insertedValues?.promptFingerprints as Record<string, string> | undefined;
+    expect(fingerprints).toBeDefined();
+    // IntentClassifier ran (router's pre-pass) → its fingerprint should
+    // be captured. Value is a 64-char sha256 hex.
+    expect(fingerprints?.["intent-classifier"]).toMatch(/^[0-9a-f]{64}$/);
+  });
 });
