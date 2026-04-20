@@ -421,6 +421,18 @@ v3's agent roster (~42 agents composed across gameplay, Session Zero, and backgr
 
 The specialists don't dissolve. They sharpen.
 
+**Three-phase architecture (authoritative as of 2026-04-20).** Every turn runs three Agent-SDK orchestrator agents in sequence, each with phase-appropriate tools + consultants:
+
+1. **Scenewright** (before-turn, fast tier) — reads player message + scene state; dispatches IntentClassifier / OverrideHandler / WorldBuilder / OutcomeJudge+Validator as consultants; emits routed verdict + populated Block 4 for KA.
+2. **KeyAnimator** (turn, creative tier, campaign provider) — narrates. 4-block DYNAMIC_BOUNDARY, consultants as subagents, 8 MCP servers. Unchanged from M1 shipped.
+3. **Chronicler** (after-turn, fast tier) — reads KA's narrative + existing entity state; calls tools to durably write entities / relationships / semantic facts / arc updates / foreshadowing lifecycle / voice patterns. Subsumes the originally-planned Memory writer + ProductionAgent + RelationshipAnalyzer + standalone-Director + ForeshadowingLedger into one orchestrator with tools. RelationshipAnalyzer remains as a thinking-tier consultant it spawns when milestone nuance warrants.
+
+Compactor and Recap remain thin utility functions (fast tier, prose-in/prose-out, no tool loops), called by state triggers — not orchestrators.
+
+The sub-sections below (§5.1 per-turn shape, §5.2 agent roster, §5.5 per-agent specs) pre-date the three-phase consolidation and over-enumerate the after-turn agents. They'll be rewritten around Scenewright + Chronicler before M1 Commit 7 ships. In the interim, treat the three-phase framing above as authoritative when it conflicts with the sub-sections.
+
+See `project_three_phase_architecture.md` and `project_worldbuilder_as_editor.md` in memory for the full rationale and scope.
+
 ### 5.1 The per-turn shape (non-negotiable)
 
 Every gameplay turn runs this shape:
