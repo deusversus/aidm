@@ -1,3 +1,4 @@
+import type { CampaignProviderConfig } from "@/lib/providers";
 import type { AidmSpanHandle } from "@/lib/tools";
 
 /**
@@ -6,16 +7,20 @@ import type { AidmSpanHandle } from "@/lib/tools";
  * tracing + logging through without making every agent import provider
  * singletons directly.
  *
- * Why not AgentSDK's context: these agents run as Mastra steps, not inside
- * KA's Agent SDK session. KA (M1 Commit 6) will invoke them either via the
- * Agent SDK's subagent primitive or via direct step calls — both paths
- * route through the same `execute` functions.
+ * `modelContext` carries the per-campaign `{ provider, tier_models }` config
+ * (from Commit A's provider registry). The turn workflow (Commit D) reads it
+ * once from `campaign.settings` and threads it through every agent call on
+ * that turn. When absent, callers fall back to `anthropicFallbackConfig()`
+ * — for scripts, `/api/ready`, and tests that don't care about per-campaign
+ * routing.
  */
 export interface AgentDeps {
   /** Optional Langfuse span handle. Null-safe inside each agent. */
   trace?: AidmSpanHandle;
   /** Optional structured logger. Defaults to console. */
   logger?: AgentLogger;
+  /** Per-campaign provider + tier_models. Propagates into every LLM call. */
+  modelContext?: CampaignProviderConfig;
 }
 
 export type AgentLogLevel = "info" | "warn" | "error";

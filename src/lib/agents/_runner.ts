@@ -1,6 +1,6 @@
 import { getAnthropic, getGoogle } from "@/lib/llm";
 import { anthropicFallbackConfig } from "@/lib/providers";
-import type { CampaignProviderConfig, TierName } from "@/lib/providers";
+import type { TierName } from "@/lib/providers";
 import type Anthropic from "@anthropic-ai/sdk";
 import type { GoogleGenAI } from "@google/genai";
 import type { z } from "zod";
@@ -66,13 +66,6 @@ export interface AgentRunnerConfig<TOutput> {
 }
 
 export interface AgentRunnerDeps extends AgentDeps {
-  /**
-   * Per-campaign provider + tier_models. When absent, falls back to
-   * `anthropicFallbackConfig()` — for scripts, `/api/ready`, and tests
-   * that don't need per-campaign routing. The turn workflow builds
-   * one from `campaign.settings` and threads it through (Commit D).
-   */
-  modelContext?: CampaignProviderConfig;
   /** Inject a mock Gemini client in tests. */
   google?: () => Pick<GoogleGenAI, "models">;
   /** Inject a mock Anthropic client in tests. */

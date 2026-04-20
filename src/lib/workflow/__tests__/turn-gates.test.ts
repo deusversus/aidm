@@ -1,6 +1,6 @@
 import type { IntentOutput } from "@/lib/types/turn";
 import { describe, expect, it } from "vitest";
-import { retrievalBudget, shouldPreJudgeOutcome } from "../turn";
+import { resolveModelContext, retrievalBudget, shouldPreJudgeOutcome } from "../turn";
 
 function intent(partial: Partial<IntentOutput>): IntentOutput {
   return {
@@ -35,6 +35,75 @@ describe("retrievalBudget (§9 tiered memory)", () => {
     expect(retrievalBudget(0.75)).toBe(9);
     expect(retrievalBudget(0.9)).toBe(9);
     expect(retrievalBudget(1.0)).toBe(9);
+  });
+});
+
+describe("resolveModelContext", () => {
+  it("falls back to Anthropic when settings is empty (legacy pre-migration row)", () => {
+    const ctx = resolveModelContext({});
+    expect(ctx.provider).toBe("anthropic");
+    expect(ctx.tier_models.creative).toBe("claude-opus-4-7");
+  });
+
+  it("falls back to Anthropic when settings is null / undefined", () => {
+    const ctx = resolveModelContext(null);
+    expect(ctx.provider).toBe("anthropic");
+  });
+
+  it("falls back when settings lacks provider or tier_models (half-migrated)", () => {
+    const ctx = resolveModelContext({ provider: "anthropic" }); // missing tier_models
+    expect(ctx.provider).toBe("anthropic"); // default Anthropic fallback
+    expect(ctx.tier_models).toBeDefined();
+  });
+
+  it("returns parsed config when fully populated", () => {
+    const settings = {
+      active_dna: {},
+      provider: "anthropic" as const,
+      tier_models: {
+        probe: "claude-haiku-4-5-20251001",
+        fast: "claude-haiku-4-5-20251001",
+        thinking: "claude-opus-4-5-20251101", // snapshot pin
+        creative: "claude-sonnet-4-6", // cost-down creative
+      },
+    };
+    const ctx = resolveModelContext(settings);
+    expect(ctx.provider).toBe("anthropic");
+    expect(ctx.tier_models.thinking).toBe("claude-opus-4-5-20251101");
+    expect(ctx.tier_models.creative).toBe("claude-sonnet-4-6");
+  });
+
+  it("throws when the config is syntactically valid but targets an unavailable provider", () => {
+    const settings = {
+      provider: "google" as const,
+      tier_models: {
+        probe: "claude-haiku-4-5-20251001",
+        fast: "gemini-3.1-flash-lite-preview",
+        thinking: "gemini-3.1-pro-preview",
+        creative: "gemini-3.1-pro-preview",
+      },
+    };
+    expect(() => resolveModelContext(settings)).toThrow(/M3\.5/);
+  });
+
+  it("throws when the model string isn't in the provider's roster", () => {
+    const settings = {
+      provider: "anthropic" as const,
+      tier_models: {
+        probe: "claude-haiku-4-5-20251001",
+        fast: "claude-haiku-4-5-20251001",
+        thinking: "claude-opus-99-fake",
+        creative: "claude-opus-4-7",
+      },
+    };
+    expect(() => resolveModelContext(settings)).toThrow(/roster|not offer/i);
+  });
+
+  it("falls back to Anthropic when settings parse fails entirely (malformed payload)", () => {
+    // Anything that doesn't match CampaignSettings fails safeParse; resolver
+    // falls back rather than blowing up the turn.
+    const ctx = resolveModelContext({ overrides: "not-an-array" });
+    expect(ctx.provider).toBe("anthropic");
   });
 });
 

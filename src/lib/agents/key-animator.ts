@@ -1,6 +1,6 @@
-import { tiers } from "@/lib/env";
 import { type RenderBlocksInput, renderKaBlocks } from "@/lib/ka/blocks";
 import { getPrompt } from "@/lib/prompts";
+import type { CampaignProviderConfig } from "@/lib/providers";
 import { buildMcpServers } from "@/lib/tools";
 import type { AidmToolContext } from "@/lib/tools";
 import {
@@ -12,8 +12,6 @@ import {
 } from "@anthropic-ai/claude-agent-sdk";
 import type { AgentDeps } from "./types";
 import { defaultLogger } from "./types";
-
-const HAIKU_MODEL = "claude-haiku-4-5-20251001";
 
 /**
  * Consultants KA can spawn via the Agent tool. Each entry is an
@@ -31,60 +29,66 @@ const HAIKU_MODEL = "claude-haiku-4-5-20251001";
  * agent's output-contract instructions; KA parses the returned text as
  * JSON per the agent's schema on its own.
  *
- * Model selection: Agent SDK subagents inherit the Anthropic API
- * interface. Our `fast` tier is Gemini (different provider) so for
- * fast-tier consultants we substitute Haiku 4.5 as the closest-tier
- * Anthropic model. Same cognitive work; different backing.
+ * Model selection (M1.5): each consultant's model comes from the
+ * campaign's tier_models. KA only runs on Anthropic today (Claude
+ * Agent SDK substrate); Google-KA / OpenAI-KA arrive at M3.5/M5.5 as
+ * parallel implementations in src/lib/agents/ka/*. Thinking consultants
+ * get `tier_models.thinking`; fast consultants get `tier_models.fast`.
+ * If the campaign pins an Anthropic snapshot (e.g. Opus 4.5) on thinking,
+ * every thinking consultant runs on that same snapshot — voice consistency
+ * across a campaign is load-bearing.
  */
-function buildKaConsultants(): Record<string, AgentDefinition> {
+function buildKaConsultants(modelContext: CampaignProviderConfig): Record<string, AgentDefinition> {
+  const thinking = modelContext.tier_models.thinking;
+  const fast = modelContext.tier_models.fast;
   return {
     "outcome-judge": {
       description:
         "Consult before narrating consequences of a consequential action. Returns JSON verdict: success_level, difficulty_class, narrative_weight (MINOR/SIGNIFICANT/CLIMACTIC), consequence, cost, rationale. Describe the intent + situation + character; the judge returns mechanical truth for you to narrate.",
       prompt: getPrompt("agents/outcome-judge").content,
-      model: tiers.thinking.model,
+      model: thinking,
       tools: [],
     },
     validator: {
       description:
         "Review an OutcomeJudge verdict for consistency against canon, character capability, composition mode, and player overrides. Call after OJ when a verdict seems off. Returns { valid, correction }.",
       prompt: getPrompt("agents/validator").content,
-      model: tiers.thinking.model,
+      model: thinking,
       tools: [],
     },
     pacing: {
       description:
         "Advise on beat rhythm — should this beat escalate, hold, release, pivot, set up, pay off, or detour? Returns { directive, toneTarget, escalationTarget, rationale }. Consult when the arc plan guidance matters for how you write this beat.",
       prompt: getPrompt("agents/pacing-agent").content,
-      model: tiers.thinking.model,
+      model: thinking,
       tools: [],
     },
     "memory-ranker": {
       description:
         "Rerank semantic memory candidates by scene relevance when raw retrieval returns more than 3 hits. Returns a ranked list with relevance scores. Skip for META/OVERRIDE turns.",
       prompt: getPrompt("agents/memory-ranker").content,
-      model: HAIKU_MODEL,
+      model: fast,
       tools: [],
     },
     recap: {
       description:
         "First turn of a session only — produces a short in-character recap of last session's cliffhanger + active threads. Not needed on subsequent turns.",
       prompt: getPrompt("agents/recap-agent").content,
-      model: HAIKU_MODEL,
+      model: fast,
       tools: [],
     },
     combat: {
       description:
         "For COMBAT intents — resolves hit/miss/damage/facts/status/resource-cost BEFORE you narrate, so you narrate facts rather than inventing mechanics. Returns JSON with resolution, damage, facts (2-4 concrete truths you must honor).",
       prompt: getPrompt("agents/combat-agent").content,
-      model: tiers.thinking.model,
+      model: thinking,
       tools: [],
     },
     "scale-selector": {
       description:
         "For combat exchanges — returns the effective composition mode (standard | blended | op_dominant | not_applicable) based on attacker/defender tier gap. Consult when tier differential is wide enough to reframe stakes onto cost vs survival.",
       prompt: getPrompt("agents/scale-selector-agent").content,
-      model: HAIKU_MODEL,
+      model: fast,
       tools: [],
     },
   };
@@ -112,6 +116,14 @@ function buildKaConsultants(): Record<string, AgentDefinition> {
  */
 
 export interface KeyAnimatorInput extends RenderBlocksInput {
+  /**
+   * Per-campaign provider + tier_models. KA's creative tier + every
+   * subagent's model resolve from here. Required at M1.5 — the turn
+   * workflow builds it once from `campaign.settings` and passes it in.
+   * Scripts / tests without a real campaign can use
+   * `anthropicFallbackConfig()`.
+   */
+  modelContext: CampaignProviderConfig;
   /**
    * Tool + MCP context. Threaded into every MCP server spawned for this
    * turn so tools authorize against the right campaign + user.
@@ -193,6 +205,19 @@ export async function* runKeyAnimator(
   const logger = deps.logger ?? defaultLogger;
   const queryFn = deps.queryFn ?? query;
 
+  // KA runs on Claude Agent SDK which is Anthropic-only. Campaigns
+  // configured for other providers need their provider's native KA
+  // (src/lib/agents/ka/google.ts, ka/openai.ts, ka/openrouter.ts)
+  // which land at M3.5 / M5.5. Fail loud here so misconfigured
+  // campaigns surface an actionable error, not silent wrong-provider
+  // dispatch.
+  if (input.modelContext.provider !== "anthropic") {
+    throw new Error(
+      `KeyAnimator on Claude Agent SDK only supports provider="anthropic" (got "${input.modelContext.provider}"). Google-KA lands M3.5; OpenAI / OpenRouter at M5.5.`,
+    );
+  }
+  const creativeModel = input.modelContext.tier_models.creative;
+
   const blocks = renderKaBlocks(input);
   const systemPrompt = buildSystemPrompt(
     blocks.block1,
@@ -220,11 +245,11 @@ export async function* runKeyAnimator(
   //   - thinking.adaptive + effort: medium → per M1 plan
   //   - systemPrompt with DYNAMIC_BOUNDARY → cache blocks 1-3, keep 4 dynamic
   const options: Options = {
-    model: tiers.creative.model,
+    model: creativeModel,
     systemPrompt,
     tools: [],
     mcpServers,
-    agents: buildKaConsultants(),
+    agents: buildKaConsultants(input.modelContext),
     permissionMode: "bypassPermissions",
     allowDangerouslySkipPermissions: true,
     settingSources: [],
@@ -249,7 +274,11 @@ export async function* runKeyAnimator(
       player_message: userMessage,
       intent: input.block4.intent,
     },
-    metadata: { model: tiers.creative.model, tier: "creative" },
+    metadata: {
+      model: creativeModel,
+      provider: input.modelContext.provider,
+      tier: "creative",
+    },
   });
 
   try {

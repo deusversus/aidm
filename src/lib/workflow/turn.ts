@@ -12,8 +12,14 @@ import {
 } from "@/lib/ka/diversity";
 import { extractNames } from "@/lib/ka/portraits";
 import { selectSakugaMode } from "@/lib/ka/sakuga";
+import {
+  type CampaignProviderConfig,
+  anthropicFallbackConfig,
+  validateCampaignProviderConfig,
+} from "@/lib/providers";
 import { campaigns, characters, profiles, turns } from "@/lib/state/schema";
 import type { AidmSpanHandle, AidmToolContext } from "@/lib/tools";
+import { CampaignSettings } from "@/lib/types/campaign-settings";
 import { Profile } from "@/lib/types/profile";
 import type { IntentOutput, OutcomeOutput } from "@/lib/types/turn";
 import { and, desc, eq, isNull, sql } from "drizzle-orm";
@@ -67,6 +73,26 @@ export function retrievalBudget(epicness: number): 0 | 3 | 6 | 9 {
   if (epicness >= 0.5) return 6;
   if (epicness >= 0.25) return 3;
   return 0;
+}
+
+/**
+ * Resolve the campaign's per-turn model context from the loaded
+ * settings jsonb. Post-M1.5 campaigns carry `provider` + `tier_models`
+ * (via `CampaignSettings`); legacy rows that slipped past the Commit-B
+ * migration fall back to `anthropicFallbackConfig()` so the turn
+ * continues rather than erroring. If the config is present but
+ * invalid (e.g. a model the provider doesn't support), the throw
+ * surfaces immediately — silent fallback on invalid config would mask
+ * a misconfiguration.
+ */
+export function resolveModelContext(settingsJson: unknown): CampaignProviderConfig {
+  const parsed = CampaignSettings.safeParse(settingsJson ?? {});
+  if (!parsed.success) return anthropicFallbackConfig();
+  const { provider, tier_models } = parsed.data;
+  if (!provider || !tier_models) return anthropicFallbackConfig();
+  const config: CampaignProviderConfig = { provider, tier_models };
+  validateCampaignProviderConfig(config); // throws if misconfigured
+  return config;
 }
 
 /**
@@ -249,6 +275,11 @@ export async function* runTurn(
   try {
     const ctx = await loadTurnContext(db, input.campaignId, input.userId);
     const settings = (ctx.campaignRow.settings ?? {}) as Record<string, unknown>;
+    // Resolve per-campaign provider + tier_models once and thread it
+    // through every sub-agent call on this turn. A misconfigured
+    // campaign (e.g. selecting Google before M3.5) throws here and
+    // surfaces as a terminal turn error to the player.
+    const modelContext = resolveModelContext(ctx.campaignRow.settings);
 
     // -------------------------------------------------------------------
     // Route pre-pass
@@ -281,6 +312,7 @@ export async function* runTurn(
     const verdict = await routePlayerMessage(routerInput, {
       trace: deps.trace,
       logger,
+      modelContext,
       ...deps.routerDeps,
     });
 
@@ -373,7 +405,7 @@ export async function* runTurn(
               value: o.value,
             })) ?? [],
         },
-        { trace: deps.trace, logger },
+        { trace: deps.trace, logger, modelContext },
       );
       outcome = judgedOutcome;
     }
@@ -437,6 +469,7 @@ export async function* runTurn(
           active_composition: settings.active_composition as never,
           arc_override: settings.arc_override as never,
         },
+        modelContext,
         workingMemory: ctx.workingMemory,
         compaction: [],
         block4: {

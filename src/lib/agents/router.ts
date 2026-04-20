@@ -93,23 +93,27 @@ export async function routePlayerMessage(
     input: { playerMessage: parsed.playerMessage, campaignPhase: parsed.campaignPhase },
   });
 
+  // Base deps threaded into every sub-agent. Per-sub-agent overrides
+  // (test injection of mock providers, etc.) spread last so they win.
+  const subagentBase = {
+    trace: deps.trace,
+    logger: deps.logger,
+    modelContext: deps.modelContext,
+  };
+
   const intent = await classifyIntent(
     {
       playerMessage: parsed.playerMessage,
       recentTurnsSummary: parsed.recentTurnsSummary,
       campaignPhase: parsed.campaignPhase,
     },
-    {
-      trace: deps.trace,
-      logger: deps.logger,
-      ...deps.intentClassifier,
-    },
+    { ...subagentBase, ...deps.intentClassifier },
   );
 
   if (intent.intent === "META_FEEDBACK") {
     const override = await handleOverride(
       { command: parsed.playerMessage, prior_overrides: parsed.priorOverrides },
-      { trace: deps.trace, logger: deps.logger, ...deps.overrideHandler },
+      { ...subagentBase, ...deps.overrideHandler },
     );
     const verdict: RouterVerdict = { kind: "meta", intent, override };
     span?.end({ output: { kind: verdict.kind, intent: intent.intent } });
@@ -119,7 +123,7 @@ export async function routePlayerMessage(
   if (intent.intent === "OVERRIDE_COMMAND") {
     const override = await handleOverride(
       { command: parsed.playerMessage, prior_overrides: parsed.priorOverrides },
-      { trace: deps.trace, logger: deps.logger, ...deps.overrideHandler },
+      { ...subagentBase, ...deps.overrideHandler },
     );
     const verdict: RouterVerdict = { kind: "override", intent, override };
     span?.end({ output: { kind: verdict.kind, intent: intent.intent } });
@@ -135,7 +139,7 @@ export async function routePlayerMessage(
         activeCanonRules: parsed.activeCanonRules,
         recentTurnsSummary: parsed.recentTurnsSummary,
       },
-      { trace: deps.trace, logger: deps.logger, ...deps.worldBuilder },
+      { ...subagentBase, ...deps.worldBuilder },
     );
     const verdict: RouterVerdict = {
       kind: "worldbuilder",
