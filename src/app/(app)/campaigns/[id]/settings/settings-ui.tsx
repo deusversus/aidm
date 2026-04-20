@@ -15,6 +15,15 @@ interface Props {
   campaignId: string;
   providers: ProviderDefinition[];
   current: CampaignProviderConfig;
+  /**
+   * Opaque concurrency token serialized at page load. Passed back to
+   * the Server Action; if the DB's current provider/tier_models no
+   * longer serialize to this same string, another tab saved between
+   * our load and our submit, and we reject with a "stale" error
+   * prompting a reload. Scoped to provider+tier_models only so
+   * unrelated background writes don't spuriously conflict.
+   */
+  configToken: string;
 }
 
 const USER_FACING_TIERS: TierName[] = ["fast", "thinking", "creative"];
@@ -49,13 +58,19 @@ function incoherenceWarning(tier: TierName, model: string): string {
   return "";
 }
 
-export default function SettingsUI({ campaignId, providers, current }: Props) {
+export default function SettingsUI({ campaignId, providers, current, configToken }: Props) {
   const [providerId, setProviderId] = useState<ProviderId>(current.provider);
   const [tierModels, setTierModels] = useState<TierModels>(current.tier_models);
   const [pending, startTransition] = useTransition();
   const [result, setResult] = useState<{ kind: "ok" } | { kind: "error"; message: string } | null>(
     null,
   );
+  // Form inputs are disabled during submit (FU-5) and when the picked
+  // provider isn't yet available (FU-3; OpenRouter / Google / OpenAI
+  // pre-M3.5/M5.5). Prevents the "form looks live but save is
+  // blocked" confusion.
+  const activeProviderAvailable = providers.find((p) => p.id === providerId)?.available ?? false;
+  const inputsDisabled = pending || !activeProviderAvailable;
 
   const activeProvider = useMemo(
     () => providers.find((p) => p.id === providerId),
@@ -86,10 +101,11 @@ export default function SettingsUI({ campaignId, providers, current }: Props) {
     e.preventDefault();
     setResult(null);
     startTransition(async () => {
-      const res = await saveCampaignModelContext(campaignId, {
-        provider: providerId,
-        tier_models: tierModels,
-      });
+      const res = await saveCampaignModelContext(
+        campaignId,
+        { provider: providerId, tier_models: tierModels },
+        configToken,
+      );
       if (res.ok) {
         setResult({ kind: "ok" });
       } else {
@@ -108,15 +124,18 @@ export default function SettingsUI({ campaignId, providers, current }: Props) {
           id="provider"
           value={providerId}
           onChange={(e) => onProviderChange(e.target.value as ProviderId)}
-          className="rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+          disabled={pending}
+          className="rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-60"
         >
+          {/*
+            `title` on disabled <option> elements isn't shown by most
+            browsers — we surface the unavailable-reason below the
+            select when that provider is selected (see the destructive
+            paragraph below). Keeping "— coming soon" in the visible
+            label so users can scan without picking.
+          */}
           {providers.map((p) => (
-            <option
-              key={p.id}
-              value={p.id}
-              disabled={!p.available}
-              title={p.available ? undefined : p.unavailableReason}
-            >
+            <option key={p.id} value={p.id} disabled={!p.available}>
               {p.displayName}
               {p.available ? "" : " — coming soon"}
             </option>
@@ -148,15 +167,16 @@ export default function SettingsUI({ campaignId, providers, current }: Props) {
                 type="text"
                 value={picked}
                 onChange={(e) => onTierChange(tier, e.target.value)}
+                disabled={inputsDisabled}
                 placeholder="Enter OpenRouter model ID (e.g. openai/gpt-4o)"
-                className="rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                className="rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-60"
               />
             ) : (
               <select
                 id={`tier-${tier}`}
                 value={picked}
                 onChange={(e) => onTierChange(tier, e.target.value)}
-                disabled={roster.length === 0}
+                disabled={inputsDisabled || roster.length === 0}
                 className="rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-60"
               >
                 {roster.length === 0 ? (

@@ -53,3 +53,33 @@ export function mergeSettingsWithProviderConfig(
     tier_models: configParsed.data.tier_models,
   };
 }
+
+/**
+ * Stable, deterministic serialization of a campaign's current
+ * provider+tier_models for optimistic concurrency checks (FU-1). The
+ * settings page computes this at load time and passes it through the
+ * form; the Server Action re-reads the campaign row, computes the
+ * same token, and rejects the save if they differ — that's the
+ * "someone else saved in another tab between your load and submit"
+ * signal.
+ *
+ * Scoped to just provider + tier_models so a concurrent write to an
+ * unrelated field (a future override save, memory writer update)
+ * doesn't spuriously conflict with THIS form's save.
+ */
+export function serializeProviderConfigToken(settingsJson: unknown): string {
+  const parsed = CampaignSettings.safeParse(settingsJson ?? {});
+  if (!parsed.success || !parsed.data.provider || !parsed.data.tier_models) {
+    return "unset";
+  }
+  // Fixed key order — JSON.stringify respects insertion order.
+  return JSON.stringify({
+    provider: parsed.data.provider,
+    tier_models: {
+      probe: parsed.data.tier_models.probe,
+      fast: parsed.data.tier_models.fast,
+      thinking: parsed.data.tier_models.thinking,
+      creative: parsed.data.tier_models.creative,
+    },
+  });
+}

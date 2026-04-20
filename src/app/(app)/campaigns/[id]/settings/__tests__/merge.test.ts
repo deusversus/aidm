@@ -1,6 +1,6 @@
 import { CampaignProviderValidationError } from "@/lib/providers";
 import { describe, expect, it } from "vitest";
-import { mergeSettingsWithProviderConfig } from "../merge";
+import { mergeSettingsWithProviderConfig, serializeProviderConfigToken } from "../merge";
 
 /**
  * Pure-function tests for the settings-merge helper. The Server Action
@@ -148,5 +148,75 @@ describe("mergeSettingsWithProviderConfig", () => {
     // not validating OR repairing existing state; just adding
     // provider + tier_models on top of whatever's there.
     expect(next.overrides).toBe("not-an-array");
+  });
+});
+
+describe("serializeProviderConfigToken (FU-1 optimistic concurrency)", () => {
+  it('returns "unset" when settings has no provider/tier_models yet', () => {
+    expect(serializeProviderConfigToken(null)).toBe("unset");
+    expect(serializeProviderConfigToken({})).toBe("unset");
+    expect(serializeProviderConfigToken({ active_dna: {} })).toBe("unset");
+    // Half-migrated row — has provider but no tier_models — also "unset".
+    expect(serializeProviderConfigToken({ provider: "anthropic" })).toBe("unset");
+  });
+
+  it("serializes provider + tier_models deterministically (same input → same token)", () => {
+    const settings = {
+      active_dna: {},
+      provider: "anthropic" as const,
+      tier_models: {
+        probe: "claude-haiku-4-5-20251001",
+        fast: "claude-haiku-4-5-20251001",
+        thinking: "claude-opus-4-7",
+        creative: "claude-opus-4-7",
+      },
+      // unrelated field shouldn't affect the token
+      world_state: { location: "Mars" },
+    };
+    const a = serializeProviderConfigToken(settings);
+    const b = serializeProviderConfigToken(settings);
+    expect(a).toBe(b);
+    expect(a).toContain("anthropic");
+    expect(a).toContain("claude-opus-4-7");
+  });
+
+  it("differs when the creative model changes (concurrency detection works)", () => {
+    const before = serializeProviderConfigToken({
+      provider: "anthropic" as const,
+      tier_models: {
+        probe: "claude-haiku-4-5-20251001",
+        fast: "claude-haiku-4-5-20251001",
+        thinking: "claude-opus-4-7",
+        creative: "claude-opus-4-7",
+      },
+    });
+    const after = serializeProviderConfigToken({
+      provider: "anthropic" as const,
+      tier_models: {
+        probe: "claude-haiku-4-5-20251001",
+        fast: "claude-haiku-4-5-20251001",
+        thinking: "claude-opus-4-7",
+        creative: "claude-sonnet-4-6", // swapped creative only
+      },
+    });
+    expect(before).not.toBe(after);
+  });
+
+  it("is insensitive to unrelated-field changes (no spurious conflicts)", () => {
+    // Same provider+tier_models, different world_state. Token identical
+    // so a concurrent world_state write doesn't cause this form to
+    // conflict falsely.
+    const base = {
+      provider: "anthropic" as const,
+      tier_models: {
+        probe: "claude-haiku-4-5-20251001",
+        fast: "claude-haiku-4-5-20251001",
+        thinking: "claude-opus-4-7",
+        creative: "claude-opus-4-7",
+      },
+    };
+    const a = serializeProviderConfigToken({ ...base, world_state: { location: "A" } });
+    const b = serializeProviderConfigToken({ ...base, world_state: { location: "B" } });
+    expect(a).toBe(b);
   });
 });

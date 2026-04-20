@@ -10,6 +10,7 @@ import { campaigns } from "@/lib/state/schema";
 import { CampaignSettings } from "@/lib/types/campaign-settings";
 import { and, eq, isNull } from "drizzle-orm";
 import { notFound, redirect } from "next/navigation";
+import { serializeProviderConfigToken } from "./merge";
 import SettingsUI from "./settings-ui";
 
 export const runtime = "nodejs";
@@ -57,6 +58,13 @@ export default async function CampaignSettingsPage({ params }: PageProps) {
   // coming without us inventing a separate "roadmap" surface.
   const providers: ProviderDefinition[] = listProviders();
 
+  // Concurrency token: serialize the current provider+tier_models so
+  // the Server Action can detect "another tab saved while you were
+  // editing this one." Scoped to just these fields — unrelated
+  // background writes (e.g. memory writer landing at M4) won't
+  // spuriously invalidate this form.
+  const configToken = serializeProviderConfigToken(campaign.settings);
+
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-6">
       <header className="flex flex-col gap-1">
@@ -67,7 +75,12 @@ export default async function CampaignSettingsPage({ params }: PageProps) {
         </p>
       </header>
 
-      <SettingsUI campaignId={campaign.id} providers={providers} current={current} />
+      <SettingsUI
+        campaignId={campaign.id}
+        providers={providers}
+        current={current}
+        configToken={configToken}
+      />
     </div>
   );
 }

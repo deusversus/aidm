@@ -6,7 +6,7 @@ import { CampaignProviderValidationError } from "@/lib/providers";
 import { campaigns } from "@/lib/state/schema";
 import { and, eq, isNull } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
-import { mergeSettingsWithProviderConfig } from "./merge";
+import { mergeSettingsWithProviderConfig, serializeProviderConfigToken } from "./merge";
 
 /**
  * Save a campaign's provider + tier_models choice.
@@ -29,6 +29,13 @@ export type SaveModelContextResult = { ok: true } | { ok: false; code: string; m
 export async function saveCampaignModelContext(
   campaignId: string,
   input: unknown,
+  /**
+   * Opaque token produced at page load via `serializeProviderConfigToken`.
+   * Undefined for legacy callers (pre-FU-1) — skip the stale check in
+   * that case so we don't break existing consumers during deploy.
+   * New form submits always pass it.
+   */
+  configToken?: string,
 ): Promise<SaveModelContextResult> {
   const user = await getCurrentUser();
   if (!user) {
@@ -52,6 +59,23 @@ export async function saveCampaignModelContext(
       code: "campaign_not_found",
       message: "Campaign not found or not yours.",
     };
+  }
+
+  // Optimistic concurrency check (FU-1). Token was computed at page
+  // load; re-compute from the current DB row. If they don't match,
+  // another tab saved between the user's load and submit — surface a
+  // stale-save error with a reload prompt rather than silently
+  // overwriting their sibling tab's changes.
+  if (configToken !== undefined) {
+    const currentToken = serializeProviderConfigToken(row.settings);
+    if (currentToken !== configToken) {
+      return {
+        ok: false,
+        code: "stale_config",
+        message:
+          "This campaign's settings changed in another tab or session. Reload the page to see the latest and try again.",
+      };
+    }
   }
 
   // Merge + validate via the pure helper. Any shape or registry
