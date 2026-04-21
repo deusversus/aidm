@@ -19,6 +19,7 @@ import {
   anthropicFallbackConfig,
   validateCampaignProviderConfig,
 } from "@/lib/providers";
+import { assembleSessionRuleLibraryGuidance } from "@/lib/rules/library";
 import { campaigns, characters, npcs, profiles, turns } from "@/lib/state/schema";
 import { type AidmSpanHandle, type AidmToolContext, invokeTool } from "@/lib/tools";
 import { CampaignSettings } from "@/lib/types/campaign-settings";
@@ -779,6 +780,19 @@ export async function* runTurn(
     };
     const budget = retrievalBudget(verdict.intent.epicness, verdict.intent);
 
+    // Rule-library bundle for this session (v3-parity, Phase 2C of v3-audit
+    // closure). Pulled fresh each turn at M1 — four small DB roundtrips, a
+    // few KB of content. Will move to campaign.settings.session_cache in
+    // Phase 7 polish. Graceful degradation: lookup misses produce an empty
+    // section, never an error.
+    const sessionRuleLibrary = await assembleSessionRuleLibraryGuidance(db, {
+      profile: ctx.profile,
+      activeDna: settings.active_dna as never,
+      activeComposition: settings.active_composition as never,
+      characterPowerTier: ctx.characterRow?.powerTier ?? null,
+      campaignId: input.campaignId,
+    });
+
     const runKa = deps.runKa ?? runKeyAnimator;
     const kaIter = runKa(
       {
@@ -816,6 +830,7 @@ export async function* runTurn(
           },
         },
         activeCompositionMode: compositionMode,
+        sessionRuleLibrary: sessionRuleLibrary || undefined,
         voicePatternsJournal: voicePatternsJournal || undefined,
         toolContext,
         abortController: input.abort,
