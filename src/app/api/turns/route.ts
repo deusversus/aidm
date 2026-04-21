@@ -1,7 +1,11 @@
 import { getDb } from "@/lib/db";
+import { campaigns } from "@/lib/state/schema";
+import { CampaignSettings } from "@/lib/types/campaign-settings";
 import { chronicleTurn, computeArcTrigger } from "@/lib/workflow/chronicle";
+import { runMeta, shouldDispatchMeta } from "@/lib/workflow/meta";
 import { runTurn } from "@/lib/workflow/turn";
 import { currentUser } from "@clerk/nextjs/server";
+import { and, eq, isNull } from "drizzle-orm";
 import { NextResponse, after } from "next/server";
 import { z } from "zod";
 
@@ -74,6 +78,70 @@ export async function POST(req: Request) {
 
       try {
         const db = getDb();
+
+        // Phase 5 meta-conversation dispatch. Pre-parse for slash
+        // commands + check in-flight meta state; route to runMeta when
+        // appropriate, runTurn otherwise. The DB lookup is cheap and
+        // bounded; avoids a full runTurn round-trip for meta exchanges.
+        const [campaignRow] = await db
+          .select({ settings: campaigns.settings })
+          .from(campaigns)
+          .where(
+            and(
+              eq(campaigns.id, body.campaignId),
+              eq(campaigns.userId, user.id),
+              isNull(campaigns.deletedAt),
+            ),
+          )
+          .limit(1);
+        const parsed = CampaignSettings.safeParse(campaignRow?.settings ?? {});
+        const metaState = parsed.success ? parsed.data.meta_conversation : undefined;
+
+        // If the player resumed with a suffix, consume it as the turn
+        // message. Drop the meta state first so runTurn sees a clean
+        // game state.
+        if (shouldDispatchMeta(body.message, metaState)) {
+          const metaIter = runMeta(
+            {
+              campaignId: body.campaignId,
+              userId: user.id,
+              playerMessage: body.message,
+            },
+            { db },
+          );
+          let pendingResumeSuffix: string | undefined;
+          for await (const ev of metaIter) {
+            const { type, ...rest } = ev;
+            controller.enqueue(encodeSseEvent(type, rest));
+            if (type === "exited") pendingResumeSuffix = ev.pendingResumeSuffix;
+          }
+          // If /resume had a suffix, fall through to runTurn with the
+          // suffix as the gameplay message. Otherwise send a terminal
+          // `done`-shaped event so the client knows the meta exchange
+          // concluded.
+          if (pendingResumeSuffix) {
+            // Intentional fallthrough — continue to runTurn below.
+            body.message = pendingResumeSuffix;
+          } else {
+            controller.enqueue(
+              encodeSseEvent("done", {
+                turnId: "",
+                turnNumber: 0,
+                narrative: "",
+                ttftMs: null,
+                totalMs: 0,
+                costUsd: null,
+                portraitNames: [],
+                verdictKind: "meta" as const,
+                intent: null,
+                outcome: null,
+              }),
+            );
+            controller.close();
+            return;
+          }
+        }
+
         const iter = runTurn(
           {
             campaignId: body.campaignId,

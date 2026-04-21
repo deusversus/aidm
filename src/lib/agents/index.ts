@@ -65,6 +65,15 @@ export {
   generateContextBlock,
 } from "./context-block-generator";
 
+// --- Meta director (v3-parity Phase 5) ---
+export {
+  MetaDirectorInput,
+  MetaDirectorOutput,
+  type MetaDirectorDeps,
+  runMetaDirector,
+  SuggestedOverride,
+} from "./meta-director";
+
 // --- Judgment consultants (Commit 5) ---
 export {
   CombatAgentInput,

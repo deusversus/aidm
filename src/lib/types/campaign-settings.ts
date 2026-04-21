@@ -58,6 +58,34 @@ const VoicePatterns = z.object({
   patterns: z.array(z.string()).default([]),
 });
 
+/**
+ * Meta-conversation state (Phase 5 of v3-audit closure). The player enters
+ * with `/meta <feedback>`, the Director responds in an authorship-
+ * calibration register, and subsequent messages are treated as meta
+ * replies until `/resume` / `/play` / `/back` / `/exit` exits the state.
+ *
+ * Meta turns do NOT consume a game turn — they're persisted here (not in
+ * the `turns` table) so turn_number continues from the last real gameplay
+ * exchange when the player resumes. This matches v3's "authorship
+ * conductor loop" pattern.
+ */
+const MetaConversation = z.object({
+  /** True while the player is in the /meta dialectic; false after /resume / exit. */
+  active: z.boolean(),
+  /** The gameplay-turn-number at which the meta conversation began. */
+  started_at_turn: z.number().int().min(0),
+  /** Per-message log. Appended on every meta turn. */
+  history: z.array(
+    z.object({
+      role: z.enum(["player", "director", "ka"]),
+      text: z.string(),
+      ts: z.string(),
+    }),
+  ),
+  /** `/resume <suffix>` pre-seeds the next gameplay message; consumed on next /send. */
+  pending_resume_suffix: z.string().optional(),
+});
+
 export const CampaignSettings = z
   .object({
     // M1: tonal state + world state + overrides.
@@ -72,6 +100,7 @@ export const CampaignSettings = z
     director_notes: z.array(z.string()).optional(),
     arc_plan: ArcPlan.optional(),
     canon_rules: z.array(z.string()).optional(),
+    meta_conversation: MetaConversation.optional(),
 
     // M1.5 — per-campaign provider + tier_models. Optional here so
     // legacy (pre-migration) rows don't fail parse; validated via
