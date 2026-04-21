@@ -1,5 +1,6 @@
 import { type ArcTrigger, type ChroniclerDeps, runChronicler } from "@/lib/agents/chronicler";
 import type { Db } from "@/lib/db";
+import { decayHeat } from "@/lib/memory/decay";
 import { campaigns, turns } from "@/lib/state/schema";
 import type { AidmToolContext } from "@/lib/tools";
 import { and, eq, isNull, sql } from "drizzle-orm";
@@ -180,6 +181,21 @@ export async function chronicleTurn(
         queryFn: deps.queryFn,
       },
     );
+
+    // Run heat decay post-Chronicler so any memories Chronicler just
+    // wrote at the current turn don't decay on their insert-turn
+    // (GREATEST(0, currentTurn - turn_number) = 0 → multiplier^0 = 1).
+    // Earlier memories get their turn-distance multiplier applied.
+    // Runs best-effort: a decay failure is logged but doesn't fail the
+    // chronicling pass, which has already been stamped-idempotent.
+    try {
+      await decayHeat(db, input.campaignId, input.turnNumber);
+    } catch (err) {
+      logger("warn", "chronicleTurn: decayHeat failed (non-fatal)", {
+        turnId: input.turnId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
 
     // Mark as chronicled. Tightly scoped to the just-processed turn.
     await db.update(turns).set({ chronicledAt: new Date() }).where(eq(turns.id, input.turnId));

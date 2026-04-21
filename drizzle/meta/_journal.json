@@ -43,6 +43,13 @@
       "when": 1776795255199,
       "tag": "0005_faithful_mongoose",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1776796051676,
+      "tag": "0006_talented_hellcat",
+      "breakpoints": true
     }
   ]
 }

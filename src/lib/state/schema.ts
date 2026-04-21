@@ -437,8 +437,25 @@ export const semanticMemories = pgTable(
     category: text("category").notNull(),
     /** Distilled fact in 1-3 sentences. */
     content: text("content").notNull(),
-    /** Heat 0-100. Decays with turn distance per category's decay rate. */
-    heat: integer("heat").notNull().default(50),
+    /**
+     * Heat 0-100. Decays with turn distance per category's decay rate
+     * (§9.1 decay curves). Default 100 — v3-parity: start hot, let decay
+     * do the work. Chronicler can write lower for supporting details.
+     */
+    heat: integer("heat").notNull().default(100),
+    /**
+     * Decay-modifying flags (§9.1 physics). Respected by decayHeat job +
+     * read-path boost-on-access + static-boost retrieval.
+     *
+     *   plot_critical: bool           — never decays (heat floors at
+     *                                   insert-time value; always at
+     *                                   most +0.3 relevance boost).
+     *   milestone_relationship: bool  — heat floors at 40 regardless of
+     *                                   decay multiplier.
+     *   boost_priority: number        — caller-chosen static boost
+     *                                   (M4-gated retrieval path).
+     */
+    flags: jsonb("flags").notNull().default(sql`'{}'::jsonb`),
     /** Turn this fact was first written. */
     turnNumber: integer("turn_number").notNull(),
     /** pgvector embedding. Null at M1; M4 decides embedder + backfills. */

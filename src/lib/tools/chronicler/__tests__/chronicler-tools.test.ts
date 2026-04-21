@@ -313,7 +313,7 @@ describe("Chronicler tools", () => {
   });
 
   describe("write_semantic_memory", () => {
-    it("inserts with default heat 50 and null embedding", async () => {
+    it("inserts with default heat 100 (Phase 4 v3-parity: start hot, let decay do the work)", async () => {
       const mod = await freshRegistry();
       const captured = makeCaptured();
       const db = fakeDb(captured, { insertReturning: [{ id: UUID }] });
@@ -323,8 +323,27 @@ describe("Chronicler tools", () => {
         makeCtx(db),
       );
       const v = captured.inserts[0]?.values as Record<string, unknown>;
-      expect(v.heat).toBe(50);
+      expect(v.heat).toBe(100);
       expect("embedding" in v).toBe(false); // null by column default
+      expect(v.flags).toEqual({}); // default empty when not provided
+    });
+
+    it("persists flags (plot_critical bypasses decay)", async () => {
+      const mod = await freshRegistry();
+      const captured = makeCaptured();
+      const db = fakeDb(captured, { insertReturning: [{ id: UUID }] });
+      await mod.invokeTool(
+        "write_semantic_memory",
+        {
+          category: "lore",
+          content: "The Red Dragon syndicate funds Vicious.",
+          turn_number: 1,
+          flags: { plot_critical: true },
+        },
+        makeCtx(db),
+      );
+      const v = captured.inserts[0]?.values as Record<string, unknown>;
+      expect(v.flags).toEqual({ plot_critical: true });
     });
 
     it("clamps heat to [0, 100]", async () => {

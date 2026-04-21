@@ -19,8 +19,20 @@ const InputSchema = z.object({
       "§9.1 category: relationship | location_fact | ability_fact | lore | npc_interaction | world_state | etc. Free-form at M1; Chronicler may nominate new categories.",
     ),
   content: z.string().min(1).describe("Distilled fact in 1–3 sentences"),
-  heat: z.number().int().min(0).max(100).default(50),
+  heat: z.number().int().min(0).max(100).default(100),
   turn_number: z.number().int().positive(),
+  /**
+   * Decay-modifying flags (§9.1 physics). plot_critical bypasses decay
+   * entirely; milestone_relationship floors at 40. Use sparingly —
+   * these override the category's decay curve.
+   */
+  flags: z
+    .object({
+      plot_critical: z.boolean().optional(),
+      milestone_relationship: z.boolean().optional(),
+      boost_priority: z.number().optional(),
+    })
+    .optional(),
 });
 
 const OutputSchema = z.object({
@@ -42,6 +54,7 @@ export const writeSemanticMemoryTool = registerTool({
         category: input.category,
         content: input.content,
         heat: input.heat,
+        flags: input.flags ?? {},
         turnNumber: input.turn_number,
         // embedding stays null — M4 decides embedder
       })

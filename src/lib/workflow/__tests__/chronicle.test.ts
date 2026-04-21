@@ -154,10 +154,12 @@ describe("chronicleTurn — wrapper semantics (Commit 7.4)", () => {
     expect(lockSqls).toMatch(/pg_advisory_lock/);
     expect(lockSqls).toMatch(/pg_advisory_unlock/);
 
-    // chronicled_at was set via update.
-    expect(hooks.updateCalls).toHaveLength(1);
-    const patch = hooks.updateCalls[0]?.patch as Record<string, unknown>;
-    expect(patch.chronicledAt).toBeInstanceOf(Date);
+    // chronicled_at was set via update. (Phase 4 added a decayHeat update
+    // call too; filter for the chronicled_at patch specifically.)
+    const chronicledAtPatches = hooks.updateCalls.filter(
+      (u) => (u.patch as Record<string, unknown>).chronicledAt instanceof Date,
+    );
+    expect(chronicledAtPatches).toHaveLength(1);
   });
 
   it("idempotency: already-chronicled turn returns 'already_chronicled' without running Chronicler", async () => {
