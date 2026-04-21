@@ -72,16 +72,28 @@ describe("validateAssertion (WorldBuilder)", () => {
     expect(result.response).toContain("?");
   });
 
-  it("returns REJECT with in-character prose, never a modal", async () => {
+  it("returns FLAG with accepting in-character prose + a craft concern (Phase 6B reshape)", async () => {
+    // v4 WB reshape (Phase 6B): REJECT is gone. Player assertions that
+    // would have been rejected in v3 now surface as FLAG — accepted at
+    // the fiction layer, with a craft advisory for Director/Chronicler.
     const { validateAssertion } = await import("../world-builder");
     const anthropic = fakeAnthropic([
       {
         text: JSON.stringify({
-          decision: "REJECT",
+          decision: "FLAG",
           response:
-            "The satchel is lighter than you remember. The amulet isn't there, and you know, with the cold certainty of memory, that you left it behind in the village.",
-          entityUpdates: [],
-          rationale: "Canonically absent in full_cast mode.",
+            "You pull out the dragon egg and for a moment Spike stares. It's the size of your palm, rough as volcanic stone. He doesn't ask where it came from.",
+          entityUpdates: [
+            { kind: "item", name: "Dragon egg", description: "palm-sized, volcanic-rough" },
+          ],
+          flags: [
+            {
+              concern:
+                "Introduces a dragon-tier artifact into Cowboy Bebop's grounded-noir register; may compress tonal consistency.",
+              severity: "worth_watching",
+            },
+          ],
+          rationale: "Accepted per editor-not-gatekeeper posture; craft flag for Director review.",
         }),
       },
     ]);
@@ -92,7 +104,9 @@ describe("validateAssertion (WorldBuilder)", () => {
       },
       { anthropic },
     );
-    expect(result.decision).toBe("REJECT");
+    expect(result.decision).toBe("FLAG");
+    expect(result.flags).toHaveLength(1);
+    expect(result.flags[0]?.severity).toBe("worth_watching");
     expect(result.response).not.toMatch(/error|rejected|invalid/i);
   });
 

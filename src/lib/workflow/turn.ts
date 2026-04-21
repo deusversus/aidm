@@ -523,7 +523,13 @@ export async function* runTurn(
           .where(and(eq(campaigns.id, input.campaignId), eq(campaigns.userId, input.userId)));
       }
 
-      if (verdict.kind === "worldbuilder" && verdict.verdict.decision === "ACCEPT") {
+      // Persist on ACCEPT and FLAG (FLAG is "accept with craft concern" —
+      // the assertion is canon, the flag rides alongside for Director).
+      // CLARIFY short-circuits before KA with a question; no persistence.
+      if (
+        verdict.kind === "worldbuilder" &&
+        (verdict.verdict.decision === "ACCEPT" || verdict.verdict.decision === "FLAG")
+      ) {
         const turnNum = ctx.nextTurnNumber;
         const baseToolCtx: AidmToolContext = {
           campaignId: input.campaignId,
@@ -534,32 +540,65 @@ export async function* runTurn(
         for (const update of verdict.verdict.entityUpdates) {
           try {
             if (update.kind === "npc") {
+              // Phase 6B: pass structured NPCDetails-shaped fields
+              // straight through to register_npc. Falls back to
+              // `details` string in `personality` when structured
+              // fields absent (legacy WB outputs).
               await invokeTool(
                 "register_npc",
                 {
                   name: update.name,
-                  personality: update.details,
+                  personality: update.personality ?? update.details ?? "",
+                  goals: update.goals,
+                  secrets: update.secrets,
+                  faction: update.faction ?? null,
+                  visual_tags: update.visual_tags,
+                  knowledge_topics: update.knowledge_topics,
+                  power_tier: update.power_tier,
+                  ensemble_archetype: update.ensemble_archetype ?? null,
                   first_seen_turn: turnNum,
                   last_seen_turn: turnNum,
                 },
                 baseToolCtx,
               );
             } else if (update.kind === "location") {
+              // Pass structured fields in the details jsonb.
+              const locDetails: Record<string, unknown> = {};
+              if (update.description || update.details) {
+                locDetails.description = update.description ?? update.details;
+              }
+              if (update.atmosphere) locDetails.atmosphere = update.atmosphere;
+              if (update.notable_features) locDetails.notable_features = update.notable_features;
+              if (update.faction_owner) locDetails.faction_owner = update.faction_owner;
               await invokeTool(
                 "register_location",
                 {
                   name: update.name,
-                  details: { description: update.details },
+                  details: locDetails,
                   first_seen_turn: turnNum,
                   last_seen_turn: turnNum,
                 },
                 baseToolCtx,
               );
+            } else if (update.kind === "faction") {
+              // New in Phase 6B. Factions weren't in the original
+              // entityUpdates enum.
+              const factionDetails: Record<string, unknown> = {};
+              if (update.description || update.details) {
+                factionDetails.description = update.description ?? update.details;
+              }
+              if (update.leadership) factionDetails.leadership = update.leadership;
+              if (update.allegiance) factionDetails.allegiance = update.allegiance;
+              if (update.goals) factionDetails.goals = update.goals;
+              await invokeTool(
+                "register_faction",
+                { name: update.name, details: factionDetails },
+                baseToolCtx,
+              );
             } else if (update.kind === "fact") {
               // Player-asserted fact. Heat 80 (above KA-narrated default
-              // of 50) because player assertions are more binding than
-              // narrative inference — the player's commitment to the
-              // fiction is stronger signal.
+              // of 100 is now the new default — player facts stay at 80
+              // to let KA writes on the same turn win ties).
               await invokeTool(
                 "write_semantic_memory",
                 {
@@ -573,11 +612,14 @@ export async function* runTurn(
             } else if (update.kind === "item") {
               // Items catalog landing later (inventory layer). For now
               // file under semantic memory so the assertion isn't lost.
+              const itemContent = update.description
+                ? `${update.name}: ${update.description}`
+                : `${update.name}: ${update.details}`;
               await invokeTool(
                 "write_semantic_memory",
                 {
                   category: "item",
-                  content: `${update.name}: ${update.details}`,
+                  content: itemContent,
                   heat: 70,
                   turn_number: turnNum,
                 },
@@ -823,7 +865,13 @@ export async function* runTurn(
           style_drift_directive: renderStyleDriftDirective(styleDrift),
           vocabulary_freshness_advisory: renderVocabFreshnessAdvisory(staleConstructions),
           director_notes: directorNotes,
-          player_overrides: routerInput.priorOverrides?.map((o) => o.value) ?? [],
+          // v3-parity format: `[CATEGORY] value` so KA sees the semantic
+          // hint (NPC_PROTECTION vs CONTENT_CONSTRAINT vs NARRATIVE_DEMAND
+          // vs TONE_REQUIREMENT). Phase 6C of v3-audit closure — dropping
+          // the category tag silently loses meaning KA needs to narrate
+          // faithfully.
+          player_overrides:
+            routerInput.priorOverrides?.map((o) => `[${o.category}] ${o.value}`) ?? [],
           arc_state: {
             current_arc: arcPlan.current_arc ?? null,
             arc_phase: arcPlan.arc_phase ?? null,

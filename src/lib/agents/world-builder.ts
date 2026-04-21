@@ -45,18 +45,66 @@ export const WorldBuilderInput = z.object({
 // Use the input-side type so callers can omit defaulted fields.
 export type WorldBuilderInput = z.input<typeof WorldBuilderInput>;
 
-export const WorldBuilderDecision = z.enum(["ACCEPT", "CLARIFY", "REJECT"]);
+/**
+ * WB reshape (v3-parity Phase 6B, locked 2026-04-20 per
+ * memory/project_worldbuilder_as_editor.md): REJECT is gone. Default
+ * is ACCEPT. CLARIFY fires only for local physical ambiguity (scene
+ * can't literally render the assertion as-written). FLAG is new —
+ * accept the assertion, but surface a craft concern for Chronicler /
+ * Director to weigh.
+ */
+export const WorldBuilderDecision = z.enum(["ACCEPT", "CLARIFY", "FLAG"]);
 
+/**
+ * Structured entity update. Shape varies by kind — prompt schema
+ * documents the field set per kind. Zod is permissive here (record
+ * of string→unknown for type-specific fields) so Chronicler can
+ * consume the richest shape the model produces, while downstream
+ * typed writes validate-in-depth at the tool boundary.
+ */
 export const EntityUpdate = z.object({
-  kind: z.enum(["npc", "item", "location", "fact"]),
+  kind: z.enum(["npc", "item", "location", "faction", "fact"]),
   name: z.string(),
-  details: z.string(),
+  /** v3-parity: free-form summary string. Coexists with structured
+   * fields for forward compatibility. */
+  details: z.string().default(""),
+  // NPC-specific
+  personality: z.string().optional(),
+  goals: z.array(z.string()).optional(),
+  secrets: z.array(z.string()).optional(),
+  faction: z.string().nullable().optional(),
+  visual_tags: z.array(z.string()).optional(),
+  knowledge_topics: z.record(z.string(), z.enum(["expert", "moderate", "basic"])).optional(),
+  power_tier: z.string().optional(),
+  ensemble_archetype: z.string().nullable().optional(),
+  // Location-specific
+  description: z.string().optional(),
+  atmosphere: z.string().optional(),
+  notable_features: z.array(z.string()).optional(),
+  faction_owner: z.string().nullable().optional(),
+  // Faction-specific
+  leadership: z.string().optional(),
+  allegiance: z.string().optional(),
+  // Item-specific
+  properties: z.array(z.string()).optional(),
 });
+export type EntityUpdate = z.infer<typeof EntityUpdate>;
+
+/**
+ * Non-blocking craft advisory surfaced alongside an ACCEPT. Chronicler
+ * + Director read these; player sees only the `response` prose.
+ */
+export const WorldBuilderFlag = z.object({
+  concern: z.string().min(1),
+  severity: z.enum(["minor", "worth_watching"]).default("minor"),
+});
+export type WorldBuilderFlag = z.infer<typeof WorldBuilderFlag>;
 
 export const WorldBuilderOutput = z.object({
   decision: WorldBuilderDecision,
   response: z.string().min(1),
   entityUpdates: z.array(EntityUpdate).default([]),
+  flags: z.array(WorldBuilderFlag).default([]),
   rationale: z.string(),
 });
 export type WorldBuilderOutput = z.infer<typeof WorldBuilderOutput>;
@@ -66,6 +114,7 @@ const CLARIFY_FALLBACK: WorldBuilderOutput = {
   response:
     "Something about the way you've told it isn't quite settling into the scene yet. Tell me more — when, where, how?",
   entityUpdates: [],
+  flags: [],
   rationale: "WorldBuilder fallback: retry budget exhausted; asking the player to rephrase.",
 };
 
