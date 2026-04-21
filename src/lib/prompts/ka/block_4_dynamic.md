@@ -12,6 +12,11 @@
 ### Mechanical verdict (from OutcomeJudge, if pre-judged)
 {{outcome_verdict}}
 
+### Effective composition mode
+{{active_composition_mode}}
+
+(This is the per-turn mode after attacker/defender tier differential. `standard` = parity; `blended` = protagonist moderately above opposition; `op_dominant` = protagonist crushing a far weaker foe — reframe stakes onto meaning, cost, or consequence rather than survival; `not_applicable` = non-combat or tier info absent. Narrate the exchange according to this mode, not the Profile's canonical composition mode.)
+
 ### Retrieval budget for this turn
 {{retrieval_budget}}
 

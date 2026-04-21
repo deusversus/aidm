@@ -1,3 +1,4 @@
+import type { CompositionMode } from "@/lib/agents/scale-selector-agent";
 import { getPrompt } from "@/lib/prompts";
 import type { Composition } from "@/lib/types/composition";
 import type { DNAScales, PartialDNAScales } from "@/lib/types/dna";
@@ -41,6 +42,14 @@ export interface CompactionEntry {
 export interface Block4Context {
   intent: IntentOutput;
   outcome?: OutcomeOutput;
+  /**
+   * Effective composition mode for this turn — standard | blended |
+   * op_dominant | not_applicable. Deterministically computed in the turn
+   * workflow from attacker/defender tier gap. Rendered in Block 4 so KA
+   * sees the mode shift (OP-dominant reframes stakes onto meaning, not
+   * survival).
+   */
+  active_composition_mode?: CompositionMode;
   /**
    * Tiered semantic-memory retrieval budget (§9). 0/3/6/9 by epicness.
    * Rendered as an advisory directive in Block 4 — KA decides how
@@ -94,6 +103,13 @@ export interface RenderBlocksInput {
   voicePatternsJournal?: string;
   /** Session-stable rule-library guidance (currently empty at M1). */
   sessionRuleLibrary?: string;
+  /**
+   * Effective composition mode for this turn. Threaded into Block 1's
+   * active_tonal_state display when non-standard so KA sees the mode
+   * shift alongside DNA + composition. Block 4 shows the same value as
+   * its own template var for per-turn surfacing.
+   */
+  activeCompositionMode?: CompositionMode;
 }
 
 export interface RenderedBlocks {
@@ -241,6 +257,9 @@ export function renderKaBlocks(input: RenderBlocksInput): RenderedBlocks {
   const activeDna = campaign.active_dna ?? profile.canonical_dna;
   const activeComposition = campaign.active_composition ?? profile.canonical_composition;
 
+  const activeModeLine = input.activeCompositionMode
+    ? `effective_composition_mode: ${input.activeCompositionMode}`
+    : null;
   const block1Vars: Record<string, string> = {
     profile_title: profile.title,
     profile_media_type: profile.media_type,
@@ -253,6 +272,7 @@ export function renderKaBlocks(input: RenderBlocksInput): RenderedBlocks {
       formatDna(activeDna),
       "composition:",
       formatComposition(activeComposition as unknown as Record<string, unknown>),
+      ...(activeModeLine ? [activeModeLine] : []),
     ].join("\n"),
     dna_delta: formatDnaDelta(profile.canonical_dna, activeDna),
     profile_power_system: JSON.stringify(profile.ip_mechanics.power_system, null, 2),
@@ -297,6 +317,7 @@ export function renderKaBlocks(input: RenderBlocksInput): RenderedBlocks {
     intent_epicness: block4.intent.epicness.toFixed(2),
     intent_special_conditions: formatSpecialConditions(block4.intent.special_conditions),
     outcome_verdict: formatOutcome(block4.outcome),
+    active_composition_mode: block4.active_composition_mode ?? "standard",
     retrieval_budget: formatRetrievalBudget(block4.retrieval_budget),
     player_message: block4.player_message,
     scene_location: block4.scene?.location ?? "(unknown)",

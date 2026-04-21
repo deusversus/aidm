@@ -1,6 +1,7 @@
 import { type RouterDeps, type RouterInput, routePlayerMessage } from "@/lib/agents";
 import { renderVoicePatternsJournal } from "@/lib/agents/director";
 import { type KeyAnimatorEvent, runKeyAnimator } from "@/lib/agents/key-animator";
+import type { CompositionMode } from "@/lib/agents/scale-selector-agent";
 import { type AgentLogger, defaultLogger } from "@/lib/agents/types";
 import { judgeOutcomeWithValidation } from "@/lib/agents/validator";
 import type { Db } from "@/lib/db";
@@ -18,8 +19,8 @@ import {
   anthropicFallbackConfig,
   validateCampaignProviderConfig,
 } from "@/lib/providers";
-import { campaigns, characters, profiles, turns } from "@/lib/state/schema";
-import type { AidmSpanHandle, AidmToolContext } from "@/lib/tools";
+import { campaigns, characters, npcs, profiles, turns } from "@/lib/state/schema";
+import { type AidmSpanHandle, type AidmToolContext, invokeTool } from "@/lib/tools";
 import { CampaignSettings } from "@/lib/types/campaign-settings";
 import { Profile } from "@/lib/types/profile";
 import type { IntentOutput, OutcomeOutput } from "@/lib/types/turn";
@@ -63,17 +64,101 @@ const ADVISORY_LOCK_TIMEOUT_MS = 15_000;
  * Tiered memory retrieval budget (§9 — v3 0/3/6/9 ladder).
  *
  * KA's semantic retrieval gets progressively larger as epicness rises.
- * Low-stakes turns (epicness < 0.25) don't pull from semantic memory at
- * all; pivotal turns (≥ 0.75) pull up to nine candidates. This is an
- * advisory — KA sees the budget in Block 4 and chooses how aggressively
- * to query the semantic layer itself via MCP. Pre-retrieval would
- * invert the KA-as-orchestrator design.
+ * Intent + special_conditions shape the budget too: COMBAT floors at
+ * Tier 2 (combat without continuity reads flat), special_conditions
+ * bump up a tier (sakuga triggers warrant extra context), and a trivial
+ * action gate drops the budget to 0 for low-stakes non-consequential
+ * moves regardless of accidental epicness noise.
+ *
+ * Thresholds match v3's calibration exactly (0.3 / 0.6 breakpoints, not
+ * 0.25 / 0.5 / 0.75). Commit 8's golden-turn evals assume these bounds.
+ *
+ * This is an advisory — KA sees the budget in Block 4 and chooses how
+ * aggressively to query the semantic layer itself via MCP. Pre-retrieval
+ * would invert the KA-as-orchestrator design.
  */
-export function retrievalBudget(epicness: number): 0 | 3 | 6 | 9 {
-  if (epicness >= 0.75) return 9;
-  if (epicness >= 0.5) return 6;
-  if (epicness >= 0.25) return 3;
-  return 0;
+export function retrievalBudget(epicness: number, intent: IntentOutput): 0 | 3 | 6 | 9 {
+  // Trivial action gate (v3 `is_trivial_action`). Low-epicness inventory
+  // checks, pocket-rummages, "I look around" — zero semantic hits even
+  // if special_conditions would otherwise bump.
+  const consequentialIntents = new Set(["COMBAT", "ABILITY", "SOCIAL"]);
+  const trivial =
+    !consequentialIntents.has(intent.intent) &&
+    epicness < 0.2 &&
+    intent.special_conditions.length === 0;
+  if (trivial) return 0;
+
+  // v3-verbatim tier ladder. 0.3 / 0.6 are the load-bearing breakpoints.
+  let tier = epicness < 0.2 ? 0 : epicness <= 0.3 ? 1 : epicness <= 0.6 ? 2 : 3;
+  // COMBAT floors at Tier 2 — combat without continuity reads flat.
+  if (intent.intent === "COMBAT" && tier < 2) tier = 2;
+  // Special conditions bump the tier (sakuga triggers warrant more context).
+  if (intent.special_conditions.length > 0 && tier < 3) tier += 1;
+  const ladder = [0, 3, 6, 9] as const;
+  return ladder[tier] ?? 0;
+}
+
+/**
+ * Parse a PowerTier string ("T1"–"T10") into its integer form.
+ * T1 = most powerful (omnipotent), T10 = weakest (human baseline) — so
+ * a HIGHER integer means a WEAKER tier. Returns null for malformed input
+ * so callers can fall back to `not_applicable` rather than crash.
+ */
+function parsePowerTier(s: string | null | undefined): number | null {
+  if (!s) return null;
+  const m = s.match(/^T(\d+)$/);
+  if (!m?.[1]) return null;
+  const n = Number.parseInt(m[1], 10);
+  if (Number.isNaN(n) || n < 1 || n > 10) return null;
+  return n;
+}
+
+/**
+ * Effective per-turn composition mode (§7.3 scale-selector, deterministic
+ * compute — not a model call). v3's scale-selector reframed stakes when
+ * attacker/defender tier gap was wide: a Tier 3 hero against a Tier 9
+ * mook narrates differently than Tier 8 vs Tier 8. Without this, OJ +
+ * KA see the profile's default mode regardless of what's actually on
+ * stage, and the "OP protagonist reframes onto meaning not survival"
+ * machinery is silently inert.
+ *
+ * Returns `not_applicable` for non-combat intents or when either
+ * participant's tier can't be determined — the fallback is safer than
+ * guessing.
+ */
+export async function computeEffectiveCompositionMode(
+  db: Db,
+  campaignId: string,
+  character: typeof characters.$inferSelect | null,
+  intent: IntentOutput,
+  scene: { present_npcs?: string[] | null } | undefined,
+): Promise<CompositionMode> {
+  if (intent.intent !== "COMBAT" && intent.intent !== "ABILITY") {
+    return "not_applicable";
+  }
+  const attackerTier = parsePowerTier(character?.powerTier);
+  if (attackerTier === null) return "not_applicable";
+
+  // Defender lookup: prefer explicit intent.target; fall back to the
+  // first present NPC (rough heuristic — works for two-party scenes).
+  const defenderName = intent.target ?? scene?.present_npcs?.[0];
+  if (!defenderName) return "not_applicable";
+
+  const [npcRow] = await db
+    .select({ powerTier: npcs.powerTier })
+    .from(npcs)
+    .where(and(eq(npcs.campaignId, campaignId), eq(npcs.name, defenderName)))
+    .limit(1);
+  const defenderTier = parsePowerTier(npcRow?.powerTier);
+  if (defenderTier === null) return "not_applicable";
+
+  // diff > 0 means defender is a WEAKER tier (higher integer); attacker
+  // is overpowered relative to them. v3 thresholds: +3 → op_dominant,
+  // +2 → blended, else → standard.
+  const diff = defenderTier - attackerTier;
+  if (diff >= 3) return "op_dominant";
+  if (diff === 2) return "blended";
+  return "standard";
 }
 
 /**
@@ -156,6 +241,13 @@ export interface TurnWorkflowDeps {
   routerDeps?: RouterDeps;
   /** Inject mock KA for tests. Defaults to real KA. */
   runKa?: typeof runKeyAnimator;
+  /**
+   * Inject a mock `routePlayerMessage` in tests. Lets us drive deterministic
+   * verdicts without having to mock the three sub-agents (IntentClassifier,
+   * OverrideHandler, WorldBuilder) + the two structured-runner providers
+   * behind them.
+   */
+  routeFn?: typeof routePlayerMessage;
 }
 
 export type TurnWorkflowEvent =
@@ -356,7 +448,8 @@ export async function* runTurn(
           }>)
         : [],
     };
-    const verdict = await routePlayerMessage(routerInput, {
+    const routeFn = deps.routeFn ?? routePlayerMessage;
+    const verdict = await routeFn(routerInput, {
       trace: deps.trace,
       logger,
       modelContext,
@@ -389,6 +482,115 @@ export async function* runTurn(
           portraitMap: {},
         })
         .returning({ id: turns.id });
+
+      // ---------------------------------------------------------------
+      // Post-short-circuit persistence (v3-parity audit fix, 2026-04-21).
+      //
+      // Router kinds MUST bind state; "classify then forget" was the
+      // original regression. Three paths:
+      //
+      //   OVERRIDE → append to campaign.settings.overrides (so next
+      //     turn's priorOverrides reads it back + Block 4 surfaces it).
+      //   WB ACCEPT → route entityUpdates through Chronicler write
+      //     tools (invokeTool). WB runs BEFORE KA so KA can't catalog
+      //     these itself; if we don't fire the writes here, the
+      //     player-asserted fact evaporates after the ack.
+      //   META → no persistence at Phase 1 (meta conversation loop
+      //     lands at Phase 5 of v3-audit-closure).
+      // ---------------------------------------------------------------
+      if (verdict.kind === "override" && verdict.override.mode === "override") {
+        const category = verdict.override.category;
+        if (category) {
+          const newOverride = {
+            id: crypto.randomUUID(),
+            category,
+            value: verdict.override.value,
+            scope: verdict.override.scope,
+            created_at: new Date().toISOString(),
+          };
+          const existing = Array.isArray(settings.overrides) ? settings.overrides : [];
+          const newSettings = { ...settings, overrides: [...existing, newOverride] };
+          await db
+            .update(campaigns)
+            .set({ settings: newSettings })
+            .where(and(eq(campaigns.id, input.campaignId), eq(campaigns.userId, input.userId)));
+        }
+      }
+
+      if (verdict.kind === "worldbuilder" && verdict.verdict.decision === "ACCEPT") {
+        const turnNum = ctx.nextTurnNumber;
+        const baseToolCtx: AidmToolContext = {
+          campaignId: input.campaignId,
+          userId: input.userId,
+          db,
+          trace: deps.trace,
+        };
+        for (const update of verdict.verdict.entityUpdates) {
+          try {
+            if (update.kind === "npc") {
+              await invokeTool(
+                "register_npc",
+                {
+                  name: update.name,
+                  personality: update.details,
+                  first_seen_turn: turnNum,
+                  last_seen_turn: turnNum,
+                },
+                baseToolCtx,
+              );
+            } else if (update.kind === "location") {
+              await invokeTool(
+                "register_location",
+                {
+                  name: update.name,
+                  details: { description: update.details },
+                  first_seen_turn: turnNum,
+                  last_seen_turn: turnNum,
+                },
+                baseToolCtx,
+              );
+            } else if (update.kind === "fact") {
+              // Player-asserted fact. Heat 80 (above KA-narrated default
+              // of 50) because player assertions are more binding than
+              // narrative inference — the player's commitment to the
+              // fiction is stronger signal.
+              await invokeTool(
+                "write_semantic_memory",
+                {
+                  category: "fact",
+                  content: `${update.name}: ${update.details}`,
+                  heat: 80,
+                  turn_number: turnNum,
+                },
+                baseToolCtx,
+              );
+            } else if (update.kind === "item") {
+              // Items catalog landing later (inventory layer). For now
+              // file under semantic memory so the assertion isn't lost.
+              await invokeTool(
+                "write_semantic_memory",
+                {
+                  category: "item",
+                  content: `${update.name}: ${update.details}`,
+                  heat: 70,
+                  turn_number: turnNum,
+                },
+                baseToolCtx,
+              );
+            }
+          } catch (err) {
+            // Best-effort. A failed write on one entity shouldn't stop
+            // the rest. Surface in trace + logs so regressions aren't
+            // silent.
+            logger("warn", "WB entity persist failed", {
+              kind: update.kind,
+              name: update.name,
+              error: err instanceof Error ? err.message : String(err),
+            });
+          }
+        }
+      }
+
       yield {
         type: "done",
         turnId: persisted?.id ?? "",
@@ -414,6 +616,26 @@ export async function* runTurn(
       response: null,
       turnNumber: ctx.nextTurnNumber,
     };
+
+    // -------------------------------------------------------------------
+    // Effective composition mode (§7.3 scale-selector — deterministic
+    // compute, not a model call). Threads into OJ context + Block 1 +
+    // Block 4. v3-parity: without this every turn sees "standard" and
+    // OP protagonist reframing is silently inert.
+    // -------------------------------------------------------------------
+    const scene = (settings.world_state ?? {}) as {
+      location?: string;
+      situation?: string;
+      time_context?: string;
+      present_npcs?: string[];
+    };
+    const compositionMode = await computeEffectiveCompositionMode(
+      db,
+      input.campaignId,
+      ctx.characterRow,
+      verdict.intent,
+      scene,
+    );
 
     // -------------------------------------------------------------------
     // OutcomeJudge pre-pass (consequential intents only).
@@ -449,7 +671,7 @@ export async function* runTurn(
               }
             : {},
           canonRules,
-          compositionMode: "standard",
+          compositionMode,
           activeOverrides:
             routerInput.priorOverrides?.map((o) => ({
               category: o.category,
@@ -486,14 +708,39 @@ export async function* runTurn(
       narrativeWeight: outcome?.narrative_weight,
       recentlyUsed: [],
     });
-    const staleConstructions = detectStaleConstructions({ recentNarrations });
 
-    const scene = (settings.world_state ?? {}) as {
-      location?: string;
-      situation?: string;
-      time_context?: string;
-      present_npcs?: string[];
-    };
+    // Build the vocab-freshness whitelists at the call site. Without these
+    // the detector false-positives on character names ("Spike Spiegel"
+    // tripping simile_like_a) and power-system jargon ("Nen" flagged as
+    // a construction). v3-parity: the Sets were passed verbatim; v4 wired
+    // the detector but left the inputs empty — this closes that gap.
+    //
+    // Bounded at 1000 names — the detector's proper-noun set is O(n) in
+    // match iteration, and a campaign with >1000 NPCs is implausible.
+    const npcCatalog = await db
+      .select({ name: npcs.name })
+      .from(npcs)
+      .where(eq(npcs.campaignId, input.campaignId))
+      .limit(1000);
+    const properNouns = new Set<string>([
+      ...(ctx.characterRow ? [ctx.characterRow.name] : []),
+      ...npcCatalog.map((n) => n.name),
+      ...(ctx.profile.ip_mechanics.voice_cards?.map((v) => v.name) ?? []),
+    ]);
+    const jargonAllowlist = new Set<string>([
+      ...(ctx.profile.ip_mechanics.power_system?.limitations
+        ?.split(/\s+/)
+        .map((w) => w.toLowerCase()) ?? []),
+      ...(ctx.profile.ip_mechanics.power_system?.tiers?.map((t) => t.toLowerCase()) ?? []),
+      ...((ctx.profile.ip_mechanics.author_voice?.sentence_patterns ?? []).flatMap((p) =>
+        p.split(/\s+/).map((w) => w.toLowerCase()),
+      ) ?? []),
+    ]);
+    const staleConstructions = detectStaleConstructions({
+      recentNarrations,
+      properNouns,
+      jargonAllowlist,
+    });
 
     const toolContext: AidmToolContext = {
       campaignId: input.campaignId,
@@ -521,7 +768,7 @@ export async function* runTurn(
       arc_phase?: string | null;
       tension_level?: number | null;
     };
-    const budget = retrievalBudget(verdict.intent.epicness);
+    const budget = retrievalBudget(verdict.intent.epicness, verdict.intent);
 
     const runKa = deps.runKa ?? runKeyAnimator;
     const kaIter = runKa(
@@ -539,6 +786,7 @@ export async function* runTurn(
           player_message: input.playerMessage,
           intent: verdict.intent,
           outcome,
+          active_composition_mode: compositionMode,
           retrieval_budget: budget,
           sakuga_injection: sakuga?.fragment,
           style_drift_directive: renderStyleDriftDirective(styleDrift),
@@ -558,6 +806,7 @@ export async function* runTurn(
             present_npcs: scene.present_npcs ?? [],
           },
         },
+        activeCompositionMode: compositionMode,
         voicePatternsJournal: voicePatternsJournal || undefined,
         toolContext,
         abortController: input.abort,

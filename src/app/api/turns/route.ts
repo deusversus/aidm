@@ -92,12 +92,15 @@ export async function POST(req: Request) {
             // perceived latency is unchanged. FIFO-per-campaign lock +
             // idempotency guard are both inside chronicleTurn.
             //
-            // At M1 we only chronicle `continue` turns (player-driven
-            // narrative). META / OVERRIDE / WORLDBUILDER short-circuits
-            // persist their own structured effects elsewhere (e.g.
-            // campaign.settings.overrides for WB) and don't need the
-            // full cataloguing pass.
-            if (ev.verdictKind === "continue") {
+            // Chronicle on `continue` (player-driven narrative) AND
+            // `worldbuilder` (player-asserted canon). WB short-circuits
+            // already persisted entity updates synchronously inside the
+            // turn workflow; Chronicler adds the episodic summary,
+            // spotlight-debt maintenance, and voice-patterns observation
+            // that apply equally to WB turns. META / OVERRIDE skip
+            // chronicling — their structured effects are the whole point
+            // of the turn; no narrative to catalog.
+            if (ev.verdictKind === "continue" || ev.verdictKind === "worldbuilder") {
               const chronicleInput = {
                 turnId: ev.turnId,
                 campaignId: body.campaignId,
