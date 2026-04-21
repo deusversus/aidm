@@ -51,6 +51,13 @@ export interface Block4Context {
    */
   active_composition_mode?: CompositionMode;
   /**
+   * Beat-craft guidance text for the current arc phase (Phase 7 polish,
+   * MINOR #18). Rendered alongside arc_phase so KA sees how to narrate
+   * the phase (setup orients, complication destabilizes, etc.), not
+   * just the name of the phase.
+   */
+  arc_phase_craft?: string;
+  /**
    * Tiered semantic-memory retrieval budget (§9). 0/3/6/9 by epicness.
    * Rendered as an advisory directive in Block 4 — KA decides how
    * aggressively to query `search_memory` given the budget.
@@ -128,10 +135,21 @@ export interface RenderedBlocks {
 
 const VARIABLE_RE = /\{\{([a-zA-Z0-9_]+)\}\}/g;
 
+/**
+ * Substitute {{var}} tokens in a template. Unresolved tokens render as
+ * `[UNSET: name]` so drift is visible in trace output; in dev mode we
+ * also console.warn so the regression surfaces before it reaches a turn.
+ * Phase 7 polish (v3-audit closure MINOR #24).
+ */
 function substitute(template: string, vars: Record<string, string>): string {
   return template.replace(VARIABLE_RE, (_match, name: string) => {
     const v = vars[name];
-    if (v === undefined) return `[UNSET: ${name}]`;
+    if (v === undefined) {
+      if (process.env.NODE_ENV !== "production") {
+        console.warn(`[blocks] unfilled template var: {{${name}}}`);
+      }
+      return `[UNSET: ${name}]`;
+    }
     return v;
   });
 }
@@ -194,6 +212,24 @@ function formatAuthorVoice(voice: unknown): string {
     lines.push(`  example_voice: ${v.example_voice}`);
   }
   return lines.length ? lines.join("\n") : "(none defined)";
+}
+
+/**
+ * Format the power system block with limitations foregrounded. v3
+ * explicitly formatted `**LIMITATIONS (You MUST Respect These):**` with
+ * directive weight; dumping the raw JSON (as v4 did pre-Phase-7) loses
+ * that emphasis. Phase 7 polish (MINOR #16).
+ */
+function formatPowerSystem(ps: Profile["ip_mechanics"]["power_system"]): string {
+  if (!ps) return "(no canonical power system — narrate without system constraints)";
+  const lines: string[] = [`**${ps.name}** — ${ps.mechanics}`];
+  if (ps.tiers.length > 0) {
+    lines.push(`Tiers: ${ps.tiers.join(", ")}`);
+  }
+  if (ps.limitations?.trim()) {
+    lines.push("", "**LIMITATIONS (you MUST respect these):**", ps.limitations.trim());
+  }
+  return lines.join("\n");
 }
 
 function formatPresentNpcs(npcs: string[] | undefined): string {
@@ -282,7 +318,7 @@ export function renderKaBlocks(input: RenderBlocksInput): RenderedBlocks {
       ...(activeModeLine ? [activeModeLine] : []),
     ].join("\n"),
     dna_delta: formatDnaDelta(profile.canonical_dna, activeDna),
-    profile_power_system: JSON.stringify(profile.ip_mechanics.power_system, null, 2),
+    profile_power_system: formatPowerSystem(profile.ip_mechanics.power_system),
     profile_power_distribution: JSON.stringify(profile.ip_mechanics.power_distribution, null, 2),
     profile_stat_mapping: profile.ip_mechanics.stat_mapping
       ? JSON.stringify(profile.ip_mechanics.stat_mapping, null, 2)
@@ -328,6 +364,8 @@ export function renderKaBlocks(input: RenderBlocksInput): RenderedBlocks {
     intent_special_conditions: formatSpecialConditions(block4.intent.special_conditions),
     outcome_verdict: formatOutcome(block4.outcome),
     active_composition_mode: block4.active_composition_mode ?? "standard",
+    arc_phase_craft:
+      block4.arc_phase_craft ?? "(no beat-craft guidance for this phase — narrate by judgment)",
     retrieval_budget: formatRetrievalBudget(block4.retrieval_budget),
     player_message: block4.player_message,
     scene_location: block4.scene?.location ?? "(unknown)",

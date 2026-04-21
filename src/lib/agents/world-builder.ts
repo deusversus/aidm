@@ -69,6 +69,10 @@ export const EntityUpdate = z.object({
    * fields for forward compatibility. */
   details: z.string().default(""),
   // NPC-specific
+  /** v3-parity NPCDetails.role (ally / rival / mentor / enemy / neutral /
+   * acquaintance). Phase 6 audit found this missing from the plan's
+   * enumeration; WB outputs now carry role through to register_npc. */
+  role: z.string().optional(),
   personality: z.string().optional(),
   goals: z.array(z.string()).optional(),
   secrets: z.array(z.string()).optional(),

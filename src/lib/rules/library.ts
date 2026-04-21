@@ -79,6 +79,17 @@ export async function getArchetypeGuidance(db: Db, archetype: string): Promise<s
   return lookupContent(db, "archetype", null, archetype);
 }
 
+/**
+ * Beat-craft guidance for the current arc phase. v3's Approach D — per-
+ * phase writing-craft directives. Block 4's arc_phase value on its own
+ * just renders an enum; this getter fetches the prose about HOW to
+ * narrate that phase (setup orients, complication destabilizes, etc.).
+ * Phase 7 polish — MINOR #18.
+ */
+export async function getBeatCraftGuidance(db: Db, arcPhase: string): Promise<string | null> {
+  return lookupContent(db, "beat_craft", null, arcPhase);
+}
+
 // ---------------------------------------------------------------------------
 // Session-level bundle assembly.
 // ---------------------------------------------------------------------------

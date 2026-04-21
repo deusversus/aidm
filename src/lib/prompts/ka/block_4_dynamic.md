@@ -30,6 +30,8 @@
 **Current arc:** {{arc_current}}
 **Arc phase:** {{arc_phase}}
 **Tension level:** {{arc_tension}}
+**Beat-craft guidance for this phase:**
+{{arc_phase_craft}}
 **Active foreshadowing seeds that could surface:**
 {{active_foreshadowing}}
 

@@ -26,7 +26,8 @@
     "prompts:dump": "tsx scripts/prompts-dump.ts",
     "seed:campaign": "tsx scripts/seed-campaign.ts",
     "migrate:campaign-providers": "tsx scripts/migrate-campaign-providers.ts",
-    "rules:index": "tsx scripts/rules-index.ts"
+    "rules:index": "tsx scripts/rules-index.ts",
+    "prompts:graph": "tsx scripts/prompts-graph.ts"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.114",

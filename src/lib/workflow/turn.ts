@@ -20,7 +20,7 @@ import {
   validateCampaignProviderConfig,
 } from "@/lib/providers";
 import { assembleSessionContextBlocks } from "@/lib/rules/context-blocks";
-import { assembleSessionRuleLibraryGuidance } from "@/lib/rules/library";
+import { assembleSessionRuleLibraryGuidance, getBeatCraftGuidance } from "@/lib/rules/library";
 import { campaigns, characters, npcs, profiles, turns } from "@/lib/state/schema";
 import { type AidmSpanHandle, type AidmToolContext, invokeTool } from "@/lib/tools";
 import { CampaignSettings } from "@/lib/types/campaign-settings";
@@ -329,6 +329,7 @@ interface LoadedContext {
     turn_number: number;
     player_message: string;
     narrative_text: string;
+    style_drift_used: string | null;
   }>;
   nextTurnNumber: number;
 }
@@ -365,6 +366,7 @@ async function loadTurnContext(db: Db, campaignId: string, userId: string): Prom
       turn_number: turns.turnNumber,
       player_message: turns.playerMessage,
       narrative_text: turns.narrativeText,
+      style_drift_used: turns.styleDriftUsed,
     })
     .from(turns)
     .where(eq(turns.campaignId, campaignId))
@@ -548,6 +550,7 @@ export async function* runTurn(
                 "register_npc",
                 {
                   name: update.name,
+                  role: update.role,
                   personality: update.personality ?? update.details ?? "",
                   goals: update.goals,
                   secrets: update.secrets,
@@ -750,11 +753,18 @@ export async function* runTurn(
     // directive when recent openings already vary; vocab-freshness
     // scans the last N narrations for construction-level repetition.
     const recentNarrations = ctx.workingMemory.map((t) => t.narrative_text);
+    // Last 3 style-drift directives actually injected — suppresses
+    // repeat-in-a-row selection. Phase 7 polish (MINOR #15). Filter
+    // null + coerce to the StyleDrift union type at the call site.
+    const recentlyUsedDrifts = ctx.workingMemory
+      .slice(-3)
+      .map((t) => t.style_drift_used)
+      .filter((d): d is string => d !== null) as Array<import("@/lib/ka/diversity").StyleDrift>;
     const styleDrift = pickStyleDrift({
       recentNarrations,
       intent: verdict.intent,
       narrativeWeight: outcome?.narrative_weight,
-      recentlyUsed: [],
+      recentlyUsed: recentlyUsedDrifts,
     });
 
     // Build the vocab-freshness whitelists at the call site. Without these
@@ -821,6 +831,10 @@ export async function* runTurn(
       arc_phase?: string | null;
       tension_level?: number | null;
     };
+    const arcPhase = arcPlan.arc_phase ?? null;
+    // Beat-craft guidance for the current arc phase (v3-parity Phase 7
+    // MINOR #18). Null-safe: missing phase → null → Block 4 fallback.
+    const arcPhaseCraft = arcPhase ? await getBeatCraftGuidance(db, arcPhase) : null;
     const budget = retrievalBudget(verdict.intent.epicness, verdict.intent);
 
     // Rule-library bundle for this session (v3-parity, Phase 2C of v3-audit
@@ -860,6 +874,7 @@ export async function* runTurn(
           intent: verdict.intent,
           outcome,
           active_composition_mode: compositionMode,
+          arc_phase_craft: arcPhaseCraft ?? undefined,
           retrieval_budget: budget,
           sakuga_injection: sakuga?.fragment,
           style_drift_directive: renderStyleDriftDirective(styleDrift),
@@ -931,6 +946,7 @@ export async function* runTurn(
         costUsd: costUsd === null ? null : costUsd.toFixed(6),
         ttftMs,
         totalMs,
+        styleDriftUsed: styleDrift ?? null,
       })
       .returning({ id: turns.id });
 

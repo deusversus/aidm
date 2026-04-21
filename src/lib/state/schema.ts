@@ -153,6 +153,15 @@ export const turns = pgTable(
      * (which additively shift debt via SQL expression).
      */
     chronicledAt: timestamp("chronicled_at", { withTimezone: true }),
+    /**
+     * Which style-drift directive (if any) was injected into this turn's
+     * Block 4 (Phase 7 polish — MINOR #15). v4 previously hardcoded
+     * `recentlyUsed: []` in pickStyleDrift, so the same directive could
+     * fire several turns in a row. The turn workflow now reads the last
+     * 3 turns' `styleDriftUsed` column to pass as `recentlyUsed`,
+     * closing that regression.
+     */
+    styleDriftUsed: text("style_drift_used"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [

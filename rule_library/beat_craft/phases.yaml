@@ -1,0 +1,45 @@
+library_slug: beat_craft_all
+category: beat_craft
+axis: null
+entries:
+  - value_key: setup
+    tags: [arc_setup, foundation]
+    content: |
+      Setup phase: establish the stakes, the people, the pressure. Narrate to ORIENT
+      the reader — who's on stage, what they want, what's in their way. Lean on
+      atmosphere over incident; let the scene feel lived-in. Avoid resolving tensions
+      you haven't yet introduced. Introduce no more than one new load-bearing element
+      per turn.
+  - value_key: development
+    tags: [arc_development, escalation]
+    content: |
+      Development phase: pressures compound. Characters take action against the
+      established stakes; small wins + small losses; relationships shift incrementally.
+      Narrate to TRACK the arc's upward pressure without hitting climax beats. Avoid
+      over-compressing — let scenes breathe enough to register the accumulation.
+      When in doubt, lean on character reaction over plot advancement.
+  - value_key: complication
+    tags: [arc_complication, twist]
+    content: |
+      Complication phase: what seemed straightforward turns. A revelation reframes
+      the stakes, an ally wavers, a plan fails productively. Narrate to DESTABILIZE —
+      the reader should feel the ground shift under the protagonist's feet. Withhold
+      resolution; this is not the climax. Use one strong complication per turn, not
+      three.
+  - value_key: crisis
+    tags: [arc_crisis, climax_proximity]
+    content: |
+      Crisis phase: the arc converges. Everything set up comes to bear. Narrate at
+      HIGHEST intensity your DNA permits — escalation compounds from prior turns.
+      The protagonist faces the question the arc has been asking. This is where
+      sakuga CLIMACTIC fires if it's going to; this is where OJ verdicts carry
+      irrevocable weight. Restraint is still possible but not required.
+  - value_key: resolution
+    tags: [arc_resolution, denouement]
+    content: |
+      Resolution phase: after the peak. Narrate to LAND the consequences — wins
+      earn their cost, losses are absorbed, the world reshapes around what just
+      happened. Pacing slows; interiority returns; characters who were in motion
+      can finally speak or be quiet. Avoid re-escalating; the arc's question has
+      been answered. Setup for the next arc can surface as a closing gesture but
+      shouldn't dominate.
