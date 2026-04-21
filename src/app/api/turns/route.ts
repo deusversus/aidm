@@ -14,8 +14,16 @@ export const dynamic = "force-dynamic";
  * Protocol: standard text/event-stream. Each SSE event carries JSON:
  *   event: routed   → data: { verdictKind, response, turnNumber }
  *   event: text     → data: { delta }
- *   event: done     → data: { turnId, turnNumber, narrative, ttftMs, totalMs, costUsd, portraitNames }
+ *   event: done     → data: { turnId, turnNumber, narrative, ttftMs, totalMs,
+ *                             costUsd, portraitNames, verdictKind, intent, outcome }
  *   event: error    → data: { message }
+ *
+ * The `done` payload's verdictKind + intent + outcome fields were added in
+ * Commit 7.4 so the route handler can fire Chronicler via `after()` with
+ * full context. The browser client currently ignores them (typed in
+ * src/hooks/use-turn-stream.ts without the new fields) — extending the
+ * client type is a low-value follow-up if the UI ever needs type-safe
+ * access.
  *
  * Client closes when it sees `done` or `error`. If the fetch is aborted
  * mid-stream (user navigates away, clicks stop), the AbortController

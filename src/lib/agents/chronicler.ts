@@ -115,7 +115,7 @@ function buildChroniclerConsultants(
 function buildUserContent(input: ChroniclerInput): string {
   const outcomeLine = input.outcome
     ? `outcome: ${input.outcome.narrative_weight} ${input.outcome.success_level}${input.outcome.consequence ? ` — ${input.outcome.consequence}` : ""}`
-    : "outcome: (none — router short-circuit)";
+    : "outcome: (none — no pre-judgment; trivial action or short-circuit path)";
   const arcLine = input.arcTrigger
     ? `arc_trigger: ${input.arcTrigger} — arc-level tools (update_arc_plan, update_voice_patterns, write_director_note) ARE enabled this pass`
     : "arc_trigger: null — arc-level tools are DISABLED this pass; skip steps 7–9";
