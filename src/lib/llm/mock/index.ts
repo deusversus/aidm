@@ -45,3 +45,7 @@ export {
   type StartMockServerOptions,
   startMockServer,
 } from "./server";
+
+export { createMockQuery } from "./agent-sdk";
+
+export { getQueryFn, getRuntimeRegistry, resetMockRuntimeForTesting } from "./runtime";

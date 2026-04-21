@@ -1,14 +1,10 @@
+import { getQueryFn } from "@/lib/llm/mock/runtime";
 import { getPrompt } from "@/lib/prompts";
 import type { CampaignProviderConfig } from "@/lib/providers";
 import { buildMcpServers } from "@/lib/tools";
 import type { AidmToolContext } from "@/lib/tools";
 import type { IntentOutput, OutcomeOutput } from "@/lib/types/turn";
-import {
-  type AgentDefinition,
-  type Options,
-  type SDKMessage,
-  query,
-} from "@anthropic-ai/claude-agent-sdk";
+import type { AgentDefinition, Options, SDKMessage, query } from "@anthropic-ai/claude-agent-sdk";
 import type { AgentDeps } from "./types";
 import { defaultLogger } from "./types";
 
@@ -152,7 +148,8 @@ export async function runChronicler(
   deps: ChroniclerDeps = {},
 ): Promise<ChroniclerResult> {
   const logger = deps.logger ?? defaultLogger;
-  const queryFn = deps.queryFn ?? query;
+  // Env-gated mock swap (Phase D of mockllm plan). Explicit deps.queryFn wins.
+  const queryFn = deps.queryFn ?? getQueryFn();
 
   if (input.modelContext.provider !== "anthropic") {
     throw new Error(

@@ -1,4 +1,5 @@
 import { type RenderBlocksInput, renderKaBlocks } from "@/lib/ka/blocks";
+import { getQueryFn } from "@/lib/llm/mock/runtime";
 import { getPrompt } from "@/lib/prompts";
 import type { CampaignProviderConfig } from "@/lib/providers";
 import { buildMcpServers } from "@/lib/tools";
@@ -8,7 +9,7 @@ import {
   type Options,
   type SDKMessage,
   SYSTEM_PROMPT_DYNAMIC_BOUNDARY,
-  query,
+  type query,
 } from "@anthropic-ai/claude-agent-sdk";
 import type { AgentDeps } from "./types";
 import { defaultLogger } from "./types";
@@ -203,7 +204,11 @@ export async function* runKeyAnimator(
   deps: KeyAnimatorDeps = {},
 ): AsyncGenerator<KeyAnimatorEvent, void, void> {
   const logger = deps.logger ?? defaultLogger;
-  const queryFn = deps.queryFn ?? query;
+  // Env-gated mock swap (Phase D of mockllm plan). getQueryFn returns
+  // the real Claude Agent SDK `query` in production, or a fixture-backed
+  // mockQuery when AIDM_MOCK_LLM=1. Explicit dep injection (`deps.queryFn`)
+  // still wins — tests stay deterministic.
+  const queryFn = deps.queryFn ?? getQueryFn();
 
   // KA runs on Claude Agent SDK which is Anthropic-only. Campaigns
   // configured for other providers need their provider's native KA
