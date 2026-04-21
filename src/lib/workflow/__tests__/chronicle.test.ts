@@ -166,12 +166,13 @@ describe("chronicleTurn — wrapper semantics (Commit 7.4)", () => {
     };
     const db = fakeDb(hooks);
     let queryCalled = false;
-    const queryFn = (() => {
-      queryCalled = true;
-      return (async function* () {
-        yield { type: "result", subtype: "success", stop_reason: "end_turn" };
-      })();
-    }) as never;
+    const queryFn = createMockQueryFn([
+      {
+        onCall: () => {
+          queryCalled = true;
+        },
+      },
+    ]);
     const result = await chronicleTurn(baseInput(), { db, queryFn });
     expect(result).toBe("already_chronicled");
     expect(queryCalled).toBe(false);
@@ -200,15 +201,10 @@ describe("chronicleTurn — wrapper semantics (Commit 7.4)", () => {
   it("swallows Chronicler errors and returns 'failed' without rethrowing", async () => {
     const hooks: DbHooks = { executeCalls: [], updateCalls: [] };
     const db = fakeDb(hooks);
-    // Stub that throws the "result error" path Chronicler surfaces.
-    const throwingQuery = (() =>
-      (async function* () {
-        yield {
-          type: "result",
-          subtype: "error_max_turns",
-          stop_reason: "max_turns",
-        };
-      })()) as never;
+    // Stub that surfaces the "result error" path Chronicler handles.
+    const throwingQuery = createMockQueryFn([
+      { result: { subtype: "error_max_turns", stop_reason: "max_turns" } },
+    ]);
     const result = await chronicleTurn(baseInput(), { db, queryFn: throwingQuery });
     expect(result).toBe("failed"); // NOT thrown
     expect(hooks.updateCalls).toHaveLength(0); // chronicled_at NOT set on failure
@@ -220,10 +216,9 @@ describe("chronicleTurn — wrapper semantics (Commit 7.4)", () => {
   it("skips chronicled_at stamping when runChronicler fails (idempotency-safe retry)", async () => {
     const hooks: DbHooks = { executeCalls: [], updateCalls: [] };
     const db = fakeDb(hooks);
-    const throwingQuery = (() =>
-      (async function* () {
-        yield { type: "result", subtype: "error_max_turns", stop_reason: "max_turns" };
-      })()) as never;
+    const throwingQuery = createMockQueryFn([
+      { result: { subtype: "error_max_turns", stop_reason: "max_turns" } },
+    ]);
     await chronicleTurn(baseInput(), { db, queryFn: throwingQuery });
     // Since chronicled_at wasn't set, a later retry would re-run Chronicler.
     expect(

@@ -72,7 +72,9 @@ async function main() {
   console.log(
     `MockLLM listening on http://127.0.0.1:${server.port} · ${fixtureCount} fixtures · mode=${modeTag}`,
   );
-  console.log(`Point Anthropic SDK at ANTHROPIC_BASE_URL=http://127.0.0.1:${server.port}`);
+  console.log(
+    `To route through the mock, run the app with AIDM_MOCK_LLM=1 MOCKLLM_PORT=${server.port}`,
+  );
   if (recordMode) {
     console.log("⚠  Record mode ACTIVE — unknown prompts will hit real Anthropic API.");
     console.log(`   Captured fixtures write to ${recordDir}`);

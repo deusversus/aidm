@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { createMockQueryFn } from "@/lib/llm/mock/testing";
 import { type CampaignProviderConfig, anthropicFallbackConfig } from "@/lib/providers";
 import type { AidmToolContext } from "@/lib/tools";
 import { Profile } from "@/lib/types/profile";
@@ -94,20 +95,15 @@ describe("runKeyAnimator — provider guard (M1.5 Commit D)", () => {
         creative: "claude-sonnet-4-6", // cost-down creative; snapshot
       },
     };
-    // Mock queryFn: capture options.model on first call, then return
-    // a minimal result event so the generator terminates cleanly.
-    const queryFn = ((args: { options: { model?: string } }) => {
-      seenModel = args.options.model;
-      return (async function* () {
-        yield {
-          type: "result",
-          subtype: "success",
-          stop_reason: "end_turn",
-          total_cost_usd: 0,
-          session_id: "test",
-        };
-      })();
-    }) as never;
+    // Unified queryFn stub with onCall capture — replaces the inline
+    // async-generator pattern. Phase F follow-up to Phase E migration.
+    const queryFn = createMockQueryFn([
+      {
+        onCall: (args) => {
+          seenModel = (args.options as { model?: string }).model;
+        },
+      },
+    ]);
     const events: string[] = [];
     for await (const ev of runKeyAnimator(baseInput(customAnthropicContext), { queryFn })) {
       events.push(ev.kind);
@@ -118,20 +114,13 @@ describe("runKeyAnimator — provider guard (M1.5 Commit D)", () => {
 
   it("passes consultant models from modelContext.tier_models (thinking + fast)", async () => {
     let seenAgents: Record<string, { model?: string }> | undefined;
-    const queryFn = ((args: {
-      options: { agents?: Record<string, { model?: string }> };
-    }) => {
-      seenAgents = args.options.agents;
-      return (async function* () {
-        yield {
-          type: "result",
-          subtype: "success",
-          stop_reason: "end_turn",
-          total_cost_usd: 0,
-          session_id: "test",
-        };
-      })();
-    }) as never;
+    const queryFn = createMockQueryFn([
+      {
+        onCall: (args) => {
+          seenAgents = (args.options as { agents?: Record<string, { model?: string }> }).agents;
+        },
+      },
+    ]);
     for await (const _ of runKeyAnimator(baseInput(anthropicFallbackConfig()), { queryFn })) {
       // drain
     }

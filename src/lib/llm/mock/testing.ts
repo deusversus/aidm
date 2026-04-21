@@ -166,6 +166,12 @@ export interface AgentSdkStubResponse {
   toolUse?: Array<{ name: string; input?: Record<string, unknown>; id?: string }>;
   /** Throw this before emitting (simulates immediate subprocess failure). */
   error?: unknown;
+  /**
+   * Callback invoked with the call's { prompt, options } before any
+   * messages emit. Use for wire-assertion tests that need to capture
+   * what runKeyAnimator / runChronicler passed to the SDK.
+   */
+  onCall?: (args: { prompt: string; options: unknown }) => void;
 }
 
 /**
@@ -176,11 +182,12 @@ export interface AgentSdkStubResponse {
  */
 export function createMockQueryFn(responses: AgentSdkStubResponse[]): typeof query {
   const seq = sequence(responses);
-  const stub = async function* (_args: {
+  const stub = async function* (args: {
     prompt: string;
     options: unknown;
   }): AsyncGenerator<SDKMessage, void, void> {
     const r = seq.next("agent-sdk.query");
+    r.onCall?.(args);
     if (r.error) throw r.error;
     const sessionId = `stub_sess_${seq.consumed}`;
 
