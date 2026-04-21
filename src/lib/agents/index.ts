@@ -48,6 +48,15 @@ export {
   runDirector,
 } from "./director";
 
+// --- Chronicler (post-turn archivist; runs via after() in 7.4) ---
+export {
+  type ArcTrigger,
+  type ChroniclerDeps,
+  type ChroniclerInput,
+  type ChroniclerResult,
+  runChronicler,
+} from "./chronicler";
+
 // --- Judgment consultants (Commit 5) ---
 export {
   CombatAgentInput,
