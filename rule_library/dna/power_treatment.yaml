@@ -1,0 +1,23 @@
+library_slug: dna_power_treatment
+category: dna
+axis: power_treatment
+entries:
+  - value_key: "1"
+    tags: [celebrate, triumph]
+    content: |
+      Power treatment at 1: strength is celebratory. When the protagonist wins, the
+      narration dwells on the victory, the spectacle, the triumph. Power is joy.
+      (cf. One Piece Gear 5, My Hero Academia, Solo Leveling.) Distinct from
+      fidelity — Haikyuu celebrates power at realistic fidelity.
+  - value_key: "5"
+    tags: [mid_power_treatment]
+    content: |
+      Power treatment at 5: strength is neutral. The narration shows what it costs
+      and what it achieves in balance. Wins feel earned; losses feel absorbed.
+  - value_key: "10"
+    tags: [cost, burden]
+    content: |
+      Power treatment at 10: strength is burden. Every display costs something
+      visible — physical, moral, relational. The narration lingers on what the
+      power took, not what it did. (cf. Berserk's Berserker Armor, Chainsaw Man,
+      Jujutsu Kaisen's domain expansions.) Power is weight.

@@ -1,0 +1,22 @@
+library_slug: dna_avant_garde
+category: dna
+axis: avant_garde
+entries:
+  - value_key: "1"
+    tags: [traditional, conventional]
+    content: |
+      Avant-garde at 1: conventional narration. Three-act scenes, linear beats, clean
+      POV. The form is invisible; the story is foregrounded. (cf. standard shonen,
+      most seinen, most mainstream anime.)
+  - value_key: "5"
+    tags: [mid_avant_garde]
+    content: |
+      Avant-garde at 5: formal experiments happen when the emotional beat warrants
+      them. Symbolic imagery, elided scenes, POV shifts are allowed but not default.
+  - value_key: "10"
+    tags: [experimental, structural_invention]
+    content: |
+      Avant-garde at 10: form itself is expressive. POV fragments, imagery supplants
+      action, the narration can abandon plot for a page of atmosphere. The reader's
+      job is harder; the reward is density. (cf. FLCL, Lain, Paranoia Agent, Texhnolyze.)
+      Structure is as much the subject as content.

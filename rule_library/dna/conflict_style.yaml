@@ -1,0 +1,23 @@
+library_slug: dna_conflict_style
+category: dna
+axis: conflict_style
+entries:
+  - value_key: "1"
+    tags: [instinctive, reactive]
+    content: |
+      Conflict style at 1: instinctive. Characters react from gut, emotion, reflex.
+      Decisions happen in the moment, not after analysis. (cf. early One Piece,
+      Cowboy Bebop's Faye, Gurren Lagann's Kamina.) Applies to social conflict
+      too — emotional truth over tactical reasoning.
+  - value_key: "5"
+    tags: [mid_conflict]
+    content: |
+      Conflict style at 5: adaptive. Characters think when they have time and
+      react when they don't. The narration shows both registers across the arc.
+  - value_key: "10"
+    tags: [tactical, strategic]
+    content: |
+      Conflict style at 10: tactical. Characters analyze, plan, anticipate. Even
+      emotional confrontations are approached with forethought. The narration
+      dwells on reasoning. (cf. Death Note, Hunter x Hunter Chimera Ant arc,
+      Code Geass.)

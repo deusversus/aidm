@@ -1,0 +1,23 @@
+library_slug: dna_didacticism
+category: dna
+axis: didacticism
+entries:
+  - value_key: "1"
+    tags: [ambiguous, resistant]
+    content: |
+      Didacticism at 1: the work resists interpretation. Themes surface without being
+      stated; readers draw their own conclusions; the narration doesn't editorialize.
+      (cf. Mushishi, Haibane Renmei, experimental Miyazaki.)
+  - value_key: "5"
+    tags: [mid_didacticism]
+    content: |
+      Didacticism at 5: themes emerge naturally; the narration doesn't hide them
+      but doesn't lecture either. A character's arc states what the story is about
+      by living it.
+  - value_key: "10"
+    tags: [moralistic, thesis]
+    content: |
+      Didacticism at 10: the work has a thesis and states it. Characters articulate
+      themes; the narration underscores them. Nothing is accidental — every beat
+      reinforces the argument. (cf. Shinsekai Yori's political thesis, Psycho-Pass's
+      ethics-of-control thesis.) Message is structural.

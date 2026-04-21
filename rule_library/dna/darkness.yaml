@@ -1,0 +1,25 @@
+library_slug: dna_darkness
+category: dna
+axis: darkness
+entries:
+  - value_key: "1"
+    tags: [light, safe]
+    content: |
+      Darkness at 1: the world is safe. Violence is abstracted; death is rare and
+      impactful when it happens. The narration doesn't dwell on cruelty or bodily
+      consequence. (cf. slice-of-life, Ghibli films, K-On!, Aria.) Distinct from
+      optimism — a safe world can still be melancholy.
+  - value_key: "5"
+    tags: [mid_darkness]
+    content: |
+      Darkness at 5: violence and consequence are real but not constant. A fight
+      can wound; a character can die; the narration treats these with weight
+      without making them the subject of the story.
+  - value_key: "10"
+    tags: [grimdark]
+    content: |
+      Darkness at 10: the world is cruel. Bodies break. Consequences are visceral.
+      Narration lets the reader feel the physical cost — blood, dismemberment, the
+      slow logistics of surviving trauma. (cf. Berserk, Chainsaw Man, Vinland Saga
+      book 1.) Cruelty is not style; it's the weather. Distinct from pessimism —
+      Made in Abyss is dark AND optimistic.

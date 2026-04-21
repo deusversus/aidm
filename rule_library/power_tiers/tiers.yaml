@@ -1,0 +1,67 @@
+library_slug: power_tier_all
+category: power_tier
+axis: null
+entries:
+  - value_key: T1
+    tags: [omnipotent, cosmic]
+    content: |
+      Tier 1 (multiversal/omnipotent): creates or destroys reality at will. Stakes
+      cannot be physical — survival is assumed, so narrate meaning, loneliness,
+      purpose, what-remains-to-mean-anything. (cf. late-stage Saitama, Tetsuo
+      post-Akira, divine entities.) Combat is meditation or boredom.
+  - value_key: T2
+    tags: [continental, god_tier]
+    content: |
+      Tier 2 (continental / multi-star-system): single entity can destroy continents
+      or reshape stars. Stakes remain meaning-over-survival for peer conflict;
+      against lower tiers, narrate as overwhelming-power horror. (cf. Escanor, Broly,
+      full-power Saiyan god forms.)
+  - value_key: T3
+    tags: [country_scale, overwhelming]
+    content: |
+      Tier 3 (country-scale / planet-shaker): can level cities or shatter regions.
+      Against peers, combat is possible and stakes are real. Against weaker foes,
+      the encounter is about cost-to-them, not survival. (cf. Goku/Vegeta mid-series,
+      Gojo, Escanor at night.)
+  - value_key: T4
+    tags: [city_scale, spectacle]
+    content: |
+      Tier 4 (city / mountain scale): major buildings or small cities. Spectacle
+      register. Landscape can be damaged. (cf. All Might, Bleach captains, most
+      "level 4" thresholds in power-scaling discourse.)
+  - value_key: T5
+    tags: [building, group_combat]
+    content: |
+      Tier 5 (building scale): can level buildings, fight elite peers, affect
+      groups. Narration can still show individual tactics; stakes are real against
+      peers. (cf. Pro Heroes mid-tier, most action-anime ace fighters.)
+  - value_key: T6
+    tags: [wall, room_scale]
+    content: |
+      Tier 6 (wall / heavy vehicle): punches through walls, takes heavy-weapon
+      hits. Professional combatants in most action series. Narration leans into
+      tactical contest. (cf. average Pro Hero, mid-tier shonen fighters.)
+  - value_key: T7
+    tags: [peak_human, elite]
+    content: |
+      Tier 7 (peak human): top of human baseline. Trained elite, highly dangerous
+      to Tier 10-9, combat-viable against most. (cf. Spike Spiegel, Jet Black,
+      early Attack on Titan soldiers.)
+  - value_key: T8
+    tags: [trained_human]
+    content: |
+      Tier 8 (trained human): soldier, adept martial artist, skilled warrior.
+      Dangerous but not exceptional. Narration treats fights as real-stakes with
+      skill mattering.
+  - value_key: T9
+    tags: [athletic_human]
+    content: |
+      Tier 9 (athletic human): conditioned but not combat-specialist. Survival in
+      combat is uncertain; tactics + environment are everything. (cf. most civilians-
+      turned-fighters, new recruits.)
+  - value_key: T10
+    tags: [civilian, baseline]
+    content: |
+      Tier 10 (civilian baseline): unarmed, untrained human. Combat is survival-
+      horror scale — any serious threat is lethal. Narration should emphasize
+      vulnerability. (cf. any bystander, non-combatant.)

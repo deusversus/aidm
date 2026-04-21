@@ -1,0 +1,33 @@
+library_slug: composition_player_role
+category: composition
+axis: player_role
+entries:
+  - value_key: protagonist
+    tags: [central, lens]
+    content: |
+      Protagonist role: the player is the lens. Narration centers their arc,
+      their growth, their reactions. Other characters exist relative to them.
+  - value_key: ensemble_member
+    tags: [team]
+    content: |
+      Ensemble member role: the player is one of a team. Narration rotates spotlight;
+      the team dynamic is as important as the player's arc. (cf. Haikyuu, any
+      balanced party game.)
+  - value_key: outsider
+    tags: [witness, visitor]
+    content: |
+      Outsider role: the player is a witness, journalist, visitor. They observe the
+      story more than shape it. Narration treats their distance as asset, not defect.
+      (cf. Mushishi's Ginko, Kino's Journey.)
+  - value_key: antagonist
+    tags: [opposing]
+    content: |
+      Antagonist role: the player opposes the canonical protagonist. Narration
+      reframes the source's moral map from the opposition's side. (cf. Code Geass's
+      Lelouch if from Britannia POV.)
+  - value_key: observer
+    tags: [non_participant]
+    content: |
+      Observer role: the player doesn't participate in the canonical events; they're
+      in the world doing something else. Slice-of-life in someone else's story.
+      (cf. Mob Psycho 100's Mob vs the world.)

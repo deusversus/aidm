@@ -1,0 +1,34 @@
+library_slug: composition_arc_shape
+category: composition
+axis: arc_shape
+entries:
+  - value_key: rising
+    tags: [escalating, climax]
+    content: |
+      Rising arc: escalation toward climax. Each beat raises stakes. The narration
+      builds momentum — bigger threats, higher cost, greater commitment. (cf. most
+      shonen, Attack on Titan, Demon Slayer.)
+  - value_key: falling
+    tags: [decline, tragedy]
+    content: |
+      Falling arc: decline from a high point. Stakes compound negatively — losses
+      stack, options narrow. Narration shows the grinding down. (cf. Berserk's
+      Eclipse arc, Made in Abyss late, some noir.)
+  - value_key: cyclical
+    tags: [reset, status_quo]
+    content: |
+      Cyclical arc: returns to status quo. Change happens in microcosm but the
+      frame resets. Narration builds the comfort of return. (cf. Simpsons-style
+      procedurals, Aria, most sitcoms.)
+  - value_key: plateau
+    tags: [steady, exploration]
+    content: |
+      Plateau arc: steady exploration without escalation. Depth accumulates; breadth
+      doesn't. Narration stays at similar emotional altitude across episodes. (cf.
+      Mushishi, Kino's Journey, Yokohama Kaidashi Kikou.)
+  - value_key: fragmented
+    tags: [episodic_with_thread]
+    content: |
+      Fragmented arc: episodic on surface, threaded beneath. Each installment
+      self-contained; through-line visible only in aggregate. Narration respects
+      both registers. (cf. Cowboy Bebop, Samurai Champloo, Baccano.)

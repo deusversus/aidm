@@ -1,0 +1,48 @@
+library_slug: ensemble_archetype_all
+category: archetype
+axis: null
+entries:
+  - value_key: struggler
+    tags: [grit, endurance]
+    content: |
+      Struggler: the ally who endures through pain. Narration locates their
+      arc in what they survive and how it marks them. They're the weight of
+      persistence. (cf. Guts, Thorfinn, Genya.)
+  - value_key: heart
+    tags: [warmth, connection]
+    content: |
+      Heart: the ally who makes the team make sense. The emotional core. Their
+      presence is what the protagonist protects — and narration leans into that.
+      (cf. Faye → Ed from Bebop, Tanjiro's sister Nezuko, Kirito-scale-anchor
+      characters.)
+  - value_key: skeptic
+    tags: [doubt, challenge]
+    content: |
+      Skeptic: the ally who questions everything. They press the protagonist's
+      choices; narration uses them to surface ethical and tactical alternatives.
+      (cf. Jet vs Spike, most "tough mentor" roles.)
+  - value_key: dependent
+    tags: [protected, motivation]
+    content: |
+      Dependent: the ally the protagonist protects. Often younger, weaker, or
+      more vulnerable. Narration weaponizes their at-risk status to make stakes
+      real. (cf. Nezuko, Ed from Bebop, Rika from School Days early.)
+  - value_key: equal
+    tags: [peer, rivalry]
+    content: |
+      Equal: the ally at comparable strength. Rival-companion. Narration uses
+      them to push the protagonist toward growth through parity. (cf. Vegeta,
+      Killua, most shonen rival-best-friends.)
+  - value_key: observer
+    tags: [witness, distance]
+    content: |
+      Observer: the ally who watches and reports back. Often the reader surrogate
+      or the chronicler of events. Narration places them at the edges; their
+      perspective is thematically useful. (cf. Holo the wise-wolf from some POVs,
+      journalist characters.)
+  - value_key: rival
+    tags: [opposition, friction]
+    content: |
+      Rival: the ally who is also somewhat the antagonist. Their goals diverge
+      often; their alliance is tactical. Narration keeps the friction visible.
+      (cf. Sasuke pre-reconciliation, Vegeta Saiyan saga, adversary-allies.)

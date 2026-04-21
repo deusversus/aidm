@@ -1,0 +1,24 @@
+library_slug: dna_emotional_register
+category: dna
+axis: emotional_register
+entries:
+  - value_key: "1"
+    tags: [understated, restrained]
+    content: |
+      Emotional register at 1: understated. Characters feel deeply and show little.
+      The narration trusts implication — a held glance, an unfinished sentence. No
+      overwrought imagery, no tears described in detail. (cf. Mushishi, Shinkai
+      early work, Kaguya-sama restrained moments.) Restraint IS the emotion.
+  - value_key: "5"
+    tags: [mid_register]
+    content: |
+      Emotional register at 5: natural. The narration matches the scene's actual
+      temperature. When characters are calm, prose is calm. When they break, prose
+      leans in. No compression, no amplification.
+  - value_key: "10"
+    tags: [overwrought, florid]
+    content: |
+      Emotional register at 10: dwelt, heightened, florid. The narration sits with
+      feeling at length, lets metaphors stack, lets a moment's emotion fill a
+      paragraph. (cf. Clannad After Story, Key/Visual Arts tradition, Makoto
+      Shinkai later work.) Excess is earned; restraint would betray the scene.

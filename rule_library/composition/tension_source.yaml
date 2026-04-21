@@ -1,0 +1,47 @@
+library_slug: composition_tension_source
+category: composition
+axis: tension_source
+entries:
+  - value_key: existential
+    tags: [meaning, aftermath]
+    content: |
+      Existential tension: survival is assumed; the question is meaning. The narration
+      locates stakes in purpose, loss, aftermath, what-it-all-meant. When the fight
+      ends, the weight is the emptiness that follows. (cf. Cowboy Bebop, Frieren.)
+  - value_key: relational
+    tags: [bonds, trust]
+    content: |
+      Relational tension: stakes live in connection. Trust, betrayal, distance,
+      presence. A battle's importance is who was beside you, not what got destroyed.
+      (cf. Attack on Titan's squad dynamics, Haikyuu, most ensemble work.)
+  - value_key: moral
+    tags: [ethics, dilemma]
+    content: |
+      Moral tension: the question is what's right. The narration sits with the
+      dilemma, doesn't resolve it by fiat, makes the reader feel the weight of
+      either choice. (cf. Monster, Death Note, Psycho-Pass.)
+  - value_key: burden
+    tags: [cost, corruption]
+    content: |
+      Burden tension: power has a price. Every display costs something visible —
+      sacrifice, corruption, exhaustion. The narration tracks the debt accumulating.
+      (cf. Berserk's Berserker Armor, Chainsaw Man.) The tension IS the cost.
+  - value_key: information
+    tags: [discovery, mystery]
+    content: |
+      Information tension: knowledge is the stake. The narration metes out discovery,
+      lets mystery drive. What's learned this turn matters structurally. (cf. Steins;Gate,
+      Erased, The Promised Neverland.)
+  - value_key: consequence
+    tags: [ripple, politics]
+    content: |
+      Consequence tension: actions ripple. Reputations shift; factions move; the
+      world remembers. The narration shows the aftershocks of earlier choices still
+      playing out. (cf. Legend of the Galactic Heroes, Code Geass.)
+  - value_key: control
+    tags: [inner_struggle, corruption]
+    content: |
+      Control tension: the threat is inside. A berserker line, a corrupting power,
+      a rage that could slip. The narration watches the protagonist managing themselves
+      — the antagonist may be their own mind. (cf. Berserk's Guts, Jujutsu Kaisen's
+      Yuji.)

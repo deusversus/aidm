@@ -1,0 +1,23 @@
+library_slug: dna_density
+category: dna
+axis: density
+entries:
+  - value_key: "1"
+    tags: [single_thread]
+    content: |
+      Density at 1: one thing happens per scene. A conversation is about one thing.
+      A fight is about one question. The narration follows a single thread and
+      resists layering. (cf. slice-of-life, single-protagonist intimate drama.)
+  - value_key: "5"
+    tags: [mid_density]
+    content: |
+      Density at 5: two or three threads can coexist in a scene — a conversation's
+      surface topic + the subtext + an off-camera concern. Don't overload, but
+      don't reduce either.
+  - value_key: "10"
+    tags: [many_layers, complex]
+    content: |
+      Density at 10: every scene runs 4-6 threads simultaneously — surface action,
+      subtext, callback, foreshadow, ensemble-background beat, worldbuilding implication.
+      The narration juggles without explaining the juggling. (cf. Legend of the Galactic
+      Heroes, Aria, dense political epics.) Reader is expected to track what's implied.

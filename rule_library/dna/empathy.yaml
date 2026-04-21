@@ -1,0 +1,23 @@
+library_slug: dna_empathy
+category: dna
+axis: empathy
+entries:
+  - value_key: "1"
+    tags: [narrow, single_POV]
+    content: |
+      Empathy at 1: narrow. The narration sympathizes with the protagonist (or a
+      very small circle) and treats others externally. Antagonists are rarely
+      humanized. (cf. Death Note's Light-POV framing, pure protagonist-lens stories.)
+  - value_key: "5"
+    tags: [mid_empathy]
+    content: |
+      Empathy at 5: multiple perspectives available. The narration grants interiority
+      to secondary characters when the scene warrants it. Antagonists get reasons
+      without excuse.
+  - value_key: "10"
+    tags: [wide_empathic_range]
+    content: |
+      Empathy at 10: wide. The narration sympathizes with everyone — even villains,
+      enemies, rivals. Every POV is a door. (cf. Legend of the Galactic Heroes,
+      Vinland Saga book 2, Ashes of the Past doujin spirit.) The reader is asked
+      to hold many hearts.

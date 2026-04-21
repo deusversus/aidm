@@ -1,0 +1,28 @@
+library_slug: composition_antagonist_multiplicity
+category: composition
+axis: antagonist_multiplicity
+entries:
+  - value_key: single_recurring
+    tags: [one_villain]
+    content: |
+      Single recurring: one primary antagonist across the arc. The narration builds
+      their presence long-term — callbacks, escalations, the final confrontation
+      earning its weight. (cf. Death Note's L/Light, Code Geass.)
+  - value_key: shifting
+    tags: [progression]
+    content: |
+      Shifting antagonist: the enemy changes as the arc progresses. Today's foe
+      becomes tomorrow's context. The narration shows the protagonist climbing
+      through layers. (cf. Vinland Saga, Attack on Titan's shifting enemies.)
+  - value_key: episodic
+    tags: [monster_of_week]
+    content: |
+      Episodic antagonist: antagonist-of-the-arc. New threat each chunk, resolved
+      within it. The narration keeps stakes local to the current arc. (cf. Cowboy
+      Bebop, Samurai Champloo, most procedurals.)
+  - value_key: absent
+    tags: [slice_of_life]
+    content: |
+      Absent antagonist: no explicit enemy. The narration finds tension in
+      relationships, internal states, environmental pressure. (cf. slice-of-life,
+      Mushishi, Aria.)

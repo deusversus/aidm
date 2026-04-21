@@ -1,0 +1,60 @@
+library_slug: composition_narrative_focus
+category: composition
+axis: narrative_focus
+entries:
+  - value_key: internal
+    tags: [protagonist, interior]
+    content: |
+      Internal focus: the protagonist's inner journey is the subject. Other characters
+      exist in relation to that arc. Narration centers their growth, their pivots,
+      their understanding. (cf. NGE's Shinji, Vinland Saga's Thorfinn.)
+  - value_key: ensemble
+    tags: [team, allies]
+    content: |
+      Ensemble focus: the team is the subject. Allies get full arcs; spotlight rotates;
+      the narration treats the group as the protagonist. (cf. Haikyuu, Attack on
+      Titan's squads, most heist stories.)
+  - value_key: reverse_ensemble
+    tags: [POV_others]
+    content: |
+      Reverse ensemble: POV lives with those facing the protagonist. The narration
+      shows the opposition's humanity — what it costs them, what they believe. (cf.
+      Vinland Saga book 2, One Piece's occasional antagonist POV.)
+  - value_key: episodic
+    tags: [new_cast, legend]
+    content: |
+      Episodic focus: each arc brings new cast; the protagonist's legend accumulates.
+      The narration introduces fresh faces per arc and treats their relationships
+      with the protagonist as meaningful-but-transient. (cf. Mushishi, Samurai
+      Champloo, most monster-of-the-week.)
+  - value_key: faction
+    tags: [organization, politics]
+    content: |
+      Faction focus: the organization is the subject. The narration frames beats in
+      institutional terms — this faction rose, that one fell, the protagonist's
+      position shifted. (cf. Legend of the Galactic Heroes, Code Geass, Ghost in
+      the Shell: Stand Alone Complex.)
+  - value_key: mundane
+    tags: [ordinary, slice]
+    content: |
+      Mundane focus: the ordinary is the goal. Everyday routines, small achievements,
+      the texture of daily life. Narration lingers on the un-dramatic. (cf.
+      slice-of-life, Aria, Laid-Back Camp.)
+  - value_key: competition
+    tags: [hierarchy, rivalry]
+    content: |
+      Competition focus: hierarchy among the powerful is the engine. Ranking systems,
+      tournaments, ladder ascensions. The narration tracks standings. (cf. My Hero
+      Academia's rankings, Solo Leveling, tournament arcs.)
+  - value_key: legacy
+    tags: [mentoring, next_generation]
+    content: |
+      Legacy focus: the transfer of something across generations is the arc. Mentoring,
+      inheritance, the passing of torches. Narration treats the student's growth as
+      the real subject. (cf. Naruto's generational arcs, Megalo Box 2.)
+  - value_key: party
+    tags: [adventure, balanced]
+    content: |
+      Party focus: balanced adventure team. The protagonist is the lens but the
+      party's dynamics are the texture. Combat is coordinated, social beats are
+      collective. (cf. Konosuba, Delicious in Dungeon, classic JRPG narration.)

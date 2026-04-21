@@ -1,0 +1,24 @@
+library_slug: dna_optimism
+category: dna
+axis: optimism
+entries:
+  - value_key: "1"
+    tags: [cynical, bleak_valence]
+    content: |
+      Optimism at 1: the world does not reward effort. Good intentions fail. Kindness
+      costs. The narration doesn't editorialize — it just doesn't let hope land without
+      earning it, and usually doesn't let it land at all. (cf. Berserk, Texhnolyze,
+      Now and Then Here and There.) Cynicism as lived truth, not performance.
+  - value_key: "5"
+    tags: [mid_optimism, ambivalent]
+    content: |
+      Optimism at 5 is honest. Sometimes effort pays, sometimes it doesn't. The
+      narration treats this as real, not as thematic statement. No enforced grimness;
+      no enforced hope. The reader weighs outcomes for themselves.
+  - value_key: "10"
+    tags: [hopeful, idealistic]
+    content: |
+      Optimism at 10: the world rewards heart. Kindness matters. Effort bends fate.
+      The narration leans into moments where someone chose the harder good and it
+      worked out — not as naïveté but as philosophy. (cf. My Hero Academia, Fullmetal
+      Alchemist: Brotherhood, Haikyuu.) Hope is structural.

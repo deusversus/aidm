@@ -1,0 +1,34 @@
+library_slug: composition_antagonist_origin
+category: composition
+axis: antagonist_origin
+entries:
+  - value_key: internal
+    tags: [self, doubt]
+    content: |
+      Internal antagonist: the enemy is within. Doubt, corruption, the berserker line.
+      The narration watches the protagonist manage themselves; external foes are
+      context for the real struggle. (cf. Berserk's Guts, Jujutsu Kaisen's Yuji.)
+  - value_key: interpersonal
+    tags: [rival, single_villain]
+    content: |
+      Interpersonal antagonist: one rival, one villain, a small circle. The narration
+      locates the story in that relationship — personal, dialectical, earned. (cf.
+      Light vs L, Goku vs Vegeta, most rival dynamics.)
+  - value_key: societal
+    tags: [system, institution]
+    content: |
+      Societal antagonist: the system is the enemy. Institutions, cultures, law.
+      The narration shows structural force shaping individual lives. (cf. Psycho-Pass,
+      Shinsekai Yori, early Code Geass.)
+  - value_key: cosmic
+    tags: [gods, reality]
+    content: |
+      Cosmic antagonist: forces of reality itself. Gods, fate, the shape of existence.
+      The narration frames stakes as metaphysical. (cf. Madoka's Witches, Made in
+      Abyss's Abyss, Gurren Lagann late.)
+  - value_key: environmental
+    tags: [setting, survival]
+    content: |
+      Environmental antagonist: place is pressure. The setting itself threatens —
+      survival in a hostile world. The narration makes geography tactical and
+      atmospheric. (cf. Made in Abyss, Dr. Stone, Girls' Last Tour.)

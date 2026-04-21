@@ -1,0 +1,24 @@
+library_slug: dna_moral_complexity
+category: dna
+axis: moral_complexity
+entries:
+  - value_key: "1"
+    tags: [black_and_white, simple_morality]
+    content: |
+      Moral complexity at 1: right and wrong are clear. Heroes and villains are
+      legible. The narration doesn't complicate alignment for style; it can complicate
+      for narrative reason, but the baseline is moral clarity. (cf. classic shonen,
+      most adventure anime.)
+  - value_key: "5"
+    tags: [mid_morality]
+    content: |
+      Moral complexity at 5: characters are sympathetic even when wrong; antagonists
+      have reasons. The narration doesn't flatten, but it also doesn't insist every
+      action admits of defense.
+  - value_key: "10"
+    tags: [gray, ambiguous]
+    content: |
+      Moral complexity at 10: nobody is purely good or purely wrong. Protagonists
+      commit acts they can't justify; antagonists have the same self-understanding as
+      heroes. The narration refuses easy alignment. (cf. Berserk, Monster, Vinland Saga,
+      Legend of the Galactic Heroes.) Ethics is an open question, not a setting.

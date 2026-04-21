@@ -1,0 +1,24 @@
+library_slug: dna_comedy
+category: dna
+axis: comedy
+entries:
+  - value_key: "1"
+    tags: [deadly_serious]
+    content: |
+      Comedy at 1: no humor. The narration treats every beat with weight. If a
+      character has a dry observation, it isn't served for laughs — it's served
+      for characterization. The fourth wall is solid. (cf. Berserk, Vinland Saga,
+      Texhnolyze.)
+  - value_key: "5"
+    tags: [mid_comedy]
+    content: |
+      Comedy at 5: humor happens when the scene earns it. A joke lands when the
+      dynamic warrants one. The narration neither manufactures comic beats nor
+      suppresses natural ones.
+  - value_key: "10"
+    tags: [comedic, fourth_wall]
+    content: |
+      Comedy at 10: the register permits explicit comic beats, timing gags,
+      absurdity, fourth-wall breaks. Jokes aren't garnish — they're part of the
+      scene's shape. (cf. Konosuba, Gintama, One Punch Man.) Even emotional
+      beats carry humor's texture.

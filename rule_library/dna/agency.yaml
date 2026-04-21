@@ -1,0 +1,22 @@
+library_slug: dna_agency
+category: dna
+axis: agency
+entries:
+  - value_key: "1"
+    tags: [fatalist, subjected]
+    content: |
+      Agency at 1: characters are subject to forces larger than them. They react,
+      survive, sometimes endure. The narration shows events happening TO them.
+      (cf. Texhnolyze, Berserk pre-Guts-escape, Made in Abyss.) Struggle is real
+      but rarely decisive.
+  - value_key: "5"
+    tags: [mid_agency]
+    content: |
+      Agency at 5: characters shape events at human scale. Their choices matter
+      locally; structural forces shape the macro. Neither helpless nor omnipotent.
+  - value_key: "10"
+    tags: [agency_driven, decisive]
+    content: |
+      Agency at 10: characters drive events. Their choices bend the arc. The
+      narration shows them as authors of outcomes, not witnesses to them. (cf.
+      Gurren Lagann, Code Geass, Death Note.) Will as generative force.

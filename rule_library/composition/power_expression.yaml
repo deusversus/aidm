@@ -1,0 +1,58 @@
+library_slug: composition_power_expression
+category: composition
+axis: power_expression
+entries:
+  - value_key: instantaneous
+    tags: [one_action, reaction]
+    content: |
+      Instantaneous power: one action ends it. The narration focuses on the moment
+      before and the reaction after. The strike itself is a sentence; what it means
+      is a page. (cf. Saitama punches, Garou arc climaxes.)
+  - value_key: overwhelming
+    tags: [inevitable, horror]
+    content: |
+      Overwhelming power: victory is assumed; horror is slow. The narration dwells
+      on the helplessness of those opposing it — the slow, certain approach of the
+      inevitable. (cf. Berserk's Apostles, Titans in Attack on Titan.)
+  - value_key: sealed
+    tags: [restraint, crack]
+    content: |
+      Sealed power: the protagonist holds back. Tension comes from the seal straining,
+      the crack widening, the possibility that today they won't hold. (cf. Bleach's
+      Ichigo, Fullmetal Alchemist's Scar's arm.)
+  - value_key: hidden
+    tags: [secret, irony]
+    content: |
+      Hidden power: the protagonist's capability is concealed. The narration leans
+      into dramatic irony — others underestimate, the reader knows. (cf. Mushoku
+      Tensei's Rudeus, The Misfit of Demon King Academy.)
+  - value_key: conditional
+    tags: [trigger, build]
+    content: |
+      Conditional power: activation requires something specific. The narration
+      builds toward that trigger — the chant, the blood, the moment of resolve.
+      Tension lives in the threshold. (cf. Bleach's Bankai, Jojo's Stand awakenings.)
+  - value_key: derivative
+    tags: [through_others, armies]
+    content: |
+      Derivative power: strength is through others. Subordinates, followers, a faction
+      obeying. The narration foregrounds command structure and the soft power of being
+      believed in. (cf. Legend of the Galactic Heroes, Code Geass.)
+  - value_key: passive
+    tags: [aura, presence]
+    content: |
+      Passive power: presence alone changes things. No action required — the air
+      shifts. The narration builds atmosphere around the character's mere arrival.
+      (cf. Gojo's approach, Dio's presence, late-stage Saitama.)
+  - value_key: flashy
+    tags: [spectacle, exciting]
+    content: |
+      Flashy power: anime-standard combat. Named attacks, visible effects, spectacle.
+      The narration leans into kinetics, impact, the visual event. (cf. Naruto,
+      Dragon Ball, JoJo.)
+  - value_key: balanced
+    tags: [standard, proportional]
+    content: |
+      Balanced power: proportional display. Capability matches stakes; narration
+      doesn't amplify or compress. Standard action-drama register. (cf. most shonen
+      baseline, Full Metal Alchemist combat.)

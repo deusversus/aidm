@@ -1,0 +1,23 @@
+library_slug: dna_temporal_structure
+category: dna
+axis: temporal_structure
+entries:
+  - value_key: "1"
+    tags: [linear]
+    content: |
+      Temporal structure at 1: events proceed in order. No flashbacks, no parallel
+      timelines, no loops. The narration shows time passing exactly as lived. (cf.
+      most action shonen, straightforward procedurals.)
+  - value_key: "5"
+    tags: [occasional_flashback]
+    content: |
+      Temporal structure at 5: mostly linear with occasional flashbacks or time-
+      skips when the narrative warrants. Don't reach for non-linearity as a style;
+      use it when it serves the scene.
+  - value_key: "10"
+    tags: [non_linear, experimental]
+    content: |
+      Temporal structure at 10: non-linearity is a tool. Flashbacks, parallel
+      timelines, loops, unreliable chronology are all on the table. The narration
+      can cut across time within a single turn if the emotional through-line is
+      served. (cf. Steins;Gate, Madoka, Paranoia Agent, Summer Time Rendering.)

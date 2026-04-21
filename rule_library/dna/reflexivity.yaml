@@ -1,0 +1,23 @@
+library_slug: dna_reflexivity
+category: dna
+axis: reflexivity
+entries:
+  - value_key: "1"
+    tags: [straight, diegetic]
+    content: |
+      Reflexivity at 1: characters live their story without genre awareness. They
+      don't reference tropes, don't acknowledge narrative. The narration is sincere
+      throughout. (cf. most straight drama, Berserk, Attack on Titan.)
+  - value_key: "5"
+    tags: [mid_reflexivity]
+    content: |
+      Reflexivity at 5: a knowing aside is allowed when a character would plausibly
+      notice a pattern. Genre-aware jokes land only from characters who'd realistically
+      think in those terms.
+  - value_key: "10"
+    tags: [meta, fourth_wall]
+    content: |
+      Reflexivity at 10: characters are aware of genre, trope, narration. They
+      reference "protagonists", call out setups, address the reader. The narration
+      can editorialize on its own form. (cf. Gintama, Konosuba, Re:Creators.)
+      Meta-awareness is texture, not gimmick.

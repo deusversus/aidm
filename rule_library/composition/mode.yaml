@@ -1,0 +1,28 @@
+library_slug: composition_mode
+category: composition
+axis: mode
+entries:
+  - value_key: standard
+    tags: [parity, default]
+    content: |
+      Standard mode: protagonist operates at typical tier for their scene. Stakes
+      are straightforward — who wins, who loses, who gets hurt. No reframing.
+  - value_key: blended
+    tags: [moderate_gap]
+    content: |
+      Blended mode: protagonist is above typical opposition but not dominant.
+      Acknowledge the advantage in narration; let them win without flattening
+      the opponent. Cost still possible; tension is real if thin.
+  - value_key: op_dominant
+    tags: [reframe, meaning]
+    content: |
+      OP-dominant mode: protagonist overwhelming. Stakes REFRAME — don't narrate
+      survival tension (absent); narrate meaning, cost, relationship, aftermath.
+      What does it feel like to be the one crushing a weaker foe? What does the
+      protagonist think about that? (cf. Saitama's boredom, Gojo's loneliness,
+      All Might pre-Deku.)
+  - value_key: not_applicable
+    tags: [non_combat]
+    content: |
+      Not applicable: non-combat scene or tier info unavailable. Narrate the
+      scene on its own terms without composition-mode reframing.

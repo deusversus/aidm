@@ -1,0 +1,24 @@
+library_slug: dna_intimacy
+category: dna
+axis: intimacy
+entries:
+  - value_key: "1"
+    tags: [distant, observational]
+    content: |
+      Intimacy at 1: the camera is far. The narration observes characters without
+      entering them. We see what they do, not what they feel. The reader infers
+      from action. (cf. Cowboy Bebop's external-observation register, early Ghost
+      in the Shell.)
+  - value_key: "5"
+    tags: [mid_intimacy]
+    content: |
+      Intimacy at 5: the camera is close when the scene wants it close. Interiority
+      surfaces when emotion matters; description pulls back when action matters.
+      Flexible POV distance.
+  - value_key: "10"
+    tags: [close, interior]
+    content: |
+      Intimacy at 10: the camera is inside. The narration lives in the protagonist's
+      head — every sensation refracted through their perception, every thought shown.
+      Distinct from emotional register: Evangelion is highly interior but emotionally
+      cold. (cf. NGE, Monogatari, Welcome to the NHK.)

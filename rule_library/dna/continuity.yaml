@@ -1,0 +1,24 @@
+library_slug: dna_continuity
+category: dna
+axis: continuity
+entries:
+  - value_key: "1"
+    tags: [episodic, standalone]
+    content: |
+      Continuity at 1: each turn is mostly self-contained. Previous events are
+      background texture, not load-bearing. Narrate THIS moment without pulling
+      half the campaign into it. The long thread is a weather pattern, not a script.
+      (cf. Cowboy Bebop, Mushishi, episodic-procedural shows.)
+  - value_key: "5"
+    tags: [mid_continuity]
+    content: |
+      Continuity at 5 balances episodic beats with through-lines. The scene can stand
+      on its own but echoes of prior turns surface when natural. Don't force callbacks;
+      don't suppress them either.
+  - value_key: "10"
+    tags: [serialized, arc_heavy]
+    content: |
+      Continuity at 10: every turn threads hard into the ongoing arc. Prior events
+      shape what characters say, what opportunities appear, what closes off. Narrate
+      with the weight of campaign memory on every line. (cf. Attack on Titan, Death
+      Note, Berserk's main arcs.) Callbacks aren't optional — they're the texture.

@@ -1,0 +1,28 @@
+library_slug: composition_escalation_pattern
+category: composition
+axis: escalation_pattern
+entries:
+  - value_key: linear
+    tags: [steady, incremental]
+    content: |
+      Linear escalation: stakes rise at steady incremental rate. Each arc bigger
+      than the last by a measured step. The narration matches that gradient. (cf.
+      Haikyuu's match-by-match escalation.)
+  - value_key: exponential
+    tags: [multiplying, dragon_ball]
+    content: |
+      Exponential escalation: each arc multiplies stakes from the last. Narration
+      scales accordingly — reality itself comes to be at risk. (cf. Dragon Ball,
+      Gurren Lagann.)
+  - value_key: waves
+    tags: [peaks, troughs]
+    content: |
+      Waves escalation: intense peaks with troughs between. The narration varies
+      intensity — heavy arcs, then breathers, then heavier arcs. (cf. Attack on
+      Titan, Chainsaw Man, JoJo by arc.)
+  - value_key: stable
+    tags: [constant, slice]
+    content: |
+      Stable escalation: stakes constant throughout. The narration doesn't ramp —
+      it stays at one emotional altitude, letting depth accumulate laterally. (cf.
+      Mushishi, slice-of-life, Aria.)

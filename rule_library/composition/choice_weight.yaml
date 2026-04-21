@@ -1,0 +1,22 @@
+library_slug: composition_choice_weight
+category: composition
+axis: choice_weight
+entries:
+  - value_key: world_shaping
+    tags: [factions, arcs]
+    content: |
+      World-shaping choice weight: player decisions ripple far. Factions shift,
+      locations change, future arcs bend. Narration surfaces the downstream
+      consequences; a choice is an investment.
+  - value_key: local
+    tags: [scene_scale]
+    content: |
+      Local choice weight: decisions shape the immediate scene and near-future
+      relationships. A choice today shows up next session in a character's attitude,
+      not in world-state. Middle-scale consequence.
+  - value_key: flavor
+    tags: [texture]
+    content: |
+      Flavor choice weight: decisions color narration without changing outcomes.
+      What the player says shapes HOW the scene reads, not WHERE the story goes.
+      Texture only.

@@ -1,0 +1,21 @@
+library_slug: dna_register
+category: dna
+axis: register
+entries:
+  - value_key: "1"
+    tags: [vernacular, colloquial]
+    content: |
+      Register at 1: vernacular. Short words, casual cadence, contractions, slang
+      where natural. Prose sounds spoken. (cf. Cowboy Bebop, Samurai Champloo,
+      Great Pretender.) Distinct from dialogue — applies to narration voice too.
+  - value_key: "5"
+    tags: [mid_register]
+    content: |
+      Register at 5: natural. The narration moves between casual and formal as
+      the scene warrants. No deliberate elevation or deliberate plainness.
+  - value_key: "10"
+    tags: [elevated, formal]
+    content: |
+      Register at 10: elevated. Long sentences, precise diction, formal syntax.
+      The narration reads literary. (cf. Legend of the Galactic Heroes, Shinsekai
+      Yori, Aoi Bungaku.) Register itself is part of the atmosphere.

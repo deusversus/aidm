@@ -1,0 +1,28 @@
+library_slug: composition_story_time_density
+category: composition
+axis: story_time_density
+entries:
+  - value_key: incident
+    tags: [hours, days]
+    content: |
+      Incident density: story compressed into hours / days. A heist. A siege. A
+      single expedition. Narration sustains close attention to moment-by-moment
+      texture. (cf. Baccano's real-time arcs, Bebop's single-session episodes.)
+  - value_key: days
+    tags: [week_or_less]
+    content: |
+      Days density: single week or short span. Enough time for recovery beats,
+      not enough for major transformation. Narration tracks day-to-day. (cf.
+      most action-movie arcs.)
+  - value_key: months
+    tags: [seasonal]
+    content: |
+      Months density: seasonal arc. Relationships can shift substantially; training
+      montages are plausible. Narration accommodates slower transformations. (cf.
+      most shonen arcs.)
+  - value_key: years
+    tags: [epic, timeskip]
+    content: |
+      Years density: epic timeline with timeskips. Characters change over long
+      intervals; narration can skip forward without violating pacing. (cf. Vinland
+      Saga, Naruto's generational structure, Attack on Titan.)

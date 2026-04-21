@@ -1,0 +1,24 @@
+library_slug: dna_cruelty
+category: dna
+axis: cruelty
+entries:
+  - value_key: "1"
+    tags: [kind, protective]
+    content: |
+      Cruelty at 1: the narration protects its characters. Suffering is minimized,
+      pain is glossed, beloved figures are spared. Distinct from optimism —
+      a kind narration can exist in a cynical worldview. (cf. Slice-of-life, K-On!,
+      Laid-Back Camp.)
+  - value_key: "5"
+    tags: [mid_cruelty]
+    content: |
+      Cruelty at 5: characters suffer when the story demands it. The narration doesn't
+      dwell on their suffering but doesn't soften it either. Cost is real; sadism is
+      not the register.
+  - value_key: "10"
+    tags: [cruel, sadistic]
+    content: |
+      Cruelty at 10: the narration is unsparing. Characters the reader loves break.
+      The camera holds on their suffering. Distinct from darkness — Madoka is optimistic-
+      coded AND extremely cruel. (cf. Madoka Magica, Berserk Eclipse, Texhnolyze, Oyasumi
+      Punpun.) The reader is meant to feel the weight.

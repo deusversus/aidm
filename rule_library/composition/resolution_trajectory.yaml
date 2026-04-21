@@ -1,0 +1,35 @@
+library_slug: composition_resolution_trajectory
+category: composition
+axis: resolution_trajectory
+entries:
+  - value_key: triumph
+    tags: [clear_win]
+    content: |
+      Triumph: the protagonist wins cleanly. The narration celebrates the victory
+      without excessive cost or ambiguity. (cf. My Hero Academia's major arc ends,
+      most mainstream shonen climaxes.)
+  - value_key: tragedy
+    tags: [clear_loss]
+    content: |
+      Tragedy: the protagonist loses — the cost outweighs the gain, or the
+      outcome is pure defeat. The narration earns the loss; doesn't flinch from
+      it. (cf. Oedipus-shape stories, Anime the Animation, some seinen.)
+  - value_key: pyrrhic
+    tags: [win_at_cost]
+    content: |
+      Pyrrhic resolution: victory at catastrophic cost. The protagonist survives
+      / wins, but what they paid overshadows the gain. Narration lingers on the
+      loss embedded in the win. (cf. Berserk Golden Age, Vinland Saga book 1,
+      Shinsekai Yori.)
+  - value_key: ambiguous
+    tags: [reader_decides]
+    content: |
+      Ambiguous resolution: neither clear win nor clear loss. The narration refuses
+      to settle the reader into an emotional conclusion. What it meant is for them
+      to decide. (cf. Cowboy Bebop's ending, Mushishi's rhythm, Evangelion.)
+  - value_key: ongoing
+    tags: [continuation]
+    content: |
+      Ongoing: no resolution this arc. The story continues; the current arc
+      shapes what comes next but doesn't end it. (cf. One Piece's arc structure,
+      long-running series mid-arc.)

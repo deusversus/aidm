@@ -1,0 +1,23 @@
+library_slug: dna_scope
+category: dna
+axis: scope
+entries:
+  - value_key: "1"
+    tags: [intimate, small]
+    content: |
+      Scope at 1: the story is small. A village. A band. A single relationship.
+      The narration doesn't pull back; it doesn't scale up for stakes. Intimacy IS
+      the stakes. (cf. Mushishi, Aria, Laid-Back Camp, slice-of-life.)
+  - value_key: "5"
+    tags: [mid_scope]
+    content: |
+      Scope at 5: regional. A city, a country, a war. The narration balances
+      personal beats against structural ones — we see the protagonist AND the
+      institutions around them.
+  - value_key: "10"
+    tags: [cosmic, universal]
+    content: |
+      Scope at 10: the stakes are existential. Worlds, dimensions, the fate of
+      existence itself. The narration can pull out to the universal scale without
+      losing the protagonist. (cf. Gurren Lagann, Evangelion, Madoka, Made in
+      Abyss later arcs.) Cosmic doesn't mean impersonal.

@@ -1,0 +1,22 @@
+library_slug: dna_epistemics
+category: dna
+axis: epistemics
+entries:
+  - value_key: "1"
+    tags: [fully_explained, transparent]
+    content: |
+      Epistemics at 1: the world is legible. Magic systems are explained; mysteries
+      are resolved; the narration doesn't withhold. The reader always understands
+      what just happened. (cf. Fullmetal Alchemist, One Piece, Hunter x Hunter.)
+  - value_key: "5"
+    tags: [mid_epistemics]
+    content: |
+      Epistemics at 5: information is metered. Some things clarify; others remain
+      uncertain. The narration withholds strategically, not stylistically.
+  - value_key: "10"
+    tags: [mysterious, withheld]
+    content: |
+      Epistemics at 10: the world resists explanation. Magic is never fully mapped;
+      entities have inscrutable motives; events don't always resolve. The narration
+      tells less than it knows and calls the reader to wonder. (cf. Serial Experiments
+      Lain, Mushishi, Made in Abyss late arcs.) Mystery is texture.

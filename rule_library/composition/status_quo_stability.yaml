@@ -1,0 +1,23 @@
+library_slug: composition_status_quo_stability
+category: composition
+axis: status_quo_stability
+entries:
+  - value_key: reset
+    tags: [episode_reset]
+    content: |
+      Reset status quo: world resets each episode. Damage from the current beat
+      doesn't carry. Narration keeps arc-scale changes off-table. (cf. Simpsons,
+      classic sitcoms, monster-of-the-week with reset buttons.)
+  - value_key: gradual
+    tags: [slow_change]
+    content: |
+      Gradual status quo: world changes slowly across arcs. Cumulative over seasons;
+      invisible within an episode. Narration acknowledges long-term shifts when
+      they accumulate. (cf. most anime, Naruto's generational changes, One Piece.)
+  - value_key: transformative
+    tags: [fundamental_change]
+    content: |
+      Transformative status quo: world fundamentally alters. Major events reshape
+      the setting — technology, politics, geography. Narration shows new baselines.
+      (cf. Death Note post-L's death, Attack on Titan post-Rumbling, Shinsekai
+      Yori.)

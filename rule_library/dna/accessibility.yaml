@@ -1,0 +1,23 @@
+library_slug: dna_accessibility
+category: dna
+axis: accessibility
+entries:
+  - value_key: "1"
+    tags: [demanding, difficult]
+    content: |
+      Accessibility at 1: demanding. The narration doesn't hand-hold. Context is
+      implied; vocabulary is specialized; the reader is expected to work. Confusion
+      is permitted; clarity is not a goal. (cf. Lain, Texhnolyze, Legend of the
+      Galactic Heroes without briefings.)
+  - value_key: "5"
+    tags: [mid_accessibility]
+    content: |
+      Accessibility at 5: intermediate. The narration provides context when needed
+      but doesn't over-explain. The reader should be able to follow without a glossary.
+  - value_key: "10"
+    tags: [accessible, clear]
+    content: |
+      Accessibility at 10: welcoming. Context is given; terms are explained; setups
+      announce themselves. Dense content is possible but never obscured. (cf. One
+      Piece, Fullmetal Alchemist: Brotherhood, My Hero Academia.) Clarity is the
+      courtesy.

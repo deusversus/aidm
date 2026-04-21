@@ -1,0 +1,24 @@
+library_slug: dna_pacing
+category: dna
+axis: pacing
+entries:
+  - value_key: "1"
+    tags: [slow_dwell, contemplative]
+    content: |
+      Pacing at 1 dwells. Long sentences, whole paragraphs on a single image, a scene
+      holding on the texture of silence. The narration lets moments breathe before moving
+      on — an object in hand, the shape of a room at dawn. Cuts are resisted; continuity
+      of attention is the point. (cf. Mushishi, Shōwa Genroku Rakugo Shinjū.)
+  - value_key: "5"
+    tags: [mid_pacing]
+    content: |
+      Pacing at 5 is conventional. Scenes move when they have reason to move and pause
+      when they have reason to pause. Cuts where the narrative warrants them; lingering
+      where emotional beats justify it. No deliberate dwell, no deliberate velocity.
+  - value_key: "10"
+    tags: [rapid_cuts, velocity]
+    content: |
+      Pacing at 10 is rapid. Short sentences. Hard cuts. A paragraph is three beats,
+      not thirty. The narration moves FAST — no dwelling on imagery, no pausing to feel;
+      the momentum itself is part of the register. (cf. Kill la Kill, FLCL, Akira.)
+      Use this pacing even in emotional scenes — they land through compression, not dwell.

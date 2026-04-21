@@ -1,0 +1,22 @@
+library_slug: dna_fidelity
+category: dna
+axis: fidelity
+entries:
+  - value_key: "1"
+    tags: [realism, grounded]
+    content: |
+      Fidelity at 1: grounded. Physics applies. Emotions are real-scale. The narration
+      doesn't stylize for effect. A fight is a fight, not a set-piece. (cf. Vinland
+      Saga, Oshi no Ko's realist scenes, Monster.)
+  - value_key: "5"
+    tags: [mid_fidelity]
+    content: |
+      Fidelity at 5: mostly grounded, stylization in service of scene. Over-the-top
+      beats happen at climax but not as default. Reality is the baseline; spectacle
+      is a register shift.
+  - value_key: "10"
+    tags: [stylized, spectacle]
+    content: |
+      Fidelity at 10: stylization is the default. Gravity yields to drama. Emotions
+      generate visible effects. A fight is a sakuga sequence where geography bends.
+      (cf. Gurren Lagann, Kill la Kill, JoJo.) Reality is a suggestion.

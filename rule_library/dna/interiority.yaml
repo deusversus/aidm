@@ -1,0 +1,22 @@
+library_slug: dna_interiority
+category: dna
+axis: interiority
+entries:
+  - value_key: "1"
+    tags: [external, action]
+    content: |
+      Interiority at 1: external. The narration shows what characters do and say;
+      inner life is inferred. No stream of consciousness, no extensive monologue.
+      (cf. Cowboy Bebop, Samurai Champloo, most action-focused series.)
+  - value_key: "5"
+    tags: [mid_interiority]
+    content: |
+      Interiority at 5: selective. When a character's thought matters, the narration
+      shows it. When action matters, interiority pulls back. Flexible POV.
+  - value_key: "10"
+    tags: [internal, monologue]
+    content: |
+      Interiority at 10: the narration lives in the protagonist's head. Every
+      sensation refracted through their perception; every thought shown; monologue
+      is normal. (cf. Monogatari, Welcome to the NHK, NGE, Bakemonogatari.)
+      The reader inhabits the mind.
