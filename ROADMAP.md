@@ -1851,26 +1851,31 @@ Each milestone ends with a deploy to production, a written retro (`docs/retros/M
 
 ### M1 — First playable turn, full shape
 
+**Status as of 2026-04-21:** three-phase turn architecture live on prod (Scenewright → KeyAnimator → Chronicler). Commits 1–7.4 shipped. Remaining: Commit 9 (rate limiter), Commit 8 (eval harness), acceptance ritual. See `docs/plans/M1-closure.md` for the commit-level view + resume pointer.
+
 **Goal:** KA orchestrates a full turn end-to-end on Claude Agent SDK. All specialists exist as callable consultants. All seven memory MCP servers exist (some returning empty sets). A seed campaign is playable.
 
 **The shape is the whole shape.** Not "a subset of the pipeline." KA runs on Agent SDK with 4-block cache, extended thinking, streaming, tool access, subagent primitive. It invokes IntentClassifier, OutcomeJudge, Validator, WorldBuilder, CombatAgent, ScaleSelectorAgent, PacingAgent, MemoryRanker, RecapAgent as consultants. It queries episodic / semantic / voice / arc / critical MCP servers as judgment dictates. This is the shape it'll have at M8 and every milestone in between.
 
-**Deliverables:**
-- Prompt registry (`src/lib/prompts/`) with fragment composition + SHA-256 fingerprints + hot-reload in dev.
-- Full agent roster scaffolded (see §5.2 table). Zod I/O for each. Consultants reachable via Agent SDK's Agent tool or direct Mastra step calls.
-- KA on Claude Agent SDK with `includePartialMessages: true` for streaming, `thinking: { type: 'adaptive' }` or budgeted, 4-block `systemPrompt` with `SYSTEM_PROMPT_DYNAMIC_BOUNDARY` marker.
-- All seven memory-layer MCP servers registered (see §9.0 table). Empty-set returns are valid for the layers whose content populates later (arc, voice). Episodic and working have real content from turn one; semantic populates as the memory writer runs.
-- Mastra workflow envelope (routing, persistence, background scheduling).
-- SSE streaming Route Handler; client typewriter hook.
-- Seed campaign + character (Spike Spiegel + Cowboy Bebop or Sung Jinwoo + Solo Leveling fixture).
-- `/campaigns/[id]/play` screen.
-- Eval harness with 5 golden turns + Haiku judge + PR gate.
-- Rate limiter (Postgres counter); per-turn cost + per-user daily cap.
-- Turn persistence with prompt fingerprints and trace links from day one (Episodic layer depends on it).
+**Deliverables (✅ = shipped, ⏳ = remaining):**
+- ✅ Prompt registry (`src/lib/prompts/`) with fragment composition + SHA-256 fingerprints + hot-reload in dev.
+- ✅ Full agent roster scaffolded (see §5.2 table). Zod I/O for each. Consultants reachable via Agent SDK's Agent tool or direct Mastra step calls.
+- ✅ KA on Claude Agent SDK with `includePartialMessages: true` for streaming, `thinking: { type: 'adaptive' }` or budgeted, 4-block `systemPrompt` with `SYSTEM_PROMPT_DYNAMIC_BOUNDARY` marker.
+- ✅ All seven memory-layer MCP servers registered (see §9.0 table). Empty-set returns are valid for the layers whose content populates later (arc, voice). Episodic and working have real content from turn one; semantic populates as the memory writer runs.
+- ✅ Mastra workflow envelope (routing, persistence, background scheduling).
+- ✅ SSE streaming Route Handler; client typewriter hook.
+- ✅ Seed campaign + character (Spike Spiegel + Cowboy Bebop or Sung Jinwoo + Solo Leveling fixture).
+- ✅ `/campaigns/[id]/play` screen.
+- ✅ Chronicler (post-turn archivist) — 15 write tools + orchestrator + RelationshipAnalyzer consultant + `after()` wiring w/ FIFO-per-campaign lock + idempotency (Commits 7.1–7.4).
+- ✅ Turn persistence with prompt fingerprints and trace links from day one (Commit 7.0 completed the fingerprint map).
+- ⏳ Rate limiter (Postgres counter); per-turn cost + per-user daily cap (Commit 9).
+- ⏳ Eval harness with 5 golden turns + Haiku judge + PR gate (Commit 8).
 
 **Acceptance:** play 10 turns on prod, narrative coherent, KA visibly consulting specialists (traces show OutcomeJudge + tool calls), cache hit rate ≥ 80% after turn 3, eval suite green, p95 TTFT < 3s.
 
 **Risks:** Agent SDK subprocess overhead vs. TTFT target (mitigable via `effort: 'medium'` and warm subprocess pool if needed); KA prompt quality on first real runs; cache boundary placement giving Block 1 stable caching across turns.
+
+**Known debt (surfaced by v3 parity audit 2026-04-21):** 6 BLOCKER-tagged gaps where v4 has wired pieces with no call site (override persistence, WB-accepted entity persistence, composition mode-shift hardcoded, semantic retrieval stub, rule library missing, context blocks missing) + 8 MAJORs. Five of the cheap BLOCKERs are a ~1-day cleanup. Rule library + context blocks may elevate to M1.75 or land with M4 (embedder decision). See `docs/plans/M1-closure.md` "Known debt" section.
 
 ### M1.5 — Multi-provider foundation
 

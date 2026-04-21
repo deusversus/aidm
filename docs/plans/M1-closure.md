@@ -6,6 +6,35 @@ The user chose the thorough path: **include Chronicler in M1** (don't rescope to
 
 ---
 
+## Status — 2026-04-21
+
+**Shipped + pushed (all audit-clean after follow-up fix commits):**
+
+| Commit | Scope | Base SHA | Fix SHA |
+|---|---|---|---|
+| 7.0 | Prompt fingerprint persistence — per-agent map in `turns.prompt_fingerprints` | `ba7a114` | — |
+| 7.1 | Chronicler schema — 10 new tables (npcs, locations, factions, relationship_events, semantic_memories, foreshadowing_seeds, voice_patterns, director_notes, spotlight_debt, arc_plan_history) | `d10276d` | — |
+| 7.2 | Chronicler tools — 15 write tools w/ authz + Zod + NPC FK guard | `64b465f` | `deaac89` |
+| 7.3 | Chronicler orchestrator + prompt + RelationshipAnalyzer consultant | `85a27f0` | `40d9c04` |
+| 7.4 | Wire Chronicler via Next `after()` w/ FIFO-per-campaign lock + idempotency | `3841668` | `d74abfe` |
+
+**Three-phase turn architecture is live end-to-end on prod.** Scenewright pre-pass → KeyAnimator streaming → `after()` → Chronicler cataloguing. Schema migration `0003_gigantic_wolf_cub.sql` applied to prod. Test suite: 305/305 passing.
+
+**Remaining to close M1:**
+
+1. **Commit 9** — rate limiter + cost cap + budget UI (§9 below). Lands BEFORE Commit 8 so the eval harness can bypass.
+2. **Commit 8** — eval harness + 5 golden turns + Haiku judge + CI gate (§8 below).
+3. **Acceptance ritual** — 10 prod turns w/ Langfuse metrics + `docs/retros/M1.md`.
+
+**Known debt (not blocking M1 ship, surfaces before M2 scope freezes):**
+
+- **v3 parity audit** (2026-04-21, 4 parallel subagents): six BLOCKER-tagged gaps where v4 has a piece wired but no call site — override persistence never fires, WB-accepted entities evaporate, composition mode-shift hardcoded to "standard", semantic retrieval stubbed, rule library missing, context blocks missing. Plus eight MAJORs. See `docs/audits/v3-parity-2026-04-21.md` if landed, or the synthesis in the conversation transcript. Five cheap BLOCKERs (~1 day of work total) are candidates for a "v3 audit debt" cleanup commit before Commit 9.
+- **ROADMAP §5 sub-sections** (per-turn shape, agent roster, per-agent specs) pre-date the three-phase consolidation and over-enumerate after-turn agents. Rewrite pending. Treat §5 top-matter and `project_three_phase_architecture.md` as authoritative.
+
+**Resume here when returning to this plan:** jump to §9 below for the next commit.
+
+---
+
 ## Principles carried in
 
 - **Build the whole shape.** Chronicler ships as the full orchestrator-with-tools shape — not a stub. Empty sets from DB queries are valid M1 state; missing tools are not.
