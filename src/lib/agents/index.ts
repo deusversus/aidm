@@ -57,6 +57,14 @@ export {
   runChronicler,
 } from "./chronicler";
 
+// --- Context block generator (v3-parity Phase 3B) ---
+export {
+  ContextBlockGeneratorInput,
+  ContextBlockGeneratorOutput,
+  type ContextBlockGeneratorDeps,
+  generateContextBlock,
+} from "./context-block-generator";
+
 // --- Judgment consultants (Commit 5) ---
 export {
   CombatAgentInput,

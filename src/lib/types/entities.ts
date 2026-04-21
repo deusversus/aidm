@@ -169,14 +169,7 @@ export const ArcPlanHistoryEntry = z.object({
 });
 export type ArcPlanHistoryEntry = z.infer<typeof ArcPlanHistoryEntry>;
 
-export const ContextBlockType = z.enum([
-  "arc",
-  "thread",
-  "quest",
-  "npc",
-  "faction",
-  "location",
-]);
+export const ContextBlockType = z.enum(["arc", "thread", "quest", "npc", "faction", "location"]);
 export type ContextBlockType = z.infer<typeof ContextBlockType>;
 
 export const ContextBlockStatus = z.enum(["active", "closed", "archived"]);
