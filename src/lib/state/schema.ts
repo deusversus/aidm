@@ -164,6 +164,73 @@ export const turns = pgTable(
 );
 
 /**
+ * Rule library — narration guidance indexed by (category, axis, value_key).
+ *
+ * Every DNA axis × value combination, every composition enum value, every
+ * power tier, every ensemble archetype has a short prose directive here.
+ * At session start KA reads the active bundle for THIS campaign's profile
+ * + character — the translation layer between "heroism: 7" (a number) and
+ * "here's what heroism=7 means in narrative practice."
+ *
+ * v3 had this content + table. v4 dropped it early in the rewrite; Block 1
+ * renders `session_rule_library_guidance` with an empty fallback until this
+ * lands. Without it, the 24 DNA axes become form fields instead of
+ * prescriptive pressures — "premise-respectful" drifts toward "generic
+ * premium LLM anime prose" over hundreds of turns.
+ *
+ * Storage is flat + category-keyed at M1. pgvector `embedding` column will
+ * be added at M4 when the embedder decision lands (same timing as semantic
+ * memory retrieval runtime). At M1, lookup is deterministic via
+ * (category, axis, value_key) — no embeddings needed because the caller
+ * knows exactly which axis/value they want guidance for.
+ */
+export const ruleLibraryChunks = pgTable(
+  "rule_library_chunks",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    /**
+     * Human-readable slug — "dna_heroism", "composition_tension_source",
+     * "power_tier_T3", "archetype_struggler". Used for display / debug
+     * and for the YAML filename → DB mapping by the indexer.
+     */
+    librarySlug: text("library_slug").notNull(),
+    /**
+     * Top-level grouping. `dna` / `composition` / `power_tier` / `archetype`
+     * / `scale` / `ceremony` / `genre` / `tension` / `op_expression` /
+     * `beat_craft` (latter added Phase 7).
+     */
+    category: text("category").notNull(),
+    /**
+     * Subgrouping within the category — "heroism", "tension_source", etc.
+     * Null for non-axis categories (power_tier has axis=null since the
+     * tier IS the value).
+     */
+    axis: text("axis"),
+    /**
+     * The specific value being looked up — "7" for a DNA axis integer,
+     * "existential" for a composition enum, "T3" for a power tier, etc.
+     * Null for aggregate entries (rare).
+     */
+    valueKey: text("value_key"),
+    /** Free-form tags for future filtering / retrieval refinement. */
+    tags: jsonb("tags").notNull().default(sql`'[]'::jsonb`),
+    /** Reserved for v3-style conditional retrieval; mostly {} at M1. */
+    retrieveConditions: jsonb("retrieve_conditions").notNull().default(sql`'{}'::jsonb`),
+    /** The narration guidance itself. 1-5 sentences of directive prose. */
+    content: text("content").notNull(),
+    /** Bumped when the YAML content changes (indexer handles this). */
+    version: integer("version").notNull().default(1),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    // Canonical lookup key — indexer upserts by this tuple.
+    uniqueIndex("rule_library_lookup_key").on(t.category, t.axis, t.valueKey),
+    index("rule_library_category_idx").on(t.category),
+  ],
+);
+
+/**
  * Chronicler-written entity + memory + arc state tables (M1 Commit 7.1).
  *
  * Chronicler runs post-every-turn and writes durable state here:

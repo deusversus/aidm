@@ -29,6 +29,13 @@
       "when": 1776782261945,
       "tag": "0003_gigantic_wolf_cub",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1776793926302,
+      "tag": "0004_volatile_violations",
+      "breakpoints": true
     }
   ]
 }
