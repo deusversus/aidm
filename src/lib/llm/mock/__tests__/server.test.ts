@@ -116,19 +116,107 @@ describe("MockLLM HTTP server — Anthropic /v1/messages", () => {
     expect(last?.model).toBe("claude-opus-4-7");
   });
 
-  it("returns 501 on streaming requests (Phase C scope)", async () => {
-    // Use raw fetch since the SDK consumes the stream differently.
+  it("streams SSE events for stream:true requests with heuristic chunking", async () => {
+    // Use raw fetch so we can read the SSE stream directly.
     const res = await fetch(`http://127.0.0.1:${server.port}/v1/messages`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         model: "claude-opus-4-7",
         max_tokens: 128,
-        messages: [{ role: "user", content: "x" }],
+        system: "You are KeyAnimator — authorship tool.",
+        messages: [{ role: "user", content: "I ask Jet about Julia." }],
         stream: true,
       }),
     });
-    expect(res.status).toBe(501);
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toContain("text/event-stream");
+    const text = await res.text();
+    // Validate the canonical Anthropic SSE event ordering.
+    expect(text).toContain("event: message_start");
+    expect(text).toContain("event: content_block_start");
+    expect(text).toContain("event: content_block_delta");
+    expect(text).toContain("event: content_block_stop");
+    expect(text).toContain("event: message_delta");
+    expect(text).toContain("event: message_stop");
+    // Text payload is chunked but full string reconstructs from deltas.
+    const deltas = text.match(/"text":"([^"]*)"/g) ?? [];
+    const combined = deltas
+      .map((d) => d.replace(/^"text":"|"$/g, ""))
+      .join("")
+      .trim();
+    // Heuristic chunking of the fixture's text should reconstruct it.
+    expect(combined).toContain("engine block");
+  });
+
+  it("parses cleanly through the Anthropic SDK's native stream() consumer", async () => {
+    const stream = client.messages.stream({
+      model: "claude-opus-4-7",
+      max_tokens: 128,
+      system: "You are KeyAnimator — authorship tool.",
+      messages: [{ role: "user", content: "I ask Jet about Julia." }],
+    });
+    const deltas: string[] = [];
+    for await (const event of stream) {
+      if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
+        deltas.push(event.delta.text);
+      }
+    }
+    const finalMessage = await stream.finalMessage();
+    expect(finalMessage.id).toBe("msg_mock_abc");
+    expect(deltas.join("")).toContain("engine block");
+  });
+
+  it("honors fixture streaming block (explicit chunks + delays)", async () => {
+    // Swap in a fixture with streaming config.
+    const streamFixture: MockLlmFixture = {
+      id: "test-stream",
+      provider: "anthropic",
+      match: { system_includes: ["streaming test"] },
+      streaming: {
+        chunks: [
+          { delay_ms: 10, text: "Hello " },
+          { delay_ms: 10, text: "world" },
+          { delay_ms: 10, text: "." },
+        ],
+        end_delay_ms: 10,
+      },
+    };
+    const reg = emptyRegistry();
+    reg.byId.set(streamFixture.id, streamFixture);
+    const bucket = reg.byProvider.get("anthropic") ?? [];
+    bucket.push(streamFixture);
+    reg.byProvider.set("anthropic", bucket);
+    server.replaceRegistry(reg);
+
+    try {
+      const res = await fetch(`http://127.0.0.1:${server.port}/v1/messages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "claude-opus-4-7",
+          max_tokens: 128,
+          system: "streaming test",
+          messages: [{ role: "user", content: "stream" }],
+          stream: true,
+        }),
+      });
+      expect(res.status).toBe(200);
+      const text = await res.text();
+      const deltas = text.match(/"text_delta","text":"([^"]*)"/g) ?? [];
+      // Chunks should arrive in order.
+      expect(deltas.length).toBe(3);
+      const combined = deltas.map((d) => d.split('"').at(-2)).join("");
+      expect(combined).toBe("Hello world.");
+    } finally {
+      // restore the original fixture for subsequent tests
+      const original = emptyRegistry();
+      original.byId.set(fixture.id, fixture);
+      const originalBucket = original.byProvider.get("anthropic") ?? [];
+      originalBucket.push(fixture);
+      original.byProvider.set("anthropic", originalBucket);
+      server.replaceRegistry(original);
+    }
   });
 
   it("responds to /health liveness", async () => {
