@@ -1,4 +1,4 @@
-import type Anthropic from "@anthropic-ai/sdk";
+import { createMockAnthropic as fakeAnthropic } from "@/lib/llm/mock/testing";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
@@ -6,24 +6,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  * (as of M1.5 Commit C). Default modelContext is Anthropic fallback, so
  * these tests inject an Anthropic fake. Provider-dispatch behavior is
  * covered in _runner.test.ts.
+ *
+ * Mock stub via unified helper (Phase E of mockllm plan).
  */
-
-function fakeAnthropic(
-  responses: Array<{ text?: string; error?: unknown }>,
-): () => Pick<Anthropic, "messages"> {
-  let i = 0;
-  return () =>
-    ({
-      messages: {
-        create: async () => {
-          const next = responses[i++];
-          if (!next) throw new Error("no more mock responses");
-          if (next.error) throw next.error;
-          return { content: [{ type: "text", text: next.text ?? "" }] };
-        },
-      },
-    }) as unknown as Pick<Anthropic, "messages">;
-}
 
 describe("classifyIntent", () => {
   beforeEach(() => {
@@ -139,15 +124,14 @@ describe("classifyIntent", () => {
   it("rejects malformed input before hitting the provider", async () => {
     const { classifyIntent } = await import("../intent-classifier");
     let called = false;
-    const anthropic = () =>
-      ({
-        messages: {
-          create: async () => {
-            called = true;
-            return { content: [{ type: "text", text: "{}" }] };
-          },
+    const anthropic = fakeAnthropic([
+      {
+        text: "{}",
+        echo: () => {
+          called = true;
         },
-      }) as unknown as Pick<Anthropic, "messages">;
+      },
+    ]);
     // Empty playerMessage should fail the input Zod schema.
     await expect(classifyIntent({ playerMessage: "" }, { anthropic })).rejects.toThrow();
     expect(called).toBe(false);

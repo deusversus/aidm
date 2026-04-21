@@ -115,17 +115,13 @@ function fakeDb(hooks: DbHooks): Db {
   } as unknown as Db;
 }
 
-/** Stub query that yields a successful result so runChronicler returns clean. */
-const stubQuery = (() =>
-  (async function* () {
-    yield {
-      type: "result",
-      subtype: "success",
-      stop_reason: "end_turn",
-      total_cost_usd: 0,
-      session_id: "test",
-    };
-  })()) as never;
+/** Stub query yielding a single clean success result. Unified helper
+ * from `@/lib/llm/mock/testing` (Phase E of mockllm plan) — replaces
+ * inline stubQuery patterns used across multiple test files. */
+import { createMockQueryFn } from "@/lib/llm/mock/testing";
+const stubQuery = createMockQueryFn([
+  { result: { subtype: "success", stop_reason: "end_turn", total_cost_usd: 0 } },
+]);
 
 function baseInput(overrides: Partial<Parameters<typeof chronicleTurn>[0]> = {}) {
   return {

@@ -1,4 +1,4 @@
-import type Anthropic from "@anthropic-ai/sdk";
+import { createMockAnthropic } from "@/lib/llm/mock/testing";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
@@ -7,26 +7,17 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  * output matters more than the content; KA's Block 1 renders the
  * voice_patterns journal verbatim and the memory writer persists the
  * rest.
+ *
+ * Mocks via unified helper (Phase E of mockllm plan).
  */
 
-function fakeAnthropic(text: string): () => Pick<Anthropic, "messages"> {
-  return () =>
-    ({
-      messages: {
-        create: async () => ({ content: [{ type: "text", text }] }),
-      },
-    }) as unknown as Pick<Anthropic, "messages">;
+function fakeAnthropic(text: string) {
+  // Runner retries once on parse failure — seed two responses.
+  return createMockAnthropic([{ text }, { text }]);
 }
 
-function failingAnthropic(): () => Pick<Anthropic, "messages"> {
-  return () =>
-    ({
-      messages: {
-        create: async () => {
-          throw new Error("upstream");
-        },
-      },
-    }) as unknown as Pick<Anthropic, "messages">;
+function failingAnthropic() {
+  return createMockAnthropic([{ error: new Error("upstream") }, { error: new Error("upstream") }]);
 }
 
 const VALID_OUTPUT = JSON.stringify({

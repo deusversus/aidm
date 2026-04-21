@@ -1,6 +1,5 @@
+import { createMockAnthropic, createMockGoogle } from "@/lib/llm/mock/testing";
 import type { CampaignProviderConfig } from "@/lib/providers";
-import type Anthropic from "@anthropic-ai/sdk";
-import type { GoogleGenAI } from "@google/genai";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
@@ -14,6 +13,9 @@ import { z } from "zod";
  * (or `anthropicFallbackConfig()` when absent), NOT from `config.tier`.
  * These tests verify both branches — default (Anthropic fallback) and
  * explicit (modelContext with provider=google).
+ *
+ * Mock stubs come from `@/lib/llm/mock/testing` (Phase E of v3-audit
+ * closure's mockllm plan) — replaces the scattered inline fakes.
  */
 
 const OutSchema = z.object({ value: z.string() });
@@ -29,41 +31,6 @@ function baseConfig(overrides: Partial<Record<string, unknown>> = {}) {
     fallback: { value: "fallback" } as Out,
     ...overrides,
   };
-}
-
-function fakeAnthropic(
-  responses: Array<{ text?: string; error?: unknown; echoParams?: (p: unknown) => void }>,
-): () => Pick<Anthropic, "messages"> {
-  let i = 0;
-  return () =>
-    ({
-      messages: {
-        create: async (params: unknown) => {
-          const next = responses[i++];
-          if (!next) throw new Error("no more mock responses");
-          next.echoParams?.(params);
-          if (next.error) throw next.error;
-          return { content: [{ type: "text", text: next.text ?? "" }] };
-        },
-      },
-    }) as unknown as Pick<Anthropic, "messages">;
-}
-
-function fakeGoogle(
-  responses: Array<{ text?: string; error?: unknown }>,
-): () => Pick<GoogleGenAI, "models"> {
-  let i = 0;
-  return () =>
-    ({
-      models: {
-        generateContent: async () => {
-          const next = responses[i++];
-          if (!next) throw new Error("no more mock responses");
-          if (next.error) throw next.error;
-          return { text: next.text };
-        },
-      },
-    }) as unknown as Pick<GoogleGenAI, "models">;
 }
 
 const googleContext: CampaignProviderConfig = {
@@ -84,14 +51,14 @@ describe("runStructuredAgent", () => {
   describe("provider dispatch", () => {
     it("routes to Anthropic by default (no modelContext → anthropicFallbackConfig)", async () => {
       const { runStructuredAgent } = await import("../_runner");
-      const anthropic = fakeAnthropic([{ text: JSON.stringify({ value: "ok" }) }]);
+      const anthropic = createMockAnthropic([{ text: JSON.stringify({ value: "ok" }) }]);
       const result = await runStructuredAgent<Out>(baseConfig() as never, { anthropic });
       expect(result.value).toBe("ok");
     });
 
     it("routes to Google when modelContext provider='google'", async () => {
       const { runStructuredAgent } = await import("../_runner");
-      const google = fakeGoogle([{ text: JSON.stringify({ value: "ok" }) }]);
+      const google = createMockGoogle([{ text: JSON.stringify({ value: "ok" }) }]);
       const result = await runStructuredAgent<Out>(baseConfig() as never, {
         modelContext: googleContext,
         google,
@@ -102,10 +69,10 @@ describe("runStructuredAgent", () => {
     it("uses the tier-appropriate model from modelContext.tier_models", async () => {
       const { runStructuredAgent } = await import("../_runner");
       let seenModel: string | undefined;
-      const anthropic = fakeAnthropic([
+      const anthropic = createMockAnthropic([
         {
           text: JSON.stringify({ value: "ok" }),
-          echoParams: (p) => {
+          echo: (p) => {
             seenModel = (p as { model: string }).model;
           },
         },
@@ -117,10 +84,10 @@ describe("runStructuredAgent", () => {
     it("honors an explicit Anthropic modelContext with a non-default creative model", async () => {
       const { runStructuredAgent } = await import("../_runner");
       let seenModel: string | undefined;
-      const anthropic = fakeAnthropic([
+      const anthropic = createMockAnthropic([
         {
           text: JSON.stringify({ value: "ok" }),
-          echoParams: (p) => {
+          echo: (p) => {
             seenModel = (p as { model: string }).model;
           },
         },
@@ -161,7 +128,7 @@ describe("runStructuredAgent", () => {
   describe("retry + fallback", () => {
     it("retries once on malformed JSON and recovers", async () => {
       const { runStructuredAgent } = await import("../_runner");
-      const anthropic = fakeAnthropic([
+      const anthropic = createMockAnthropic([
         { text: "not json" },
         { text: JSON.stringify({ value: "recovered" }) },
       ]);
@@ -171,14 +138,14 @@ describe("runStructuredAgent", () => {
 
     it("falls back when retries exhaust", async () => {
       const { runStructuredAgent } = await import("../_runner");
-      const anthropic = fakeAnthropic([{ text: "garbage" }, { text: "still garbage" }]);
+      const anthropic = createMockAnthropic([{ text: "garbage" }, { text: "still garbage" }]);
       const result = await runStructuredAgent<Out>(baseConfig() as never, { anthropic });
       expect(result.value).toBe("fallback");
     });
 
     it("falls back on network errors", async () => {
       const { runStructuredAgent } = await import("../_runner");
-      const anthropic = fakeAnthropic([
+      const anthropic = createMockAnthropic([
         { error: new Error("ECONNRESET") },
         { error: new Error("ECONNRESET") },
       ]);
@@ -189,7 +156,7 @@ describe("runStructuredAgent", () => {
     it("strips markdown fences", async () => {
       const { runStructuredAgent } = await import("../_runner");
       const body = JSON.stringify({ value: "fenced" });
-      const anthropic = fakeAnthropic([{ text: `\`\`\`json\n${body}\n\`\`\`` }]);
+      const anthropic = createMockAnthropic([{ text: `\`\`\`json\n${body}\n\`\`\`` }]);
       const result = await runStructuredAgent<Out>(baseConfig() as never, { anthropic });
       expect(result.value).toBe("fenced");
     });
@@ -197,7 +164,7 @@ describe("runStructuredAgent", () => {
     it("logs warn on each attempt failure and error on fallback", async () => {
       const { runStructuredAgent } = await import("../_runner");
       const logs: Array<[string, string]> = [];
-      const anthropic = fakeAnthropic([{ text: "garbage" }, { text: "still garbage" }]);
+      const anthropic = createMockAnthropic([{ text: "garbage" }, { text: "still garbage" }]);
       await runStructuredAgent<Out>(baseConfig() as never, {
         anthropic,
         logger: (level, msg) => logs.push([level, msg]),
@@ -211,10 +178,10 @@ describe("runStructuredAgent", () => {
     it("passes budget_tokens to Anthropic when thinkingBudget > 0", async () => {
       const { runStructuredAgent } = await import("../_runner");
       let capturedParams: Record<string, unknown> | undefined;
-      const anthropic = fakeAnthropic([
+      const anthropic = createMockAnthropic([
         {
           text: JSON.stringify({ value: "ok" }),
-          echoParams: (p) => {
+          echo: (p) => {
             capturedParams = p as Record<string, unknown>;
           },
         },
@@ -232,10 +199,10 @@ describe("runStructuredAgent", () => {
     it("increases max_tokens above thinking budget to avoid the API constraint", async () => {
       const { runStructuredAgent } = await import("../_runner");
       let capturedParams: Record<string, unknown> | undefined;
-      const anthropic = fakeAnthropic([
+      const anthropic = createMockAnthropic([
         {
           text: JSON.stringify({ value: "ok" }),
-          echoParams: (p) => {
+          echo: (p) => {
             capturedParams = p as Record<string, unknown>;
           },
         },
@@ -254,7 +221,7 @@ describe("runStructuredAgent", () => {
 
     it("omits thinking param on Google path even if thinkingBudget is set", async () => {
       const { runStructuredAgent } = await import("../_runner");
-      const google = fakeGoogle([{ text: JSON.stringify({ value: "ok" }) }]);
+      const google = createMockGoogle([{ text: JSON.stringify({ value: "ok" }) }]);
       const result = await runStructuredAgent<Out>(
         baseConfig({ tier: "fast", thinkingBudget: 2048 }) as never,
         { modelContext: googleContext, google },
@@ -268,7 +235,7 @@ describe("runStructuredAgent", () => {
     it("records fingerprint when promptId + recordPrompt are both set", async () => {
       const { runStructuredAgent } = await import("../_runner");
       const recorded: Array<[string, string]> = [];
-      const anthropic = fakeAnthropic([{ text: JSON.stringify({ value: "ok" }) }]);
+      const anthropic = createMockAnthropic([{ text: JSON.stringify({ value: "ok" }) }]);
       // Use an actual registry id so getPrompt returns a real fingerprint.
       await runStructuredAgent<Out>(baseConfig({ promptId: "agents/outcome-judge" }) as never, {
         anthropic,
@@ -282,7 +249,7 @@ describe("runStructuredAgent", () => {
     it("skips recording when promptId is absent (literal systemPrompt path)", async () => {
       const { runStructuredAgent } = await import("../_runner");
       const recorded: Array<[string, string]> = [];
-      const anthropic = fakeAnthropic([{ text: JSON.stringify({ value: "ok" }) }]);
+      const anthropic = createMockAnthropic([{ text: JSON.stringify({ value: "ok" }) }]);
       await runStructuredAgent<Out>(baseConfig() as never, {
         anthropic,
         recordPrompt: (name, fp) => recorded.push([name, fp]),
@@ -292,7 +259,7 @@ describe("runStructuredAgent", () => {
 
     it("skips recording when recordPrompt is absent (null-safe)", async () => {
       const { runStructuredAgent } = await import("../_runner");
-      const anthropic = fakeAnthropic([{ text: JSON.stringify({ value: "ok" }) }]);
+      const anthropic = createMockAnthropic([{ text: JSON.stringify({ value: "ok" }) }]);
       // No recordPrompt in deps — should not throw.
       const result = await runStructuredAgent<Out>(
         baseConfig({ promptId: "agents/outcome-judge" }) as never,
@@ -304,7 +271,7 @@ describe("runStructuredAgent", () => {
     it("swallows getPrompt throws when promptId is bogus — agent still runs", async () => {
       const { runStructuredAgent } = await import("../_runner");
       const recorded: Array<[string, string]> = [];
-      const anthropic = fakeAnthropic([{ text: JSON.stringify({ value: "ok" }) }]);
+      const anthropic = createMockAnthropic([{ text: JSON.stringify({ value: "ok" }) }]);
       const result = await runStructuredAgent<Out>(
         baseConfig({ promptId: "does/not/exist" }) as never,
         {
@@ -323,7 +290,7 @@ describe("runStructuredAgent", () => {
       // First attempt fails parse; second succeeds. Recording should happen
       // exactly once — reflecting the prompt the agent intended to run,
       // not a per-attempt duplicate.
-      const anthropic = fakeAnthropic([
+      const anthropic = createMockAnthropic([
         { text: "not json" },
         { text: JSON.stringify({ value: "recovered" }) },
       ]);
@@ -350,7 +317,7 @@ describe("runStructuredAgent", () => {
           };
         },
       };
-      const anthropic = fakeAnthropic([{ text: JSON.stringify({ value: "traced" }) }]);
+      const anthropic = createMockAnthropic([{ text: JSON.stringify({ value: "traced" }) }]);
       await runStructuredAgent<Out>(baseConfig() as never, { anthropic, trace });
       expect(spans[0]?.name).toBe("agent:test-agent");
       expect(spans[0]?.endedWith).toMatchObject({
@@ -373,7 +340,7 @@ describe("runStructuredAgent", () => {
           };
         },
       };
-      const anthropic = fakeAnthropic([{ text: "x" }, { text: "y" }]);
+      const anthropic = createMockAnthropic([{ text: "x" }, { text: "y" }]);
       await runStructuredAgent<Out>(baseConfig() as never, { anthropic, trace });
       expect(spans[0]?.endedWith).toMatchObject({
         output: { value: "fallback" },
@@ -391,7 +358,7 @@ describe("runStructuredAgent", () => {
           return { end() {} };
         },
       };
-      const anthropic = fakeAnthropic([{ text: JSON.stringify({ value: "ok" }) }]);
+      const anthropic = createMockAnthropic([{ text: JSON.stringify({ value: "ok" }) }]);
       await runStructuredAgent<Out>(baseConfig({ tier: "thinking" }) as never, {
         anthropic,
         trace,

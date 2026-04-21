@@ -49,3 +49,14 @@ export {
 export { createMockQuery } from "./agent-sdk";
 
 export { getQueryFn, getRuntimeRegistry, resetMockRuntimeForTesting } from "./runtime";
+
+export {
+  type AgentSdkStubResponse,
+  type AnthropicStubResponse,
+  createMockAnthropic,
+  createMockGoogle,
+  createMockQueryFn,
+  type GoogleStubResponse,
+  type SequenceIterator,
+  sequence,
+} from "./testing";

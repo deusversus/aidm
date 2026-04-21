@@ -1,22 +1,7 @@
-import type Anthropic from "@anthropic-ai/sdk";
+import { createMockAnthropic as fakeAnthropic } from "@/lib/llm/mock/testing";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-function fakeAnthropic(
-  responses: Array<{ text?: string; error?: unknown }>,
-): () => Pick<Anthropic, "messages"> {
-  let i = 0;
-  return () =>
-    ({
-      messages: {
-        create: async () => {
-          const next = responses[i++];
-          if (!next) throw new Error("no more mock responses");
-          if (next.error) throw next.error;
-          return { content: [{ type: "text", text: next.text ?? "" }] };
-        },
-      },
-    }) as unknown as Pick<Anthropic, "messages">;
-}
+// Unified mock Anthropic stub aliased to preserve call-site diff. Phase E.
 
 describe("handleOverride", () => {
   beforeEach(() => {

@@ -1,24 +1,9 @@
-import type Anthropic from "@anthropic-ai/sdk";
+import { createMockAnthropic as fakeAnthropic } from "@/lib/llm/mock/testing";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-function fakeAnthropic(
-  responses: Array<{ text?: string; error?: unknown }>,
-): () => Pick<Anthropic, "messages"> {
-  let i = 0;
-  return () =>
-    ({
-      messages: {
-        create: async () => {
-          const next = responses[i++];
-          if (!next) throw new Error("no more mock responses");
-          if (next.error) throw next.error;
-          return {
-            content: [{ type: "text", text: next.text ?? "" }],
-          };
-        },
-      },
-    }) as unknown as Pick<Anthropic, "messages">;
-}
+// Mock Anthropic client stub via the unified helper — same signature
+// as the inline fakeAnthropic that used to live here; aliased so the
+// call-site diff is zero. Phase E of mockllm plan.
 
 describe("validateAssertion (WorldBuilder)", () => {
   beforeEach(() => {

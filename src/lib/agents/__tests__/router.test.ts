@@ -1,4 +1,4 @@
-import type Anthropic from "@anthropic-ai/sdk";
+import { createMockAnthropic } from "@/lib/llm/mock/testing";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
@@ -11,29 +11,21 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  * runStructuredAgent with provider dispatch from `deps.modelContext`.
  * Tests don't pass modelContext here, so everything falls back to the
  * Anthropic default — inject Anthropic fakes throughout.
+ *
+ * Mocks via unified helper (Phase E of mockllm plan). The router makes
+ * one structured call per turn (IntentClassifier), sometimes followed
+ * by OverrideHandler / WorldBuilder calls — response sequence accounts
+ * for that by padding with duplicates where call count varies.
  */
 
-function anthropicReturning(text: string): () => Pick<Anthropic, "messages"> {
-  return () =>
-    ({
-      messages: {
-        create: async () => ({
-          content: [{ type: "text", text }],
-        }),
-      },
-    }) as unknown as Pick<Anthropic, "messages">;
+function anthropicReturning(text: string) {
+  // Single-text for tests making one call; pad to 4 for safety against
+  // retry paths.
+  return createMockAnthropic([{ text }, { text }, { text }, { text }]);
 }
 
-function anthropicSequence(texts: string[]): () => Pick<Anthropic, "messages"> {
-  let i = 0;
-  return () =>
-    ({
-      messages: {
-        create: async () => ({
-          content: [{ type: "text", text: texts[i++] ?? texts[texts.length - 1] }],
-        }),
-      },
-    }) as unknown as Pick<Anthropic, "messages">;
+function anthropicSequence(texts: string[]) {
+  return createMockAnthropic(texts.map((text) => ({ text })));
 }
 
 describe("routePlayerMessage", () => {
@@ -167,14 +159,10 @@ describe("routePlayerMessage", () => {
 
   it("surfaces IntentClassifier fallback (DEFAULT) when classification fails hard", async () => {
     const { routePlayerMessage } = await import("../router");
-    const anthropic = () =>
-      ({
-        messages: {
-          create: async () => {
-            throw new Error("upstream down");
-          },
-        },
-      }) as unknown as Pick<Anthropic, "messages">;
+    const anthropic = createMockAnthropic([
+      { error: new Error("upstream down") },
+      { error: new Error("upstream down") },
+    ]);
     const verdict = await routePlayerMessage(
       { playerMessage: "uncertain action", canonicalityMode: "inspired" },
       { intentClassifier: { anthropic } },

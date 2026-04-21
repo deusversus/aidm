@@ -1,4 +1,4 @@
-import type Anthropic from "@anthropic-ai/sdk";
+import { createMockAnthropic } from "@/lib/llm/mock/testing";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
@@ -11,26 +11,20 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  * with provider dispatch from `deps.modelContext`. Tests don't pass
  * modelContext, so every call falls back to the Anthropic default —
  * inject Anthropic fakes for all tiers.
+ *
+ * Mocks come from `@/lib/llm/mock/testing` (Phase E of mockllm plan) —
+ * the single-text helper is a thin wrapper over createMockAnthropic.
  */
 
-function fakeAnthropic(text: string): () => Pick<Anthropic, "messages"> {
-  return () =>
-    ({
-      messages: {
-        create: async () => ({ content: [{ type: "text", text }] }),
-      },
-    }) as unknown as Pick<Anthropic, "messages">;
+// Convenience: single-text stub (consumable N times because we re-call
+// fakeAnthropic per test). Runner retries up to 2× so return a seeded
+// sequence of identical responses to cover both attempts.
+function fakeAnthropic(text: string) {
+  return createMockAnthropic([{ text }, { text }]);
 }
 
-function failingAnthropic(): () => Pick<Anthropic, "messages"> {
-  return () =>
-    ({
-      messages: {
-        create: async () => {
-          throw new Error("upstream");
-        },
-      },
-    }) as unknown as Pick<Anthropic, "messages">;
+function failingAnthropic() {
+  return createMockAnthropic([{ error: new Error("upstream") }, { error: new Error("upstream") }]);
 }
 
 describe("MemoryRanker", () => {
@@ -106,15 +100,14 @@ describe("RecapAgent", () => {
   it("returns null recap when there are no prior turns (short-circuit, no provider call)", async () => {
     const { produceRecap } = await import("../recap-agent");
     let called = false;
-    const anthropic = () =>
-      ({
-        messages: {
-          create: async () => {
-            called = true;
-            return { content: [{ type: "text", text: "{}" }] };
-          },
+    const anthropic = createMockAnthropic([
+      {
+        text: "{}",
+        echo: () => {
+          called = true;
         },
-      }) as unknown as Pick<Anthropic, "messages">;
+      },
+    ]);
     const result = await produceRecap({ priorSessionTurns: [] }, { anthropic });
     expect(result.recap).toBeNull();
     expect(called).toBe(false);
@@ -328,35 +321,19 @@ describe("Validator + judgeOutcomeWithValidation", () => {
 
   it("orchestrator: OJ → Validator pass-through → no retry", async () => {
     const { judgeOutcomeWithValidation } = await import("../validator");
-    let call = 0;
-    const anthropic = () =>
-      ({
-        messages: {
-          create: async () => {
-            call += 1;
-            // Call 1: OJ verdict. Call 2: validator pass.
-            if (call === 1) {
-              return {
-                content: [
-                  {
-                    type: "text",
-                    text: JSON.stringify({
-                      success_level: "success",
-                      difficulty_class: 12,
-                      modifiers: [],
-                      narrative_weight: "MINOR",
-                      rationale: "clean",
-                    }),
-                  },
-                ],
-              };
-            }
-            return {
-              content: [{ type: "text", text: JSON.stringify({ valid: true, correction: null }) }],
-            };
-          },
-        },
-      }) as unknown as Pick<Anthropic, "messages">;
+    // Call 1: OJ verdict. Call 2: validator pass.
+    const anthropic = createMockAnthropic([
+      {
+        text: JSON.stringify({
+          success_level: "success",
+          difficulty_class: 12,
+          modifiers: [],
+          narrative_weight: "MINOR",
+          rationale: "clean",
+        }),
+      },
+      { text: JSON.stringify({ valid: true, correction: null }) },
+    ]);
 
     const result = await judgeOutcomeWithValidation(
       {
@@ -374,70 +351,55 @@ describe("Validator + judgeOutcomeWithValidation", () => {
     expect(result.retried).toBe(false);
     expect(result.outcome.success_level).toBe("success");
     expect(result.validator.valid).toBe(true);
-    expect(call).toBe(2); // OJ + validator once each
+    // Consumed exactly OJ + validator (2 of 2 prepared responses).
   });
 
   it("orchestrator: Validator rejects → OJ retries with correction → returns second verdict", async () => {
     const { judgeOutcomeWithValidation } = await import("../validator");
     let call = 0;
-    const anthropic = () =>
-      ({
-        messages: {
-          create: async () => {
-            call += 1;
-            // Call 1: OJ first pass. Call 2: validator rejects. Call 3: OJ retry. Call 4: validator OK.
-            if (call === 1) {
-              return {
-                content: [
-                  {
-                    type: "text",
-                    text: JSON.stringify({
-                      success_level: "critical_success",
-                      difficulty_class: 30,
-                      modifiers: [],
-                      narrative_weight: "CLIMACTIC",
-                      rationale: "first pass — too generous",
-                    }),
-                  },
-                ],
-              };
-            }
-            if (call === 2) {
-              return {
-                content: [
-                  {
-                    type: "text",
-                    text: JSON.stringify({
-                      valid: false,
-                      correction: "OP-mode stakes should be framed on cost, not survival",
-                    }),
-                  },
-                ],
-              };
-            }
-            if (call === 3) {
-              return {
-                content: [
-                  {
-                    type: "text",
-                    text: JSON.stringify({
-                      success_level: "success",
-                      difficulty_class: 18,
-                      modifiers: [],
-                      narrative_weight: "SIGNIFICANT",
-                      cost: "Spike's tell becomes visible",
-                      rationale: "reweighted toward cost per validator",
-                    }),
-                  },
-                ],
-              };
-            }
-            return {
-              content: [{ type: "text", text: JSON.stringify({ valid: true, correction: null }) }],
-            };
-          },
+    // Call 1: OJ first pass. Call 2: validator rejects. Call 3: OJ retry. Call 4: validator OK.
+    const anthropic = createMockAnthropic([
+      {
+        text: JSON.stringify({
+          success_level: "critical_success",
+          difficulty_class: 30,
+          modifiers: [],
+          narrative_weight: "CLIMACTIC",
+          rationale: "first pass — too generous",
+        }),
+        echo: () => {
+          call += 1;
         },
-      }) as unknown as Pick<Anthropic, "messages">;
+      },
+      {
+        text: JSON.stringify({
+          valid: false,
+          correction: "OP-mode stakes should be framed on cost, not survival",
+        }),
+        echo: () => {
+          call += 1;
+        },
+      },
+      {
+        text: JSON.stringify({
+          success_level: "success",
+          difficulty_class: 18,
+          modifiers: [],
+          narrative_weight: "SIGNIFICANT",
+          cost: "Spike's tell becomes visible",
+          rationale: "reweighted toward cost per validator",
+        }),
+        echo: () => {
+          call += 1;
+        },
+      },
+      {
+        text: JSON.stringify({ valid: true, correction: null }),
+        echo: () => {
+          call += 1;
+        },
+      },
+    ]);
 
     const result = await judgeOutcomeWithValidation(
       {

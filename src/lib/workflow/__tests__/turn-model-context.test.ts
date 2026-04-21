@@ -2,9 +2,9 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { KeyAnimatorEvent, KeyAnimatorInput } from "@/lib/agents/key-animator";
 import type { Db } from "@/lib/db";
+import { createMockAnthropic } from "@/lib/llm/mock/testing";
 import type { CampaignProviderConfig } from "@/lib/providers";
 import { campaigns, characters, profiles, turns } from "@/lib/state/schema";
-import type Anthropic from "@anthropic-ai/sdk";
 import { describe, expect, it } from "vitest";
 import { runTurn } from "../turn";
 
@@ -99,13 +99,9 @@ function makeDb(opts: {
   } as unknown as Db;
 }
 
-function fakeAnthropic(text: string): () => Pick<Anthropic, "messages"> {
-  return () =>
-    ({
-      messages: {
-        create: async () => ({ content: [{ type: "text", text }] }),
-      },
-    }) as unknown as Pick<Anthropic, "messages">;
+// Unified mock Anthropic stub via Phase E helper.
+function fakeAnthropic(text: string) {
+  return createMockAnthropic([{ text }, { text }]);
 }
 
 describe("runTurn — modelContext threading (FU-A)", () => {
