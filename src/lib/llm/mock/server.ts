@@ -41,6 +41,17 @@ export interface StartMockServerOptions {
   strict?: boolean;
   /** Bind address (default 127.0.0.1 — loopback-only for safety). */
   host?: string;
+  /**
+   * Record-mode config (Phase F). When set, unmatched requests proxy
+   * to the real provider + capture the response as a fixture file in
+   * `recordDir`. Mutually exclusive with `strict: true` (enforced at
+   * startup). Incurs real API $ — the server logs loudly on every
+   * recorded call.
+   */
+  record?: {
+    recordDir: string;
+    idPrefix?: string;
+  };
 }
 
 export interface MockServer {
@@ -99,6 +110,7 @@ interface ServerState {
   registry: FixtureRegistry;
   strict: boolean;
   calls: ServedCall[];
+  record: StartMockServerOptions["record"] | undefined;
 }
 
 /**
@@ -160,6 +172,29 @@ async function handleAnthropicMessages(
       response = synthesizeAnthropicResponse(signature);
     }
     if (outcome.fixture.streaming) streamingConfig = outcome.fixture.streaming;
+  } else if (state.record) {
+    // Record mode: proxy the request to the real provider + capture
+    // the response as a fixture. Transparent to the client (they get
+    // the real response back); the fixture persists for replay on
+    // future runs.
+    try {
+      const { forwardToAnthropic, writeRecordedFixture } = await import("./record");
+      const real = await forwardToAnthropic(signature, body);
+      const newFixture = writeRecordedFixture(signature, real, state.record);
+      // Add to in-memory registry so subsequent identical requests in
+      // this process replay from memory without another $ hit.
+      state.registry.byId.set(newFixture.id, newFixture);
+      const bucket = state.registry.byProvider.get("anthropic") ?? [];
+      bucket.push(newFixture);
+      state.registry.byProvider.set("anthropic", bucket);
+      response = real;
+      matched = "fixture";
+      fixtureId = newFixture.id;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      sendError(res, 502, `MockLLM record-mode forward failed: ${msg}`);
+      return;
+    }
   } else if (state.strict) {
     const hash = outcome.kind === "synth" ? outcome.reason : "unknown";
     state.calls.push({
@@ -343,10 +378,16 @@ async function streamAnthropicResponse(
 }
 
 export async function startMockServer(opts: StartMockServerOptions = {}): Promise<MockServer> {
+  if (opts.strict && opts.record) {
+    throw new Error(
+      "MockLLM: `strict` and `record` are mutually exclusive — strict rejects unknown prompts; record captures them.",
+    );
+  }
   const state: ServerState = {
     registry: opts.registry ?? emptyRegistry(),
     strict: opts.strict ?? false,
     calls: [],
+    record: opts.record,
   };
 
   const server = createServer(async (req, res) => {

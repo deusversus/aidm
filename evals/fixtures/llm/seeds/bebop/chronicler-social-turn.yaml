@@ -1,0 +1,42 @@
+# Chronicler post-turn pass after the Jet-about-Julia social beat.
+# Emits a tool_use sequence matching what Chronicler's prompt teaches:
+# write_episodic_summary + record_relationship_event + adjust_spotlight_debt.
+id: bebop-chronicler-social-turn
+provider: anthropic
+notes: |
+  Chronicler fixture for a social beat. Tool-use sequence emits via
+  assistant message (Chronicler's countToolUseBlocks reflects this).
+match:
+  system_includes:
+    - "Chronicler"
+  user_includes:
+    - "ask Jet about Julia"
+response:
+  content:
+    - type: text
+      text: "Cataloguing turn."
+    - type: tool_use
+      id: chron_1
+      name: write_episodic_summary
+      input:
+        turn_number: 7
+        content: "Spike asked Jet about Julia. Jet deflected but acknowledged she was real — first on-screen confirmation."
+    - type: tool_use
+      id: chron_2
+      name: record_relationship_event
+      input:
+        npc_id: npc_jet
+        milestone_type: first_vulnerability
+        evidence: "Jet set down the wrench + stopped working to answer"
+        turn_number: 7
+    - type: tool_use
+      id: chron_3
+      name: adjust_spotlight_debt
+      input:
+        npc_id: npc_jet
+        delta: 1
+  stop_reason: end_turn
+  usage:
+    input_tokens: 2400
+    output_tokens: 140
+    cache_read_input_tokens: 2100

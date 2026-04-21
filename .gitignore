@@ -52,3 +52,6 @@ reference/
 
 # local tooling
 .claude/
+
+# MockLLM — auto-captured fixtures (review before committing)
+evals/fixtures/llm/recorded/*.yaml

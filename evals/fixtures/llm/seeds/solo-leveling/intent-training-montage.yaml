@@ -1,0 +1,26 @@
+# IntentClassifier for a Solo Leveling training-montage beat. Player
+# commits to a multi-day training sequence; intent EXPLORATION with
+# high epicness + special_conditions.
+id: solo-leveling-intent-training-montage
+provider: anthropic
+notes: |
+  Jin-Woo locks himself in a low-level dungeon for repeated kills.
+  EXPLORATION intent; epicness 0.7 because it's a real arc move
+  (stat grinding); special_conditions includes "training_montage"
+  which bumps retrieval tier for the scene to pull in Jin-Woo's
+  stat baselines + prior-arc references.
+match:
+  system_includes:
+    - "IntentClassifier"
+  user_includes:
+    - "training"
+    - "dungeon"
+response:
+  content:
+    - type: text
+      text: |
+        {"intent":"EXPLORATION","target":"low-rank dungeon","action":"grind stats through repeated clears","epicness":0.7,"special_conditions":["training_montage","time_skip"],"confidence":0.88}
+  stop_reason: end_turn
+  usage:
+    input_tokens: 1100
+    output_tokens: 50

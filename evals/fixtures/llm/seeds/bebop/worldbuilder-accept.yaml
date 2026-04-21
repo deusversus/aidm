@@ -1,0 +1,23 @@
+# WorldBuilder ACCEPT — player asserts Jet's ISSP backstory. Emits
+# the full v3-parity NPCDetails structure via entityUpdates.
+id: bebop-worldbuilder-accept-jet-issp
+provider: anthropic
+notes: |
+  Player-asserted NPC backstory. v4 WB defaults to ACCEPT; this
+  fixture emits the response prose + structured NPCDetails to persist.
+match:
+  system_includes:
+    - "WorldBuilder"
+  user_includes:
+    - "Jet"
+    - "ISSP"
+response:
+  content:
+    - type: text
+      text: |
+        {"decision":"ACCEPT","response":"Jet glances at the old badge in the drawer without picking it up. 'Long time ago,' he says. It's not a denial. The dent in his prosthetic arm has a story now.","entityUpdates":[{"kind":"npc","name":"Jet Black","role":"ally","personality":"Former ISSP major. Stoic, principled, carries the weight of a broken past he doesn't discuss.","goals":["keep the crew running","occasionally work leads from his old precinct"],"secrets":["ISSP connections still owe him"],"faction":"Bebop","visual_tags":["bald","cybernetic arm","goatee"],"power_tier":"T7","ensemble_archetype":"skeptic"}],"flags":[],"rationale":"Player-consistent backstory grounded in canon Bebop lore; accept + catalog NPC fields."}
+  stop_reason: end_turn
+  usage:
+    input_tokens: 1500
+    output_tokens: 220
+    cache_read_input_tokens: 1100

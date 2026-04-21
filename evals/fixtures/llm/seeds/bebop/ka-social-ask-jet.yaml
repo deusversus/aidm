@@ -1,0 +1,62 @@
+# KeyAnimator narrative for the same Bebop social beat. Streaming
+# config included so dev-server playback feels alive.
+id: bebop-ka-social-ask-jet
+provider: anthropic
+notes: |
+  Jet-about-Julia social response. Restrained register matching
+  canonical Bebop DNA (darkness: 7, emotional_register: 6, intimacy: 6).
+match:
+  system_includes:
+    - "You are KeyAnimator"
+    - "Cowboy Bebop"
+  user_includes:
+    - "ask Jet about Julia"
+response:
+  content:
+    - type: text
+      text: |
+        Jet doesn't look up from the engine block. Grease to his elbows. A socket wrench turns, once, with the deliberate care of someone who'd rather do anything than answer.
+
+        "Julia." He sets the wrench down. Doesn't look at you. "You're finally asking."
+
+        The hangar hums. Somewhere in the deck above, Faye's laugh, brief and unmeant. Jet wipes his hands on a rag that's been gray for a decade.
+
+        "She was real. That's all I'll say standing up."
+  stop_reason: end_turn
+  usage:
+    input_tokens: 4200
+    output_tokens: 180
+    cache_read_input_tokens: 3800
+streaming:
+  chunks:
+    - delay_ms: 450
+      text: "Jet doesn't look up from the engine block. "
+    - delay_ms: 80
+      text: "Grease to his elbows. "
+    - delay_ms: 80
+      text: "A socket wrench turns, once, "
+    - delay_ms: 80
+      text: "with the deliberate care of someone "
+    - delay_ms: 80
+      text: "who'd rather do anything than answer.\n\n"
+    - delay_ms: 100
+      text: "\"Julia.\" "
+    - delay_ms: 80
+      text: "He sets the wrench down. Doesn't look at you. "
+    - delay_ms: 80
+      text: "\"You're finally asking.\"\n\n"
+    - delay_ms: 100
+      text: "The hangar hums. "
+    - delay_ms: 80
+      text: "Somewhere in the deck above, "
+    - delay_ms: 80
+      text: "Faye's laugh, brief and unmeant. "
+    - delay_ms: 80
+      text: "Jet wipes his hands on a rag "
+    - delay_ms: 80
+      text: "that's been gray for a decade.\n\n"
+    - delay_ms: 100
+      text: "\"She was real. "
+    - delay_ms: 80
+      text: "That's all I'll say standing up.\""
+  end_delay_ms: 150

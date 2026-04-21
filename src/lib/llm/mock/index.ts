@@ -60,3 +60,5 @@ export {
   type SequenceIterator,
   sequence,
 } from "./testing";
+
+export { forwardToAnthropic, type RecordOptions, writeRecordedFixture } from "./record";

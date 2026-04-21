@@ -1,0 +1,32 @@
+# KeyAnimator narrative for a Solo Leveling dungeon-floor encounter.
+# Demonstrates OP-dominant composition mode (Jin-Woo fighting a lower-tier
+# monster — tension reframes onto cost, not survival).
+id: solo-leveling-ka-dungeon-op-dominant
+provider: anthropic
+notes: |
+  Jin-Woo at T3 clearing a T7 mook. OP-dominant register —
+  survival isn't in question; the beat is about what this is
+  becoming, how far he's drifted from the human he started as.
+match:
+  system_includes:
+    - "You are KeyAnimator"
+    - "Solo Leveling"
+  user_includes:
+    - "dungeon"
+    - "monster"
+response:
+  content:
+    - type: text
+      text: |
+        The Orc Chieftain lunges — nine feet of muscle and tusk and whatever the System uses for hatred — and Jin-Woo doesn't move.
+
+        Doesn't need to. The shadow at his feet lengthens, coils, and by the time the axe descends it's already been answered. Two of his summons shear through the creature's calves. The Chieftain pitches forward. Jin-Woo watches the way he would watch a clock wind down.
+
+        He thinks — and this is the beat — *when did I stop flinching?* The Chieftain roars something guttural. Jin-Woo reads its level like checking a timestamp. E-rank. He had been E-rank, once, and had been terrified.
+
+        He turns away before the killing blow lands.
+  stop_reason: end_turn
+  usage:
+    input_tokens: 4800
+    output_tokens: 210
+    cache_read_input_tokens: 4400

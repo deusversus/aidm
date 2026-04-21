@@ -1,0 +1,22 @@
+# OutcomeJudge verdict for a Bebop combat exchange. Mid-tier parity
+# fight; success but with cost.
+id: bebop-outcome-judge-combat
+provider: anthropic
+notes: |
+  Spike vs a Red Dragon enforcer, T7 vs T7. Composition mode standard
+  (parity), so OJ emits a success-with-cost verdict.
+match:
+  system_includes:
+    - "OutcomeJudge"
+  user_includes:
+    - "COMBAT"
+response:
+  content:
+    - type: text
+      text: |
+        {"success_level":"success","difficulty_class":14,"modifiers":[],"narrative_weight":"SIGNIFICANT","consequence":"The enforcer is disarmed but calls backup","cost":"Spike takes a shallow cut to the forearm","rationale":"T7 vs T7 parity; Spike's positioning advantage + firearm reach wins the exchange but not cleanly."}
+  stop_reason: end_turn
+  usage:
+    input_tokens: 1800
+    output_tokens: 90
+    cache_read_input_tokens: 1400
