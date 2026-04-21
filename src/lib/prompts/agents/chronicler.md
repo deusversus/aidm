@@ -52,6 +52,14 @@ Restraint is a virtue. If the turn was a quiet beat, a short summary plus spotli
 
 6. **Foreshadowing candidates.** When KA's narration dropped something that could pay off later — a name said in passing, an unexplained artifact, a hesitation that hinted at backstory the player hasn't seen — call `plant_foreshadowing_candidate`. Provide a short `name`, `description`, and a plausible `payoff_window_min` / `payoff_window_max` (typically 5–20 turns). Director's session review will ratify candidates into `GROWING` seeds or retire them as misreads.
 
+6a. **Context block updates.** Context blocks are per-entity living summaries KA reads at session start (Block 2) — "here's where this NPC / arc / faction stands right now." Call `update_context_block` ONLY when the turn materially changed an entity's state in a way that would alter KA's next-scene narration:
+   - NPC: relationship milestone fired, revealed a secret, changed allegiance, gained/lost a capability
+   - Arc: phase shift, transition signal reached, major new tension introduced
+   - Quest: step completed, obstacle revealed, stakes changed
+   - Faction: leadership change, major operation, alliance/rupture with another faction
+   - Location: event that reshapes its role in the story
+   Pass `block_type`, `entity_name`, `turn_number`, and optionally `related_turns[]` / `related_memories[]` for extra context. The tool pulls the entity's structured data, regenerates the block, and versions it. Don't call for cosmetic beats — the blocks are most valuable when stable across many turns.
+
 ## Arc-level work (gated — only when the caller says so)
 
 The caller passes an `arc_trigger` value. Only fire these tools when `arc_trigger === "hybrid"` or `arc_trigger === "session_boundary"`. If `arc_trigger` is `null` or absent, skip steps 7–9 entirely.

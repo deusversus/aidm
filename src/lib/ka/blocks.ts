@@ -104,6 +104,13 @@ export interface RenderBlocksInput {
   /** Session-stable rule-library guidance (currently empty at M1). */
   sessionRuleLibrary?: string;
   /**
+   * Session-start context-blocks bundle for Block 2. Per-entity living
+   * summaries (arc, threads, quests, NPCs, factions, locations) — the
+   * distilled campaign state KA reads before writing the scene. Block 2
+   * is semi-static, invalidates when any block updates.
+   */
+  sessionContextBlocks?: string;
+  /**
    * Effective composition mode for this turn. Threaded into Block 1's
    * active_tonal_state display when non-standard so KA sees the mode
    * shift alongside DNA + composition. Block 4 shows the same value as
@@ -296,10 +303,13 @@ export function renderKaBlocks(input: RenderBlocksInput): RenderedBlocks {
   const block1Template = getPrompt("ka/block_1_ambient").content;
   const block1 = substitute(block1Template, block1Vars);
 
-  // --- Block 2 (compaction) ---
+  // --- Block 2 (compaction + session context-block briefing) ---
   const block2Template = getPrompt("ka/block_2_compaction").content;
   const block2 = substitute(block2Template, {
     compaction_entries: formatCompaction(compaction),
+    session_context_blocks:
+      input.sessionContextBlocks ??
+      "(no context blocks yet — Chronicler will build them as NPCs, arcs, and locations solidify through play)",
   });
 
   // --- Block 3 (working memory) ---

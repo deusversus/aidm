@@ -19,6 +19,7 @@ import {
   anthropicFallbackConfig,
   validateCampaignProviderConfig,
 } from "@/lib/providers";
+import { assembleSessionContextBlocks } from "@/lib/rules/context-blocks";
 import { assembleSessionRuleLibraryGuidance } from "@/lib/rules/library";
 import { campaigns, characters, npcs, profiles, turns } from "@/lib/state/schema";
 import { type AidmSpanHandle, type AidmToolContext, invokeTool } from "@/lib/tools";
@@ -793,6 +794,13 @@ export async function* runTurn(
       campaignId: input.campaignId,
     });
 
+    // Context-blocks bundle for Block 2 (v3-parity Phase 3C). Pulls all
+    // `active` blocks for the campaign; ordered arc → thread → quest →
+    // faction → location → npc; capped at ~10 blocks for token budget.
+    // Chronicler drives block creation/updates via update_context_block
+    // tool; blocks accumulate organically through play.
+    const sessionContextBlocks = await assembleSessionContextBlocks(db, input.campaignId);
+
     const runKa = deps.runKa ?? runKeyAnimator;
     const kaIter = runKa(
       {
@@ -831,6 +839,7 @@ export async function* runTurn(
         },
         activeCompositionMode: compositionMode,
         sessionRuleLibrary: sessionRuleLibrary || undefined,
+        sessionContextBlocks: sessionContextBlocks || undefined,
         voicePatternsJournal: voicePatternsJournal || undefined,
         toolContext,
         abortController: input.abort,

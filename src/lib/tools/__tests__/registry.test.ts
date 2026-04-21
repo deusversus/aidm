@@ -66,6 +66,7 @@ describe("tool registry — core infrastructure", () => {
           "retire_foreshadowing_seed",
           "trigger_compactor",
           "update_arc_plan",
+          "update_context_block",
           "update_npc",
           "update_voice_patterns",
           "write_director_note",
@@ -73,6 +74,7 @@ describe("tool registry — core infrastructure", () => {
           "write_semantic_memory",
           // Critical / Entities / Episodic / Semantic / Voice reads
           "get_character_sheet",
+          "get_context_block",
           "get_critical_memories",
           "get_npc_details",
           "get_overrides",
@@ -97,6 +99,7 @@ describe("tool registry — core infrastructure", () => {
       ).toEqual(
         [
           "get_character_sheet",
+          "get_context_block",
           "get_npc_details",
           "get_world_state",
           "list_known_npcs",
@@ -105,6 +108,7 @@ describe("tool registry — core infrastructure", () => {
           "register_faction",
           "register_location",
           "register_npc",
+          "update_context_block",
           "update_npc",
         ].sort(),
       );
