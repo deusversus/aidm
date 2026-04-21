@@ -387,6 +387,126 @@ describe("runTurn — /override persistence (Phase 1, v3-audit closure)", () => 
     expect(ids).toContain("pre-existing");
   });
 
+  it("next turn's router reads the persisted override back via priorOverrides (v3-parity plan §1.1)", async () => {
+    const trace = makeTrace();
+    // Shared campaign state across two turns — settings mutates via the
+    // override persist path, next turn loads it back.
+    const base = fakeDb(trace);
+    let sharedSettings: { overrides: unknown[] } = { overrides: [] };
+    const db: Db = {
+      ...base,
+      select: (cols?: unknown) => {
+        const inner = (base as unknown as { select: (c?: unknown) => unknown }).select(cols) as {
+          from: (t: unknown) => {
+            where: (w?: unknown) => {
+              limit: () => Promise<unknown[]>;
+              orderBy: (o?: unknown) => unknown;
+            };
+          };
+        };
+        return {
+          from: (t: unknown) => ({
+            where: (w?: unknown) => {
+              const inner2 = inner.from(t).where(w);
+              return {
+                limit: async () => {
+                  const rows = await inner2.limit();
+                  // Inject the live sharedSettings onto the campaign row each select.
+                  if (Array.isArray(rows) && rows.length > 0 && "settings" in (rows[0] as object)) {
+                    const row = rows[0] as { settings: unknown };
+                    return [{ ...row, settings: sharedSettings }];
+                  }
+                  return rows;
+                },
+                orderBy: inner2.orderBy,
+              };
+            },
+          }),
+        };
+      },
+      update: (table: unknown) => {
+        const name = (() => {
+          try {
+            return getTableName(table as Table);
+          } catch {
+            return "unknown";
+          }
+        })();
+        return {
+          set: (patch: unknown) => {
+            trace.updateCalls.push({ table: name, patch });
+            // Mutate the shared settings reference so the NEXT select
+            // sees the persisted override.
+            if (name === "campaigns") {
+              const p = patch as { settings?: { overrides?: unknown[] } };
+              if (p.settings) sharedSettings = p.settings as { overrides: unknown[] };
+            }
+            return { where: async () => ({ rowCount: 1 }) };
+          },
+        };
+      },
+    } as unknown as Db;
+
+    const { runTurn } = await import("../turn");
+
+    const firstRouteFn = (async () => ({
+      kind: "override" as const,
+      intent: makeIntent({ intent: "OVERRIDE_COMMAND" }),
+      override: {
+        mode: "override" as const,
+        category: "CONTENT_CONSTRAINT" as const,
+        value: "No explicit violence",
+        scope: "campaign" as const,
+        conflicts_with: [],
+        ack_phrasing: "Noted.",
+      },
+    })) as unknown as Parameters<typeof runTurn>[1]["routeFn"];
+
+    for await (const _ of runTurn(
+      { campaignId: CAMPAIGN_ID, userId: USER_ID, playerMessage: "/override no violence" },
+      { db, routeFn: firstRouteFn },
+    )) {
+      /* drain */
+    }
+
+    // Second turn: router receives priorOverrides populated from first persist.
+    let capturedPriorOverrides: unknown[] | undefined;
+    const secondRouteFn = (async (input: { priorOverrides?: unknown[] }) => {
+      capturedPriorOverrides = input.priorOverrides;
+      return {
+        kind: "continue" as const,
+        intent: makeIntent({ intent: "DEFAULT", epicness: 0.05 }),
+      };
+    }) as unknown as Parameters<typeof runTurn>[1]["routeFn"];
+
+    // Mock runKa to avoid reaching the real Agent SDK.
+    const mockRunKa = async function* () {
+      yield {
+        kind: "final",
+        narrative: "nothing happens.",
+        ttftMs: null,
+        totalMs: 10,
+        costUsd: 0,
+        sessionId: null,
+        stopReason: "end_turn",
+      };
+    } as unknown as Parameters<typeof runTurn>[1]["runKa"];
+
+    for await (const _ of runTurn(
+      { campaignId: CAMPAIGN_ID, userId: USER_ID, playerMessage: "continue" },
+      { db, routeFn: secondRouteFn, runKa: mockRunKa },
+    )) {
+      /* drain */
+    }
+
+    expect(capturedPriorOverrides).toBeDefined();
+    expect(capturedPriorOverrides).toHaveLength(1);
+    const [o] = capturedPriorOverrides as Array<{ category: string; value: string; scope: string }>;
+    expect(o?.category).toBe("CONTENT_CONSTRAINT");
+    expect(o?.value).toBe("No explicit violence");
+    expect(o?.scope).toBe("campaign");
+  });
+
   it("does not persist when override mode is 'meta' (meta conversation Phase 5)", async () => {
     const trace = makeTrace();
     const db = fakeDb(trace);

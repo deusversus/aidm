@@ -499,22 +499,26 @@ export async function* runTurn(
       //     lands at Phase 5 of v3-audit-closure).
       // ---------------------------------------------------------------
       if (verdict.kind === "override" && verdict.override.mode === "override") {
-        const category = verdict.override.category;
-        if (category) {
-          const newOverride = {
-            id: crypto.randomUUID(),
-            category,
-            value: verdict.override.value,
-            scope: verdict.override.scope,
-            created_at: new Date().toISOString(),
-          };
-          const existing = Array.isArray(settings.overrides) ? settings.overrides : [];
-          const newSettings = { ...settings, overrides: [...existing, newOverride] };
-          await db
-            .update(campaigns)
-            .set({ settings: newSettings })
-            .where(and(eq(campaigns.id, input.campaignId), eq(campaigns.userId, input.userId)));
-        }
+        // Schema allows `category: null` even under mode="override" (the
+        // fallback builder at override-handler.ts:85 defaults to
+        // NARRATIVE_DEMAND, but a structured-output anomaly could still
+        // yield null). Default to NARRATIVE_DEMAND here rather than
+        // silently dropping the override — the player saw an ack; state
+        // MUST reflect what they asked for.
+        const category = verdict.override.category ?? "NARRATIVE_DEMAND";
+        const newOverride = {
+          id: crypto.randomUUID(),
+          category,
+          value: verdict.override.value,
+          scope: verdict.override.scope,
+          created_at: new Date().toISOString(),
+        };
+        const existing = Array.isArray(settings.overrides) ? settings.overrides : [];
+        const newSettings = { ...settings, overrides: [...existing, newOverride] };
+        await db
+          .update(campaigns)
+          .set({ settings: newSettings })
+          .where(and(eq(campaigns.id, input.campaignId), eq(campaigns.userId, input.userId)));
       }
 
       if (verdict.kind === "worldbuilder" && verdict.verdict.decision === "ACCEPT") {
@@ -731,7 +735,12 @@ export async function* runTurn(
       ...(ctx.profile.ip_mechanics.power_system?.limitations
         ?.split(/\s+/)
         .map((w) => w.toLowerCase()) ?? []),
-      ...(ctx.profile.ip_mechanics.power_system?.tiers?.map((t) => t.toLowerCase()) ?? []),
+      // Tier names tokenized in case canon uses multi-word tiers
+      // ("high-rank executor", "s-rank hunter"). The vocab detector
+      // matches single lowercased tokens, not the full string.
+      ...(ctx.profile.ip_mechanics.power_system?.tiers?.flatMap((t) =>
+        t.split(/\s+/).map((w) => w.toLowerCase()),
+      ) ?? []),
       ...((ctx.profile.ip_mechanics.author_voice?.sentence_patterns ?? []).flatMap((p) =>
         p.split(/\s+/).map((w) => w.toLowerCase()),
       ) ?? []),
