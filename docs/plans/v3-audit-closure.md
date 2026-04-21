@@ -575,6 +575,15 @@ These findings are genuinely gated on other milestone work. Listed here so they 
 - **Also consider:** adding `max_tool_rounds` hint to KA's system prompt as a soft directive. Already somewhat present via Block 4 retrieval budget; can extend to "total tool calls this turn should stay under N."
 - **Explicit ticket:** "Research-phase bound: eval assertion + soft directive" — lands with Commit 8 or M2.
 
+### 8.4 Context blocks — session-start auto-generation (Phase 3.3 path 1 reshape)
+- **Finding:** Plan §3.3 specified three generation paths — (1) session-start auto-generation detecting first-turn or ≥30min gap; (2) Chronicler-triggered update_context_block; (3) KA on-demand via get_context_block. Phase 3C shipped paths 2 + 3; path 1 (session-start auto-generation) was reshaped to organic accumulation via Chronicler post-turn triggers.
+- **Reshape justification:** Session-start generation adds 5–10s latency on the first turn of each session (per plan §Risks). Chronicler already runs after every turn; blocks accumulate through play without a latency spike. For a fresh campaign with NPCs catalogued but no blocks yet, Block 2's fallback message ("no context blocks yet — Chronicler will build them") renders gracefully.
+- **Re-evaluate after playtest.** If KA starts a session with thin briefings (blocks stale or absent for entities that matter), revisit. Possible mitigations:
+  - Synchronous pass for the MOST load-bearing block only (current arc) at session start; others stay organic.
+  - Background pre-generation triggered on session-start detection (no latency; blocks may lag one turn).
+  - Keep as-is if blocks accumulate fast enough in practice.
+- **Meta-audit note:** Flagged in the 2026-04-21 HONEST_CLOSURE meta-audit as the one silent reshape across the 7-phase stack. Documented here so it doesn't evaporate.
+
 ---
 
 ## Risks + open questions
