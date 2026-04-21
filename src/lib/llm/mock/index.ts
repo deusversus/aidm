@@ -38,3 +38,10 @@ export {
 } from "./synth";
 
 export { estimateCostUsd, pricingFor, type ModelPricing, type UsageStats } from "./pricing";
+
+export {
+  type MockServer,
+  type ServedCall,
+  type StartMockServerOptions,
+  startMockServer,
+} from "./server";
