@@ -1,4 +1,5 @@
-import type { campaigns } from "@/lib/state/schema";
+import { type campaigns, campaigns as campaignsTable } from "@/lib/state/schema";
+import { type Table, getTableName } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { z } from "zod";
 import {
@@ -22,11 +23,30 @@ import {
 type FakeRow = Pick<typeof campaigns.$inferSelect, "id" | "userId" | "name" | "settings">;
 
 function fakeDb(rows: FakeRow[]): AidmToolContext["db"] {
+  // Table-aware fake: returns the passed `rows` for campaigns lookups
+  // (authorizeCampaignAccess), empty arrays for everything else. Tools
+  // that actually query their own table (e.g. list_known_npcs) get []
+  // instead of the campaign row spuriously matching their schema.
+  const tableNameOf = (t: unknown): string => {
+    try {
+      return getTableName(t as Table);
+    } catch {
+      return "unknown";
+    }
+  };
+  const rowsFor = (table: unknown): unknown[] => {
+    const name = tableNameOf(table);
+    if (name === getTableName(campaignsTable)) return rows;
+    return [];
+  };
   return {
     select: (_cols?: unknown) => ({
-      from: (_t: unknown) => ({
+      from: (t: unknown) => ({
         where: (_cond: unknown) => ({
-          limit: async (_n: number) => rows,
+          limit: async (_n: number) => rowsFor(t),
+          orderBy: (_o: unknown) => ({
+            limit: async (_n: number) => rowsFor(t),
+          }),
         }),
       }),
     }),
@@ -64,6 +84,7 @@ describe("tool registry — core infrastructure", () => {
           "register_location",
           "register_npc",
           "retire_foreshadowing_seed",
+          "spawn_transient",
           "trigger_compactor",
           "update_arc_plan",
           "update_context_block",
@@ -108,6 +129,7 @@ describe("tool registry — core infrastructure", () => {
           "register_faction",
           "register_location",
           "register_npc",
+          "spawn_transient",
           "update_context_block",
           "update_npc",
         ].sort(),

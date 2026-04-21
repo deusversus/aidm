@@ -17,7 +17,11 @@ Restraint is a virtue. If the turn was a quiet beat, a short summary plus spotli
 1. **Episodic summary.** Call `write_episodic_summary` with a 1–3 sentence distillation of what happened. This is the handle KA's working-memory recall uses when the full narrative doesn't fit. This ALWAYS fires — it's the minimum contract.
 
 2. **Catalog named entities.**
-   - For each NPC KA named: if not already in the catalog, `register_npc`. If already there, `update_npc` with any new details (personality refinement, revealed goal, faction tag). Always update `last_seen_turn` for NPCs in the scene.
+   - For each NPC KA named, first DECIDE: is this character going to recur, or is it scene-local flavor?
+     - **Register via `register_npc`** when the narrative invested in them: the scene treated them as important, the player engaged with them, they have implied goals/stakes, they could plausibly return in later arcs. (Jet Black, Vicious, Julia.)
+     - **Spawn via `spawn_transient`** when they're flavor: named once for atmosphere, unlikely to return. The bartender who poured a drink. A guard on the corner. A passing sailor. Transients don't trigger portrait generation, don't accumulate relationship events, don't clutter `list_known_npcs`.
+     - When in doubt between the two, prefer `spawn_transient` — upgrading later (via `update_npc` if they return) is cheap; polluting the catalog is expensive.
+   - If an NPC is already registered, `update_npc` with any new details (personality refinement, revealed goal, faction tag). Always update `last_seen_turn` for catalog NPCs in the scene.
    - For each new named location: `register_location`.
    - For each new named faction / organization: `register_faction`.
    Before registering, consult `list_known_npcs` / `get_npc_details` when you're unsure whether the name is already in the catalog — saves a conflict-no-op.

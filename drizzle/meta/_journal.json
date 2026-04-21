@@ -50,6 +50,13 @@
       "when": 1776796051676,
       "tag": "0006_talented_hellcat",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1776796959797,
+      "tag": "0007_typical_iron_patriot",
+      "breakpoints": true
     }
   ]
 }

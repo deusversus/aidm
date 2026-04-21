@@ -26,6 +26,7 @@ import "./chronicler/register-faction";
 import "./chronicler/register-location";
 import "./chronicler/register-npc";
 import "./chronicler/retire-foreshadowing-seed";
+import "./chronicler/spawn-transient";
 import "./chronicler/trigger-compactor";
 import "./chronicler/update-arc-plan";
 import "./chronicler/update-context-block";

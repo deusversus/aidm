@@ -1,0 +1,2 @@
+ALTER TABLE "npcs" ADD COLUMN "is_transient" boolean DEFAULT false NOT NULL;--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "npcs_transient_idx" ON "npcs" USING btree ("campaign_id","is_transient");

@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  boolean,
   index,
   integer,
   jsonb,
@@ -339,6 +340,14 @@ export const npcs = pgTable(
     powerTier: text("power_tier").notNull().default("T10"),
     /** Ensemble role: struggler | heart | skeptic | dependent | equal | observer | rival. */
     ensembleArchetype: text("ensemble_archetype"),
+    /**
+     * Transient vs catalog NPC (v3-parity Phase 6A). True = flavor
+     * character unlikely to recur (the bartender, a passing sailor) —
+     * no portrait generation, filtered out of list_known_npcs by default,
+     * no relationship-event tracking. False = catalog NPC, persistent
+     * across sessions.
+     */
+    isTransient: boolean("is_transient").notNull().default(false),
     firstSeenTurn: integer("first_seen_turn").notNull(),
     lastSeenTurn: integer("last_seen_turn").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
@@ -347,6 +356,7 @@ export const npcs = pgTable(
   (t) => [
     uniqueIndex("npcs_campaign_name_key").on(t.campaignId, t.name),
     index("npcs_campaign_idx").on(t.campaignId),
+    index("npcs_transient_idx").on(t.campaignId, t.isTransient),
   ],
 );
 
