@@ -28,7 +28,7 @@ The user chose the thorough path: **include Chronicler in M1** (don't rescope to
 
 **Known debt (not blocking M1 ship, surfaces before M2 scope freezes):**
 
-- **v3 parity audit** (2026-04-21, 4 parallel subagents): six BLOCKER-tagged gaps where v4 has a piece wired but no call site — override persistence never fires, WB-accepted entities evaporate, composition mode-shift hardcoded to "standard", semantic retrieval stubbed, rule library missing, context blocks missing. Plus eight MAJORs. See `docs/audits/v3-parity-2026-04-21.md` if landed, or the synthesis in the conversation transcript. Five cheap BLOCKERs (~1 day of work total) are candidates for a "v3 audit debt" cleanup commit before Commit 9.
+- **v3 parity audit** (2026-04-21, 4 parallel subagents): six BLOCKER-tagged gaps where v4 has a piece wired but no call site — override persistence never fires, WB-accepted entities evaporate, composition mode-shift hardcoded to "standard", semantic retrieval stubbed, rule library missing, context blocks missing. Plus eight MAJORs + ten MINORs. Full audit with findings + citations + synthesis at `docs/audits/v3-parity-2026-04-21.md`. Fix plan with explicit paths for every finding at `docs/plans/v3-audit-closure.md` (7 phases, ~10 working days). Five cheap BLOCKERs (~1 day of work, closure plan Phase 1) are candidates for a "v3 audit debt" cleanup commit before Commit 9.
 - **ROADMAP §5 sub-sections** (per-turn shape, agent roster, per-agent specs) pre-date the three-phase consolidation and over-enumerate after-turn agents. Rewrite pending. Treat §5 top-matter and `project_three_phase_architecture.md` as authoritative.
 
 **Resume here when returning to this plan:** jump to §9 below for the next commit.
