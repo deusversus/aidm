@@ -1,6 +1,6 @@
 import type { Db } from "@/lib/db";
 import { contextBlocks } from "@/lib/state/schema";
-import { and, asc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 
 /**
  * Read-path helper for context_blocks (Phase 3C of v3-audit closure).
@@ -16,15 +16,27 @@ import { and, asc, eq } from "drizzle-orm";
  * detail follows. Stable across turns within a session.
  *
  * Budget: target <3000 tokens total per plan §3 Phase audit focus. Each
- * block averages ~400 tokens; this accommodates 6-7 active blocks. If
- * the campaign has more, the assembler caps at ~10 blocks prioritized
- * by the ordering above (oldest-updated drops first within a type).
+ * block averages ~400 tokens; per-type cap ensures no single category
+ * (especially NPCs, which scale fastest) starves the others as the
+ * campaign grows.
  */
 
 const BLOCK_TYPE_ORDER = ["arc", "thread", "quest", "faction", "location", "npc"] as const;
-const MAX_BLOCKS = 10;
+/** Max blocks per category. Keeps the briefing balanced as the campaign
+ * accumulates — 3 NPCs × 6 categories ≈ 18 blocks worst case, bounded by
+ * MAX_TOTAL. Oldest-updated blocks within each category drop first. */
+const PER_TYPE_CAP = 3;
+/** Hard cap across all categories. ~10 × 400 tokens ≈ 4k, a ~30% overshoot
+ * of the <3000 target that's acceptable given Block 2 is cache-eligible
+ * and amortizes across turns within a session. */
+const MAX_TOTAL = 10;
 
 export async function assembleSessionContextBlocks(db: Db, campaignId: string): Promise<string> {
+  // Pull ALL active blocks — no DB-level alphabetical order or early limit
+  // (those were the Phase 3 audit MINORs: alphabetical != canonical; early
+  // limit starves NPCs). In-memory sort + per-type cap is the only way to
+  // preserve the canonical briefing order + prevent one category from
+  // eating the budget.
   const rows = await db
     .select({
       blockType: contextBlocks.blockType,
@@ -35,25 +47,35 @@ export async function assembleSessionContextBlocks(db: Db, campaignId: string): 
     })
     .from(contextBlocks)
     .where(and(eq(contextBlocks.campaignId, campaignId), eq(contextBlocks.status, "active")))
-    .orderBy(asc(contextBlocks.blockType), asc(contextBlocks.entityName))
-    .limit(MAX_BLOCKS * 2);
+    .orderBy(desc(contextBlocks.lastUpdatedTurn))
+    .limit(500);
 
   if (rows.length === 0) return "";
 
-  // Sort by canonical type order, then by most-recently-updated.
-  const orderIndex = (t: string) => {
-    const i = BLOCK_TYPE_ORDER.indexOf(t as (typeof BLOCK_TYPE_ORDER)[number]);
-    return i === -1 ? BLOCK_TYPE_ORDER.length : i;
-  };
-  rows.sort((a, b) => {
-    const diff = orderIndex(a.blockType) - orderIndex(b.blockType);
-    if (diff !== 0) return diff;
-    return b.lastUpdatedTurn - a.lastUpdatedTurn;
-  });
+  // Bucket by block_type and keep the PER_TYPE_CAP most-recently-updated
+  // within each bucket (rows are already last-updated-desc from the DB
+  // query).
+  const byType = new Map<string, typeof rows>();
+  for (const row of rows) {
+    const list = byType.get(row.blockType) ?? [];
+    if (list.length < PER_TYPE_CAP) list.push(row);
+    byType.set(row.blockType, list);
+  }
 
-  const capped = rows.slice(0, MAX_BLOCKS);
+  // Materialize in canonical order up to MAX_TOTAL.
+  const capped: typeof rows = [];
+  for (const blockType of BLOCK_TYPE_ORDER) {
+    const list = byType.get(blockType);
+    if (!list) continue;
+    for (const row of list) {
+      if (capped.length >= MAX_TOTAL) break;
+      capped.push(row);
+    }
+    if (capped.length >= MAX_TOTAL) break;
+  }
 
-  // Group by block_type; render sections.
+  // Group for rendering (preserves canonical order because we iterated
+  // over BLOCK_TYPE_ORDER above).
   const grouped = new Map<string, typeof capped>();
   for (const row of capped) {
     const list = grouped.get(row.blockType) ?? [];
