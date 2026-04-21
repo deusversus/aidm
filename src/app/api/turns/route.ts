@@ -1,7 +1,8 @@
 import { getDb } from "@/lib/db";
+import { chronicleTurn, computeArcTrigger } from "@/lib/workflow/chronicle";
 import { runTurn } from "@/lib/workflow/turn";
 import { currentUser } from "@clerk/nextjs/server";
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { z } from "zod";
 
 export const runtime = "nodejs";
@@ -77,7 +78,36 @@ export async function POST(req: Request) {
         for await (const ev of iter) {
           const { type, ...rest } = ev;
           controller.enqueue(encodeSseEvent(type, rest));
-          if (type === "done" || type === "error") break;
+          if (type === "done") {
+            // Fire Chronicler post-response via Next's after(). It runs
+            // after the SSE response has flushed to the client — user-
+            // perceived latency is unchanged. FIFO-per-campaign lock +
+            // idempotency guard are both inside chronicleTurn.
+            //
+            // At M1 we only chronicle `continue` turns (player-driven
+            // narrative). META / OVERRIDE / WORLDBUILDER short-circuits
+            // persist their own structured effects elsewhere (e.g.
+            // campaign.settings.overrides for WB) and don't need the
+            // full cataloguing pass.
+            if (ev.verdictKind === "continue") {
+              const chronicleInput = {
+                turnId: ev.turnId,
+                campaignId: body.campaignId,
+                userId: user.id,
+                turnNumber: ev.turnNumber,
+                playerMessage: body.message,
+                narrative: ev.narrative,
+                intent: ev.intent,
+                outcome: ev.outcome,
+                arcTrigger: computeArcTrigger(ev.intent.epicness, ev.turnNumber),
+              };
+              after(async () => {
+                await chronicleTurn(chronicleInput, { db });
+              });
+            }
+            break;
+          }
+          if (type === "error") break;
         }
       } catch (err) {
         controller.enqueue(

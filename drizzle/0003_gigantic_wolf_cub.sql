@@ -1,0 +1,1 @@
+ALTER TABLE "turns" ADD COLUMN "chronicled_at" timestamp with time zone;

@@ -143,6 +143,15 @@ export const turns = pgTable(
     ttftMs: integer("ttft_ms"),
     /** Total wall-clock from request to end_turn. */
     totalMs: integer("total_ms"),
+    /**
+     * Timestamp Chronicler successfully processed this turn. Null = not
+     * yet chronicled; non-null = Chronicler's post-turn writes landed.
+     * Used as the idempotency guard so a retried Chronicler run (e.g.
+     * after a deploy mid-flight) doesn't double-apply non-idempotent
+     * writes like `record_relationship_event` or `adjust_spotlight_debt`
+     * (which additively shift debt via SQL expression).
+     */
+    chronicledAt: timestamp("chronicled_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [

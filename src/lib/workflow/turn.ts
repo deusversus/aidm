@@ -176,6 +176,18 @@ export type TurnWorkflowEvent =
       totalMs: number;
       costUsd: number | null;
       portraitNames: string[];
+      /**
+       * Route verdict kind — tells the SSE route handler whether to fire
+       * Chronicler. At M1 Chronicler runs only on `continue` turns
+       * (player-driven narrative with intent + outcome). META / OVERRIDE /
+       * WORLDBUILDER short-circuits skip Chronicler; their structured
+       * effects land elsewhere (e.g. campaign.settings.overrides for WB).
+       */
+      verdictKind: "continue" | "meta" | "override" | "worldbuilder";
+      /** IntentClassifier's output for the message. Required — every done has one. */
+      intent: IntentOutput;
+      /** OJ verdict. Null for short-circuit paths (no outcome judgment ran). */
+      outcome: OutcomeOutput | null;
     }
   | { type: "error"; message: string };
 
@@ -386,6 +398,9 @@ export async function* runTurn(
         totalMs: 0,
         costUsd: null,
         portraitNames: [],
+        verdictKind: verdict.kind,
+        intent: verdict.intent,
+        outcome: null,
       };
       return;
     }
@@ -598,6 +613,9 @@ export async function* runTurn(
       totalMs,
       costUsd,
       portraitNames,
+      verdictKind: "continue",
+      intent: verdict.intent,
+      outcome: outcome ?? null,
     };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
