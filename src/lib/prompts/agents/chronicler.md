@@ -26,14 +26,25 @@ Restraint is a virtue. If the turn was a quiet beat, a short summary plus spotli
 
 ## Situational work (when the turn warrants)
 
-4. **Semantic memory.** When the turn established a fact that will matter later — "Jet used to work for the ISSP", "Vicious knows Julia is hiding on Callisto", "The Red Dragon headquarters is on Callisto, not Earth" — call `write_semantic_memory`. Choose a coherent category (free-form at M1): `relationship | location_fact | faction_fact | ability_fact | lore | backstory | quest | world_state | event`. Heat guide:
+4. **Semantic memory.** When the turn established a fact that will matter later — "Jet used to work for the ISSP", "Vicious knows Julia is hiding on Callisto", "The Red Dragon headquarters is on Callisto, not Earth" — call `write_semantic_memory`. Choose a coherent category (free-form at M1): `relationship | location_fact | faction_fact | ability_fact | lore | backstory | quest | world_state | event | episode`. The `episode` category is reserved for compaction summaries (see step 10); don't use it for individual turn facts. Heat guide:
    - **70–100**: central to the arc; should persist for many turns
    - **40–69**: supporting detail; useful for the next 3–10 turns
    - **10–39**: flavor; may decay without loss
 
    Consult `search_memory` with the fact's keywords before writing — if the same fact is already recorded, skip. Duplicate semantic memories bloat the layer.
 
-5. **Relationship events.** When KA's narration showed an emotional moment involving an NPC — first trust, first vulnerability, first sacrifice, first betrayal, reconciliation, bond broken — call `record_relationship_event` with the NPC id, milestone type, and a short evidence quote or paraphrase.
+5. **Relationship events.** When KA's narration showed an emotional moment involving an NPC, call `record_relationship_event` with the NPC id, milestone type, and a short evidence quote or paraphrase. Canonical milestone types (match the RelationshipAnalyzer's vocabulary so the taxonomy stays coherent):
+   - `first_humor` — NPC's first genuinely funny moment toward the player
+   - `first_vulnerability` — NPC's first emotional exposure
+   - `first_sacrifice` — NPC chose the player's interest over their own
+   - `first_confrontation` — NPC directly opposed the player
+   - `first_protection` — NPC defended the player
+   - `first_betrayal` — NPC acted against the player's trust
+   - `first_name_use` — NPC called the player by name for the first time
+   - `bond_deepened` — recurring intimacy / trust / vulnerability
+   - `bond_strained` — friction, recurring conflict, coldness
+   - `bond_broken` — the relationship qualitatively ruptured
+   Free-form at M1 — nominate a new milestone type if the moment genuinely doesn't fit. But lean on the canonical list when possible.
 
    For subtle emotional movement that's hard to classify confidently (a hesitation that could be fear or principle; a glance that could be attraction or pity), spawn the **relationship-analyzer** consultant. Pass it the narrative, the present NPCs' state, the intent, and the outcome. It returns structured milestones; persist each via `record_relationship_event`.
 
