@@ -116,27 +116,16 @@ export async function POST(req: Request) {
             if (type === "exited") pendingResumeSuffix = ev.pendingResumeSuffix;
           }
           // If /resume had a suffix, fall through to runTurn with the
-          // suffix as the gameplay message. Otherwise send a terminal
-          // `done`-shaped event so the client knows the meta exchange
-          // concluded.
+          // suffix as the gameplay message. Otherwise emit a distinct
+          // `meta_done` terminal event so the client knows the meta
+          // exchange concluded WITHOUT committing a phantom turn_number=0
+          // row to the gameplay feed. The gameplay `done` event is
+          // reserved for real turns that advance the turn counter.
           if (pendingResumeSuffix) {
             // Intentional fallthrough — continue to runTurn below.
             body.message = pendingResumeSuffix;
           } else {
-            controller.enqueue(
-              encodeSseEvent("done", {
-                turnId: "",
-                turnNumber: 0,
-                narrative: "",
-                ttftMs: null,
-                totalMs: 0,
-                costUsd: null,
-                portraitNames: [],
-                verdictKind: "meta" as const,
-                intent: null,
-                outcome: null,
-              }),
-            );
+            controller.enqueue(encodeSseEvent("meta_done", {}));
             controller.close();
             return;
           }

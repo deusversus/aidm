@@ -49,6 +49,14 @@ describe("classifyMetaMessage — slash-command parsing", () => {
   it("trims leading whitespace before the slash", () => {
     expect(classifyMetaMessage("   /meta hi").command).toBe("meta");
   });
+  it("does NOT match substrings (/metafoo, /playing, /resumestuff)", () => {
+    // Word-boundary guard: only whitespace or end-of-string counts as the
+    // command's end. Without this, `/metafoo` silently entered meta mode.
+    expect(classifyMetaMessage("/metafoo").command).toBe(null);
+    expect(classifyMetaMessage("/playing chess").command).toBe(null);
+    expect(classifyMetaMessage("/resumestuff").command).toBe(null);
+    expect(classifyMetaMessage("/exiting").command).toBe(null);
+  });
 });
 
 describe("shouldDispatchMeta — routing decision", () => {

@@ -56,7 +56,10 @@ export interface MetaWorkflowDeps {
   runMetaDirectorFn?: typeof runMetaDirector;
 }
 
-const SLASH_RE = /^\s*\/(meta|resume|play|back|exit)\s*/i;
+// Word-boundary lookahead — requires the command to be followed by whitespace
+// or end-of-string. Without it `/metafoo` / `/playing` / `/resumestuff` would
+// silently match as their respective commands and misinterpret the payload.
+const SLASH_RE = /^\s*\/(meta|resume|play|back|exit)(?=\s|$)\s*/i;
 
 /**
  * Classify the incoming message against meta-loop commands. Returns the
