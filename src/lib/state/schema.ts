@@ -164,6 +164,71 @@ export const turns = pgTable(
 );
 
 /**
+ * Context blocks — per-entity living prose summaries that survive across
+ * sessions. Each row is "the current document for this entity" — the arc's
+ * state in 2-4 paragraphs, a quest's trajectory in a few sentences, an
+ * NPC's personality + active goals + recent changes as a distilled bio.
+ *
+ * Distinct from semantic_memories (fact atoms) and turns (transcripts):
+ * context_blocks hold the aggregate story-state for an entity at the
+ * current moment. Chronicler updates them when material changes happen;
+ * KA reads them at session start as "here's where everything stands"
+ * so a 50-turn arc's continuity doesn't require 20 MCP tool calls to
+ * reconstruct.
+ *
+ * Versioning: every update bumps `version`, preserves the old content as
+ * of that version count (audit trail is via `updated_at` + trace);
+ * `continuity_checklist` is structured flat k:v for discrete facts KA
+ * must honor ("alive", "knows_about_X", "loyal_to").
+ *
+ * `embedding` column stays jsonb-null at M1; M4 embedder backfills so
+ * Chronicler can query "blocks related to this scene" instead of
+ * blanket-loading all active blocks.
+ */
+export const contextBlocks = pgTable(
+  "context_blocks",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    campaignId: uuid("campaign_id")
+      .notNull()
+      .references(() => campaigns.id, { onDelete: "cascade" }),
+    blockType: text("block_type", {
+      enum: ["arc", "thread", "quest", "npc", "faction", "location"],
+    }).notNull(),
+    /**
+     * FK into npcs/locations/factions when applicable; null for
+     * anonymous arc/thread/quest blocks not backed by a catalog row.
+     * No explicit FK at the DB level because `entity_id` crosses three
+     * different target tables — enforced via Chronicler write tools.
+     */
+    entityId: uuid("entity_id"),
+    entityName: text("entity_name").notNull(),
+    content: text("content").notNull(),
+    /**
+     * Flat k:v jsonb — discrete, load-bearing facts KA must honor.
+     * For NPCs: { "alive": true, "knows_about_X": false, "loyal_to": "Red Dragon" }.
+     * For arcs: { "transition_signal_reached": false, "escalation_beat": "2/5" }.
+     */
+    continuityChecklist: jsonb("continuity_checklist").notNull().default(sql`'{}'::jsonb`),
+    status: text("status", { enum: ["active", "closed", "archived"] })
+      .notNull()
+      .default("active"),
+    version: integer("version").notNull().default(1),
+    firstTurn: integer("first_turn").notNull(),
+    lastUpdatedTurn: integer("last_updated_turn").notNull(),
+    /** pgvector-ready. jsonb null at M1 (embedder decision is M4). */
+    embedding: jsonb("embedding"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("context_blocks_unique").on(t.campaignId, t.blockType, t.entityName),
+    index("context_blocks_campaign_type").on(t.campaignId, t.blockType),
+    index("context_blocks_entity").on(t.campaignId, t.entityId),
+  ],
+);
+
+/**
  * Rule library — narration guidance indexed by (category, axis, value_key).
  *
  * Every DNA axis × value combination, every composition enum value, every

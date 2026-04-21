@@ -168,3 +168,40 @@ export const ArcPlanHistoryEntry = z.object({
   setAtTurn: z.number().int().positive(),
 });
 export type ArcPlanHistoryEntry = z.infer<typeof ArcPlanHistoryEntry>;
+
+export const ContextBlockType = z.enum([
+  "arc",
+  "thread",
+  "quest",
+  "npc",
+  "faction",
+  "location",
+]);
+export type ContextBlockType = z.infer<typeof ContextBlockType>;
+
+export const ContextBlockStatus = z.enum(["active", "closed", "archived"]);
+export type ContextBlockStatus = z.infer<typeof ContextBlockStatus>;
+
+/**
+ * Context block — per-entity living prose summary that survives across
+ * sessions. Phase 3 of v3-audit closure (docs/plans/v3-audit-closure.md).
+ *
+ * A context block is distilled story-state for one entity — an arc's
+ * current position, a quest's trajectory, an NPC's personality + active
+ * goals + recent changes. KA reads these at session start in place of
+ * reconstructing campaign state from scattered memory tool calls.
+ */
+export const ContextBlock = z.object({
+  id: z.string().uuid(),
+  campaignId: z.string().uuid(),
+  blockType: ContextBlockType,
+  entityId: z.string().uuid().nullable().default(null),
+  entityName: z.string().min(1),
+  content: z.string().min(1),
+  continuityChecklist: z.record(z.string(), z.unknown()).default({}),
+  status: ContextBlockStatus.default("active"),
+  version: z.number().int().min(1).default(1),
+  firstTurn: z.number().int().positive(),
+  lastUpdatedTurn: z.number().int().positive(),
+});
+export type ContextBlock = z.infer<typeof ContextBlock>;
