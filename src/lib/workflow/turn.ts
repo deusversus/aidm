@@ -234,6 +234,20 @@ export interface TurnWorkflowInput {
   playerMessage: string;
   /** Optional abort signal — forwarded to KA for mid-stream cancellation. */
   abort?: AbortController;
+  /**
+   * Eval bypass flag (Commit 9). Inert at the `runTurn` level — the
+   * gate lives in `/api/turns/route.ts` via `checkBudget`, which is
+   * never called by runTurn itself. The eval harness (Commit 8)
+   * calls `runTurn` directly (bypassing the route handler + its gate
+   * + its post-turn ledger increment), so `bypassLimiter` here is a
+   * documentary marker tying test-surface intent to the gate that
+   * lives elsewhere. If a future refactor moves the gate into
+   * `runTurn`, THIS field becomes the read surface.
+   *
+   * The route handler's request body schema (`/api/turns/route.ts`)
+   * does not accept this field, so user input cannot set it true.
+   */
+  bypassLimiter?: boolean;
 }
 
 export interface TurnWorkflowDeps {
@@ -424,6 +438,20 @@ export async function* runTurn(
       promptFingerprints[agentName] = fingerprint;
     };
 
+    // Per-turn pre-pass cost accumulator (Commit 9). Every _runner.ts-
+    // based consultant (IntentClassifier, OJ, Validator, WB, OverrideHandler,
+    // Scenewright, KA consultants, Chronicler's RelationshipAnalyzer)
+    // calls this after each attempt with its accumulated USD cost.
+    //
+    // KA + Chronicler themselves bypass this — the Agent SDK returns
+    // its own `total_cost_usd` at the result event, which subsumes
+    // their consultants. We add their SDK-reported cost directly to
+    // `turnCostUsd` below.
+    let prePassCostUsd = 0;
+    const recordCost = (_agentName: string, costUsd: number): void => {
+      prePassCostUsd += costUsd;
+    };
+
     // -------------------------------------------------------------------
     // Route pre-pass
     // -------------------------------------------------------------------
@@ -458,6 +486,7 @@ export async function* runTurn(
       logger,
       modelContext,
       recordPrompt,
+      recordCost,
       ...deps.routerDeps,
     });
 
@@ -729,7 +758,7 @@ export async function* runTurn(
               value: o.value,
             })) ?? [],
         },
-        { trace: deps.trace, logger, modelContext, recordPrompt },
+        { trace: deps.trace, logger, modelContext, recordPrompt, recordCost },
       );
       outcome = judgedOutcome;
     }
@@ -907,13 +936,17 @@ export async function* runTurn(
         toolContext,
         abortController: input.abort,
       },
+      // KA does NOT receive `recordCost` — the Agent SDK reports a
+      // SESSION total_cost_usd that already subsumes KA's consultants.
+      // Passing `recordCost` here would double-count if a future KA
+      // path ever routed an internal call through `_runner.ts`.
       { trace: deps.trace, logger, recordPrompt },
     );
 
     let narrative = "";
     let ttftMs: number | null = null;
     let totalMs = 0;
-    let costUsd: number | null = null;
+    let kaCostUsd: number | null = null;
 
     for await (const ev of kaIter as AsyncIterable<KeyAnimatorEvent>) {
       if (ev.kind === "text") {
@@ -922,10 +955,15 @@ export async function* runTurn(
       } else {
         ttftMs = ev.ttftMs;
         totalMs = ev.totalMs;
-        costUsd = ev.costUsd;
+        kaCostUsd = ev.costUsd;
         narrative = ev.narrative;
       }
     }
+
+    // Total pre-Chronicler turn cost: pre-pass consultants + KA's own
+    // SDK-reported total_cost_usd (which subsumes KA's consultants).
+    // Chronicler's cost lands later via chronicle.ts post-hoc update.
+    const turnCostUsd = prePassCostUsd + (kaCostUsd ?? 0);
 
     const portraitNames = extractNames(narrative);
     const portraitMap: Record<string, string | null> = {};
@@ -943,7 +981,7 @@ export async function* runTurn(
         outcome: outcome ?? null,
         promptFingerprints,
         portraitMap,
-        costUsd: costUsd === null ? null : costUsd.toFixed(6),
+        costUsd: turnCostUsd.toFixed(6),
         ttftMs,
         totalMs,
         styleDriftUsed: styleDrift ?? null,
@@ -957,7 +995,7 @@ export async function* runTurn(
       narrative,
       ttftMs,
       totalMs,
-      costUsd,
+      costUsd: turnCostUsd,
       portraitNames,
       verdictKind: "continue",
       intent: verdict.intent,

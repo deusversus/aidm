@@ -29,6 +29,15 @@ const envSchema = z.object({
   LANGFUSE_HOST: z.string().url().default("https://us.cloud.langfuse.com"),
   NEXT_PUBLIC_POSTHOG_KEY: z.string().optional(),
   NEXT_PUBLIC_POSTHOG_HOST: z.string().url().default("https://us.i.posthog.com"),
+
+  // --- Budget caps (Commit 9) ---
+  // Per-user per-minute turn cap — accident-prevention guard, not a
+  // business control. Default 6 (roughly 10s between turns — generous
+  // for thinking-then-acting; no one is hitting this with good intent).
+  // User-configurable spending caps live on `users.daily_cost_cap_usd`;
+  // there is deliberately no AIDM_DAILY_COST_CAP_USD (business model
+  // is cost-forward + markup, users choose their own ceiling).
+  AIDM_TURNS_PER_MINUTE_CAP: z.coerce.number().int().positive().default(6),
 });
 
 export type Env = z.infer<typeof envSchema>;

@@ -6,6 +6,7 @@ import {
   jsonb,
   numeric,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   uniqueIndex,
@@ -19,8 +20,82 @@ export const users = pgTable(
     email: text("email").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
+    /**
+     * User-set daily spending guardrail in USD (Commit 9). Null = no cap
+     * (default). Users opt into a daily ceiling via /account/spending; the
+     * system never imposes a default cap — business model is cost-forward
+     * + markup on owned provider keys (project_business_model.md), so
+     * bounded spend is the user's choice, not a platform gate. Rate
+     * limiting (AIDM_TURNS_PER_MINUTE_CAP) exists as an accident-prevention
+     * guard regardless of this column.
+     *
+     * Cap = 0 is a legitimate user choice (zero-spend day) distinct from
+     * null (no cap). The gate branches on null explicitly.
+     */
+    dailyCostCapUsd: numeric("daily_cost_cap_usd", { precision: 10, scale: 2 }),
   },
   (t) => [uniqueIndex("users_email_key").on(t.email)],
+);
+
+/**
+ * Per-user, per-minute turn counter (Commit 9).
+ *
+ * System accident-prevention guard — capped at AIDM_TURNS_PER_MINUTE_CAP
+ * (default 6). Not a business control; exists to stop runaway loops or
+ * fast-finger bugs, not to shape spending. Daily spend is gated separately
+ * via `user_cost_ledger` + `users.daily_cost_cap_usd`.
+ *
+ * Atomic increment via INSERT ... ON CONFLICT DO UPDATE on the composite
+ * primary key. Bucket keys are UTC ISO8601 minute (`YYYY-MM-DDTHH:MMZ`).
+ * Rows accumulate indefinitely at M1; GC cron lands with billing work.
+ */
+export const userRateCounters = pgTable(
+  "user_rate_counters",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    minuteBucket: text("minute_bucket").notNull(),
+    count: integer("count").notNull().default(0),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.userId, t.minuteBucket] }),
+    index("user_rate_counters_user_idx").on(t.userId, t.minuteBucket),
+  ],
+);
+
+/**
+ * Per-user, per-day cost ledger (Commit 9).
+ *
+ * Running total of USD spent in a UTC calendar day. Purpose-built
+ * (distinct from user_rate_counters) because the ledger is a
+ * forever-record — useful later for billing reconciliation, spend-history
+ * UI, and the M2.5 credits substrate. Collapsing rate + cost into one
+ * polymorphic counter table would confuse those purposes.
+ *
+ * The ledger is always written; the gate is only consulted when
+ * `users.daily_cost_cap_usd IS NOT NULL`. That means the ledger row
+ * accumulates even for users with no cap, so when they opt into one later
+ * we have history to render.
+ *
+ * Atomic increment via INSERT ... ON CONFLICT DO UPDATE on the composite
+ * primary key. Bucket keys are UTC date (`YYYY-MM-DD`).
+ */
+export const userCostLedger = pgTable(
+  "user_cost_ledger",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    dayBucket: text("day_bucket").notNull(),
+    totalCostUsd: numeric("total_cost_usd", { precision: 12, scale: 6 }).notNull().default("0"),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.userId, t.dayBucket] }),
+    index("user_cost_ledger_user_idx").on(t.userId, t.dayBucket),
+  ],
 );
 
 /**

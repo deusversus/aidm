@@ -31,6 +31,24 @@ export interface AgentDeps {
    * without a recorder just don't get the audit trail.
    */
   recordPrompt?: (agentName: string, fingerprint: string) => void;
+  /**
+   * Per-turn cost recorder (Commit 9). Parallel to `recordPrompt`.
+   * `_runner.ts` computes USD cost per agent call from the provider
+   * response's usage + the canonical pricing table (`@/lib/llm/pricing`)
+   * and calls this with `(agentName, costUsd)`. The turn workflow
+   * accumulates across all pre-pass + KA + consultant calls and writes
+   * the total to `turns.costUsd`; the post-turn flow also increments
+   * `user_cost_ledger[user, today]` by the same delta. Null-safe —
+   * tests + scripts without a recorder skip the accounting silently.
+   *
+   * KA + Chronicler bypass this path: the Agent SDK returns its own
+   * `total_cost_usd` on the result event, which the agent wrappers
+   * surface directly to the turn workflow without going through
+   * `recordCost` (they're ALREADY aggregated by the SDK). `recordCost`
+   * is strictly for `_runner.ts`-based consultants where we have to
+   * compute the cost ourselves.
+   */
+  recordCost?: (agentName: string, costUsd: number) => void;
 }
 
 export type AgentLogLevel = "info" | "warn" | "error";

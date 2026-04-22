@@ -1,4 +1,5 @@
 import { getAnthropic, getGoogle } from "@/lib/llm";
+import { type UsageStats, estimateCostUsd } from "@/lib/llm/pricing";
 import { getPrompt } from "@/lib/prompts";
 import { anthropicFallbackConfig } from "@/lib/providers";
 import type { TierName } from "@/lib/providers";
@@ -92,12 +93,17 @@ export function extractJson(text: string): string {
   return text.trim();
 }
 
+interface ProviderCallResult {
+  raw: string;
+  usage: UsageStats;
+}
+
 async function callAnthropic(
   config: AgentRunnerConfig<unknown>,
   userMessage: string,
   model: string,
   anthropic: () => Pick<Anthropic, "messages">,
-): Promise<string> {
+): Promise<ProviderCallResult> {
   const client = anthropic();
   const params: Anthropic.Messages.MessageCreateParamsNonStreaming = {
     model,
@@ -116,7 +122,15 @@ async function callAnthropic(
   const textBlocks = response.content.filter((b): b is Anthropic.TextBlock => b.type === "text");
   const raw = textBlocks.map((b) => b.text).join("");
   if (!raw.trim()) throw new Error("empty response");
-  return raw;
+  // Anthropic usage fields — input/output always present; cache-read +
+  // cache-creation present when the prompt uses cache_control breakpoints.
+  const usage: UsageStats = {
+    input_tokens: response.usage?.input_tokens ?? 0,
+    output_tokens: response.usage?.output_tokens ?? 0,
+    cache_read_input_tokens: response.usage?.cache_read_input_tokens ?? 0,
+    cache_creation_input_tokens: response.usage?.cache_creation_input_tokens ?? 0,
+  };
+  return { raw, usage };
 }
 
 async function callGoogle(
@@ -125,7 +139,7 @@ async function callGoogle(
   model: string,
   temperature: number,
   google: () => Pick<GoogleGenAI, "models">,
-): Promise<string> {
+): Promise<ProviderCallResult> {
   const client = google();
   const response = await client.models.generateContent({
     model,
@@ -138,7 +152,16 @@ async function callGoogle(
   });
   const text = response.text?.trim();
   if (!text) throw new Error("empty response");
-  return text;
+  // Google's usageMetadata: promptTokenCount / candidatesTokenCount. No
+  // cache-read split at the structured-output tier (context caching is
+  // a separate API surface). Map to the canonical UsageStats shape.
+  const usage: UsageStats = {
+    input_tokens: response.usageMetadata?.promptTokenCount ?? 0,
+    output_tokens: response.usageMetadata?.candidatesTokenCount ?? 0,
+    cache_read_input_tokens: 0,
+    cache_creation_input_tokens: 0,
+  };
+  return { raw: text, usage };
 }
 
 /**
@@ -185,7 +208,7 @@ export async function runStructuredAgent<TOutput>(
   // retry loop. Providers that don't yet have a KA substrate throw
   // immediately (helpful error, no silent fallback to anthropic —
   // that would mask misconfiguration).
-  let invoke: (userMessage: string, temperature: number) => Promise<string>;
+  let invoke: (userMessage: string, temperature: number) => Promise<ProviderCallResult>;
   switch (ctx.provider) {
     case "anthropic": {
       const anthropic = deps.anthropic ?? getAnthropic;
@@ -204,6 +227,12 @@ export async function runStructuredAgent<TOutput>(
       );
   }
 
+  // Cost accumulates ACROSS retries — every attempt that made a real
+  // LLM call cost money, including the one that returned unparsable
+  // JSON. This is honest accounting: if a retry saved the run, the
+  // user still paid for both attempts.
+  let accumulatedCostUsd = 0;
+
   let lastError: unknown;
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     try {
@@ -211,10 +240,12 @@ export async function runStructuredAgent<TOutput>(
       const message = `${config.userContent}${reminder}`;
       const temperature = attempt === 1 ? (config.temperature ?? 0.2) : 0;
 
-      const raw = await invoke(message, temperature);
+      const { raw, usage } = await invoke(message, temperature);
+      accumulatedCostUsd += estimateCostUsd(model, usage);
 
       const parsed = config.outputSchema.parse(JSON.parse(extractJson(raw)));
-      span?.end({ output: parsed, metadata: { attempt } });
+      span?.end({ output: parsed, metadata: { attempt, costUsd: accumulatedCostUsd } });
+      deps.recordCost?.(config.agentName, accumulatedCostUsd);
       return parsed;
     } catch (err) {
       lastError = err;
@@ -232,8 +263,11 @@ export async function runStructuredAgent<TOutput>(
     output: config.fallback,
     metadata: {
       fallback: true,
+      costUsd: accumulatedCostUsd,
       error: lastError instanceof Error ? lastError.message : String(lastError),
     },
   });
+  // Fallback path still incurred cost — record whatever we accumulated.
+  deps.recordCost?.(config.agentName, accumulatedCostUsd);
   return config.fallback;
 }

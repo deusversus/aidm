@@ -1,14 +1,20 @@
 /**
- * Hardcoded pricing table for MockLLM cost emulation.
+ * Hardcoded pricing table — canonical per-1M-token rates for all model
+ * tiers we invoke (Anthropic, Google, OpenAI — last two mostly stubs
+ * until M3.5/M5.5).
  *
- * The real Anthropic API reports `total_cost_usd` on its result events;
- * to make cost-aware tests realistic under the mock, we synthesize the
- * same figure from a known pricing table keyed by model.
+ * Two consumers today:
+ *   1. MockLLM cost emulation — synthesizes `total_cost_usd` for mock
+ *      responses so cost-aware tests see realistic figures.
+ *   2. Production pre-pass cost aggregation (Commit 9) — `_runner.ts`
+ *      reads provider usage from Anthropic/Google responses and computes
+ *      actual USD spend per call, which rolls up into `turns.costUsd`
+ *      and `user_cost_ledger`. KA + Chronicler use the Agent SDK's own
+ *      `total_cost_usd` and bypass this table.
  *
  * Values reflect published per-1M-token rates as of 2026-04. Update
- * here if pricing shifts — the mock doesn't care about accuracy beyond
- * "plausible enough for regression gating," and hardcoded is simpler
- * than env-configurable until billing tests regress under drift.
+ * here when pricing shifts. Hardcoded is fine until billing tests
+ * regress under drift; env-configurable is future work.
  */
 
 export interface ModelPricing {

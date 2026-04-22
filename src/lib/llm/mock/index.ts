@@ -37,7 +37,9 @@ export {
   synthesizeCostUsd,
 } from "./synth";
 
-export { estimateCostUsd, pricingFor, type ModelPricing, type UsageStats } from "./pricing";
+// Re-exported from `../pricing` since Commit 9 — prod agents import
+// directly from `@/lib/llm/pricing`; mock consumers keep the original path.
+export { estimateCostUsd, pricingFor, type ModelPricing, type UsageStats } from "../pricing";
 
 export {
   type MockServer,

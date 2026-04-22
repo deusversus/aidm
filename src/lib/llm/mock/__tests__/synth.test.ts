@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { estimateCostUsd, pricingFor } from "../pricing";
+import { estimateCostUsd, pricingFor } from "../../pricing";
 import {
   appearsToWantStructuredOutput,
   synthesizeAnthropicResponse,

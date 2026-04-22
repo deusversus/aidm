@@ -1,3 +1,4 @@
+import { checkBudget, incrementCostLedger } from "@/lib/budget";
 import { getDb } from "@/lib/db";
 import { campaigns } from "@/lib/state/schema";
 import { CampaignSettings } from "@/lib/types/campaign-settings";
@@ -57,6 +58,43 @@ export async function POST(req: Request) {
     return NextResponse.json(
       { error: "invalid_body", detail: err instanceof Error ? err.message : String(err) },
       { status: 400 },
+    );
+  }
+
+  // Pre-turn budget gate (Commit 9). Runs BEFORE opening the SSE stream
+  // so we can return an honest 429 + JSON body; encoding a gate-rejection
+  // as an SSE error event on a 200 stream would be misleading to the
+  // client. `checkBudget` does the cost-cap check first (non-mutating),
+  // then atomically increments the rate counter and compares — that
+  // ordering is what closes the TOCTOU gap a read-then-increment pattern
+  // would leave under concurrent POSTs.
+  const gate = await checkBudget(user.id);
+  if (!gate.ok) {
+    if (gate.reason === "rate") {
+      return NextResponse.json(
+        {
+          error: "rate_limited",
+          reason: "rate",
+          retryAfterSec: gate.retryAfterSec,
+          rateCount: gate.rateCount,
+          rateCap: gate.rateCap,
+        },
+        {
+          status: 429,
+          headers: { "Retry-After": String(gate.retryAfterSec) },
+        },
+      );
+    }
+    // cost_cap
+    return NextResponse.json(
+      {
+        error: "cost_cap_reached",
+        reason: "cost_cap",
+        usedUsd: gate.usedUsd,
+        capUsd: gate.capUsd,
+        nextResetAt: gate.nextResetAt,
+      },
+      { status: 429 },
     );
   }
 
@@ -137,6 +175,11 @@ export async function POST(req: Request) {
             userId: user.id,
             playerMessage: body.message,
             abort,
+            // Pre-turn gate was enforced before the stream opened.
+            // Bypass is hardcoded false here — the HTTP route never
+            // lets the caller skip the gate. Only the eval harness
+            // (Commit 8) passes true.
+            bypassLimiter: false,
           },
           { db },
         );
@@ -144,6 +187,23 @@ export async function POST(req: Request) {
           const { type, ...rest } = ev;
           controller.enqueue(encodeSseEvent(type, rest));
           if (type === "done") {
+            // Post-turn cost ledger increment (Commit 9). Adds the
+            // PRE-CHRONICLER turn cost into user_cost_ledger[user, today].
+            // Chronicler's cost is added separately inside chronicleTurn
+            // when it finishes (it can trail the done event by seconds).
+            // Wrapped in try/catch — a ledger failure must not fail a
+            // turn the user already saw; log + continue.
+            if (typeof ev.costUsd === "number" && ev.costUsd > 0) {
+              try {
+                await incrementCostLedger(user.id, ev.costUsd);
+              } catch (err) {
+                console.warn("post-turn incrementCostLedger failed", {
+                  userId: user.id,
+                  costUsd: ev.costUsd,
+                  error: err instanceof Error ? err.message : String(err),
+                });
+              }
+            }
             // Fire Chronicler post-response via Next's after(). It runs
             // after the SSE response has flushed to the client — user-
             // perceived latency is unchanged. FIFO-per-campaign lock +

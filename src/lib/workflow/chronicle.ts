@@ -1,4 +1,5 @@
 import { type ArcTrigger, type ChroniclerDeps, runChronicler } from "@/lib/agents/chronicler";
+import { incrementCostLedger } from "@/lib/budget";
 import type { Db } from "@/lib/db";
 import { decayHeat } from "@/lib/memory/decay";
 import { campaigns, turns } from "@/lib/state/schema";
@@ -163,7 +164,7 @@ export async function chronicleTurn(
       trace: deps.trace,
     };
 
-    await runChronicler(
+    const chroniclerResult = await runChronicler(
       {
         turnNumber: input.turnNumber,
         playerMessage: input.playerMessage,
@@ -197,8 +198,37 @@ export async function chronicleTurn(
       });
     }
 
-    // Mark as chronicled. Tightly scoped to the just-processed turn.
-    await db.update(turns).set({ chronicledAt: new Date() }).where(eq(turns.id, input.turnId));
+    // Chronicler cost roll-up (Commit 9). Agent SDK returns the full
+    // session cost including any consultant subagent (RelationshipAnalyzer).
+    // Adds into the turn row's costUsd + user_cost_ledger, both safe to
+    // call with 0 (no-op updates).
+    const chroniclerCost = chroniclerResult.costUsd ?? 0;
+    if (chroniclerCost > 0) {
+      // NUMERIC addition in SQL preserves precision across the ledger.
+      await db
+        .update(turns)
+        .set({
+          costUsd: sql`COALESCE(${turns.costUsd}, 0) + ${chroniclerCost.toFixed(6)}`,
+          chronicledAt: new Date(),
+        })
+        .where(eq(turns.id, input.turnId));
+      try {
+        await incrementCostLedger(input.userId, chroniclerCost);
+      } catch (err) {
+        // Ledger-increment failure must not fail the chronicling pass —
+        // the per-user budget gate degrades to conservative (gate still
+        // fires on the PRE-PASS/KA cost written earlier) rather than
+        // retroactively failing a turn that narratively landed.
+        logger("warn", "chronicleTurn: incrementCostLedger failed (non-fatal)", {
+          turnId: input.turnId,
+          chroniclerCost,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    } else {
+      // No cost — just stamp chronicledAt.
+      await db.update(turns).set({ chronicledAt: new Date() }).where(eq(turns.id, input.turnId));
+    }
 
     logger("info", "chronicleTurn: ok", {
       turnId: input.turnId,

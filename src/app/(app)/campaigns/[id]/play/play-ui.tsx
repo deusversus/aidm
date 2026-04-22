@@ -1,5 +1,6 @@
 "use client";
 
+import { BudgetIndicator } from "@/components/budget-indicator";
 import { useTurnStream } from "@/hooks/use-turn-stream";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
@@ -27,6 +28,7 @@ export default function PlayUI({ campaignId, campaignName, priorTurns }: Props) 
     useTurnStream(campaignId);
   const [input, setInput] = useState("");
   const [committed, setCommitted] = useState<PriorTurn[]>(priorTurns);
+  const [budgetRefreshKey, setBudgetRefreshKey] = useState(0);
   const feedRef = useRef<HTMLDivElement>(null);
   // Track the player's message at send() time — we need it when `lastTurn`
   // fires later to record what they typed. Using a ref avoids the
@@ -53,6 +55,10 @@ export default function PlayUI({ campaignId, campaignName, priorTurns }: Props) 
       },
     ]);
     pendingMessageRef.current = "";
+    // Nudge BudgetIndicator to re-fetch so the gauge reflects this
+    // turn's spend. Chronicler's cost lands on a later update; a
+    // second nudge isn't wired (gauge is advisory, not real-time).
+    setBudgetRefreshKey((k) => k + 1);
   }, [lastTurn]);
 
   // Auto-scroll as new content arrives. The deps are triggers (not things
@@ -81,6 +87,7 @@ export default function PlayUI({ campaignId, campaignName, priorTurns }: Props) 
       <header className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold tracking-tight">{campaignName}</h1>
         <div className="flex items-center gap-4">
+          <BudgetIndicator refreshKey={budgetRefreshKey} />
           <Link
             href={`/campaigns/${campaignId}/settings`}
             className="text-muted-foreground text-sm hover:text-foreground"
