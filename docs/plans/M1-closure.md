@@ -22,9 +22,9 @@ The user chose the thorough path: **include Chronicler in M1** (don't rescope to
 
 **Remaining to close M1:**
 
-1. **Commit 9** — rate limiter + cost cap + budget UI (§9 below). Lands BEFORE Commit 8 so the eval harness can bypass.
-2. **Commit 8** — eval harness + 5 golden turns + Haiku judge + CI gate (§8 below).
-3. **Acceptance ritual** — 10 prod turns w/ Langfuse metrics + `docs/retros/M1.md`.
+1. ~~**Commit 9**~~ — **SHIPPED 2026-04-22** as `95cca32`. Rate limiter + user-set cost guardrail + budget UI. Two purpose-built tables (`user_rate_counters` + `user_cost_ledger`), `users.daily_cost_cap_usd` nullable (user opts in; no system-imposed cap per business model); atomic ON CONFLICT increment closes the TOCTOU gap; warn at 50% + 90%. Plan in `docs/plans/M1-commit9-rate-limiter.md`. Migration 0009 generated; apply to prod via `pnpm drizzle-kit migrate` when ready.
+2. ~~**Commit 8**~~ — **SHIPPED 2026-04-22** as `cc1f765`. Eval harness + 5 golden-turn fixtures spanning DEFAULT/COMBAT/SOCIAL/EXPLORATION/ABILITY + ~18 MockLLM fixtures + deterministic CI gate (intent exact-match, outcome bounds, must_include/must_not_include, length) + manual-only Haiku judge gated behind `--judge` with hard CI guard (never runs in CI). Plan in `docs/plans/M1-commit8-eval-harness.md`. GitHub Actions workflow posts no API keys.
+3. **Acceptance ritual** — 10 prod turns w/ Langfuse metrics + `docs/retros/M1.md`. Pre-requisite: apply migration 0009 to prod.
 
 **Known debt (not blocking M1 ship, surfaces before M2 scope freezes):**
 
@@ -32,7 +32,9 @@ The user chose the thorough path: **include Chronicler in M1** (don't rescope to
 - **MockLLM infrastructure — SHIPPED 2026-04-21.** All 6 phases from `docs/plans/mockllm.md` landed + pushed (84a801a…2a1814d, 8 commits). HTTP mock server speaking Anthropic `/v1/messages` (non-streaming + streaming) + env-driven baseURL swap on the Anthropic SDK singleton + fixture-backed `queryFn` mock for Claude Agent SDK (so KA + Chronicler run against the mock) + unified test helpers replacing 9 inline fake patterns (zero hand-rolled SDK mocks remain) + record mode for capturing real responses + 7 hand-authored seed fixtures at `evals/fixtures/llm/seeds/`. Meta-audit HONEST_CLOSURE. 489 tests. `pnpm mockllm` CLI ready; `AIDM_MOCK_LLM=1 pnpm dev` achieves dev-server parity with zero API $. Ties into Commit 8 eval harness — golden-turn fixtures become the eval inputs.
 - **ROADMAP §5 sub-sections** (per-turn shape, agent roster, per-agent specs) pre-date the three-phase consolidation and over-enumerate after-turn agents. Rewrite pending. Treat §5 top-matter and `project_three_phase_architecture.md` as authoritative.
 
-**Resume here when returning to this plan:** jump to §9 below for the next commit. Commit 8 (eval harness) should build on the mockllm fixtures — same YAML format, `evals/fixtures/llm/seeds/` as inputs.
+**Resume here when returning to this plan:** Commits 8 + 9 both shipped 2026-04-22. Next: (a) apply migration 0009 against prod DATABASE_URL, (b) run the acceptance ritual (10 prod turns on Bebop with Langfuse traces), (c) write `docs/retros/M1.md`.
+
+**WB reshape delta — open thread.** User's 2026-04-21 conversation proposed pushing further than what v3-audit Phase 6B+6C shipped: IntentClassifier becomes a tagger (WORLD_BUILDING mostly flows straight to KA Block 4 instead of routing to a specialist handler), FLAG gets three distinct types (voice_fit, stakes_implication, internal_consistency) with category-specific sidebar UI. Neither shipped in Phase 6. Separate commit after M1 close; tracked in memory note `project_worldbuilder_as_editor.md`.
 
 ---
 
