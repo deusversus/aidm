@@ -1,14 +1,18 @@
-# M1 Commit 9 — rate limiter + cost cap + budget UI
+# M1 Commit 9 — rate limiter + user-set cost guardrail + budget UI
 
-**Drafted 2026-04-22.** Expands `docs/plans/M1-closure.md §9` to file-level scope. Lands BEFORE Commit 8 so the eval harness can bypass. Spec derives from ROADMAP §M1 ("Rate limiter (Postgres counter); per-turn cost + per-user daily cap").
+**Drafted 2026-04-22.** Expands `docs/plans/M1-closure.md §9` to file-level scope. Lands BEFORE Commit 8 so the eval harness can exercise the bypass flag. Spec derives from ROADMAP §M1 ("Rate limiter (Postgres counter); per-turn cost") — with the scope correction that **daily cost limits are user-set, not system-imposed** (business model is cost-forward + markup; we bill credits, we don't gate spend, users choose their own guardrail).
 
 ---
 
 ## Why
 
-Today the app has no cost ceiling and no rate gate. A runaway client, a bad actor with a signed-in account, or a dev-loop mistake could burn unbounded $ against real providers. ROADMAP §M1 lists rate limiter + daily cost cap + budget UI as M1 deliverables. M1 cannot ship without these.
+Today the app has no rate gate and no honest per-turn cost visibility. A runaway client or accidental infinite loop could burn unbounded $ against real providers before the user notices. ROADMAP §M1 lists the rate limiter as a deliverable. M1 cannot ship without it.
 
-Secondary: honest per-turn cost visibility. Today `turns.costUsd` captures KA's `total_cost_usd` only — pre-pass agents (Scenewright / IntentClassifier / OutcomeJudge / Validator / WorldBuilder / OverrideHandler) run through `_runner.ts` which throws away usage. Chronicler's cost is captured in-process but never written back to the turn row. So the user sees ~60% of actual spend, undercounting what a daily cap has to gate.
+Per-minute turn rate is a **system accident-prevention guard** — no one is sending 6 messages a minute through this pipeline with good intent; the cap exists to stop runaway loops and fast-finger bugs, not to shape spending.
+
+Per-day cost is a **user-configurable guardrail** — the business model (per `project_business_model.md`) is cost-forward + markup on owned provider keys; users pay for what they use. If a user wants to bound their own spending, they set `daily_cost_cap_usd` on their account. The system defaults to no cap. This differs from v3's framing and earlier M1-closure §9 wording; the closure doc's language is updated downstream.
+
+Secondary: honest per-turn cost visibility. Today `turns.costUsd` captures KA's `total_cost_usd` only — pre-pass agents (Scenewright / IntentClassifier / OutcomeJudge / Validator / WorldBuilder / OverrideHandler) run through `_runner.ts` which throws away usage. Chronicler's cost is captured in-process but never written back to the turn row. So the surfaced cost is ~60% of actual spend.
 
 ---
 
@@ -17,46 +21,72 @@ Secondary: honest per-turn cost visibility. Today `turns.costUsd` captures KA's 
 **Lands in this commit:**
 
 1. **Cost aggregation across the turn.** `_runner.ts` returns `{ result, usage, costUsd }`. Turn workflow accumulates pre-pass cost + KA cost → writes to `turns.costUsd` (total-turn cost at `done`-event time, pre-Chronicler).
-2. **Chronicler cost updates `turns` post-hoc.** After Chronicler's `after()` run completes, it updates the turn row: `costUsd += chroniclerCostUsd`; also populates `chronicledAt`.
-3. **`user_usage_counters` table.** Single table keyed by `(user_id, bucket_type, bucket_key)` with atomic `INSERT ... ON CONFLICT DO UPDATE` semantics. Two bucket types: `turns_per_minute` (integer counter) and `cost_per_day` (numeric USD). Indexed for cheap lookup.
-4. **Pre-turn rate check.** In `/api/turns/route.ts`, before calling `runTurn`: look up `turns_per_minute` for `(user, current-minute)`, reject with 429 if over cap. Look up `cost_per_day` for `(user, today)`, reject with 429 if over cap. Both in a single round-trip.
-5. **Atomic per-turn counter increment.** Increment `turns_per_minute` for the current minute-bucket BEFORE starting the turn (so concurrent bursts serialize through Postgres's conflict resolution). No decrement on failure — the bucket expires naturally.
-6. **Post-turn cost increment.** After `runTurn` yields `done`, increment `cost_per_day` by the turn's cost. After Chronicler finishes, increment by its cost too.
-7. **Eval bypass flag.** `runTurn({ bypassLimiter?: boolean })` threaded through. Route handler NEVER sets it (TypeScript guards). Only the eval harness (Commit 8) + integration tests pass it.
-8. **Budget indicator component.** New `src/components/budget-indicator.tsx` — compact progress bar showing today's cost vs. cap. Refreshed after each turn completes. Rendered in the `/campaigns/[id]/play` header.
-9. **`/api/budget` endpoint** returning `{ usedUsd, capUsd, remainingUsd, percent, warn: boolean }`. `warn` flips true at 80%.
-10. **Config env vars.** `AIDM_TURNS_PER_MINUTE_CAP` (default `6`), `AIDM_DAILY_COST_CAP_USD` (default `10.00`), `AIDM_DAILY_COST_WARN_THRESHOLD` (default `0.8`). Added to `envSchema` + `client-env.ts`-surface for UI (cap value; used computed per-fetch).
-11. **Tests.** Integration test: burst 10 concurrent POSTs; exactly `cap` succeed, rest return 429. Daily cap test: seed usage row to 9.99, next turn rejects. Bypass test: passing `bypassLimiter: true` skips both gates. UI test: indicator renders + warns at 80% threshold.
-12. **Migration** `drizzle/0009_<name>.sql` creating `user_usage_counters`.
+2. **Chronicler cost updates `turns` post-hoc.** After Chronicler's `after()` run completes, it updates the turn row: `costUsd += chroniclerCostUsd`. Daily ledger also gets the Chronicler delta.
+3. **Two purpose-built tables** (rejecting the earlier polymorphic single-table suggestion):
+   - `user_rate_counters` — integer counter per `(user_id, minute_bucket)` for the TPM gate. Atomic `INSERT ... ON CONFLICT DO UPDATE`. Bucket key is ISO8601 `YYYY-MM-DDTHH:MMZ` (UTC).
+   - `user_cost_ledger` — USD running total per `(user_id, day_bucket)`. Same atomic increment pattern. Bucket key is `YYYY-MM-DD` (UTC). This is the forever-ledger of daily spend, useful later for billing reconciliation and user-facing spend history.
+4. **Users table extension.** `users.daily_cost_cap_usd NUMERIC(10, 2)` — nullable column. Null = no cap (default for existing + new users). User sets via the UI.
+5. **Pre-turn rate gate.** In `/api/turns/route.ts`, before streaming begins: look up `user_rate_counters[user, currentMinute]`. If `>= AIDM_TURNS_PER_MINUTE_CAP` (default 6), reject with HTTP 429 + JSON body `{ reason: "rate", retryAfterSec: <sec until next minute> }`.
+6. **Pre-turn cost gate (conditional).** If `users.daily_cost_cap_usd IS NOT NULL`, look up `user_cost_ledger[user, today]`. If `>= cap`, reject with 429 + `{ reason: "cost_cap", usedUsd, capUsd, nextResetAt: <start of tomorrow UTC> }`. When cap is null, gate is skipped entirely.
+7. **Atomic per-turn counter increment.** Increment `user_rate_counters[user, currentMinute]` atomically BEFORE streaming starts. No decrement on failure — bucket expires naturally.
+8. **Post-turn cost increment.** After `runTurn` yields `done`, increment `user_cost_ledger[user, today]` by the turn's cost. After Chronicler finishes in `after()`, increment by its cost too.
+9. **Eval bypass flag.** `runTurn({ bypassLimiter?: boolean })` threaded through. Route handler TypeScript type forbids setting it true from request input (no such pathway exists). Only the eval harness (Commit 8) and integration tests pass it.
+10. **`/api/budget` endpoint.** GET returns `{ capUsd: number | null, usedUsd: number, percent: number | null, warn50: boolean, warn90: boolean, nextResetAt: string }`. When `capUsd` is null: `percent`, `warn50`, `warn90` all null/false. Authorizes on Clerk session.
+11. **`/api/user/cap` endpoint.** POST `{ capUsd: number | null }` — authenticated user sets/clears their own cap. Zod-validated. Null clears the cap.
+12. **`<BudgetIndicator />` component.** Compact readout in the play-screen header:
+    - No cap set: shows today's spend as a bare number + "Set daily cap" link.
+    - Cap set, under 50%: neutral progress bar with `$X.XX / $Y.YY`.
+    - Between 50% and 90%: yellow.
+    - ≥ 90%: red, with a "you're near your cap" tooltip.
+    Refreshes by re-fetching `/api/budget` after each turn's `done` event.
+13. **Minimal `/account/spending` page.** Single-field form: current cap display + input + "save" button + "clear cap" button. Submits to `/api/user/cap`. Enough surface to demonstrate the feature end-to-end; can be richer in M2+.
+14. **Config env var.** `AIDM_TURNS_PER_MINUTE_CAP` (default `6`). No env for daily cost — that's a user setting, not a system knob.
+15. **Tests.** Integration: burst 10 concurrent POSTs, exactly `cap` succeed, rest return 429. User-cap test: set cap to $0.10, run turn that spends $0.12, next turn rejects. Bypass test: passing `bypassLimiter: true` skips both gates. `/api/user/cap` authz test: user A cannot set user B's cap. UI tests: budget indicator renders three visual states + re-fetches on turn done.
+16. **Migration** `drizzle/0009_<name>.sql` creating both tables + adding the users column. Backfill existing users to `daily_cost_cap_usd = NULL` implicitly (nullable column default).
 
 **Explicitly NOT landing here:**
 
-- Per-user monthly / lifetime caps — out of scope; M2.5 billing substrate handles lifetime credits.
-- Per-IP rate limiting — Clerk auth is cheap enough that per-user is the right axis.
-- Rate-limit bypass for specific power users / admin roles — no admin role exists yet; M2+ concern.
-- Cost attribution per-provider-per-tier breakdowns — single aggregate `costUsd` is the M1 granularity. Finer splits land with billing in M2.5.
-- Cleanup / GC of old bucket rows — minute buckets accumulate one row per user per minute. Postpone GC until it matters (monthly cron added with billing work).
+- Per-user monthly / lifetime caps — M2.5 billing substrate owns lifetime credits.
+- Per-IP rate limiting — user-axis is right for Clerk-authenticated traffic.
+- Admin override / bypass roles — no admin surface exists yet; M2+ concern.
+- Cost attribution per-provider-per-tier — single aggregate `costUsd` is M1 granularity.
+- Bucket GC cron — minute-buckets accumulate. Postpone until it matters (monthly GC lands with billing work). Surfaced in `M1-closure.md §Known debt`.
+- Warn notifications (email, push) — `warn50` / `warn90` are only UI signals at M1.
 
 ---
 
 ## Schema
 
 ```sql
-CREATE TABLE user_usage_counters (
+-- Atomic per-minute counter. Each row is one user's attempts in one UTC minute.
+CREATE TABLE user_rate_counters (
   user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  bucket_type TEXT NOT NULL,     -- 'turns_per_minute' | 'cost_per_day'
-  bucket_key TEXT NOT NULL,      -- '2026-04-22T15:42Z' or '2026-04-22'
-  value NUMERIC(12, 6) NOT NULL DEFAULT 0,  -- integer count OR USD (6dp enough)
+  minute_bucket TEXT NOT NULL,  -- 'YYYY-MM-DDTHH:MMZ'
+  count INTEGER NOT NULL DEFAULT 0,
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
-  PRIMARY KEY (user_id, bucket_type, bucket_key)
+  PRIMARY KEY (user_id, minute_bucket)
 );
-CREATE INDEX user_usage_counters_user_type_idx
-  ON user_usage_counters(user_id, bucket_type, bucket_key DESC);
+CREATE INDEX user_rate_counters_user_idx
+  ON user_rate_counters(user_id, minute_bucket DESC);
+
+-- Running ledger of daily spend. Each row is one user's spend in one UTC day.
+-- Purpose-built; useful for spend history UI, billing reconciliation later.
+CREATE TABLE user_cost_ledger (
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  day_bucket TEXT NOT NULL,  -- 'YYYY-MM-DD'
+  total_cost_usd NUMERIC(12, 6) NOT NULL DEFAULT 0,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
+  PRIMARY KEY (user_id, day_bucket)
+);
+CREATE INDEX user_cost_ledger_user_idx
+  ON user_cost_ledger(user_id, day_bucket DESC);
+
+-- User's self-set daily spending guardrail. Null = no cap (default).
+ALTER TABLE users
+  ADD COLUMN daily_cost_cap_usd NUMERIC(10, 2);
 ```
 
-Drizzle equivalent in `src/lib/state/schema.ts` with composite primary key via `pgTable`'s second arg.
-
-No additional columns on `turns` — `costUsd` already holds total. Chronicler's post-hoc update is `UPDATE turns SET cost_usd = cost_usd + $chronicler_cost WHERE id = $turn_id`. Idempotent-safe because Chronicler uses `chronicledAt IS NULL` as its idempotency guard (won't run twice).
+No additional columns on `turns` — `costUsd` already holds total. Chronicler's post-hoc update is `UPDATE turns SET cost_usd = cost_usd + $chronicler_cost WHERE id = $turn_id` (idempotent-safe because Chronicler's `chronicledAt IS NULL` guard prevents double-run).
 
 ---
 
@@ -64,79 +94,89 @@ No additional columns on `turns` — `costUsd` already holds total. Chronicler's
 
 ### New files
 
-- `src/lib/budget/caps.ts` — env reads + helpers (`getTurnRateCap()`, `getDailyCostCap()`, `getWarnThreshold()`).
-- `src/lib/budget/counters.ts` — `incrementTurnCounter(userId, minute)`, `incrementCostCounter(userId, day, deltaUsd)`, `getCurrentUsage(userId)` returning both counters.
-- `src/lib/budget/gate.ts` — `checkBudget(userId)` → `{ ok: true } | { ok: false, reason: 'rate' | 'cost', retryAfterSec?: number }`. The single read-and-check called by the route handler.
-- `src/lib/budget/gate.test.ts` — unit tests (concurrency, threshold edge cases, bypass honored).
-- `src/lib/budget/counters.test.ts` — real DB tests with Drizzle against dev Postgres (atomic increment semantics, ON CONFLICT correctness, cross-minute rollover).
-- `src/app/api/budget/route.ts` — GET endpoint returning current usage snapshot.
-- `src/components/budget-indicator.tsx` — UI component (progress bar + warn color).
+- `src/lib/budget/config.ts` — env reads + constants (`getTurnRateCap()`, warn thresholds `[0.5, 0.9]`).
+- `src/lib/budget/counters.ts` — `incrementRateCounter(userId, minute)` + `incrementCostLedger(userId, day, deltaUsd)` + `getUsage(userId)` returning current-minute count + current-day cost.
+- `src/lib/budget/gate.ts` — `checkBudget(userId, opts: { bypass?: boolean })` → `{ ok: true } | { ok: false, reason: 'rate' | 'cost_cap', ... }`. Single read-and-check consumed by the route handler.
+- `src/lib/budget/gate.test.ts` — unit tests with mocked counters (threshold edges, bypass honored, null cap path).
+- `src/lib/budget/counters.test.ts` — real Drizzle tests against dev Postgres (atomic increment semantics, ON CONFLICT correctness, concurrency).
+- `src/app/api/budget/route.ts` — GET current usage + cap + warn flags.
+- `src/app/api/user/cap/route.ts` — POST to set/clear own cap.
+- `src/components/budget-indicator.tsx` — header UI component.
+- `src/app/(app)/account/spending/page.tsx` — minimal cap-setting form.
 - `drizzle/0009_<name>.sql` — migration.
 
 ### Modified files
 
-- `src/lib/env.ts` — add `AIDM_TURNS_PER_MINUTE_CAP`, `AIDM_DAILY_COST_CAP_USD`, `AIDM_DAILY_COST_WARN_THRESHOLD` to schema.
-- `src/lib/client-env.ts` — expose `NEXT_PUBLIC_DAILY_COST_CAP_USD` for UI (cap is non-secret; usage is fetched).
-- `src/lib/state/schema.ts` — new `userUsageCounters` table.
-- `src/lib/agents/_runner.ts` — extract cost from Anthropic / Google response usage, return alongside result. Update `runStructuredAgent` signature to return `{ result, costUsd, usage }`. Existing callers unpack `.result` (mechanical).
-- All structured-agent wrappers that call `runStructuredAgent` (IntentClassifier, OutcomeJudge, Validator, WorldBuilder, OverrideHandler, Scenewright, all consultants in `src/lib/agents/ka/`, Chronicler's RelationshipAnalyzer) — unpack `.result` from the new return shape. `.costUsd` threaded back to caller via existing `trace`/`logger` deps + a new `recordCost` dep.
-- `src/lib/workflow/turn.ts` — accumulate pre-pass + KA costs into a single `turnCostUsd` number; write to `turns.costUsd` at persist time. New `bypassLimiter` option on `TurnInput`. No rate check in the workflow itself (the route does that).
-- `src/lib/workflow/chronicle.ts` — after Chronicler completes, UPDATE `turns.costUsd = cost_usd + chronicler_cost` AND increment daily cost counter.
-- `src/app/api/turns/route.ts` — call `checkBudget(userId)` before `runTurn`; on fail, emit SSE `error` with payload `{ reason, retryAfterSec, cap }` and 429 status. Increment `turns_per_minute` atomically before streaming starts. Post-stream, increment `cost_per_day` by the turn's cost. `bypassLimiter: false` always from this handler (typed, so a refactor can't accidentally set it true).
-- `src/app/(app)/campaigns/[id]/play/play-ui.tsx` — render `<BudgetIndicator />` in header. Re-fetch `/api/budget` after each turn's `done` event.
-- `src/lib/types/turn.ts` — new event type for budget-triggered error.
-- `scripts/mockllm.ts` — no changes (mock doesn't participate in budget).
+- `src/lib/env.ts` — add `AIDM_TURNS_PER_MINUTE_CAP` (numeric, default `6`). No daily cost env.
+- `src/lib/state/schema.ts` — add `userRateCounters`, `userCostLedger` tables; add `dailyCostCapUsd` column to `users`.
+- `src/lib/agents/_runner.ts` — return `{ result, costUsd, usage }` from `runStructuredAgent`. `costUsd` computed from the provider response's usage field + the campaign's model pricing (reuse `src/lib/llm/mock/pricing.ts`'s `estimateCostUsd` — it's already the canonical pricing table, just move / re-export from `src/lib/llm/pricing.ts`). Callers unpack `.result` (mechanical refactor across the consultant call sites).
+- All structured-agent wrappers (`intent-classifier.ts`, `outcome-judge.ts`, `validator.ts`, `world-builder.ts`, `override-handler.ts`, `scale-selector-agent.ts` if it uses runner, `scenewright.ts`, KA consultants in `src/lib/agents/ka/`, Chronicler's `relationship-analyzer.ts`) — unpack `.result`; thread `.costUsd` back to caller via a new `recordCost(agentName, usd)` dep (added to `AgentDeps`).
+- `src/lib/workflow/turn.ts` — initialize a `turnCostAccumulator`; each agent call contributes; sum + KA's cost → `turns.costUsd` at persist time. Add `bypassLimiter?: boolean` to `TurnInput`.
+- `src/lib/workflow/chronicle.ts` — after Chronicler completes, UPDATE `turns.costUsd += chroniclerCost` AND `incrementCostLedger`.
+- `src/app/api/turns/route.ts` — call `checkBudget(userId, { bypass: false })` before streaming begins; on rate/cap fail, return 429 with JSON body (not SSE). Increment rate counter atomically before streaming. Post-stream, increment cost ledger. TypeScript type forbids `bypass: true` from this handler (types-not-runtime guard).
+- `src/app/(app)/campaigns/[id]/play/play-ui.tsx` — render `<BudgetIndicator />` in header; re-fetch `/api/budget` on `done` event.
+- `src/lib/types/turn.ts` — add the 429 error payload shape.
+- `src/lib/state/schema.ts` — extend `users` with new column.
 
 ### Test files
 
-- `src/lib/workflow/__tests__/turn-budget.test.ts` — bypass flag respected; turn cost written to turns row.
-- `src/app/api/turns/__tests__/budget-gate.test.ts` — pre-turn gate returns 429 over cap; under cap streams normally.
-- `src/lib/budget/counters.test.ts` (real DB) — atomic semantics under concurrent INSERT.
+- `src/lib/workflow/__tests__/turn-budget.test.ts` — bypass honored; cost aggregated correctly.
+- `src/app/api/turns/__tests__/budget-gate.test.ts` — rate gate + cap gate behavior; unknown user path.
+- `src/app/api/user/cap/__tests__/authz.test.ts` — authz enforced.
+- `src/components/__tests__/budget-indicator.test.tsx` — three visual states.
+- `src/lib/budget/counters.test.ts` — real DB concurrency.
 
 ---
 
 ## Audit focus
 
-- **Atomic correctness.** The ON CONFLICT DO UPDATE pattern must hold under simulated concurrent POSTs from the same user. Test burst-10; exactly cap succeed.
-- **Bypass cannot leak from user input.** `bypassLimiter` typed so that `/api/turns/route.ts` literally cannot set it true (not just "currently doesn't"). Audit should confirm by searching for any assignment of `bypassLimiter` outside `evals/` and test fixtures.
-- **Cost accounting.** pre-pass + KA cost land in `turns.costUsd` pre-Chronicler. Chronicler's contribution updates the row post-hoc. Daily cap sums `turns.costUsd` with post-Chronicler state; no double-counting from incrementing the counter AND summing the column.
-- **Minute-bucket key correctness.** UTC. No off-by-one at midnight boundaries.
-- **Warn threshold actually flips the UI color.** Visual test: at 79% no warn, at 80%+ warn.
-- **`/api/budget` authorizes.** Users can only read their own usage.
-- **Env var validation.** Caps must parse as numbers; malformed values fail `envSchema.parse` at first-access time.
-- **Bucket cleanup is deferred, not forgotten.** A tracking TODO or breadcrumb in `M1-closure.md §Known debt` saying "bucket GC cron not yet written; minute-buckets accumulate."
+- **Two-table design respected** — `user_rate_counters` and `user_cost_ledger` both present, both purpose-built. No polymorphic bucket-type column hiding in either.
+- **User-set cap semantics.** Null cap → cost gate never fires (not "fires with cap = 0"). Cap = $0 means "no spending allowed" (a legitimate user choice that should gate even the first turn). Audit confirms both paths.
+- **Atomic correctness.** ON CONFLICT DO UPDATE holds under burst-10 concurrent POSTs; test proves the cap is exact.
+- **Bypass cannot leak from user input.** `bypassLimiter` typed so that `/api/turns/route.ts` literally cannot set it true. Grep for `bypassLimiter` assignments outside `evals/` and test files.
+- **Warn thresholds at 50% + 90%.** Not 80%. Not one-threshold. UI transitions tested at boundary values.
+- **Cost accounting rolls up.** Pre-pass + KA + Chronicler all contribute. Daily ledger doesn't double-count (ledger increments are additive, `turns.costUsd` is the authoritative turn-total).
+- **Bucket key is UTC.** No off-by-one at midnight; no DST concerns.
+- **Migrations are reversible.** 0009 down migration drops tables + column cleanly.
+- **`/api/user/cap` authz hardened.** User A cannot set user B's cap; unauthenticated request returns 401.
+- **Business-model alignment.** No system-default daily cap env var. Users not opted into cap have `daily_cost_cap_usd = null` and hit no cost gate.
 
 ---
 
 ## Risks
 
-1. **Drizzle ON CONFLICT semantics.** `pgTable` with composite PK + `.onConflictDoUpdate({ target, set: { value: sql`${t.value} + ${delta}` } })` — need to verify the SQL generator emits `EXCLUDED.value + t.value` correctly. Worst case, fall through to raw `sql` for the increment statement.
-2. **SSE streaming + 429.** SSE convention is to always 200 and encode errors in the stream. Plan: pre-turn gate returns 429 *before* switching to SSE (route handler branches on gate result). After streaming starts, any error gets encoded as an `error` event at 200. Rate-limit rejections always hit pre-stream.
-3. **UI jitter.** `BudgetIndicator` re-fetches after every turn. If the network is slow, the gauge visibly lags. Accept — this is an advisory, not a real-time display.
-4. **Cost undercount still.** Even with this commit, consultant LLM calls inside KA (via Agent SDK's Agent tool) roll up into KA's `total_cost_usd`. Correct. But subagent definitions that spawn their OWN messages outside the turn's session will undercount. Audit: verify the KA's `total_cost_usd` subsumes consultants. Grep for any direct `anthropic.messages.create` outside `_runner.ts` + `key-animator.ts` + `chronicler.ts` in agent code.
+1. **Drizzle ON CONFLICT semantics.** `pgTable` with composite PK + `.onConflictDoUpdate({ target, set: { count: sql`${t.count} + 1` } })` — verify the generator emits correctly. Fall through to raw `sql` for the increment if needed.
+2. **SSE + 429 shape.** Pre-turn gate returns 429 + JSON *before* switching to SSE. Route handler branches on gate result; only success paths open the stream.
+3. **UI jitter on slow fetches.** BudgetIndicator re-fetches after each turn. Accept lag — advisory, not real-time.
+4. **Cap = $0 vs. no cap.** Treat them distinctly: `null` = no cap (gate bypassed), `0` = zero budget (every turn rejected). Audit confirms correct branching.
+5. **Moving pricing table.** `src/lib/llm/mock/pricing.ts` currently lives under mock/ but serves production too. Move to `src/lib/llm/pricing.ts` with re-export from mock/. Mechanical, but touches imports.
+6. **Users column nullability in tests.** Fresh test users default to `daily_cost_cap_usd = null`; make sure fixtures seed this explicitly where relevant.
 
 ---
 
 ## Scope estimate
 
-~1–1.5 days of focused work. ~8 file additions, ~12 file modifications. Migration + one round of per-commit audit.
+~1.5 days. ~10 new files, ~12 modified. Migration + per-commit audit. User-settings UI is minimal but real.
 
 ---
 
-## Delivery order (within this single commit)
+## Delivery order (within this commit)
 
 1. Schema + migration → verify round-trip on dev DB.
-2. `src/lib/budget/*` — caps, counters, gate. Unit tests for gate; real-DB tests for counters.
-3. `_runner.ts` cost-return refactor + thread through consultants. Fix any test breakage.
-4. Turn workflow cost aggregation + persistence.
-5. Chronicler post-hoc update of turns row + daily cost counter.
-6. API route pre-turn gate + post-turn counter.
-7. `/api/budget` endpoint + `<BudgetIndicator />` + wire into play UI.
-8. `bypassLimiter` flag threading. Tests.
-9. `pnpm typecheck && pnpm lint && pnpm test` green.
-10. Subagent audit on full stack.
-11. Fix findings. Commit. Push.
+2. Move pricing table to `src/lib/llm/pricing.ts`.
+3. `_runner.ts` cost-return refactor + thread through consultants. Fix test breakage.
+4. `src/lib/budget/*` — counters, gate, config. Unit + real-DB tests.
+5. Turn workflow cost aggregation + persistence.
+6. Chronicler post-hoc cost + ledger update.
+7. API route pre-turn gate + post-turn increment.
+8. `/api/budget` + `/api/user/cap` endpoints.
+9. `<BudgetIndicator />` component + wire into play header.
+10. `/account/spending` page.
+11. `bypassLimiter` threading + tests.
+12. `pnpm typecheck && pnpm lint && pnpm test` green.
+13. Subagent audit on full stack.
+14. Fix findings. Commit. Push.
 
 ---
 
-*Drafted 2026-04-22 from `docs/plans/M1-closure.md §9`. Commit lands before Commit 8 per M1-closure ordering.*
+*Revised 2026-04-22 after user scope corrections: daily cost is a user-set guardrail (not system cap), two purpose-built tables (not polymorphic single), warn at 50% + 90% (not one 80% threshold). Original draft committed as `3cf3d98` prior to corrections.*

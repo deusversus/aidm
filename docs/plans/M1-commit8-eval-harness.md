@@ -1,6 +1,8 @@
-# M1 Commit 8 — eval harness + 5 golden turns + Haiku judge + CI gate
+# M1 Commit 8 — eval harness + 5 golden turns + deterministic CI gate + manual prose review
 
 **Drafted 2026-04-22.** Expands `docs/plans/M1-closure.md §8` to file-level scope. Lands AFTER Commit 9 so the harness can exercise the eval-mode bypass. Consumes MockLLM infrastructure (`docs/plans/mockllm.md`) as its deterministic replay substrate.
+
+**Scope correction 2026-04-22.** The earlier draft had the Haiku judge running live in CI on every PR (~$0.01/PR). That's rejected: **no live LLM calls in CI, ever.** Any automated testing with live costs is a cost + security risk. Prose-quality review moves from an automated CI gate to a **manual process I run at strategic intervals with the user's explicit approval.**
 
 ---
 
@@ -8,13 +10,15 @@
 
 ROADMAP §M1 acceptance requires "eval suite green." Without a harness, every prompt or model change becomes trust-the-vibes. Three failure modes this commit prevents:
 
-1. **Silent intent-classifier drift.** A prompt tweak shifts IntentClassifier's output on a canonical social beat; no one notices until play feels off three weeks later.
-2. **Voice regressions.** A new Block 1 fragment accidentally dilutes the Bebop register; prose goes generic.
-3. **Structural regressions.** Router short-circuits break; WB FLAG paths silently start REJECTing again.
+1. **Silent intent-classifier drift.** A prompt tweak shifts IntentClassifier's output on a canonical social beat.
+2. **Structural regressions.** Router short-circuits break; WB paths silently shift behavior.
+3. **Output-shape regressions.** Outcome narrative_weight/success_level ranges stop making sense.
 
-Five golden turns across the intent space + a Haiku-judged narrative rubric + a PR gate catch these before they ship.
+Five golden turns + MockLLM fixtures + deterministic CI checks catch these before they ship.
 
-Secondary: this harness is the forever-tool. M2 Session Zero evals plug into the same shape. M4 semantic retrieval evals likewise.
+Prose-quality regressions (voice, register, specificity, tonal drift) are a different class — they need LLM-quality judgment. Those are caught by manual reviews I run locally with your approval, not by CI.
+
+Secondary: the harness is the forever-tool. M2 Session Zero evals plug into the same shape. M4 semantic retrieval evals likewise.
 
 ---
 
@@ -28,25 +32,53 @@ Secondary: this harness is the forever-tool. M2 Session Zero evals plug into the
    - `bebop-exploration.yaml` — Spike drifts through Europa's ice market (intent=EXPLORATION, world-texture test).
    - `solo-leveling-ability.yaml` — Jinwoo summons Igris mid-dungeon (intent=ABILITY, power-display test).
    - `solo-leveling-default.yaml` — low-stakes downtime in the Hunter Association lobby (intent=DEFAULT, trivial-action gate test).
-2. **Fixture shape.** Each fixture declares `input` (player_message + campaign fixture + character fixture + last-3-turns summary), `expected_intent` (exact match target: intent + mode + trigger), `expected_outcome_bounds` (`narrative_weight` range, `success_level` set), and `narrative_rubric` (criteria + threshold). Expected pre-pass behavior is asserted directly against the typed output. Expected narrative is scored by the Haiku judge.
-3. **Pre-pass MockLLM fixtures** — five scenarios × the pre-pass agents they exercise = ~20 MockLLM fixtures under `evals/fixtures/llm/gameplay/<scenario>/`. Written by hand against the expected JSON shapes so the harness runs deterministically without real API calls. Scenewright / IntentClassifier / OJ / Validator / (selected WB) fixtures per scenario.
-4. **KA MockLLM fixtures** — one streaming response per scenario. Hand-authored prose matching the rubric so the Haiku judge scores consistently.
-5. **`evals/run.ts`** — harness binary. Loads each golden-turn fixture, loads matching MockLLM fixtures into the registry, seeds a fresh campaign + character in a scratch DB, calls `runTurn({ ..., bypassLimiter: true })`, collects the turn's intent + outcome + narrative. Reports pass/fail per dimension per scenario.
-6. **Haiku judge.** `evals/judge.ts` — separate LLM call, real Haiku (not mock) in CI, sends the narrative + rubric + expected criteria, returns 1–5 scores on: *intent_coherence*, *outcome_feasibility*, *narrative_specificity* (named entities present), *voice_adherence* (register matches profile DNA), *causal_logic*. Aggregate `average ≥ 3.5` + no dimension `< 3.0` = pass. Runs once per scenario.
-7. **`evals/latest.json`** — canonical output: `{ ranAt, commit, scenarios: [{ id, passed, intentExact: bool, outcomeInBounds: bool, judgeScores: {...}, narrative: "..." }], summary: { passed: N, failed: M, breakdowns: {...} } }`. Committed per run; `.gitignore`-excluded so CI artifacts don't pollute.
-8. **`pnpm evals` script.** Package.json entry pointing at `tsx evals/run.ts`. Exits non-zero if any scenario fails.
-9. **GitHub Actions workflow** at `.github/workflows/evals.yml` — triggered on PR to master. Spins up a temporary Postgres (via `services: postgres:16` in the workflow), runs migrations, runs `pnpm evals --ci`, posts summary to the PR. Uses real Haiku (a PR-gate sized spend, bounded).
-10. **Eval seed fixtures.** `evals/golden/profiles/` already has Cowboy Bebop + Solo Leveling. Ensure each scenario's `input.campaign` references one of them; `input.character` references a scenario-specific character fixture under `evals/golden/characters/`.
-11. **Tests on the harness itself.** `evals/run.test.ts` — unit tests on the harness plumbing (fixture loader parses all 5, judge caller respects strict mode, aggregator thresholds correct).
+
+2. **Fixture shape.** Each fixture declares:
+   - `input` — player_message + campaign fixture + character fixture + last-3-turns summary
+   - `expected_intent` — exact-match target (intent, mode, trigger, special_conditions)
+   - `expected_outcome_bounds` — narrative_weight range, success_level enum set, justification_non_empty
+   - `expected_narrative_deterministic` — `must_include_entity: [...]`, `must_not_include: [...]`, `min_length_chars`, `max_length_chars`. CI checks these.
+   - `manual_rubric` — criteria for *my* prose review (register, tone anchors, voice adherence). NOT checked in CI. Loaded only when `--judge` flag is passed locally, which I only pass with your explicit approval per review.
+
+3. **Pre-pass MockLLM fixtures** — five scenarios × the pre-pass agents they exercise = ~20 MockLLM fixtures under `evals/fixtures/llm/gameplay/<scenario>/`. Hand-authored against the expected JSON shapes so the harness runs deterministically without real API calls. Scenewright / IntentClassifier / OJ / Validator / (selected WB) per scenario.
+
+4. **KA MockLLM fixtures** — one streaming response per scenario. Hand-authored prose matching each scenario's `expected_narrative_deterministic` and `manual_rubric`.
+
+5. **`evals/run.ts`** — harness binary. Loads each golden-turn fixture, loads matching MockLLM fixtures into the registry, seeds a fresh campaign + character in a scratch DB, calls `runTurn({ ..., bypassLimiter: true })`, collects the turn's intent + outcome + narrative. Reports pass/fail per deterministic dimension per scenario. Exits non-zero if any dimension fails.
+
+6. **Deterministic CI gate.** Runs on PR:
+   - Intent exact match (IntentClassifier output vs. `expected_intent`)
+   - Outcome bounds (narrative_weight in range, success_level in set, justification non-empty)
+   - Narrative must-include: every entity in `must_include_entity` appears
+   - Narrative must-not-include: no entry in `must_not_include` appears
+   - Narrative length within bounds
+   - NO LLM calls. Fast (<30s). Zero recurring cost.
+
+7. **Manual prose review tool (opt-in, explicit approval).** `evals/judge.ts` exists but is gated:
+   - Runs only when `pnpm evals --judge` is invoked locally
+   - Calls real Haiku 4.5 to score each scenario's narrative on the `manual_rubric` (1–5 per dimension: register, tone, specificity, voice adherence, causal logic)
+   - Writes output to `evals/manual-reviews/<YYYY-MM-DD>-<commit>.json` (gitignored; I report findings back to user)
+   - I only invoke this when you explicitly approve a review pass. Default flow does not run it.
+   - CI workflow never runs it. There is no Anthropic key in CI.
+
+8. **`evals/latest.json`** — canonical output of the deterministic run: `{ ranAt, commit, scenarios: [{ id, passed, intentExact, outcomeInBounds, narrativeChecks: {...} }], summary: {...} }`. Committed by CI as a workflow artifact; locally gitignored.
+
+9. **`pnpm evals`** script — runs deterministic gate. `pnpm evals --judge` adds the manual rubric scoring (my-use-only-with-approval).
+
+10. **GitHub Actions workflow** `.github/workflows/evals.yml` — triggered on PR to master. Spins up Postgres (workflow `services:` block), runs migrations, sets `AIDM_MOCK_LLM=1 + MOCKLLM_STRICT=1`, runs `pnpm evals` (deterministic only). **No API keys injected. No live LLM calls.** Posts summary comment to PR.
+
+11. **Seed fixtures.** `evals/golden/profiles/` already has Cowboy Bebop + Solo Leveling. Each scenario's `input.campaign` references one; `input.character` references a scenario-specific character fixture under `evals/golden/characters/`.
+
+12. **Tests on harness.** `evals/run.test.ts` — harness plumbing: fixture loader parses all 5, deterministic checks fire correctly on stubbed narratives, aggregator thresholds correct, `--judge` path gated behind the flag.
 
 **Explicitly NOT landing here:**
 
-- SZ evals — `M2` deliverable.
-- Multi-turn arc evals — requires Chronicler state to persist across calls in a way the harness doesn't yet model. Single-turn scenarios only.
+- Live-LLM CI gate — rejected (no live calls in CI ever).
+- SZ evals — M2 deliverable.
+- Multi-turn arc evals — Chronicler state persistence across eval calls not yet modeled.
 - Adversarial / jailbreak evals — out of scope.
 - Cost-budget evals — Commit 9 owns cost tests.
-- Per-agent (non-turn) evals — harness is turn-level.
-- CI spend cap on the workflow itself — monitored by hand at M1; tune after first 10 runs.
+- Automated prose regression — explicitly out of scope per user direction. Prose review is manual, strategic-interval, with user approval.
 
 ---
 
@@ -66,6 +98,8 @@ last_turns_summary: |
   Turn 2: crew silent dinner; Faye asleep.
 input:
   player_message: "I want to ask Jet about Julia."
+
+# CI-checked: deterministic
 expected_intent:
   intent: SOCIAL
   mode: direct
@@ -78,14 +112,17 @@ expected_outcome_bounds:
   success_level:
     one_of: [PARTIAL, FULL]
   justification_non_empty: true
-mockllm_fixture_dir: evals/fixtures/llm/gameplay/bebop-social/
-narrative_rubric:
+expected_narrative_deterministic:
   must_include_entity:
     - Jet
     - Julia
   must_not_include:
     - "exposition dump"
-    - "Jet explains at length"
+  min_length_chars: 200
+  max_length_chars: 2000
+
+# NOT CI-checked: manual review only, run by Claude with user's explicit approval.
+manual_rubric:
   register:
     - "restrained"
     - "earned silence"
@@ -93,12 +130,17 @@ narrative_rubric:
   tone_anchors:
     - "mechanical / domestic detail grounding emotion"
     - "lines breaking off rather than resolving"
-  judge_threshold:
-    average: 3.5
-    min_dimension: 3.0
+  forbidden_patterns:
+    - "Jet explains at length"
+    - "three-paragraph monologue"
+  judge_threshold_note: |
+    Average ≥ 3.5, min dim ≥ 3.0 is my default acceptance. Raise if
+    review session surfaces prose drift.
+
+mockllm_fixture_dir: evals/fixtures/llm/gameplay/bebop-social/
 ```
 
-Pre-pass MockLLM fixtures under `mockllm_fixture_dir` use the existing shape from `docs/plans/mockllm.md`, one per agent invocation (scenewright → intent → oj → validator → ka streaming).
+The `manual_rubric` block is parsed only when `--judge` is passed. CI parses only `expected_intent`, `expected_outcome_bounds`, `expected_narrative_deterministic`.
 
 ---
 
@@ -107,131 +149,114 @@ Pre-pass MockLLM fixtures under `mockllm_fixture_dir` use the existing shape fro
 ### New files
 
 - `evals/run.ts` — harness binary.
-- `evals/judge.ts` — Haiku-judge caller.
+- `evals/judge.ts` — manual prose reviewer; reads `manual_rubric`; calls real Haiku; writes report. Only runs with `--judge` flag.
 - `evals/aggregate.ts` — per-dimension scoring + latest.json writer.
-- `evals/types.ts` — Zod schemas: `GoldenFixture`, `EvalResult`, `JudgeScore`, `EvalSummary`.
+- `evals/types.ts` — Zod schemas: `GoldenFixture`, `EvalResult`, `DeterministicChecks`, `ManualRubric`, `JudgeScore`, `EvalSummary`.
 - `evals/db-scratch.ts` — seed a throwaway campaign + character in the current DB (or dedicated eval DB via env var `EVAL_DB_URL`).
 - `evals/run.test.ts` — harness plumbing tests.
+- `evals/README.md` — brief usage note (how to invoke; why CI never runs `--judge`; prose-review cadence is user-approved).
 - `evals/golden/gameplay/*.yaml` — 5 scenarios.
 - `evals/golden/characters/*.yaml` — character fixtures per scenario.
-- `evals/fixtures/llm/gameplay/<scenario>/*.yaml` — ~20 MockLLM fixtures (pre-pass + KA per scenario).
-- `.github/workflows/evals.yml` — CI workflow.
+- `evals/fixtures/llm/gameplay/<scenario>/*.yaml` — ~20 MockLLM fixtures.
+- `.github/workflows/evals.yml` — CI workflow (deterministic only; zero API keys).
 
 ### Modified files
 
-- `package.json` — `"evals": "tsx evals/run.ts"`, `"evals:ci": "tsx evals/run.ts --ci"`.
-- `docs/plans/M1-closure.md` — mark §8 shipped once the CI gate runs green on the first PR.
-- `.gitignore` — add `evals/latest.json`.
-- `README.md` (only if one exists — per CLAUDE.md don't create) — skip.
-- `evals/fixtures/llm/README.md` — append a section describing the harness consumes the same format under `evals/fixtures/llm/gameplay/`.
+- `package.json` — `"evals": "tsx evals/run.ts"`, `"evals:ci": "tsx evals/run.ts --ci"`. No `:judge` script entry — invoked by hand.
+- `docs/plans/M1-closure.md` — mark §8 shipped once CI gate runs green on first PR.
+- `.gitignore` — add `evals/latest.json`, `evals/manual-reviews/`.
+- `evals/fixtures/llm/README.md` — append section describing the harness consumes the same format under `evals/fixtures/llm/gameplay/`.
 
 ### No changes needed
 
 - `src/lib/workflow/turn.ts` — `bypassLimiter` already threaded by Commit 9.
-- `src/lib/llm/mock/*` — already able to load a directory of fixtures per the registry shape.
+- `src/lib/llm/mock/*` — already able to load directory of fixtures per the registry shape.
 
 ---
 
-## Haiku judge design
+## Manual prose review — the approval-gated path
 
-Single LLM call per scenario. Input:
-```
-You are a narrative evaluator. Score the narrative on five dimensions,
-1–5 each. Return JSON matching the schema.
+When I detect or you request a prose review:
 
-Rubric criteria:
-  must_include_entity: [...]
-  must_not_include: [...]
-  register: [...]
-  tone_anchors: [...]
+1. I tell you: "I'd like to run a prose review pass. This will call real Haiku 4.5 against 5 scenarios. Estimated cost: ~$0.01. Proceed?"
+2. You say yes (or no).
+3. On yes, I invoke `pnpm evals --judge` locally (my machine, with my Anthropic key). Outputs land at `evals/manual-reviews/<timestamp>.json`.
+4. I read the judge output, summarize findings, and report back. We discuss whether any fixture's rubric needs tightening / loosening, or whether the narrative needs adjustment.
+5. No file committed automatically. Review artifacts gitignored.
 
-Narrative:
-  <the turn's narrative_text>
+Review cadence (suggested, subject to your input):
+- Before M1 ship.
+- After any prompt-registry or Block 1 fragment change.
+- After a model version bump.
+- On user request ("let's do a prose pass").
 
-Expected intent + outcome (for reference only, don't score these):
-  intent: SOCIAL
-  outcome: { narrative_weight: 0.48, success_level: PARTIAL, ... }
-```
-
-Output Zod schema:
-```ts
-z.object({
-  intent_coherence: z.number().min(1).max(5),
-  outcome_feasibility: z.number().min(1).max(5),
-  narrative_specificity: z.number().min(1).max(5),
-  voice_adherence: z.number().min(1).max(5),
-  causal_logic: z.number().min(1).max(5),
-  rationale: z.string(),
-})
-```
-
-Aggregation per scenario: `average = sum / 5`. Pass iff `average ≥ 3.5` AND `min(dims) ≥ 3.0`. Hard threshold; tune after first 3 PR cycles if too tight.
-
-**Stability check.** `evals/run.test.ts` includes a "stability" test that calls the judge 3× with the same narrative and asserts max dim variance < 0.7. If unstable, set temperature to 0 + add a seed.
+Not automated. Not scheduled. Explicit approval each time.
 
 ---
 
 ## CI gate mechanics
 
-Workflow runs on PRs to master. Steps:
+Workflow on PRs to master. Steps:
 
 1. Checkout + pnpm install.
-2. Start Postgres service (workflow `services:` block, `postgres:16` image, pgvector init script).
+2. Start Postgres service (`postgres:16` image + pgvector init).
 3. `pnpm drizzle-kit migrate:up` against the throwaway DB.
-4. Set `ANTHROPIC_API_KEY` from repo secret (judge only; the turn pipeline runs against MockLLM).
-5. Set `AIDM_MOCK_LLM=1` + `MOCKLLM_STRICT=1`.
-6. `pnpm evals:ci` — harness loads golden fixtures, seeds DB, runs turn pipeline against MockLLM, feeds narratives to Haiku judge, emits `latest.json` to the Actions artifact.
-7. Post a summary comment to the PR with per-scenario pass/fail + aggregated dim scores.
-8. Exit non-zero on any failure.
+4. Set `AIDM_MOCK_LLM=1` + `MOCKLLM_STRICT=1`. **No `ANTHROPIC_API_KEY` injected.**
+5. `pnpm evals:ci` — harness loads golden fixtures, seeds DB, runs turn pipeline against MockLLM, runs deterministic checks, emits `latest.json`.
+6. Post summary comment to PR with per-scenario pass/fail.
+7. Exit non-zero on any failure.
 
-Cost estimate per run: 5 scenarios × ~500 tokens narrative × Haiku rate ≈ **well under $0.01 per PR run**. No budget concern.
+Cost per run: **$0.** No LLM calls in the pipeline (everything mocked); no judge calls (gated behind `--judge` which CI never passes).
+
+Runtime target: <30s for all 5 scenarios.
 
 ---
 
 ## Audit focus
 
-- **Fixtures span the intent space.** DEFAULT / COMBAT / SOCIAL / EXPLORATION / ABILITY all represented; no two scenarios collapse to the same intent.
-- **Judge rubric produces stable scores.** Test the stability case; variance < 0.7 across repeated runs.
-- **PR gate thresholds defensible.** Not too loose (passes when it shouldn't), not too tight (fails on prose nuance). Document chosen thresholds with rationale in the fixture file.
-- **Bypass plumbed correctly.** Harness sets `bypassLimiter: true`; route handler never does.
-- **Mock fixtures match shape.** Each pre-pass fixture matches the system prompt + user shape the real agent sends, so fixture-match-by-includes doesn't spuriously miss.
-- **Judge fixture doesn't leak expected JSON into the prompt.** The judge scores what's given, not what should be; audit the judge prompt.
-- **CI workflow reproducibility.** Two consecutive runs on the same commit land identical `latest.json` (modulo timestamps). If not, track down non-determinism (fixture ordering, DB seeding, judge temp).
-- **Cost of judge calls logged.** Each judge call's cost captured; visible in the PR summary.
+- **No live LLM in CI.** Audit the workflow file directly. No API keys referenced. Workflow does not pass `--judge`. Fixtures load only MockLLM; strict mode on.
+- **Fixtures span the intent space.** DEFAULT / COMBAT / SOCIAL / EXPLORATION / ABILITY all represented; no two collapse.
+- **Deterministic checks are defensible.** Not too loose (passes on generic prose), not too tight (flakes on small edits). `must_include_entity` + `must_not_include` + length bounds — verify with one intentional narrative tweak that should fail, confirm it does.
+- **`--judge` is truly gated.** Running `pnpm evals` without the flag does zero LLM work. Running with the flag requires a local Anthropic key.
+- **Bypass plumbed correctly.** Harness sets `bypassLimiter: true`; route handler can never.
+- **MockLLM fixtures match real prompts.** Each pre-pass fixture's match rules (system_includes, user_includes) match what the real agent sends.
+- **CI reproducibility.** Two runs on same commit land identical `latest.json` (modulo timestamps). Non-determinism source = bug.
 
 ---
 
 ## Risks
 
-1. **MockLLM fixture drift.** If KA's Block 1 fragment changes, the scenario's expected narrative (and therefore the KA fixture) goes stale. Mitigation: MockLLM's match-by-semantic-includes is robust to small prompt edits; record-mode regenerates when structural changes happen. Document the re-record cadence in `evals/README.md`.
-2. **Judge instability.** If Haiku scores vary >0.7 across runs on identical input, the gate becomes flaky. Mitigations in order: temperature 0, explicit seed, rubric tightening, fall through to "rubric-only" deterministic scoring (regex over narrative for `must_include_entity` etc.) with judge only scoring register/tone.
-3. **Flaky DB seed.** Two concurrent PR runs fighting over the same scratch DB. Mitigation: per-run randomized campaign slug; `EVAL_DB_URL` points at a dedicated DB in CI.
-4. **Real Haiku in CI surprises.** If the Anthropic key hits a rate limit, the gate fails spuriously. Mitigation: judge runs scenarios sequentially (not parallel); single key should handle the rate.
-5. **Fixture maintenance burden.** 5 scenarios × 4–5 fixtures each = ~20 fixtures. If they go stale, audit-fix-commit becomes expensive. Mitigation: set a reminder to re-record after any Block 1 / prompt-registry change.
+1. **MockLLM fixture drift.** If KA's Block 1 fragment changes, the scenario's expected narrative (and the KA MockLLM fixture) goes stale. Mitigations: semantic-includes matching is robust to small prompt edits; record-mode regenerates on structural changes; fixture drift surfaces during manual review sessions.
+2. **Deterministic narrative checks feel shallow.** `must_include_entity` + `must_not_include` catches gross regressions but misses voice/tone drift. That's why manual review exists — deliberately split labor.
+3. **Flaky DB seed.** Concurrent PRs fighting over the same scratch DB. Mitigation: per-run randomized campaign slug; `EVAL_DB_URL` points at dedicated CI DB.
+4. **Fixture maintenance burden.** 5 scenarios × 4–5 fixtures each = ~20 fixtures. Re-record after any Block 1 / prompt-registry change.
+5. **`--judge` accidentally run in CI.** Mitigation: the workflow file is audited for the flag's absence; `evals/judge.ts` itself logs loudly on entry ("MANUAL REVIEW MODE — real LLM calls; estimated cost ~$0.01"); a CI env guard in judge.ts (`if (process.env.CI === "true") throw new Error("--judge disallowed in CI")`) makes accidental invocation impossible.
+6. **Manual review cadence slippage.** If prose review gets skipped, voice drift lands undetected. Mitigation: milestone-close checklist includes "prose review pass complete with user approval." Not technical, process.
 
 ---
 
 ## Scope estimate
 
-~2–3 days of focused work. Golden-turn fixture authoring is the slowest part — 5 scenarios × careful prose drafting. The harness + judge plumbing is straightforward. CI workflow + rerun verification ~½ day.
+~2–3 days. Most of the time is golden-fixture prose-drafting + MockLLM fixture authoring. Harness + deterministic aggregator is straightforward.
 
 ---
 
 ## Delivery order (within this commit)
 
-1. `evals/types.ts` + `evals/golden/gameplay/bebop-social.yaml` (first scenario end-to-end as the reference shape).
+1. `evals/types.ts` + `evals/golden/gameplay/bebop-social.yaml` as reference.
 2. MockLLM fixtures for bebop-social (pre-pass + KA).
 3. `evals/run.ts` skeleton — load + seed DB + run one scenario + print result.
-4. `evals/judge.ts` + Zod schema + threshold aggregation.
-5. Iterate: four more scenarios, their MockLLM fixtures, harness handles all.
-6. `evals/latest.json` writer + `--ci` mode.
-7. `pnpm evals` script + local green run.
-8. GitHub Actions workflow + first CI run to master-compatible PR.
-9. Subagent audit on full stack.
-10. Fix findings. Commit. Push.
+4. Deterministic aggregator + thresholds (`evals/aggregate.ts`).
+5. `evals/judge.ts` — manual tool, CI-guard, Haiku caller. Logs loudly.
+6. Four more scenarios + their MockLLM fixtures.
+7. `evals/latest.json` writer + `--ci` mode + `--judge` mode.
+8. `pnpm evals` script + local green run (no `--judge`).
+9. GitHub Actions workflow + CI-green verification.
+10. Subagent audit on full stack.
+11. Fix findings. Commit. Push.
 
 Close M1's §8 line in `M1-closure.md`.
 
 ---
 
-*Drafted 2026-04-22 from `docs/plans/M1-closure.md §8`. Commit depends on Commit 9 (bypass flag) + MockLLM (fixtures). Lands before M1 acceptance ritual.*
+*Revised 2026-04-22 after user scope correction: no live LLM in CI ever. Prose-quality review becomes a manual, explicit-approval, strategic-interval process Claude runs with the user's permission. Original draft committed as `3cf3d98` prior to correction.*
