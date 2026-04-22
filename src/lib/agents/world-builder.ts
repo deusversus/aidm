@@ -62,6 +62,27 @@ export const WorldBuilderDecision = z.enum(["ACCEPT", "CLARIFY", "FLAG"]);
  * consume the richest shape the model produces, while downstream
  * typed writes validate-in-depth at the tool boundary.
  */
+/**
+ * Opus tolerates prompt instructions well but slips occasionally on
+ * loose-JSON habits: a single-item list rendered as a bare string
+ * ("to expand" instead of ["to expand"]), a null where the prompt
+ * says "omit when unknown." Prod logs 2026-04-22 showed WB falling
+ * back to CLARIFY purely from these. A couple of Zod preprocess
+ * helpers coerce the loose shapes into the strict ones at parse
+ * time — the prompt still asks for clean shapes, but we survive
+ * the slips gracefully.
+ */
+const coerceStringList = z.preprocess((v) => {
+  if (typeof v === "string") return [v];
+  if (Array.isArray(v)) return v;
+  return v;
+}, z.array(z.string()).optional());
+
+const coerceOptionalStringDropNull = z.preprocess((v) => {
+  if (v === null) return undefined;
+  return v;
+}, z.string().optional());
+
 export const EntityUpdate = z.object({
   kind: z.enum(["npc", "item", "location", "faction", "fact"]),
   name: z.string(),
@@ -74,23 +95,23 @@ export const EntityUpdate = z.object({
    * enumeration; WB outputs now carry role through to register_npc. */
   role: z.string().optional(),
   personality: z.string().optional(),
-  goals: z.array(z.string()).optional(),
-  secrets: z.array(z.string()).optional(),
+  goals: coerceStringList,
+  secrets: coerceStringList,
   faction: z.string().nullable().optional(),
-  visual_tags: z.array(z.string()).optional(),
+  visual_tags: coerceStringList,
   knowledge_topics: z.record(z.string(), z.enum(["expert", "moderate", "basic"])).optional(),
   power_tier: z.string().optional(),
   ensemble_archetype: z.string().nullable().optional(),
   // Location-specific
   description: z.string().optional(),
   atmosphere: z.string().optional(),
-  notable_features: z.array(z.string()).optional(),
+  notable_features: coerceStringList,
   faction_owner: z.string().nullable().optional(),
   // Faction-specific
-  leadership: z.string().optional(),
-  allegiance: z.string().optional(),
+  leadership: coerceOptionalStringDropNull,
+  allegiance: coerceOptionalStringDropNull,
   // Item-specific
-  properties: z.array(z.string()).optional(),
+  properties: coerceStringList,
 });
 export type EntityUpdate = z.infer<typeof EntityUpdate>;
 
@@ -154,13 +175,31 @@ export const WorldBuilderOutput = z.object({
 });
 export type WorldBuilderOutput = z.infer<typeof WorldBuilderOutput>;
 
-const CLARIFY_FALLBACK: WorldBuilderOutput = {
-  decision: "CLARIFY",
-  response:
-    "Something about the way you've told it isn't quite settling into the scene yet. Tell me more — when, where, how?",
+/**
+ * WB fallback when the LLM call fails retry budget (WB reshape 2026-04-22).
+ *
+ * **ACCEPT, not CLARIFY.** In authorship tooling the safe default for
+ * "we couldn't run the editor successfully" is: accept the assertion
+ * silently and let KA narrate forward with it as canon. CLARIFY on
+ * failure was a gatekeeper-era instinct — blocking a narrative turn
+ * because WB couldn't do its editor pass is the opposite of what this
+ * subsystem is for.
+ *
+ * The decision carries no entityUpdates + no flags — we don't know
+ * what the author declared, so we don't pre-register anything. KA
+ * narrates the assertion directly from the raw playerMessage (which
+ * already flowed into Block 4 as player_message); Chronicler's
+ * post-turn pass catalogs any entities KA renders.
+ *
+ * `response` is brief + in-character, surfaced to KA via Block 4's
+ * `wb_acknowledgment` slot — not shown to the player directly.
+ */
+const ACCEPT_FALLBACK: WorldBuilderOutput = {
+  decision: "ACCEPT",
+  response: "Noted. The world bends accordingly.",
   entityUpdates: [],
   flags: [],
-  rationale: "WorldBuilder fallback: retry budget exhausted; asking the player to rephrase.",
+  rationale: "WorldBuilder fallback: retry budget exhausted; accepting silently.",
 };
 
 export type WorldBuilderDeps = AgentRunnerDeps;
@@ -190,8 +229,10 @@ export async function validateAssertion(
       promptId: "agents/world-builder",
       userContent: buildUserContent(parsed),
       outputSchema: WorldBuilderOutput,
-      fallback: CLARIFY_FALLBACK,
-      maxTokens: 1024,
+      fallback: ACCEPT_FALLBACK,
+      // Long worldbuilding assertions (multi-paragraph exposition)
+      // need headroom — 1024 was truncating some Opus outputs.
+      maxTokens: 2048,
       spanInput: parsed,
     },
     deps,

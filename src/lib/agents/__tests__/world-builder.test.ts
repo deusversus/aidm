@@ -140,18 +140,23 @@ describe("validateAssertion (WorldBuilder)", () => {
     expect(result.decision).toBe("ACCEPT");
   });
 
-  it("falls back to CLARIFY with in-character prose after retry budget", async () => {
+  it("falls back to ACCEPT with brief in-character prose after retry budget (WB reshape 2026-04-22)", async () => {
+    // Fallback posture change: CLARIFY was gatekeeper-era — blocked the
+    // turn on WB failure. ACCEPT lets KA narrate forward with the raw
+    // assertion as Block 4 context; safer default for authorship tooling.
     const { validateAssertion } = await import("../world-builder");
     const anthropic = fakeAnthropic([{ text: "garbage" }, { text: "still garbage" }]);
     const result = await validateAssertion(
       { assertion: "x", canonicalityMode: "inspired" },
       { anthropic },
     );
-    expect(result.decision).toBe("CLARIFY");
+    expect(result.decision).toBe("ACCEPT");
+    expect(result.entityUpdates).toEqual([]);
+    expect(result.flags).toEqual([]);
     expect(result.response).not.toMatch(/error|failed|sorry/i);
   });
 
-  it("falls back to CLARIFY on network errors", async () => {
+  it("falls back to ACCEPT on network errors", async () => {
     const { validateAssertion } = await import("../world-builder");
     const anthropic = fakeAnthropic([
       { error: new Error("timeout") },
@@ -161,6 +166,39 @@ describe("validateAssertion (WorldBuilder)", () => {
       { assertion: "x", canonicalityMode: "inspired" },
       { anthropic },
     );
-    expect(result.decision).toBe("CLARIFY");
+    expect(result.decision).toBe("ACCEPT");
+  });
+
+  it("coerces single-string goals into an array (Opus loose-shape tolerance)", async () => {
+    const { validateAssertion } = await import("../world-builder");
+    const anthropic = fakeAnthropic([
+      {
+        text: JSON.stringify({
+          decision: "ACCEPT",
+          response: "Canon.",
+          entityUpdates: [
+            {
+              kind: "faction",
+              name: "Spacer Guilds",
+              // Opus sometimes emits a bare string for a single-item list.
+              goals: "to expand sovereign domain",
+              // And null for an optional string the assertion didn't cover.
+              leadership: null,
+            },
+          ],
+          flags: [],
+          rationale: "ok",
+        }),
+      },
+    ]);
+    const result = await validateAssertion(
+      { assertion: "the spacer guilds claim sovereign domain", canonicalityMode: "inspired" },
+      { anthropic },
+    );
+    expect(result.decision).toBe("ACCEPT");
+    expect(result.entityUpdates).toHaveLength(1);
+    const e = result.entityUpdates[0];
+    expect(e?.goals).toEqual(["to expand sovereign domain"]);
+    expect(e?.leadership).toBeUndefined();
   });
 });

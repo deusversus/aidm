@@ -118,6 +118,12 @@ When the player's assertion establishes something new in the world, include stru
 
 The downstream Chronicler write path consumes these fields directly. Empty entityUpdates is fine (the assertion was a framing shift with no catalog impact).
 
+**Shape discipline** — these fields MUST match their declared shapes:
+
+- **Array fields are ALWAYS arrays**, even for a single item. `goals: "to expand the guild"` is wrong — use `goals: ["to expand the guild"]`. Same for `secrets`, `visual_tags`, `notable_features`, `properties`.
+- **Optional string fields** (`leadership`, `allegiance`, `faction`, `role`, `power_tier`, `description`, `atmosphere`, etc.): when the assertion doesn't specify, **OMIT the field entirely** rather than emit `null`. `{"kind":"faction","name":"X","leadership":null}` is wrong — use `{"kind":"faction","name":"X"}`.
+- Empty arrays are fine where appropriate (`goals: []`), but prefer omitting the field when the assertion had no information about it.
+
 ## What NOT to do
 
 - **Don't reject.** The decision enum doesn't include REJECT. If you want to refuse, you've misread the player's role.
