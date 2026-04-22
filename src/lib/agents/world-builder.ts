@@ -83,6 +83,51 @@ const coerceOptionalStringDropNull = z.preprocess((v) => {
   return v;
 }, z.string().optional());
 
+/**
+ * `knowledge_topics` is a `Record<string, "expert" | "moderate" | "basic">`.
+ * Opus sometimes emits it as an array instead (prod log 2026-04-22 turn 7):
+ *
+ *   Array of objects:  [{ topic: "ratcatching", level: "expert" }, ...]
+ *   Array of objects:  [{ name: "X", expertise: "basic" }, ...]
+ *   Array of strings:  ["ratcatching", "fencing"]  (no level inferable)
+ *
+ * Coerce each to the record shape. For the bare-string case we assume
+ * "basic" as the conservative default — the model knew the NPC had
+ * knowledge in the area, just didn't specify depth.
+ */
+const LEVELS = ["expert", "moderate", "basic"] as const;
+type Level = (typeof LEVELS)[number];
+function isLevel(v: unknown): v is Level {
+  return typeof v === "string" && (LEVELS as readonly string[]).includes(v);
+}
+
+const coerceKnowledgeTopics = z.preprocess((v) => {
+  if (v === null || v === undefined) return undefined;
+  // Already a record — let Zod validate downstream.
+  if (typeof v === "object" && !Array.isArray(v)) return v;
+  // Array shapes.
+  if (Array.isArray(v)) {
+    const record: Record<string, Level> = {};
+    for (const item of v) {
+      if (typeof item === "string") {
+        record[item] = "basic";
+      } else if (item && typeof item === "object") {
+        const obj = item as Record<string, unknown>;
+        const topic =
+          (typeof obj.topic === "string" && obj.topic) ||
+          (typeof obj.name === "string" && obj.name) ||
+          (typeof obj.subject === "string" && obj.subject);
+        const rawLevel = obj.level ?? obj.expertise ?? obj.depth ?? "basic";
+        if (topic) {
+          record[topic] = isLevel(rawLevel) ? rawLevel : "basic";
+        }
+      }
+    }
+    return record;
+  }
+  return v;
+}, z.record(z.string(), z.enum(LEVELS)).optional());
+
 export const EntityUpdate = z.object({
   kind: z.enum(["npc", "item", "location", "faction", "fact"]),
   name: z.string(),
@@ -99,7 +144,7 @@ export const EntityUpdate = z.object({
   secrets: coerceStringList,
   faction: z.string().nullable().optional(),
   visual_tags: coerceStringList,
-  knowledge_topics: z.record(z.string(), z.enum(["expert", "moderate", "basic"])).optional(),
+  knowledge_topics: coerceKnowledgeTopics,
   power_tier: z.string().optional(),
   ensemble_archetype: z.string().nullable().optional(),
   // Location-specific

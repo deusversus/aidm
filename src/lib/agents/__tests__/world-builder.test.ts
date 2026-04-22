@@ -169,6 +169,68 @@ describe("validateAssertion (WorldBuilder)", () => {
     expect(result.decision).toBe("ACCEPT");
   });
 
+  it("coerces knowledge_topics array-of-objects into a record (Opus loose-shape tolerance)", async () => {
+    // Prod log 2026-04-22 turn 7: Opus emitted knowledge_topics as an
+    // array of { topic, level } objects instead of the Record<string, enum>
+    // the schema declares. Coerce accepts it.
+    const { validateAssertion } = await import("../world-builder");
+    const anthropic = fakeAnthropic([
+      {
+        text: JSON.stringify({
+          decision: "ACCEPT",
+          response: "Canon.",
+          entityUpdates: [
+            {
+              kind: "npc",
+              name: "Hawke the ratcatcher",
+              knowledge_topics: [
+                { topic: "ratcatching", level: "expert" },
+                { topic: "fencing", level: "basic" },
+              ],
+            },
+          ],
+          flags: [],
+          rationale: "ok",
+        }),
+      },
+    ]);
+    const result = await validateAssertion(
+      { assertion: "Hawke is a ratcatcher who also fences", canonicalityMode: "inspired" },
+      { anthropic },
+    );
+    expect(result.decision).toBe("ACCEPT");
+    const e = result.entityUpdates[0];
+    expect(e?.knowledge_topics).toEqual({ ratcatching: "expert", fencing: "basic" });
+  });
+
+  it("coerces knowledge_topics bare-string array into a record with 'basic' default", async () => {
+    const { validateAssertion } = await import("../world-builder");
+    const anthropic = fakeAnthropic([
+      {
+        text: JSON.stringify({
+          decision: "ACCEPT",
+          response: "Canon.",
+          entityUpdates: [
+            {
+              kind: "npc",
+              name: "Hawke",
+              knowledge_topics: ["ratcatching", "fencing"],
+            },
+          ],
+          flags: [],
+          rationale: "ok",
+        }),
+      },
+    ]);
+    const result = await validateAssertion(
+      { assertion: "Hawke knows about those things", canonicalityMode: "inspired" },
+      { anthropic },
+    );
+    expect(result.decision).toBe("ACCEPT");
+    const e = result.entityUpdates[0];
+    expect(e?.knowledge_topics).toEqual({ ratcatching: "basic", fencing: "basic" });
+  });
+
   it("coerces single-string goals into an array (Opus loose-shape tolerance)", async () => {
     const { validateAssertion } = await import("../world-builder");
     const anthropic = fakeAnthropic([

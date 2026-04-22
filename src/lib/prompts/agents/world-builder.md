@@ -122,6 +122,7 @@ The downstream Chronicler write path consumes these fields directly. Empty entit
 
 - **Array fields are ALWAYS arrays**, even for a single item. `goals: "to expand the guild"` is wrong — use `goals: ["to expand the guild"]`. Same for `secrets`, `visual_tags`, `notable_features`, `properties`.
 - **Optional string fields** (`leadership`, `allegiance`, `faction`, `role`, `power_tier`, `description`, `atmosphere`, etc.): when the assertion doesn't specify, **OMIT the field entirely** rather than emit `null`. `{"kind":"faction","name":"X","leadership":null}` is wrong — use `{"kind":"faction","name":"X"}`.
+- **`knowledge_topics` is a RECORD (object), not an array.** Shape: `{ "topic_name": "expert" | "moderate" | "basic", ... }`. Correct: `knowledge_topics: { "ratcatching": "expert", "fencing": "basic" }`. Wrong: `knowledge_topics: [{ "topic": "ratcatching", "level": "expert" }]` or `knowledge_topics: ["ratcatching", "fencing"]`.
 - Empty arrays are fine where appropriate (`goals: []`), but prefer omitting the field when the assertion had no information about it.
 
 ## What NOT to do
