@@ -4,6 +4,7 @@ import { type KeyAnimatorEvent, runKeyAnimator } from "@/lib/agents/key-animator
 import type { CompositionMode } from "@/lib/agents/scale-selector-agent";
 import { type AgentLogger, defaultLogger } from "@/lib/agents/types";
 import { judgeOutcomeWithValidation } from "@/lib/agents/validator";
+import type { WorldBuilderFlag } from "@/lib/agents/world-builder";
 import type { Db } from "@/lib/db";
 import {
   detectStaleConstructions,
@@ -61,6 +62,54 @@ import { and, desc, eq, isNull, sql } from "drizzle-orm";
 
 const WORKING_MEMORY_TURNS = 6;
 const ADVISORY_LOCK_TIMEOUT_MS = 15_000;
+
+/**
+ * Render Block 4's `{{player_assertion}}` slot from the router's
+ * `wbAssertion` payload (WB reshape commit). Returns an empty string
+ * when no assertion fired — Block 4 renders normally with the slot
+ * collapsed. When present, gives KA the assertion text, a compact
+ * entity summary, and any flagged craft concerns so the narration
+ * knows what's been established + what to handle carefully.
+ */
+function renderPlayerAssertionBlock(
+  wbAssertion: import("@/lib/agents").WbAssertionPayload | undefined,
+): string {
+  if (!wbAssertion) return "";
+  const lines: string[] = [];
+  lines.push("### Player worldbuilding assertion (treat as established canon)");
+  lines.push("");
+  lines.push(`> ${wbAssertion.assertion}`);
+  lines.push("");
+  if (wbAssertion.entityUpdates.length > 0) {
+    lines.push("Entities established by this assertion:");
+    for (const e of wbAssertion.entityUpdates) {
+      const primary = e.personality ?? e.description ?? e.details ?? "(no detail)";
+      lines.push(`- **${e.name}** (${e.kind}): ${primary}`);
+    }
+    lines.push("");
+  }
+  if (wbAssertion.flags.length > 0) {
+    // Flags are editorial notes FOR THE AUTHOR, rendered in the
+    // sidebar. We still surface them to KA so the narration can
+    // handle stakes-dissolving moves with extra care — flagged
+    // assertions are canon, but KA knows to tread thoughtfully.
+    lines.push("Editor flags on this assertion (non-blocking):");
+    for (const f of wbAssertion.flags) {
+      if (f.kind === "voice_fit") {
+        lines.push(`- **voice_fit**: ${f.evidence} — suggestion: ${f.suggestion}`);
+      } else if (f.kind === "stakes_implication") {
+        lines.push(`- **stakes_implication**: ${f.evidence} — dissolves: ${f.what_dissolves}`);
+      } else if (f.kind === "internal_consistency") {
+        lines.push(`- **internal_consistency**: ${f.evidence} — contradicts: ${f.contradicts}`);
+      }
+    }
+    lines.push("");
+  }
+  lines.push(
+    "Narrate forward with the assertion as canon — weave it in without meta-authorial acknowledgment. The fact is simply true in the fiction now.",
+  );
+  return lines.join("\n");
+}
 
 /**
  * Tiered memory retrieval budget (§9 — v3 0/3/6/9 ladder).
@@ -256,7 +305,7 @@ export type TurnWorkflowEvent =
   | {
       type: "routed";
       verdictKind: "continue" | "meta" | "override" | "worldbuilder";
-      /** In-character prose to surface to the player immediately (WB accept/clarify/reject, override ack). Null for `continue`. */
+      /** In-character prose to surface to the player immediately (WB-CLARIFY, override ack). Null for `continue`. */
       response: string | null;
       turnNumber: number;
     }
@@ -274,14 +323,22 @@ export type TurnWorkflowEvent =
        * Route verdict kind — tells the SSE route handler whether to fire
        * Chronicler. At M1 Chronicler runs only on `continue` turns
        * (player-driven narrative with intent + outcome). META / OVERRIDE /
-       * WORLDBUILDER short-circuits skip Chronicler; their structured
-       * effects land elsewhere (e.g. campaign.settings.overrides for WB).
+       * WORLDBUILDER (CLARIFY only) short-circuits skip Chronicler.
+       * WB-ACCEPT / WB-FLAG arrive on the continue path with wbAssertion
+       * (WB reshape commit) and DO chronicle.
        */
       verdictKind: "continue" | "meta" | "override" | "worldbuilder";
       /** IntentClassifier's output for the message. Required — every done has one. */
       intent: IntentOutput;
       /** OJ verdict. Null for short-circuit paths (no outcome judgment ran). */
       outcome: OutcomeOutput | null;
+      /**
+       * Non-blocking WorldBuilder flags for the player's sidebar UI
+       * (WB reshape commit). Empty when WB didn't fire or the
+       * assertion had no craft concerns. Three-kind discriminated
+       * union: voice_fit | stakes_implication | internal_consistency.
+       */
+      flags: WorldBuilderFlag[];
     }
   | { type: "error"; message: string };
 
@@ -476,8 +533,13 @@ export async function* runTurn(
       ...deps.routerDeps,
     });
 
-    // Short-circuit branches: META / OVERRIDE / WB (any decision).
-    // Persist a minimal turn row with the in-character response and return.
+    // Short-circuit branches: META / OVERRIDE / WB-CLARIFY.
+    //
+    // WB reshape note: ACCEPT / FLAG used to live here too. The reshape
+    // moved them onto the `continue` path (router emits `wbAssertion`
+    // on the continue verdict) so KA narrates normally with the
+    // assertion as Block-4 canon. Only CLARIFY — genuine physical
+    // ambiguity — still short-circuits with the clarifying question.
     if (verdict.kind !== "continue") {
       const responseText =
         verdict.kind === "worldbuilder" ? verdict.verdict.response : verdict.override.ack_phrasing;
@@ -503,19 +565,22 @@ export async function* runTurn(
         .returning({ id: turns.id });
 
       // ---------------------------------------------------------------
-      // Post-short-circuit persistence (v3-parity audit fix, 2026-04-21).
+      // Short-circuit persistence (v3-parity audit fix, 2026-04-21).
       //
       // Router kinds MUST bind state; "classify then forget" was the
-      // original regression. Three paths:
+      // original regression. Two paths still landing here:
       //
       //   OVERRIDE → append to campaign.settings.overrides (so next
       //     turn's priorOverrides reads it back + Block 4 surfaces it).
-      //   WB ACCEPT → route entityUpdates through Chronicler write
-      //     tools (invokeTool). WB runs BEFORE KA so KA can't catalog
-      //     these itself; if we don't fire the writes here, the
-      //     player-asserted fact evaporates after the ack.
       //   META → no persistence at Phase 1 (meta conversation loop
       //     lands at Phase 5 of v3-audit-closure).
+      //   WB-CLARIFY → no persistence (player's answer will reshape
+      //     the assertion; persisting now would commit to a draft
+      //     the player is about to revise).
+      //
+      // WB-ACCEPT / WB-FLAG no longer short-circuit — their entity
+      // persistence moved onto the continue branch below, so KA's
+      // tool calls see the new entities when it narrates forward.
       // ---------------------------------------------------------------
       if (verdict.kind === "override" && verdict.override.mode === "override") {
         // Schema allows `category: null` even under mode="override" (the
@@ -540,122 +605,10 @@ export async function* runTurn(
           .where(and(eq(campaigns.id, input.campaignId), eq(campaigns.userId, input.userId)));
       }
 
-      // Persist on ACCEPT and FLAG (FLAG is "accept with craft concern" —
-      // the assertion is canon, the flag rides alongside for Director).
-      // CLARIFY short-circuits before KA with a question; no persistence.
-      if (
-        verdict.kind === "worldbuilder" &&
-        (verdict.verdict.decision === "ACCEPT" || verdict.verdict.decision === "FLAG")
-      ) {
-        const turnNum = ctx.nextTurnNumber;
-        const baseToolCtx: AidmToolContext = {
-          campaignId: input.campaignId,
-          userId: input.userId,
-          db,
-          trace: deps.trace,
-        };
-        for (const update of verdict.verdict.entityUpdates) {
-          try {
-            if (update.kind === "npc") {
-              // Phase 6B: pass structured NPCDetails-shaped fields
-              // straight through to register_npc. Falls back to
-              // `details` string in `personality` when structured
-              // fields absent (legacy WB outputs).
-              await invokeTool(
-                "register_npc",
-                {
-                  name: update.name,
-                  role: update.role,
-                  personality: update.personality ?? update.details ?? "",
-                  goals: update.goals,
-                  secrets: update.secrets,
-                  faction: update.faction ?? null,
-                  visual_tags: update.visual_tags,
-                  knowledge_topics: update.knowledge_topics,
-                  power_tier: update.power_tier,
-                  ensemble_archetype: update.ensemble_archetype ?? null,
-                  first_seen_turn: turnNum,
-                  last_seen_turn: turnNum,
-                },
-                baseToolCtx,
-              );
-            } else if (update.kind === "location") {
-              // Pass structured fields in the details jsonb.
-              const locDetails: Record<string, unknown> = {};
-              if (update.description || update.details) {
-                locDetails.description = update.description ?? update.details;
-              }
-              if (update.atmosphere) locDetails.atmosphere = update.atmosphere;
-              if (update.notable_features) locDetails.notable_features = update.notable_features;
-              if (update.faction_owner) locDetails.faction_owner = update.faction_owner;
-              await invokeTool(
-                "register_location",
-                {
-                  name: update.name,
-                  details: locDetails,
-                  first_seen_turn: turnNum,
-                  last_seen_turn: turnNum,
-                },
-                baseToolCtx,
-              );
-            } else if (update.kind === "faction") {
-              // New in Phase 6B. Factions weren't in the original
-              // entityUpdates enum.
-              const factionDetails: Record<string, unknown> = {};
-              if (update.description || update.details) {
-                factionDetails.description = update.description ?? update.details;
-              }
-              if (update.leadership) factionDetails.leadership = update.leadership;
-              if (update.allegiance) factionDetails.allegiance = update.allegiance;
-              if (update.goals) factionDetails.goals = update.goals;
-              await invokeTool(
-                "register_faction",
-                { name: update.name, details: factionDetails },
-                baseToolCtx,
-              );
-            } else if (update.kind === "fact") {
-              // Player-asserted fact. Heat 80 (above KA-narrated default
-              // of 100 is now the new default — player facts stay at 80
-              // to let KA writes on the same turn win ties).
-              await invokeTool(
-                "write_semantic_memory",
-                {
-                  category: "fact",
-                  content: `${update.name}: ${update.details}`,
-                  heat: 80,
-                  turn_number: turnNum,
-                },
-                baseToolCtx,
-              );
-            } else if (update.kind === "item") {
-              // Items catalog landing later (inventory layer). For now
-              // file under semantic memory so the assertion isn't lost.
-              const itemContent = update.description
-                ? `${update.name}: ${update.description}`
-                : `${update.name}: ${update.details}`;
-              await invokeTool(
-                "write_semantic_memory",
-                {
-                  category: "item",
-                  content: itemContent,
-                  heat: 70,
-                  turn_number: turnNum,
-                },
-                baseToolCtx,
-              );
-            }
-          } catch (err) {
-            // Best-effort. A failed write on one entity shouldn't stop
-            // the rest. Surface in trace + logs so regressions aren't
-            // silent.
-            logger("warn", "WB entity persist failed", {
-              kind: update.kind,
-              name: update.name,
-              error: err instanceof Error ? err.message : String(err),
-            });
-          }
-        }
-      }
+      // WB-CLARIFY no longer persists entities (the player is about to
+      // revise the assertion; persisting now would commit to a draft).
+      // WB-ACCEPT / WB-FLAG persistence moved to the continue branch
+      // below (happens BEFORE KA runs so KA's tool calls see new rows).
 
       yield {
         type: "done",
@@ -669,6 +622,7 @@ export async function* runTurn(
         verdictKind: verdict.kind,
         intent: verdict.intent,
         outcome: null,
+        flags: [],
       };
       return;
     }
@@ -682,6 +636,113 @@ export async function* runTurn(
       response: null,
       turnNumber: ctx.nextTurnNumber,
     };
+
+    // -------------------------------------------------------------------
+    // WB reshape: ACCEPT / FLAG now arrive on the continue path with a
+    // `wbAssertion` payload. Persist the entities BEFORE KA runs so the
+    // new NPC/location/faction rows are visible to KA's tool calls
+    // (e.g. `list_known_npcs` returning the NPC the player just
+    // declared). Flags accumulate here and ride along to the done event;
+    // CLARIFY never reaches this branch.
+    // -------------------------------------------------------------------
+    const wbAssertion = verdict.wbAssertion;
+    if (wbAssertion) {
+      const turnNum = ctx.nextTurnNumber;
+      const baseToolCtx: AidmToolContext = {
+        campaignId: input.campaignId,
+        userId: input.userId,
+        db,
+        trace: deps.trace,
+      };
+      for (const update of wbAssertion.entityUpdates) {
+        try {
+          if (update.kind === "npc") {
+            await invokeTool(
+              "register_npc",
+              {
+                name: update.name,
+                role: update.role,
+                personality: update.personality ?? update.details ?? "",
+                goals: update.goals,
+                secrets: update.secrets,
+                faction: update.faction ?? null,
+                visual_tags: update.visual_tags,
+                knowledge_topics: update.knowledge_topics,
+                power_tier: update.power_tier,
+                ensemble_archetype: update.ensemble_archetype ?? null,
+                first_seen_turn: turnNum,
+                last_seen_turn: turnNum,
+              },
+              baseToolCtx,
+            );
+          } else if (update.kind === "location") {
+            const locDetails: Record<string, unknown> = {};
+            if (update.description || update.details) {
+              locDetails.description = update.description ?? update.details;
+            }
+            if (update.atmosphere) locDetails.atmosphere = update.atmosphere;
+            if (update.notable_features) locDetails.notable_features = update.notable_features;
+            if (update.faction_owner) locDetails.faction_owner = update.faction_owner;
+            await invokeTool(
+              "register_location",
+              {
+                name: update.name,
+                details: locDetails,
+                first_seen_turn: turnNum,
+                last_seen_turn: turnNum,
+              },
+              baseToolCtx,
+            );
+          } else if (update.kind === "faction") {
+            const factionDetails: Record<string, unknown> = {};
+            if (update.description || update.details) {
+              factionDetails.description = update.description ?? update.details;
+            }
+            if (update.leadership) factionDetails.leadership = update.leadership;
+            if (update.allegiance) factionDetails.allegiance = update.allegiance;
+            if (update.goals) factionDetails.goals = update.goals;
+            await invokeTool(
+              "register_faction",
+              { name: update.name, details: factionDetails },
+              baseToolCtx,
+            );
+          } else if (update.kind === "fact") {
+            await invokeTool(
+              "write_semantic_memory",
+              {
+                category: "fact",
+                content: `${update.name}: ${update.details}`,
+                heat: 80,
+                turn_number: turnNum,
+              },
+              baseToolCtx,
+            );
+          } else if (update.kind === "item") {
+            const itemContent = update.description
+              ? `${update.name}: ${update.description}`
+              : `${update.name}: ${update.details}`;
+            await invokeTool(
+              "write_semantic_memory",
+              {
+                category: "item",
+                content: itemContent,
+                heat: 70,
+                turn_number: turnNum,
+              },
+              baseToolCtx,
+            );
+          }
+        } catch (err) {
+          // Best-effort. A failed write on one entity shouldn't block
+          // the rest or stop KA from narrating forward.
+          logger("warn", "WB entity persist failed", {
+            kind: update.kind,
+            name: update.name,
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+      }
+    }
 
     // -------------------------------------------------------------------
     // Effective composition mode (§7.3 scale-selector — deterministic
@@ -902,6 +963,10 @@ export async function* runTurn(
           // faithfully.
           player_overrides:
             routerInput.priorOverrides?.map((o) => `[${o.category}] ${o.value}`) ?? [],
+          // WB reshape: when WB accepted or flagged an assertion, inject
+          // the player-assertion section so KA narrates with it as canon.
+          // Empty string on non-WB turns so the block flows as before.
+          player_assertion: renderPlayerAssertionBlock(wbAssertion),
           arc_state: {
             current_arc: arcPlan.current_arc ?? null,
             arc_phase: arcPlan.arc_phase ?? null,
@@ -971,6 +1036,7 @@ export async function* runTurn(
         ttftMs,
         totalMs,
         styleDriftUsed: styleDrift ?? null,
+        flags: wbAssertion?.flags ?? [],
       })
       .returning({ id: turns.id });
 
@@ -986,6 +1052,7 @@ export async function* runTurn(
       verdictKind: "continue",
       intent: verdict.intent,
       outcome: outcome ?? null,
+      flags: wbAssertion?.flags ?? [],
     };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

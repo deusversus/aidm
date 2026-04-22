@@ -62,11 +62,8 @@ describe("routePlayerMessage", () => {
     }
   });
 
-  it("routes WORLD_BUILDING to WorldBuilder and surfaces its decision", async () => {
+  it("WB ACCEPT returns continue with wbAssertion (WB reshape — no short-circuit)", async () => {
     const { routePlayerMessage } = await import("../router");
-    // One shared anthropic fake handles both IntentClassifier's classification
-    // and WorldBuilder's decision because both route through the Anthropic
-    // path by default. Sequence: classification first, then WB decision.
     const anthropic = anthropicSequence([
       JSON.stringify({
         intent: "WORLD_BUILDING",
@@ -76,9 +73,83 @@ describe("routePlayerMessage", () => {
       }),
       JSON.stringify({
         decision: "ACCEPT",
-        response: "It is so.",
+        response: "The amulet settles in your palm.",
+        entityUpdates: [
+          { kind: "item", name: "grandmother's amulet", description: "silver, tarnished" },
+        ],
+        flags: [],
+        rationale: "Extends prior canon; no craft concern.",
+      }),
+    ]);
+    const verdict = await routePlayerMessage(
+      {
+        playerMessage: "I pull the amulet from my satchel.",
+        canonicalityMode: "inspired",
+      },
+      { intentClassifier: { anthropic }, worldBuilder: { anthropic } },
+    );
+    expect(verdict.kind).toBe("continue");
+    if (verdict.kind === "continue") {
+      expect(verdict.wbAssertion).toBeDefined();
+      expect(verdict.wbAssertion?.decision).toBe("ACCEPT");
+      expect(verdict.wbAssertion?.entityUpdates).toHaveLength(1);
+      expect(verdict.wbAssertion?.flags).toEqual([]);
+    }
+  });
+
+  it("WB FLAG returns continue with wbAssertion + typed flags", async () => {
+    const { routePlayerMessage } = await import("../router");
+    const anthropic = anthropicSequence([
+      JSON.stringify({
+        intent: "WORLD_BUILDING",
+        epicness: 0.5,
+        special_conditions: [],
+        confidence: 0.9,
+      }),
+      JSON.stringify({
+        decision: "FLAG",
+        response: "Noted.",
         entityUpdates: [],
-        rationale: "ok",
+        flags: [
+          {
+            kind: "voice_fit",
+            evidence: "galactic-empire scale in a grounded noir",
+            suggestion: "consider implying the scope off-screen",
+          },
+        ],
+        rationale: "Scale mismatch with the premise; surfacing as voice_fit.",
+      }),
+    ]);
+    const verdict = await routePlayerMessage(
+      {
+        playerMessage: "The galactic empire has existed for 10,000 years.",
+        canonicalityMode: "inspired",
+      },
+      { intentClassifier: { anthropic }, worldBuilder: { anthropic } },
+    );
+    expect(verdict.kind).toBe("continue");
+    if (verdict.kind === "continue") {
+      expect(verdict.wbAssertion?.decision).toBe("FLAG");
+      expect(verdict.wbAssertion?.flags).toHaveLength(1);
+      expect(verdict.wbAssertion?.flags[0]?.kind).toBe("voice_fit");
+    }
+  });
+
+  it("WB CLARIFY returns worldbuilder kind (still short-circuits for physical ambiguity)", async () => {
+    const { routePlayerMessage } = await import("../router");
+    const anthropic = anthropicSequence([
+      JSON.stringify({
+        intent: "WORLD_BUILDING",
+        epicness: 0.3,
+        special_conditions: [],
+        confidence: 0.88,
+      }),
+      JSON.stringify({
+        decision: "CLARIFY",
+        response: "You reach, but the satchel feels emptier than expected. When did you stow it?",
+        entityUpdates: [],
+        flags: [],
+        rationale: "Scene established satchel as empty; assertion conflicts.",
       }),
     ]);
     const verdict = await routePlayerMessage(
@@ -90,7 +161,8 @@ describe("routePlayerMessage", () => {
     );
     expect(verdict.kind).toBe("worldbuilder");
     if (verdict.kind === "worldbuilder") {
-      expect(verdict.verdict.decision).toBe("ACCEPT");
+      expect(verdict.verdict.decision).toBe("CLARIFY");
+      expect(verdict.verdict.response).toContain("?");
     }
   });
 

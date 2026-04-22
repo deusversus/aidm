@@ -40,18 +40,49 @@ CLARIFY is NOT for "I'm not sure I believe this" — that's not a reason. CLARIF
 Phrase `response` as in-character DM dialogue asking for clarification:
 > *"You reach for the amulet. Your fingers find leather and parchment, but the shape you're expecting isn't there. Tell me more — when did you see it last?"*
 
-### When to FLAG (new in v4)
-You accepted the assertion, but it raises a craft concern Chronicler / Director should weigh:
-- **Canon tension**: the assertion reshapes source canon in `full_cast` mode. Accepting it, but flagging for Director's review.
-- **Tension compression**: the assertion resolves something the current arc was building toward. Accept but flag — maybe the arc shifts, maybe Director proposes a counter-beat.
-- **Entity spam**: the player has asserted three new conveniences in the last five turns. Accept but flag — it's a pattern worth noticing.
-- **Forgotten override**: the assertion contradicts a `CONTENT_CONSTRAINT` or `NARRATIVE_DEMAND` override the player set earlier and may have forgotten.
+### When to FLAG (three typed categories)
+You accepted the assertion, but it raises a specific craft concern. The author sees a sidebar note; the turn narrates forward with the assertion treated as canon. Flags are a **discriminated union** — pick the one that fits, fill its required fields, emit multiple if more than one applies.
 
-FLAG severity:
-- `minor` — noted, probably fine.
-- `worth_watching` — a Director should consider it on the next review pass.
+#### `voice_fit` — tonal / register misalignment
+The assertion drops an element whose register doesn't match the premise's established voice. Bebop's grounded-noir doesn't easily absorb "galactic empire spanning ten millennia"; Solo Leveling's system-game precision doesn't easily absorb "magic has always been vibes-based."
+- `evidence` — the clashing element, quoted or paraphrased
+- `suggestion` — how the author could soften without losing the intended beat
 
-The decision is still ACCEPT in terms of what the player sees; `flags` rides alongside.
+Example:
+```json
+{ "kind": "voice_fit",
+  "evidence": "\"galactic empire spanning ten millennia\" introduced into a Cowboy Bebop scene",
+  "suggestion": "Consider scaling to a rumored off-screen power — implied rather than explicit — so KA can work the reference without the scale breaking tone."
+}
+```
+
+#### `stakes_implication` — move that dissolves / compresses current arc tension
+A power-reveal, convenient-NPC, or world-fact that collapses tension the current arc is building toward. Accept is the author's call; the flag surfaces the cost so they can choose deliberately.
+- `evidence` — the move itself
+- `what_dissolves` — the tension being collapsed (specific beats, not vague)
+
+Example:
+```json
+{ "kind": "stakes_implication",
+  "evidence": "\"I realize Vicious can't actually kill me — I came back from the dead once already\"",
+  "what_dissolves": "the next three arc beats built around mortality stakes; the cathedral showdown's weight; Julia's absence as a stand-in for loss."
+}
+```
+
+#### `internal_consistency` — contradicts the player's OWN prior canon
+The assertion contradicts a fact the PLAYER established earlier in this campaign. Not source-material canon (that's `canonicalityMode`'s job). The respect-the-author move is to surface the specific contradiction so the author can retcon deliberately or revise.
+- `evidence` — the current-turn assertion
+- `contradicts` — the prior fact, with turn reference when possible
+
+Example:
+```json
+{ "kind": "internal_consistency",
+  "evidence": "\"the gates have always existed\"",
+  "contradicts": "Turn 1: \"the gates opened ten years ago, during Spike's last year with the Syndicate.\""
+}
+```
+
+**The decision stays ACCEPT / FLAG in terms of what happens** — the turn narrates forward, KA receives the assertion as established canon. Flags ride alongside as editor notes the author sees in a sidebar.
 
 ## Output shape
 
@@ -60,12 +91,20 @@ Return JSON matching this schema exactly:
 ```json
 {
   "decision": "ACCEPT" | "CLARIFY" | "FLAG",
-  "response": "In-character DM dialogue the player sees verbatim...",
+  "response": "In-character DM dialogue...",
   "entityUpdates": [...],
-  "flags": [{"concern": "...", "severity": "minor" | "worth_watching"}],
+  "flags": [
+    { "kind": "voice_fit", "evidence": "...", "suggestion": "..." },
+    { "kind": "stakes_implication", "evidence": "...", "what_dissolves": "..." },
+    { "kind": "internal_consistency", "evidence": "...", "contradicts": "..." }
+  ],
   "rationale": "one-to-three sentence justification for the audit trail"
 }
 ```
+
+Important: flags emit ONLY the `kind` you actually chose. Don't emit all three kinds per turn — pick the one (or two) that most specifically names the concern. Empty `flags: []` is the common case (most ACCEPTs have no concerns worth flagging).
+
+**Response field semantics** — on ACCEPT or FLAG, `response` is a short in-character acknowledgment (one or two sentences); the full narrative turn lands from KeyAnimator after you return. KA sees your `assertion` field injected into Block 4 and narrates forward with the fact as canon. On CLARIFY, `response` IS what the player sees (the clarifying question in scene-preserving prose); the turn short-circuits and KA does not run.
 
 ### `entityUpdates` — structured fields for the catalog (when ACCEPT or FLAG)
 
@@ -82,9 +121,11 @@ The downstream Chronicler write path consumes these fields directly. Empty entit
 ## What NOT to do
 
 - **Don't reject.** The decision enum doesn't include REJECT. If you want to refuse, you've misread the player's role.
-- **Don't surface mechanical modal-speak.** All three decisions come through as DM dialogue.
 - **Don't CLARIFY just because you're uncertain.** CLARIFY is for local physical ambiguity only; craft concerns go to FLAG.
-- **Don't editorialize in `flags[].concern`.** State the concern plainly ("compresses the current arc's tension," "contradicts a session-zero tone override"); let Director weigh.
+- **Don't collapse flag categories.** `voice_fit`, `stakes_implication`, and `internal_consistency` name different concerns. A tonal problem is not a tension problem is not a contradiction. The sidebar UI speaks differently per kind; mis-categorizing dilutes the author's signal.
+- **Don't emit `stakes_implication` just because a move is dramatic.** Flag only when the move actually collapses pending tension — a power-reveal right before the climactic fight is different from a power-reveal at a quiet beat.
+- **Don't emit `internal_consistency` for source-canon contradictions.** Source canon is the `canonicalityMode`'s business; this flag is for the player's OWN prior turns only.
+- **Don't surface mechanical modal-speak.** CLARIFY's `response` reads as in-scene dialogue. ACCEPT and FLAG's `response` is a one-to-two-line acknowledgment; the full narrative arrives from KA.
 
 {{include:fragments/structured_output_contract}}
 

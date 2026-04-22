@@ -10,10 +10,17 @@ import { useCallback, useRef, useState } from "react";
  *   - `streaming` — true while a turn is in flight
  *   - `liveText` — the narrative text as it accumulates
  *   - `routedResponse` — non-null when the router short-circuits
- *     (WorldBuilder clarify/reject, override ack, meta ack)
- *   - `lastTurn` — the most recent `done` event payload
+ *     (WorldBuilder CLARIFY, override ack, meta ack)
+ *   - `lastTurn` — the most recent `done` event payload (includes WB flags)
  *   - `error` — terminal error, if any
  */
+
+// Mirror of WorldBuilderFlag (src/lib/agents/world-builder.ts). Kept as
+// a client-only type so the UI bundle doesn't pull in server schemas.
+export type ClientWorldBuilderFlag =
+  | { kind: "voice_fit"; evidence: string; suggestion: string }
+  | { kind: "stakes_implication"; evidence: string; what_dissolves: string }
+  | { kind: "internal_consistency"; evidence: string; contradicts: string };
 
 type TurnEvent =
   | {
@@ -32,6 +39,7 @@ type TurnEvent =
       totalMs: number;
       costUsd: number | null;
       portraitNames: string[];
+      flags?: ClientWorldBuilderFlag[];
     }
   | { type: "error"; message: string };
 

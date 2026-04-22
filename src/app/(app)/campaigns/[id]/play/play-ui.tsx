@@ -1,6 +1,7 @@
 "use client";
 
 import { BudgetIndicator } from "@/components/budget-indicator";
+import { FlagSidebar } from "@/components/flag-sidebar";
 import { useTurnStream } from "@/hooks/use-turn-stream";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
@@ -141,6 +142,10 @@ export default function PlayUI({ campaignId, campaignName, priorTurns }: Props) 
             <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-destructive text-sm">
               {error}
             </div>
+          ) : null}
+
+          {lastTurn?.flags && lastTurn.flags.length > 0 ? (
+            <FlagSidebar flags={lastTurn.flags} turnKey={lastTurn.turnNumber} />
           ) : null}
         </div>
       </div>

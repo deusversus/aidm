@@ -69,6 +69,14 @@ export interface Block4Context {
   director_notes?: string;
   /** Player's hard constraints, formatted as a list for the model. */
   player_overrides: string[];
+  /**
+   * WB reshape: when the router's verdict carried a `wbAssertion`
+   * (WB-ACCEPT or WB-FLAG), this holds the pre-rendered player-assertion
+   * section for Block 4 — the assertion text + any entity summaries +
+   * any craft flags. Absent when WB didn't fire; renders as empty so
+   * the block flows as before.
+   */
+  player_assertion?: string;
   /** Arc plan slice KA needs this turn. */
   arc_state?: {
     current_arc?: string | null;
@@ -378,6 +386,7 @@ export function renderKaBlocks(input: RenderBlocksInput): RenderedBlocks {
     active_foreshadowing: formatForeshadowing(block4.active_foreshadowing),
     director_notes: block4.director_notes ?? "(none this turn)",
     player_overrides: formatOverrides(block4.player_overrides),
+    player_assertion: block4.player_assertion ?? "",
     sakuga_injection: block4.sakuga_injection ?? "",
     style_drift_directive: block4.style_drift_directive ?? "",
     vocabulary_freshness_advisory: block4.vocabulary_freshness_advisory ?? "",

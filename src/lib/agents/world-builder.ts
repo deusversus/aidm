@@ -95,13 +95,54 @@ export const EntityUpdate = z.object({
 export type EntityUpdate = z.infer<typeof EntityUpdate>;
 
 /**
- * Non-blocking craft advisory surfaced alongside an ACCEPT. Chronicler
- * + Director read these; player sees only the `response` prose.
+ * Non-blocking craft advisory — discriminated union of three types
+ * (WB reshape commit, closing the 2026-04-20 design delta). Each type
+ * carries category-specific fields so the sidebar UI can render
+ * specific copy rather than a generic "flag" badge the author learns
+ * to ignore.
+ *
+ *   - voice_fit: tonal / register misalignment. Jinwoo-in-Bebop.
+ *     Non-fatal but the scene may read flat without adjustment.
+ *   - stakes_implication: a move that dissolves or compresses the
+ *     current arc's tension. Accepting it is the author's call;
+ *     this flag surfaces the cost.
+ *   - internal_consistency: contradicts the player's OWN prior canon
+ *     (not source canon — source contradictions belong on canonicalityMode).
+ *     Shows the specific contradiction so the author can retcon
+ *     deliberately or revise.
  */
-export const WorldBuilderFlag = z.object({
-  concern: z.string().min(1),
-  severity: z.enum(["minor", "worth_watching"]).default("minor"),
+export const VoiceFitFlag = z.object({
+  kind: z.literal("voice_fit"),
+  /** The clashing element — "galactic empire spanning ten millennia" in a Bebop campaign. */
+  evidence: z.string().min(1),
+  /** How the author could soften without losing the intended beat. */
+  suggestion: z.string().min(1),
 });
+export type VoiceFitFlag = z.infer<typeof VoiceFitFlag>;
+
+export const StakesImplicationFlag = z.object({
+  kind: z.literal("stakes_implication"),
+  /** The move itself — "Spike reveals he's immortal." */
+  evidence: z.string().min(1),
+  /** The tension being collapsed — "the next three arc beats around mortality." */
+  what_dissolves: z.string().min(1),
+});
+export type StakesImplicationFlag = z.infer<typeof StakesImplicationFlag>;
+
+export const InternalConsistencyFlag = z.object({
+  kind: z.literal("internal_consistency"),
+  /** The current-turn assertion — "the gates are ancient." */
+  evidence: z.string().min(1),
+  /** The prior fact it contradicts — "turn 1 framing: gates opened 10 years ago." */
+  contradicts: z.string().min(1),
+});
+export type InternalConsistencyFlag = z.infer<typeof InternalConsistencyFlag>;
+
+export const WorldBuilderFlag = z.discriminatedUnion("kind", [
+  VoiceFitFlag,
+  StakesImplicationFlag,
+  InternalConsistencyFlag,
+]);
 export type WorldBuilderFlag = z.infer<typeof WorldBuilderFlag>;
 
 export const WorldBuilderOutput = z.object({

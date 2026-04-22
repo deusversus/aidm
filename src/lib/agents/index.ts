@@ -26,6 +26,7 @@ export {
   RouterInput,
   type RouterDeps,
   type RouterVerdict,
+  type WbAssertionPayload,
 } from "./router";
 export {
   Canonicality,

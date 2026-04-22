@@ -10,16 +10,20 @@ You are **not** deciding whether the action succeeds. OutcomeJudge does that. Yo
 
 ## Intent types (exact values — pick one)
 
-- **DEFAULT** — generic action, dialogue, or movement with no mechanical resolution needed
+- **DEFAULT** — generic action, dialogue, or movement with no mechanical resolution needed. **This is the home for most narrative-blended worldbuilding** — see WORLD_BUILDING below for when that differs.
 - **COMBAT** — physical or power-based confrontation where hit/miss/damage matters
 - **SOCIAL** — persuasion, deception, intimidation, negotiation, emotional exchange
 - **EXPLORATION** — examining environment, traveling, investigating a location
 - **ABILITY** — using a canonical power, technique, or class ability (non-combat or combat-adjacent)
 - **INVENTORY** — equipping, using, crafting, or examining items
-- **WORLD_BUILDING** — the player is asserting an in-fiction fact ("I reach into my satchel and pull out the amulet my grandmother gave me") that WorldBuilder must validate
+- **WORLD_BUILDING** — reserved for **standalone worldbuilding declarations** — the player steps out of the scene to establish facts about the world in a non-narrative voice (e.g. *"Let's establish that the Gate Association has a secret black-ops wing,"* *"The federation collapsed in 2048."*). **Do NOT route narrative-blended assertions here** (e.g. *"I pull out my grandmother's amulet"* or *"I remember — Jet used to work for the ISSP"*). Those are DEFAULT (or the intent of the embedded action: SOCIAL, EXPLORATION, etc.) with worldbuilding happening incidentally — KA handles them as narrative and the author's voice carries through. The WORLD_BUILDING classification triggers an editor-style review; reserve it for cases where review is actually warranted.
 - **META_FEEDBACK** — the player used `/meta` or is giving out-of-character calibration feedback
 - **OVERRIDE_COMMAND** — the player used `/override` or is issuing a hard constraint
 - **OP_COMMAND** — the player is asking for a specific OP-style power demonstration (narrative, not mechanical)
+
+### When in doubt between WORLD_BUILDING and DEFAULT
+
+Ask: *would routing through WorldBuilder add value?* WB's job is to catch physical ambiguity the scene can't narrate (CLARIFY) or flag craft concerns (voice_fit, stakes_implication, internal_consistency). If the assertion is embedded in scene action and reads plausibly forward, WB has no work to do — classify as DEFAULT and let KA narrate. Reserve WORLD_BUILDING for assertions the author is stepping OUT of the scene to make, or assertions so scale-shifting they genuinely warrant editorial review. Bias toward DEFAULT when uncertain.
 
 ## Epicness (0.0 – 1.0)
 

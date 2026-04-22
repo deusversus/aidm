@@ -41,6 +41,8 @@
 ### Player overrides (must be enforced)
 {{player_overrides}}
 
+{{player_assertion}}
+
 ---
 
 {{sakuga_injection}}

@@ -57,10 +57,12 @@ describe("validateAssertion (WorldBuilder)", () => {
     expect(result.response).toContain("?");
   });
 
-  it("returns FLAG with accepting in-character prose + a craft concern (Phase 6B reshape)", async () => {
-    // v4 WB reshape (Phase 6B): REJECT is gone. Player assertions that
-    // would have been rejected in v3 now surface as FLAG — accepted at
-    // the fiction layer, with a craft advisory for Director/Chronicler.
+  it("returns FLAG with accepting in-character prose + a typed craft concern (WB reshape)", async () => {
+    // v4 WB reshape: REJECT is gone, and FLAG carries a discriminated
+    // union of three types (voice_fit / stakes_implication /
+    // internal_consistency). Assertions that would have been rejected
+    // in v3 surface as a typed flag; the sidebar UI renders category-
+    // specific copy rather than a generic badge.
     const { validateAssertion } = await import("../world-builder");
     const anthropic = fakeAnthropic([
       {
@@ -73,9 +75,11 @@ describe("validateAssertion (WorldBuilder)", () => {
           ],
           flags: [
             {
-              concern:
-                "Introduces a dragon-tier artifact into Cowboy Bebop's grounded-noir register; may compress tonal consistency.",
-              severity: "worth_watching",
+              kind: "voice_fit",
+              evidence:
+                "Dragon-tier artifact introduced into Cowboy Bebop's grounded-noir register.",
+              suggestion:
+                "Consider framing the egg as a curio or MacGuffin whose mythic-ness stays implied rather than explicit.",
             },
           ],
           rationale: "Accepted per editor-not-gatekeeper posture; craft flag for Director review.",
@@ -91,7 +95,12 @@ describe("validateAssertion (WorldBuilder)", () => {
     );
     expect(result.decision).toBe("FLAG");
     expect(result.flags).toHaveLength(1);
-    expect(result.flags[0]?.severity).toBe("worth_watching");
+    const flag = result.flags[0];
+    expect(flag?.kind).toBe("voice_fit");
+    if (flag?.kind === "voice_fit") {
+      expect(flag.evidence).toContain("Bebop");
+      expect(flag.suggestion).toBeTruthy();
+    }
     expect(result.response).not.toMatch(/error|rejected|invalid/i);
   });
 

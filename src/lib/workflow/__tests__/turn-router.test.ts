@@ -538,12 +538,28 @@ describe("runTurn — /override persistence (Phase 1, v3-audit closure)", () => 
   });
 });
 
-describe("runTurn — WB ACCEPT entity persistence (Phase 1, v3-audit closure)", () => {
+describe("runTurn — WB ACCEPT entity persistence (WB reshape: continues through KA)", () => {
   beforeEach(async () => {
     vi.resetModules();
   });
 
-  it("invokes register_npc for npc entityUpdates", async () => {
+  // Shared mockRunKa — WB reshape moved ACCEPT/FLAG onto the continue
+  // path, so KA runs on these turns. Stub a minimal final event so the
+  // workflow completes and entity persistence can be asserted.
+  const makeMockRunKa = () =>
+    async function* () {
+      yield {
+        kind: "final",
+        narrative: "KA narrated with the assertion as canon.",
+        ttftMs: null,
+        totalMs: 1,
+        costUsd: 0,
+        sessionId: null,
+        stopReason: "end_turn",
+      };
+    } as unknown as Parameters<typeof import("../turn").runTurn>[1]["runKa"];
+
+  it("invokes register_npc for npc entityUpdates (now on continue path)", async () => {
     const trace = makeTrace();
     const db = fakeDb(trace);
     const tools = await import("@/lib/tools");
@@ -553,11 +569,12 @@ describe("runTurn — WB ACCEPT entity persistence (Phase 1, v3-audit closure)",
     const { runTurn } = await import("../turn");
 
     const routeFn = (async () => ({
-      kind: "worldbuilder" as const,
+      kind: "continue" as const,
       intent: makeIntent({ intent: "WORLD_BUILDING" }),
-      verdict: {
+      wbAssertion: {
+        assertion: "Jet is a retired ISSP major",
         decision: "ACCEPT" as const,
-        response: "Of course — Jet's ISSP past is canon.",
+        acknowledgment: "Of course — Jet's ISSP past is canon.",
         entityUpdates: [
           {
             kind: "npc" as const,
@@ -565,7 +582,7 @@ describe("runTurn — WB ACCEPT entity persistence (Phase 1, v3-audit closure)",
             details: "Former ISSP major; Bebop co-captain",
           },
         ],
-        rationale: "player-consistent backstory for Jet",
+        flags: [],
       },
     })) as unknown as Parameters<typeof runTurn>[1]["routeFn"];
 
@@ -575,7 +592,7 @@ describe("runTurn — WB ACCEPT entity persistence (Phase 1, v3-audit closure)",
         userId: USER_ID,
         playerMessage: "Jet is a retired ISSP major",
       },
-      { db, routeFn },
+      { db, routeFn, runKa: makeMockRunKa() },
     );
     for await (const _ of iter) {
       /* drain */
@@ -601,11 +618,12 @@ describe("runTurn — WB ACCEPT entity persistence (Phase 1, v3-audit closure)",
     const { runTurn } = await import("../turn");
 
     const routeFn = (async () => ({
-      kind: "worldbuilder" as const,
+      kind: "continue" as const,
       intent: makeIntent({ intent: "WORLD_BUILDING" }),
-      verdict: {
+      wbAssertion: {
+        assertion: "I dock at Tharsis 17",
         decision: "ACCEPT" as const,
-        response: "The docking bay is yours.",
+        acknowledgment: "The docking bay is yours.",
         entityUpdates: [
           {
             kind: "location" as const,
@@ -613,7 +631,7 @@ describe("runTurn — WB ACCEPT entity persistence (Phase 1, v3-audit closure)",
             details: "grimy orbital dock; Red Dragon territory",
           },
         ],
-        rationale: "new location grounded in canon",
+        flags: [],
       },
     })) as unknown as Parameters<typeof runTurn>[1]["routeFn"];
 
@@ -623,7 +641,7 @@ describe("runTurn — WB ACCEPT entity persistence (Phase 1, v3-audit closure)",
         userId: USER_ID,
         playerMessage: "I dock at Tharsis 17",
       },
-      { db, routeFn },
+      { db, routeFn, runKa: makeMockRunKa() },
     );
     for await (const _ of iter) {
       /* drain */
@@ -649,11 +667,12 @@ describe("runTurn — WB ACCEPT entity persistence (Phase 1, v3-audit closure)",
     const { runTurn } = await import("../turn");
 
     const routeFn = (async () => ({
-      kind: "worldbuilder" as const,
+      kind: "continue" as const,
       intent: makeIntent({ intent: "WORLD_BUILDING" }),
-      verdict: {
+      wbAssertion: {
+        assertion: "Spike owes Vicious money",
         decision: "ACCEPT" as const,
-        response: "Established.",
+        acknowledgment: "Established.",
         entityUpdates: [
           {
             kind: "fact" as const,
@@ -661,7 +680,7 @@ describe("runTurn — WB ACCEPT entity persistence (Phase 1, v3-audit closure)",
             details: "Spike owes Vicious twelve million woolongs",
           },
         ],
-        rationale: "backstory fact",
+        flags: [],
       },
     })) as unknown as Parameters<typeof runTurn>[1]["routeFn"];
 
@@ -671,7 +690,7 @@ describe("runTurn — WB ACCEPT entity persistence (Phase 1, v3-audit closure)",
         userId: USER_ID,
         playerMessage: "Spike owes Vicious money",
       },
-      { db, routeFn },
+      { db, routeFn, runKa: makeMockRunKa() },
     );
     for await (const _ of iter) {
       /* drain */
@@ -688,7 +707,7 @@ describe("runTurn — WB ACCEPT entity persistence (Phase 1, v3-audit closure)",
     );
   });
 
-  it("does NOT invoke any tools on WB CLARIFY (non-ACCEPT)", async () => {
+  it("does NOT invoke any tools on WB CLARIFY (short-circuits, no KA, no persistence)", async () => {
     const trace = makeTrace();
     const db = fakeDb(trace);
     const tools = await import("@/lib/tools");
@@ -697,6 +716,7 @@ describe("runTurn — WB ACCEPT entity persistence (Phase 1, v3-audit closure)",
 
     const { runTurn } = await import("../turn");
 
+    // CLARIFY stays on the worldbuilder verdict kind — short-circuits.
     const routeFn = (async () => ({
       kind: "worldbuilder" as const,
       intent: makeIntent({ intent: "WORLD_BUILDING" }),
@@ -704,6 +724,7 @@ describe("runTurn — WB ACCEPT entity persistence (Phase 1, v3-audit closure)",
         decision: "CLARIFY" as const,
         response: "Tell me more about the amulet.",
         entityUpdates: [{ kind: "npc" as const, name: "x", details: "y" }],
+        flags: [],
         rationale: "needs clarification",
       },
     })) as unknown as Parameters<typeof runTurn>[1]["routeFn"];
@@ -734,23 +755,24 @@ describe("runTurn — WB ACCEPT entity persistence (Phase 1, v3-audit closure)",
     const { runTurn } = await import("../turn");
 
     const routeFn = (async () => ({
-      kind: "worldbuilder" as const,
+      kind: "continue" as const,
       intent: makeIntent({ intent: "WORLD_BUILDING" }),
-      verdict: {
+      wbAssertion: {
+        assertion: "assert much",
         decision: "ACCEPT" as const,
-        response: "noted.",
+        acknowledgment: "noted.",
         entityUpdates: [
           { kind: "npc" as const, name: "A", details: "a" },
           { kind: "location" as const, name: "B", details: "b" },
           { kind: "fact" as const, name: "C", details: "c" },
         ],
-        rationale: "multiple entities",
+        flags: [],
       },
     })) as unknown as Parameters<typeof runTurn>[1]["routeFn"];
 
     const iter = runTurn(
       { campaignId: CAMPAIGN_ID, userId: USER_ID, playerMessage: "assert much" },
-      { db, routeFn },
+      { db, routeFn, runKa: makeMockRunKa() },
     );
     for await (const _ of iter) {
       /* drain */
@@ -758,5 +780,43 @@ describe("runTurn — WB ACCEPT entity persistence (Phase 1, v3-audit closure)",
 
     // All three were attempted despite first throwing.
     expect(invokeSpy).toHaveBeenCalledTimes(3);
+  });
+
+  it("emits WB flags on the done event (WB reshape)", async () => {
+    const trace = makeTrace();
+    const db = fakeDb(trace);
+    const { runTurn } = await import("../turn");
+
+    const routeFn = (async () => ({
+      kind: "continue" as const,
+      intent: makeIntent({ intent: "WORLD_BUILDING" }),
+      wbAssertion: {
+        assertion: "galactic empire spanning ten thousand years",
+        decision: "FLAG" as const,
+        acknowledgment: "Noted.",
+        entityUpdates: [],
+        flags: [
+          {
+            kind: "voice_fit" as const,
+            evidence: "galactic-empire scale in a grounded noir",
+            suggestion: "consider implying the scope off-screen",
+          },
+        ],
+      },
+    })) as unknown as Parameters<typeof runTurn>[1]["routeFn"];
+
+    const iter = runTurn(
+      { campaignId: CAMPAIGN_ID, userId: USER_ID, playerMessage: "galactic empire…" },
+      { db, routeFn, runKa: makeMockRunKa() },
+    );
+    const events: Array<{ type: string; flags?: unknown[] }> = [];
+    for await (const ev of iter) events.push(ev as { type: string; flags?: unknown[] });
+
+    const done = events.find((e) => e.type === "done") as
+      | { type: "done"; flags: Array<{ kind: string }> }
+      | undefined;
+    expect(done).toBeDefined();
+    expect(done?.flags).toHaveLength(1);
+    expect(done?.flags[0]?.kind).toBe("voice_fit");
   });
 });

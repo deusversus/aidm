@@ -9,7 +9,9 @@ import {
 import type { AgentDeps } from "./types";
 import {
   Canonicality,
+  type EntityUpdate,
   type WorldBuilderDeps,
+  type WorldBuilderFlag,
   type WorldBuilderOutput,
   validateAssertion,
 } from "./world-builder";
@@ -19,27 +21,32 @@ import {
  *
  * Runs IntentClassifier first, then branches:
  *
- *   META_FEEDBACK    → OverrideHandler (meta mode) → verdict.kind === "meta"
- *   OVERRIDE_COMMAND → OverrideHandler (override)  → verdict.kind === "override"
- *   WORLD_BUILDING   → WorldBuilder                → verdict.kind === "worldbuilder"
- *   everything else                                → verdict.kind === "continue"
+ *   META_FEEDBACK      → OverrideHandler (meta)  → verdict.kind === "meta"
+ *   OVERRIDE_COMMAND   → OverrideHandler         → verdict.kind === "override"
+ *   WORLD_BUILDING →
+ *     WB decision = ACCEPT or FLAG               → verdict.kind === "continue"
+ *                                                   with wbAssertion payload
+ *                                                   (KA narrates with the
+ *                                                    assertion as canon)
+ *     WB decision = CLARIFY                      → verdict.kind === "worldbuilder"
+ *                                                   (short-circuit with the
+ *                                                    clarifying question)
+ *   everything else                              → verdict.kind === "continue"
+ *
+ * **WB reshape note:** ACCEPT/FLAG used to short-circuit (WB's `response`
+ * was the player-facing prose, KA didn't run). That was gatekeeper
+ * behavior — the scene halted on every world-fact assertion. The
+ * reshape keeps WB as an editor: it looks at the assertion, registers
+ * any entityUpdates, flags craft concerns, and steps out of the way.
+ * KA runs as normal with the assertion injected into Block 4 so the
+ * narrative moves forward.
  *
  * What the router does NOT do:
- *   - Persist overrides (the workflow step consumes the verdict and writes)
- *   - Render the WorldBuilder response to SSE (same — workflow step)
- *   - Consume a turn on meta / worldbuilder-reject (same — workflow step)
- *
- * This function is deterministic given its deps: swap providers in tests,
- * get predictable verdicts. The turn workflow (`src/lib/workflow/turn.ts`)
- * calls it directly as the pre-pass that annotates and routes before KA
- * starts orchestrating the scene.
- *
- * Span hierarchy: the router's span and its sub-agents' spans currently
- * share the same `trace` handle (the root). True parent/child nesting is
- * a Langfuse-native concern — revisit whether `AidmSpanHandle` needs
- * `.span()` as well as `.end()` to model hierarchy when the Langfuse UI
- * surface the flat layout becomes unwieldy. Siblings-on-one-trace is
- * readable today; don't over-engineer until it stops being.
+ *   - Persist overrides (workflow step consumes verdict and writes)
+ *   - Render WB response to SSE (same — workflow step)
+ *   - Consume a turn on meta / CLARIFY (same — workflow step)
+ *   - Persist WB entityUpdates (workflow step does this BEFORE KA runs
+ *     on ACCEPT/FLAG so KA's tool calls see the new entities)
  */
 
 export const RouterInput = z.object({
@@ -71,8 +78,25 @@ export const RouterInput = z.object({
 // Use input-side type so callers can omit defaulted fields.
 export type RouterInput = z.input<typeof RouterInput>;
 
+/**
+ * Payload emitted when WorldBuilder produced an ACCEPT or FLAG verdict.
+ * Rides on a `continue`-kind verdict so the turn workflow can persist
+ * entities + inject the assertion into Block 4 + pass flags through to
+ * the player's sidebar UI, all while KA narrates normally.
+ */
+export interface WbAssertionPayload {
+  assertion: string;
+  entityUpdates: EntityUpdate[];
+  flags: WorldBuilderFlag[];
+  /** Decision that produced this payload — either "ACCEPT" or "FLAG". */
+  decision: "ACCEPT" | "FLAG";
+  /** WB's brief in-character acknowledgment — informs Block 4 tone,
+   * not surfaced as the player-facing response. */
+  acknowledgment: string;
+}
+
 export type RouterVerdict =
-  | { kind: "continue"; intent: IntentOutput }
+  | { kind: "continue"; intent: IntentOutput; wbAssertion?: WbAssertionPayload }
   | { kind: "meta"; intent: IntentOutput; override: OverrideHandlerOutput }
   | { kind: "override"; intent: IntentOutput; override: OverrideHandlerOutput }
   | { kind: "worldbuilder"; intent: IntentOutput; verdict: WorldBuilderOutput };
@@ -142,16 +166,35 @@ export async function routePlayerMessage(
       },
       { ...subagentBase, ...deps.worldBuilder },
     );
+    // CLARIFY — genuine physical ambiguity, scene can't render forward.
+    // Short-circuit with WB's clarifying question as the player response.
+    if (wbVerdict.decision === "CLARIFY") {
+      const verdict: RouterVerdict = { kind: "worldbuilder", intent, verdict: wbVerdict };
+      span?.end({
+        output: { kind: verdict.kind, intent: intent.intent, decision: wbVerdict.decision },
+      });
+      return verdict;
+    }
+    // ACCEPT / FLAG — editor posture: take note, step out of the way,
+    // let KA narrate with the assertion as canon. Flags ride on the
+    // continue verdict so the workflow emits them alongside `done`.
     const verdict: RouterVerdict = {
-      kind: "worldbuilder",
+      kind: "continue",
       intent,
-      verdict: wbVerdict,
+      wbAssertion: {
+        assertion: parsed.playerMessage,
+        entityUpdates: wbVerdict.entityUpdates,
+        flags: wbVerdict.flags,
+        decision: wbVerdict.decision,
+        acknowledgment: wbVerdict.response,
+      },
     };
     span?.end({
       output: {
         kind: verdict.kind,
         intent: intent.intent,
         decision: wbVerdict.decision,
+        flagCount: wbVerdict.flags.length,
       },
     });
     return verdict;

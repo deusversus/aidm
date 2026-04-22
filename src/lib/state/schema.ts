@@ -237,6 +237,20 @@ export const turns = pgTable(
      * closing that regression.
      */
     styleDriftUsed: text("style_drift_used"),
+    /**
+     * Non-blocking craft flags emitted by WorldBuilder (WB reshape
+     * commit). Discriminated-union shape — `voice_fit`, `stakes_implication`,
+     * or `internal_consistency`. Empty array when WB didn't fire or
+     * the assertion didn't warrant flagging. Surface drives the
+     * `<FlagSidebar />` on the play screen; Director/Chronicler may
+     * later read these to weigh arc transitions (post-M1).
+     *
+     * The reshape moved WB ACCEPT/FLAG off the short-circuit path so
+     * KA narrates normally with the assertion injected into Block 4;
+     * flags ride alongside the turn on this column. CLARIFY still
+     * short-circuits and never emits flags.
+     */
+    flags: jsonb("flags").notNull().default(sql`'[]'::jsonb`),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [

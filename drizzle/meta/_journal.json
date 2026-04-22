@@ -71,6 +71,13 @@
       "when": 1776873368848,
       "tag": "0009_budget_caps",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1776883260622,
+      "tag": "0010_wb_flags",
+      "breakpoints": true
     }
   ]
 }
