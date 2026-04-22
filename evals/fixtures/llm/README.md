@@ -12,6 +12,10 @@ evals/fixtures/llm/
 ├── seeds/                 # hand-authored demonstration fixtures
 │   ├── bebop/             # Cowboy Bebop scenarios
 │   └── solo-leveling/     # Solo Leveling scenarios
+├── gameplay/              # Commit 8 eval-harness fixtures (one dir per
+│                          # scenario under evals/golden/gameplay/).
+│                          # Loaded by evals/run.ts into an HTTP mock
+│                          # server + the Agent SDK queryFn registry.
 └── recorded/              # auto-captured fixtures (gitignored by default)
 ```
 

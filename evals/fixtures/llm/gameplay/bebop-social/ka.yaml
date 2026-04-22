@@ -1,0 +1,35 @@
+# KeyAnimator streaming narrative for the bebop-social turn.
+# Register: restrained, earned silence, Jet reveals a fragment then
+# closes. Matches the golden-turn's `must_include_entity` (Jet, Julia)
+# + avoids `must_not_include` patterns (exposition dump, long monologue).
+id: eval-bebop-social-ka
+provider: anthropic
+notes: |
+  Hand-authored prose matching the Cowboy Bebop canonical_dna
+  (darkness: 7, restraint: 7, emotional_register: 6, intimacy: 6).
+  Jet acknowledges Julia existed, refuses to elaborate. Terse lines.
+match:
+  system_includes:
+    - KeyAnimator
+    - Cowboy Bebop
+  user_includes:
+    - Jet
+    - Julia
+response:
+  content:
+    - type: text
+      text: |
+        Jet doesn't look up from the engine block. Grease to his elbows. A socket wrench turns, once, with the deliberate care of someone who'd rather do anything than answer.
+
+        "Julia." He sets the wrench down. Doesn't look at you. "You're finally asking."
+
+        The hangar hums. Somewhere in the deck above, Faye's laugh, brief and unmeant. Jet wipes his hands on a rag that's been gray for a decade.
+
+        "She was real. That's all I'll say standing up."
+
+        He picks the wrench back up. The conversation is over; the repair is not.
+  stop_reason: end_turn
+  usage:
+    input_tokens: 4200
+    output_tokens: 180
+    cache_read_input_tokens: 3800

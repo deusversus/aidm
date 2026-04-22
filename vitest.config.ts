@@ -4,7 +4,7 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   test: {
     environment: "node",
-    include: ["src/**/*.test.ts", "tests/**/*.test.ts"],
+    include: ["src/**/*.test.ts", "tests/**/*.test.ts", "evals/**/*.test.ts"],
     setupFiles: ["tests/setup.ts"],
     // Fail fast on CI so a broken test doesn't eat minutes.
     bail: process.env.CI ? 1 : 0,

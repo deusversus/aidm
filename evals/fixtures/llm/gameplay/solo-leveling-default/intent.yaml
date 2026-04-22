@@ -1,0 +1,17 @@
+id: eval-sl-default-intent
+provider: anthropic
+match:
+  system_includes:
+    - IntentClassifier
+  user_includes:
+    - ranking
+    - board
+response:
+  content:
+    - type: text
+      text: |
+        {"intent":"DEFAULT","target":"ranking_board","action":"glance","epicness":0.15,"special_conditions":[],"confidence":0.88}
+  stop_reason: end_turn
+  usage:
+    input_tokens: 720
+    output_tokens: 35

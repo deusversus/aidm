@@ -1,0 +1,70 @@
+id: solo-leveling-ability-summon-igris
+description: |
+  ABILITY intent — Jinwoo summons Igris mid-dungeon. Power-display
+  test. Exercises ABILITY → OJ always-fires + Solo Leveling's
+  high-agency register.
+
+profile_slug: solo-leveling
+
+character:
+  name: Sung Jinwoo
+  concept: |
+    S-rank hunter, Shadow Monarch. Unique among Hunters — the System
+    only leveled him. Quiet. Not smug about it.
+  power_tier: T2
+  sheet:
+    available: true
+    name: Sung Jinwoo
+    power_tier: T2
+    stats:
+      STR: 22
+      DEX: 20
+      CON: 18
+      INT: 16
+      WIS: 14
+      CHA: 12
+    abilities:
+      - name: "Shadow Extraction"
+        description: Extract defeated enemies as shadow soldiers
+
+last_turns_summary: |
+  Turn N-2: Jinwoo led the raid team into the A-rank gate.
+  Turn N-1: the boss room — a shattered coliseum, the Demon King
+  pacing. Jinwoo's party watches from the threshold.
+
+input:
+  player_message: "Arise, Igris."
+
+expected_intent:
+  intent: ABILITY
+  epicness_min: 0.7
+  epicness_max: 1.0
+  special_conditions: []
+
+expected_outcome_bounds:
+  narrative_weight_one_of: [SIGNIFICANT, CLIMACTIC]
+  success_level_one_of: [success, critical_success]
+  rationale_non_empty: true
+
+expected_narrative_deterministic:
+  must_include_entity:
+    - Igris
+    - Jinwoo
+  must_not_include:
+    - "HP bar"
+  min_length_chars: 200
+  max_length_chars: 3000
+
+manual_rubric:
+  register:
+    - shadow-monarch register
+    - quiet command
+    - weight of ritual
+  tone_anchors:
+    - shadow rising from floor
+    - knight-form iconography
+  forbidden_patterns:
+    - shonen power-up speech
+    - numeric damage calcs
+
+mockllm_fixture_dir: evals/fixtures/llm/gameplay/solo-leveling-ability/

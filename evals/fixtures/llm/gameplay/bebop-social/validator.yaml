@@ -1,0 +1,17 @@
+# Validator fixture for bebop-social — OJ's outcome is coherent, accept.
+id: eval-bebop-social-validator
+provider: anthropic
+match:
+  system_includes:
+    - Validator
+  user_includes:
+    - partial_success
+response:
+  content:
+    - type: text
+      text: |
+        {"valid":true,"correction":null}
+  stop_reason: end_turn
+  usage:
+    input_tokens: 1600
+    output_tokens: 20

@@ -1,0 +1,16 @@
+id: eval-sl-ability-intent
+provider: anthropic
+match:
+  system_includes:
+    - IntentClassifier
+  user_includes:
+    - Igris
+response:
+  content:
+    - type: text
+      text: |
+        {"intent":"ABILITY","target":"Igris","action":"summon shadow soldier","epicness":0.85,"special_conditions":["shadow_monarch_power"],"confidence":0.96}
+  stop_reason: end_turn
+  usage:
+    input_tokens: 780
+    output_tokens: 45

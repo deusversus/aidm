@@ -1,0 +1,56 @@
+id: solo-leveling-default-lobby-downtime
+description: |
+  DEFAULT intent with low epicness — the trivial-action gate path.
+  Jinwoo pauses in the Hunter Association lobby before a meeting,
+  glances at the board. Low-stakes ambient beat; OJ does NOT fire
+  because epicness < 0.6 and it's not COMBAT/ABILITY/SOCIAL-at-0.4.
+  Exercises the skip-pre-judge path; outcome is null on the turn.
+
+profile_slug: solo-leveling
+
+character:
+  name: Sung Jinwoo
+  concept: S-rank hunter, Shadow Monarch.
+  power_tier: T2
+  sheet:
+    available: true
+    name: Sung Jinwoo
+    power_tier: T2
+    stats: { STR: 22, DEX: 20, CON: 18, INT: 16, WIS: 14, CHA: 12 }
+
+last_turns_summary: |
+  Turn N-1: Jinwoo was summoned to the Hunter Association HQ for a
+  routine debrief after the last gate clear.
+
+input:
+  player_message: "I glance at the ranking board before heading in."
+
+expected_intent:
+  intent: DEFAULT
+  epicness_min: 0.0
+  epicness_max: 0.3
+  special_conditions: []
+
+# No outcome bounds — the turn should SKIP pre-judge (trivial action gate).
+# Leaving expected_outcome_bounds absent asserts outcome is null-or-absent.
+
+expected_narrative_deterministic:
+  must_include_entity:
+    - Jinwoo
+  must_not_include: []
+  min_length_chars: 150
+  max_length_chars: 2000
+
+manual_rubric:
+  register:
+    - lived-in quiet
+    - quiet-S-rank celebrity
+    - solo-leveling establishment-insider vibe
+  tone_anchors:
+    - minor texture
+    - ambient beat
+  forbidden_patterns:
+    - overblown action
+    - long monologue
+
+mockllm_fixture_dir: evals/fixtures/llm/gameplay/solo-leveling-default/

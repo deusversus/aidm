@@ -1,0 +1,16 @@
+id: eval-sl-ability-oj
+provider: anthropic
+match:
+  system_includes:
+    - OutcomeJudge
+  user_includes:
+    - Igris
+response:
+  content:
+    - type: text
+      text: |
+        {"success_level":"critical_success","difficulty_class":18,"modifiers":["unique_class","established_bond"],"narrative_weight":"CLIMACTIC","consequence":"Igris manifests fully armored, ready for command","cost":"mana draw is significant but Jinwoo is S-rank","rationale":"Igris is Jinwoo's most developed shadow; the summon is a signature move that lands cleanly"}
+  stop_reason: end_turn
+  usage:
+    input_tokens: 2300
+    output_tokens: 130

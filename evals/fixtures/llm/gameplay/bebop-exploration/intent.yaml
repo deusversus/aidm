@@ -1,0 +1,17 @@
+id: eval-bebop-exploration-intent
+provider: anthropic
+match:
+  system_includes:
+    - IntentClassifier
+  user_includes:
+    - market
+    - tooth
+response:
+  content:
+    - type: text
+      text: |
+        {"intent":"EXPLORATION","target":"tooth dealer","action":"search ice market","epicness":0.7,"special_conditions":[],"confidence":0.9}
+  stop_reason: end_turn
+  usage:
+    input_tokens: 820
+    output_tokens: 40

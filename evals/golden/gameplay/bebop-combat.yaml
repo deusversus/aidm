@@ -1,0 +1,58 @@
+id: bebop-combat-vicious-ambush
+description: |
+  COMBAT intent with climactic sakuga stakes. Vicious ambushes Spike
+  in the cathedral — deliberate callback to the series finale. Exercises
+  the COMBAT → OJ always-fires path + CLIMACTIC narrative_weight.
+
+profile_slug: cowboy-bebop
+
+character:
+  name: Spike Spiegel
+  concept: |
+    Ex-syndicate enforcer turned reluctant bounty hunter.
+  power_tier: T9
+  sheet:
+    available: true
+    name: Spike Spiegel
+    power_tier: T9
+    stats: { STR: 13, DEX: 16, CON: 12, INT: 13, WIS: 11, CHA: 14 }
+
+last_turns_summary: |
+  Turn N-2: Spike tracked the lead to the abandoned cathedral.
+  Turn N-1: silence. Incense. The stations of the cross in shadow.
+
+input:
+  player_message: "I raise the Jericho and step into the nave."
+
+expected_intent:
+  intent: COMBAT
+  epicness_min: 0.75
+  epicness_max: 1.0
+  special_conditions: []
+
+expected_outcome_bounds:
+  narrative_weight_one_of: [CLIMACTIC]
+  success_level_one_of: [partial_success, success, critical_success, failure]
+  rationale_non_empty: true
+
+expected_narrative_deterministic:
+  must_include_entity:
+    - Spike
+    - Vicious
+  must_not_include: []
+  min_length_chars: 250
+  max_length_chars: 3000
+
+manual_rubric:
+  register:
+    - sakuga-climactic
+    - cathedral imagery
+    - mythic stillness punctuated by violence
+  tone_anchors:
+    - incense + gunsmoke
+    - cinematic framing
+  forbidden_patterns:
+    - "anime power-up monologue"
+    - "HP damage numbers"
+
+mockllm_fixture_dir: evals/fixtures/llm/gameplay/bebop-combat/

@@ -1,0 +1,16 @@
+id: eval-bebop-combat-validator
+provider: anthropic
+match:
+  system_includes:
+    - Validator
+  user_includes:
+    - CLIMACTIC
+response:
+  content:
+    - type: text
+      text: |
+        {"valid":true,"correction":null}
+  stop_reason: end_turn
+  usage:
+    input_tokens: 1700
+    output_tokens: 20

@@ -1,0 +1,26 @@
+id: eval-sl-ability-ka
+provider: anthropic
+match:
+  system_includes:
+    - KeyAnimator
+    - Solo Leveling
+  user_includes:
+    - Igris
+response:
+  content:
+    - type: text
+      text: |
+        Jinwoo speaks the name as if it were already present. The coliseum's dust pauses, listens.
+
+        Shadow pools at his feet — first a breath of it, then a weight. Something rises through the stone of the arena: helm first, then pauldrons, then the full shape of a knight the color of dried blood. Igris kneels. Waits.
+
+        The Demon King, pacing at the opposite wall, stops.
+
+        Behind Jinwoo, the raid team's breath catches — they have seen the Shadow Monarch call once before, but never this easy, never this quiet.
+
+        "Rise." Jinwoo's voice doesn't lift. Igris does.
+  stop_reason: end_turn
+  usage:
+    input_tokens: 4400
+    output_tokens: 190
+    cache_read_input_tokens: 4000

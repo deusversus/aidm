@@ -1,0 +1,71 @@
+id: bebop-social-ask-jet-about-julia
+description: |
+  Social beat from the Europa hangar. Spike asks Jet about Julia after
+  the whisperer mission. Expected register: restrained, earned silence,
+  Jet reveals nothing standing up. Exercises the SOCIAL intent path
+  with moderate epicness — pre-judge gate fires (OJ + Validator run).
+
+profile_slug: cowboy-bebop
+
+character:
+  name: Spike Spiegel
+  concept: |
+    Ex-syndicate enforcer turned reluctant bounty hunter. Moves like
+    someone who's already resigned himself to dying and finds that
+    funny. Carries a Jericho 941.
+  power_tier: T9
+  sheet:
+    available: true
+    name: Spike Spiegel
+    concept: Bounty hunter, ex-Red Dragon enforcer, Jeet Kune Do stylist.
+    power_tier: T9
+    stats:
+      STR: 13
+      DEX: 16
+      CON: 12
+      INT: 13
+      WIS: 11
+      CHA: 14
+
+last_turns_summary: |
+  Turn 1: whisperer mission ended; Spike limping, Jet stitching him.
+  Turn 2: crew silent dinner; Faye asleep.
+
+input:
+  player_message: "I want to ask Jet about Julia."
+
+expected_intent:
+  intent: SOCIAL
+  epicness_min: 0.3
+  epicness_max: 0.7
+  special_conditions: []
+
+expected_outcome_bounds:
+  narrative_weight_one_of: [MINOR, SIGNIFICANT]
+  success_level_one_of: [partial_success, success]
+  rationale_non_empty: true
+
+expected_narrative_deterministic:
+  must_include_entity:
+    - Jet
+    - Julia
+  must_not_include: []
+  min_length_chars: 200
+  max_length_chars: 2500
+
+manual_rubric:
+  register:
+    - restrained
+    - earned silence
+    - cowboy-bebop-noir
+  tone_anchors:
+    - mechanical / domestic detail grounding emotion
+    - lines breaking off rather than resolving
+  forbidden_patterns:
+    - three-paragraph monologue
+    - exposition dump
+  judge_threshold_note: |
+    Average ≥ 3.5, min dim ≥ 3.0 is my default acceptance for social
+    beats in the Bebop register.
+
+mockllm_fixture_dir: evals/fixtures/llm/gameplay/bebop-social/

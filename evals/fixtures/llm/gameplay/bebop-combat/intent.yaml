@@ -1,0 +1,17 @@
+id: eval-bebop-combat-intent
+provider: anthropic
+match:
+  system_includes:
+    - IntentClassifier
+  user_includes:
+    - Jericho
+    - nave
+response:
+  content:
+    - type: text
+      text: |
+        {"intent":"COMBAT","target":"Vicious","action":"draw weapon and close distance","epicness":0.92,"special_conditions":["sakuga_trigger"],"confidence":0.95}
+  stop_reason: end_turn
+  usage:
+    input_tokens: 850
+    output_tokens: 50

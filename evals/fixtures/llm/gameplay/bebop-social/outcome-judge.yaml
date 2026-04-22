@@ -1,0 +1,18 @@
+# OutcomeJudge fixture for bebop-social. Low-stakes partial_success
+# with SIGNIFICANT weight — the moment lands, Jet reveals a fragment.
+id: eval-bebop-social-oj
+provider: anthropic
+match:
+  system_includes:
+    - OutcomeJudge
+  user_includes:
+    - Julia
+response:
+  content:
+    - type: text
+      text: |
+        {"success_level":"partial_success","difficulty_class":12,"modifiers":["earned_trust"],"narrative_weight":"SIGNIFICANT","consequence":"Jet acknowledges Julia existed; leaves her fate unsaid","cost":null,"rationale":"Jet trusts Spike but won't open the wound standing up; partial gives a fragment, not the whole story"}
+  stop_reason: end_turn
+  usage:
+    input_tokens: 2200
+    output_tokens: 120

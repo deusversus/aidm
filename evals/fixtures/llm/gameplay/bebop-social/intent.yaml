@@ -1,0 +1,21 @@
+# IntentClassifier fixture for bebop-social scenario.
+id: eval-bebop-social-intent
+provider: anthropic
+notes: |
+  Spike asks Jet about Julia. Moderate-weight SOCIAL beat — epicness
+  at 0.5 crosses shouldPreJudgeOutcome's 0.4 threshold so OJ fires.
+match:
+  system_includes:
+    - IntentClassifier
+  user_includes:
+    - Jet
+    - Julia
+response:
+  content:
+    - type: text
+      text: |
+        {"intent":"SOCIAL","target":"Jet","action":"ask about Julia","epicness":0.5,"special_conditions":[],"confidence":0.92}
+  stop_reason: end_turn
+  usage:
+    input_tokens: 800
+    output_tokens: 40

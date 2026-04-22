@@ -1,0 +1,28 @@
+id: eval-sl-default-ka
+provider: anthropic
+notes: |
+  Low-stakes lobby beat. Jinwoo sees his own name at the top of the
+  board, walks past. No confrontation; no reveal. Ambient texture.
+match:
+  system_includes:
+    - KeyAnimator
+    - Solo Leveling
+  user_includes:
+    - ranking
+    - board
+response:
+  content:
+    - type: text
+      text: |
+        The board is a column of names on cheap LCD. Jinwoo's reads first. Underneath it, the next five — hunters who used to intimidate him two years ago, who now ask him to lunch.
+
+        He reads it the way anyone reads a number they already know. Then he keeps walking.
+
+        A receptionist at the desk lifts her eyes and lowers them again. Jinwoo catches the movement; doesn't call it out. The meeting room is to the left.
+
+        Someone inside is already arguing about budget.
+  stop_reason: end_turn
+  usage:
+    input_tokens: 3600
+    output_tokens: 140
+    cache_read_input_tokens: 3200

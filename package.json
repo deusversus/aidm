@@ -28,7 +28,9 @@
     "migrate:campaign-providers": "tsx scripts/migrate-campaign-providers.ts",
     "rules:index": "tsx scripts/rules-index.ts",
     "prompts:graph": "tsx scripts/prompts-graph.ts",
-    "mockllm": "tsx scripts/mockllm.ts"
+    "mockllm": "tsx scripts/mockllm.ts",
+    "evals": "tsx evals/run.ts",
+    "evals:ci": "tsx evals/run.ts --ci"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.114",

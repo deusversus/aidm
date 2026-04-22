@@ -1,0 +1,16 @@
+id: eval-bebop-exploration-oj
+provider: anthropic
+match:
+  system_includes:
+    - OutcomeJudge
+  user_includes:
+    - market
+response:
+  content:
+    - type: text
+      text: |
+        {"success_level":"partial_success","difficulty_class":14,"modifiers":["unfamiliar_ground"],"narrative_weight":"SIGNIFICANT","consequence":"Spike finds a lead to the dealer's booth but someone notices him looking","cost":null,"rationale":"The market is closed to outsiders; Spike's Red Dragon history buys him one direction of inquiry"}
+  stop_reason: end_turn
+  usage:
+    input_tokens: 2100
+    output_tokens: 110

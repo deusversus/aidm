@@ -1,0 +1,33 @@
+id: eval-bebop-combat-ka
+provider: anthropic
+notes: |
+  Cathedral ambush. Incense, gunsmoke, stained-glass light. Sakuga-
+  climactic register — cinematic stillness, weight, the fight gets
+  joined but does not resolve. Both names present.
+match:
+  system_includes:
+    - KeyAnimator
+    - Cowboy Bebop
+  user_includes:
+    - Jericho
+    - nave
+response:
+  content:
+    - type: text
+      text: |
+        The nave swallows the sound of Spike's heel. Incense, old and stale. The stations of the cross watch him walk.
+
+        Then — Vicious. From the choir loft. Katana in one hand, pistol in the other, silhouette slashed across stained glass.
+
+        "You came."
+
+        Spike doesn't answer. The Jericho rises. Two shots, the cathedral's acoustics multiplying each into a war.
+
+        Vicious moves. Something burns Spike's shoulder — a line of fire, then wet. He staggers. Doesn't fall. The Jericho holds true; one round finds wood beside Vicious's head, splintering a saint's painted eye.
+
+        The fight is joined. Neither man down. The saints look on and say nothing.
+  stop_reason: end_turn
+  usage:
+    input_tokens: 5100
+    output_tokens: 240
+    cache_read_input_tokens: 4600

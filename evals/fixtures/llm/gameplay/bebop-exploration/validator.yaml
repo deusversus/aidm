@@ -1,0 +1,16 @@
+id: eval-bebop-exploration-validator
+provider: anthropic
+match:
+  system_includes:
+    - Validator
+  user_includes:
+    - unfamiliar_ground
+response:
+  content:
+    - type: text
+      text: |
+        {"valid":true,"correction":null}
+  stop_reason: end_turn
+  usage:
+    input_tokens: 1500
+    output_tokens: 20

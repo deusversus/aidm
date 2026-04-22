@@ -1,0 +1,31 @@
+id: eval-bebop-exploration-ka
+provider: anthropic
+match:
+  system_includes:
+    - KeyAnimator
+    - Cowboy Bebop
+  user_includes:
+    - market
+    - tooth
+response:
+  content:
+    - type: text
+      text: |
+        Europa's market smells like cold copper and fish nobody caught. Spike's breath fogs once, twice. He walks past the booths without looking.
+
+        Hookers under fluorescent strip-lights. A man selling ice guns, the barrels patinaed. A kid running numbers for someone off-world. Spike remembers being ten on Mars and keeps walking.
+
+        The tooth dealer's stall is further in, past where the ice starts to groan. A woman with a scar down her cheek tends the counter. Teeth in glass jars — human, canid, something that's neither. "You're lost."
+
+        "I'm Red Dragon."
+
+        She looks at him the way you look at a ghost that's overstayed. "Not for twelve years."
+
+        "For one question."
+
+        She nods once at a curtain. Spike can feel a kid behind him watching, memorizing his face for someone else's money.
+  stop_reason: end_turn
+  usage:
+    input_tokens: 4800
+    output_tokens: 230
+    cache_read_input_tokens: 4300

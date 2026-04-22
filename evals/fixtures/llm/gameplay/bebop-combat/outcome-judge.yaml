@@ -1,0 +1,16 @@
+id: eval-bebop-combat-oj
+provider: anthropic
+match:
+  system_includes:
+    - OutcomeJudge
+  user_includes:
+    - Jericho
+response:
+  content:
+    - type: text
+      text: |
+        {"success_level":"partial_success","difficulty_class":22,"modifiers":["surprise_ambush","cathedral_acoustics"],"narrative_weight":"CLIMACTIC","consequence":"Spike is hit, Vicious is not — the fight is joined","cost":"Spike takes a round to the shoulder; the Jericho lands true","rationale":"Vicious had the high ground and the angle; Spike trades for the engagement"}
+  stop_reason: end_turn
+  usage:
+    input_tokens: 2400
+    output_tokens: 140
