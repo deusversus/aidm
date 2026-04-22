@@ -326,42 +326,4 @@ describe("runTurn — cost aggregation (Commit 9)", () => {
     };
     expect(values.costUsd).toBe("0.000000");
   });
-
-  it("accepts bypassLimiter on TurnWorkflowInput without error", async () => {
-    const trace: DbTrace = { insertValues: [], updateCalls: [] };
-    const db = fakeDb(trace);
-    const { runTurn } = await import("../turn");
-
-    const routeFn = (async () => ({
-      kind: "continue" as const,
-      intent: makeIntent({ intent: "DEFAULT", epicness: 0.05 }),
-    })) as unknown as Parameters<typeof runTurn>[1]["routeFn"];
-
-    const mockRunKa = async function* () {
-      yield {
-        kind: "final",
-        narrative: "ok",
-        ttftMs: null,
-        totalMs: 1,
-        costUsd: 0,
-        sessionId: null,
-        stopReason: "end_turn",
-      };
-    } as unknown as Parameters<typeof runTurn>[1]["runKa"];
-
-    const iter = runTurn(
-      {
-        campaignId: CAMPAIGN_ID,
-        userId: USER_ID,
-        playerMessage: "test",
-        bypassLimiter: true,
-      },
-      { db, routeFn, runKa: mockRunKa },
-    );
-    const events: string[] = [];
-    for await (const ev of iter) events.push(ev.type);
-    // Should complete normally; bypassLimiter is an inert forward-looking
-    // marker at the runTurn level (gate lives in the route handler).
-    expect(events).toContain("done");
-  });
 });

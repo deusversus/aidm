@@ -92,12 +92,15 @@ async function runOneScenario(
   let error: string | undefined;
 
   try {
+    // Eval harness calls runTurn DIRECTLY, not through /api/turns/route.ts,
+    // so the budget gate + rate counter never fire. That's why there's
+    // no bypass flag: the field was dead plumbing and was dropped along
+    // with the leftover Commit 9 audit-MINOR fixes.
     const iter = runTurn(
       {
         campaignId: refs.campaignId,
         userId: refs.userId,
         playerMessage: fixture.input.player_message,
-        bypassLimiter: true,
       },
       { db },
     );

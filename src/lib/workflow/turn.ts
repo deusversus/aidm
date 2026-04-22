@@ -234,20 +234,6 @@ export interface TurnWorkflowInput {
   playerMessage: string;
   /** Optional abort signal — forwarded to KA for mid-stream cancellation. */
   abort?: AbortController;
-  /**
-   * Eval bypass flag (Commit 9). Inert at the `runTurn` level — the
-   * gate lives in `/api/turns/route.ts` via `checkBudget`, which is
-   * never called by runTurn itself. The eval harness (Commit 8)
-   * calls `runTurn` directly (bypassing the route handler + its gate
-   * + its post-turn ledger increment), so `bypassLimiter` here is a
-   * documentary marker tying test-surface intent to the gate that
-   * lives elsewhere. If a future refactor moves the gate into
-   * `runTurn`, THIS field becomes the read surface.
-   *
-   * The route handler's request body schema (`/api/turns/route.ts`)
-   * does not accept this field, so user input cannot set it true.
-   */
-  bypassLimiter?: boolean;
 }
 
 export interface TurnWorkflowDeps {

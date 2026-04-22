@@ -84,7 +84,7 @@ export function SpendingForm({ initialCap }: Props) {
         <button
           type="button"
           onClick={onClear}
-          disabled={submitting || initialCap === null}
+          disabled={submitting}
           className="rounded-md border px-3 py-1.5 text-muted-foreground text-sm hover:text-foreground disabled:opacity-60"
         >
           clear cap

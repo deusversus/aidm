@@ -169,17 +169,15 @@ export async function POST(req: Request) {
           }
         }
 
+        // Pre-turn gate ran before this stream opened. The HTTP route
+        // cannot skip the gate — checkBudget is unconditional above,
+        // and the request body schema doesn't accept any override field.
         const iter = runTurn(
           {
             campaignId: body.campaignId,
             userId: user.id,
             playerMessage: body.message,
             abort,
-            // Pre-turn gate was enforced before the stream opened.
-            // Bypass is hardcoded false here — the HTTP route never
-            // lets the caller skip the gate. Only the eval harness
-            // (Commit 8) passes true.
-            bypassLimiter: false,
           },
           { db },
         );
