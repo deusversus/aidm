@@ -30,7 +30,8 @@
     "prompts:graph": "tsx scripts/prompts-graph.ts",
     "mockllm": "tsx scripts/mockllm.ts",
     "evals": "tsx evals/run.ts",
-    "evals:ci": "tsx evals/run.ts --ci"
+    "evals:ci": "tsx evals/run.ts --ci",
+    "langfuse:latest": "tsx --env-file=.env.local scripts/langfuse-latest.ts"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.114",
@@ -60,6 +61,7 @@
     "@types/react-dom": "^19.0.0",
     "drizzle-kit": "^0.28.0",
     "js-yaml": "^4.1.1",
+    "langfuse-cli": "^0.0.9",
     "tailwindcss": "^4.0.0",
     "tsx": "^4.19.0",
     "typescript": "^5.6.0",
