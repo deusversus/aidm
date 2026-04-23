@@ -31,6 +31,11 @@ export default function PlayUI({ campaignId, campaignName, priorTurns }: Props) 
   const [committed, setCommitted] = useState<PriorTurn[]>(priorTurns);
   const [budgetRefreshKey, setBudgetRefreshKey] = useState(0);
   const feedRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  // Track IME composition (Chinese/Japanese/Korean input methods use
+  // Enter to confirm candidates) so Enter-to-submit doesn't steal the
+  // key while the user is still choosing characters.
+  const isComposingRef = useRef(false);
   // Track the player's message at send() time — we need it when `lastTurn`
   // fires later to record what they typed. Using a ref avoids the
   // input-as-effect-dep bug (effect re-firing on every keystroke and
@@ -74,13 +79,38 @@ export default function PlayUI({ campaignId, campaignName, priorTurns }: Props) 
 
   const displayedLive = liveText || routedResponse || "";
 
-  const onSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Auto-grow the textarea as the player types. Clamped to ~8 lines so
+  // long-form worldbuilding exposition still has a scrollbar rather than
+  // pushing the feed off-screen.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: input is the content-change trigger
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    const maxPx = 200; // ~8 lines at default font size
+    el.style.height = `${Math.min(el.scrollHeight, maxPx)}px`;
+  }, [input]);
+
+  const submit = async () => {
     const message = input.trim();
     if (!message || streaming) return;
     pendingMessageRef.current = message;
     setInput("");
     await send(message);
+  };
+
+  const onSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await submit();
+  };
+
+  const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // Enter → submit; Shift+Enter → newline (default textarea behavior).
+    // IME composition always takes precedence — don't steal the confirm key.
+    if (e.key === "Enter" && !e.shiftKey && !isComposingRef.current) {
+      e.preventDefault();
+      void submit();
+    }
   };
 
   return (
@@ -150,13 +180,22 @@ export default function PlayUI({ campaignId, campaignName, priorTurns }: Props) 
         </div>
       </div>
 
-      <form onSubmit={onSubmit} className="flex gap-2">
-        <input
+      <form onSubmit={onSubmit} className="flex items-end gap-2">
+        <textarea
+          ref={textareaRef}
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder={streaming ? "…" : "What do you do?"}
+          onKeyDown={onKeyDown}
+          onCompositionStart={() => {
+            isComposingRef.current = true;
+          }}
+          onCompositionEnd={() => {
+            isComposingRef.current = false;
+          }}
+          placeholder={streaming ? "…" : "What do you do? (Shift+Enter for newline)"}
           disabled={streaming}
-          className="flex-1 rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-60"
+          rows={1}
+          className="flex-1 resize-none rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-60"
         />
         {streaming ? (
           <button
