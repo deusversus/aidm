@@ -64,29 +64,36 @@ function toSdkTool(spec: AidmToolSpec, ctx: AidmToolContext): ReturnType<typeof 
       metadata: { layer: spec.layer },
     });
 
+    // Match `invokeTool`'s logging shape so KA-driven MCP calls and
+    // turn-workflow direct calls both emit the same `tool: ok` / `tool:
+    // failed` lines. Without this wrapper, the MCP path (KA's tool
+    // calls against search_memory, recall_scene, get_character_sheet,
+    // etc.) was silent in prod — only the handful of WB-reshape
+    // direct-invokeTool calls showed up.
+    const start = Date.now();
+    const logMeta = { ...ctx.logContext, tool: spec.name, layer: spec.layer };
     try {
       const rawOutput = await spec.execute(input, ctx);
       const output = spec.outputSchema.parse(rawOutput);
       span?.end({ output });
+      ctx.logger?.("info", "tool: ok", {
+        ...logMeta,
+        durationMs: Date.now() - start,
+      });
       // MCP tool return shape: text-content payload carrying the JSON.
       return {
         content: [{ type: "text" as const, text: JSON.stringify(output) }],
       };
     } catch (err) {
-      span?.end({
-        metadata: {
-          error: err instanceof Error ? err.message : String(err),
-        },
+      const errMsg = err instanceof Error ? err.message : String(err);
+      span?.end({ metadata: { error: errMsg } });
+      ctx.logger?.("warn", "tool: failed", {
+        ...logMeta,
+        durationMs: Date.now() - start,
+        error: errMsg,
       });
       return {
-        content: [
-          {
-            type: "text" as const,
-            text: JSON.stringify({
-              error: err instanceof Error ? err.message : String(err),
-            }),
-          },
-        ],
+        content: [{ type: "text" as const, text: JSON.stringify({ error: errMsg }) }],
         isError: true,
       };
     }

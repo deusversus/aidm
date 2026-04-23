@@ -453,12 +453,19 @@ export async function* runTurn(
 ): AsyncGenerator<TurnWorkflowEvent, void, void> {
   const logger = deps.logger ?? defaultLogger;
   const { db } = deps;
+  // Correlation fields for every log emitted during this turn. Declared
+  // at function entry so the outer catch block (which runs when
+  // loadTurnContext throws BEFORE turnNumber is known) still has the
+  // user + campaign fields. turnNumber fills in post-load.
+  const logContext: { campaignId: string; userId: string; turnNumber?: number } = {
+    campaignId: input.campaignId,
+    userId: input.userId,
+  };
 
   const acquired = await tryAcquireLock(db, input.campaignId, ADVISORY_LOCK_TIMEOUT_MS);
   if (!acquired) {
     logger("warn", "runTurn: advisory lock timeout", {
-      campaignId: input.campaignId,
-      userId: input.userId,
+      ...logContext,
       timeoutMs: ADVISORY_LOCK_TIMEOUT_MS,
     });
     yield {
@@ -477,14 +484,9 @@ export async function* runTurn(
     // surfaces as a terminal turn error to the player.
     const modelContext = resolveModelContext(ctx.campaignRow.settings, logger);
 
-    // Correlation fields for every log emitted during this turn.
-    // Passed through deps so sub-agents don't have to plumb the
-    // fields individually — `logger("warn", msg, { ...logContext, extra })`.
-    const logContext = {
-      campaignId: input.campaignId,
-      userId: input.userId,
-      turnNumber: ctx.nextTurnNumber,
-    };
+    // Fill in turnNumber now that context is loaded — outer catch was
+    // already seeded with campaignId/userId at function entry.
+    logContext.turnNumber = ctx.nextTurnNumber;
     logger("info", "runTurn: start", {
       ...logContext,
       phase: ctx.campaignRow.phase,
@@ -1104,8 +1106,7 @@ export async function* runTurn(
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     logger("error", "runTurn: failed", {
-      campaignId: input.campaignId,
-      userId: input.userId,
+      ...logContext,
       error: msg,
     });
     yield { type: "error", message: msg };

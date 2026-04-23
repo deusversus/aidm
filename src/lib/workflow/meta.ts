@@ -161,6 +161,7 @@ export async function* runMeta(
   const db = deps.db;
   const metaDirectorFn = deps.runMetaDirectorFn ?? runMetaDirector;
   const { command, payload } = classifyMetaMessage(input.playerMessage);
+  const logContext = { campaignId: input.campaignId, userId: input.userId };
 
   try {
     const state = await loadMetaState(db, input.campaignId, input.userId);
@@ -243,8 +244,7 @@ export async function* runMeta(
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     logger("error", "runMeta: failed", {
-      campaignId: input.campaignId,
-      userId: input.userId,
+      ...logContext,
       error: msg,
     });
     yield { type: "error", message: msg };

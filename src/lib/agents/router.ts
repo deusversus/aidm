@@ -119,11 +119,17 @@ export async function routePlayerMessage(
 
   // Base deps threaded into every sub-agent. Per-sub-agent overrides
   // (test injection of mock providers, etc.) spread last so they win.
+  // logContext + recordCost added 2026-04-22 observability pass — the
+  // stale version dropped both, so sub-agents (IntentClassifier,
+  // OverrideHandler, WorldBuilder) lost correlation fields + cost
+  // accumulation.
   const subagentBase = {
     trace: deps.trace,
     logger: deps.logger,
+    logContext: deps.logContext,
     modelContext: deps.modelContext,
     recordPrompt: deps.recordPrompt,
+    recordCost: deps.recordCost,
   };
 
   const intent = await classifyIntent(
