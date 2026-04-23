@@ -78,7 +78,8 @@ describe("runStructuredAgent", () => {
         },
       ]);
       await runStructuredAgent<Out>(baseConfig({ tier: "thinking" }) as never, { anthropic });
-      expect(seenModel).toBe("claude-opus-4-7"); // from anthropicFallbackConfig thinking default
+      // thinking default changed 2026-04-23 from Opus 4.7 → Sonnet 4.6.
+      expect(seenModel).toBe("claude-sonnet-4-6");
     });
 
     it("honors an explicit Anthropic modelContext with a non-default creative model", async () => {
@@ -365,7 +366,7 @@ describe("runStructuredAgent", () => {
       });
       expect(spans[0]?.metadata).toMatchObject({
         provider: "anthropic",
-        model: "claude-opus-4-7",
+        model: "claude-sonnet-4-6", // thinking default changed 2026-04-23 from Opus 4.7
         tier: "thinking",
       });
     });

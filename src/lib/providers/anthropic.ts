@@ -53,7 +53,15 @@ export const ANTHROPIC_ROSTER: readonly string[] = [...LATEST_MODELS, ...SNAPSHO
 export const ANTHROPIC_DEFAULTS = {
   probe: PROBE_DEFAULT,
   fast: PROBE_DEFAULT,
-  thinking: "claude-opus-4-7",
+  // Sonnet 4.6 on thinking tier (changed 2026-04-23): thinking fires
+  // on ~10 agent surfaces per pre-judged turn (OutcomeJudge, Validator,
+  // WorldBuilder, + KA consultants pacing/combat/memory-ranker/recap,
+  // + Chronicler's RelationshipAnalyzer, + Director). Opus at $15/$75
+  // per 1M tokens was overkill for structured-verdict judgment work;
+  // Sonnet 4.6 at $3/$15 still supports extended thinking and handles
+  // Zod-schema adherence cleanly. Creative tier stays on Opus — KA is
+  // the one surface where narrative quality dominates cost.
+  thinking: "claude-sonnet-4-6",
   creative: "claude-opus-4-7",
 } as const;
 

@@ -63,7 +63,10 @@ describe("anthropicDefaults (fallback-only; authoritative config is per-campaign
     const { anthropicDefaults } = await import("./env");
     expect(anthropicDefaults.probe).toBe("claude-haiku-4-5-20251001");
     expect(anthropicDefaults.fast).toBe("claude-haiku-4-5-20251001");
-    expect(anthropicDefaults.thinking).toBe("claude-opus-4-7");
+    // thinking: Sonnet 4.6 (changed 2026-04-23 from Opus 4.7 — ~5× cheaper
+    // per-token, still supports extended thinking; Opus is overkill for
+    // structured-verdict judgment across 10+ thinking-tier surfaces).
+    expect(anthropicDefaults.thinking).toBe("claude-sonnet-4-6");
     expect(anthropicDefaults.creative).toBe("claude-opus-4-7");
   });
 

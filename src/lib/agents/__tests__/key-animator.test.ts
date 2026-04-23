@@ -124,8 +124,9 @@ describe("runKeyAnimator — provider guard (M1.5 Commit D)", () => {
     for await (const _ of runKeyAnimator(baseInput(anthropicFallbackConfig()), { queryFn })) {
       // drain
     }
-    expect(seenAgents?.["outcome-judge"]?.model).toBe("claude-opus-4-7"); // thinking default
-    expect(seenAgents?.validator?.model).toBe("claude-opus-4-7");
+    // thinking default changed 2026-04-23 from Opus 4.7 → Sonnet 4.6 (cost).
+    expect(seenAgents?.["outcome-judge"]?.model).toBe("claude-sonnet-4-6");
+    expect(seenAgents?.validator?.model).toBe("claude-sonnet-4-6");
     expect(seenAgents?.["memory-ranker"]?.model).toBe("claude-haiku-4-5-20251001"); // fast default
     expect(seenAgents?.recap?.model).toBe("claude-haiku-4-5-20251001");
   });

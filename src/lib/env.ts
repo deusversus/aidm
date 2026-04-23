@@ -105,6 +105,6 @@ import { PROBE_DEFAULT } from "@/lib/providers/types";
 export const anthropicDefaults = {
   probe: PROBE_DEFAULT,
   fast: PROBE_DEFAULT,
-  thinking: "claude-opus-4-7",
+  thinking: "claude-sonnet-4-6",
   creative: "claude-opus-4-7",
 } as const;

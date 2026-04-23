@@ -126,7 +126,8 @@ describe("runChronicler — provider guard + modelContext wiring (Commit 7.3)", 
       })();
     }) as never;
     await runChronicler(baseInput(anthropicFallbackConfig()), { queryFn });
-    expect(seenAgents?.["relationship-analyzer"]?.model).toBe("claude-opus-4-7");
+    // thinking default changed 2026-04-23 from Opus 4.7 → Sonnet 4.6.
+    expect(seenAgents?.["relationship-analyzer"]?.model).toBe("claude-sonnet-4-6");
   });
 
   it("renders the user message with intent + outcome + arc_trigger state", async () => {
