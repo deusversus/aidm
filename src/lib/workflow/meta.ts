@@ -242,7 +242,11 @@ export async function* runMeta(
     await writeMetaState(db, input.campaignId, input.userId, state.settings, newMeta);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    logger("error", "runMeta failed", { error: msg });
+    logger("error", "runMeta: failed", {
+      campaignId: input.campaignId,
+      userId: input.userId,
+      error: msg,
+    });
     yield { type: "error", message: msg };
   }
 }

@@ -22,6 +22,7 @@ export async function POST(req: Request) {
   const svixSignature = headerList.get("svix-signature");
 
   if (!svixId || !svixTimestamp || !svixSignature) {
+    console.warn("[clerk-webhook] 400 missing svix headers");
     return new Response("Missing svix headers", { status: 400 });
   }
 
@@ -34,7 +35,14 @@ export async function POST(req: Request) {
       "svix-timestamp": svixTimestamp,
       "svix-signature": svixSignature,
     }) as WebhookEvent;
-  } catch {
+  } catch (err) {
+    // Signature-verification failures are often benign (webhook replays,
+    // mismatched secrets) but repeated failures are an attack signal —
+    // log so ops can grep.
+    console.warn("[clerk-webhook] 400 signature verification failed", {
+      svixId,
+      error: err instanceof Error ? err.message : String(err),
+    });
     return new Response("Signature verification failed", { status: 400 });
   }
 

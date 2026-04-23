@@ -244,7 +244,7 @@ export async function runChronicler(
         sessionId = msg.session_id ?? sessionId;
         if (msg.subtype !== "success") {
           const err = `Chronicler result error: ${msg.subtype}`;
-          logger("error", err, { sessionId, stopReason });
+          logger("error", err, { ...deps.logContext, sessionId, stopReason });
           throw new Error(err);
         }
       }
@@ -259,14 +259,26 @@ export async function runChronicler(
         stop_reason: stopReason,
       },
     });
+    logger("info", "chronicler: ok", {
+      ...deps.logContext,
+      sessionId,
+      model: fastModel,
+      provider: input.modelContext.provider,
+      totalMs,
+      costUsd,
+      stopReason,
+      toolCallCount,
+      arcTrigger: input.arcTrigger,
+    });
 
     return { sessionId, stopReason, costUsd, totalMs, toolCallCount };
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : String(err);
-    logger("error", "Chronicler run failed", {
+    logger("error", "chronicler: failed", {
+      ...deps.logContext,
       error: errMsg,
-      turn_number: input.turnNumber,
-      tool_calls_before_error: toolCallCount,
+      turnNumber: input.turnNumber,
+      toolCallsBeforeError: toolCallCount,
     });
     span?.end({
       metadata: {

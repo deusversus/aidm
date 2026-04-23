@@ -343,7 +343,7 @@ export async function* runKeyAnimator(
         sessionId = msg.session_id ?? sessionId;
         if (msg.subtype !== "success") {
           const err = `KA result error: ${msg.subtype}`;
-          logger("error", err, { sessionId, stopReason });
+          logger("error", err, { ...deps.logContext, sessionId, stopReason });
           throw new Error(err);
         }
       }
@@ -359,6 +359,17 @@ export async function* runKeyAnimator(
         stop_reason: stopReason,
       },
     });
+    logger("info", "key-animator: ok", {
+      ...deps.logContext,
+      sessionId,
+      model: creativeModel,
+      provider: input.modelContext.provider,
+      ttftMs,
+      totalMs,
+      costUsd,
+      stopReason,
+      narrativeLength: narrative.length,
+    });
 
     yield {
       kind: "final",
@@ -371,10 +382,12 @@ export async function* runKeyAnimator(
     };
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : String(err);
-    logger("error", "KeyAnimator stream failed", {
+    logger("error", "key-animator: failed", {
+      ...deps.logContext,
+      sessionId,
       error: errMsg,
-      ttft_ms: ttftMs,
-      partial_narrative_length: narrative.length,
+      ttftMs,
+      partialNarrativeLength: narrative.length,
     });
     span?.end({
       metadata: {

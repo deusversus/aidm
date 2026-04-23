@@ -1,6 +1,8 @@
 import { checkBudget, incrementCostLedger } from "@/lib/budget";
 import { getDb } from "@/lib/db";
+import { getLangfuse } from "@/lib/observability/langfuse";
 import { campaigns } from "@/lib/state/schema";
+import type { AidmSpanHandle } from "@/lib/tools";
 import { CampaignSettings } from "@/lib/types/campaign-settings";
 import { chronicleTurn, computeArcTrigger } from "@/lib/workflow/chronicle";
 import { runMeta, shouldDispatchMeta } from "@/lib/workflow/meta";
@@ -45,9 +47,37 @@ function encodeSseEvent(event: string, data: unknown): Uint8Array {
   return new TextEncoder().encode(`event: ${event}\ndata: ${payload}\n\n`);
 }
 
+/**
+ * Construct an `AidmSpanHandle` from the Langfuse trace. `AidmSpanHandle`
+ * was already shaped to match Langfuse's `trace.span({name,input,metadata})`
+ * → `{end({output,metadata})}` API — the trace client satisfies the
+ * interface directly; we just narrow to the methods we use. When Langfuse
+ * isn't configured (no keys), returns undefined so every `deps.trace?.span`
+ * call stays no-op and existing null-safety holds.
+ */
+function buildTraceHandle(
+  name: string,
+  metadata: Record<string, unknown>,
+): AidmSpanHandle | undefined {
+  const client = getLangfuse();
+  if (!client) return undefined;
+  const trace = client.trace({ name, metadata });
+  return {
+    span: (opts) => {
+      const s = trace.span({ name: opts.name, input: opts.input, metadata: opts.metadata });
+      return {
+        end: (data) => {
+          s.end({ output: data?.output, metadata: data?.metadata });
+        },
+      };
+    },
+  };
+}
+
 export async function POST(req: Request) {
   const user = await currentUser();
   if (!user) {
+    console.warn("[turns] 401 unauthenticated");
     return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
   }
 
@@ -55,10 +85,9 @@ export async function POST(req: Request) {
   try {
     body = PostBody.parse(await req.json());
   } catch (err) {
-    return NextResponse.json(
-      { error: "invalid_body", detail: err instanceof Error ? err.message : String(err) },
-      { status: 400 },
-    );
+    const detail = err instanceof Error ? err.message : String(err);
+    console.warn("[turns] 400 invalid_body", { userId: user.id, detail });
+    return NextResponse.json({ error: "invalid_body", detail }, { status: 400 });
   }
 
   // Pre-turn budget gate (Commit 9). Runs BEFORE opening the SSE stream
@@ -71,6 +100,13 @@ export async function POST(req: Request) {
   const gate = await checkBudget(user.id);
   if (!gate.ok) {
     if (gate.reason === "rate") {
+      console.warn("[turns] 429 rate_limited", {
+        userId: user.id,
+        campaignId: body.campaignId,
+        rateCount: gate.rateCount,
+        rateCap: gate.rateCap,
+        retryAfterSec: gate.retryAfterSec,
+      });
       return NextResponse.json(
         {
           error: "rate_limited",
@@ -86,6 +122,12 @@ export async function POST(req: Request) {
       );
     }
     // cost_cap
+    console.warn("[turns] 429 cost_cap_reached", {
+      userId: user.id,
+      campaignId: body.campaignId,
+      usedUsd: gate.usedUsd,
+      capUsd: gate.capUsd,
+    });
     return NextResponse.json(
       {
         error: "cost_cap_reached",
@@ -101,6 +143,15 @@ export async function POST(req: Request) {
   const abort = new AbortController();
   // Forward client disconnect to KA's subprocess.
   req.signal.addEventListener("abort", () => abort.abort(), { once: true });
+
+  // Build the Langfuse trace handle once per request. Every span call
+  // in runTurn / runMeta / chronicleTurn / sub-agents / tool registry
+  // hangs off this root. Until this landed, every `deps.trace?.span(...)`
+  // was a null-safe no-op in prod (scaffolded-but-never-instantiated).
+  const trace = buildTraceHandle("POST /api/turns", {
+    userId: user.id,
+    campaignId: body.campaignId,
+  });
 
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
@@ -145,7 +196,7 @@ export async function POST(req: Request) {
               userId: user.id,
               playerMessage: body.message,
             },
-            { db },
+            { db, trace },
           );
           let pendingResumeSuffix: string | undefined;
           for await (const ev of metaIter) {
@@ -179,7 +230,7 @@ export async function POST(req: Request) {
             playerMessage: body.message,
             abort,
           },
-          { db },
+          { db, trace },
         );
         for await (const ev of iter) {
           const { type, ...rest } = ev;
@@ -195,8 +246,11 @@ export async function POST(req: Request) {
               try {
                 await incrementCostLedger(user.id, ev.costUsd);
               } catch (err) {
-                console.warn("post-turn incrementCostLedger failed", {
+                console.warn("[turns] post-turn incrementCostLedger failed", {
                   userId: user.id,
+                  campaignId: body.campaignId,
+                  turnId: ev.turnId,
+                  turnNumber: ev.turnNumber,
                   costUsd: ev.costUsd,
                   error: err instanceof Error ? err.message : String(err),
                 });
@@ -228,7 +282,7 @@ export async function POST(req: Request) {
                 arcTrigger: computeArcTrigger(ev.intent.epicness, ev.turnNumber),
               };
               after(async () => {
-                await chronicleTurn(chronicleInput, { db });
+                await chronicleTurn(chronicleInput, { db, trace });
               });
             }
             break;
@@ -236,11 +290,13 @@ export async function POST(req: Request) {
           if (type === "error") break;
         }
       } catch (err) {
-        controller.enqueue(
-          encodeSseEvent("error", {
-            message: err instanceof Error ? err.message : String(err),
-          }),
-        );
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error("[turns] 500 stream threw", {
+          userId: user.id,
+          campaignId: body.campaignId,
+          error: msg,
+        });
+        controller.enqueue(encodeSseEvent("error", { message: msg }));
       } finally {
         controller.close();
       }

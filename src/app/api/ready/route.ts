@@ -10,7 +10,10 @@ async function checkDb(): Promise<"ok" | "fail"> {
   try {
     await getDb().execute(sql`SELECT 1`);
     return "ok";
-  } catch {
+  } catch (err) {
+    console.error("[ready] db check failed", {
+      error: err instanceof Error ? err.message : String(err),
+    });
     return "fail";
   }
 }

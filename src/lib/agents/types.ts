@@ -14,11 +14,34 @@ import type { AidmSpanHandle } from "@/lib/tools";
  * — for scripts, `/api/ready`, and tests that don't care about per-campaign
  * routing.
  */
+/**
+ * Correlation fields threaded through every log line so a single
+ * user-reported incident can be joined to its traces, DB writes,
+ * and downstream errors across the whole turn pipeline.
+ *
+ * Built once at the top of the turn workflow (runTurn / runMeta /
+ * chronicleTurn) and passed down through every deps bag. Call sites
+ * spread into meta: `logger("warn", "foo", { ...logContext, extra })`.
+ */
+export interface LogContext {
+  campaignId: string;
+  userId: string;
+  /** Present when the turn number has been resolved (post-context-load). */
+  turnNumber?: number;
+}
+
 export interface AgentDeps {
   /** Optional Langfuse span handle. Null-safe inside each agent. */
   trace?: AidmSpanHandle;
   /** Optional structured logger. Defaults to console. */
   logger?: AgentLogger;
+  /**
+   * Correlation fields — threaded into every error/warn/info log emitted
+   * during this turn so `userId`, `campaignId`, `turnNumber` land on
+   * every log line without each agent having to plumb them individually.
+   * Absent in scripts + tests that don't need the correlation.
+   */
+  logContext?: LogContext;
   /** Per-campaign provider + tier_models. Propagates into every LLM call. */
   modelContext?: CampaignProviderConfig;
   /**

@@ -456,6 +456,11 @@ export async function* runTurn(
 
   const acquired = await tryAcquireLock(db, input.campaignId, ADVISORY_LOCK_TIMEOUT_MS);
   if (!acquired) {
+    logger("warn", "runTurn: advisory lock timeout", {
+      campaignId: input.campaignId,
+      userId: input.userId,
+      timeoutMs: ADVISORY_LOCK_TIMEOUT_MS,
+    });
     yield {
       type: "error",
       message: "Another turn is in progress for this campaign. Try again in a moment.",
@@ -471,6 +476,20 @@ export async function* runTurn(
     // campaign (e.g. selecting Google before M3.5) throws here and
     // surfaces as a terminal turn error to the player.
     const modelContext = resolveModelContext(ctx.campaignRow.settings, logger);
+
+    // Correlation fields for every log emitted during this turn.
+    // Passed through deps so sub-agents don't have to plumb the
+    // fields individually — `logger("warn", msg, { ...logContext, extra })`.
+    const logContext = {
+      campaignId: input.campaignId,
+      userId: input.userId,
+      turnNumber: ctx.nextTurnNumber,
+    };
+    logger("info", "runTurn: start", {
+      ...logContext,
+      phase: ctx.campaignRow.phase,
+      provider: modelContext.provider,
+    });
 
     // Per-turn prompt-fingerprint accumulator. Every agent call that
     // passes a `promptId` records its composed-prompt fingerprint here.
@@ -527,10 +546,17 @@ export async function* runTurn(
     const verdict = await routeFn(routerInput, {
       trace: deps.trace,
       logger,
+      logContext,
       modelContext,
       recordPrompt,
       recordCost,
       ...deps.routerDeps,
+    });
+    logger("info", "runTurn: routed", {
+      ...logContext,
+      verdictKind: verdict.kind,
+      intent: verdict.intent.intent,
+      epicness: verdict.intent.epicness,
     });
 
     // Short-circuit branches: META / OVERRIDE / WB-CLARIFY.
@@ -563,6 +589,11 @@ export async function* runTurn(
           portraitMap: {},
         })
         .returning({ id: turns.id });
+      logger("info", "runTurn: short-circuit persisted", {
+        ...logContext,
+        verdictKind: verdict.kind,
+        turnId: persisted?.id ?? "",
+      });
 
       // ---------------------------------------------------------------
       // Short-circuit persistence (v3-parity audit fix, 2026-04-21).
@@ -653,6 +684,8 @@ export async function* runTurn(
         userId: input.userId,
         db,
         trace: deps.trace,
+        logger,
+        logContext,
       };
       for (const update of wbAssertion.entityUpdates) {
         try {
@@ -736,6 +769,7 @@ export async function* runTurn(
           // Best-effort. A failed write on one entity shouldn't block
           // the rest or stop KA from narrating forward.
           logger("warn", "WB entity persist failed", {
+            ...logContext,
             kind: update.kind,
             name: update.name,
             error: err instanceof Error ? err.message : String(err),
@@ -805,7 +839,7 @@ export async function* runTurn(
               value: o.value,
             })) ?? [],
         },
-        { trace: deps.trace, logger, modelContext, recordPrompt, recordCost },
+        { trace: deps.trace, logger, logContext, modelContext, recordPrompt, recordCost },
       );
       outcome = judgedOutcome;
     }
@@ -886,6 +920,8 @@ export async function* runTurn(
       userId: input.userId,
       db,
       trace: deps.trace,
+      logger,
+      logContext,
     };
 
     const voicePatternsArray = Array.isArray(
@@ -991,7 +1027,7 @@ export async function* runTurn(
       // SESSION total_cost_usd that already subsumes KA's consultants.
       // Passing `recordCost` here would double-count if a future KA
       // path ever routed an internal call through `_runner.ts`.
-      { trace: deps.trace, logger, recordPrompt },
+      { trace: deps.trace, logger, logContext, recordPrompt },
     );
 
     let narrative = "";
@@ -1039,6 +1075,17 @@ export async function* runTurn(
         flags: wbAssertion?.flags ?? [],
       })
       .returning({ id: turns.id });
+    logger("info", "runTurn: persisted", {
+      ...logContext,
+      turnId: persisted?.id ?? "",
+      intent: verdict.intent.intent,
+      ttftMs,
+      totalMs,
+      costUsd: turnCostUsd,
+      outcomeWeight: outcome?.narrative_weight ?? null,
+      outcomeSuccess: outcome?.success_level ?? null,
+      wbFlags: wbAssertion?.flags.length ?? 0,
+    });
 
     yield {
       type: "done",
@@ -1056,7 +1103,11 @@ export async function* runTurn(
     };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    logger("error", "turn workflow failed", { error: msg });
+    logger("error", "runTurn: failed", {
+      campaignId: input.campaignId,
+      userId: input.userId,
+      error: msg,
+    });
     yield { type: "error", message: msg };
   } finally {
     await releaseLock(db, input.campaignId).catch(() => {

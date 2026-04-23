@@ -90,14 +90,24 @@ export async function invokeTool(
     metadata: { layer: spec.layer },
   });
 
+  const start = Date.now();
+  const logMeta = { ...ctx.logContext, tool: spec.name, layer: spec.layer };
   try {
     const rawOutput = await spec.execute(input, ctx);
     const output = spec.outputSchema.parse(rawOutput);
     span?.end({ output });
+    ctx.logger?.("info", "tool: ok", {
+      ...logMeta,
+      durationMs: Date.now() - start,
+    });
     return output;
   } catch (err) {
-    span?.end({
-      metadata: { error: err instanceof Error ? err.message : String(err) },
+    const errMsg = err instanceof Error ? err.message : String(err);
+    span?.end({ metadata: { error: errMsg } });
+    ctx.logger?.("warn", "tool: failed", {
+      ...logMeta,
+      durationMs: Date.now() - start,
+      error: errMsg,
     });
     throw err;
   }

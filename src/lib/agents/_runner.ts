@@ -233,6 +233,7 @@ export async function runStructuredAgent<TOutput>(
   // user still paid for both attempts.
   let accumulatedCostUsd = 0;
 
+  const attemptStart = Date.now();
   let lastError: unknown;
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     try {
@@ -246,17 +247,45 @@ export async function runStructuredAgent<TOutput>(
       const parsed = config.outputSchema.parse(JSON.parse(extractJson(raw)));
       span?.end({ output: parsed, metadata: { attempt, costUsd: accumulatedCostUsd } });
       deps.recordCost?.(config.agentName, accumulatedCostUsd);
+      // Only emit a per-agent ok log when a retry saved the call —
+      // the success-at-attempt-1 case would be too noisy (fires on
+      // every consultant on every turn). Retries are rare enough to
+      // be signal.
+      if (attempt > 1) {
+        logger("info", `${config.agentName}: ok after retry`, {
+          ...deps.logContext,
+          agent: config.agentName,
+          tier: config.tier,
+          provider: ctx.provider,
+          model,
+          attempt,
+          costUsd: accumulatedCostUsd,
+          durationMs: Date.now() - attemptStart,
+        });
+      }
       return parsed;
     } catch (err) {
       lastError = err;
-      logger("warn", `${config.agentName} attempt failed`, {
+      logger("warn", `${config.agentName}: attempt failed`, {
+        ...deps.logContext,
+        agent: config.agentName,
+        tier: config.tier,
+        provider: ctx.provider,
+        model,
         attempt,
         error: err instanceof Error ? err.message : String(err),
       });
     }
   }
 
-  logger("error", `${config.agentName} fell back after retry`, {
+  logger("error", `${config.agentName}: fell back after retry`, {
+    ...deps.logContext,
+    agent: config.agentName,
+    tier: config.tier,
+    provider: ctx.provider,
+    model,
+    costUsd: accumulatedCostUsd,
+    durationMs: Date.now() - attemptStart,
     error: lastError instanceof Error ? lastError.message : String(lastError),
   });
   span?.end({

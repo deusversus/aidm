@@ -28,27 +28,24 @@ const Body = z.object({
 export async function POST(req: Request) {
   const user = await currentUser();
   if (!user) {
+    console.warn("[user/cap] 401 unauthenticated");
     return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
   }
   let body: z.infer<typeof Body>;
   try {
     body = Body.parse(await req.json());
   } catch (err) {
-    return NextResponse.json(
-      { error: "invalid_body", detail: err instanceof Error ? err.message : String(err) },
-      { status: 400 },
-    );
+    const detail = err instanceof Error ? err.message : String(err);
+    console.warn("[user/cap] 400 invalid_body", { userId: user.id, detail });
+    return NextResponse.json({ error: "invalid_body", detail }, { status: 400 });
   }
   try {
     await setUserDailyCap(user.id, body.capUsd);
+    console.log("[user/cap] ok", { userId: user.id, capUsd: body.capUsd });
     return NextResponse.json({ ok: true, capUsd: body.capUsd });
   } catch (err) {
-    return NextResponse.json(
-      {
-        error: "update_failed",
-        detail: err instanceof Error ? err.message : String(err),
-      },
-      { status: 500 },
-    );
+    const detail = err instanceof Error ? err.message : String(err);
+    console.error("[user/cap] 500 update_failed", { userId: user.id, detail });
+    return NextResponse.json({ error: "update_failed", detail }, { status: 500 });
   }
 }

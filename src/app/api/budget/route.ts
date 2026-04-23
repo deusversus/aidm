@@ -22,8 +22,15 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const user = await currentUser();
   if (!user) {
+    console.warn("[budget] 401 unauthenticated");
     return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
   }
-  const snapshot = await getBudgetSnapshot(user.id);
-  return NextResponse.json(snapshot);
+  try {
+    const snapshot = await getBudgetSnapshot(user.id);
+    return NextResponse.json(snapshot);
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err);
+    console.error("[budget] 500 snapshot failed", { userId: user.id, detail });
+    return NextResponse.json({ error: "snapshot_failed", detail }, { status: 500 });
+  }
 }

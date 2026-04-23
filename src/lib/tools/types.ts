@@ -2,6 +2,18 @@ import type { Db } from "@/lib/db";
 import type { z } from "zod";
 
 /**
+ * Minimal logger surface for tool-layer observability (WB reshape follow-up).
+ * Mirror of `AgentLogger` in `src/lib/agents/types.ts`, kept here so the
+ * tools module doesn't depend on agents. Same signature — consumers can
+ * pass the same function to both.
+ */
+export type AidmToolLogger = (
+  level: "info" | "warn" | "error",
+  message: string,
+  meta?: Record<string, unknown>,
+) => void;
+
+/**
  * The cognitive memory layer (§9.0) or operational surface each tool belongs to.
  * Tools are grouped into MCP servers by this tag — KA calls `aidm-episodic`
  * when it wants to recall a scene, `aidm-entities` when it wants a character
@@ -49,6 +61,24 @@ export interface AidmToolContext {
   userId: string;
   db: Db;
   trace?: AidmSpanHandle;
+  /**
+   * Structured logger for tool-layer observability. When present,
+   * `invokeTool` emits start / ok / failed lines per call with the
+   * tool name, input size, output size, and duration. Null-safe —
+   * scripts and tests without a logger still work.
+   */
+  logger?: AidmToolLogger;
+  /**
+   * Turn-correlation fields spread into every tool log line so a
+   * "search_memory returned zero for campaign X on turn 27" can be
+   * grepped by campaign/user/turn. Built once by the turn workflow
+   * and threaded into every toolContext.
+   */
+  logContext?: {
+    campaignId: string;
+    userId: string;
+    turnNumber?: number;
+  };
 }
 
 /**

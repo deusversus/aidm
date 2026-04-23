@@ -111,6 +111,14 @@ export async function chronicleTurn(
 ): Promise<"ok" | "already_chronicled" | "failed" | "skipped_non_continue"> {
   const logger = deps.logger ?? ((level, msg, meta) => console.log(`[${level}] ${msg}`, meta));
   const db = deps.db;
+  // Correlation fields attached to every chronicler log so a failure
+  // joins up with the originating turn's stdout lines.
+  const logContext = {
+    campaignId: input.campaignId,
+    userId: input.userId,
+    turnNumber: input.turnNumber,
+  };
+  logger("info", "chronicleTurn: start", { ...logContext, turnId: input.turnId });
 
   await acquireChroniclerLock(db, input.campaignId, deps._lockNamespaceOffset);
   try {
@@ -121,13 +129,13 @@ export async function chronicleTurn(
       .where(eq(turns.id, input.turnId))
       .limit(1);
     if (!existing) {
-      logger("warn", "chronicleTurn: turn row not found", { turnId: input.turnId });
+      logger("warn", "chronicleTurn: turn row not found", { ...logContext, turnId: input.turnId });
       return "failed";
     }
     if (existing.chronicledAt !== null) {
       logger("info", "chronicleTurn: already chronicled, skipping", {
+        ...logContext,
         turnId: input.turnId,
-        turnNumber: input.turnNumber,
       });
       return "already_chronicled";
     }
@@ -148,7 +156,7 @@ export async function chronicleTurn(
       .limit(1);
     if (!campaign) {
       logger("warn", "chronicleTurn: campaign not found (deleted or transferred?)", {
-        campaignId: input.campaignId,
+        ...logContext,
       });
       return "failed";
     }
@@ -162,6 +170,8 @@ export async function chronicleTurn(
       userId: input.userId,
       db,
       trace: deps.trace,
+      logger,
+      logContext,
     };
 
     const chroniclerResult = await runChronicler(
@@ -177,6 +187,7 @@ export async function chronicleTurn(
       },
       {
         logger: deps.logger,
+        logContext,
         trace: deps.trace,
         recordPrompt: deps.recordPrompt,
         queryFn: deps.queryFn,
@@ -190,9 +201,14 @@ export async function chronicleTurn(
     // Runs best-effort: a decay failure is logged but doesn't fail the
     // chronicling pass, which has already been stamped-idempotent.
     try {
-      await decayHeat(db, input.campaignId, input.turnNumber);
+      const decayResult = await decayHeat(db, input.campaignId, input.turnNumber);
+      logger("info", "chronicleTurn: decayHeat ok", {
+        ...logContext,
+        rowsAffected: decayResult.rowsAffected,
+      });
     } catch (err) {
       logger("warn", "chronicleTurn: decayHeat failed (non-fatal)", {
+        ...logContext,
         turnId: input.turnId,
         error: err instanceof Error ? err.message : String(err),
       });
@@ -220,6 +236,7 @@ export async function chronicleTurn(
         // fires on the PRE-PASS/KA cost written earlier) rather than
         // retroactively failing a turn that narratively landed.
         logger("warn", "chronicleTurn: incrementCostLedger failed (non-fatal)", {
+          ...logContext,
           turnId: input.turnId,
           chroniclerCost,
           error: err instanceof Error ? err.message : String(err),
@@ -231,15 +248,19 @@ export async function chronicleTurn(
     }
 
     logger("info", "chronicleTurn: ok", {
+      ...logContext,
       turnId: input.turnId,
-      turnNumber: input.turnNumber,
+      chroniclerCostUsd: chroniclerResult.costUsd,
+      chroniclerTotalMs: chroniclerResult.totalMs,
+      chroniclerToolCallCount: chroniclerResult.toolCallCount,
+      chroniclerStopReason: chroniclerResult.stopReason,
     });
     return "ok";
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : String(err);
     logger("error", "chronicleTurn: failed (swallowed; turn state unchanged)", {
+      ...logContext,
       turnId: input.turnId,
-      turnNumber: input.turnNumber,
       error: errMsg,
     });
     return "failed";
