@@ -1,7 +1,8 @@
 import { defineConfig } from "drizzle-kit";
 
 export default defineConfig({
-  schema: "./src/lib/state/schema.ts",
+  // Lands with the C3 substrate commit (nine-layer schema).
+  schema: "./src/lib/db/schema.ts",
   out: "./drizzle",
   dialect: "postgresql",
   dbCredentials: {

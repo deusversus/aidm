@@ -2,7 +2,7 @@
   "name": "aidm",
   "version": "0.0.1",
   "private": true,
-  "description": "AIDM v4 — anime-themed long-horizon single-player TTRPG dungeon master",
+  "description": "AIDM v5 — an engine for co-telling long-form fiction that stays true to a premise",
   "type": "module",
   "engines": {
     "node": ">=22"
@@ -22,33 +22,22 @@
     "db:push": "drizzle-kit push",
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
-    "hello:trace": "tsx scripts/langfuse-hello.ts",
-    "prompts:dump": "tsx scripts/prompts-dump.ts",
-    "seed:campaign": "tsx scripts/seed-campaign.ts",
-    "migrate:campaign-providers": "tsx scripts/migrate-campaign-providers.ts",
-    "rules:index": "tsx scripts/rules-index.ts",
-    "prompts:graph": "tsx scripts/prompts-graph.ts",
-    "mockllm": "tsx scripts/mockllm.ts",
-    "evals": "tsx evals/run.ts",
-    "evals:ci": "tsx evals/run.ts --ci",
     "langfuse:latest": "tsx --env-file=.env.local scripts/langfuse-latest.ts"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.114",
     "@anthropic-ai/sdk": "^0.90.0",
     "@clerk/nextjs": "^7.2.3",
-    "@google/genai": "^1.50.1",
-    "@mastra/core": "^1.25.0",
     "drizzle-orm": "^0.36.0",
     "langfuse": "^3.38.20",
     "next": "^15.1.0",
-    "openai": "^6.34.0",
     "pg": "^8.13.0",
     "posthog-js": "^1.369.3",
     "posthog-node": "^5.29.2",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "svix": "^1.90.0",
+    "voyageai": "^0.4.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {

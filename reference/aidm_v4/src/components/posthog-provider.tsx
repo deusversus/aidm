@@ -22,8 +22,8 @@ export function PostHogProvider({ children }: { children: ReactNode }) {
       capture_pageleave: true,
       autocapture: true,
       // posthog-js autocapture does NOT include JS exceptions by default.
-      // Explicit opt-in so the Error Tracking product has data. Revisit
-      // mask_all_text when the play view lands (sensitive story content).
+      // Explicit opt-in so the Error Tracking product has data. M2+ when
+      // chat UI lands: revisit mask_all_text for sensitive SZ content.
       capture_exceptions: true,
     });
   }, []);

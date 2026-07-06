@@ -17,7 +17,6 @@ coverage
 .vscode
 .idea
 README.md
-ROADMAP.md
 docs
 reference
 Dockerfile

@@ -1,31 +1,31 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-describe("getDb singleton", () => {
+describe("getDb", () => {
   const originalEnv = process.env;
 
   beforeEach(() => {
-    // Belt-and-suspenders: `tests/setup.ts` also calls resetModules(), but
-    // this test's correctness depends on the db module's `_db`/`_pool`
-    // singletons being fresh per case. Explicit reset prevents a future
-    // refactor of setup.ts from silently breaking these assertions.
     vi.resetModules();
-    process.env = { ...originalEnv, DATABASE_URL: "postgres://u:p@h:5432/d" };
+    process.env = { ...originalEnv };
   });
 
   afterEach(() => {
     process.env = originalEnv;
   });
 
-  it("returns the same Drizzle instance on repeated calls", async () => {
-    const { getDb } = await import("./db");
-    const a = getDb();
-    const b = getDb();
-    expect(a).toBe(b);
+  it("importing the module does not touch env or construct a pool", async () => {
+    Reflect.deleteProperty(process.env, "DATABASE_URL");
+    await expect(import("./db")).resolves.toBeDefined();
   });
 
-  it("throws a configuration error when DATABASE_URL is missing on first call", async () => {
+  it("throws a configuration-shaped error when DATABASE_URL is missing", async () => {
     Reflect.deleteProperty(process.env, "DATABASE_URL");
     const { getDb } = await import("./db");
-    expect(() => getDb()).toThrow(/DATABASE_URL/);
+    expect(() => getDb()).toThrow(/DATABASE_URL not configured/);
+  });
+
+  it("rejects a non-URL DATABASE_URL via the env Proxy", async () => {
+    process.env.DATABASE_URL = "not-a-url";
+    const { getDb } = await import("./db");
+    expect(() => getDb()).toThrow();
   });
 });

@@ -1,5 +1,5 @@
 import { getDb } from "@/lib/db";
-import { pingAnthropic } from "@/lib/llm/anthropic";
+import { pingAnthropic } from "@/lib/llm";
 import { sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
 

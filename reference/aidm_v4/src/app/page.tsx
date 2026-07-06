@@ -11,10 +11,10 @@ export default async function HomePage() {
     <main className="mx-auto flex min-h-screen max-w-2xl flex-col justify-center gap-6 px-6 py-16">
       <h1 className="text-4xl font-semibold tracking-tight">AIDM</h1>
       <p className="text-lg text-muted-foreground">
-        An engine for co-telling long-form fiction that stays true to a premise.
+        Anime-themed long-horizon single-player tabletop RPG dungeon master.
       </p>
       <p className="text-sm text-muted-foreground">
-        v5 substrate (M0). Session Zero and the turn engine land at M1.
+        Walking skeleton (M0). Session Zero and gameplay land in M1–M2.
       </p>
       <div className="flex gap-3 pt-4">
         {isSignedIn ? (

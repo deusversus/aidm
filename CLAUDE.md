@@ -1,26 +1,42 @@
-# AIDM v4 — working agreement
+# AIDM v5 — working agreement
 
-This file is loaded into context on every Claude session in this repo. Read it first; it's the orientation. It deliberately doesn't duplicate information that lives in memory, ROADMAP, or code — it links.
+This file is loaded into context on every Claude session in this repo. It's the orientation, not the spec. It deliberately doesn't duplicate what lives in the blueprint, memory, or code — it links.
+
+**The spec-of-record is [`docs/plans/v5-blueprint.md`](docs/plans/v5-blueprint.md) (v3-final, signed 2026-07-06, decision log closed). Read §0 "The Spirit" before any design or architectural work — always, and especially after context loss.** This file's job is to make sure you open it.
 
 ---
 
 ## Who you're working with
 
-**jcettison.** Sole player, sole developer, v3 author. This is a passion project first, product second. User-confirmed model versions as of 2026-04: Gemini 3.1, GPT 5.4, Claude Opus 4.7, Claude Haiku 4.5. Do not guess newer without explicit confirmation.
+**jcettison.** Sole player, sole developer, author of v3. This is a passion project first, product second. What the machinery buys is not an app — it is more of the moments v3 already gave him: stories that made him laugh out loud, nearly cry, and yearn in real life. Blueprint §0 carries this in full; internalize it before touching anything.
 
-**What the user is building.** Authorship tooling for a premise-respectful long-form fiction engine. *"Sequel to Berserk."* *"Miyazaki makes Pokemon."* *"Cowboy Bebop as isekai space opera."* The premise is the product; the system's job is to honor it over hundreds of turns against generic-narration gravity. Not an AI DM. Not an RPG. **Read [`project_v4_vision.md`](~/.claude/projects/C--Users-admin-Downloads-aidm-v4/memory/project_v4_vision.md) before any architectural work** — it's the load-bearing authority.
+**Model versions (user-confirmed 2026-07-06):** Claude Fable 5, Opus 4.8, Sonnet 5, Haiku 4.5. The player-facing tier menus live in blueprint §3. Do not guess newer models without explicit confirmation.
 
-**v3 is the spec.** `./reference/aidm_v3/` is the working Python implementation. When in doubt about behavior, read v3 first. Don't frame v3 as a draft, plumbing to cut, or a cautionary tale. It's accumulated empirical wisdom from years of play. 2026 primitives upgrade the substrate; they don't simplify the structure. See [`feedback_v3_respect.md`](~/.claude/projects/C--Users-admin-Downloads-aidm-v4/memory/feedback_v3_respect.md).
+## Authority ordering
 
----
+1. **`docs/plans/v5-blueprint.md`** — the signed spec. All §13 decisions are closed; don't relitigate them, and don't quietly deviate. Deviations surface to the user in conversation, never appear first in code.
+2. **Memory files** (`project_v5_redesign.md` first) — session-to-session state and the feedback record.
+3. **This file** — workflow and substrate discipline.
+4. **`reference/aidm_v3/`** — the Python predecessor: the *empirical record* of real failure modes. Never dismiss it, never treat it as plumbing to cut (blueprint axiom 10, §11 ledger) — but it is no longer the design authority; the blueprint is.
+5. **`reference/aidm_v4/`** — the shelved TypeScript map. Reference-on-request ONLY. Never import from `reference/` in live code; never recite v4 framings (KA-as-orchestrator, seven MCP memory layers, core-inversion list) as if they were current — they are dead.
 
-## Core inversions (the current vision, easy to forget)
+## The shape (one-screen map; details in the blueprint §)
 
-- **KA is the orchestrator.** The cascade inverts. KA runs on Claude Agent SDK and invokes IntentClassifier, OutcomeJudge, Validator, Pacing, CombatAgent, etc. as *consultants* via the Agent tool. In v3 the pipeline called KA last; in v4 KA holds orchestration.
-- **Memory is seven cognitive layers**, each an MCP server with its own retrieval shape: ambient, working, episodic, semantic, voice, arc, critical. KA chooses which layer to query. Memory is **written narrated** — storyboarded fragments alongside facts.
-- **DNA + composition are the instrument**, not configuration. 24 DNA axes + 13 composition axes are prescriptive pressures the agents apply during generation. Don't treat them as form fields.
-- **Session Zero is one conductor conversation**, not a pipeline. Subagents on tap; not orchestrated stages.
-- **Build the whole shape scaffolded**, not MVP subsets with M4-deferrals. Empty sets from a live layer are a valid state; missing layers are not. The shape at M1 equals the shape at M8; content inside sharpens over time.
+- **Premise Instrument** (§4): World · Treatment (24 DNA axes) · Framing (13 enums) · Voice · Canonicality, × four time layers (canonical / active / arc_override / learned). Renderer → **Settei** (Style Charter, Block 1) + Amendments; **Sakkan** (Gauge) measures drift blind against anchors.
+- **Turn engine** (§5): **Layout → KeyAnimator → Compositor**. Fixed skeleton, triaged interior; tiers **douga / genga / sakuga**. The KA is the only writer — one creative call per scene; everything else is context compilation. Narration streams free prose + a mandatory `commit_scene` tool trailer; every other model call uses native strict structured output.
+- **Memory** (§6): nine campaign layers + the cross-campaign player profile. Every write carries `{turn_id, provenance, confidence}`; tombstones make turns revocable.
+- **Direction** (§7): Director (arcs, seeds, dailies), Pacer, Arc Model (Beat < Scene < Episode < Arc < Season < Series), stakes doctrine.
+- **Session Zero** (§8): one conductor conversation — the spark, finitude, the intensity contract.
+- **The register** (§16): code speaks the studio vocabulary — `Conte`, `Settei`, `Sakkan`, `PencilMark`, yokoku, cour. Plain terms go in docstrings.
+
+## Doctrine (compressed; the full axioms are blueprint §2)
+
+- The engine is a **context compiler**. One writer; distributed judgment, centralized voice. Bookkeeping prose never reaches the player.
+- **Quality outranks latency and cost.** *"I'd wait five minutes for a GOOD reply."* Budgets catch waste, never trim deliberate depth.
+- **Measured, not vibed.** Corrective pressure is injected only when measurement says so.
+- **Whole shape from day one.** A layer with a writer but no reader — or vice versa — is a defect. Empty sets from a live layer are valid; missing layers are not.
+- **Player authority:** expressed player word > premise-truth > the engine's inference of what the player would enjoy. Failure is part of the story now; **stories only end intentionally, never at the behest of a die-roll.**
+- **The ledger is closed** (§11 + §14 risk 6): new mechanisms require a named failure mode and a pillar, in a plan doc, before code.
 
 ---
 
@@ -28,49 +44,43 @@ This file is loaded into context on every Claude session in this repo. Read it f
 
 ### Planning
 
-- **Non-trivial work starts with a plan.** Write it as `docs/plans/M<n>-<topic>.md` before implementation. The user's "thorough commits" preference applies to plans too — plan the whole commit, not the first file.
-- **Milestones are depth milestones, not feature additions.** Don't carve scope with "defer to M4." If something needs to exist, scaffold it now, ramp content over milestones.
-- **Before proposing architectural changes, check the core inversions above.** The failure mode that's happened before: defaulting to harness-mode (ship-efficient) framing when the question is vision-level. When the user pushes back on architecture, drop the plan and actually think before replying. See [`feedback_think_dont_manage.md`](~/.claude/projects/C--Users-admin-Downloads-aidm-v4/memory/feedback_think_dont_manage.md).
+- **Non-trivial work starts with a plan** at `docs/plans/M<n>-<topic>.md`, written before implementation. Plan the whole milestone's commits, not the first file. Current: [`M0-substrate.md`](docs/plans/M0-substrate.md).
+- **Every bullet listed in a commit's deliverables ships in that commit.** Scope cuts surface to the user before the code lands, never in audit softening.
+- **Milestones are depth milestones.** The shape at M1 equals the shape at M6; content sharpens. Don't carve scope with "defer to M4" unless the blueprint already does.
 
 ### Audit cadence (load-bearing)
 
-**Every commit: work → subagent audit → fix findings → push.** The audit is non-negotiable and runs via a subagent (usually Opus), not inline. The user doesn't do audit reviews — that's the subagent's job. The user does directional review of clean, audited work.
+**Every commit: work → subagent audit → fix findings → push.** The audit is non-negotiable and runs via a subagent, not inline. The user does directional review of clean, audited work — not audit review.
 
-- Run the audit on the **full commit stack before push**, not after. Catching HOSTNAME and ARG issues (M0) required auditing on the full stack, not incrementally.
-- Audit prompts should be specific: what to check, what's out of scope, what format to report in. Under 800 words of output.
-- If findings surface, address them before pushing. Re-run the audit if findings are structural.
-- "Clean commit" is a valid audit outcome. Don't manufacture findings.
+- Run the audit on the **full commit stack before push**, not after.
+- Audit prompts are specific: what to check, what's out of scope, report format, under 800 words.
+- Findings get addressed before pushing; structural findings re-run the audit.
+- "Clean commit" is a valid outcome. Don't manufacture findings.
 
 ### Commits
 
-- **Thorough over tiny.** Each commit should be a substantial, coherent unit. M0 shipped in 7 thorough commits, not 40 tiny ones. User explicitly prefers this — gives more coverage per audit cycle.
-- **Commit messages explain the why**, not the what. Reference ROADMAP sections, spike docs, audit findings when relevant.
-- **Co-author trailer:** `Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>`
-- **Never amend a committed-and-pushed commit.** Create a new commit.
-- **Never `--no-verify`, `--no-gpg-sign`, or skip hooks** unless the user explicitly asks.
-- **Never force-push to master.** Ask first if you think it's needed.
+- **Thorough over tiny.** Each commit is a substantial, coherent unit — more coverage per audit cycle.
+- **Messages explain the why**, referencing blueprint sections and plan commits.
+- **Co-author trailer:** `Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>`
+- **Never amend a pushed commit. Never `--no-verify` or skip hooks. Never force-push master.**
 
 ### When to ask before acting
 
-Authorization for an action doesn't generalize. Match scope to what was actually requested.
-
-- **Ask before:** destructive git operations (reset --hard, force push, branch delete), package removals, migrations that alter existing data, changes to auth/permissions/env config, any external-visible action (pushing code, opening PRs, posting anywhere), cost-incurring operations above trivial (LLM calls using >$0.10, image generation, long-running background jobs).
-- **Don't ask for:** file edits in the working tree, local builds, running tests, running the dev server, local git operations (add, commit, status), spawning research subagents against read-only tasks, creating new files the plan calls for.
-- **When in doubt, surface the action and the reversibility cost in one sentence, then ask.** The cost of pausing is low.
+- **Ask before:** destructive git operations, package removals, migrations altering existing data, auth/permissions/env-config changes, external-visible actions (push is covered by the audit cadence; PRs/posting are not), LLM spend above trivial (>$0.10).
+- **Don't ask for:** working-tree edits, local builds/tests/dev server, local git operations, read-only research subagents, files the plan calls for.
+- When in doubt, surface the action and its reversibility cost in one sentence, then ask.
 
 ### Parallelism
 
-- Independent searches, reads, or tool calls in the same turn go in parallel. Sequential dependencies block.
-- Spawn a subagent (Explore / general-purpose) for any research that would take more than 3 queries. Audit-cadence subagents always run via Task.
-- Don't duplicate a spawned subagent's work. If you launched an agent, wait for its result — don't also do its searches inline.
-- Running the audit in background while you draft the next thing is fine; just don't push before the audit returns.
+- Independent searches/reads/tool calls go in parallel in the same turn.
+- Research beyond ~3 queries → spawn an Explore/general-purpose subagent; don't duplicate its work inline.
+- Audits may run in background while drafting the next thing; never push before the audit returns.
 
 ### Shell and tooling quirks
 
-- **Shell is Git Bash on Windows.** Use Unix syntax (`/dev/null`, forward slashes). Set `MSYS_NO_PATHCONV=1` when passing literal paths like `/sign-in` as arguments or MSYS will rewrite them to `C:\Program Files\Git\sign-in`.
-- **Use the dedicated tools** over Bash: Glob for file search, Grep for content search, Read for files, Edit/Write for edits. Only use Bash for actual shell operations.
-- **Never `cat`/`head`/`tail`/`sed`/`awk`/`echo` when a tool exists.** Use Read, Edit, Write.
-- **Don't `cd`** unless the user asks. Use absolute paths. The CWD is already set.
+- **Shell is Git Bash on Windows.** Unix syntax; set `MSYS_NO_PATHCONV=1` when passing literal `/paths` as arguments.
+- **Use dedicated tools** (Glob/Grep/Read/Edit/Write) over shell equivalents. Bash is for actual shell operations.
+- **Don't `cd`**; use absolute paths.
 
 ---
 
@@ -82,103 +92,73 @@ Authorization for an action doesn't generalize. Match scope to what was actually
 | Language | TypeScript strict (`noUncheckedIndexedAccess`) |
 | Package manager | pnpm 10 |
 | Lint/format | Biome 1.9 (`pnpm lint`, `pnpm lint:fix`) |
-| Typecheck | `pnpm typecheck` (`tsc --noEmit`) |
-| Tests | Vitest (`pnpm test`, `pnpm test:watch`) |
-| DB | Postgres 16 + pgvector 0.8 on Railway |
-| ORM | Drizzle + drizzle-kit |
+| Typecheck / tests | `pnpm typecheck` · Vitest (`pnpm test`) |
+| DB | Postgres 16 + pgvector 0.8 on Railway — **fresh v5 database, never the v4 one** |
+| ORM | Drizzle + drizzle-kit (schema at `src/lib/db/schema.ts`, lands C3) |
 | Auth | Clerk v7 (`currentUser()` pattern — no `<SignedIn>/<SignedOut>` in v7) |
-| LLM — KA | Claude Agent SDK (`@anthropic-ai/claude-agent-sdk`) on Opus 4.7 |
-| LLM — probe | Haiku 4.5 via raw `@anthropic-ai/sdk` |
-| LLM — fast tier | Gemini 3.1 Flash via `@google/genai` |
-| Workflow | Mastra (`@mastra/core`) for step composition + tool registry |
-| Observability | Langfuse (LLM traces) + PostHog (product analytics) |
+| LLM | Anthropic-only for generation, via Claude Agent SDK spine + raw SDK. Player-facing tier menus (§3): narration Sonnet 5 / Opus 4.8 / Fable 5 · judgment Haiku 4.5 / Sonnet 5 / Opus 4.8 · probe Haiku 4.5 / Sonnet 5. Fable narration always configures server-side fallback to Opus 4.8 |
+| Embeddings | **Voyage `voyage-3.5` @ 1024 dims — the named exception, frozen at M0** |
+| Observability | Langfuse (every model call traced + cost-metered; `pnpm langfuse:latest` for trace questions) + PostHog |
 | Deploy | Railway (Dockerfile builder, GitHub push-to-deploy) |
-| Schema validation | Zod v4 |
+| Schema validation | Zod v4 (Agent SDK peer dep — don't downgrade) |
 
 ### Key directories
 
-- `src/lib/types/` — Zod schemas + TS types (profile, campaign, dna, composition, arc, turn)
-- `src/lib/env.ts` — lazy Proxy over `envSchema.parse()`; see the file comment
-- `src/lib/client-env.ts` — `NEXT_PUBLIC_*` surface for browser code; never bypass with raw `process.env`
-- `src/lib/db.ts` — lazy Drizzle singleton with shutdown handlers
-- `src/lib/llm/` — provider SDK singletons (`getAnthropic`, `getGoogle`, `getOpenAI`)
-- `src/lib/observability/` — `getLangfuse`, `getPostHog` (null-safe, advisory)
-- `src/lib/prompts/` — prompt registry + fragments (lands in M1 Commit 2)
-- `src/lib/agents/` — agent implementations
-- `src/lib/tools/` — Mastra tool registry + MCP server wrappers
-- `evals/golden/profiles/` — hand-scored IP fixtures (Cowboy Bebop, Solo Leveling)
-- `evals/golden/gameplay/` — 5 golden turns for PR gate (lands in M1)
-- `docs/plans/M<n>-*.md` — implementation plans per milestone
-- `docs/retros/M<n>.md` — retros at milestone close
-- `docs/spikes/*.md` — de-risking spikes with findings
-- `reference/aidm_v3/` — v3 Python source, the spec
-- `scripts/` — standalone scripts (Langfuse hello, spikes, seeds)
+- `src/lib/types/` — the type pool: salvaged `dna.ts`/`composition.ts` + premise/conte/sidecar/marks/turn/provenance contracts (C2)
+- `src/lib/db/` — nine-layer schema + provenance envelope (C3)
+- `src/lib/llm/` — `anthropic.ts` singleton; tiers/calls/voyage land C4 (the metered choke point)
+- `src/lib/observability/` — Langfuse wrapper + cost meter (C4)
+- `src/lib/blocks/` — four-block cache plumbing, append-only Block 3 (C5)
+- `src/lib/ka/` — salvaged sakuga/diversity craft logic
+- `rule_library/` — guidance chunks + `anchors/` + `exemplars/` grounding data (C6)
+- `evals/golden/` — hand-scored profile fixtures (Bebop, Solo Leveling); harness returns C6
+- `docs/plans/` — blueprint + milestone plans · `docs/retros/` — milestone retros
+- `reference/aidm_v3/`, `reference/aidm_v4/` — the shelved past; read-only
 
-### Known gotchas
+## Substrate disciplines (v5-specific; violations are defects)
 
-- **Railway Dockerfile + NEXT_PUBLIC_\*:** every `NEXT_PUBLIC_*` env var needs `ARG` + `ENV` in the builder stage or Next inlines `undefined` at build time and the var silently no-ops in the browser. Check `Dockerfile` lines 21–38 for the pattern.
-- **HOSTNAME=0.0.0.0** required in runner stage for Next standalone on Railway. Without it the server binds to localhost and Railway's proxy returns 404.
-- **Env parsing is lazy.** `env.ts` uses a Proxy that parses on first access. Never call `envSchema.parse(process.env)` at module import time — it breaks Next's build-time page-data collection.
-- **`getDb()` is a lazy singleton** — pool construction runs on first access, not module load.
-- **Drizzle migrations run from dev machine, not Railway.** No `preDeployCommand` pointing at drizzle-kit (it's a devDep; Railway prunes devDeps at runtime).
-- **Clerk v7** does not export `<SignedIn>` / `<SignedOut>` components. Use server-side `currentUser()` from `@clerk/nextjs/server`.
-- **zod v4** is required (Agent SDK peer dep). Don't downgrade.
-- **Biome's `noDelete`** rule + TS strict mode: use `Reflect.deleteProperty(process.env, "X")` in tests, never raw `delete`.
-- **Vitest + env-dependent tests:** use `vi.resetModules()` in `beforeEach` + dynamic `await import("./module")` inside the test. Don't try to cache-bust via `?fresh=...` — esbuild loader breaks.
-- **`typedRoutes: false`** in `next.config.ts` — Next 15's typed routes are strict and the types only generate at build. Setting true breaks dev typecheck.
+- **Every model call flows through the traced trio** in `src/lib/llm/` (from C4): `streamNarration` / `callJudgment` / `callProbe`. No raw SDK calls elsewhere; if it isn't traced and metered, it doesn't ship.
+- **`EMBEDDING_DIMENSIONS = 1024` is frozen.** Changing it is a re-embed migration, by design.
+- **Block 3 is append-only between compaction events.** Never add a mutation path to the block store; a sliding window silently destroys prefix caching (§5.6).
+- **Every layer-table write carries `{turn_id, provenance, confidence, tombstoned_at}`.** Reads go through the `notTombstoned()` helper — it's the rewind substrate.
+- **Narration prose streams as free text** (the one structured-output exemption, §5.7); its sidecar arrives as the `commit_scene` tool trailer. Everything else: native strict structured output.
+- **Never import from `reference/`.**
 
----
+## Known gotchas
 
-## The seven memory MCP servers (quick reference)
-
-Each layer has its own retrieval shape. KA chooses which to query.
-
-| Layer | Surface | Used for |
-|---|---|---|
-| `aidm-ambient` | Block 1 of KA's cache; manifests via prompt rendering | Profile DNA, rules, author voice |
-| `aidm-working` | Block 3 sliding window | Current scene; last N exchanges |
-| `aidm-episodic` | `recall_scene`, `get_turn_narrative`, `get_recent_episodes` | Turn transcripts as prose; keyword/tsvector search |
-| `aidm-semantic` | `search_memory`, `get_critical_memories` | Distilled cross-turn facts; pgvector + 15-category decay |
-| `aidm-voice` | `get_voice_patterns`, `get_voice_exemplars_by_beat_type` | Director's journal of cadences that worked |
-| `aidm-arc` | `get_arc_state`, `list_active_seeds`, `plantForeshadowingSeed` | Arc plan + foreshadowing causal graph |
-| `aidm-critical` | `get_critical_memories`, `get_overrides` | Session Zero facts, player overrides; never decays |
-
-**Write path:** memory writer (background, post-turn) routes content to the appropriate layer(s) and writes **storyboarded fragments** alongside facts. A scene becomes both a searchable fact and a short prose fragment that preserves voice for recall.
-
----
+- **Railway Dockerfile + NEXT_PUBLIC_\*:** every new `NEXT_PUBLIC_*` var needs `ARG` + `ENV` in the builder stage or Next inlines `undefined` and it silently no-ops in the browser (Dockerfile lines 21–38).
+- **HOSTNAME=0.0.0.0** required in the runner stage for Next standalone on Railway.
+- **Env parsing is lazy** (`env.ts` Proxy). Never call `envSchema.parse(process.env)` at module import — it breaks Next's build-time page-data collection.
+- **`getDb()` is a lazy singleton** — pool construction on first access, never module load.
+- **Drizzle migrations run from the dev machine**, not Railway (drizzle-kit is a devDep; Railway prunes devDeps).
+- **Biome `noDelete`:** use `Reflect.deleteProperty(process.env, "X")` in tests.
+- **Vitest + env-dependent tests:** `vi.resetModules()` in `beforeEach` + dynamic `await import()` inside the test.
+- **`typedRoutes: false`** in `next.config.ts` — Next 15 typed routes break dev typecheck.
+- **Agent SDK native binary:** the Dockerfile's runner stage installs `@anthropic-ai/claude-agent-sdk-linux-x64-musl` by hand (standalone tracing can't follow optional deps) — keep its version pinned to the SDK version.
 
 ## Anti-patterns (do not)
 
-- **Don't simplify v3's complexity because it looks like scaffolding.** The cascade, the 24 DNA axes, the sakuga ladder, the authority gradient, the tiered memory — each exists because the user watched the system fail without it. When instinct says "this isn't needed," ask what failure mode it prevents.
-- **Don't frame v3 as plumbing to cut** or "~80% redundant." 2026 primitives upgrade the substrate; they don't delete mechanisms.
-- **Don't defer load-bearing structure to later milestones.** "M1 needs only X; defer Y to M4" is the wrong frame unless the user explicitly asks for it. The full shape scaffolds from day one; content sharpens with play.
-- **Don't skip the subagent audit before push.** Inline "I checked everything" is not a substitute.
-- **Don't mock the database in integration-flavored tests.** If a test verifies state mutations, hit the real Drizzle against a real Postgres (dev DB is fine).
-- **Don't add features beyond what the task requires.** No speculative abstractions. No backwards-compat shims when changing unshipped code. Three similar lines beats a premature abstraction.
+- **Don't relitigate closed decisions.** §13 is closed. Model menus, Voyage, media-late, register naming — done. New evidence goes to the user, not into divergent code.
+- **Don't simplify carried v3 mechanisms because they look like scaffolding.** Each §11 "C" row exists because the user watched the system fail without it. When instinct says "this isn't needed," ask what failure mode it prevents.
+- **Don't add mechanisms beyond the ledger** without a named failure mode + pillar in a plan doc first (§14 risk 6 — v3's 21-agent sprawl is the cautionary tale).
+- **Don't defer load-bearing structure.** Axiom 8: whole shape, scaffolded, from M1.
+- **Don't mock the database in integration-flavored tests.** State-mutation tests hit the real dev Postgres.
 - **Don't write documentation files or READMEs unless asked.** Plans and retros are requested; `*.md` as a substitute for conversation is not.
-- **Don't write comments unless the WHY is non-obvious.** No narration comments. No "// added for issue #123". Well-named identifiers carry what.
-- **Don't claim UI work is complete without browser testing** when the change affects UI. Type-check green ≠ feature works.
-- **Don't generate URLs the user didn't provide** unless you're confident they're for programming tasks (GitHub, npm, docs).
-
----
+- **Don't write comments unless the WHY is non-obvious.** No narration comments, no changelog comments.
+- **Don't claim UI work is complete without browser testing.** Type-check green ≠ feature works.
+- **Don't push before the subagent audit.** Inline "I checked everything" is not a substitute.
 
 ## When in doubt
 
-1. Read [`project_v4_vision.md`](~/.claude/projects/C--Users-admin-Downloads-aidm-v4/memory/project_v4_vision.md).
-2. Read the relevant `reference/aidm_v3/` source.
-3. Check ROADMAP but treat it as a working design doc — it can be wrong; the memory files are the authority when they diverge.
+1. Read blueprint **§0**, then the section owning the system you're touching.
+2. Read the relevant `reference/aidm_v3/` source for empirical behavior.
+3. Check memory — `project_v5_redesign.md` is the session-state anchor.
 4. Ask the user.
 
-Memory files that matter most:
-- **Authority:** `project_v4_vision.md`, `feedback_v3_respect.md`, `feedback_think_dont_manage.md`
-- **Workflow:** `feedback_audit_cadence.md`
-- **Context:** `project_aidm_v4.md`, `project_v3_soul.md`, `project_v3_profile_and_sz.md`
-- **Gotchas:** `project_railway_next_build_env.md`, `project_model_versions.md`
-
----
+Memory files that matter most: **authority** `project_v5_redesign.md` · **conduct** `feedback_think_dont_manage.md`, `feedback_no_scope_ducking.md`, `feedback_user_selects_models.md`, `feedback_v3_respect.md`, `feedback_audit_cadence.md` · **context** `user_profile.md`, `project_business_model.md` · **gotchas** `project_railway_next_build_env.md`, `project_langfuse_trace_tool.md`.
 
 ## Tone
 
 The user trusts thoroughness over speed. A slower, deeper reply beats a fast surface one. When the work is ambitious, match the ambition. When it's routine, be terse. Don't perform process; do the work and report what happened. Skip the "I'll now do X" preambles — just do X and tell the user what you found.
 
-When you're wrong, say so cleanly. No "you raise a good point" filler. Concede, correct, continue.
+When you're wrong, say so cleanly. No "you raise a good point" filler. Concede, correct, continue. The blueprint's §15 walk-back log exists because he'd rather see the reversal recorded than papered over.

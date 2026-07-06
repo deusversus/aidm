@@ -1,10 +1,9 @@
 import { env } from "@/lib/env";
-import { type NodePgDatabase, drizzle } from "drizzle-orm/node-postgres";
+import * as schema from "@/lib/state/schema";
+import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 
-// Schema-less until the C3 substrate commit lands the nine-layer schema at
-// src/lib/db/schema.ts; getDb() gains the typed schema generic there.
-export type Db = NodePgDatabase;
+export type Db = ReturnType<typeof drizzle<typeof schema>>;
 
 // Lazy singleton. Module-load-time pool construction breaks Next.js production
 // builds (page-data collection imports route handlers before DATABASE_URL is set).
@@ -28,7 +27,7 @@ export function getDb(): Db {
     connectionString: env.DATABASE_URL,
     max: 10,
   });
-  _db = drizzle(_pool, { casing: "snake_case" });
+  _db = drizzle(_pool, { schema, casing: "snake_case" });
 
   // Graceful shutdown — Railway sends SIGTERM on redeploy. Drain the pool so
   // in-flight queries finish and new revisions don't inherit orphaned

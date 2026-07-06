@@ -47,18 +47,9 @@ coverage/
 .idea/
 *.swp
 
-# v3 reference — lives on the v3 branch of this repo; not mirrored on master
-reference/
+# v3 reference — lives on the v3 branch of this repo; not mirrored on master.
+# reference/aidm_v4/ (the shelved v4 implementation) IS tracked on master.
+reference/aidm_v3/
 
 # local tooling
 .claude/
-
-# MockLLM — auto-captured fixtures (review before committing)
-evals/fixtures/llm/recorded/*.yaml
-
-# Eval harness (Commit 8)
-# - latest.json is the output of `pnpm evals`; CI regenerates per run
-# - manual-reviews/ holds judge.ts output (prose scoring from Haiku
-#   calls invoked with the user's explicit approval); never committed
-evals/latest.json
-evals/manual-reviews/

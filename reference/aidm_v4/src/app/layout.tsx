@@ -6,7 +6,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "AIDM",
-  description: "An engine for co-telling long-form fiction that stays true to a premise.",
+  description: "Anime-themed long-horizon single-player TTRPG dungeon master.",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

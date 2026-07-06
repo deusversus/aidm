@@ -41,10 +41,8 @@ describe("env Proxy", () => {
   it("leaves optional keys undefined when unset", async () => {
     process.env.DATABASE_URL = "postgres://u:p@h:5432/d";
     Reflect.deleteProperty(process.env, "ANTHROPIC_API_KEY");
-    Reflect.deleteProperty(process.env, "VOYAGE_API_KEY");
     const { env } = await import("./env");
     expect(env.ANTHROPIC_API_KEY).toBeUndefined();
-    expect(env.VOYAGE_API_KEY).toBeUndefined();
   });
 
   it("ownKeys works for spread/destructure", async () => {
@@ -53,5 +51,28 @@ describe("env Proxy", () => {
     const keys = Object.keys(env);
     expect(keys).toContain("DATABASE_URL");
     expect(keys).toContain("NODE_ENV");
+  });
+});
+
+describe("anthropicDefaults (fallback-only; authoritative config is per-campaign tier_models)", () => {
+  beforeEach(() => {
+    vi.resetModules();
+  });
+
+  it("declares probe / fast / thinking / creative keys with Anthropic model strings", async () => {
+    const { anthropicDefaults } = await import("./env");
+    expect(anthropicDefaults.probe).toBe("claude-haiku-4-5-20251001");
+    expect(anthropicDefaults.fast).toBe("claude-haiku-4-5-20251001");
+    // thinking: Sonnet 4.6 (changed 2026-04-23 from Opus 4.7 — ~5× cheaper
+    // per-token, still supports extended thinking; Opus is overkill for
+    // structured-verdict judgment across 10+ thinking-tier surfaces).
+    expect(anthropicDefaults.thinking).toBe("claude-sonnet-4-6");
+    expect(anthropicDefaults.creative).toBe("claude-opus-4-7");
+  });
+
+  it("matches ANTHROPIC_DEFAULTS from the providers registry (single source of truth)", async () => {
+    const { anthropicDefaults } = await import("./env");
+    const { ANTHROPIC_DEFAULTS } = await import("./providers");
+    expect(anthropicDefaults).toEqual(ANTHROPIC_DEFAULTS);
   });
 });

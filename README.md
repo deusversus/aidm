@@ -1,67 +1,38 @@
-# AIDM v4
+# AIDM v5
 
-Anime-themed long-horizon single-player tabletop RPG dungeon master.
+An engine for co-telling long-form fiction that stays true to a premise.
 
-See [ROADMAP.md](./ROADMAP.md) for the master design document and [docs/plans/](./docs/plans/) for per-milestone implementation plans. The [`v3`](https://github.com/deusversus/aidm/tree/v3) branch holds the Python predecessor v4 reincarnates in 2026 primitives.
+The spec-of-record is [`docs/plans/v5-blueprint.md`](docs/plans/v5-blueprint.md) (v3-final, signed 2026-07-06) — read §0 first. Per-milestone implementation plans live in [docs/plans/](docs/plans/). The past is reference, not spec: [`reference/aidm_v3/`](reference/aidm_v3/) holds the Python predecessor (the empirical record), [`reference/aidm_v4/`](reference/aidm_v4/) the shelved 2026 TypeScript map.
 
 ## Stack
 
-TypeScript · Next.js 15 (App Router) · React 19 · Tailwind 4 · Drizzle ORM · Postgres 16 + pgvector · Mastra · Claude Agent SDK · Clerk · Langfuse · PostHog · Railway.
+TypeScript · Next.js 15 (App Router) · React 19 · Tailwind 4 · Drizzle ORM · Postgres 16 + pgvector · Claude Agent SDK (Anthropic-only generation) · Voyage embeddings · Clerk · Langfuse · PostHog · Railway.
 
 ## Deploy topology
 
-One Railway project (`aidm`). `master` autodeploys on push to GitHub. The Railway-managed Postgres plugin provides `DATABASE_URL` at runtime (injected automatically). Local development runs against the **same** Railway Postgres via its public URL — no local Docker required.
+One Railway project (`aidm`). `master` autodeploys on push to GitHub. The Railway-managed Postgres plugin provides `DATABASE_URL` at runtime (injected automatically). Local development runs against the **same** Railway Postgres via its public URL — no local Docker required. v5 uses a fresh database on that instance; the v4 database is untouched reference data.
 
 ## Local dev
 
-Requires Node 22+ and a Railway project with the Postgres plugin provisioned (see below).
+Requires Node 22+ and the Railway project (Postgres plugin provisioned).
 
 ```sh
 corepack enable                   # first time only — activates pnpm
-cp .env.example .env.local        # paste keys (see below)
+cp .env.example .env.local        # paste keys (see .env.example comments)
 pnpm install
-pnpm db:push                      # apply schema to the Railway Postgres
 pnpm dev                          # http://localhost:3000
 ```
-
-### Getting `DATABASE_URL`
-
-1. Railway dashboard → `aidm` project → Postgres plugin → **Variables** tab.
-2. Copy the `DATABASE_PUBLIC_URL` value (starts with `postgresql://`, ends with `.proxy.rlwy.net:<port>/railway`).
-3. Paste into `.env.local` as `DATABASE_URL=...`.
-
-Internal `DATABASE_URL` (with `postgres.railway.internal`) is set automatically when the app runs on Railway — never paste that into `.env.local`.
 
 ## Scripts
 
 | Command | Purpose |
 |---|---|
-| `pnpm dev` | Next.js dev server |
-| `pnpm build` | Production build |
-| `pnpm lint` | Biome lint check |
-| `pnpm typecheck` | `tsc --noEmit` strict |
-| `pnpm test` | Vitest unit/integration |
-| `pnpm db:generate` | Generate migration from schema diff |
-| `pnpm db:push` | Apply schema directly (dev) |
-| `pnpm db:migrate` | Run migrations (prod-style, idempotent) |
+| `pnpm dev` / `pnpm build` | Next.js dev server / production build |
+| `pnpm lint` / `pnpm typecheck` / `pnpm test` | Biome · tsc strict · Vitest |
+| `pnpm db:generate` / `pnpm db:migrate` | Drizzle migration diff / apply |
 | `pnpm db:studio` | Drizzle Studio GUI |
-| `pnpm eval` | Run eval harness (full) |
-| `pnpm eval:fast` | Run eval smoke subset |
+| `pnpm langfuse:latest` | Latest-trace diagnostic (tier / model / cost / latency) |
 
 ### Migration workflow
 
-Migrations run from the **dev machine** against the Railway Postgres, not on Railway itself. After editing `src/lib/state/schema.ts`:
-
-```sh
-pnpm db:generate      # produces drizzle/NNNN_<name>.sql + meta/ updates
-# hand-review the generated SQL per ROADMAP §4.6
-pnpm db:migrate       # applies against the DATABASE_URL in .env.local
-git add drizzle/ && git commit -m "feat(db): <change>"
-git push              # Railway rebuilds; migration state already in prod
-```
-
-Reasoning: the runner image is minimal (no drizzle-kit, no devDeps); `pnpm` isn't wired for the `nextjs` user; and running schema changes ahead of the push lets you verify the state before the rebuild spins down old revisions. Matches the pattern from `hvmsite` and `DDD`.
-
-## Repository layout
-
-See [ROADMAP §3.3](./ROADMAP.md#33-repo-layout).
+Migrations run from the **dev machine** against the Railway Postgres, not on Railway itself (the runner image has no devDeps). After editing `src/lib/db/schema.ts`: `pnpm db:generate` → hand-review the SQL → `pnpm db:migrate` → commit `drizzle/` → push.

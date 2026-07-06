@@ -6,7 +6,7 @@ const envSchema = z.object({
   DATABASE_URL: z.string().url(),
   NEXT_PUBLIC_APP_URL: z.string().url().default("http://localhost:3000"),
 
-  // --- Clerk auth (commit 3) ---
+  // --- Clerk auth ---
   // Publishable key inlined into client bundle at build time. Must be set in
   // Railway's BUILD env, not just runtime, or Clerk throws in the browser.
   NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: z.string().optional(),
@@ -17,27 +17,18 @@ const envSchema = z.object({
   NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL: z.string().default("/campaigns"),
   NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL: z.string().default("/campaigns"),
 
-  // --- LLM providers (commit 4) ---
+  // --- LLM ---
+  // Anthropic-only for story generation (blueprint §3). Voyage is the named
+  // embedding exception — Anthropic has no embeddings API.
   ANTHROPIC_API_KEY: z.string().optional(),
-  GOOGLE_API_KEY: z.string().optional(),
-  OPENAI_API_KEY: z.string().optional(),
-  OPENROUTER_API_KEY: z.string().optional(),
+  VOYAGE_API_KEY: z.string().optional(),
 
-  // --- Observability (commit 5) ---
+  // --- Observability ---
   LANGFUSE_PUBLIC_KEY: z.string().optional(),
   LANGFUSE_SECRET_KEY: z.string().optional(),
   LANGFUSE_HOST: z.string().url().default("https://us.cloud.langfuse.com"),
   NEXT_PUBLIC_POSTHOG_KEY: z.string().optional(),
   NEXT_PUBLIC_POSTHOG_HOST: z.string().url().default("https://us.i.posthog.com"),
-
-  // --- Budget caps (Commit 9) ---
-  // Per-user per-minute turn cap — accident-prevention guard, not a
-  // business control. Default 6 (roughly 10s between turns — generous
-  // for thinking-then-acting; no one is hitting this with good intent).
-  // User-configurable spending caps live on `users.daily_cost_cap_usd`;
-  // there is deliberately no AIDM_DAILY_COST_CAP_USD (business model
-  // is cost-forward + markup, users choose their own ceiling).
-  AIDM_TURNS_PER_MINUTE_CAP: z.coerce.number().int().positive().default(6),
 });
 
 export type Env = z.infer<typeof envSchema>;
@@ -70,41 +61,3 @@ export const env = new Proxy({} as Env, {
     return Reflect.getOwnPropertyDescriptor(cached, prop);
   },
 });
-
-/**
- * Fallback-only model defaults — NOT the global source of truth.
- *
- * In the per-campaign multi-provider world (M1.5 Commit A onwards), the
- * authoritative `{ provider, tier_models }` config lives on each
- * campaign row at `settings.provider` + `settings.tier_models`. The
- * turn workflow reads it via `resolveModelContext` and threads it
- * through every LLM call on the turn.
- *
- * This constant is the narrow fallback for callers that don't have a
- * campaign context:
- *   - `/api/ready` reachability probe (see `pingAnthropic`)
- *   - CLI scripts that don't target a specific campaign
- *   - Tests that don't need per-campaign routing
- *
- * The runtime hot path (router → consultants → KA) must NOT read from
- * here. If you're reaching for `anthropicDefaults` from code that runs
- * during a turn, you've missed the modelContext threading in Commit D —
- * that's a bug, not a convenience.
- *
- * Kept identical to `src/lib/providers/anthropic.ts` ANTHROPIC_DEFAULTS
- * (single source of truth for Anthropic's baseline). If they diverge,
- * fix it here — the providers registry is authoritative.
- */
-// Import via a string re-export path so env.ts can be consumed by
-// Next's build-time page-data collection without pulling in zod. The
-// PROBE_DEFAULT const lives in providers/types alongside its registry
-// use; single-source + small enough to duplicate literally if
-// providers/types ever grows transitive weight here.
-import { PROBE_DEFAULT } from "@/lib/providers/types";
-
-export const anthropicDefaults = {
-  probe: PROBE_DEFAULT,
-  fast: PROBE_DEFAULT,
-  thinking: "claude-sonnet-4-6",
-  creative: "claude-opus-4-7",
-} as const;
