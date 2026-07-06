@@ -6,7 +6,7 @@ The spec-of-record is [`docs/plans/v5-blueprint.md`](docs/plans/v5-blueprint.md)
 
 ## Stack
 
-TypeScript · Next.js 15 (App Router) · React 19 · Tailwind 4 · Drizzle ORM · Postgres 16 + pgvector · Claude Agent SDK (Anthropic-only generation) · Voyage embeddings · Clerk · Langfuse · PostHog · Railway.
+TypeScript · Next.js 15 (App Router) · React 19 · Tailwind 4 · Drizzle ORM · Postgres 18 + pgvector · Claude Agent SDK (Anthropic-only generation) · Voyage embeddings · Clerk · Langfuse · PostHog · Railway.
 
 ## Deploy topology
 

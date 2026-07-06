@@ -93,7 +93,7 @@ This file is loaded into context on every Claude session in this repo. It's the 
 | Package manager | pnpm 10 |
 | Lint/format | Biome 1.9 (`pnpm lint`, `pnpm lint:fix`) |
 | Typecheck / tests | `pnpm typecheck` · Vitest (`pnpm test`) |
-| DB | Postgres 16 + pgvector 0.8 on Railway — **fresh v5 database, never the v4 one** |
+| DB | Postgres 18 + pgvector 0.8 on Railway (`aidm_v5` database — **never the v4 one**; blueprint says 16, instance is actually 18.3) |
 | ORM | Drizzle + drizzle-kit (schema at `src/lib/db/schema.ts`, lands C3) |
 | Auth | Clerk v7 (`currentUser()` pattern — no `<SignedIn>/<SignedOut>` in v7) |
 | LLM | Anthropic-only for generation, via Claude Agent SDK spine + raw SDK. Player-facing tier menus (§3): narration Sonnet 5 / Opus 4.8 / Fable 5 · judgment Haiku 4.5 / Sonnet 5 / Opus 4.8 · probe Haiku 4.5 / Sonnet 5. Fable narration always configures server-side fallback to Opus 4.8 |
