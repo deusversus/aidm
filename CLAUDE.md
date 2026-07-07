@@ -123,6 +123,7 @@ This file is loaded into context on every Claude session in this repo. It's the 
 - **Every layer-table write carries `{turn_id, provenance, confidence, tombstoned_at}`.** Reads go through the `notTombstoned()` helper — it's the rewind substrate.
 - **Narration prose streams as free text** (the one structured-output exemption, §5.7); its sidecar arrives as the `commit_scene` tool trailer. Everything else: native strict structured output.
 - **Never import from `reference/`.**
+- **Automated tests/evals/smokes/soaks never call Fable.** Dev traffic runs Sonnet/Haiku (`DEV_TIER_SELECTION`); Fable spend is player-facing only. A Fable-path change needing live re-verification: ask first, price stated.
 
 ## Known gotchas
 
