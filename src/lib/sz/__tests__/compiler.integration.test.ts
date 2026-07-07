@@ -112,6 +112,31 @@ describe.skipIf(!url)("SZ compiler (real Postgres)", () => {
         },
       })
       .onConflictDoNothing();
+    // Second source for the hybrid fixture — content reused, identity distinct.
+    await db
+      .insert(schema.profiles)
+      .values({
+        id: "test_sz_profile_b",
+        title: "Solo Leveling",
+        profile: {
+          id: "test_sz_profile_b",
+          title: "Solo Leveling",
+          alternate_titles: [],
+          media_type: "anime",
+          status: "completed",
+          relation_type: "canonical",
+          ip_mechanics: {
+            ...contract.canonical.world,
+            author_voice: contract.canonical.voice.author_voice,
+            voice_cards: [],
+          },
+          canonical_dna: contract.canonical.treatment,
+          canonical_composition: contract.canonical.framing,
+          director_personality: contract.canonical.voice.director_personality,
+          cast_depth_posture: contract.canonical.voice.cast_depth_posture,
+        },
+      })
+      .onConflictDoNothing();
     const draft: ConductorDraft = {
       transcript: [{ role: "user", content: "let's play bebop" }],
       observations: SCRIPTED_OBSERVATIONS,
@@ -131,6 +156,7 @@ describe.skipIf(!url)("SZ compiler (real Postgres)", () => {
     try {
       await db.delete(schema.campaigns).where(eq(schema.campaigns.id, campaignId));
       await db.delete(schema.profiles).where(eq(schema.profiles.id, "test_sz_profile"));
+      await db.delete(schema.profiles).where(eq(schema.profiles.id, "test_sz_profile_b"));
       await db.delete(schema.players).where(eq(schema.players.id, playerId));
     } finally {
       await pool.end();
@@ -175,7 +201,7 @@ describe.skipIf(!url)("SZ compiler (real Postgres)", () => {
     expect(resolved.deferred.some((d) => d.includes("tier selection"))).toBe(true);
   });
 
-  it("blend choices resolve latest-wins per component; hybrids block compile honestly (M4 staging)", () => {
+  it("blend choices resolve latest-wins per component; malformed ones defer", () => {
     const resolved = resolveObservations([
       obs("blend", '{"component": "world", "choice": "Solo Leveling"}'),
       obs("blend", '{"component": "framing", "choice": "Cowboy Bebop"}'),
@@ -185,10 +211,39 @@ describe.skipIf(!url)("SZ compiler (real Postgres)", () => {
     expect(resolved.blendChoices).toContainEqual({ component: "world", choice: "Cowboy Bebop" });
     expect(resolved.blendChoices).toHaveLength(2);
     expect(resolved.deferred.some((d) => d.includes("unparseable blend"))).toBe(true);
+  });
 
-    const gaps = gapVerdict(resolveObservations(SCRIPTED_OBSERVATIONS), true, 2);
-    expect(gaps.some((g) => g.includes("hybrid"))).toBe(true);
-    expect(gapVerdict(resolveObservations(SCRIPTED_OBSERVATIONS), true, 1)).toEqual([]);
+  it("a hybrid draft compiles single-source from the player's WORLD pick, recipe carried (M1, user-ratified)", async () => {
+    if (!db) throw new Error("unreachable");
+    const hybridDraft: ConductorDraft = {
+      transcript: [],
+      observations: [
+        ...SCRIPTED_OBSERVATIONS,
+        obs("blend", '{"component": "world", "choice": "Solo Leveling"}'),
+        obs("blend", '{"component": "framing", "choice": "Cowboy Bebop"}'),
+      ],
+      // Bebop was researched FIRST — the world pick must still win the base.
+      profileIds: ["test_sz_profile", "test_sz_profile_b"],
+      readyToCompile: true,
+    };
+    const [hybrid] = await db
+      .insert(schema.campaigns)
+      .values({ playerId, title: "hybrid fixture", status: "draft", szTranscript: hybridDraft })
+      .returning();
+    if (!hybrid) throw new Error("insert failed");
+    try {
+      const result = await compileSessionZero(db, hybrid.id, {
+        ospSynthesizer: async () => STUB_OSP,
+      });
+      expect(result.gaps).toEqual([]);
+      expect(result.contract.hybrid_recipe?.world.source_profile_ids).toEqual([
+        "test_sz_profile_b",
+      ]);
+      expect(result.contract.hybrid_recipe?.framing.notes).toContain("Cowboy Bebop");
+      expect(result.contract.anchors_used).toContain("test_sz_profile");
+    } finally {
+      await db.delete(schema.campaigns).where(eq(schema.campaigns.id, hybrid.id));
+    }
   });
 
   it("gap verdict blocks a sparkless handoff (§8)", () => {

@@ -19,7 +19,7 @@ import {
   SuggestionAffordance,
 } from "@/lib/types/premise";
 import { Profile } from "@/lib/types/profile";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import type { ConductorDraft, Observation } from "./conductor";
 
@@ -202,21 +202,9 @@ export function resolveObservations(observations: Observation[]): ResolvedObserv
 
 // --- Gap verdict (deterministic, blocking) ----------------------------------
 
-export function gapVerdict(
-  resolved: ResolvedObservations,
-  hasProfile: boolean,
-  profileCount = 1,
-): string[] {
+export function gapVerdict(resolved: ResolvedObservations, hasProfile: boolean): string[] {
   const gaps: string[] = [];
   if (!hasProfile) gaps.push("no researched profile — the World never loaded");
-  if (profileCount > 1) {
-    // Honest, not silent: compiling a hybrid conversation from one source
-    // would quietly discard the blend. Per-component assembly is M4-staged
-    // (M1 plan); the draft and its blend observations are durable.
-    gaps.push(
-      "hybrid premise: per-component assembly lands at M4 — this draft keeps everything and compiles then (or the staging gets pulled forward)",
-    );
-  }
   if (!resolved.spark) gaps.push("the spark was never gathered (§8's one mandatory question)");
   if (!resolved.finitude) gaps.push("finitude undetermined — the Series contract is sacrosanct");
   if (!resolved.deathPhysics) gaps.push("death physics ungathered (intensity contract)");
@@ -328,15 +316,54 @@ export async function compileSessionZero(
   if (!draft) throw new Error("no SZ draft to compile");
 
   const resolved = resolveObservations(draft.observations);
-  const profileId = draft.profileIds[0];
-  const [profileRow] = profileId
-    ? await db.select().from(profiles).where(eq(profiles.id, profileId))
-    : [];
-  const gaps = gapVerdict(resolved, !!profileRow, draft.profileIds.length);
+  const rows =
+    draft.profileIds.length > 0
+      ? await db.select().from(profiles).where(inArray(profiles.id, draft.profileIds))
+      : [];
+  // Hybrid at M1 (user-ratified 2026-07-07): compile single-source; the
+  // blend intent rides the contract's hybrid_recipe (notes) and the OSP's
+  // deferred context so the Director honors it in prose until M4's
+  // per-component assembly replaces this. The BASE is the world the player
+  // chose to stand in (their world pick), else the first source loaded.
+  const isHybrid = draft.profileIds.length > 1;
+  let profileRow = rows.find((r) => r.id === draft.profileIds[0]);
+  const worldPick = resolved.blendChoices.find((b) => b.component === "world");
+  if (isHybrid && worldPick) {
+    const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "");
+    const match = rows.find(
+      (r) =>
+        r.id === worldPick.choice ||
+        norm(worldPick.choice).includes(norm(r.title)) ||
+        norm(r.title).includes(norm(worldPick.choice)),
+    );
+    if (match) profileRow = match;
+  }
+  const profileId = profileRow?.id;
+  const gaps = gapVerdict(resolved, !!profileRow);
   if (gaps.length > 0) {
     return { gaps } as CompileResult; // blocking — handoff halted (§8)
   }
   const profile = Profile.parse(profileRow?.profile);
+  if (isHybrid) {
+    resolved.deferred.push(
+      `hybrid premise compiled single-source (base: ${profileId}) — per-component assembly lands at M4; honor the recorded blend in prose meanwhile`,
+    );
+  }
+  const blendNote = (component: string) => {
+    const pick = resolved.blendChoices.find((b) => b.component === component);
+    return pick
+      ? `player chose: ${pick.choice} — M4 assembly pending`
+      : "M1 single-source; blend unresolved for this component";
+  };
+  const hybridRecipe =
+    isHybrid && profileId
+      ? Object.fromEntries(
+          ["world", "treatment", "framing", "voice", "canonicality"].map((c) => [
+            c,
+            { method: "single" as const, source_profile_ids: [profileId], notes: blendNote(c) },
+          ]),
+        )
+      : undefined;
 
   // Canonical components from the profile; active = canonical + player moves.
   const canonicality: Canonicality = Canonicality.parse({
@@ -373,6 +400,7 @@ export async function compileSessionZero(
     campaign_id: campaignId,
     canonical,
     active,
+    ...(hybridRecipe ? { hybrid_recipe: hybridRecipe } : {}),
     spark: resolved.spark,
     presentation_vocabulary: PresentationVocabulary.parse({
       grants: resolved.presentationGrants,
