@@ -38,7 +38,9 @@ export const IntentOutput = z.object({
   epicness: z.number().min(0).max(1),
   special_conditions: z.array(z.string()).default([]),
   confidence: z.number().min(0).max(1),
-  secondary_intent: IntentType.optional(),
+  // Same null→undefined guard as target/action above: Haiku emits null for
+  // "omit when unknown" (live layout probe, 2026-07-07).
+  secondary_intent: z.preprocess((v) => (v === null ? undefined : v), IntentType.optional()),
 });
 
 export type IntentOutput = z.infer<typeof IntentOutput>;

@@ -265,10 +265,16 @@ export const semanticMemories = pgTable(
     embedding: vector({ dimensions: EMBEDDING_DIMENSIONS }).notNull(),
     /** 15-category heat curves carry v3's values as defaults (§6.4). */
     category: text().notNull(),
-    /** Decay computed at QUERY time over (baseHeat, lastBoostedAt, category half-life, floor) — no decay cron. */
+    /** Decay computed at QUERY time over (baseHeat, lastBoostedTurn, category curve, floor) — no decay cron. */
     baseHeat: real().notNull().default(50),
     lastBoostedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
-    heatFloor: real().notNull().default(0),
+    /**
+     * Decay distance is measured in TURNS, not wall-clock (v3's curves are
+     * per-turn; time-based decay would erase a sleeping player's heat).
+     * lastBoostedAt above stays as bookkeeping.
+     */
+    lastBoostedTurn: integer().notNull().default(0),
+    heatFloor: real().notNull().default(1),
     /** Promotion provenance flag; the promoted fact itself lives in critical_facts (§6.3). */
     plotCritical: boolean().notNull().default(false),
     ...provenanceColumns,
@@ -279,6 +285,31 @@ export const semanticMemories = pgTable(
       "hnsw",
       t.embedding.op("vector_cosine_ops"),
     ),
+  }),
+);
+
+/**
+ * Heat-boost accumulator (§6.4): Layout records which memories entered the
+ * conte; boosts apply as ONE batched UPDATE in Chronicler G2 (C6), never
+ * inline in retrieval. Write-only until C6 binds the reader — a stated
+ * dead-end seam, three commits wide (M1 plan C4).
+ */
+export const heatBoosts = pgTable(
+  "heat_boosts",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    campaignId: uuid()
+      .notNull()
+      .references(() => campaigns.id, { onDelete: "cascade" }),
+    memoryId: uuid()
+      .notNull()
+      .references(() => semanticMemories.id, { onDelete: "cascade" }),
+    boost: real().notNull(),
+    turnNumber: integer().notNull(),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    campaignIdx: index("heat_boosts_campaign_idx").on(t.campaignId, t.turnNumber),
   }),
 );
 
