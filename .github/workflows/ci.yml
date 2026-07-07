@@ -51,3 +51,5 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm db:migrate
       - run: pnpm test
+      # Deterministic eval gate only — LLM suites are skipped under --ci.
+      - run: pnpm evals:ci
