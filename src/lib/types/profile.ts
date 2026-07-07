@@ -170,6 +170,19 @@ export const Profile = z.object({
   // --- Director personality ---
   /** 3-5 sentence directing style prompt, IP-specific. Drives Director's voice at session boundaries. */
   director_personality: z.string(),
+
+  /**
+   * v5 addition (blueprint §4.1): per-tier characterization posture —
+   * flanderization is a premise variable. Synthesized alongside
+   * director_personality; optional for pre-v5 fixtures.
+   */
+  cast_depth_posture: z
+    .object({
+      main_cast: z.string().min(1),
+      supporting: z.string().min(1),
+      recurring_bits: z.string().min(1),
+    })
+    .optional(),
 });
 
 export type Profile = z.infer<typeof Profile>;

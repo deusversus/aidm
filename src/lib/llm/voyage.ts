@@ -18,6 +18,12 @@ export function getVoyage(): VoyageAIClient {
 export interface EmbedOptions {
   /** Asymmetric embedding hint: retrieval queries vs stored documents. */
   inputType?: "query" | "document";
+  /**
+   * 429 posture. "interactive" (default): one quick retry — a player's turn
+   * must never block minutes on rate limits; the degrade ladder owns that
+   * failure. "research": patient multi-minute backoff for corpus builds.
+   */
+  patience?: "interactive" | "research";
   campaignId?: string;
   turnNumber?: number;
 }
@@ -40,12 +46,32 @@ export async function embedTexts(texts: string[], opts: EmbedOptions = {}): Prom
   });
   const started = Date.now();
 
-  const res = await getVoyage().embed({
-    input: texts,
-    model: EMBEDDING_MODEL,
-    outputDimension: EMBEDDING_DIMENSIONS,
-    ...(opts.inputType ? { inputType: opts.inputType } : {}),
-  });
+  // Keyless-tier Voyage runs at 3 RPM / 10K TPM. Research callers wait it
+  // out; interactive callers fail fast into the degrade ladder (a payment
+  // method on the account lifts the limit; 200M free tokens still apply).
+  const maxAttempts = opts.patience === "research" ? 6 : 2;
+  const backoffMs = (attempt: number) =>
+    opts.patience === "research" ? 21_000 * (attempt + 1) : 2_000;
+  let res: Awaited<ReturnType<ReturnType<typeof getVoyage>["embed"]>> | undefined;
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    try {
+      res = await getVoyage().embed({
+        input: texts,
+        model: EMBEDDING_MODEL,
+        outputDimension: EMBEDDING_DIMENSIONS,
+        ...(opts.inputType ? { inputType: opts.inputType } : {}),
+      });
+      break;
+    } catch (err) {
+      const status = (err as { statusCode?: number }).statusCode;
+      if (status !== 429 || attempt === maxAttempts - 1) throw err;
+      console.warn(
+        `[voyage] 429 — backing off ${backoffMs(attempt) / 1000}s (${opts.patience ?? "interactive"})`,
+      );
+      await new Promise((r) => setTimeout(r, backoffMs(attempt)));
+    }
+  }
+  if (!res) throw new Error("embedTexts: unreachable");
   const latencyMs = Date.now() - started;
 
   // Meter before validating — a malformed response is still a billed one.

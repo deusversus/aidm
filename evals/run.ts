@@ -2,6 +2,7 @@ import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { flushLangfuse } from "@/lib/observability/langfuse";
 import { budgetAssertions } from "./suites/budget-assertions";
+import { goldenProfile } from "./suites/golden-profile";
 import { notAnotherAnime } from "./suites/not-another-anime";
 import { rendererEfficacy } from "./suites/renderer-efficacy";
 import { scaffolds } from "./suites/scaffolds";
@@ -15,7 +16,13 @@ import type { Suite, SuiteResult } from "./types";
  */
 
 const ci = process.argv.includes("--ci");
-const suites: Suite[] = [budgetAssertions, notAnotherAnime, rendererEfficacy, ...scaffolds];
+const suites: Suite[] = [
+  budgetAssertions,
+  goldenProfile,
+  notAnotherAnime,
+  rendererEfficacy,
+  ...scaffolds,
+];
 
 const results: SuiteResult[] = [];
 for (const suite of suites) {

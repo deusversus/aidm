@@ -15,6 +15,13 @@
       "when": 1783427596590,
       "tag": "0001_silly_lord_tyger",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1783448335107,
+      "tag": "0002_worried_may_parker",
+      "breakpoints": true
     }
   ]
 }

@@ -171,6 +171,27 @@ export const modelCalls = pgTable(
   }),
 );
 
+/**
+ * Source profiles (§8): research output, cached permanently, cross-campaign
+ * — spine-adjacent reference data like canon_chunks (which key on
+ * profiles.id). Not a memory layer; sourcing lives in researchProvenance.
+ */
+export const profiles = pgTable("profiles", {
+  /** Slug, e.g. "cowboy_bebop" — canon_chunks.profileId points here. */
+  id: text().primaryKey(),
+  title: text().notNull(),
+  anilistId: integer(),
+  malId: integer(),
+  /** The typed Profile contract (types/profile.ts). */
+  profile: jsonb().notNull(),
+  /** micro | standard | complex | epic — research depth class (§8). */
+  scopeClass: text(),
+  /** Sources, fetch timestamps, synthesis versions, judge verdicts. */
+  researchProvenance: jsonb().notNull().default({}),
+  createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+});
+
 // ---------------------------------------------------------------------------
 // Layer 2 — Compacted history (narrated beats; §6.2)
 // ---------------------------------------------------------------------------
