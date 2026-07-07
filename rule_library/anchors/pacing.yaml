@@ -1,0 +1,29 @@
+axis: pacing
+scale: "slow dwell (0) ↔ rapid cuts (10) — sentence rhythm and scene length"
+bands:
+  "1":
+    excerpt_ref: pacing_b1_mushishi
+    shows:
+      - title: Mushishi
+        note: episodes breathe in whole seasons; a conversation can be the climax
+      - title: Aria the Animation
+        note: gondola-speed plotting; the point is the dwell itself
+      - title: Girls' Last Tour
+        note: two characters, one landscape, minutes of quiet traversal per beat
+  "5":
+    shows:
+      - title: Fullmetal Alchemist Brotherhood
+        note: propulsive but breathes between arcs; scene length tracks stakes
+      - title: Cowboy Bebop
+        note: jazz pacing — sprints and long cool silences in one episode
+      - title: Hunter x Hunter (2011)
+        note: patient escalation punctuated by sudden violence
+  "9":
+    excerpt_ref: pacing_b9_flcl
+    shows:
+      - title: FLCL
+        note: six episodes at music-video velocity; cuts outrun comprehension on purpose
+      - title: Kill la Kill
+        note: every scene sprints; exposition delivered mid-collision
+      - title: Mob Psycho 100
+        note: escalation montage as default idiom

@@ -53,3 +53,6 @@ reference/aidm_v3/
 
 # local tooling
 .claude/
+
+# eval harness output — regenerated per run
+evals/latest.json

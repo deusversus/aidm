@@ -1,0 +1,29 @@
+axis: epistemics
+scale: "all explained (0) ↔ mysterious (10) — information asymmetry between story and reader"
+bands:
+  "1":
+    excerpt_ref: epistemics_b1_drstone
+    shows:
+      - title: Dr. Stone
+        note: the show's pleasure is the full derivation, every time
+      - title: Cells at Work!
+        note: didactic by construction; the explanation is the episode
+      - title: Hunter x Hunter (2011)
+        note: Nen rules exhaustively specified before they're used
+  "5":
+    shows:
+      - title: Fullmetal Alchemist Brotherhood
+        note: mysteries exist but resolve on schedule with fair clues
+      - title: Attack on Titan
+        note: long-held secrets, ultimately ledgered and explained
+      - title: Death Note
+        note: reader knows the rules; tension lives in application
+  "9":
+    excerpt_ref: epistemics_b9_lain
+    shows:
+      - title: Serial Experiments Lain
+        note: explanation itself is destabilized; ambiguity is the text
+      - title: Haibane Renmei
+        note: the world's rules are felt, never stated
+      - title: Angel's Egg
+        note: pure image-logic; interpretation is the viewer's burden

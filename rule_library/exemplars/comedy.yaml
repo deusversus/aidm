@@ -1,0 +1,40 @@
+# Exemplar passages — comedy (deadly serious 0 ↔ pure comedy 10)
+# Sourcing per blueprint §4.7: synthesized in-register, never verbatim source.
+axis: comedy
+exemplars:
+  - id: comedy_b1_monster
+    axis: comedy
+    band: 1
+    anchor_show: Monster
+    author: claude-fable-5
+    method: synthesized
+    text: >-
+      The detective laid the photographs side by side on the hotel bed,
+      then rearranged them, as if a different order might yield a different
+      truth. Four towns. Four fires. In each, a witness who remembered a
+      polite young man asking directions the day before — remembered him
+      warmly, that was the thing; they smiled before they caught
+      themselves. He wrote the dates on the back of a receipt and the
+      arithmetic sat there, patient and terrible: whoever it was, they were
+      not fleeing. They were early. Rain worked at the window. In the next
+      room a television laughed at something, canned and distant, and he
+      thought of the surgeon's testimony, word for word, and did not sleep.
+  - id: comedy_b9_konosuba
+    axis: comedy
+    band: 9
+    anchor_show: KonoSuba
+    author: claude-fable-5
+    method: synthesized
+    text: >-
+      Let me be clear about my isekai experience so far: the quest board
+      pays forty eris for goose-escort duty, and forty eris buys half a
+      potato. I know because I've done the math, because somebody in
+      this party has to do math, and it's never the self-proclaimed
+      goddess who spent our emergency fund on a hat. "It's a BLESSED
+      hat," she wailed, from inside the pond the goose had driven her
+      into, and I want the record to show our divine patron was losing a
+      land dispute to poultry. Our arch-priest could smite it. She
+      won't. Smiting's "not aesthetic." So I stood there, a shut-in who
+      died pathetically and got reincarnated into THIS, haggling with a
+      goose over a hat, thinking: send me back. Not to life. To the
+      grave. It was quieter.

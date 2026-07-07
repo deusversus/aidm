@@ -26,6 +26,9 @@
     "spike:narration": "tsx --env-file=.env.local scripts/spike-narration.ts",
     "spike:embed": "tsx --env-file=.env.local scripts/spike-embed.ts",
     "spike:prewarm": "tsx --env-file=.env.local scripts/spike-prewarm.ts",
+    "evals": "tsx --env-file=.env.local evals/run.ts",
+    "evals:ci": "tsx evals/run.ts --ci",
+    "grounding:check": "tsx scripts/grounding-check.ts",
     "langfuse:latest": "tsx --env-file=.env.local scripts/langfuse-latest.ts"
   },
   "dependencies": {

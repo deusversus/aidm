@@ -1,0 +1,41 @@
+# Exemplar passages — interiority (external action 0 ↔ internal monologue 10)
+# Sourcing per blueprint §4.7: synthesized in-register, never verbatim source.
+axis: interiority
+exemplars:
+  - id: interiority_b1_blacklagoon
+    axis: interiority
+    band: 1
+    anchor_show: Black Lagoon
+    author: claude-fable-5
+    method: synthesized
+    text: >-
+      She came through the beaded curtain shooting. The first two never
+      cleared their holsters; the third flipped the card table and got a
+      burst through it for his trouble, felt and splinters and blood all
+      going up together. She reloaded walking. The bartender surfaced with
+      a shotgun and she put her boot on a chair, vaulted the bar, and laid
+      the pistol against his cheek before his finger found the guard.
+      "Boss's ledger. Now." Outside, a truck horn, someone screaming about
+      the police in two languages. He produced the book with the speed of a
+      man who had always known this day would come with an itemized
+      receipt. She took it, took his cigarettes too, and shot the radio on
+      the way out.
+  - id: interiority_b9_nhk
+    axis: interiority
+    band: 9
+    anchor_show: Welcome to the NHK
+    author: claude-fable-5
+    method: synthesized
+    text: >-
+      The doorbell rings and I do not move, because moving would confirm to
+      the door that I exist, and the door reports to the landlord, who
+      reports to society, which has been compiling a file on me since 2004.
+      It rings again. Here is the thing they don't tell you about becoming
+      nothing: it's a full-time job. You have to actively not-answer, and
+      the not-answering takes everything, whole afternoons of it, whole
+      seasons. Maybe it's the delivery. Maybe it's her. The thought arrives
+      like a coin dropped down a well and I wait — one, two — for the
+      splash of panic, and there it is, right on time. I could open the
+      door. People open doors constantly; there's precedent. My hand makes
+      it as far as my knee. The bell does not ring a third time, and I
+      tell myself that's a victory, and I almost believe me.

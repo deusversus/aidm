@@ -1,0 +1,38 @@
+# Exemplar passages — pacing (slow dwell 0 ↔ rapid cuts 10)
+# Sourcing per blueprint §4.7: synthesized in-register, never verbatim source.
+axis: pacing
+exemplars:
+  - id: pacing_b1_mushishi
+    axis: pacing
+    band: 1
+    anchor_show: Mushishi
+    author: claude-fable-5
+    method: synthesized
+    text: >-
+      The traveler set his pack against the cedar and waited for the tea to
+      steep. Steam rose, thinned, vanished somewhere above the rafters. The
+      old woman did not speak of the thing in the well, not yet; she poured,
+      and he drank, and outside the snow continued its slow work of erasing
+      the path he had come by. There would be time. The mountain had held
+      its silence for eighty years — it would hold it through one more cup.
+      When she finally spoke, it was of her sister, who had loved the well
+      water's sweetness as a girl. He listened. The lamp guttered once and
+      steadied itself, and the snow went on falling.
+  - id: pacing_b9_flcl
+    axis: pacing
+    band: 9
+    anchor_show: FLCL
+    author: claude-fable-5
+    method: synthesized
+    text: >-
+      The delivery girl takes the stairs four at a time, then skips the
+      stairs entirely — freeze on the pigeon, unimpressed — and the
+      package in her basket is ticking in a way packages shouldn't. Cut:
+      the boy on the roof, holding the antenna, holding his breath,
+      holding a grudge against the entire sky. Cut: a commercial for a
+      noodle brand that has never existed. She lands. The umbrella she
+      carries is not an umbrella; it unfolds with a sound like a filing
+      cabinet falling in love. "Sign here." He signs. The town's one
+      traffic light turns a color it doesn't have. Somewhere below,
+      laundry achieves liftoff. Nothing is explained; the receipt, when
+      he reads it later, is just the word LATER, printed forty times.

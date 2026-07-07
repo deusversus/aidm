@@ -1,0 +1,29 @@
+axis: intimacy
+scale: "distant (0) ↔ close (10) — camera warmth; Evangelion has interiority without intimacy"
+bands:
+  "1":
+    excerpt_ref: intimacy_b1_logh
+    shows:
+      - title: Legend of the Galactic Heroes
+        note: narrator-as-historian; characters viewed from orbital height
+      - title: Monster
+        note: clinical camera; closeness is always earned and rationed
+      - title: Ghost in the Shell Stand Alone Complex
+        note: procedural distance even inside personal episodes
+  "5":
+    shows:
+      - title: Fullmetal Alchemist Brotherhood
+        note: warm ensemble camera without lingering inside anyone too long
+      - title: Cowboy Bebop
+        note: closeness glimpsed sideways, then the camera looks away
+      - title: Vinland Saga
+        note: epic scope that periodically closes to a single face
+  "9":
+    excerpt_ref: intimacy_b9_march
+    shows:
+      - title: March Comes in Like a Lion
+        note: the kotatsu-warmth camera; proximity IS the story
+      - title: Toradora
+        note: lives inside the breath between two people
+      - title: Horimiya
+        note: small domestic closeness rendered enormous

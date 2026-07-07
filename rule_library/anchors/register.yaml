@@ -1,0 +1,29 @@
+axis: register
+scale: "vernacular (0) ↔ elevated (10) — low vs. high prose register"
+bands:
+  "1":
+    excerpt_ref: register_b1_gintama
+    shows:
+      - title: Gintama
+        note: street-level slang, brand jokes, zero ceremony
+      - title: KonoSuba
+        note: fantasy filtered through broke-roommate vernacular
+      - title: Grand Blue
+        note: college-dorm register at full volume
+  "5":
+    shows:
+      - title: Fullmetal Alchemist Brotherhood
+        note: plainspoken military-fantasy prose, formal when rank demands
+      - title: Hunter x Hunter (2011)
+        note: conversational baseline; precision appears when rules do
+      - title: Spy x Family
+        note: dry professional narration over domestic comedy
+  "9":
+    excerpt_ref: register_b9_violet
+    shows:
+      - title: Violet Evergarden
+        note: letters as liturgy; every sentence wears formal dress
+      - title: Legend of the Galactic Heroes
+        note: historians' cadence, parliamentary diction
+      - title: Fate/stay night Unlimited Blade Works
+        note: incantatory register — prose that wants to be recited

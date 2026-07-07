@@ -1,0 +1,42 @@
+# Exemplar passages — moral_complexity (black-and-white 0 ↔ morally gray 10)
+# Sourcing per blueprint §4.7: synthesized in-register, never verbatim source.
+axis: moral_complexity
+exemplars:
+  - id: moral_complexity_b1_mha
+    axis: moral_complexity
+    band: 1
+    anchor_show: My Hero Academia
+    author: claude-fable-5
+    method: synthesized
+    text: >-
+      The villain had the hostages, the vantage, and the quirk advantage,
+      and the boy had a broken arm and the thing his teacher had told him
+      on the first day: a hero's job is to be there before the math says
+      you can. So he went. Over the barricade while the pros argued
+      jurisdiction, into the dust cloud, because the little girl in there
+      was crying and heroes move at the speed of someone crying. The
+      villain sneered about ideals — they always sneered about ideals,
+      as if naming a thing beat it. The boy set his feet the way he'd
+      practiced ten thousand times in the rain. "You took someone's
+      daughter," he said, and the dust rolled off his shoulders, and his
+      one good fist began to glow. "Everything after that is just
+      details."
+  - id: moral_complexity_b9_vinland
+    axis: moral_complexity
+    band: 9
+    anchor_show: Vinland Saga
+    author: claude-fable-5
+    method: synthesized
+    text: >-
+      The monks had fed them through the winter. In spring the captain
+      came back with eighty men and took the granary, because eighty men
+      eat, and a war band that pays for grain twice is a war band other
+      men stop fearing. The young monk grabbed his bridle. Called him an
+      animal. The captain looked down at him for a while. He was
+      fifteen the first time he burned a village. He remembered the
+      smell, and remembered deciding it was the smell of being on the
+      strong side, because deciding anything else meant putting down the
+      axe, and men who put down the axe fed no one, saved no one, were
+      no one. "We'll leave your seed grain," he said. It was more than
+      his own father would have left. It was nothing. Both things were
+      true, and he rode out knowing it.

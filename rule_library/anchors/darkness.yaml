@@ -1,0 +1,29 @@
+axis: darkness
+scale: "light (0) ↔ grimdark (10) — distinct from optimism; Made in Abyss is optimistic AND dark"
+bands:
+  "1":
+    excerpt_ref: darkness_b1_yurucamp
+    shows:
+      - title: Laid-Back Camp
+        note: the worst possible outcome is lukewarm curry
+      - title: K-On!
+        note: stakes cap at teatime and graduation
+      - title: Nichijou
+        note: absurdity without a single shadow under it
+  "5":
+    shows:
+      - title: Fullmetal Alchemist Brotherhood
+        note: genocide and child alchemy inside a fundamentally lit world
+      - title: Jujutsu Kaisen
+        note: body horror normalized but leavened by cast warmth
+      - title: Attack on Titan (S1)
+        note: brutal losses, still adventure-shaped at this point
+  "9":
+    excerpt_ref: darkness_b9_berserk
+    shows:
+      - title: Berserk
+        note: the world's default answer to hope is the Eclipse
+      - title: Made in Abyss
+        note: wonder as bait; the Abyss collects in flesh
+      - title: Devilman Crybaby
+        note: escalates past rescue into apocalypse without blinking

@@ -1,0 +1,40 @@
+# Exemplar passages — darkness (light 0 ↔ grimdark 10)
+# Sourcing per blueprint §4.7: synthesized in-register, never verbatim source.
+axis: darkness
+exemplars:
+  - id: darkness_b1_yurucamp
+    axis: darkness
+    band: 1
+    anchor_show: Laid-Back Camp
+    author: claude-fable-5
+    method: synthesized
+    text: >-
+      The lake at dawn was the color of milk tea, which felt appropriate,
+      because she was holding milk tea. Somewhere behind her the tent
+      performed its small miracle of still standing. Her friend emerged in
+      four layers of borrowed fleece, hair announcing a difficult night,
+      and gravely accepted the second cup like a soldier accepting orders.
+      They sat on the cold bench and watched the mountain take off its
+      clouds. "We should do curry tonight," her friend said, with the
+      seriousness of a war council. "With the good sausages." A duck
+      surfaced, considered them, and decided they were harmless. It was
+      right. The kettle ticked as it cooled, and the whole day stretched
+      ahead of them, unscheduled and warm at the edges.
+  - id: darkness_b9_berserk
+    axis: darkness
+    band: 9
+    anchor_show: Berserk
+    author: claude-fable-5
+    method: synthesized
+    text: >-
+      The village had stopped burning sometime before dawn; what smoked now
+      was slower and worse. He walked the cart-road with his sword dragging
+      a thin line in the ash, past the well where they had thrown what they
+      threw, past the church whose god had watched with the same flat
+      patience it watched everything. A survivor clutched his sleeve and
+      asked why, as if why were a coin he could give her. He had seen the
+      brand on the headman's door. He knew what had been promised here, and
+      by whom, and what it had bought. Mercy was a story travelers told at
+      inns two counties away. He pried her fingers loose, gently, because
+      gentleness was all that was left, and it was not enough, and he kept
+      walking.

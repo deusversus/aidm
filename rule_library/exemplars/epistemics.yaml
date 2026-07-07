@@ -1,0 +1,43 @@
+# Exemplar passages — epistemics (all explained 0 ↔ mysterious 10)
+# Sourcing per blueprint §4.7: synthesized in-register, never verbatim source.
+axis: epistemics
+exemplars:
+  - id: epistemics_b1_drstone
+    axis: epistemics
+    band: 1
+    anchor_show: Dr. Stone
+    author: claude-fable-5
+    method: synthesized
+    text: >-
+      "Soap," she announced, chalking the plank, "is a chemical weapon
+      against every disease in this village, and we can cook it from
+      garbage. Watch the board. Wood ash, steeped — that's potassium
+      hydroxide, a base strong enough to bite. Boar fat — triglycerides,
+      three fatty-acid tails on a glycerol spine. Boil them together and
+      the base rips the tails free. That reaction has a name,
+      saponification, and it has never once failed anyone who measured
+      honestly." The hunters stared at the foam like it was sorcery.
+      "It's not magic. Magic doesn't show its work. Ratio's on the board,
+      temperature's on the board, and when your wounds stop festering
+      this winter, the reason will be on the board too. Now — who's
+      rendering the fat?"
+  - id: epistemics_b9_lain
+    axis: epistemics
+    band: 9
+    anchor_show: Serial Experiments Lain
+    author: claude-fable-5
+    method: synthesized
+    text: >-
+      The forum thread was timestamped tomorrow. She read her own
+      handle in it, replying to a question no one had asked yet, in a
+      voice that used her punctuation almost correctly. The power lines
+      outside droned their single note, and it seemed to her the note
+      had been getting imperceptibly lower for weeks, though the
+      neighbors' faces said no such thing was happening, had ever
+      happened. Her father explained about server clocks and caching,
+      and the explanation was airtight and soothing and did not survive
+      contact with the second thread, the one where her handle asked the
+      question. She deleted the account. The confirmation email thanked
+      her for joining. Somewhere under the floor of the world, a
+      protocol went on completing itself, patient as dial tone, and it
+      knew her name in both directions.

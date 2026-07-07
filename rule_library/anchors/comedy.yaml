@@ -1,0 +1,29 @@
+axis: comedy
+scale: "deadly serious (0) ↔ pure comedy (10) — register and fourth-wall permission"
+bands:
+  "1":
+    excerpt_ref: comedy_b1_monster
+    shows:
+      - title: Monster
+        note: seventy-four episodes, zero jokes, by design
+      - title: Grave of the Fireflies
+        note: humor structurally absent; would break the film
+      - title: Vinland Saga (S2)
+        note: levity exists only as brief mercy between weights
+  "5":
+    shows:
+      - title: Fullmetal Alchemist Brotherhood
+        note: chibi-cut gags coexist with war crimes; tonal switchboard
+      - title: Spy x Family
+        note: sitcom engine over an espionage chassis
+      - title: Frieren
+        note: dry, quiet comedy woven through elegy
+  "9":
+    excerpt_ref: comedy_b9_konosuba
+    shows:
+      - title: KonoSuba
+        note: every dramatic setup exists to be faceplanted
+      - title: Gintama
+        note: fourth wall optional; parody is the native language
+      - title: Nichijou
+        note: mundane life rendered at slapstick amplitude

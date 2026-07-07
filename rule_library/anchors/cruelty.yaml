@@ -1,0 +1,29 @@
+axis: cruelty
+scale: "kind to characters (0) ↔ cruel (10) — Madoka is optimistic-coded AND extremely cruel"
+bands:
+  "1":
+    excerpt_ref: cruelty_b1_natsume
+    shows:
+      - title: Natsume's Book of Friends
+        note: the narrative protects everyone it introduces, even antagonists
+      - title: Aria the Animation
+        note: the world conspires gently in the cast's favor
+      - title: Laid-Back Camp
+        note: no character is ever the butt of real harm
+  "5":
+    shows:
+      - title: Hunter x Hunter (2011)
+        note: the world is dangerous but rarely spiteful; losses have logic
+      - title: Cowboy Bebop
+        note: cruel endings arrive, but the narrative grieves them
+      - title: Jujutsu Kaisen
+        note: deaths sting yet the story doesn't savor the wound
+  "9":
+    excerpt_ref: cruelty_b9_madoka
+    shows:
+      - title: Puella Magi Madoka Magica
+        note: hope itself is the mechanism of harm
+      - title: Berserk
+        note: the story grants dreams specifically to cost them
+      - title: Devilman Crybaby
+        note: kindness is punished at apocalyptic scale

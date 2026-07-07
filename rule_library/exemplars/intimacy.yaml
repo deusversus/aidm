@@ -1,0 +1,40 @@
+# Exemplar passages — intimacy (distant camera 0 ↔ close camera 10)
+# Sourcing per blueprint §4.7: synthesized in-register, never verbatim source.
+axis: intimacy
+exemplars:
+  - id: intimacy_b1_logh
+    axis: intimacy
+    band: 1
+    anchor_show: Legend of the Galactic Heroes
+    author: claude-fable-5
+    method: synthesized
+    text: >-
+      History would record that the Eighth Fleet broke at 0340 shipboard
+      time, though the men inside it experienced no single moment of
+      breaking — only a gradient of orders arriving later and mattering
+      less. The admiral committed his reserve at the Y-shaped confluence of
+      debris fields, a decision the academies would debate for a century
+      without reaching the obvious conclusion: that it was neither brilliance
+      nor blunder, but the arithmetic of a man who had slept four hours in
+      six days. Twenty thousand died in the eleven minutes that followed.
+      The flagship's log records the admiral asking for coffee at 0351. On
+      such details, historians build their theories of character; the dead,
+      as always, declined to comment.
+  - id: intimacy_b9_march
+    axis: intimacy
+    band: 9
+    anchor_show: March Comes in Like a Lion
+    author: claude-fable-5
+    method: synthesized
+    text: >-
+      The kotatsu is too warm and her socked foot keeps bumping mine and
+      she doesn't notice, or she notices and doesn't mind, which is a
+      different thing, a bigger thing, and I am trying to hold the shape of
+      it without breathing on it. The mandarin she peeled sits in my palm
+      in perfect segments. She did that. Without asking. The way you'd do
+      for someone who — the television says something and her sister laughs
+      and the sound goes through me like warm water through cold pipes,
+      finding every hollow place I pretended wasn't there. I eat the
+      mandarin segment by segment. If I say anything I will say everything.
+      So I say it's sweet, and she says right?, and under the blanket the
+      whole world is the size of this table.

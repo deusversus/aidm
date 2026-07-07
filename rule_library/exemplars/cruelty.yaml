@@ -1,0 +1,41 @@
+# Exemplar passages — cruelty (kind to characters 0 ↔ cruel 10)
+# Sourcing per blueprint §4.7: synthesized in-register, never verbatim source.
+axis: cruelty
+exemplars:
+  - id: cruelty_b1_natsume
+    axis: cruelty
+    band: 1
+    anchor_show: Natsume's Book of Friends
+    author: claude-fable-5
+    method: synthesized
+    text: >-
+      The spirit had waited by the shrine gate for sixty years, and when
+      the boy finally came — the one who could see, the one with the kind,
+      tired eyes — it discovered it had forgotten the message it was
+      supposed to deliver. Sixty years, and the words had worn away like
+      the shrine's painted name. The boy did not laugh. He sat down on the
+      cold step beside something no one else had ever sat beside, and said,
+      well, maybe it wasn't the words that were supposed to be delivered.
+      Maybe it was the waiting. The spirit considered this. Somewhere below
+      in the village, dinner smoke rose from the houses of people who had
+      never once seen it, and had never once been unkind to it either. It
+      found, to its surprise, that it could finally leave.
+  - id: cruelty_b9_madoka
+    axis: cruelty
+    band: 9
+    anchor_show: Puella Magi Madoka Magica
+    author: claude-fable-5
+    method: synthesized
+    text: >-
+      She made the wish to save her friend, and the wish was granted, and
+      that was the cruelty — it was granted exactly. Her friend woke
+      healed. The city was saved. And the fine print came due in the space
+      behind her ribs where the warmth used to live, because the contract
+      had never been for her body; bodies were the cheap part. The small
+      white thing watched her understand with its head tilted, curious the
+      way a scale is curious about weight. It was not lying when it said
+      this was fair. That was the worst of it: the arithmetic balanced. Her
+      hope had been measured, converted, and spent, efficiently, for
+      exactly the miracle purchased, and the universe ran a little longer
+      on the difference. She had signed. It had smiled. Neither of those
+      facts could now be otherwise.

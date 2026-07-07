@@ -1,0 +1,29 @@
+axis: emotional_register
+scale: "understated (0) ↔ overwrought (10) — Mushishi restrains; Clannad dwells"
+bands:
+  "1":
+    excerpt_ref: emotional_register_b1_haibane
+    shows:
+      - title: Haibane Renmei
+        note: grief processed through routine and small objects, never speeches
+      - title: Mushishi
+        note: tragedy delivered at the volume of weather
+      - title: Girls' Last Tour
+        note: existential weight carried in shrugs and snack breaks
+  "5":
+    shows:
+      - title: Cowboy Bebop
+        note: deflection as the default register; the ache stays under the cool
+      - title: Frieren
+        note: feeling arrives late and lands quietly, but it lands on-screen
+      - title: March Comes in Like a Lion
+        note: oscillates — restraint until the dam is allowed to break
+  "9":
+    excerpt_ref: emotional_register_b9_clannad
+    shows:
+      - title: Clannad After Story
+        note: dwells inside every tear until the audience joins it
+      - title: Your Lie in April
+        note: emotion externalized as color, music, and monologue
+      - title: Anohana
+        note: the finale is a group sob held for a full act

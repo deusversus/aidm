@@ -1,0 +1,39 @@
+# Exemplar passages — emotional_register (understated 0 ↔ overwrought 10)
+# Sourcing per blueprint §4.7: synthesized in-register, never verbatim source.
+axis: emotional_register
+exemplars:
+  - id: emotional_register_b1_haibane
+    axis: emotional_register
+    band: 1
+    anchor_show: Haibane Renmei
+    author: claude-fable-5
+    method: synthesized
+    text: >-
+      She found the coat on its hook by the bakery door, where it had hung
+      all winter. The girl who owned it was not coming back for it; that
+      was understood now, the way weather is understood. She took it down,
+      folded it along its old creases, and set it in the donation box with
+      the sleeves tucked in — the sleeves mattered somehow, she couldn't
+      have said why. Out in the courtyard the younger ones were hanging
+      laundry, arguing about nothing, their voices thin and bright in the
+      cold. She stood a moment with her hand on the box. Then she went to
+      help with the sheets, because the sheets needed hanging, and the sun
+      would not stay out forever.
+  - id: emotional_register_b9_clannad
+    axis: emotional_register
+    band: 9
+    anchor_show: Clannad After Story
+    author: claude-fable-5
+    method: synthesized
+    text: >-
+      He found the drawing where she'd hidden it for him to find — the two
+      of them and the little one, stick-armed, holding hands under a sun
+      with too many rays, because she always drew the sun with too many
+      rays, she said the real one worked hard and deserved them. His knees
+      went. Right there in the kitchen, on the floor she used to sweep
+      humming that song she never knew the middle of, he pressed the paper
+      to his chest like he could push it through into the hollow place and
+      make it hold. "I was going to show you," he said to the empty room,
+      to the crayon sun, to everything. "She learned to write her name. You
+      hear me? Her whole name." The paper shook. He could not make it
+      stop shaking, and he did not want to.

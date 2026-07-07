@@ -1,0 +1,29 @@
+axis: moral_complexity
+scale: "black-and-white (0) ↔ morally gray (10) — how complicated the ethics can be"
+bands:
+  "1":
+    excerpt_ref: moral_complexity_b1_mha
+    shows:
+      - title: My Hero Academia
+        note: villainy is named on sight; heroism is a settled question
+      - title: Dragon Ball Z
+        note: evil announces itself and is punched accordingly
+      - title: Demon Slayer
+        note: sympathy for demons never complicates the verdict
+  "5":
+    shows:
+      - title: Fullmetal Alchemist Brotherhood
+        note: clean core morality with genuinely contested edges (Ishval)
+      - title: Code Geass
+        note: means are debated even where ends stay legible
+      - title: Hunter x Hunter (2011)
+        note: the Ant arc quietly dissolves the hero/monster line
+  "9":
+    excerpt_ref: moral_complexity_b9_vinland
+    shows:
+      - title: Monster
+        note: every mercy is interrogated; the villain argues back
+      - title: Vinland Saga
+        note: violence, faith, and commerce all keep honest ledgers
+      - title: Attack on Titan (final arcs)
+        note: the protagonist becomes the trolley problem

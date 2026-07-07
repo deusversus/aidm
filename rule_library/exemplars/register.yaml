@@ -1,0 +1,41 @@
+# Exemplar passages — register (vernacular 0 ↔ elevated 10)
+# Sourcing per blueprint §4.7: synthesized in-register, never verbatim source.
+axis: register
+exemplars:
+  - id: register_b1_gintama
+    axis: register
+    band: 1
+    anchor_show: Gintama
+    author: claude-fable-5
+    method: synthesized
+    text: >-
+      Look, nobody plans to fight a guy over the last strawberry milk. It
+      just happens. One minute you're in the konbini minding your business,
+      dead broke, doing the math on whether dignity or dinner matters more
+      this week, and the next some alien in a tracksuit — a TRACKSUIT — has
+      his mitts on the last carton like he pays rent here. So yeah, words
+      were exchanged. Then a mop was exchanged. The clerk kept scanning
+      snacks the whole time like this was Tuesday, which, fair, it was.
+      Anyway that's how we got banned from the good konbini and that's why
+      we're drinking the off-brand stuff that tastes like regret and pink
+      crayons. Quit laughing. You weren't there, man. You didn't see the
+      tracksuit.
+  - id: register_b9_violet
+    axis: register
+    band: 9
+    anchor_show: Violet Evergarden
+    author: claude-fable-5
+    method: synthesized
+    text: >-
+      The letter required four drafts, for the words that came easily were
+      not the true ones, and the true ones did not come easily. She wrote:
+      that the garden her mother planted had survived the winter, though
+      the frost had taken the roses everyone called too delicate for this
+      latitude — all but one, which bloomed now against the south wall out
+      of what she could only name defiance, or memory, or that quality the
+      two share of refusing an ending on another's terms. She wrote: that
+      grief, which she had believed a burden to be set down, had revealed
+      itself instead as a letter one carries unopened, until the day one is
+      strong enough to read it and find it was, all along, addressed with
+      love. She signed her name. The ink dried slowly, the way true things
+      do.

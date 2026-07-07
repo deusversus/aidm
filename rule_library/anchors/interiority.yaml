@@ -1,0 +1,29 @@
+axis: interiority
+scale: "external action (0) ↔ internal monologue (10) — narrator's distance from the POV head"
+bands:
+  "1":
+    excerpt_ref: interiority_b1_blacklagoon
+    shows:
+      - title: Black Lagoon
+        note: character revealed exclusively through action and dialogue
+      - title: One Punch Man
+        note: interiority played as a punchline when it appears at all
+      - title: Golden Kamuy
+        note: motive shown through appetite and violence, not reflection
+  "5":
+    shows:
+      - title: Cowboy Bebop
+        note: interiority implied by silence, flashback fragments, never narrated
+      - title: Attack on Titan
+        note: monologue arrives at pivots, action carries the rest
+      - title: Frieren
+        note: thought surfaces sparingly, in single quiet lines
+  "9":
+    excerpt_ref: interiority_b9_nhk
+    shows:
+      - title: Welcome to the NHK
+        note: the narrator's spiral IS the plot
+      - title: Neon Genesis Evangelion
+        note: climaxes staged entirely inside a mind
+      - title: March Comes in Like a Lion
+        note: whole episodes inside the protagonist's weather
