@@ -294,7 +294,10 @@ export async function runConductorTurn(
         role: m.role,
         content: m.content as never,
       })),
-      maxTokens: 2_000,
+      // Adaptive thinking spends from THIS budget too (the C1 NAA lesson):
+      // 2k truncated a long reply mid-word live. A ceiling, not a target —
+      // only produced tokens bill.
+      maxTokens: 8_000,
       tools: CONDUCTOR_TOOLS,
       campaignId,
     });
