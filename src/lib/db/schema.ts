@@ -65,10 +65,16 @@ export const campaigns = pgTable(
     status: text().notNull().default("draft"),
     /** The signed §8 handoff artifact (PremiseContract type). */
     premiseContract: jsonb(),
+    /** The §8 handoff's other half (OpeningStatePackage type). */
+    openingPackage: jsonb(),
     /** Player-facing tier menus (§3): { narration, judgment, probe } model selections. */
     tierModels: jsonb(),
     /** At most one active override, latest wins (§4.2); ArcOverride type. */
     arcOverride: jsonb(),
+    /** SZ durable draft (§8): the conversation, resumable across sittings. */
+    szTranscript: jsonb(),
+    /** SZ quiet-extraction accumulator: observations gathered mid-conversation. */
+    szExtraction: jsonb(),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },

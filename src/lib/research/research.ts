@@ -8,6 +8,7 @@
 import type { Db } from "@/lib/db";
 import { profiles } from "@/lib/db/schema";
 import { Profile } from "@/lib/types/profile";
+import { eq } from "drizzle-orm";
 import type { z } from "zod";
 import {
   type AniListMedia,
@@ -82,6 +83,14 @@ export interface ResearchOptions {
    * when set, search is skipped and this id is researched directly.
    */
   anilistId?: number;
+  /**
+   * Return the stored profile when one exists (§8: profiles cache
+   * permanently — the conductor never re-buys research). Identity
+   * resolution + the franchise walk still run (free, and the
+   * disambiguation notes must surface every time); everything paid —
+   * scrape, synthesis, embedding — is skipped. The CLI re-researches.
+   */
+  reuseExisting?: boolean;
 }
 
 export async function researchTitle(
@@ -118,6 +127,31 @@ export async function researchTitle(
   }
   if (walk.siblings.length > 0) {
     notes.push(`franchise siblings: ${walk.siblings.map((s) => s.title).join(", ")}`);
+  }
+
+  if (options.reuseExisting) {
+    const slug = profileSlug(title);
+    const [existing] = await db.select().from(profiles).where(eq(profiles.id, slug));
+    if (existing) {
+      const prov = (existing.researchProvenance ?? {}) as {
+        confidence?: number;
+        wikiBase?: string | null;
+        seasonsMerged?: number;
+        pagesFetched?: number;
+      };
+      notes.push("profile cached (§8) — paid research skipped");
+      return {
+        profileId: slug,
+        title: existing.title,
+        scope: (existing.scopeClass ?? "standard") as ScopeClass,
+        seasonsMerged: prov.seasonsMerged ?? 0,
+        wikiBase: prov.wikiBase ?? null,
+        pagesFetched: prov.pagesFetched ?? 0,
+        chunksWritten: 0,
+        confidence: prov.confidence ?? 85,
+        notes,
+      };
+    }
   }
 
   // 3. Wiki + scope — alternate titles feed discovery (kimetsu-no-yaiba).

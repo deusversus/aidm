@@ -2,7 +2,12 @@ import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 
 // Routes under the (app) route group require auth. Everything else — landing page,
 // sign-in/sign-up, webhooks, health/ready — is public.
-const isProtected = createRouteMatcher(["/campaigns(.*)", "/settings(.*)", "/admin(.*)"]);
+const isProtected = createRouteMatcher([
+  "/campaigns(.*)",
+  "/sz(.*)",
+  "/settings(.*)",
+  "/admin(.*)",
+]);
 
 export default clerkMiddleware(async (auth, req) => {
   if (isProtected(req)) {

@@ -226,6 +226,12 @@ export interface NarrationOptions extends CallContext {
   messages: MessageParam[];
   maxTokens: number;
   effort?: Effort;
+  /**
+   * Tool surface for this narration-tier call. Defaults to the §5.7
+   * commit_scene trailer (the turn engine's contract); orchestrator-shaped
+   * callers (the SZ conductor, Director investigation) supply their own.
+   */
+  tools?: Tool[];
 }
 
 export interface NarrationResult {
@@ -288,7 +294,7 @@ export function streamNarration(opts: NarrationOptions) {
     max_tokens: opts.maxTokens,
     system: opts.system,
     messages: opts.messages,
-    tools: [COMMIT_SCENE_TOOL],
+    tools: opts.tools ?? [COMMIT_SCENE_TOOL],
     tool_choice: { type: "auto" },
     ...(caps.adaptiveThinking ? { thinking: { type: "adaptive" } } : {}),
     ...(opts.effort && caps.effortControl ? { output_config: { effort: opts.effort } } : {}),
