@@ -58,13 +58,25 @@ export interface ResolvedObservations {
   deferred: string[];
 }
 
-// Word-boundary matches, longest-first: "indefinite" CONTAINS "finite", so a
-// bare substring scan inverts the player's sacrosanct Series choice (§8).
-const FINITUDE_PATTERNS: [RegExp, "finite" | "indefinite" | "undecided"][] = [
-  [/\bindefinite(ly)?\b/i, "indefinite"],
-  [/\bundecided\b/i, "undecided"],
-  [/\bfinite\b/i, "finite"],
-];
+type Finitude = "finite" | "indefinite" | "undecided";
+
+/**
+ * Finitude is the sacrosanct Series choice (§8) recorded as free text, and
+ * free text can name BOTH words ("finite — they considered indefinite…").
+ * Resolution never guesses: the leading word wins (the conductor is told to
+ * record it first); otherwise a value resolves only when exactly ONE
+ * distinct word appears. Ambiguous records stay unresolved — the gap
+ * verdict blocks a guessed contract, it never ships one.
+ */
+export function resolveFinitude(content: string): Finitude | undefined {
+  const anchored = /^\s*["'“]?(indefinite|undecided|finite)\b/i.exec(content);
+  if (anchored) return anchored[1]?.toLowerCase() as Finitude;
+  const hits = new Set<Finitude>();
+  if (/\bindefinite(ly)?\b/i.test(content)) hits.add("indefinite");
+  if (/\bundecided\b/i.test(content)) hits.add("undecided");
+  if (/\bfinite\b/i.test(content)) hits.add("finite");
+  return hits.size === 1 ? [...hits][0] : undefined;
+}
 
 export function resolveObservations(observations: Observation[]): ResolvedObservations {
   const resolved: ResolvedObservations = {
@@ -82,8 +94,9 @@ export function resolveObservations(observations: Observation[]): ResolvedObserv
         resolved.spark = obs.content; // verbatim, latest wins
         break;
       case "finitude": {
-        const match = FINITUDE_PATTERNS.find(([re]) => re.test(obs.content));
-        if (match) resolved.finitude = match[1];
+        const value = resolveFinitude(obs.content);
+        if (value) resolved.finitude = value;
+        else resolved.deferred.push(`ambiguous finitude: ${obs.content.slice(0, 80)}`);
         break;
       }
       case "death_physics":

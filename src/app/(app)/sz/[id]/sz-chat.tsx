@@ -35,6 +35,10 @@ export function SzChat({
   const [error, setError] = useState<string | null>(null);
   const [queued, setQueued] = useState<string | null>(null);
   const queuedRef = useRef<string | null>(null);
+  // Synchronous in-flight gate: `busy` state is render-lagged, and a
+  // keystroke landing between the turn's finally and the busy=false commit
+  // would queue a message nothing ever drains. Refs don't go stale.
+  const busyRef = useRef(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const kickoffFired = useRef(false);
 
@@ -45,6 +49,7 @@ export function SzChat({
 
   const runTurn = useCallback(
     async (message: string) => {
+      busyRef.current = true;
       setBusy(true);
       setError(null);
       setStreamText("");
@@ -113,9 +118,11 @@ export function SzChat({
       } finally {
         setStreamText("");
         setStaging(null);
+        busyRef.current = false;
         setBusy(false);
         // No dead air (§8): whatever the player typed while the conductor
         // worked (interview answers during research) fires immediately.
+        // Single-threaded with send()'s busyRef gate — no strand window.
         const q = queuedRef.current;
         if (q) {
           queuedRef.current = null;
@@ -139,7 +146,7 @@ export function SzChat({
   const send = () => {
     const message = input.trim();
     if (!message) return;
-    if (busy) {
+    if (busyRef.current) {
       // Mid-turn (often mid-research): queue it — the conversation never
       // makes the player wait to speak.
       queuedRef.current = queuedRef.current ? `${queuedRef.current}\n${message}` : message;

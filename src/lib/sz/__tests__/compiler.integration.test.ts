@@ -147,13 +147,26 @@ describe.skipIf(!url)("SZ compiler (real Postgres)", () => {
     expect(resolved.finitude).toBe("finite");
   });
 
-  it("finitude never inverts: 'indefinite' must not resolve as finite (§8 sacrosanct)", () => {
+  it("finitude never inverts and never guesses (§8 sacrosanct)", () => {
     const indefinite = resolveObservations([
       obs("finitude", "indefinite — an open monster-of-the-week cycle"),
     ]);
     expect(indefinite.finitude).toBe("indefinite");
     const undecided = resolveObservations([obs("finitude", "they're undecided for now")]);
     expect(undecided.finitude).toBe("undecided");
+    // The chosen word leads (the conductor is told to record it first) —
+    // a trailing mention of the other word must not flip it.
+    const both = resolveObservations([
+      obs("finitude", "finite — they considered indefinite but want a real ending"),
+    ]);
+    expect(both.finitude).toBe("finite");
+    // Ambiguous mid-string mentions of BOTH words resolve to nothing: the
+    // gap verdict blocks a guessed Series contract rather than shipping one.
+    const ambiguous = resolveObservations([
+      obs("finitude", "torn between a finite run and letting it go on indefinitely"),
+    ]);
+    expect(ambiguous.finitude).toBeUndefined();
+    expect(ambiguous.deferred.some((d) => d.includes("ambiguous finitude"))).toBe(true);
   });
 
   it("a malformed tier_selection defers instead of throwing", () => {
