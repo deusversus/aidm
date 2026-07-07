@@ -273,9 +273,17 @@ export const defaultOspSynthesizer: OspSynthesizer = async ({
       "soft = strong preferences. Uncertainties are things the conversation",
       "left OPEN — state them with a safe assumption and guidance for",
       "writing AROUND them without foreclosing (never resolve them).",
+      "RECONCILE before writing an uncertainty: if a recorded fact answers",
+      "the question, it is NOT an uncertainty — never resurrect what the",
+      "conversation resolved. When an open question sits NEXT TO a resolved",
+      "one, the question text must state what IS known so the two cannot be",
+      "confused (e.g. 'the mechanism is recorded; the ORIGIN is not').",
       "forbidden_opening_moves protect the cold open (no premature reveals,",
       "no spending the spark in scene one). Briefs are seeds for the entity",
-      "layer; admit_to_catalog=true only for entities certain to persist.",
+      "layer: ONE brief per underlying entity — a role reference ('Mother')",
+      "and a proper name are the same person; merge under the best canonical",
+      "name with aliases noted in the brief. admit_to_catalog=true only for",
+      "entities certain to persist.",
       "Orphan facts: anything true that fits nowhere — keep, never drop.",
     ].join(" "),
     prompt: [
@@ -293,7 +301,9 @@ export const defaultOspSynthesizer: OspSynthesizer = async ({
       `Deferred (Director's territory — likely uncertainties): ${resolved.deferred.join("; ") || "(none)"}`,
     ].join("\n"),
     effort: "high",
-    maxTokens: 8_000,
+    // Adaptive thinking spends from this budget; the reconciliation probe
+    // caught an 8k truncation live. Ceiling, not target.
+    maxTokens: 16_000,
   });
 };
 
