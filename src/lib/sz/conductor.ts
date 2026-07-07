@@ -32,6 +32,7 @@ WHAT YOU GATHER, AS CONVERSATION (record each with record_observation as it surf
 - suggestion affordance: some players want suggested moves at decision points, some never — ask once, casually.
 - tier selection: present the model menus in plain terms — narration (the writer): Sonnet 5 (excellent, standard cost) / Opus 4.8 (deeper, ~2x) / Fable 5 (the frontier, ~3x, with automatic fallback protection); judgment and probe tiers likewise. Their pick is their cost/intelligence throttle and they can change it anytime — note that changing later resets the story's prompt cache and may shift the voice slightly (a "studio handoff"). Record with kind "tier_selection", content as JSON: {"narration": "claude-sonnet-5" | "claude-opus-4-8" | "claude-fable-5", "judgment": "claude-haiku-4-5" | "claude-sonnet-5" | "claude-opus-4-8", "probe": "claude-haiku-4-5" | "claude-sonnet-5"}.
 - world facts the player asserts are WORLD-BUILDING, always: record them (kind "world_fact" / "cast_fact"). The player's words are never just answers to your questions.
+- the player themselves: what they loved and when, who they were when it found them, the patterns in what lights them up — record durable taste observations (kind "player_taste") as they surface. These follow the player across campaigns; a returning player is a regular, not a stranger.
 
 STEERING HONESTY. If their stated taste and their actual choices diverge, you may name it once, gently ("you keep saying quiet, but you keep choosing loud — want me to trust the choices?"). Their answer wins.
 
@@ -243,6 +244,10 @@ export async function runConductorTurn(
   if (campaign.status !== "draft") throw new Error("SZ conversation is closed on this campaign");
   const draft = (campaign.szTranscript as ConductorDraft | null) ?? emptyDraft();
   const selection = TierSelection.safeParse(campaign.tierModels);
+  // Base marks for the merge-on-conflict persist below.
+  const baseUpdatedAt = campaign.updatedAt;
+  const baseTranscript = draft.transcript.length;
+  const baseObservations = draft.observations.length;
 
   // §6.9: the conductor greets a returning player from the taste profile.
   const [player] = await db.select().from(players).where(eq(players.id, campaign.playerId));
@@ -288,10 +293,22 @@ export async function runConductorTurn(
     const result = await done();
     if (result.prose.trim()) streamedAny = true;
 
-    draft.transcript.push({ role: "assistant", content: result.message.content });
-
-    const toolUses = result.message.content.filter((b) => b.type === "tool_use");
-    if (toolUses.length === 0 || result.message.stop_reason !== "tool_use") break;
+    const toolUses =
+      result.message.stop_reason === "tool_use"
+        ? result.message.content.filter((b) => b.type === "tool_use")
+        : [];
+    // A truncated round (max_tokens mid-tool-call) can carry tool_use blocks
+    // that will never receive results — persisting them would make every
+    // future turn's API replay invalid, bricking the draft. Persist only
+    // what can be replayed.
+    const persistable =
+      toolUses.length > 0
+        ? result.message.content
+        : result.message.content.filter((b) => b.type !== "tool_use");
+    if (persistable.length > 0) {
+      draft.transcript.push({ role: "assistant", content: persistable });
+    }
+    if (toolUses.length === 0) break;
 
     const results = [];
     for (const block of toolUses) {
@@ -302,14 +319,37 @@ export async function runConductorTurn(
     draft.transcript.push({ role: "user", content: results });
   }
 
-  await db
-    .update(campaigns)
-    .set({
-      szTranscript: draft,
-      szExtraction: draft.observations,
-      ...(draft.title ? { title: draft.title } : {}),
-      updatedAt: new Date(),
-    })
-    .where(eq(campaigns.id, campaignId));
+  // Persist with a lost-update guard: an orphaned turn (client disconnected,
+  // turn ran to completion server-side) can race a fresh turn started after
+  // reload. Last-write-wins would silently drop one exchange from the
+  // durable transcript — instead, detect the concurrent write and APPEND
+  // this turn's slice onto the stored draft. Nothing the player said is lost.
+  await db.transaction(async (tx) => {
+    const [current] = await tx
+      .select({ szTranscript: campaigns.szTranscript, updatedAt: campaigns.updatedAt })
+      .from(campaigns)
+      .where(eq(campaigns.id, campaignId))
+      .for("update");
+    let toWrite = draft;
+    if (current && current.updatedAt.getTime() !== baseUpdatedAt.getTime()) {
+      const stored = (current.szTranscript as ConductorDraft | null) ?? emptyDraft();
+      toWrite = {
+        transcript: [...stored.transcript, ...draft.transcript.slice(baseTranscript)],
+        observations: [...stored.observations, ...draft.observations.slice(baseObservations)],
+        profileIds: [...new Set([...stored.profileIds, ...draft.profileIds])],
+        readyToCompile: stored.readyToCompile || draft.readyToCompile,
+        ...(draft.title || stored.title ? { title: draft.title ?? stored.title } : {}),
+      };
+    }
+    await tx
+      .update(campaigns)
+      .set({
+        szTranscript: toWrite,
+        szExtraction: toWrite.observations,
+        ...(toWrite.title ? { title: toWrite.title } : {}),
+        updatedAt: new Date(),
+      })
+      .where(eq(campaigns.id, campaignId));
+  });
   return draft;
 }

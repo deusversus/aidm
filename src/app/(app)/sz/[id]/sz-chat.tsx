@@ -33,6 +33,8 @@ export function SzChat({
   const [compiling, setCompiling] = useState(false);
   const [gaps, setGaps] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [queued, setQueued] = useState<string | null>(null);
+  const queuedRef = useRef<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const kickoffFired = useRef(false);
 
@@ -92,13 +94,35 @@ export function SzChat({
             }
           }
         }
+        if (acc.trim()) setMessages((m) => [...m, { role: "conductor", text: acc }]);
       } catch (err) {
         setError(err instanceof Error ? err.message : "the conductor lost the thread — try again");
+        // The server persisted nothing for a failed turn — showing the
+        // partial reply or keeping the player bubble would diverge from the
+        // durable transcript the next turn is built on. Roll both back and
+        // hand the words back to the player.
+        if (message) {
+          setMessages((m) =>
+            m.length > 0 && m[m.length - 1]?.role === "player" ? m.slice(0, -1) : m,
+          );
+          const q = queuedRef.current;
+          queuedRef.current = null;
+          setQueued(null);
+          setInput((prev) => [message, q, prev.trim() || null].filter(Boolean).join("\n"));
+        }
       } finally {
-        if (acc.trim()) setMessages((m) => [...m, { role: "conductor", text: acc }]);
         setStreamText("");
         setStaging(null);
         setBusy(false);
+        // No dead air (§8): whatever the player typed while the conductor
+        // worked (interview answers during research) fires immediately.
+        const q = queuedRef.current;
+        if (q) {
+          queuedRef.current = null;
+          setQueued(null);
+          setMessages((m) => [...m, { role: "player", text: q }]);
+          void runTurn(q);
+        }
       }
     },
     [campaignId],
@@ -114,7 +138,15 @@ export function SzChat({
 
   const send = () => {
     const message = input.trim();
-    if (!message || busy) return;
+    if (!message) return;
+    if (busy) {
+      // Mid-turn (often mid-research): queue it — the conversation never
+      // makes the player wait to speak.
+      queuedRef.current = queuedRef.current ? `${queuedRef.current}\n${message}` : message;
+      setQueued(queuedRef.current);
+      setInput("");
+      return;
+    }
     setMessages((m) => [...m, { role: "player", text: message }]);
     setInput("");
     void runTurn(message);
@@ -188,6 +220,11 @@ export function SzChat({
           </div>
         )}
         {error && <p className="text-xs text-red-500">{error}</p>}
+        {queued && (
+          <p className="text-right text-xs italic text-muted-foreground">
+            queued — sends when the conductor finishes: “{queued}”
+          </p>
+        )}
         <div ref={bottomRef} />
       </div>
 
@@ -212,18 +249,19 @@ export function SzChat({
                 send();
               }
             }}
-            placeholder={busy ? "…" : "Say something"}
+            placeholder={
+              busy ? "type away — it sends when the conductor finishes" : "Say something"
+            }
             rows={2}
-            disabled={busy}
-            className="flex-1 resize-none rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-foreground disabled:opacity-50"
+            className="flex-1 resize-none rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-foreground"
           />
           <button
             type="button"
             onClick={send}
-            disabled={busy || !input.trim()}
+            disabled={!input.trim()}
             className="rounded-md border border-border px-4 text-sm font-medium hover:bg-muted disabled:opacity-50"
           >
-            Send
+            {busy ? "Queue" : "Send"}
           </button>
         </div>
       </footer>

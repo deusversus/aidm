@@ -154,6 +154,15 @@ describe.skipIf(!url)("SZ conductor draft-resume (real Postgres, scripted model)
     expect(blocks.some((b) => b.type === "tool_use")).toBe(true);
 
     expect(draft.transcript).toHaveLength(6);
+    // Extraction state rehydrates too: turn 1's observation came from the DB,
+    // not this turn's memory, and survives the round-trip.
+    expect(draft.observations).toHaveLength(1);
+    expect(draft.observations[0]?.content).toContain("returning player");
+    const [row] = await db
+      .select()
+      .from(schema.campaigns)
+      .where(eq(schema.campaigns.id, campaignId));
+    expect(row?.szExtraction).toHaveLength(1);
     const shown = draftMessages(draft);
     expect(shown.some((m) => m.role === "player" && m.text.includes("cowboy bebop"))).toBe(true);
     expect(shown.some((m) => m.text === SZ_KICKOFF)).toBe(false);

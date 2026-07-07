@@ -19,7 +19,7 @@ import {
   SuggestionAffordance,
 } from "@/lib/types/premise";
 import { Profile } from "@/lib/types/profile";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import type { ConductorDraft, Observation } from "./conductor";
 
@@ -58,11 +58,13 @@ export interface ResolvedObservations {
   deferred: string[];
 }
 
-const FINITUDE_WORDS: Record<string, "finite" | "indefinite" | "undecided"> = {
-  finite: "finite",
-  indefinite: "indefinite",
-  undecided: "undecided",
-};
+// Word-boundary matches, longest-first: "indefinite" CONTAINS "finite", so a
+// bare substring scan inverts the player's sacrosanct Series choice (§8).
+const FINITUDE_PATTERNS: [RegExp, "finite" | "indefinite" | "undecided"][] = [
+  [/\bindefinite(ly)?\b/i, "indefinite"],
+  [/\bundecided\b/i, "undecided"],
+  [/\bfinite\b/i, "finite"],
+];
 
 export function resolveObservations(observations: Observation[]): ResolvedObservations {
   const resolved: ResolvedObservations = {
@@ -80,8 +82,8 @@ export function resolveObservations(observations: Observation[]): ResolvedObserv
         resolved.spark = obs.content; // verbatim, latest wins
         break;
       case "finitude": {
-        const word = Object.keys(FINITUDE_WORDS).find((w) => obs.content.toLowerCase().includes(w));
-        if (word) resolved.finitude = FINITUDE_WORDS[word];
+        const match = FINITUDE_PATTERNS.find(([re]) => re.test(obs.content));
+        if (match) resolved.finitude = match[1];
         break;
       }
       case "death_physics":
@@ -137,8 +139,13 @@ export function resolveObservations(observations: Observation[]): ResolvedObserv
         break;
       }
       case "tier_selection": {
-        const parsed = TierSelection.safeParse(JSON.parse(obs.content));
-        if (parsed.success) resolved.tierSelection = parsed.data;
+        try {
+          const parsed = TierSelection.safeParse(JSON.parse(obs.content));
+          if (parsed.success) resolved.tierSelection = parsed.data;
+          else resolved.deferred.push(`unparseable tier selection: ${obs.content.slice(0, 80)}`);
+        } catch {
+          resolved.deferred.push(`unparseable tier selection: ${obs.content.slice(0, 80)}`);
+        }
         break;
       }
       case "world_fact":
@@ -205,6 +212,7 @@ const OspDraft = z.object({
 });
 
 export type OspSynthesizer = (input: {
+  campaignId: string;
   title: string;
   spark: string;
   resolved: ResolvedObservations;
@@ -212,44 +220,45 @@ export type OspSynthesizer = (input: {
 }) => Promise<z.infer<typeof OspDraft>>;
 
 export const defaultOspSynthesizer: OspSynthesizer = async ({
+  campaignId,
   title,
   spark,
   resolved,
   directorPersonality,
 }) => {
-  return callJudgment(
-    { ...DEV_TIER_SELECTION, judgment: "claude-sonnet-5" as const },
-    {
-      name: "sz_compile_osp",
-      schema: OspDraft,
-      system: [
-        "You compile Session Zero's Opening State Package for a story engine.",
-        "Constraints: hard = inviolable (player hard lines, world physics);",
-        "soft = strong preferences. Uncertainties are things the conversation",
-        "left OPEN — state them with a safe assumption and guidance for",
-        "writing AROUND them without foreclosing (never resolve them).",
-        "forbidden_opening_moves protect the cold open (no premature reveals,",
-        "no spending the spark in scene one). Briefs are seeds for the entity",
-        "layer; admit_to_catalog=true only for entities certain to persist.",
-        "Orphan facts: anything true that fits nowhere — keep, never drop.",
-      ].join(" "),
-      prompt: [
-        `Title: ${title}`,
-        `Director personality: ${directorPersonality}`,
-        `THE SPARK (verbatim): ${spark}`,
-        `Finitude: ${resolved.finitude}`,
-        `Death physics: ${resolved.deathPhysics}`,
-        `Lethality: ${resolved.lethalityPosture}`,
-        `Hard lines: ${resolved.hardLines.join("; ") || "(none)"}`,
-        `Control key: ${resolved.controlKey ?? "(not on the table)"}`,
-        `World facts: ${resolved.worldFacts.map((o) => o.content).join("; ") || "(none)"}`,
-        `Cast facts: ${resolved.castFacts.map((o) => o.content).join("; ") || "(none)"}`,
-        `Deferred (Director's territory — likely uncertainties): ${resolved.deferred.join("; ") || "(none)"}`,
-      ].join("\n"),
-      effort: "high",
-      maxTokens: 8_000,
-    },
-  );
+  // The player's judgment tier drives the compile (their pick, never the
+  // engine's); the gap verdict guarantees it exists by the time this runs.
+  return callJudgment(resolved.tierSelection ?? DEV_TIER_SELECTION, {
+    name: "sz_compile_osp",
+    campaignId,
+    schema: OspDraft,
+    system: [
+      "You compile Session Zero's Opening State Package for a story engine.",
+      "Constraints: hard = inviolable (player hard lines, world physics);",
+      "soft = strong preferences. Uncertainties are things the conversation",
+      "left OPEN — state them with a safe assumption and guidance for",
+      "writing AROUND them without foreclosing (never resolve them).",
+      "forbidden_opening_moves protect the cold open (no premature reveals,",
+      "no spending the spark in scene one). Briefs are seeds for the entity",
+      "layer; admit_to_catalog=true only for entities certain to persist.",
+      "Orphan facts: anything true that fits nowhere — keep, never drop.",
+    ].join(" "),
+    prompt: [
+      `Title: ${title}`,
+      `Director personality: ${directorPersonality}`,
+      `THE SPARK (verbatim): ${spark}`,
+      `Finitude: ${resolved.finitude}`,
+      `Death physics: ${resolved.deathPhysics}`,
+      `Lethality: ${resolved.lethalityPosture}`,
+      `Hard lines: ${resolved.hardLines.join("; ") || "(none)"}`,
+      `Control key: ${resolved.controlKey ?? "(not on the table)"}`,
+      `World facts: ${resolved.worldFacts.map((o) => o.content).join("; ") || "(none)"}`,
+      `Cast facts: ${resolved.castFacts.map((o) => o.content).join("; ") || "(none)"}`,
+      `Deferred (Director's territory — likely uncertainties): ${resolved.deferred.join("; ") || "(none)"}`,
+    ].join("\n"),
+    effort: "high",
+    maxTokens: 8_000,
+  });
 };
 
 // --- Compile -----------------------------------------------------------------
@@ -333,6 +342,7 @@ export async function compileSessionZero(
 
   const synthesize = opts.ospSynthesizer ?? defaultOspSynthesizer;
   const ospDraft = await synthesize({
+    campaignId,
     title: profile.title,
     spark: contract.spark,
     resolved,
@@ -344,80 +354,106 @@ export async function compileSessionZero(
     briefs: ospDraft.briefs.map((b) => ({ ...b, ...SZ_ENVELOPE })),
   });
 
-  // --- Persistence: the handoff becomes state -------------------------------
-  await db
-    .update(campaigns)
-    .set({
-      premiseContract: contract,
-      openingPackage: opening,
-      tierModels: resolved.tierSelection,
-      status: "active",
-      updatedAt: new Date(),
-    })
-    .where(eq(campaigns.id, campaignId));
+  // --- Persistence: the handoff becomes state, atomically --------------------
+  // One transaction, and the draft→active flip is its concurrency gate: two
+  // racing compiles both pass the route's status check (the OSP call is slow),
+  // but only one wins this conditional update — the loser inserts nothing.
+  await db.transaction(async (tx) => {
+    const flipped = await tx
+      .update(campaigns)
+      .set({
+        premiseContract: contract,
+        openingPackage: opening,
+        tierModels: resolved.tierSelection,
+        status: "active",
+        updatedAt: new Date(),
+      })
+      .where(and(eq(campaigns.id, campaignId), eq(campaigns.status, "draft")))
+      .returning({ id: campaigns.id });
+    if (flipped.length === 0) {
+      throw new Error("compile lost the race — this campaign is already active");
+    }
 
-  const critical = [
-    `Finitude: ${contract.finitude} — only the player may change this.`,
-    `Death physics: ${contract.intensity.death_physics}`,
-    `Lethality posture: ${contract.intensity.lethality_posture}`,
-    ...contract.intensity.hard_lines.map((l) => `HARD LINE (absolute): ${l}`),
-    ...(contract.intensity.control_key
-      ? [`Control key (player-cut): ${contract.intensity.control_key.circumstances}`]
-      : []),
-  ];
-  await db.insert(criticalFacts).values(
-    critical.map((content) => ({
-      campaignId,
-      content,
-      category: "contract",
-      ...SZ_ROW,
-      confidence: 1,
-    })),
-  );
-
-  // The spark is the campaign's first pencil mark (§8).
-  await db.insert(pencilMarks).values({
-    campaignId,
-    kind: "craft_note",
-    topic: "spark",
-    direction: `Multiply this: ${contract.spark}`,
-    evidence: "Session Zero, verbatim",
-    ...SZ_ROW,
-    confidence: 1,
-  });
-
-  // Catalog admission is an explicit act (§6.5) — briefs marked for it.
-  const admitted = opening.briefs.filter((b) => b.admit_to_catalog);
-  if (admitted.length > 0) {
-    await db.insert(entities).values(
-      admitted.map((b) => ({
+    const critical = [
+      `Finitude: ${contract.finitude} — only the player may change this.`,
+      `Death physics: ${contract.intensity.death_physics}`,
+      `Lethality posture: ${contract.intensity.lethality_posture}`,
+      ...contract.intensity.hard_lines.map((l) => `HARD LINE (absolute): ${l}`),
+      ...(contract.intensity.control_key
+        ? [`Control key (player-cut): ${contract.intensity.control_key.circumstances}`]
+        : []),
+    ];
+    await tx.insert(criticalFacts).values(
+      critical.map((content) => ({
         campaignId,
-        name: b.name,
-        entityType:
-          b.kind === "cast"
-            ? "npc"
-            : b.kind === "faction"
-              ? "faction"
-              : b.kind === "world"
-                ? "location"
-                : "thread",
-        block: b.brief,
+        content,
+        category: "contract",
         ...SZ_ROW,
+        confidence: 1,
       })),
     );
-  }
 
-  // Player profile, thin (§6.9): taste observations accumulate.
-  if (resolved.playerTaste.length > 0) {
-    const [player] = await db.select().from(players).where(eq(players.id, campaign.playerId));
-    const existing = (player?.profile as { taste?: string[] } | null) ?? {};
-    await db
-      .update(players)
-      .set({
-        profile: { ...existing, taste: [...(existing.taste ?? []), ...resolved.playerTaste] },
-      })
-      .where(eq(players.id, campaign.playerId));
-  }
+    // Player-asserted facts persist DETERMINISTICALLY (player words are
+    // world-building, never dropped) — the OSP call may also weave them into
+    // briefs, but nothing about their survival depends on a model.
+    const asserted = [...resolved.worldFacts, ...resolved.castFacts];
+    if (asserted.length > 0) {
+      await tx.insert(criticalFacts).values(
+        asserted.map((o) => ({
+          campaignId,
+          content: o.content,
+          category: "sz_fact",
+          turnId: 0,
+          provenance: "player_assertion",
+          confidence: o.confidence,
+        })),
+      );
+    }
+
+    // The spark is the campaign's first pencil mark (§8).
+    await tx.insert(pencilMarks).values({
+      campaignId,
+      kind: "craft_note",
+      topic: "spark",
+      direction: `Multiply this: ${contract.spark}`,
+      evidence: "Session Zero, verbatim",
+      ...SZ_ROW,
+      confidence: 1,
+    });
+
+    // Catalog admission is an explicit act (§6.5) — briefs marked for it.
+    const admitted = opening.briefs.filter((b) => b.admit_to_catalog);
+    if (admitted.length > 0) {
+      await tx.insert(entities).values(
+        admitted.map((b) => ({
+          campaignId,
+          name: b.name,
+          entityType:
+            b.kind === "cast"
+              ? "npc"
+              : b.kind === "faction"
+                ? "faction"
+                : b.kind === "world"
+                  ? "location"
+                  : "thread",
+          block: b.brief,
+          ...SZ_ROW,
+        })),
+      );
+    }
+
+    // Player profile, thin (§6.9): taste observations accumulate.
+    if (resolved.playerTaste.length > 0) {
+      const [player] = await tx.select().from(players).where(eq(players.id, campaign.playerId));
+      const existing = (player?.profile as { taste?: string[] } | null) ?? {};
+      await tx
+        .update(players)
+        .set({
+          profile: { ...existing, taste: [...(existing.taste ?? []), ...resolved.playerTaste] },
+        })
+        .where(eq(players.id, campaign.playerId));
+    }
+  });
 
   return { contract, opening, gaps: [] };
 }

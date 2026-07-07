@@ -147,12 +147,63 @@ describe.skipIf(!url)("SZ compiler (real Postgres)", () => {
     expect(resolved.finitude).toBe("finite");
   });
 
+  it("finitude never inverts: 'indefinite' must not resolve as finite (§8 sacrosanct)", () => {
+    const indefinite = resolveObservations([
+      obs("finitude", "indefinite — an open monster-of-the-week cycle"),
+    ]);
+    expect(indefinite.finitude).toBe("indefinite");
+    const undecided = resolveObservations([obs("finitude", "they're undecided for now")]);
+    expect(undecided.finitude).toBe("undecided");
+  });
+
+  it("a malformed tier_selection defers instead of throwing", () => {
+    const resolved = resolveObservations([obs("tier_selection", "sonnet for everything please")]);
+    expect(resolved.tierSelection).toBeUndefined();
+    expect(resolved.deferred.some((d) => d.includes("tier selection"))).toBe(true);
+  });
+
   it("gap verdict blocks a sparkless handoff (§8)", () => {
     const gaps = gapVerdict(
       resolveObservations(SCRIPTED_OBSERVATIONS.filter((o) => o.kind !== "spark")),
       true,
     );
     expect(gaps.some((g) => g.includes("spark"))).toBe(true);
+  });
+
+  it("a sparkless compile HALTS: campaign stays draft, nothing persists", async () => {
+    if (!db) throw new Error("unreachable");
+    const sparkless: ConductorDraft = {
+      transcript: [],
+      observations: SCRIPTED_OBSERVATIONS.filter((o) => o.kind !== "spark"),
+      profileIds: ["test_sz_profile"],
+      readyToCompile: true,
+    };
+    const [blocked] = await db
+      .insert(schema.campaigns)
+      .values({ playerId, title: "sparkless fixture", status: "draft", szTranscript: sparkless })
+      .returning();
+    if (!blocked) throw new Error("insert failed");
+    try {
+      const result = await compileSessionZero(db, blocked.id, {
+        ospSynthesizer: async () => {
+          throw new Error("OSP must never run on a gapped draft");
+        },
+      });
+      expect(result.gaps.length).toBeGreaterThan(0);
+      const [row] = await db
+        .select()
+        .from(schema.campaigns)
+        .where(eq(schema.campaigns.id, blocked.id));
+      expect(row?.status).toBe("draft");
+      expect(row?.premiseContract).toBeNull();
+      const facts = await db
+        .select()
+        .from(schema.criticalFacts)
+        .where(eq(schema.criticalFacts.campaignId, blocked.id));
+      expect(facts).toHaveLength(0);
+    } finally {
+      await db.delete(schema.campaigns).where(eq(schema.campaigns.id, blocked.id));
+    }
   });
 
   it("compiles the scripted draft: contract + OSP persisted, handoff complete", async () => {
@@ -179,6 +230,20 @@ describe.skipIf(!url)("SZ compiler (real Postgres)", () => {
       .where(eq(schema.criticalFacts.campaignId, campaignId));
     expect(facts.some((f) => f.content.includes("Finitude: finite"))).toBe(true);
     expect(facts.some((f) => f.content.startsWith("HARD LINE"))).toBe(true);
+    // Player assertions persist deterministically — never via the OSP model.
+    const trawler = facts.find((f) => f.content.includes("fishing trawler"));
+    expect(trawler?.provenance).toBe("player_assertion");
+    expect(trawler?.category).toBe("sz_fact");
+
+    // A second compile must lose the draft→active race, not double-write.
+    await expect(
+      compileSessionZero(db, campaignId, { ospSynthesizer: async () => STUB_OSP }),
+    ).rejects.toThrow(/already active/);
+    const factsAfter = await db
+      .select()
+      .from(schema.criticalFacts)
+      .where(eq(schema.criticalFacts.campaignId, campaignId));
+    expect(factsAfter).toHaveLength(facts.length);
 
     const marks = await db
       .select()
