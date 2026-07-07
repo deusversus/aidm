@@ -1,0 +1,43 @@
+# Exemplar passages — agency (fatalist 0 ↔ agency-driven 10)
+# Added at M1-C1 per the grounding-gap rule (golden profiles render this axis).
+# Sourcing per blueprint §4.7: synthesized in-register, never verbatim source.
+axis: agency
+exemplars:
+  - id: agency_b1_devilman
+    axis: agency
+    band: 1
+    anchor_show: Devilman Crybaby
+    author: claude-fable-5
+    method: synthesized
+    text: >-
+      The meeting was supposed to fix it. He'd printed flyers. Flyers!
+      Paper, in a week like this — wet stacks of them, his neighbors'
+      names in bold, PLEASE, WE KNOW THESE PEOPLE. Screens in every
+      window: the same face, the same word, mouths moving with it. He
+      talks fast. He talks so fast. Hands shaking, mic squealing,
+      somebody's grandmother nodding — she's nodding! — and for one
+      breath the room bends toward him like maybe. Then the phones go off.
+      All of them. One sound from four hundred pockets, the vote already
+      counted somewhere upstream of every word he'd said, the buses
+      already dispatched, the lists already lists. The grandmother stops
+      nodding. She looks embarrassed for him. Outside, the sky. It was
+      never asking. It was counting down.
+  - id: agency_b9_gurrenlagann
+    axis: agency
+    band: 9
+    anchor_show: Gurren Lagann
+    author: claude-fable-5
+    method: synthesized
+    text: >-
+      The ceiling of the world was a lie, and the auger in her fists was an
+      opinion about lies. Probability said the gate held; the gate had been
+      computed by minds the size of moons. But computation, the old
+      foreman taught her, only binds those who agree to be computed — and
+      she had signed nothing. She planted her boots on the wreck of the
+      engine they swore could never fall. It fell. "The odds—" began the
+      tactician. "Are a description," she said, "of people who stopped."
+      The auger bit, and it bit with everything stacked beneath her: every
+      cellar generation told to love its lid, every impossible yesterday
+      already behind them, every tomorrow that owed her money. The gate
+      broke the way all ceilings break for people like her — first in its
+      arithmetic, then everywhere else. She was already climbing.

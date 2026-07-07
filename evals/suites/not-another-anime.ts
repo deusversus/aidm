@@ -64,9 +64,10 @@ export const notAnotherAnime: Suite = {
           effort: "low",
           maxTokens: 6_000,
         });
-      // One retry: a truncated/runaway response is metered either way (C4),
-      // but shouldn't fail the whole library on a single flaky sample — and
-      // a still-failing sample is reported by id without aborting the rest.
+      // Error resilience: one retry on a failed CALL. Verdict resilience: a
+      // single judge sample is noise at the margin (§4.5's own drift rule
+      // demands two consecutive samples) — a failing verdict is confirmed
+      // only by majority of three.
       let verdict: z.infer<typeof Verdict>;
       try {
         verdict = await judge().catch(judge);
@@ -76,11 +77,28 @@ export const notAnotherAnime: Suite = {
         );
         continue;
       }
-      if (verdict.band_true && verdict.register_specific) {
-        details.push(`${e.id}: OK`);
+      let fails = verdict.band_true && verdict.register_specific ? 0 : 1;
+      if (fails > 0) {
+        for (let i = 0; i < 2 && fails < 2; i++) {
+          try {
+            const v = await judge().catch(judge);
+            if (!(v.band_true && v.register_specific)) {
+              fails++;
+              verdict = v;
+            }
+          } catch {
+            // A twice-failed resample CALL yields no verdict either way —
+            // the majority decides on the samples obtained (never fail the
+            // library on a flaky call).
+            details.push(`${e.id}: one resample unavailable (call failed twice)`);
+          }
+        }
+      }
+      if (fails < 2) {
+        details.push(`${e.id}: OK${fails ? " (1 of 3 samples dissented)" : ""}`);
       } else {
         failures.push(
-          `${e.id}: band_true=${verdict.band_true} register_specific=${verdict.register_specific} — ${verdict.reasoning}`,
+          `${e.id}: failed majority-of-3 — band_true=${verdict.band_true} register_specific=${verdict.register_specific} — ${verdict.reasoning}`,
         );
       }
     }

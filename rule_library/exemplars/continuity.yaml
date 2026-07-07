@@ -1,0 +1,43 @@
+# Exemplar passages — continuity (standalone episodes 0 ↔ serialized arc 10)
+# Added at M1-C1 per the grounding-gap rule (golden profiles render this axis).
+# Sourcing per blueprint §4.7: synthesized in-register, never verbatim source.
+axis: continuity
+exemplars:
+  - id: continuity_b1_kino
+    axis: continuity
+    band: 1
+    anchor_show: Kino's Journey
+    author: claude-fable-5
+    method: synthesized
+    text: >-
+      The country of the Weighed Word required every citizen to carry a
+      ledger of everything they had ever said. The traveler stayed the
+      customary three days. She watched a man read his own ledger in the
+      plaza, weeping at page four hundred; she ate a fine supper with the
+      customs officer, who spoke only in questions; she declined,
+      politely, the gift of a blank ledger of her own. On the third
+      morning she oiled the motorrad, paid the exit toll, and rode out
+      through the northern gate. The road ahead held another country,
+      which would have another custom, which would ask nothing of this
+      one. Behind her the gates closed on the ledgers and the weeping
+      man, complete, requiring no sequel. The road did not remember. That
+      was the road's kindness.
+  - id: continuity_b9_vinland
+    axis: continuity
+    band: 9
+    anchor_show: Vinland Saga
+    author: claude-fable-5
+    method: synthesized
+    text: >-
+      Nothing in this war stayed spent. The armistice they signed in the
+      fourth winter became, clause by clause, the legal engine of the next
+      war — the grain tariff in article nine starved the river towns, the
+      river towns bred the ferry mutiny, the mutiny gave the marshals
+      their pretext. The medic she had shamed into staying at the southern
+      crossing now ran the enemy's field hospitals, and ran them with
+      everything she'd taught him. She kept a map with pins for every
+      promise the dead had extracted from her. Seventeen pins now, and
+      three of them contradicted each other, and keeping all three was
+      slowly becoming next spring's catastrophe. When recruits asked why
+      veterans never celebrated victories, she showed them the map.
+      Nothing here concludes, she said. It compounds.

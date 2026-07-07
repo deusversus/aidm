@@ -8,9 +8,10 @@ import { DNAScales } from "./dna";
  * Both live as repo-versioned YAML under rule_library/.
  */
 
-export const AXIS_NAMES = Object.keys(DNAScales.shape) as [string, ...string[]];
+type AxisKey = keyof z.infer<typeof DNAScales>;
+export const AXIS_NAMES = Object.keys(DNAScales.shape) as [AxisKey, ...AxisKey[]];
 export const AxisName = z.enum(AXIS_NAMES);
-export type AxisName = z.infer<typeof AxisName>;
+export type AxisName = AxisKey;
 
 /** Bands carry the 0–10 scale's calibration points; v0 pins 1/5/9. */
 export const Band = z.union([z.literal(1), z.literal(5), z.literal(9)]);
@@ -63,7 +64,7 @@ export const ExemplarFile = z.object({
 });
 export type ExemplarFile = z.infer<typeof ExemplarFile>;
 
-/** The ten highest-leverage axes — v0 coverage (plan §0.5). Data, not schema; swap at skim time. */
+/** The ten highest-leverage axes — v0 coverage (M0 plan §0.5). Historical record; use COVERED_AXES. */
 export const V0_AXES: AxisName[] = [
   "pacing",
   "darkness",
@@ -75,4 +76,19 @@ export const V0_AXES: AxisName[] = [
   "cruelty",
   "epistemics",
   "moral_complexity",
+];
+
+/**
+ * Axes with authored extreme coverage — grows via the grounding-gap rule
+ * (M1 plan C1): no code path may press or exemplar-inject an uncovered
+ * axis. M1-C1 added the four the golden profiles render in their exemplar
+ * top-3 (empathy, continuity, power_treatment, agency). Full 24-axis
+ * coverage is the M2 build-out.
+ */
+export const COVERED_AXES: AxisName[] = [
+  ...V0_AXES,
+  "empathy",
+  "continuity",
+  "power_treatment",
+  "agency",
 ];

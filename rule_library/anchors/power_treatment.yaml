@@ -1,0 +1,25 @@
+axis: power_treatment
+scale: "celebrate wins (0) ↔ dwell on cost (10) — how the narrative THEMATICALLY treats power"
+bands:
+  "1":
+    excerpt_ref: power_treatment_b1_dbz
+    shows:
+      - title: Dragon Ball Z
+        note: new power is a festival; the form reveal IS the reward
+      - title: My Hero Academia
+        note: power growth celebrated as moral achievement (Plus Ultra)
+  "5":
+    shows:
+      - title: Hunter x Hunter (2011)
+        note: power delights AND disturbs; Nen contracts price everything
+      - title: Jujutsu Kaisen
+        note: strength celebrated in choreography, mourned in consequence
+  "9":
+    excerpt_ref: power_treatment_b9_frieren
+    shows:
+      - title: Frieren Beyond Journey's End
+        note: mastery outlives everyone it was learned beside
+      - title: Puella Magi Madoka Magica
+        note: every gain is a lien against the self
+      - title: Attack on Titan
+        note: the great powers are curses with expiration dates

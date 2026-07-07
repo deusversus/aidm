@@ -1,0 +1,25 @@
+axis: agency
+scale: "fatalist (0) ↔ agency-driven (10) — §4.3 boundary: felt volition inside a scene; Framing owns structural agency"
+bands:
+  "1":
+    excerpt_ref: agency_b1_devilman
+    shows:
+      - title: Devilman Crybaby
+        note: will passes through the plot like rain through a fence
+      - title: Texhnolyze
+        note: the city's decline proceeds regardless of anyone
+      - title: Puella Magi Madoka Magica
+        note: the system prices every act before it is chosen
+  "5":
+    shows:
+      - title: Cowboy Bebop
+        note: agency real but the past keeps the casting vote
+      - title: Vinland Saga
+        note: choices matter inside currents older than the choosers
+  "9":
+    excerpt_ref: agency_b9_gurrenlagann
+    shows:
+      - title: Gurren Lagann
+        note: will is load-bearing physics; refusal drills through fate
+      - title: Code Geass
+        note: one mind's decisions bend nations scene by scene

@@ -1,6 +1,6 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import { AnchorFile, type Exemplar, ExemplarFile, V0_AXES } from "@/lib/types/grounding";
+import { AnchorFile, COVERED_AXES, type Exemplar, ExemplarFile } from "@/lib/types/grounding";
 import jsYaml from "js-yaml";
 
 /**
@@ -71,13 +71,14 @@ export function loadGrounding(): GroundingLibrary {
       }
     }
   }
-  // v0 coverage (§4.7): both extremes of every v0 axis.
-  for (const axis of V0_AXES) {
+  // Coverage invariant (§4.7 + the M1 grounding-gap rule): both extremes of
+  // every covered axis.
+  for (const axis of COVERED_AXES) {
     const anchor = anchors.find((a) => a.axis === axis);
-    if (!anchor) throw new Error(`grounding: v0 axis ${axis} has no anchor file`);
+    if (!anchor) throw new Error(`grounding: covered axis ${axis} has no anchor file`);
     for (const band of [1, 9] as const) {
       if (!exemplars.some((e) => e.axis === axis && e.band === band)) {
-        throw new Error(`grounding: v0 axis ${axis} missing band-${band} exemplar`);
+        throw new Error(`grounding: covered axis ${axis} missing band-${band} exemplar`);
       }
     }
   }

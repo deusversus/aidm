@@ -23,11 +23,6 @@ export const scaffolds: Suite[] = [
     "§10.1 test-retest anchor scoring needs the Sakkan (M2); demotes unreliable axes",
   ),
   scaffold(
-    "renderer-efficacy",
-    "M1",
-    "§10.2 A/B needs the Renderer's Settei (M1); asserts pressure moves target axes without collateral drift",
-  ),
-  scaffold(
     "drift-soak",
     "M2",
     "§10.3 needs scripted 50–100 turn runs (M2); drift band held, corrections restore within one Sakkan interval",

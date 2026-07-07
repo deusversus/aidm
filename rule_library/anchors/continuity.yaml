@@ -1,0 +1,27 @@
+axis: continuity
+scale: "standalone episodes (0) ↔ serialized arc (10) — §4.3 boundary: colors rendering only; Framing owns structure"
+bands:
+  "1":
+    excerpt_ref: continuity_b1_kino
+    shows:
+      - title: Kino's Journey
+        note: arrive, observe, depart; countries never call back
+      - title: Mushishi
+        note: each episode a sealed vessel; the traveler alone persists
+      - title: Space Dandy
+        note: continuity actively mocked — the crew dies and returns unremarked
+  "5":
+    shows:
+      - title: Cowboy Bebop
+        note: bounty-of-the-week surface over a slow-burning past
+      - title: Trigun
+        note: episodic until the long thread stands up and takes over
+  "9":
+    excerpt_ref: continuity_b9_vinland
+    shows:
+      - title: Attack on Titan
+        note: every scene mortgaged to the long thread; nothing stays spent
+      - title: Vinland Saga
+        note: consequences compound across years and books
+      - title: One Piece
+        note: setups pay off decades later; the ledger never closes

@@ -1,0 +1,41 @@
+# Exemplar passages — empathy (narrow 0 ↔ wide empathic range 10)
+# Added at M1-C1 per the grounding-gap rule (golden profiles render this axis).
+# Sourcing per blueprint §4.7: synthesized in-register, never verbatim source.
+axis: empathy
+exemplars:
+  - id: empathy_b1_deathnote
+    axis: empathy
+    band: 1
+    anchor_show: Death Note
+    author: claude-fable-5
+    method: synthesized
+    text: >-
+      The detective arranged the sugar cubes into a tower and considered the
+      seventeen people who had touched the envelope. Sixteen were noise. He
+      subtracted them the way one subtracts furniture from a room: the
+      courier with his predictable route, the clerk with her verifiable
+      alibi, the officers whose mediocrity was its own exoneration. What
+      remained was the sender — a mind, finally, worth modeling. He built
+      it in the dark behind his eyes: proud, methodical, young enough to
+      believe in tidiness. The tower of sugar reached six cubes. Somewhere
+      in the city that mind was building a model of him in return, and the
+      thought produced the closest thing he had felt to warmth all month.
+      Everyone else in the world was, for present purposes, scenery.
+  - id: empathy_b9_fruitsbasket
+    axis: empathy
+    band: 9
+    anchor_show: Fruits Basket
+    author: claude-fable-5
+    method: synthesized
+    text: >-
+      The girl who had shoved her in the hallway was crying in the
+      stairwell, and she understood — not forgave, exactly, but understood
+      the way you understand weather once you learn where wind comes from.
+      The shove had a mother in it. A kitchen with the lights off. Report
+      cards signed in silence. Even the teacher who never intervened had a
+      reason folded in his coat pocket: a sister he hadn't saved once, long
+      ago, and every conflict since had looked like deep water. She sat
+      down on the step below the crying girl, close enough to be present,
+      far enough to be refusable. "You don't have to tell me," she said,
+      and meant it, because everyone in this story was carrying something,
+      and being allowed not to show it was also a kindness.

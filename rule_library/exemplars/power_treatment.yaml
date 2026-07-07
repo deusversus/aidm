@@ -1,0 +1,43 @@
+# Exemplar passages — power_treatment (celebrate wins 0 ↔ dwell on cost 10)
+# Added at M1-C1 per the grounding-gap rule (golden profiles render this axis).
+# Sourcing per blueprint §4.7: synthesized in-register, never verbatim source.
+axis: power_treatment
+exemplars:
+  - id: power_treatment_b1_dbz
+    axis: power_treatment
+    band: 1
+    anchor_show: Dragon Ball Z
+    author: claude-fable-5
+    method: synthesized
+    text: >-
+      The new form hit like a sunrise given a body. He felt the plateau he
+      had trained against for three years crack and fall away beneath him,
+      and he laughed — actually laughed — as the aura came up gold and the
+      canyon walls peeled back from the sheer joy of it. The tyrant's face
+      did the thing all their faces did: the recalculation. "Impossible"
+      was already forming on his lips, and it tasted delicious. Down on
+      the ridge his friends were shouting themselves hoarse, and the
+      loudest of them was hollering exactly what everyone was thinking:
+      that's what happens, THAT'S what happens when you give him three
+      years! He rolled his shoulders. The power answered like an old
+      friend at a festival. "So," he said, grinning wider, "want to see
+      what it does?"
+  - id: power_treatment_b9_frieren
+    axis: power_treatment
+    band: 9
+    anchor_show: Frieren Beyond Journey's End
+    author: claude-fable-5
+    method: synthesized
+    text: >-
+      The spell that had broken the siege of the northern capital took her
+      four decades to master and one exhale to cast, and the strange thing,
+      she reflected, watching the enemy line simply cease, was how little
+      it resembled triumph anymore. The soldiers cheered. They always
+      cheered; they were twenty, and the war was the largest thing that
+      would ever happen to them. For her the casting was mostly memory
+      now: the master who taught her the third gesture, dead these two
+      hundred years; the apprentice who never got the timing right, dead
+      also, of nothing worse than time. Power accumulated like snowfall on
+      a roof, and what it weighed on was always the same beam. She banked
+      the residual heat, corrected a young mage's grip without being
+      asked, and went to find somewhere quiet to remember.

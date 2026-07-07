@@ -1,14 +1,14 @@
-import { V0_AXES } from "@/lib/types/grounding";
+import { COVERED_AXES } from "@/lib/types/grounding";
 import { describe, expect, it } from "vitest";
 import { loadGrounding } from "../grounding";
 
-describe("grounding library (§4.6–4.7 v0)", () => {
+describe("grounding library (§4.6–4.7, gap rule)", () => {
   const lib = loadGrounding();
 
-  it("covers all ten v0 axes with anchors and both extreme exemplars", () => {
-    expect(V0_AXES).toHaveLength(10);
-    expect(lib.anchors.length).toBeGreaterThanOrEqual(10);
-    expect(lib.exemplars).toHaveLength(20);
+  it("covers all fourteen axes (v0 ten + M1 gap-rule four) with anchors and both extremes", () => {
+    expect(COVERED_AXES).toHaveLength(14);
+    expect(lib.anchors.length).toBeGreaterThanOrEqual(14);
+    expect(lib.exemplars).toHaveLength(28);
   });
 
   it("every anchor band pins 2–5 witness shows with IP-specific notes", () => {
@@ -29,7 +29,7 @@ describe("grounding library (§4.6–4.7 v0)", () => {
       expect(anchor.bands["9"].excerpt_ref, `${anchor.axis} band 9`).toBeDefined();
     }
     // loadGrounding() already threw if any ref dangled — this asserts the happy path.
-    expect(lib.byId.size).toBe(20);
+    expect(lib.byId.size).toBe(28);
   });
 
   it("exemplars are 80–150 words of synthesized prose with full provenance", () => {
