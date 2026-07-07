@@ -1,0 +1,1 @@
+ALTER TABLE "pins" ADD COLUMN "source_turn" integer DEFAULT 0 NOT NULL;

@@ -91,7 +91,18 @@ async function callStructured<T>(
   // create() + manual parse, NOT messages.parse(): parse() throws on a
   // truncated/unparseable response BEFORE usage is readable, and a billed
   // call that never reaches the ledger breaks the choke-point promise.
-  const message = await getAnthropic().messages.create(params);
+  let message: Message;
+  try {
+    message = await getAnthropic().messages.create(params);
+  } catch (err) {
+    const statusMessage = err instanceof Error ? err.message : String(err);
+    generation?.end({
+      level: "ERROR",
+      statusMessage,
+      metadata: { latencyMs: Date.now() - started },
+    });
+    throw err;
+  }
   const latencyMs = Date.now() - started;
 
   await recordModelCall({
@@ -142,6 +153,57 @@ export function callJudgment<T>(
 /** Probe tier: intent/triage, transition checks, routers, extractions. */
 export function callProbe<T>(selection: TierSelection, opts: StructuredCallOptions<T>): Promise<T> {
   return callStructured("probe", selection, opts);
+}
+
+/**
+ * Cache pre-warm (§5.6): a max_tokens=1 request against the exact blocks
+ * 1–3 prefix so the player's real call reads warm. Fired by the play view
+ * when the input regains focus after >4min idle (client hook lands M1).
+ */
+export async function prewarmPrefix(
+  selection: TierSelection,
+  system: TextBlockParam[],
+  ctx: CallContext = {},
+): Promise<{ cacheCreation: number; cacheRead: number; costUsd: number }> {
+  const model = selection.narration;
+  const lf = getLangfuse();
+  const trace = lf?.trace({
+    name: "prewarm",
+    tags: ["narration"],
+    metadata: { campaignId: ctx.campaignId },
+  });
+  const started = Date.now();
+  let message: Message;
+  try {
+    message = await getAnthropic().messages.create({
+      model,
+      max_tokens: 1,
+      system,
+      messages: [{ role: "user", content: "." }],
+    });
+  } catch (err) {
+    const statusMessage = err instanceof Error ? err.message : String(err);
+    trace?.update({ output: { error: statusMessage, latencyMs: Date.now() - started } });
+    throw err;
+  }
+  const latencyMs = Date.now() - started;
+  const usage = usageStats(message.usage);
+  const costUsd = await recordModelCall({
+    provider: "anthropic",
+    model,
+    tier: "narration",
+    usage,
+    latencyMs,
+    campaignId: ctx.campaignId,
+    turnNumber: ctx.turnNumber,
+    traceId: trace?.id,
+  });
+  trace?.update({ output: { latencyMs, ...usage } });
+  return {
+    cacheCreation: usage.cache_creation_input_tokens,
+    cacheRead: usage.cache_read_input_tokens,
+    costUsd,
+  };
 }
 
 // ---------------------------------------------------------------------------

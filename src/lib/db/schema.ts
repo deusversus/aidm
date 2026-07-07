@@ -533,6 +533,14 @@ export const pins = pgTable(
       .references(() => campaigns.id, { onDelete: "cascade" }),
     content: text().notNull(),
     position: integer().notNull().default(0),
+    /**
+     * Turn the pinned passage was selected from. Dedup keys on THIS vs the
+     * compaction watermark (source exchange still in the verbatim tail →
+     * pin withheld), never on window text — text-scanning dedup flips
+     * membership mid-session when narration echoes the pin, invalidating
+     * the B3 prefix (C5 audit). 0 = unknown/pre-play → always rendered.
+     */
+    sourceTurn: integer().notNull().default(0),
     ...provenanceColumns,
   },
   (t) => ({
