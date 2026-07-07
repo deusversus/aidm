@@ -52,6 +52,12 @@ export interface ResolvedObservations {
   presentationGrants: string[];
   suggestionAffordance?: z.infer<typeof SuggestionAffordance>;
   tierSelection?: TierSelection;
+  /**
+   * Hybrid per-component picks (§4.1: a hybrid is a selection, not an
+   * average). Gathered and persisted from C3 on; the per-component contract
+   * ASSEMBLY is M4's — see gapVerdict's hybrid block.
+   */
+  blendChoices: { component: string; choice: string }[];
   worldFacts: Observation[];
   castFacts: Observation[];
   playerTaste: string[];
@@ -83,6 +89,7 @@ export function resolveObservations(observations: Observation[]): ResolvedObserv
     hardLines: [],
     calibration: {},
     presentationGrants: [],
+    blendChoices: [],
     worldFacts: [],
     castFacts: [],
     playerTaste: [],
@@ -142,6 +149,21 @@ export function resolveObservations(observations: Observation[]): ResolvedObserv
         }
         break;
       }
+      case "blend": {
+        try {
+          const parsed = z
+            .object({ component: z.string().min(1), choice: z.string().min(1) })
+            .parse(JSON.parse(obs.content));
+          // Latest wins per component.
+          resolved.blendChoices = [
+            ...resolved.blendChoices.filter((b) => b.component !== parsed.component),
+            parsed,
+          ];
+        } catch {
+          resolved.deferred.push(`unparseable blend choice: ${obs.content.slice(0, 80)}`);
+        }
+        break;
+      }
       case "presentation":
         resolved.presentationGrants.push(obs.content);
         break;
@@ -180,9 +202,21 @@ export function resolveObservations(observations: Observation[]): ResolvedObserv
 
 // --- Gap verdict (deterministic, blocking) ----------------------------------
 
-export function gapVerdict(resolved: ResolvedObservations, hasProfile: boolean): string[] {
+export function gapVerdict(
+  resolved: ResolvedObservations,
+  hasProfile: boolean,
+  profileCount = 1,
+): string[] {
   const gaps: string[] = [];
   if (!hasProfile) gaps.push("no researched profile — the World never loaded");
+  if (profileCount > 1) {
+    // Honest, not silent: compiling a hybrid conversation from one source
+    // would quietly discard the blend. Per-component assembly is M4-staged
+    // (M1 plan); the draft and its blend observations are durable.
+    gaps.push(
+      "hybrid premise: per-component assembly lands at M4 — this draft keeps everything and compiles then (or the staging gets pulled forward)",
+    );
+  }
   if (!resolved.spark) gaps.push("the spark was never gathered (§8's one mandatory question)");
   if (!resolved.finitude) gaps.push("finitude undetermined — the Series contract is sacrosanct");
   if (!resolved.deathPhysics) gaps.push("death physics ungathered (intensity contract)");
@@ -265,6 +299,7 @@ export const defaultOspSynthesizer: OspSynthesizer = async ({
       `Lethality: ${resolved.lethalityPosture}`,
       `Hard lines: ${resolved.hardLines.join("; ") || "(none)"}`,
       `Control key: ${resolved.controlKey ?? "(not on the table)"}`,
+      `Blend decisions: ${resolved.blendChoices.map((b) => `${b.component} ← ${b.choice}`).join("; ") || "(single source)"}`,
       `World facts: ${resolved.worldFacts.map((o) => o.content).join("; ") || "(none)"}`,
       `Cast facts: ${resolved.castFacts.map((o) => o.content).join("; ") || "(none)"}`,
       `Deferred (Director's territory — likely uncertainties): ${resolved.deferred.join("; ") || "(none)"}`,
@@ -297,7 +332,7 @@ export async function compileSessionZero(
   const [profileRow] = profileId
     ? await db.select().from(profiles).where(eq(profiles.id, profileId))
     : [];
-  const gaps = gapVerdict(resolved, !!profileRow);
+  const gaps = gapVerdict(resolved, !!profileRow, draft.profileIds.length);
   if (gaps.length > 0) {
     return { gaps } as CompileResult; // blocking — handoff halted (§8)
   }

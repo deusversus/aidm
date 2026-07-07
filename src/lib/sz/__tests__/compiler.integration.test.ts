@@ -175,6 +175,22 @@ describe.skipIf(!url)("SZ compiler (real Postgres)", () => {
     expect(resolved.deferred.some((d) => d.includes("tier selection"))).toBe(true);
   });
 
+  it("blend choices resolve latest-wins per component; hybrids block compile honestly (M4 staging)", () => {
+    const resolved = resolveObservations([
+      obs("blend", '{"component": "world", "choice": "Solo Leveling"}'),
+      obs("blend", '{"component": "framing", "choice": "Cowboy Bebop"}'),
+      obs("blend", '{"component": "world", "choice": "Cowboy Bebop"}'),
+      obs("blend", "mostly bebop I guess"),
+    ]);
+    expect(resolved.blendChoices).toContainEqual({ component: "world", choice: "Cowboy Bebop" });
+    expect(resolved.blendChoices).toHaveLength(2);
+    expect(resolved.deferred.some((d) => d.includes("unparseable blend"))).toBe(true);
+
+    const gaps = gapVerdict(resolveObservations(SCRIPTED_OBSERVATIONS), true, 2);
+    expect(gaps.some((g) => g.includes("hybrid"))).toBe(true);
+    expect(gapVerdict(resolveObservations(SCRIPTED_OBSERVATIONS), true, 1)).toEqual([]);
+  });
+
   it("gap verdict blocks a sparkless handoff (§8)", () => {
     const gaps = gapVerdict(
       resolveObservations(SCRIPTED_OBSERVATIONS.filter((o) => o.kind !== "spark")),
