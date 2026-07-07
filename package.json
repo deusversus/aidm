@@ -22,6 +22,9 @@
     "db:push": "drizzle-kit push",
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
+    "spike:judgment": "tsx --env-file=.env.local scripts/spike-judgment.ts",
+    "spike:narration": "tsx --env-file=.env.local scripts/spike-narration.ts",
+    "spike:embed": "tsx --env-file=.env.local scripts/spike-embed.ts",
     "langfuse:latest": "tsx --env-file=.env.local scripts/langfuse-latest.ts"
   },
   "dependencies": {
