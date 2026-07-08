@@ -42,7 +42,7 @@ export default async function CampaignsPage() {
           {rows.map((c) => (
             <li key={c.id}>
               <Link
-                href={`/sz/${c.id}`}
+                href={c.status === "draft" ? `/sz/${c.id}` : `/play/${c.id}`}
                 className="flex items-center justify-between px-4 py-3 text-sm hover:bg-muted"
               >
                 <span className="font-medium">{c.title}</span>
