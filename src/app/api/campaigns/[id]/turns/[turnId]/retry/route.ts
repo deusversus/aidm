@@ -2,7 +2,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import { campaigns, turns } from "@/lib/db/schema";
 import { executeTurn, isRunning } from "@/lib/turn/runtime";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
@@ -38,13 +38,11 @@ export async function POST(
     return NextResponse.json({ error: "turn is already running" }, { status: 409 });
   }
 
-  // Reopen at the checkpointed phase; the executor resumes from there.
-  await db
-    .update(turns)
-    .set({
-      status: sql`CASE WHEN ${turns.checkpoints} ? 'phase_b' THEN 'phase_b_complete' ELSE 'phase_a_complete' END`,
-    })
-    .where(eq(turns.id, turnId));
+  // Reopen: move OFF the terminal 'failed' status so the executor runs, then
+  // let its per-step CHECKPOINT markers (not this status) decide where to
+  // resume — Phase A re-rolls if it never checkpointed; otherwise it skips
+  // to the last incomplete step. One source of truth, no status guessing.
+  await db.update(turns).set({ status: "queued" }).where(eq(turns.id, turnId));
   void executeTurn(db, turnId).catch((err) => {
     console.error("[retry] execution crashed", { turnId, err });
   });

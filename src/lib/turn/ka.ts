@@ -222,6 +222,15 @@ export async function runKeyAnimator(
       };
     }
 
+    // A truncated response (adaptive thinking + prose overran max_tokens) is
+    // NOT a forgotten trailer: the prose is cut mid-sentence, so committing it
+    // would freeze half a scene into the permanent episodic record. Fail the
+    // attempt so the Phase-B retry loop re-renders instead of fabricating a
+    // sidecar over the cut.
+    if (result.message.stop_reason === "max_tokens") {
+      throw new Error("narration truncated (max_tokens) — retrying the scene");
+    }
+
     const sidecar = extractCommitScene(result.message);
     if (sidecar) {
       return {
@@ -235,17 +244,30 @@ export async function runKeyAnimator(
       };
     }
 
-    const researchUses = result.message.content.filter(
-      (b) => b.type === "tool_use" && b.name !== "commit_scene",
-    );
+    const toolUses = result.message.content.filter((b) => b.type === "tool_use");
+    const researchUses = toolUses.filter((b) => b.type === "tool_use" && b.name !== "commit_scene");
     if (result.message.stop_reason !== "tool_use" || researchUses.length === 0) {
-      break; // prose ended without a trailer — probe fallback below
+      break; // prose ended without a (valid) trailer — probe fallback below
     }
 
     messages.push({ role: "assistant", content: result.message.content });
+    // Every tool_use in the assistant message MUST get a tool_result or the
+    // next request 400s — including a commit_scene block whose input failed
+    // validation (extractCommitScene returned null above) and any research
+    // tool. The invalid trailer gets a nudge to re-emit it cleanly.
     const results = [];
-    for (const block of researchUses) {
+    for (const block of toolUses) {
       if (block.type !== "tool_use") continue;
+      if (block.name === "commit_scene") {
+        results.push({
+          type: "tool_result" as const,
+          tool_use_id: block.id,
+          content:
+            "That commit_scene call was malformed. Finish the scene if unfinished, then call commit_scene once more with valid fields (notable_beats needs 1–3 entries).",
+          is_error: true,
+        });
+        continue;
+      }
       let output: string;
       if (researchCalls >= budget) {
         output = "Research budget exhausted — write the scene from what you have.";

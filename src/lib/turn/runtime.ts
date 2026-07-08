@@ -37,32 +37,53 @@ export type TurnEvent =
 interface BusEntry {
   listeners: Set<(e: TurnEvent) => void>;
   buffer: TurnEvent[];
+  /** Bumped on every terminal event; the cleanup timer no-ops if it changed. */
+  generation: number;
 }
 
 const bus = new Map<string, BusEntry>();
 const running = new Set<string>();
 
-function publish(turnId: string, event: TurnEvent) {
+function ensureEntry(turnId: string): BusEntry {
   let entry = bus.get(turnId);
   if (!entry) {
-    entry = { listeners: new Set(), buffer: [] };
+    entry = { listeners: new Set(), buffer: [], generation: 0 };
     bus.set(turnId, entry);
   }
+  return entry;
+}
+
+/**
+ * A fresh run (initial or retry) discards any stale buffer so a re-attaching
+ * client never replays a PRIOR run's terminal event (e.g. an old 'error'
+ * that would close a retry stream on sight). Listeners persist — a client
+ * may already be attached and waiting.
+ */
+function resetBuffer(turnId: string) {
+  const entry = bus.get(turnId);
+  if (entry) entry.buffer = [];
+}
+
+function publish(turnId: string, event: TurnEvent) {
+  const entry = ensureEntry(turnId);
   entry.buffer.push(event);
   for (const l of entry.listeners) l(event);
   if (event.type === "done" || event.type === "error" || event.type === "channel") {
-    // Terminal: drop the bus entry after a grace window for late attaches.
-    setTimeout(() => bus.delete(turnId), 60_000).unref?.();
+    // Terminal: drop the entry after a grace window — but only if no newer
+    // run has published since (generation guard) and nothing is running, so
+    // a retry started inside the window is never orphaned.
+    entry.generation += 1;
+    const gen = entry.generation;
+    setTimeout(() => {
+      const e = bus.get(turnId);
+      if (e && e.generation === gen && !running.has(turnId)) bus.delete(turnId);
+    }, 60_000).unref?.();
   }
 }
 
 /** Attach a listener; replays buffered events first. Returns detach. */
 export function attachToTurn(turnId: string, listener: (e: TurnEvent) => void): () => void {
-  let entry = bus.get(turnId);
-  if (!entry) {
-    entry = { listeners: new Set(), buffer: [] };
-    bus.set(turnId, entry);
-  }
+  const entry = ensureEntry(turnId);
   for (const e of entry.buffer) listener(e);
   entry.listeners.add(listener);
   return () => entry.listeners.delete(listener);
@@ -130,6 +151,8 @@ export async function submitTurn(
 export async function executeTurn(db: Db, turnId: string): Promise<void> {
   if (running.has(turnId)) return;
   running.add(turnId);
+  // Fresh run: any buffered terminal event belongs to a prior (failed) run.
+  resetBuffer(turnId);
   try {
     await executeTurnInner(db, turnId);
   } finally {
@@ -137,10 +160,49 @@ export async function executeTurn(db: Db, turnId: string): Promise<void> {
   }
 }
 
+/** Terminal statuses the executor never re-runs (guards a stale-status race). */
+const TERMINAL_STATUSES = new Set(["complete", "channel", "failed"]);
+
 async function executeTurnInner(db: Db, turnId: string): Promise<void> {
   const [turn] = await db.select().from(turns).where(eq(turns.id, turnId));
   if (!turn) throw new Error("turn not found");
-  if (turn.status === "complete" || turn.status === "channel") return;
+  // A terminal turn is never re-run: a retry moves status OFF 'failed' first,
+  // so this guard closes the stream-route stale-status window (a third,
+  // unsanctioned attempt on an already-failed turn) without blocking retries.
+  if (TERMINAL_STATUSES.has(turn.status)) return;
+  const emit = (e: TurnEvent) => publish(turnId, e);
+  try {
+    await runPhases(db, turnId, turn, emit);
+  } catch (err) {
+    // Uncaught failure OUTSIDE the Phase-B retry loop (Phase A, block
+    // assembly, G1 write). §5.7/§9.1: never a silent hang — mark failed,
+    // surface a typed retryable error. Resume re-runs from the last
+    // checkpoint (Phase A re-rolls fresh; nothing was committed).
+    console.error("[runtime] turn failed outside Phase B", { turnId, err });
+    await db
+      .update(turns)
+      .set({
+        status: "failed",
+        checkpoints: sql`${turns.checkpoints} || ${JSON.stringify({ error: String(err) })}::jsonb`,
+      })
+      .where(eq(turns.id, turnId));
+    emit({
+      type: "error",
+      message:
+        "The scene hit a snag before it could render. Your action is saved — retry when ready.",
+      retryable: true,
+    });
+  }
+}
+
+type TurnRow = typeof turns.$inferSelect;
+
+async function runPhases(
+  db: Db,
+  turnId: string,
+  turn: TurnRow,
+  emit: (e: TurnEvent) => void,
+): Promise<void> {
   const [campaign] = await db.select().from(campaigns).where(eq(campaigns.id, turn.campaignId));
   if (!campaign) throw new Error("campaign not found");
   const parsedSelection = TierSelection.safeParse(campaign.tierModels);
@@ -153,7 +215,6 @@ async function executeTurnInner(db: Db, turnId: string): Promise<void> {
     trailer_fallback?: boolean;
     error?: string;
   };
-  const emit = (e: TurnEvent) => publish(turnId, e);
 
   // --- Phase A (checkpointed by runLayout itself) ----------------------------
   let conte: Conte;
@@ -250,6 +311,11 @@ async function executeTurnInner(db: Db, turnId: string): Promise<void> {
     }
   } else {
     sidecar = (turn.sidecar as CommitScene | null) ?? null;
+    // Resume after a crash between the Phase-B checkpoint and G1: the prose
+    // is durable but the reconnecting client's buffer is empty (post-restart)
+    // — replay it so the scene actually reaches the player (§5.7), not just
+    // a bare 'done'.
+    if (narration) emit({ type: "prose", text: narration });
   }
 
   // --- G1-minimal (§5.8): verbatim episodic + completion markers --------------

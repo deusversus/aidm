@@ -107,7 +107,7 @@ describe.skipIf(!url)("Layout (real Postgres, scripted models)", () => {
       {
         content: "The crew is broke; the fridge is empty again",
         category: "fact",
-        embedding: basis(0).map((x, i) => (i === 0 ? 0.9 : i === 1 ? 0.44 : 0)),
+        embedding: basis(0).map((_v, i) => (i === 0 ? 0.9 : i === 1 ? 0.44 : 0)),
         baseHeat: 50,
         lastBoostedTurn: 1,
       },

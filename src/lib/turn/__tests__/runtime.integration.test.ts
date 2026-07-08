@@ -294,6 +294,93 @@ describe.skipIf(!url)("Turn Runtime (real Postgres, scripted models)", () => {
     expect(episodic[0]?.narration).toBe("The scene lands clean. ");
   });
 
+  it("orphaned phase_b_complete resume REPLAYS the persisted prose, then finishes G1 (§5.7)", async () => {
+    if (!db) throw new Error("unreachable");
+    // Simulate a crash between the Phase-B checkpoint and G1: a durable turn
+    // with narration + sidecar persisted, phase_b marked, g1 not, and an
+    // EMPTY event bus (post-restart). No stream mock should be consulted.
+    mockStream.mockImplementation(() => {
+      throw new Error("Phase B must not run on a phase_b-checkpointed resume");
+    });
+    const [row] = await db
+      .insert(schema.turns)
+      .values({
+        campaignId,
+        turnNumber: 1,
+        tier: "genga",
+        status: "phase_b_complete",
+        playerInput: "I read the room",
+        conte: { turn_id: 1, tier: "genga", degraded: false },
+        narration: "The bar exhaled smoke and old grievances.",
+        sidecar: { ...SIDECAR, decision_point: false, suggested_moves: undefined },
+        checkpoints: { phase_a: true, phase_b: true },
+      })
+      .returning({ id: schema.turns.id });
+    if (!row) throw new Error("insert failed");
+
+    const events: { type: string; text?: string }[] = [];
+    await new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error("resume hung")), 10_000);
+      attachToTurn(row.id, (e) => {
+        events.push(e);
+        if (e.type === "done" || e.type === "error") {
+          clearTimeout(timer);
+          resolve();
+        }
+      });
+      void executeTurn(db, row.id);
+    });
+    const prose = events.find((e) => e.type === "prose");
+    expect(prose?.text).toContain("old grievances");
+    expect(events.at(-1)?.type).toBe("done");
+    const [turn] = await db.select().from(schema.turns).where(eq(schema.turns.id, row.id));
+    expect(turn?.status).toBe("complete");
+    const episodic = await db
+      .select()
+      .from(schema.episodicRecords)
+      .where(eq(schema.episodicRecords.campaignId, campaignId));
+    expect(episodic).toHaveLength(1);
+    expect(episodic[0]?.narration).toContain("old grievances");
+  });
+
+  it("Phase-A failure surfaces a typed retryable error and wedges nothing (§5.7)", async () => {
+    if (!db) throw new Error("unreachable");
+    // The intent probe outage: runLayout throws before any checkpoint.
+    // biome-ignore lint/suspicious/noExplicitAny: harness
+    mockProbe.mockImplementation((_s: any, opts: any) => {
+      if (opts.name === "intent_triage")
+        return Promise.reject(new Error("probe outage (scripted)")) as never;
+      return Promise.resolve({}) as never;
+    });
+    const { turnId } = await submitTurn(db, campaignId, "I look around");
+    const events: { type: string; retryable?: boolean }[] = [];
+    await new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error("Phase-A failure hung — no terminal event")), 15_000);
+      attachToTurn(turnId, (e) => {
+        events.push(e);
+        if (e.type === "error" || e.type === "done") {
+          clearTimeout(timer);
+          resolve();
+        }
+      });
+    });
+    expect(events.at(-1)?.type).toBe("error");
+    expect((events.at(-1) as { retryable?: boolean }).retryable).toBe(true);
+    const [turn] = await db.select().from(schema.turns).where(eq(schema.turns.id, turnId));
+    expect(turn?.status).toBe("failed");
+
+    // A reconnect (executeTurn again on the failed turn) must NOT re-run —
+    // the terminal-status guard prevents unbounded re-execution.
+    let extraProbe = false;
+    // biome-ignore lint/suspicious/noExplicitAny: harness
+    mockProbe.mockImplementation((_s: any, opts: any) => {
+      if (opts.name === "intent_triage") extraProbe = true;
+      return Promise.reject(new Error("should not be called")) as never;
+    });
+    await executeTurn(db, turnId);
+    expect(extraProbe).toBe(false);
+  });
+
   it("trailer fallback: no commit_scene → probe reconstructs; checkpoint records it", async () => {
     if (!db) throw new Error("unreachable");
     mockStream.mockImplementation(() =>

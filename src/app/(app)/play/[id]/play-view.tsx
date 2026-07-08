@@ -45,9 +45,14 @@ export function PlayView({
   const [pinNotice, setPinNotice] = useState<string | null>(null);
   const queuedRef = useRef<string | null>(null);
   const busyRef = useRef(false);
+  // Live mirrors of state read inside long-running async closures (the C3
+  // lesson: a captured `error`/`submit` goes stale mid-stream and can loop).
+  const errorRef = useRef<{ message: string; turnId: string } | null>(null);
+  const submitRef = useRef<(m: string) => void>(() => {});
   const lastActivityRef = useRef(Date.now());
   const bottomRef = useRef<HTMLDivElement>(null);
   const resumedRef = useRef(false);
+  errorRef.current = error;
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: scroll follows content
   useEffect(() => {
@@ -55,16 +60,24 @@ export function PlayView({
   }, [exchanges, streamText, staging, chips]);
 
   const attachStream = useCallback(
-    async (turnId: string, playerInput: string) => {
+    async (turnId: string, playerInput: string, retries = 0) => {
       busyRef.current = true;
       setBusy(true);
       setError(null);
       setChips([]);
       let acc = "";
       let terminal = false;
+      let hadError = false;
+      let reconnecting = false;
       try {
         const res = await fetch(`/api/campaigns/${campaignId}/turns/${turnId}/stream`);
-        if (!res.ok || !res.body) throw new Error(`stream failed (${res.status})`);
+        if (!res.ok || !res.body) {
+          // Auth/gone are terminal — never spin on them.
+          if (res.status === 401 || res.status === 403 || res.status === 404) {
+            throw Object.assign(new Error(`stream unavailable (${res.status})`), { fatal: true });
+          }
+          throw new Error(`stream failed (${res.status})`);
+        }
         const reader = res.body.getReader();
         const decoder = new TextDecoder();
         let buffer = "";
@@ -107,11 +120,12 @@ export function PlayView({
               ]);
               setStreamText("");
               setPendingInput(null);
+              // §9.2: chips appear by default ONLY when SZ set default_on.
               if (
                 payload.decisionPoint &&
                 payload.suggestedMoves &&
                 payload.suggestedMoves.length > 0 &&
-                suggestionAffordance !== "never"
+                suggestionAffordance === "default_on"
               ) {
                 setChips(payload.suggestedMoves);
               }
@@ -122,35 +136,54 @@ export function PlayView({
               setPinNotice("The studio heard you — the meta booth opens in a later build.");
             } else if (event === "error") {
               terminal = true;
+              hadError = true;
               setError({ message: payload.message ?? "the turn failed", turnId });
               setStreamText("");
             }
           }
         }
-        if (!terminal) {
-          // Stream dropped mid-turn (network hiccup): the turn is durable —
-          // re-attach and the server replays or resumes.
-          setStaging("reconnecting…");
-          setTimeout(() => void attachStream(turnId, playerInput), 1_500);
+        // Stream ended without a terminal event (network hiccup): the turn is
+        // durable — re-attach and the server replays or resumes.
+        if (!terminal) reconnecting = true;
+      } catch (err) {
+        // Fatal (auth/gone) or retries exhausted: stop spinning, surface a
+        // reload affordance — the turn is durable, the transport gave up.
+        if ((err as { fatal?: boolean })?.fatal || retries >= 5) {
+          busyRef.current = false;
+          setBusy(false);
+          setStaging(null);
+          setError({
+            message:
+              "Lost the connection to this scene. Reload to pick it back up — your turn is saved.",
+            turnId,
+          });
           return;
         }
-      } catch {
-        setStaging("reconnecting…");
-        setTimeout(() => void attachStream(turnId, playerInput), 2_500);
-        return;
+        reconnecting = true;
       } finally {
-        setStaging(null);
+        // Preserve the "reconnecting…" indicator across the reschedule.
+        if (!reconnecting) setStaging(null);
+      }
+      if (reconnecting) {
+        setStaging("reconnecting…");
+        const backoff = Math.min(1_500 * 2 ** retries, 15_000);
+        setTimeout(() => void attachStream(turnId, playerInput, retries + 1), backoff);
+        return;
       }
       busyRef.current = false;
       setBusy(false);
+      // Drain a queued input only if this turn did NOT fail — a failed turn
+      // waits on the retry affordance, never an auto-resubmit (which would
+      // loop against the still-open failed turn). hadError is local, so it's
+      // reliable where the `error` state closure would be stale.
       const q = queuedRef.current;
-      if (q && !error) {
+      if (q && !hadError) {
         queuedRef.current = null;
         setQueued(null);
-        void submit(q);
+        void submitRef.current(q);
       }
     },
-    [campaignId, suggestionAffordance, error],
+    [campaignId, suggestionAffordance],
   );
 
   const submit = useCallback(
@@ -190,6 +223,7 @@ export function PlayView({
     },
     [campaignId, attachStream],
   );
+  submitRef.current = submit;
 
   // Resume an open turn on load (§5.7: reconnect finds it, never loses it).
   useEffect(() => {
@@ -211,6 +245,9 @@ export function PlayView({
   const send = () => {
     const message = input.trim();
     if (!message) return;
+    // A failed turn holds the campaign open: retry it first, don't stack a
+    // new action behind it (that would 409 and re-queue indefinitely).
+    if (errorRef.current) return;
     if (busyRef.current) {
       queuedRef.current = queuedRef.current ? `${queuedRef.current}\n${message}` : message;
       setQueued(queuedRef.current);
@@ -285,7 +322,7 @@ export function PlayView({
             <div className="whitespace-pre-wrap text-[15px] leading-7">{e.narration}</div>
           </div>
         ))}
-        {pendingInput && !exchanges.some((e) => e.playerInput === pendingInput && !streamText) && (
+        {pendingInput && (
           <div className="flex justify-end">
             <div className="max-w-[80%] whitespace-pre-wrap rounded-lg bg-foreground px-3 py-2 text-sm text-background opacity-80">
               {pendingInput}
