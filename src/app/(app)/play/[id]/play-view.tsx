@@ -245,9 +245,12 @@ export function PlayView({
   const send = () => {
     const message = input.trim();
     if (!message) return;
-    // A failed turn holds the campaign open: retry it first, don't stack a
-    // new action behind it (that would 409 and re-queue indefinitely).
-    if (errorRef.current) return;
+    // A FAILED TURN (error carries its turnId) holds the campaign open: retry
+    // it first via the retry affordance, don't stack a new action behind it
+    // (that would 409 and re-queue indefinitely). A submit-level error
+    // (turnId "") has no open turn and no retry button — a fresh send() is
+    // the recovery path, so it must NOT be blocked here.
+    if (errorRef.current?.turnId) return;
     if (busyRef.current) {
       queuedRef.current = queuedRef.current ? `${queuedRef.current}\n${message}` : message;
       setQueued(queuedRef.current);

@@ -355,7 +355,10 @@ describe.skipIf(!url)("Turn Runtime (real Postgres, scripted models)", () => {
     const { turnId } = await submitTurn(db, campaignId, "I look around");
     const events: { type: string; retryable?: boolean }[] = [];
     await new Promise<void>((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error("Phase-A failure hung — no terminal event")), 15_000);
+      const timer = setTimeout(
+        () => reject(new Error("Phase-A failure hung — no terminal event")),
+        15_000,
+      );
       attachToTurn(turnId, (e) => {
         events.push(e);
         if (e.type === "error" || e.type === "done") {
