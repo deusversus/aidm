@@ -103,10 +103,12 @@ describe("power: the OP-premise table (§5.1 DC floor)", () => {
 });
 
 describe("scale/imbalance (Module 12)", () => {
-  it("raw power doubles per tier step", () => {
-    expect(rawPowerRatio(5, 7)).toBe(4); // two tiers stronger → 4×
-    expect(rawPowerRatio(7, 5)).toBe(0.25);
+  it("raw ratio is v3's LINEAR inverted-tier math, not exponential", () => {
+    expect(rawPowerRatio(5, 7)).toBeCloseTo(5 / 3); // T5 vs T7 → 5/3
+    expect(rawPowerRatio(7, 5)).toBeCloseTo(3 / 5);
     expect(rawPowerRatio(7, 7)).toBe(1);
+    expect(rawPowerRatio(5, 10)).toBe(10); // vs the powerless: pc × 2 (v3)
+    expect(rawPowerRatio(10, 10)).toBe(0); // both powerless → balanced band
   });
   it("bands at v3 thresholds", () => {
     expect(imbalanceBand(1.2)).toBe("balanced");
@@ -128,7 +130,7 @@ describe("scale/imbalance (Module 12)", () => {
 });
 
 describe("degrade ladder (§5.5)", () => {
-  it("fires steps in the blueprint order, logging each", () => {
+  it("escalation is proportional: a mildly-late turn fires ONE rung, never the terminal ones", () => {
     let clock = 0;
     const fired: string[] = [];
     const ladder = createDegradeClock(
@@ -136,8 +138,24 @@ describe("degrade ladder (§5.5)", () => {
       (s) => fired.push(s),
       () => clock,
     );
-    expect(ladder.shouldDegrade()).toBe(false);
-    clock = 150; // budget blown
+    clock = 110; // 1.1× budget
+    while (ladder.shouldDegrade()) ladder.fire();
+    expect(fired).toEqual(["skip_validation_retry"]);
+    expect(ladder.state.degraded).toBe(false);
+    clock = 150; // 1.5× — two more rungs cross
+    while (ladder.shouldDegrade()) ladder.fire();
+    expect(fired).toEqual(["skip_validation_retry", "timebox_pacer", "cap_research_2"]);
+    expect(ladder.state.degraded).toBe(false);
+  });
+  it("a catastrophic stall reaches the §5.5 terminal fallback in order", () => {
+    let clock = 0;
+    const fired: string[] = [];
+    const ladder = createDegradeClock(
+      100,
+      (s) => fired.push(s),
+      () => clock,
+    );
+    clock = 250; // 2.5× budget
     while (ladder.shouldDegrade()) ladder.fire();
     expect(fired).toEqual([...LADDER_STEPS]);
     expect(ladder.state.degraded).toBe(true);
@@ -151,6 +169,23 @@ describe("degrade ladder (§5.5)", () => {
     );
     expect(ladder.shouldDegrade()).toBe(false);
     expect(ladder.state.degraded).toBe(false);
+  });
+});
+
+describe("intent probe null tolerance (live-probe regression)", () => {
+  it("secondary_intent/target/action null coerce to undefined", async () => {
+    const { IntentOutput } = await import("@/lib/types/turn");
+    const parsed = IntentOutput.parse({
+      intent: "EXPLORATION",
+      target: null,
+      action: null,
+      epicness: 0.4,
+      special_conditions: [],
+      confidence: 0.9,
+      secondary_intent: null,
+    });
+    expect(parsed.secondary_intent).toBeUndefined();
+    expect(parsed.target).toBeUndefined();
   });
 });
 

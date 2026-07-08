@@ -163,13 +163,22 @@ export const SCALE_COMPATIBILITY: Record<TierBand, Record<NarrativeScale, ScaleC
 };
 
 /**
- * Module-12 imbalance: Effective = (PC raw × context) ÷ threat raw, where
- * raw power doubles per tier step and context multipliers (0.1–1.0)
- * suppress effective power (secret identity, self-limiter, mentor
- * restraint…). v3 scale_selector.py L268-366.
+ * Module-12 imbalance: Effective = (PC raw × context) ÷ threat raw.
+ * v3's EXACT math (scale_selector.py L259-314): raw power is the inverted
+ * tier number (T10→0 … T1→9, linear — the 1.5/3/10 thresholds were
+ * calibrated against this ratio, so an exponential substitute would
+ * misband everything), threat at power 0 doubles the character's raw
+ * instead of dividing by zero.
  */
+export function tierPowerNum(tier: number): number {
+  return Math.max(0, 10 - tier);
+}
+
 export function rawPowerRatio(characterTier: number, threatTier: number): number {
-  return 2 ** (threatTier - characterTier);
+  const pc = tierPowerNum(characterTier);
+  const threat = tierPowerNum(threatTier);
+  if (threat === 0) return pc * 2; // v3: vs the powerless, high advantage
+  return pc / Math.max(1, threat);
 }
 
 export type ImbalanceBand = "balanced" | "moderate" | "significant" | "overwhelming";

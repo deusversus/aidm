@@ -18,7 +18,7 @@ import { PencilMark } from "@/lib/types/marks";
 import { PremiseContract } from "@/lib/types/premise";
 import { IntentOutput, TURN_CONTRACTS, type TurnEffort } from "@/lib/types/turn";
 import { and, desc, eq, gt, sql } from "drizzle-orm";
-import { PHASE_A_BUDGET_MS, createDegradeClock } from "./degrade";
+import { type LadderStep, PHASE_A_BUDGET_MS, createDegradeClock } from "./degrade";
 import { judgeOutcome, syntheticOutcome, validateOutcome } from "./outcome";
 import { pacerMicroCheck } from "./pacer";
 import { powerContext } from "./power";
@@ -55,6 +55,8 @@ export type LayoutResult =
       intent: IntentOutput;
       /** Post-promotion effort (escalation beats run ≥ high — §3 caveat). */
       effort: TurnEffort;
+      /** Degrade rungs fired (§5.5) — Phase B consumes cap_research_* (C5). */
+      ladderSteps: LadderStep[];
       turnRowId: string;
     }
   | {
@@ -125,11 +127,11 @@ export async function runLayout(
     console.warn(`[layout] degrade ladder fired: ${step} at ${ms}ms (turn ${turnNumber})`);
     emit({ type: "staging", text: `running long — ${step.replaceAll("_", " ")}` });
   });
-  // Progressive: at most ONE rung per stage boundary (§5.5's order is a
-  // sequence of mitigations, not a drain — firing the whole ladder at once
-  // strips a healthy turn's brief, which the doctrine forbids).
+  // Threshold-progressive: each rung has its own overrun multiple, so a
+  // mildly-late turn fires one rung and only a catastrophic stall reaches
+  // the §5.5 terminal fallback — the while-loop can't drain a healthy turn.
   const applyLadder = () => {
-    if (ladder.shouldDegrade()) ladder.fire();
+    while (ladder.shouldDegrade()) ladder.fire();
   };
 
   // --- Parallel fan-out (§5.1 DAG) -------------------------------------------
@@ -167,8 +169,14 @@ export async function runLayout(
           turnContract.canonFanOut,
         )
       : Promise.resolve([]),
-    fetchEntityCards(db, campaignId, playerInput),
-    fetchCallbacks(db, campaignId, turnNumber),
+    // §5.1 douga row: retrieval is NONE — critical block only. Entity cards
+    // and callbacks are fan-out members, so they're tier-gated too.
+    turnContract.retrievalCandidates > 0
+      ? fetchEntityCards(db, campaignId, playerInput)
+      : Promise.resolve([]),
+    turnContract.retrievalCandidates > 0
+      ? fetchCallbacks(db, campaignId, turnNumber)
+      : Promise.resolve([]),
     fetchCritical(db, campaignId),
     db
       .select({ content: overrides.content })
@@ -180,17 +188,19 @@ export async function runLayout(
           notTombstoned(overrides),
         ),
       ),
-    db
-      .select({ description: consequences.description })
-      .from(consequences)
-      .where(
-        and(
-          eq(consequences.campaignId, campaignId),
-          eq(consequences.active, true),
-          notTombstoned(consequences),
-        ),
-      )
-      .limit(8),
+    turnContract.retrievalCandidates > 0
+      ? db
+          .select({ description: consequences.description })
+          .from(consequences)
+          .where(
+            and(
+              eq(consequences.campaignId, campaignId),
+              eq(consequences.active, true),
+              notTombstoned(consequences),
+            ),
+          )
+          .limit(8)
+      : Promise.resolve([]),
     turnContract.consultants.includes("pacer") && !ladder.has("timebox_pacer")
       ? pacerMicroCheck(selection, {
           intent,
@@ -216,7 +226,10 @@ export async function runLayout(
   // --- Relevance filter (part of the prescription budget, §6.4) --------------
   const filtered =
     retrieved.length > 0
-      ? await relevanceFilter(selection, retrieved, intent, playerInput, { campaignId, turnNumber })
+      ? await relevanceFilter(selection, retrieved, intent, playerInput, situation, {
+          campaignId,
+          turnNumber,
+        })
       : [];
   applyLadder();
 
@@ -273,6 +286,9 @@ export async function runLayout(
     });
     judgment.mechanics.combat_results = scale.directive;
   }
+  // Final boundary before assembly: the terminal rungs (drop_to_genga,
+  // minimal_brief) must be able to engage on a catastrophically slow turn.
+  applyLadder();
 
   // Typed resource spends parse from the judge's cost line when it names
   // amounts ("20 MP") — costs-rare doctrine means usually there are none.
@@ -321,7 +337,9 @@ export async function runLayout(
     mechanics: judgment.mechanics,
     charter_amendments: amendments.text,
     scene_shape_directive: minimal ? "" : sceneShape.text,
-    pacer_beat: pacer.beat,
+    // §5.5 rung 2: "proceed without its directive" — the beat is dropped
+    // when the rung fired, even though the probe itself already resolved.
+    pacer_beat: ladder.has("timebox_pacer") ? undefined : pacer.beat,
     canonicality_directives: canonicalityDirectives,
     hard_constraints: [...critical, ...activeOverrides.map((o) => o.content)],
     callbacks: minimal ? [] : callbacks,
@@ -347,7 +365,7 @@ export async function runLayout(
       playerInput,
       conte,
       degraded: conte.degraded,
-      checkpoints: { phase_a: true },
+      checkpoints: { phase_a: true, ladder: ladder.state.fired },
     })
     .onConflictDoUpdate({
       target: [turns.campaignId, turns.turnNumber],
@@ -357,7 +375,7 @@ export async function runLayout(
         playerInput,
         conte,
         degraded: conte.degraded,
-        checkpoints: sql`${turns.checkpoints} || '{"phase_a": true}'::jsonb`,
+        checkpoints: sql`${turns.checkpoints} || ${JSON.stringify({ phase_a: true, ladder: ladder.state.fired })}::jsonb`,
       },
     })
     .returning({ id: turns.id });
@@ -369,5 +387,12 @@ export async function runLayout(
   const effort: TurnEffort =
     pacer.promoteEffort && turnContract.effort === "low" ? "high" : turnContract.effort;
 
-  return { kind: "conte", conte, intent, effort, turnRowId: row.id };
+  return {
+    kind: "conte",
+    conte,
+    intent,
+    effort,
+    ladderSteps: [...ladder.state.fired],
+    turnRowId: row.id,
+  };
 }

@@ -157,7 +157,14 @@ export async function fetchCandidates(
   for (const [qi, emb] of embeddings.entries()) {
     const vec = toVec(emb);
     const query = queries[qi] ?? "";
-    // Keyword-hybrid: +0.25 when content matches the query terms (v3 L347).
+    // Keyword-hybrid (+0.25, v3 L347): match TOKENS, not the whole query —
+    // an entire-sentence ILIKE never fires (C4 audit). Word-boundary regex
+    // over the query's meaningful words.
+    const keywords = (query.toLowerCase().match(/[a-z0-9]{4,}/g) ?? []).slice(0, 4);
+    const keywordPattern =
+      keywords.length > 0
+        ? `\\m(${keywords.map((k) => k.replace(/[^a-z0-9]/g, "")).join("|")})\\M`
+        : null;
     const rows = await db
       .select({
         id: semanticMemories.id,
@@ -167,11 +174,13 @@ export async function fetchCandidates(
         provenance: semanticMemories.provenance,
         confidence: semanticMemories.confidence,
         heat,
+        // Flag boosts carry v3 (memory.py L278-284): +0.3 for plot-critical
+        // OR session-zero material, +0.15 for episodes.
         score: sql<number>`
           LEAST(1.0,
             (1 - (${semanticMemories.embedding} <=> ${vec}::vector))
-            + CASE WHEN ${semanticMemories.content} ILIKE ${`%${query.slice(0, 60)}%`} THEN 0.25 ELSE 0 END
-            + CASE WHEN ${semanticMemories.plotCritical} THEN 0.3 ELSE 0 END
+            + CASE WHEN ${keywordPattern !== null} AND ${semanticMemories.content} ~* ${keywordPattern ?? ""} THEN 0.25 ELSE 0 END
+            + CASE WHEN ${semanticMemories.plotCritical} OR ${semanticMemories.category} IN ('session_zero', 'session_zero_voice') THEN 0.3 ELSE 0 END
             + CASE WHEN ${semanticMemories.category} = 'episode' THEN 0.15 ELSE 0 END
           )`,
       })
@@ -235,6 +244,7 @@ export async function relevanceFilter(
   candidates: MemoryCandidate[],
   intent: IntentOutput,
   playerInput: string,
+  situation: string | undefined,
   ctx: { campaignId: string; turnNumber: number },
 ): Promise<MemoryCandidate[]> {
   const systemCommand =
@@ -262,10 +272,13 @@ export async function relevanceFilter(
       prompt: [
         `CURRENT ACTION: ${playerInput}`,
         `INTENT: ${intent.intent}${intent.target ? ` → ${intent.target}` : ""}`,
+        situation ? `CURRENT SITUATION: ${situation}` : "",
         "",
         "CANDIDATES:",
         ...candidates.map((c, i) => `${i}. [${c.category}] ${c.content.slice(0, 300)}`),
-      ].join("\n"),
+      ]
+        .filter(Boolean)
+        .join("\n"),
       maxTokens: 2_000,
     });
     const scoreByIndex = new Map(ranked.scores.map((s) => [s.index, s.score]));

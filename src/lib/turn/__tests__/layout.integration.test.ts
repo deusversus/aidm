@@ -281,9 +281,14 @@ describe.skipIf(!url)("Layout (real Postgres, scripted models)", () => {
     expect(result.conte.tier).toBe("douga");
     expect(calls).toEqual(["intent_triage"]); // no retrieval filter, no judge, no pacer
     expect(result.conte.outcome?.narrative_weight).toBe("MINOR");
+    // §5.1 douga row: retrieval NONE — no memories, no fan-out members.
     expect(result.conte.memories).toHaveLength(0);
+    expect(result.conte.callbacks).toHaveLength(0);
+    expect(result.conte.entity_cards).toHaveLength(0);
+    expect(result.conte.active_consequences).toHaveLength(0);
     expect(result.conte.hard_constraints.some((c) => c.includes("corgi"))).toBe(true);
     expect(result.effort).toBe("low");
+    expect(result.ladderSteps).toHaveLength(0);
   });
 
   it("channel inputs route out before the story pipeline (§5.4)", async () => {

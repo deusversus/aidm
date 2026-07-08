@@ -22,15 +22,31 @@ export interface LadderState {
   degraded: boolean;
 }
 
+/**
+ * Overrun thresholds: rung N fires when elapsed exceeds budget × threshold.
+ * Escalation is proportional to how blown the budget is — a mildly-late
+ * turn only skips its validation retry; only a catastrophically stalled one
+ * reaches the §5.5 terminal fallback (minimal brief, degraded flag). Every
+ * rung is reachable at any stage boundary; none fire on a healthy turn.
+ */
+export const RUNG_OVERRUN: Record<LadderStep, number> = {
+  skip_validation_retry: 1.0,
+  timebox_pacer: 1.2,
+  cap_research_2: 1.4,
+  cap_research_0: 1.6,
+  drop_to_genga: 1.9,
+  minimal_brief: 2.4,
+};
+
 export interface DegradeClock {
   /** ms since Phase A began. */
   elapsed(): number;
   /** The tier's Phase-A budget in ms. */
   budgetMs: number;
   state: LadderState;
-  /** True when the budget is blown and the next un-fired step should apply. */
+  /** True when the NEXT un-fired rung's overrun threshold is crossed. */
   shouldDegrade(): boolean;
-  /** Fire the next step (idempotent per step); returns the step or null when exhausted. */
+  /** Fire the next step; returns the step or null when exhausted. */
   fire(): LadderStep | null;
   has(step: LadderStep): boolean;
 }
@@ -47,7 +63,9 @@ export function createDegradeClock(
     state,
     elapsed: () => now() - started,
     shouldDegrade() {
-      return now() - started > budgetMs && state.fired.length < LADDER_STEPS.length;
+      const next = LADDER_STEPS[state.fired.length];
+      if (!next) return false;
+      return now() - started > budgetMs * RUNG_OVERRUN[next];
     },
     fire() {
       const next = LADDER_STEPS[state.fired.length];

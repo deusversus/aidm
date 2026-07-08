@@ -18,8 +18,12 @@ import {
  * Effective = (PC raw × context) ÷ threat raw. Context modifiers suppress
  * effective power (a secret identity held, a mentor's restraint, political
  * cost) — the fight a character COULD win at a walk still plays tense when
- * the context says they're fighting with one hand. Same-tier fights skip
- * the model call (v3 optimization).
+ * the context says they're fighting with one hand.
+ *
+ * v3 skipped the model call on same-tier fights, but its threat tier came
+ * in via outcome.target_tier — a field the M0-frozen OutcomeOutput doesn't
+ * carry, so the threat estimate arrives WITH this call and no pre-call
+ * skip is possible. Revisit at M2 if the contract grows target_tier.
  */
 
 const ScaleJudgment = z.object({
