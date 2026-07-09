@@ -285,7 +285,6 @@ async function settleG2Inner(db: Db, turnId: string): Promise<void> {
 
   // 5. entities — background enrichment (never creates, §6.5) + spotlight debt.
   if (!g2.entities) {
-    const narrationLower = narration.toLowerCase();
     await db.transaction(async (tx) => {
       const active = await tx
         .select()
@@ -333,8 +332,14 @@ async function settleG2Inner(db: Db, turnId: string): Promise<void> {
         }
 
         // Spotlight debt: present this scene → 0; absent → +1 (npc/faction only).
+        // Word-boundary match, never substring — "Rei" inside "reign" is not
+        // a scene appearance (C6 audit: short names corrupted the debt).
         if (e.entityType === "npc" || e.entityType === "faction") {
-          const present = Boolean(update) || narrationLower.includes(e.name.toLowerCase());
+          const namePattern = new RegExp(
+            `\\b${e.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`,
+            "i",
+          );
+          const present = Boolean(update) || namePattern.test(narration);
           state.spotlightDebt = present ? 0 : ((state.spotlightDebt as number) ?? 0) + 1;
           dirty = true;
         }

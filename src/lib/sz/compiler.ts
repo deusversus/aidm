@@ -364,223 +364,253 @@ export async function compileSessionZero(
     );
   }
 
-  // The C6 rebind (§5.4): SZ world/cast facts flow through the SAME
-  // universal-ingestion subsystem as gameplay assertions — the resolver
-  // links against canon and never duplicates; entities mint here and the
-  // later brief admissions enrich-or-skip against them. Runs BEFORE the
-  // OSP synthesis so a compile-time CLARIFY (unanswerable now — the
-  // conversation is over) lands in the deferred context and becomes an
-  // OSP uncertainty instead of vanishing. The deterministic critical_facts
-  // sz_fact writes below are unchanged — guaranteed injection stays
-  // guaranteed regardless of what ingestion does.
-  const assertedText = [...resolved.worldFacts, ...resolved.castFacts]
-    .map((o) => o.content)
-    .join("\n");
-  if (assertedText.trim()) {
-    const ingest = opts.ingestor ?? ingestAssertion;
-    try {
-      const ingested = await ingest(db, campaignId, 0, assertedText, {
-        profileIds: draft.profileIds,
-        provenance: "sz_compiler",
-      });
-      if (ingested.clarify) resolved.deferred.push(`unresolved at the table: ${ingested.clarify}`);
-      resolved.deferred.push(...ingested.flags);
-    } catch (err) {
-      // Ingestion enriches; it never gates the handoff. The critical-facts
-      // path below still carries every assertion.
-      console.warn(
-        "[sz.compile] ingestion failed — assertions persist via critical facts only",
-        err,
-      );
-    }
-  }
-  const blendNote = (component: string) => {
-    const pick = resolved.blendChoices.find((b) => b.component === component);
-    return pick
-      ? `player chose: ${pick.choice} — M4 assembly pending`
-      : "M1 single-source; blend unresolved for this component";
-  };
-  const hybridRecipe =
-    isHybrid && profileId
-      ? Object.fromEntries(
-          ["world", "treatment", "framing", "voice", "canonicality"].map((c) => [
-            c,
-            { method: "single" as const, source_profile_ids: [profileId], notes: blendNote(c) },
-          ]),
-        )
-      : undefined;
-
-  // Canonical components from the profile; active = canonical + player moves.
-  const canonicality: Canonicality = Canonicality.parse({
-    timeline_mode: resolved.canonicality?.timeline_mode ?? "inspired",
-    canon_cast_mode: resolved.canonicality?.canon_cast_mode ?? "full_cast",
-    event_fidelity: resolved.canonicality?.event_fidelity ?? "influenceable",
-    accepted_divergences: resolved.canonicality?.accepted_divergences ?? [],
-    forbidden_contradictions: resolved.canonicality?.forbidden_contradictions ?? [],
-  });
-  const voice = {
-    author_voice: profile.ip_mechanics.author_voice,
-    voice_cards: profile.ip_mechanics.voice_cards,
-    director_personality: profile.director_personality,
-    cast_depth_posture: profile.cast_depth_posture ?? {
-      main_cast: "broad-and-deep",
-      supporting: "sharp silhouettes with one true note",
-      recurring_bits: "role-filling",
-    },
-  };
-  const { author_voice: _av, voice_cards: _vc, ...worldOnly } = profile.ip_mechanics;
-  const canonical: PremiseComponents = {
-    world: worldOnly,
-    treatment: profile.canonical_dna,
-    framing: profile.canonical_composition,
-    voice,
-    canonicality,
-  };
-  const active: PremiseComponents = structuredClone(canonical);
-  for (const [axis, value] of Object.entries(resolved.calibration)) {
-    active.treatment[axis as keyof DNAScales] = value as number;
+  // CLAIM the compile before any side effect (C6 audit): ingestion and the
+  // OSP call run OUTSIDE the final transaction (the clarify must feed the
+  // OSP prompt), so the single-winner gate has to come FIRST or a lost-race
+  // compile leaves orphaned ingestion writes behind. 'compiling' is
+  // re-claimable — a crash mid-compile stays retryable.
+  const claimed = await db
+    .update(campaigns)
+    .set({ status: "compiling" })
+    .where(and(eq(campaigns.id, campaignId), inArray(campaigns.status, ["draft", "compiling"])))
+    .returning({ id: campaigns.id });
+  if (claimed.length === 0) {
+    throw new Error("compile lost the race — this campaign is already active");
   }
 
-  const contract = PremiseContract.parse({
-    campaign_id: campaignId,
-    canonical,
-    active,
-    ...(hybridRecipe ? { hybrid_recipe: hybridRecipe } : {}),
-    spark: resolved.spark,
-    presentation_vocabulary: PresentationVocabulary.parse({
-      grants: resolved.presentationGrants,
-    }),
-    finitude: resolved.finitude,
-    intensity: {
-      death_physics: resolved.deathPhysics,
-      lethality_posture: resolved.lethalityPosture,
-      hard_lines: resolved.hardLines,
-      ...(resolved.controlKey ? { control_key: { circumstances: resolved.controlKey } } : {}),
-    },
-    suggestion_affordance: resolved.suggestionAffordance ?? "on_request_only",
-    anchors_used: draft.profileIds,
-  });
+  try {
+    // The C6 rebind (§5.4): SZ world/cast facts flow through the SAME
+    // universal-ingestion subsystem as gameplay assertions — the resolver
+    // links against canon and never duplicates; entities mint here and the
+    // later brief admissions enrich-or-skip against them. Runs BEFORE the
+    // OSP synthesis so a compile-time CLARIFY (unanswerable now — the
+    // conversation is over) lands in the deferred context and becomes an
+    // OSP uncertainty instead of vanishing. The deterministic critical_facts
+    // sz_fact writes below are unchanged — guaranteed injection stays
+    // guaranteed regardless of what ingestion does.
+    const assertedText = [...resolved.worldFacts, ...resolved.castFacts]
+      .map((o) => o.content)
+      .join("\n");
+    if (assertedText.trim()) {
+      const ingest = opts.ingestor ?? ingestAssertion;
+      try {
+        const ingested = await ingest(db, campaignId, 0, assertedText, {
+          profileIds: draft.profileIds,
+          provenance: "sz_compiler",
+        });
+        if (ingested.clarify)
+          resolved.deferred.push(`unresolved at the table: ${ingested.clarify}`);
+        resolved.deferred.push(...ingested.flags);
+      } catch (err) {
+        // Ingestion enriches; it never gates the handoff. The critical-facts
+        // path below still carries every assertion.
+        console.warn(
+          "[sz.compile] ingestion failed — assertions persist via critical facts only",
+          err,
+        );
+      }
+    }
+    const blendNote = (component: string) => {
+      const pick = resolved.blendChoices.find((b) => b.component === component);
+      return pick
+        ? `player chose: ${pick.choice} — M4 assembly pending`
+        : "M1 single-source; blend unresolved for this component";
+    };
+    const hybridRecipe =
+      isHybrid && profileId
+        ? Object.fromEntries(
+            ["world", "treatment", "framing", "voice", "canonicality"].map((c) => [
+              c,
+              { method: "single" as const, source_profile_ids: [profileId], notes: blendNote(c) },
+            ]),
+          )
+        : undefined;
 
-  const synthesize = opts.ospSynthesizer ?? defaultOspSynthesizer;
-  const ospDraft = await synthesize({
-    campaignId,
-    title: profile.title,
-    spark: contract.spark,
-    resolved,
-    directorPersonality: profile.director_personality,
-  });
-  const opening = OpeningStatePackage.parse({
-    ...ospDraft,
-    constraints: ospDraft.constraints.map((c) => ({ ...c, ...SZ_ENVELOPE })),
-    briefs: ospDraft.briefs.map((b) => ({ ...b, ...SZ_ENVELOPE })),
-  });
-
-  // --- Persistence: the handoff becomes state, atomically --------------------
-  // One transaction, and the draft→active flip is its concurrency gate: two
-  // racing compiles both pass the route's status check (the OSP call is slow),
-  // but only one wins this conditional update — the loser inserts nothing.
-  await db.transaction(async (tx) => {
-    const flipped = await tx
-      .update(campaigns)
-      .set({
-        premiseContract: contract,
-        openingPackage: opening,
-        tierModels: resolved.tierSelection,
-        status: "active",
-        updatedAt: new Date(),
-      })
-      .where(and(eq(campaigns.id, campaignId), eq(campaigns.status, "draft")))
-      .returning({ id: campaigns.id });
-    if (flipped.length === 0) {
-      throw new Error("compile lost the race — this campaign is already active");
+    // Canonical components from the profile; active = canonical + player moves.
+    const canonicality: Canonicality = Canonicality.parse({
+      timeline_mode: resolved.canonicality?.timeline_mode ?? "inspired",
+      canon_cast_mode: resolved.canonicality?.canon_cast_mode ?? "full_cast",
+      event_fidelity: resolved.canonicality?.event_fidelity ?? "influenceable",
+      accepted_divergences: resolved.canonicality?.accepted_divergences ?? [],
+      forbidden_contradictions: resolved.canonicality?.forbidden_contradictions ?? [],
+    });
+    const voice = {
+      author_voice: profile.ip_mechanics.author_voice,
+      voice_cards: profile.ip_mechanics.voice_cards,
+      director_personality: profile.director_personality,
+      cast_depth_posture: profile.cast_depth_posture ?? {
+        main_cast: "broad-and-deep",
+        supporting: "sharp silhouettes with one true note",
+        recurring_bits: "role-filling",
+      },
+    };
+    const { author_voice: _av, voice_cards: _vc, ...worldOnly } = profile.ip_mechanics;
+    const canonical: PremiseComponents = {
+      world: worldOnly,
+      treatment: profile.canonical_dna,
+      framing: profile.canonical_composition,
+      voice,
+      canonicality,
+    };
+    const active: PremiseComponents = structuredClone(canonical);
+    for (const [axis, value] of Object.entries(resolved.calibration)) {
+      active.treatment[axis as keyof DNAScales] = value as number;
     }
 
-    const critical = [
-      `Finitude: ${contract.finitude} — only the player may change this.`,
-      `Death physics: ${contract.intensity.death_physics}`,
-      `Lethality posture: ${contract.intensity.lethality_posture}`,
-      ...contract.intensity.hard_lines.map((l) => `HARD LINE (absolute): ${l}`),
-      ...(contract.intensity.control_key
-        ? [`Control key (player-cut): ${contract.intensity.control_key.circumstances}`]
-        : []),
-    ];
-    await tx.insert(criticalFacts).values(
-      critical.map((content) => ({
-        campaignId,
-        content,
-        category: "contract",
-        ...SZ_ROW,
-        confidence: 1,
-      })),
-    );
-
-    // Player-asserted facts persist DETERMINISTICALLY (player words are
-    // world-building, never dropped) — the OSP call may also weave them into
-    // briefs, but nothing about their survival depends on a model.
-    const asserted = [...resolved.worldFacts, ...resolved.castFacts];
-    if (asserted.length > 0) {
-      await tx.insert(criticalFacts).values(
-        asserted.map((o) => ({
-          campaignId,
-          content: o.content,
-          category: "sz_fact",
-          turnId: 0,
-          provenance: "player_assertion",
-          confidence: o.confidence,
-        })),
-      );
-    }
-
-    // The spark is the campaign's first pencil mark (§8).
-    await tx.insert(pencilMarks).values({
-      campaignId,
-      kind: "craft_note",
-      topic: "spark",
-      direction: `Multiply this: ${contract.spark}`,
-      evidence: "Session Zero, verbatim",
-      ...SZ_ROW,
-      confidence: 1,
+    const contract = PremiseContract.parse({
+      campaign_id: campaignId,
+      canonical,
+      active,
+      ...(hybridRecipe ? { hybrid_recipe: hybridRecipe } : {}),
+      spark: resolved.spark,
+      presentation_vocabulary: PresentationVocabulary.parse({
+        grants: resolved.presentationGrants,
+      }),
+      finitude: resolved.finitude,
+      intensity: {
+        death_physics: resolved.deathPhysics,
+        lethality_posture: resolved.lethalityPosture,
+        hard_lines: resolved.hardLines,
+        ...(resolved.controlKey ? { control_key: { circumstances: resolved.controlKey } } : {}),
+      },
+      suggestion_affordance: resolved.suggestionAffordance ?? "on_request_only",
+      anchors_used: draft.profileIds,
     });
 
-    // Catalog admission is an explicit act (§6.5) — briefs marked for it.
-    // Conflict-safe: the ingestion resolver above may have minted the same
-    // entity from a player assertion; the brief no-ops rather than erroring
-    // the compile (the partial unique index is on campaign+type+name).
-    const admitted = opening.briefs.filter((b) => b.admit_to_catalog);
-    if (admitted.length > 0) {
-      await tx
-        .insert(entities)
-        .values(
-          admitted.map((b) => ({
-            campaignId,
-            name: b.name,
-            entityType:
-              b.kind === "cast"
-                ? "npc"
-                : b.kind === "faction"
-                  ? "faction"
-                  : b.kind === "world"
-                    ? "location"
-                    : "thread",
-            block: b.brief,
-            ...SZ_ROW,
-          })),
-        )
-        .onConflictDoNothing();
-    }
+    const synthesize = opts.ospSynthesizer ?? defaultOspSynthesizer;
+    const ospDraft = await synthesize({
+      campaignId,
+      title: profile.title,
+      spark: contract.spark,
+      resolved,
+      directorPersonality: profile.director_personality,
+    });
+    const opening = OpeningStatePackage.parse({
+      ...ospDraft,
+      constraints: ospDraft.constraints.map((c) => ({ ...c, ...SZ_ENVELOPE })),
+      briefs: ospDraft.briefs.map((b) => ({ ...b, ...SZ_ENVELOPE })),
+    });
 
-    // Player profile, thin (§6.9): taste observations accumulate.
-    if (resolved.playerTaste.length > 0) {
-      const [player] = await tx.select().from(players).where(eq(players.id, campaign.playerId));
-      const existing = (player?.profile as { taste?: string[] } | null) ?? {};
-      await tx
-        .update(players)
+    // --- Persistence: the handoff becomes state, atomically --------------------
+    // One transaction; the compiling→active flip closes the claim taken above.
+    // The claim (not this flip) is the single-winner gate — it fired before any
+    // side effect, so a loser truly inserts nothing (C6 audit).
+    await db.transaction(async (tx) => {
+      const flipped = await tx
+        .update(campaigns)
         .set({
-          profile: { ...existing, taste: [...(existing.taste ?? []), ...resolved.playerTaste] },
+          premiseContract: contract,
+          openingPackage: opening,
+          tierModels: resolved.tierSelection,
+          status: "active",
+          updatedAt: new Date(),
         })
-        .where(eq(players.id, campaign.playerId));
-    }
-  });
+        .where(and(eq(campaigns.id, campaignId), eq(campaigns.status, "compiling")))
+        .returning({ id: campaigns.id });
+      if (flipped.length === 0) {
+        throw new Error("compile lost the race — this campaign is already active");
+      }
 
-  return { contract, opening, gaps: [] };
+      const critical = [
+        `Finitude: ${contract.finitude} — only the player may change this.`,
+        `Death physics: ${contract.intensity.death_physics}`,
+        `Lethality posture: ${contract.intensity.lethality_posture}`,
+        ...contract.intensity.hard_lines.map((l) => `HARD LINE (absolute): ${l}`),
+        ...(contract.intensity.control_key
+          ? [`Control key (player-cut): ${contract.intensity.control_key.circumstances}`]
+          : []),
+      ];
+      await tx.insert(criticalFacts).values(
+        critical.map((content) => ({
+          campaignId,
+          content,
+          category: "contract",
+          ...SZ_ROW,
+          confidence: 1,
+        })),
+      );
+
+      // Player-asserted facts persist DETERMINISTICALLY (player words are
+      // world-building, never dropped) — the OSP call may also weave them into
+      // briefs, but nothing about their survival depends on a model.
+      const asserted = [...resolved.worldFacts, ...resolved.castFacts];
+      if (asserted.length > 0) {
+        await tx.insert(criticalFacts).values(
+          asserted.map((o) => ({
+            campaignId,
+            content: o.content,
+            category: "sz_fact",
+            turnId: 0,
+            provenance: "player_assertion",
+            confidence: o.confidence,
+          })),
+        );
+      }
+
+      // The spark is the campaign's first pencil mark (§8).
+      await tx.insert(pencilMarks).values({
+        campaignId,
+        kind: "craft_note",
+        topic: "spark",
+        direction: `Multiply this: ${contract.spark}`,
+        evidence: "Session Zero, verbatim",
+        ...SZ_ROW,
+        confidence: 1,
+      });
+
+      // Catalog admission is an explicit act (§6.5) — briefs marked for it.
+      // Conflict-safe: the ingestion resolver above may have minted the same
+      // entity from a player assertion; the brief no-ops rather than erroring
+      // the compile (the partial unique index is on campaign+type+name).
+      const admitted = opening.briefs.filter((b) => b.admit_to_catalog);
+      if (admitted.length > 0) {
+        await tx
+          .insert(entities)
+          .values(
+            admitted.map((b) => ({
+              campaignId,
+              name: b.name,
+              entityType:
+                b.kind === "cast"
+                  ? "npc"
+                  : b.kind === "faction"
+                    ? "faction"
+                    : b.kind === "world"
+                      ? "location"
+                      : "thread",
+              block: b.brief,
+              ...SZ_ROW,
+            })),
+          )
+          .onConflictDoNothing();
+      }
+
+      // Player profile, thin (§6.9): taste observations accumulate.
+      if (resolved.playerTaste.length > 0) {
+        const [player] = await tx.select().from(players).where(eq(players.id, campaign.playerId));
+        const existing = (player?.profile as { taste?: string[] } | null) ?? {};
+        await tx
+          .update(players)
+          .set({
+            profile: { ...existing, taste: [...(existing.taste ?? []), ...resolved.playerTaste] },
+          })
+          .where(eq(players.id, campaign.playerId));
+      }
+    });
+
+    return { contract, opening, gaps: [] };
+  } catch (err) {
+    // Any failure after the claim reverts to 'draft' so retry works — but
+    // NEVER un-claim a compile that actually completed (the transaction may
+    // have landed before a late throw) or one another winner finished.
+    try {
+      await db
+        .update(campaigns)
+        .set({ status: "draft" })
+        .where(and(eq(campaigns.id, campaignId), eq(campaigns.status, "compiling")));
+    } catch {
+      // best-effort — the 'compiling' claim is re-claimable anyway
+    }
+    throw err;
+  }
 }

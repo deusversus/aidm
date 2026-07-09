@@ -1,4 +1,5 @@
 import { getCurrentUser } from "@/lib/auth";
+import { settleG2IfPending } from "@/lib/compositor/g2";
 import { getDb } from "@/lib/db";
 import { campaigns, turns } from "@/lib/db/schema";
 import { OPEN_TURN_STATUSES, checkRewindGuards, rewindCampaign } from "@/lib/turn/rewind";
@@ -52,6 +53,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   const guard = checkRewindGuards({ toTurn, currentMax, hasOpenTurn: Boolean(open) });
   if (!guard.ok) return NextResponse.json({ error: guard.error }, { status: guard.status });
+
+  // Drain lagging/in-flight G2 settles before the sweep (rewindCampaign's
+  // caller contract): a detached settle racing the tombstone pass would
+  // write ghost rows for an un-happened turn. The promise-map guard makes
+  // this await in-flight work, not just skip it.
+  await settleG2IfPending(db, id);
 
   const result = await rewindCampaign(db, id, toTurn, reason);
   return NextResponse.json(result);

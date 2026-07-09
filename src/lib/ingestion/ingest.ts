@@ -299,6 +299,12 @@ export async function ingestAssertion(
           .values({ campaignId, name, entityType, block, ...envelope })
           .returning({ id: entities.id });
         if (!created) throw new Error("ingestAssertion: entity insert failed");
+        // Creation writes version 1 so a rewind can always restore the block
+        // to a known state — enrichment versions stack on top (C6 audit).
+        await db
+          .insert(entityVersions)
+          .values({ entityId: created.id, version: 1, block, ...envelope })
+          .onConflictDoNothing();
         catalog.set(name.toLowerCase(), { id: created.id, name, entityType, block });
         writes.push({
           kind: "entity_created",

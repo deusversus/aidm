@@ -23,7 +23,7 @@ export default async function PlayPage({ params }: { params: Promise<{ id: strin
   const db = getDb();
   const [campaign] = await db.select().from(campaigns).where(eq(campaigns.id, id));
   if (!campaign || campaign.playerId !== user.id) notFound();
-  if (campaign.status === "draft") redirect(`/sz/${id}`);
+  if (campaign.status === "draft" || campaign.status === "compiling") redirect(`/sz/${id}`);
   if (campaign.status !== "active") {
     return (
       <main className="mx-auto flex min-h-screen max-w-2xl flex-col justify-center gap-4 px-6 py-16">

@@ -112,6 +112,10 @@ export async function rewindCampaign(
   toTurn: number,
   reason?: string,
 ): Promise<{ tombstonedCount: number; snapshotTurn: number | null; nonReversible: string[] }> {
+  // CALLER CONTRACT: drain G2 first (the route does — settleG2IfPending). A
+  // detached settle racing this sweep would write ghost layer rows for an
+  // un-happened turn AFTER the tombstone pass (C6 audit). This function
+  // stays pure code (no model calls), so the drain lives at the entry point.
   return db.transaction(async (tx) => {
     const now = new Date();
 
@@ -151,6 +155,27 @@ export async function rewindCampaign(
         ),
       );
     tombstonedCount += versionRes.rowCount ?? 0;
+
+    // Roll each surviving entity's living block BACK to its newest surviving
+    // version — tombstoning the version rows alone left the block poisoned
+    // with un-happened enrichment (C6 audit). Creation writes version 1
+    // (g1/ingestion), so a surviving entity always has a base to restore.
+    const survivors = await tx
+      .select({ id: entities.id, block: entities.block })
+      .from(entities)
+      .where(and(eq(entities.campaignId, campaignId), notTombstoned(entities)));
+    for (const s of survivors) {
+      const [newest] = await tx
+        .select({ block: entityVersions.block })
+        .from(entityVersions)
+        .where(and(eq(entityVersions.entityId, s.id), isNull(entityVersions.tombstonedAt)))
+        .orderBy(desc(entityVersions.version))
+        .limit(1);
+      // No surviving version = a pre-versioning legacy row — leave it be.
+      if (newest && newest.block !== s.block) {
+        await tx.update(entities).set({ block: newest.block }).where(eq(entities.id, s.id));
+      }
+    }
 
     // 2. heat_boosts has no tombstone columns — it is an unapplied batch (the
     //    C4 write-only seam). Dead-timeline boosts are simply deleted.
@@ -212,12 +237,18 @@ export async function rewindCampaign(
       for (const row of replayRows) {
         const conte = row.conte as { mechanics?: { resource_spends?: ResourceSpend[] } } | null;
         for (const spend of conte?.mechanics?.resource_spends ?? []) {
-          const pool = resources[spend.resource];
+          const key = spend.resource.toUpperCase();
+          const pool = resources[key];
           if (pool) {
-            resources[spend.resource] = {
+            resources[key] = {
               ...pool,
               current: Math.max(0, pool.current - spend.amount),
             };
+          } else {
+            // Mirror forward-G1 exactly: an unknown resource initializes at
+            // a default max of 100, floored at 0 (C6 audit — divergent
+            // replay math would drift the restored state).
+            resources[key] = { current: Math.max(0, 100 - spend.amount), max: 100 };
           }
         }
       }

@@ -220,6 +220,16 @@ export async function runCompaction(
  */
 export const COMPACTION_TRIGGER_EXCHANGES = 16;
 export const COMPACTION_KEEP_TAIL = 10;
+/** The tail never shrinks below this many verbatim exchanges. */
+export const COMPACTION_MIN_TAIL = 4;
+/**
+ * Token-side hysteresis: when the TOKEN ceiling (not the exchange count)
+ * triggers, the kept tail shrinks until it weighs ≤ this fraction of the
+ * ceiling — so the batch is big enough that the next event is turns away.
+ * A fixed keep-tail under a token trigger would trickle-compact one
+ * exchange per turn on a token-heavy campaign (§5.6 forbids exactly that).
+ */
+export const COMPACTION_TOKEN_KEEP_FRACTION = 0.6;
 
 /**
  * The Chronicler G2 compaction step: run one real (judgment-tier, subtext-
@@ -253,9 +263,23 @@ export async function maybeCompact(
       epochMergeDue: b2TokensAfter > BLOCK2_CEILING_TOKENS,
     };
   }
+  // Both triggers get hysteresis: exchange-count keeps the fixed tail; a
+  // token trigger additionally shrinks the tail (floor COMPACTION_MIN_TAIL)
+  // until the kept exchanges weigh ≤ the keep-fraction of the ceiling.
+  const exchangeTokens = (e: ExchangeRow) =>
+    approxTokens(e.playerInput) + approxTokens(e.narration);
+  let keepTail = Math.min(COMPACTION_KEEP_TAIL, window.length);
+  const tailTokens = () =>
+    window.slice(Math.max(0, window.length - keepTail)).reduce((s, e) => s + exchangeTokens(e), 0);
+  while (
+    keepTail > COMPACTION_MIN_TAIL &&
+    tailTokens() > WINDOW_MAX_TOKENS * COMPACTION_TOKEN_KEEP_FRACTION
+  ) {
+    keepTail -= 1;
+  }
   const report = await runCompaction(db, campaignId, turnNumber, {
     compactor: judgmentCompactor(selection, { campaignId, turnNumber }),
-    keepTail: COMPACTION_KEEP_TAIL,
+    keepTail,
     provenance: "chronicler_compaction",
   });
   if (report.epochMergeDue) {

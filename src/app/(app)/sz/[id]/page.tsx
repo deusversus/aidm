@@ -23,7 +23,9 @@ export default async function SessionZeroPage({ params }: { params: Promise<{ id
   const [campaign] = await db.select().from(campaigns).where(eq(campaigns.id, id));
   if (!campaign || campaign.playerId !== user.id) notFound();
 
-  if (campaign.status !== "draft") {
+  // 'compiling' = a compile crashed mid-flight; the chat view's compile
+  // button re-claims it, so the conversation stays reachable.
+  if (campaign.status !== "draft" && campaign.status !== "compiling") {
     return (
       <main className="mx-auto flex min-h-screen max-w-2xl flex-col justify-center gap-4 px-6 py-16">
         <h1 className="text-2xl font-semibold tracking-tight">{campaign.title}</h1>

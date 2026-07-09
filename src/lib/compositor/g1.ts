@@ -1,7 +1,6 @@
 import type { Db } from "@/lib/db";
 import { notTombstoned } from "@/lib/db/helpers";
-import { consequences, entities } from "@/lib/db/schema";
-import { ingestAssertion } from "@/lib/ingestion/ingest";
+import { consequences, entities, entityVersions } from "@/lib/db/schema";
 import { writeSnapshotIfDue } from "@/lib/turn/rewind";
 import type { Conte } from "@/lib/types/conte";
 import type { CommitScene } from "@/lib/types/sidecar";
@@ -44,15 +43,21 @@ export async function settleG1(
     turnNumber: number;
     conte: Conte;
     sidecar: CommitScene | null;
-    profileIds: string[];
+    /** Kept for future G1 seams (booth/pin deltas); unused at M1. */
+    profileIds?: string[];
   },
 ): Promise<void> {
-  const { campaignId, turnNumber, conte, sidecar, profileIds } = args;
+  const { campaignId, turnNumber, conte, sidecar } = args;
 
   await applyMechanicalState(db, campaignId, turnNumber, conte);
   await applyConsequence(db, campaignId, turnNumber, conte);
   await applyCastCatalog(db, campaignId, turnNumber, sidecar);
-  await applyWorldAssertions(db, campaignId, turnNumber, conte, profileIds);
+
+  // World-assertion ingestion happens in LAYOUT (Phase A), not here: the
+  // §5.4 pipeline runs once per assertion so the conte can carry integration
+  // notes for the KA. conte.world_assertion_notes holds Layout's RESULT
+  // SUMMARIES — re-ingesting them here double-ingested engine meta-prose
+  // (C6 audit, blocking). One subsystem, one call site per channel.
 
   // Override/pin updates: none arrive via the M1 commit_scene sidecar (§5.7's
   // field list carries no override/pin delta). When the meta booth (C9) or a
@@ -195,15 +200,26 @@ async function applyCastCatalog(
     if (existing) {
       // Same-name entity already catalogued: enrich its block with the note
       // rather than minting a duplicate. Idempotent — a G1 replay finds the
-      // note already present and skips the append.
-      if (note && !existing.block.includes(note)) {
-        const block = existing.block ? `${existing.block}\n${note}` : note;
-        await db.update(entities).set({ block }).where(eq(entities.id, existing.id));
+      // note already present and skips the append. Re-admission REACTIVATES
+      // a dismissed entity (§6.5: admission is the explicit act) — without
+      // this, a returning character stays invisible to G2 enrichment
+      // forever (C6 audit).
+      const block =
+        note && !existing.block.includes(note)
+          ? existing.block
+            ? `${existing.block}\n${note}`
+            : note
+          : existing.block;
+      if (block !== existing.block || existing.status !== "active") {
+        await db
+          .update(entities)
+          .set({ block, status: "active" })
+          .where(eq(entities.id, existing.id));
       }
       continue;
     }
 
-    await db
+    const [created] = await db
       .insert(entities)
       .values({
         campaignId,
@@ -216,39 +232,22 @@ async function applyCastCatalog(
       })
       // The partial unique index (campaign, type, name) WHERE not tombstoned
       // makes a concurrent/replayed admit a no-op.
-      .onConflictDoNothing();
-  }
-}
-
-/**
- * Player-authored world-building (§5.4/§6.5, highest catalog authority) routes
- * through the universal ingestion subsystem — resolve against canon + campaign
- * state, then write with provenance. In M1 normal play `world_assertion_notes`
- * is empty (Layout leaves the channel dormant), so this is a wired-but-quiet
- * seam (axiom 8: whole shape from day one). Best-effort: an ingestion failure
- * must never wedge the must-commit group.
- */
-async function applyWorldAssertions(
-  db: Db,
-  campaignId: string,
-  turnNumber: number,
-  conte: Conte,
-  profileIds: string[],
-): Promise<void> {
-  for (const note of conte.world_assertion_notes ?? []) {
-    const text = note.trim();
-    if (!text) continue;
-    try {
-      await ingestAssertion(db, campaignId, turnNumber, text, {
-        profileIds,
-        provenance: "player_assertion",
-      });
-    } catch (err) {
-      console.error("[g1] world-assertion ingestion failed — canon not persisted this turn", {
-        campaignId,
-        turnNumber,
-        err,
-      });
+      .onConflictDoNothing()
+      .returning({ id: entities.id });
+    // Creation writes version 1 so a rewind can always restore the block to
+    // a known state — enrichment versions stack on top (C6 audit).
+    if (created) {
+      await db
+        .insert(entityVersions)
+        .values({
+          entityId: created.id,
+          version: 1,
+          block: note,
+          turnId: turnNumber,
+          provenance: G1_PROVENANCE,
+          confidence: 0.9,
+        })
+        .onConflictDoNothing();
     }
   }
 }

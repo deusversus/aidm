@@ -184,13 +184,18 @@ describe.skipIf(!url)("Universal ingestion (real Postgres, scripted extractor)",
     expect(rows2).toHaveLength(1); // still exactly one — never duplicated
     expect(rows2[0]?.block).toContain("taxes every jump gate"); // appended
 
+    // Creation writes version 1 (rewind's restore base — C6 audit);
+    // enrichment stacks version 2.
     const versions = await db
       .select()
       .from(schema.entityVersions)
-      .where(eq(schema.entityVersions.entityId, entity.id));
-    expect(versions).toHaveLength(1);
+      .where(eq(schema.entityVersions.entityId, entity.id))
+      .orderBy(schema.entityVersions.version);
+    expect(versions).toHaveLength(2);
     expect(versions[0]?.version).toBe(1);
-    expect(versions[0]?.turnId).toBe(2);
+    expect(versions[0]?.turnId).toBe(1); // creation turn
+    expect(versions[1]?.version).toBe(2);
+    expect(versions[1]?.turnId).toBe(2); // enrichment turn
   });
 
   it("resolver: a weak/absent canon hit mints a plain entity from the assertion", async () => {
@@ -375,11 +380,15 @@ describe.skipIf(!url)("Universal ingestion (real Postgres, scripted extractor)",
     const versions = await db
       .select()
       .from(schema.entityVersions)
-      .where(eq(schema.entityVersions.entityId, ent.id));
-    expect(versions).toHaveLength(1);
-    expect(versions[0]?.turnId).toBe(8); // the enrichment turn
-    expect(versions[0]?.provenance).toBe("sz_extraction");
-    expect(versions[0]?.confidence).toBe(1);
+      .where(eq(schema.entityVersions.entityId, ent.id))
+      .orderBy(schema.entityVersions.version);
+    expect(versions).toHaveLength(2); // v1 creation + v2 enrichment
+    expect(versions[0]?.turnId).toBe(7); // creation turn
+    expect(versions[1]?.turnId).toBe(8); // the enrichment turn
+    for (const v of versions) {
+      expect(v.provenance).toBe("sz_extraction");
+      expect(v.confidence).toBe(1);
+    }
 
     const mems = await db
       .select()

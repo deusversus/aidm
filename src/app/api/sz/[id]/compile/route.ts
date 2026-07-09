@@ -24,7 +24,9 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
   if (!campaign || campaign.playerId !== user.id) {
     return NextResponse.json({ error: "not found" }, { status: 404 });
   }
-  if (campaign.status !== "draft") {
+  // 'compiling' stays retryable: a crash mid-compile leaves the claim held,
+  // and compileSessionZero re-claims it (C6 audit).
+  if (campaign.status !== "draft" && campaign.status !== "compiling") {
     return NextResponse.json({ error: "already compiled" }, { status: 409 });
   }
 
