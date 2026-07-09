@@ -368,6 +368,18 @@ describe.skipIf(!url)("SZ compiler (real Postgres)", () => {
       .where(eq(schema.entities.campaignId, campaignId));
     expect(admitted.some((e) => e.name === "The Trawler")).toBe(true);
 
+    // SZ admission is a minting authority: creation writes version 1 so the
+    // rewind block-restore always has a base (C6 re-audit — an unversioned
+    // mint leaves the block unrestorable once later enrichments tombstone).
+    const trawlerEntity = admitted.find((e) => e.name === "The Trawler");
+    const trawlerVersions = await db
+      .select()
+      .from(schema.entityVersions)
+      .where(eq(schema.entityVersions.entityId, trawlerEntity?.id ?? ""));
+    expect(trawlerVersions).toHaveLength(1);
+    expect(trawlerVersions[0]?.version).toBe(1);
+    expect(trawlerVersions[0]?.block).toBe(trawlerEntity?.block);
+
     const [player] = await db.select().from(schema.players).where(eq(schema.players.id, playerId));
     expect((player?.profile as { taste?: string[] }).taste?.[0]).toContain("found-family");
   });
@@ -383,5 +395,45 @@ describe.skipIf(!url)("SZ compiler (real Postgres)", () => {
     expect(settei.charterTokens).toBeGreaterThan(0);
     expect(settei.text).toContain("whatever happens");
     expect(settei.renderedAxes).toContain("darkness");
+  });
+
+  it("the compile claim is exclusive: a live 'compiling' blocks, a stale one re-claims", async () => {
+    if (!db) throw new Error("unreachable");
+    // Simulate a compile in flight: the claim was stamped moments ago.
+    await db
+      .update(schema.campaigns)
+      .set({ status: "compiling", updatedAt: new Date() })
+      .where(eq(schema.campaigns.id, campaignId));
+    await expect(
+      compileSessionZero(db, campaignId, {
+        ospSynthesizer: async () => STUB_OSP,
+        ingestor: async () => ({ writes: [], flags: [] }),
+      }),
+    ).rejects.toThrow(/already in flight/);
+    // The loser lost BEFORE any side effect — it must NOT have reverted the
+    // winner's claim (the C6 re-audit sabotage mode: a loser's catch flipping
+    // compiling→draft fails the winner's own compiling→active transaction).
+    const [held] = await db
+      .select()
+      .from(schema.campaigns)
+      .where(eq(schema.campaigns.id, campaignId));
+    expect(held?.status).toBe("compiling");
+
+    // A CRASHED compile (stale claim, no process left to revert it) stays
+    // retryable: past the staleness window the claim is taken over.
+    await db
+      .update(schema.campaigns)
+      .set({ updatedAt: new Date(Date.now() - 6 * 60 * 1000) })
+      .where(eq(schema.campaigns.id, campaignId));
+    const result = await compileSessionZero(db, campaignId, {
+      ospSynthesizer: async () => STUB_OSP,
+      ingestor: async () => ({ writes: [], flags: [] }),
+    });
+    expect(result.gaps).toEqual([]);
+    const [after] = await db
+      .select()
+      .from(schema.campaigns)
+      .where(eq(schema.campaigns.id, campaignId));
+    expect(after?.status).toBe("active");
   });
 });

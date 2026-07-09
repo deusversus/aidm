@@ -3,6 +3,7 @@ import {
   campaigns,
   criticalFacts,
   entities,
+  entityVersions,
   pencilMarks,
   players,
   profiles,
@@ -20,7 +21,7 @@ import {
   SuggestionAffordance,
 } from "@/lib/types/premise";
 import { Profile } from "@/lib/types/profile";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, lt, or } from "drizzle-orm";
 import { z } from "zod";
 import type { ConductorDraft, Observation } from "./conductor";
 
@@ -38,6 +39,9 @@ import type { ConductorDraft, Observation } from "./conductor";
 const SZ_STAMP = { provenance: "sz_compiler", confidence: 0.9 };
 const SZ_ENVELOPE = { turn_id: 0, ...SZ_STAMP };
 const SZ_ROW = { turnId: 0, ...SZ_STAMP };
+
+/** A 'compiling' claim older than this is a crashed compile — re-claimable. */
+const STALE_COMPILE_CLAIM_MS = 5 * 60 * 1000;
 
 // --- Resolution: latest-wins per kind (per-axis for calibration) -----------
 
@@ -367,15 +371,31 @@ export async function compileSessionZero(
   // CLAIM the compile before any side effect (C6 audit): ingestion and the
   // OSP call run OUTSIDE the final transaction (the clarify must feed the
   // OSP prompt), so the single-winner gate has to come FIRST or a lost-race
-  // compile leaves orphaned ingestion writes behind. 'compiling' is
-  // re-claimable — a crash mid-compile stays retryable.
+  // compile leaves orphaned ingestion writes behind. The claim is EXCLUSIVE
+  // (C6 re-audit — inArray(draft,compiling) let two concurrent compiles both
+  // claim, and the loser's catch-revert sabotaged the winner's flip): a live
+  // 'compiling' row only re-claims once STALE, so a crash mid-compile stays
+  // retryable while a concurrent compile loses here, before any side effect.
   const claimed = await db
     .update(campaigns)
-    .set({ status: "compiling" })
-    .where(and(eq(campaigns.id, campaignId), inArray(campaigns.status, ["draft", "compiling"])))
+    .set({ status: "compiling", updatedAt: new Date() })
+    .where(
+      and(
+        eq(campaigns.id, campaignId),
+        or(
+          eq(campaigns.status, "draft"),
+          and(
+            eq(campaigns.status, "compiling"),
+            lt(campaigns.updatedAt, new Date(Date.now() - STALE_COMPILE_CLAIM_MS)),
+          ),
+        ),
+      ),
+    )
     .returning({ id: campaigns.id });
   if (claimed.length === 0) {
-    throw new Error("compile lost the race — this campaign is already active");
+    throw new Error(
+      "compile lost the race — a compile is already in flight or the campaign is already active",
+    );
   }
 
   try {
@@ -564,7 +584,7 @@ export async function compileSessionZero(
       // the compile (the partial unique index is on campaign+type+name).
       const admitted = opening.briefs.filter((b) => b.admit_to_catalog);
       if (admitted.length > 0) {
-        await tx
+        const created = await tx
           .insert(entities)
           .values(
             admitted.map((b) => ({
@@ -582,7 +602,24 @@ export async function compileSessionZero(
               ...SZ_ROW,
             })),
           )
-          .onConflictDoNothing();
+          .onConflictDoNothing()
+          .returning({ id: entities.id, block: entities.block });
+        // Creation writes version 1 so a rewind can always restore the block
+        // to a known state (C6 audit) — SZ admission is the THIRD minting
+        // authority alongside g1 cast-admit and ingestion create, and an
+        // unversioned mint leaves the block unrestorable once later enrich
+        // versions tombstone away. `returning` yields only the rows actually
+        // inserted, so a resolver-duplicate no-op mints no spurious version.
+        if (created.length > 0) {
+          await tx.insert(entityVersions).values(
+            created.map((r) => ({
+              entityId: r.id,
+              version: 1,
+              block: r.block,
+              ...SZ_ROW,
+            })),
+          );
+        }
       }
 
       // Player profile, thin (§6.9): taste observations accumulate.

@@ -333,12 +333,13 @@ async function settleG2Inner(db: Db, turnId: string): Promise<void> {
 
         // Spotlight debt: present this scene → 0; absent → +1 (npc/faction only).
         // Word-boundary match, never substring — "Rei" inside "reign" is not
-        // a scene appearance (C6 audit: short names corrupted the debt).
+        // a scene appearance (C6 audit: short names corrupted the debt). The
+        // boundaries are Unicode lookarounds, not \b: \b is ASCII-only, so a
+        // name ending in a macron/accent ("Ryū") would never test present
+        // and accrue phantom debt every scene it appears in (C6 re-audit).
         if (e.entityType === "npc" || e.entityType === "faction") {
-          const namePattern = new RegExp(
-            `\\b${e.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`,
-            "i",
-          );
+          const escaped = e.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+          const namePattern = new RegExp(`(?<![\\p{L}\\p{N}_])${escaped}(?![\\p{L}\\p{N}_])`, "iu");
           const present = Boolean(update) || namePattern.test(narration);
           state.spotlightDebt = present ? 0 : ((state.spotlightDebt as number) ?? 0) + 1;
           dirty = true;

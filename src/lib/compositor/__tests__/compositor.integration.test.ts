@@ -338,6 +338,59 @@ describe.skipIf(!url)("Compositor (real Postgres, scripted models)", () => {
         .from(schema.entities)
         .where(and(eq(schema.entities.campaignId, campaignId), eq(schema.entities.name, "Julia")));
       expect(julia).toHaveLength(1);
+
+      // Creation minted version 1 (C6 audit — the rewind restore base) …
+      const juliaVersions = await db
+        .select()
+        .from(schema.entityVersions)
+        .where(eq(schema.entityVersions.entityId, julia[0]?.id ?? ""));
+      expect(juliaVersions).toHaveLength(1);
+      expect(juliaVersions[0]?.block).toBe("an old flame");
+
+      // … and a re-admit ENRICH writes the next version alongside the block
+      // change (C6 re-audit: an unversioned enrich is silently clobbered by
+      // the rewind block-restore). Run twice — still exactly one new version.
+      const conte2 = Conte.parse({
+        turn_id: 2,
+        tier: "genga",
+        outcome: {
+          success_level: "success",
+          difficulty_class: 10,
+          narrative_weight: "SIGNIFICANT",
+          rationale: "x",
+        },
+        mechanics: { resource_spends: [] },
+      });
+      const sidecar2 = CommitScene.parse({
+        decision_point: false,
+        notable_beats: ["x"],
+        scene_cast_delta: [
+          { name: "Julia", action: "admit_to_catalog", note: "seen at the cathedral" },
+        ],
+      });
+      const args2 = {
+        campaignId,
+        turnId: "unused",
+        turnNumber: 2,
+        conte: conte2,
+        sidecar: sidecar2,
+        profileIds: [],
+      };
+      await settleG1(db, args2);
+      await settleG1(db, args2);
+
+      const [juliaAfter] = await db
+        .select()
+        .from(schema.entities)
+        .where(and(eq(schema.entities.campaignId, campaignId), eq(schema.entities.name, "Julia")));
+      expect(juliaAfter?.block).toBe("an old flame\nseen at the cathedral");
+      const versionsAfter = await db
+        .select()
+        .from(schema.entityVersions)
+        .where(eq(schema.entityVersions.entityId, juliaAfter?.id ?? ""));
+      expect(versionsAfter.map((v) => v.version).sort()).toEqual([1, 2]);
+      // The restore-loop invariant: living block == newest surviving version.
+      expect(versionsAfter.find((v) => v.version === 2)?.block).toBe(juliaAfter?.block);
     },
   );
 
@@ -353,7 +406,7 @@ describe.skipIf(!url)("Compositor (real Postgres, scripted models)", () => {
       const campaignId = await makeCampaign();
       const turnNumber = 3;
       const narration =
-        "The bar went quiet. Jet set down his drink. On the wall, the bounty on Vicious stared back.";
+        "The bar went quiet. Jet set down his drink. Ryū watched from the corner. On the wall, the bounty on Vicious stared back.";
       const [turnRow] = await db
         .insert(schema.turns)
         .values({
@@ -398,6 +451,16 @@ describe.skipIf(!url)("Compositor (real Postgres, scripted models)", () => {
           entityType: "npc",
           block: "Faye Valentine.",
           state: { spotlightDebt: 2 },
+          turnId: 0,
+          provenance: "sz_handoff",
+          confidence: 1,
+        },
+        {
+          campaignId,
+          name: "Ryū",
+          entityType: "npc",
+          block: "Ryū — a silent enforcer.",
+          state: { spotlightDebt: 1 },
           turnId: 0,
           provenance: "sz_handoff",
           confidence: 1,
@@ -516,6 +579,15 @@ describe.skipIf(!url)("Compositor (real Postgres, scripted models)", () => {
         .from(schema.entities)
         .where(and(eq(schema.entities.campaignId, campaignId), eq(schema.entities.name, "Faye")));
       expect((faye?.state as { spotlightDebt: number }).spotlightDebt).toBe(3); // absent → +1
+
+      // Non-ASCII name in the narration still registers as present — ASCII \b
+      // never matched a trailing macron, so "Ryū" accrued phantom debt every
+      // scene he actually appeared in (C6 re-audit).
+      const [ryu] = await db
+        .select()
+        .from(schema.entities)
+        .where(and(eq(schema.entities.campaignId, campaignId), eq(schema.entities.name, "Ryū")));
+      expect((ryu?.state as { spotlightDebt: number }).spotlightDebt).toBe(0);
 
       // Seed confirmation.
       const [seed] = await db

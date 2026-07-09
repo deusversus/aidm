@@ -4,7 +4,7 @@ import { consequences, entities, entityVersions } from "@/lib/db/schema";
 import { writeSnapshotIfDue } from "@/lib/turn/rewind";
 import type { Conte } from "@/lib/types/conte";
 import type { CommitScene } from "@/lib/types/sidecar";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, max, sql } from "drizzle-orm";
 
 /**
  * Chronicler Group 1 — the must-commit write group (blueprint §5.8). Runs
@@ -211,10 +211,30 @@ async function applyCastCatalog(
             : note
           : existing.block;
       if (block !== existing.block || existing.status !== "active") {
-        await db
-          .update(entities)
-          .set({ block, status: "active" })
-          .where(eq(entities.id, existing.id));
+        // A block change lands WITH its version row (one transaction): the
+        // rewind block-restore (§6.7) rolls every surviving entity back to
+        // its newest surviving version, so an unversioned enrich here would
+        // be silently clobbered by the next bounded rewind (C6 re-audit).
+        await db.transaction(async (tx) => {
+          await tx
+            .update(entities)
+            .set({ block, status: "active" })
+            .where(eq(entities.id, existing.id));
+          if (block !== existing.block) {
+            const [row] = await tx
+              .select({ v: max(entityVersions.version) })
+              .from(entityVersions)
+              .where(eq(entityVersions.entityId, existing.id));
+            await tx.insert(entityVersions).values({
+              entityId: existing.id,
+              version: (row?.v ?? 0) + 1,
+              block,
+              turnId: turnNumber,
+              provenance: G1_PROVENANCE,
+              confidence: 0.9,
+            });
+          }
+        });
       }
       continue;
     }
