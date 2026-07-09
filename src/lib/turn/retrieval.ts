@@ -5,9 +5,9 @@ import {
   criticalFacts,
   entities,
   heatBoosts,
-  seeds,
   semanticMemories,
 } from "@/lib/db/schema";
+import { callbackReadySeeds } from "@/lib/direction/seeds";
 import { callJudgment } from "@/lib/llm/calls";
 import type { TierSelection } from "@/lib/llm/tiers";
 import { embedTexts } from "@/lib/llm/voyage";
@@ -372,29 +372,19 @@ export async function fetchEntityCards(
     .map((r) => `${r.name} (${r.entityType}): ${r.block}`);
 }
 
-/** Seeds inside their payoff window (or urgent) surface as callback opportunities (≤3). */
+/**
+ * Callback-ready seeds surface as conte callback opportunities (≤3, never
+ * obligations). Delegates to the §7.6 ledger predicate (C7) — window `from`
+ * respected and dependency-gated; the old `urgency > 0` shortcut let barely
+ * mentioned seeds bypass their window entirely.
+ */
 export async function fetchCallbacks(
   db: Db,
   campaignId: string,
   currentTurn: number,
 ): Promise<string[]> {
-  const rows = await db
-    .select()
-    .from(seeds)
-    .where(
-      and(
-        eq(seeds.campaignId, campaignId),
-        inArray(seeds.status, ["planted", "confirmed"]),
-        notTombstoned(seeds),
-      ),
-    );
-  return rows
-    .filter((s) => {
-      const w = s.payoffWindow as { from?: number; to?: number } | null;
-      const inWindow = w?.from !== undefined && currentTurn >= w.from;
-      return inWindow || s.urgency > 0;
-    })
-    .sort((a, b) => b.urgency - a.urgency)
+  const ready = await callbackReadySeeds(db, campaignId, currentTurn);
+  return ready
     .slice(0, 3)
     .map(
       (s) => `${s.description}${s.expectedPayoff ? ` (expected payoff: ${s.expectedPayoff})` : ""}`,

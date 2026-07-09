@@ -8,6 +8,8 @@ import {
   pencilMarks,
   turns,
 } from "@/lib/db/schema";
+import { getActiveArc } from "@/lib/direction/arcs";
+import { saveDirectionState } from "@/lib/direction/director";
 import { ingestAssertion } from "@/lib/ingestion/ingest";
 import { type RepetitionReadings, measureRepetition } from "@/lib/ka/antirep";
 import { selectSakugaMode } from "@/lib/ka/sakuga";
@@ -16,13 +18,14 @@ import { DEV_TIER_SELECTION, TierSelection } from "@/lib/llm/tiers";
 import { renderAmendments } from "@/lib/renderer/amendments";
 import { renderSceneShape } from "@/lib/renderer/scene-shape";
 import { Conte } from "@/lib/types/conte";
+import { DirectionState, type PacerArcState, PacerPhase } from "@/lib/types/direction";
 import { PencilMark } from "@/lib/types/marks";
 import { PremiseContract } from "@/lib/types/premise";
 import { IntentOutput, TURN_CONTRACTS, type TurnEffort } from "@/lib/types/turn";
 import { and, desc, eq, gt, sql } from "drizzle-orm";
 import { type LadderStep, PHASE_A_BUDGET_MS, createDegradeClock } from "./degrade";
 import { judgeOutcome, syntheticOutcome, validateOutcome } from "./outcome";
-import { pacerMicroCheck } from "./pacer";
+import { runPacer } from "./pacer";
 import { powerContext } from "./power";
 import {
   decomposeQueries,
@@ -95,6 +98,7 @@ export async function runLayout(
   const contract = PremiseContract.parse(campaign.premiseContract);
   const parsedSelection = TierSelection.safeParse(campaign.tierModels);
   const selection = parsedSelection.success ? parsedSelection.data : DEV_TIER_SELECTION;
+  const direction = DirectionState.parse(campaign.directionState ?? {});
 
   // --- Triage: the intent probe IS the triage call (§5.1) -------------------
   emit({ type: "staging", text: "reading the room" });
@@ -104,24 +108,56 @@ export async function runLayout(
     .where(and(eq(episodicRecords.campaignId, campaignId), notTombstoned(episodicRecords)))
     .orderBy(desc(episodicRecords.turnNumber))
     .limit(1);
-  const intent = await callProbe(selection, {
-    name: "intent_triage",
-    schema: IntentOutput,
-    campaignId,
-    turnNumber,
-    system: INTENT_SYSTEM,
-    prompt: [
-      lastEpisodic ? `PREVIOUS SCENE (tail): …${lastEpisodic.narration.slice(-600)}` : "",
-      `PLAYER INPUT: ${playerInput}`,
-    ]
-      .filter(Boolean)
-      .join("\n"),
-    maxTokens: 1_500,
-  });
+  // Direction reads ride the triage call's latency (indexed, ms-scale).
+  const [intent, activeArc, recentTurnRows] = await Promise.all([
+    callProbe(selection, {
+      name: "intent_triage",
+      schema: IntentOutput,
+      campaignId,
+      turnNumber,
+      system: INTENT_SYSTEM,
+      prompt: [
+        lastEpisodic ? `PREVIOUS SCENE (tail): …${lastEpisodic.narration.slice(-600)}` : "",
+        `PLAYER INPUT: ${playerInput}`,
+      ]
+        .filter(Boolean)
+        .join("\n"),
+      maxTokens: 1_500,
+    }),
+    getActiveArc(db, campaignId),
+    db
+      .select({ conte: turns.conte })
+      .from(turns)
+      .where(and(eq(turns.campaignId, campaignId), eq(turns.status, "complete")))
+      .orderBy(desc(turns.turnNumber))
+      .limit(3),
+  ]);
 
   if (isChannelInput(intent)) {
     return { kind: "channel", intent };
   }
+
+  // Arc state for the Pacer (§7.2): phase ownership is the Director's —
+  // phase_state only counts when it points at the CURRENT active arc.
+  const phaseOwned = direction.phase_state?.arc_id === activeArc?.id;
+  const parsedPhase = PacerPhase.safeParse(
+    phaseOwned ? direction.phase_state?.phase : activeArc?.phase,
+  );
+  const arcState: PacerArcState | null = activeArc
+    ? {
+        phase: parsedPhase.success ? parsedPhase.data : "setup",
+        turnsInPhase:
+          phaseOwned && direction.phase_state
+            ? Math.max(0, turnNumber - direction.phase_state.entered_at_turn)
+            : 0,
+        tensionLevel: direction.tension_level,
+        arcName: activeArc.name,
+        shape: activeArc.shape,
+      }
+    : null;
+  const recentBeats = recentTurnRows
+    .map((r) => (r.conte as Conte | null)?.pacer_beat?.beat_classification)
+    .filter((b): b is string => Boolean(b));
 
   const tier = classifyTier(intent);
   const turnContract = TURN_CONTRACTS[tier];
@@ -175,29 +211,26 @@ export async function runLayout(
   // Failure never blocks the turn. Phase-A re-runs may re-ingest (noted:
   // duplicate semantic facts are noise, not corruption — G2's distillation
   // dedups nothing at M1).
-  const ingestionProbe: Promise<string[]> =
+  const ingestionProbe: Promise<{ notes: string[]; flags: string[] }> =
     intent.intent === "WORLD_BUILDING"
       ? ingestAssertion(db, campaignId, turnNumber, playerInput, {
           profileIds: contract.anchors_used,
           provenance: "player_assertion",
         })
           .then((r) => {
-            for (const flag of r.flags) {
-              console.log(`[layout] ingestion FLAG (Director territory, C7): ${flag}`);
-            }
             const notes = r.writes.map((w) => `Established fact (${w.kind}): ${w.summary}`);
             if (r.clarify) {
               notes.push(
                 `The assertion left a genuine ambiguity — let the scene surface it naturally: ${r.clarify}`,
               );
             }
-            return notes;
+            return { notes, flags: r.flags };
           })
           .catch((err) => {
             console.warn(`[layout] ingestion failed (turn ${turnNumber}): ${err}`);
-            return [];
+            return { notes: [], flags: [] };
           })
-      : Promise.resolve([]);
+      : Promise.resolve({ notes: [], flags: [] });
 
   const [
     retrieved,
@@ -257,21 +290,25 @@ export async function runLayout(
           .limit(8)
       : Promise.resolve([]),
     turnContract.consultants.includes("pacer") && !ladder.has("timebox_pacer")
-      ? pacerMicroCheck(selection, {
-          intent,
+      ? runPacer(selection, {
+          intent: `${intent.intent}, epicness ${intent.epicness.toFixed(2)}`,
           playerInput,
-          recentBeats: [],
+          recentBeats,
+          arcState,
           campaignId,
           turnNumber,
         })
-      : Promise.resolve({ promoteEffort: false, timedOut: false, beat: undefined }),
+      : Promise.resolve<import("./pacer").PacerResult>({ promoteEffort: false, timedOut: false }),
+    // Amendments window (§4.4a/b): marks since the last session-open Settei
+    // rebuild ride the Amendments; the rebuild bakes them into the Charter.
+    // Pre-C7 campaigns (no snapshot yet) keep the legacy 10-turn window.
     db
       .select()
       .from(pencilMarks)
       .where(
         and(
           eq(pencilMarks.campaignId, campaignId),
-          gt(pencilMarks.turnId, Math.max(0, turnNumber - 10)),
+          gt(pencilMarks.turnId, direction.settei?.rebuilt_at_turn ?? Math.max(0, turnNumber - 10)),
           notTombstoned(pencilMarks),
         ),
       ),
@@ -279,6 +316,14 @@ export async function runLayout(
     ingestionProbe,
   ]);
   applyLadder();
+
+  // Ingestion FLAGs are Director territory (§5.4): queue them for the next
+  // dailies review. Layout is the turn's only DirectionState writer and the
+  // prior turn's G2 has drained by now (settleG2IfPending at submit).
+  if (worldAssertionNotes.flags.length > 0) {
+    direction.pending_flags = [...direction.pending_flags, ...worldAssertionNotes.flags].slice(-20);
+    await saveDirectionState(db, campaignId, direction);
+  }
 
   // --- Relevance filter (part of the prescription budget, §6.4) --------------
   const filtered =
@@ -360,14 +405,19 @@ export async function runLayout(
 
   // --- Conte assembly (code) --------------------------------------------------
   emit({ type: "staging", text: "assembling the storyboard" });
+  // id + provenance are REQUIRED by PencilMark — omitting them failed every
+  // safeParse and silently dropped ALL fresh marks from the Amendments
+  // (caught by the C7 session agent; same defect fixed in blocks/campaign.ts).
   const freshMarks = freshMarksRaw
     .map((r) =>
       PencilMark.safeParse({
+        id: r.id,
         kind: r.kind,
         topic: r.topic,
         direction: r.direction,
         evidence: r.evidence ?? "",
         turn_id: r.turnId,
+        provenance: r.provenance,
         confidence: r.confidence,
       }),
     )
@@ -378,7 +428,27 @@ export async function runLayout(
     sakkanNotes: [],
     freshMarks,
   });
-  const sceneShape = renderSceneShape(contract.active.framing, {});
+  // Scene-Shape Directive (§4.4c): the Director is the producer (C7) — arc
+  // line from the active arc, trajectory + notes from the last cycle. The
+  // pilot plan rides turn 1 keyed on turn NUMBER, not a consumed flag, so a
+  // Phase-A crash-replay re-injects identically (§5.7 re-entrancy).
+  const sceneShape = renderSceneShape(contract.active.framing, {
+    arcName: activeArc?.name,
+    phase: arcState?.phase,
+    trajectoryNote: direction.scene_shape?.trajectory_note,
+  });
+  const directorNotes = [
+    ...(direction.scene_shape?.notes ?? []),
+    ...direction.director_notes,
+  ].slice(0, 3);
+  const pilot = turnNumber === 1 ? direction.pilot_plan : undefined;
+  let sceneShapeText = sceneShape.text;
+  if (directorNotes.length > 0) {
+    sceneShapeText += `\n${directorNotes.map((n) => `Director: ${n}`).join("\n")}`;
+  }
+  if (pilot?.opening_pov) {
+    sceneShapeText += `\nOpening POV: ${pilot.opening_pov}`;
+  }
   const canonicality = contract.active.canonicality;
   const canonicalityDirectives = [
     `Timeline: ${canonicality.timeline_mode}; cast: ${canonicality.canon_cast_mode}; events: ${canonicality.event_fidelity}.`,
@@ -393,21 +463,32 @@ export async function runLayout(
     outcome: judgment.outcome,
     mechanics: judgment.mechanics,
     charter_amendments: amendments.text,
-    scene_shape_directive: minimal ? "" : sceneShape.text,
+    scene_shape_directive: minimal ? "" : sceneShapeText,
     // §5.5 rung 2: "proceed without its directive" — the beat is dropped
     // when the rung fired, even though the probe itself already resolved.
     pacer_beat: ladder.has("timebox_pacer") ? undefined : pacer.beat,
     canonicality_directives: canonicalityDirectives,
-    hard_constraints: [...critical, ...activeOverrides.map((o) => o.content)],
+    // Pilot constraints (§8 handoff, ratified pilot-as-normal-turn): the
+    // OSP's forbidden opening moves + the Director's cold-open constraints
+    // are hard core on turn 1 — they survive even a minimal brief.
+    hard_constraints: [
+      ...critical,
+      ...activeOverrides.map((o) => o.content),
+      ...(pilot?.forbidden_opening_moves.map((m) => `FORBIDDEN OPENING MOVE: ${m}`) ?? []),
+      ...(pilot?.cold_open_constraints ?? []),
+    ],
     callbacks: minimal ? [] : callbacks,
     memories: minimal ? [] : toConteMemories(filtered),
     canon_chunks: minimal ? [] : canon,
     entity_cards: minimal ? [] : entityCards,
-    spotlight_hints: [],
+    // The Director's spotlight directives (§7.1) — refreshed each cycle.
+    spotlight_hints: minimal
+      ? []
+      : direction.spotlight_directives.map((d) => `${d.name}: ${d.note}`),
     active_consequences: minimal ? [] : activeConsequences.map((c) => c.description),
     // World assertions survive even a minimal brief — player-authored canon
     // is hard core, not garnish (§5.4).
-    world_assertion_notes: worldAssertionNotes,
+    world_assertion_notes: worldAssertionNotes.notes,
     // §5.3 diversity injections — measured, and dropped under a minimal brief.
     style_drift_directive: minimal ? undefined : repetition.styleDriftDirective,
     vocab_freshness_advisory: minimal ? undefined : repetition.vocabFreshnessAdvisory,
@@ -417,6 +498,15 @@ export async function runLayout(
   });
 
   // --- Checkpoint: Phase A persists the moment it completes (§5.7) -----------
+  // epicness + the pacer's phase-transition suggestion ride the checkpoints
+  // so G2's Director trigger (step 11) can fold this turn into the
+  // accumulators without re-deriving Phase-A judgments.
+  const checkpointPatch = {
+    phase_a: true,
+    ladder: ladder.state.fired,
+    epicness: intent.epicness,
+    pacer_transition: pacer.phaseTransition ?? null,
+  };
   const [row] = await db
     .insert(turns)
     .values({
@@ -427,7 +517,7 @@ export async function runLayout(
       playerInput,
       conte,
       degraded: conte.degraded,
-      checkpoints: { phase_a: true, ladder: ladder.state.fired },
+      checkpoints: checkpointPatch,
     })
     .onConflictDoUpdate({
       target: [turns.campaignId, turns.turnNumber],
@@ -437,7 +527,7 @@ export async function runLayout(
         playerInput,
         conte,
         degraded: conte.degraded,
-        checkpoints: sql`${turns.checkpoints} || ${JSON.stringify({ phase_a: true, ladder: ladder.state.fired })}::jsonb`,
+        checkpoints: sql`${turns.checkpoints} || ${JSON.stringify(checkpointPatch)}::jsonb`,
       },
     })
     .returning({ id: turns.id });

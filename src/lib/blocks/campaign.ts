@@ -1,11 +1,12 @@
 import type { Db } from "@/lib/db";
 import { notTombstoned } from "@/lib/db/helpers";
-import { campaigns, pencilMarks, pins } from "@/lib/db/schema";
-import { renderSettei } from "@/lib/renderer/settei";
+import { campaigns, pencilMarks, pins, turns } from "@/lib/db/schema";
+import { type Settei, renderSettei } from "@/lib/renderer/settei";
 import { KA_CONTRACT } from "@/lib/turn/ka";
+import { DirectionState, SetteiSnapshot } from "@/lib/types/direction";
 import { PencilMark, activeMarks } from "@/lib/types/marks";
 import { PremiseContract } from "@/lib/types/premise";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
 import { type AssembledBlocks, assembleBlocks } from "./assemble";
 import { compactionWatermark, loadBeats, workingWindow } from "./compaction";
 
@@ -43,15 +44,21 @@ export async function assembleForCampaign(
       .orderBy(asc(pencilMarks.turnId), asc(pencilMarks.id)),
   ]);
 
+  // id + provenance are REQUIRED by the PencilMark contract — omitting them
+  // failed every safeParse and silently dropped ALL standing marks from the
+  // Settei since C1 (caught by the C7 session agent). Same defect existed in
+  // layout's Amendments mapping; both fixed together.
   const marks = activeMarks(
     markRows
       .map((r) =>
         PencilMark.safeParse({
+          id: r.id,
           kind: r.kind,
           topic: r.topic,
           direction: r.direction,
           evidence: r.evidence ?? "",
           turn_id: r.turnId,
+          provenance: r.provenance,
           confidence: r.confidence,
           ...(r.supersededBy ? { superseded_by: r.supersededBy } : {}),
         }),
@@ -60,11 +67,28 @@ export async function assembleForCampaign(
       .map((p) => p.data),
   );
 
-  const settei = renderSettei({ contract, marks });
-  if (settei.uncoveredExtremes.length > 0) {
+  // Block 1's Settei is FROZEN per session (§4.4a): when a snapshot exists,
+  // render from it — never from live marks — so a mid-session G2 mark write
+  // can't silently bust the Block-1 prefix cache (§5.6). Absent (pre-C7
+  // campaign / first assembly) → render as before AND lazily freeze it once;
+  // session open re-freezes it through direction/session.rebuildSettei.
+  const dir = DirectionState.safeParse(campaign.directionState);
+  const snapshot = dir.success ? dir.data.settei : undefined;
+  let setteiText: string;
+  let uncoveredExtremes: readonly string[];
+  if (snapshot) {
+    setteiText = snapshot.text;
+    uncoveredExtremes = snapshot.uncovered_extremes;
+  } else {
+    const rendered = renderSettei({ contract, marks });
+    setteiText = rendered.text;
+    uncoveredExtremes = rendered.uncoveredExtremes;
+    await freezeSettei(db, campaignId, dir.success ? dir.data : null, rendered);
+  }
+  if (uncoveredExtremes.length > 0) {
     console.warn("[blocks] premise extremes without grounding — author exemplars", {
       campaignId,
-      axes: settei.uncoveredExtremes,
+      axes: uncoveredExtremes,
     });
   }
 
@@ -74,7 +98,7 @@ export async function assembleForCampaign(
       ? `\n\n## Presentation vocabulary (granted — use at your judgment, never as obligation)\n${grants.map((g) => `- ${g}`).join("\n")}`
       : "";
 
-  const block1 = `${settei.text}${presentation}\n\n${KA_CONTRACT}`;
+  const block1 = `${setteiText}${presentation}\n\n${KA_CONTRACT}`;
 
   return assembleBlocks({
     settei: block1,
@@ -87,4 +111,43 @@ export async function assembleForCampaign(
     })),
     watermark,
   });
+}
+
+/**
+ * Lazy Settei freeze for a campaign with no snapshot yet (first assembly /
+ * pre-C7). Best-effort: the live render already returned, so a write failure
+ * never fails the assembly. rebuilt_at_turn is the current max turn — marks
+ * newer than it ride Amendments until the next session-open rebuild.
+ */
+async function freezeSettei(
+  db: Db,
+  campaignId: string,
+  direction: DirectionState | null,
+  rendered: Settei,
+): Promise<void> {
+  try {
+    const [latest] = await db
+      .select({ turnNumber: turns.turnNumber })
+      .from(turns)
+      .where(eq(turns.campaignId, campaignId))
+      .orderBy(desc(turns.turnNumber))
+      .limit(1);
+    const next: DirectionState = {
+      ...(direction ?? DirectionState.parse({})),
+      settei: SetteiSnapshot.parse({
+        text: rendered.text,
+        charter_tokens: rendered.charterTokens,
+        rendered_axes: rendered.renderedAxes,
+        uncovered_extremes: rendered.uncoveredExtremes,
+        rebuilt_at_turn: latest?.turnNumber ?? 0,
+        rebuilt_at: new Date().toISOString(),
+      }),
+    };
+    await db.update(campaigns).set({ directionState: next }).where(eq(campaigns.id, campaignId));
+  } catch (err) {
+    console.warn("[blocks] lazy Settei freeze failed — live render served", {
+      campaignId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
 }

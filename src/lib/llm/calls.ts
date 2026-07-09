@@ -3,6 +3,7 @@ import { recordModelCall } from "@/lib/observability/meter";
 import { CommitScene } from "@/lib/types/sidecar";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import type {
+  ContentBlockParam,
   Message,
   MessageCreateParamsNonStreaming,
   MessageParam,
@@ -49,6 +50,19 @@ interface StructuredCallOptions<T> extends CallContext {
   system?: string;
   maxTokens?: number;
   effort?: Effort;
+  /**
+   * Investigation toolkit (§7.1 Director): when supplied together with
+   * `executeTool` and `maxToolRounds > 0`, the call runs a budgeted tool loop
+   * BEFORE the structured emit — investigation rounds (tools, no output_config)
+   * accumulate assistant + tool_result turns, then one final structured round
+   * closes them. Absent (the default), the call stays a single structured shot,
+   * byte-for-byte the prior behavior.
+   */
+  tools?: Tool[];
+  /** Executes one tool call; returns its result string (errors returned, never thrown). */
+  executeTool?: (name: string, input: unknown) => Promise<string>;
+  /** Investigation rounds before the final structured emit. 0 (default) = single-shot. */
+  maxToolRounds?: number;
 }
 
 function usageStats(usage: Usage) {
@@ -73,6 +87,99 @@ async function callStructured<T>(
     tags: [tier],
     metadata: { campaignId: opts.campaignId, turnNumber: opts.turnNumber },
   });
+
+  // The transcript. Single-shot callers leave it at one user turn; an
+  // investigation loop (§7.1) grows it in place with tool round-trips before
+  // the final structured emit. When no tools run, `messages` is identical to
+  // the prior inline literal — the single-shot path stays untouched.
+  const messages: MessageParam[] = [{ role: "user", content: opts.prompt }];
+  const maxToolRounds = opts.maxToolRounds ?? 0;
+  if (opts.tools && opts.tools.length > 0 && opts.executeTool && maxToolRounds > 0) {
+    const execute = opts.executeTool;
+    // NEVER combine tools with output_config in one request: investigation
+    // rounds carry {tools, messages} and NO format; the final round emits.
+    for (let round = 0; round < maxToolRounds; round++) {
+      const invGeneration = trace?.generation({
+        name: `${opts.name}_investigate_${round + 1}`,
+        model,
+        input: messages,
+      });
+      const invStarted = Date.now();
+      let invMessage: Message;
+      try {
+        invMessage = await getAnthropic().messages.create({
+          model,
+          max_tokens: opts.maxTokens ?? 1024,
+          ...(opts.system ? { system: opts.system } : {}),
+          messages,
+          tools: opts.tools,
+          ...(caps.adaptiveThinking ? { thinking: { type: "adaptive" } } : {}),
+        });
+      } catch (err) {
+        const statusMessage = err instanceof Error ? err.message : String(err);
+        invGeneration?.end({
+          level: "ERROR",
+          statusMessage,
+          metadata: { latencyMs: Date.now() - invStarted },
+        });
+        throw err;
+      }
+      const invLatency = Date.now() - invStarted;
+      await recordModelCall({
+        provider: "anthropic",
+        model,
+        tier,
+        usage: usageStats(invMessage.usage),
+        latencyMs: invLatency,
+        campaignId: opts.campaignId,
+        turnNumber: opts.turnNumber,
+        traceId: trace?.id,
+      });
+      invGeneration?.end({
+        usage: { input: invMessage.usage.input_tokens, output: invMessage.usage.output_tokens },
+        metadata: { latencyMs: invLatency, stopReason: invMessage.stop_reason },
+      });
+
+      // Only a tool_use stop carries calls to answer; a truncated round
+      // (max_tokens mid-call) can hold a dangling tool_use that will never get
+      // a result — persist only what can be replayed, or the next request 400s
+      // on the orphaned block (the C5/SZ lesson: every tool_use gets a result).
+      const toolUses =
+        invMessage.stop_reason === "tool_use"
+          ? invMessage.content.filter((b) => b.type === "tool_use")
+          : [];
+      const persistable =
+        toolUses.length > 0
+          ? invMessage.content
+          : invMessage.content.filter((b) => b.type !== "tool_use");
+      if (persistable.length > 0) messages.push({ role: "assistant", content: persistable });
+      if (toolUses.length === 0) break; // the model stopped investigating
+
+      const results: ContentBlockParam[] = [];
+      for (const block of toolUses) {
+        if (block.type !== "tool_use") continue;
+        let output: string;
+        try {
+          output = await execute(block.name, block.input);
+        } catch (err) {
+          output = `Tool failed (${err instanceof Error ? err.message : "error"}).`;
+        }
+        results.push({ type: "tool_result", tool_use_id: block.id, content: output });
+      }
+      messages.push({ role: "user", content: results });
+    }
+    // Close the investigation and demand the structured output. Folded into the
+    // trailing user turn when the loop exhausted on a tool_result (no two
+    // consecutive user turns); otherwise its own turn after the model's summary.
+    const closing = "Investigation complete. Emit the structured output now.";
+    const last = messages[messages.length - 1];
+    if (last?.role === "user" && Array.isArray(last.content)) {
+      last.content.push({ type: "text", text: closing });
+    } else {
+      messages.push({ role: "user", content: closing });
+    }
+  }
+
   const generation = trace?.generation({ name: opts.name, model, input: opts.prompt });
   const started = Date.now();
 
@@ -80,7 +187,7 @@ async function callStructured<T>(
     model,
     max_tokens: opts.maxTokens ?? 1024,
     ...(opts.system ? { system: opts.system } : {}),
-    messages: [{ role: "user", content: opts.prompt }],
+    messages,
     output_config: {
       format: zodOutputFormat(opts.schema),
       ...(opts.effort && caps.effortControl ? { effort: opts.effort } : {}),
@@ -289,13 +396,16 @@ export function streamNarration(opts: NarrationOptions) {
   const generation = trace?.generation({ name, model });
   const started = Date.now();
 
+  // tools: [] means a deliberately tool-less narration call (recap/yokoku,
+  // §9.3/§9.4) — tool_choice with an empty tools array is an API 400, so
+  // both fields drop together (C7 session agent's catch).
+  const tools = opts.tools ?? [COMMIT_SCENE_TOOL];
   const params: MessageStreamParams = {
     model,
     max_tokens: opts.maxTokens,
     system: opts.system,
     messages: opts.messages,
-    tools: opts.tools ?? [COMMIT_SCENE_TOOL],
-    tool_choice: { type: "auto" },
+    ...(tools.length > 0 ? { tools, tool_choice: { type: "auto" as const } } : {}),
     ...(caps.adaptiveThinking ? { thinking: { type: "adaptive" } } : {}),
     ...(opts.effort && caps.effortControl ? { output_config: { effort: opts.effort } } : {}),
   };

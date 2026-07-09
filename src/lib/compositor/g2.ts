@@ -13,13 +13,23 @@ import {
   semanticMemories,
   turns,
 } from "@/lib/db/schema";
+import {
+  accumulate,
+  evaluateDirectorTrigger,
+  loadDirectionState,
+  runDirectorCycle,
+  saveDirectionState,
+} from "@/lib/direction/director";
+import { overdueSeeds, overdueTensionBump } from "@/lib/direction/seeds";
+import { rollingCheckpoint } from "@/lib/direction/session";
 import { callJudgment, callProbe } from "@/lib/llm/calls";
 import { DEV_TIER_SELECTION, TierSelection } from "@/lib/llm/tiers";
 import { embedTexts } from "@/lib/llm/voyage";
 import { CATEGORY_DECAY } from "@/lib/turn/retrieval";
 import { ArcOverride } from "@/lib/types/arc";
+import { DIRECTOR_MAX_INTERVAL } from "@/lib/types/direction";
 import { CommitScene } from "@/lib/types/sidecar";
-import { and, asc, eq, inArray, lte, max, sql } from "drizzle-orm";
+import { and, asc, eq, lte, max, sql } from "drizzle-orm";
 import { z } from "zod";
 
 /**
@@ -521,30 +531,73 @@ async function settleG2Inner(db: Db, turnId: string): Promise<void> {
     await markDb();
   }
 
-  // 11. director_trigger — evaluate-and-log only; the Director binds at C7.
+  // 11. director_trigger — the §7.1 hybrid trigger, bound (C7). Fold this
+  //     turn into the accumulators (Layout stashed epicness + any pacer
+  //     phase-transition suggestion in the checkpoints), bump tension for
+  //     overdue seeds (v3), evaluate, and run the cycle when it fires. The
+  //     accumulator save + marker land BEFORE the cycle: a failed Director
+  //     run is a skipped daily (the next trigger fires within 8 turns), never
+  //     a wedged G2 — and a replayed cycle would double-apply seed plants.
   if (!g2.director_trigger) {
-    const [{ total } = { total: 0 }] = await db
-      .select({ total: sql<number>`count(*)::int` })
-      .from(turns)
-      .where(eq(turns.campaignId, campaignId));
-    const openSeeds = await db
-      .select({ payoffWindow: seeds.payoffWindow })
-      .from(seeds)
-      .where(
-        and(
-          eq(seeds.campaignId, campaignId),
-          inArray(seeds.status, ["planted", "confirmed"]),
-          notTombstoned(seeds),
-        ),
-      );
-    const overdue = openSeeds.filter((s) => {
-      const w = s.payoffWindow as { to?: number } | null;
-      return w?.to !== undefined && turnNumber > w.to;
-    }).length;
-    console.log(
-      `[g2] director trigger eval — turn ${turnNumber}: ${total} turns, ${overdue} seeds overdue (Director binds C7)`,
-    );
+    const stash = checkpoints as { epicness?: number; pacer_transition?: string | null };
+    const conteForEvents = turn.conte as {
+      outcome?: { narrative_weight?: string };
+      mechanics?: { combat_results?: string };
+    } | null;
+    const events: string[] = [];
+    if (turn.tier === "sakuga") events.push("sakuga_moment");
+    if (conteForEvents?.outcome?.narrative_weight === "CLIMACTIC") {
+      events.push(conteForEvents.mechanics?.combat_results ? "boss_defeat" : "climactic_beat");
+    }
+    if (
+      (sidecar?.intended_seed_mentions?.length ?? 0) > 0 ||
+      payload.confirmed_seed_descriptions.length > 0
+    ) {
+      events.push("foreshadowing_mentioned");
+    }
+    if (stash.pacer_transition) {
+      events.push(`phase_transition_suggested:${stash.pacer_transition}`);
+    }
+
+    let direction = accumulate(await loadDirectionState(db, campaignId), {
+      epicness: stash.epicness ?? 0,
+      events,
+    });
+    const overdue = await overdueSeeds(db, campaignId, turnNumber);
+    if (overdue.length > 0) {
+      direction = {
+        ...direction,
+        tension_level: Math.min(1, direction.tension_level + overdueTensionBump(overdue.length)),
+      };
+    }
+    const trigger = evaluateDirectorTrigger(direction, turnNumber);
+    await saveDirectionState(db, campaignId, direction);
     g2.director_trigger = true;
+    await markDb();
+    if (trigger.fire) {
+      try {
+        await runDirectorCycle(db, campaignId, turnNumber, {
+          trigger: trigger.reasons.join(","),
+        });
+      } catch (err) {
+        console.warn(
+          `[g2] director cycle failed (turn ${turnNumber}) — skipped daily, next trigger ≤${DIRECTOR_MAX_INTERVAL} turns:`,
+          err,
+        );
+      }
+    }
+  }
+
+  // 11b. rolling checkpoint (§9.4 close trigger 3): every 12 turns the open
+  //      session's memo refreshes in place, so a never-closed session still
+  //      accrues Learned-layer content. Non-fatal like the cycle above.
+  if (!g2.rolling_checkpoint) {
+    try {
+      await rollingCheckpoint(db, campaignId, turnNumber);
+    } catch (err) {
+      console.warn(`[g2] rolling checkpoint failed (turn ${turnNumber}):`, err);
+    }
+    g2.rolling_checkpoint = true;
     await markDb();
   }
 

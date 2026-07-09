@@ -71,6 +71,9 @@ export const campaigns = pgTable(
     tierModels: jsonb(),
     /** At most one active override, latest wins (§4.2); ArcOverride type. */
     arcOverride: jsonb(),
+    /** Direction machinery state (§7, C7): trigger accumulators, pilot plan,
+     *  scene-shape base, session-frozen Settei snapshot. DirectionState type. */
+    directionState: jsonb(),
     /** SZ durable draft (§8): the conversation, resumable across sittings. */
     szTranscript: jsonb(),
     /** SZ quiet-extraction accumulator: observations gathered mid-conversation. */

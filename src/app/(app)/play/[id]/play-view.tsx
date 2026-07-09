@@ -45,6 +45,12 @@ export function PlayView({
   const [pinNotice, setPinNotice] = useState<string | null>(null);
   const [rewindOpen, setRewindOpen] = useState(false);
   const [rewindBusy, setRewindBusy] = useState(false);
+  // §9.4 session lifecycle: recap opens the sitting, yokoku closes it.
+  const [recap, setRecap] = useState<string | null>(null);
+  const [yokoku, setYokoku] = useState<string | null>(null);
+  const [sessionClosed, setSessionClosed] = useState(false);
+  const [closing, setClosing] = useState(false);
+  const openedRef = useRef(false);
   const queuedRef = useRef<string | null>(null);
   const busyRef = useRef(false);
   // Live mirrors of state read inside long-running async closures (the C3
@@ -244,7 +250,47 @@ export function PlayView({
     }
   }, [openTurn, attachStream]);
 
+  // §9.4 open the sitting once on mount. Idempotent server-side (a fresh open
+  // session is a no-op); a genuine open may return a premise-rendered recap.
+  useEffect(() => {
+    if (openedRef.current) return;
+    openedRef.current = true;
+    void (async () => {
+      try {
+        const res = await fetch(`/api/campaigns/${campaignId}/session/open`, { method: "POST" });
+        if (!res.ok) return;
+        const body = (await res.json()) as { recap?: string };
+        if (body.recap) setRecap(body.recap);
+      } catch (err) {
+        console.warn("session open failed", err);
+      }
+    })();
+  }, [campaignId]);
+
+  const endSession = async () => {
+    if (closing || sessionClosed) return;
+    setClosing(true);
+    try {
+      const res = await fetch(`/api/campaigns/${campaignId}/session/close`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ trigger: "explicit" }),
+      });
+      if (res.ok) {
+        const body = (await res.json()) as { yokoku?: string };
+        if (body.yokoku) setYokoku(body.yokoku);
+        setSessionClosed(true);
+      } else {
+        setPinNotice("Couldn't close the session — try again.");
+      }
+    } catch {
+      setPinNotice("Couldn't close the session — try again.");
+    }
+    setClosing(false);
+  };
+
   const send = () => {
+    if (sessionClosed) return;
     const message = input.trim();
     if (!message) return;
     // A FAILED TURN (error carries its turnId) holds the campaign open: retry
@@ -391,6 +437,16 @@ export function PlayView({
       )}
 
       <div className="flex-1 space-y-5 overflow-y-auto py-4">
+        {recap && (
+          <div className="border-l-2 border-border pl-4">
+            <p className="mb-1 text-[10px] uppercase tracking-widest text-muted-foreground/60">
+              previously
+            </p>
+            <p className="whitespace-pre-wrap text-sm italic leading-7 text-muted-foreground">
+              {recap}
+            </p>
+          </div>
+        )}
         {exchanges.map((e) => (
           <div key={e.turnNumber} className="space-y-3">
             <div className="flex justify-end">
@@ -459,6 +515,21 @@ export function PlayView({
           </p>
         )}
         {pinNotice && <p className="text-xs text-muted-foreground">{pinNotice}</p>}
+        {yokoku && (
+          <div className="border-l-2 border-border pl-4">
+            <p className="mb-1 text-[10px] uppercase tracking-widest text-muted-foreground/60">
+              next time
+            </p>
+            <p className="whitespace-pre-wrap text-sm italic leading-7 text-muted-foreground">
+              {yokoku}
+            </p>
+          </div>
+        )}
+        {sessionClosed && (
+          <p className="text-xs italic text-muted-foreground">
+            Session closed — reopen it from the shelf when you’re ready for the next sitting.
+          </p>
+        )}
         <div ref={bottomRef} />
       </div>
 
@@ -474,17 +545,35 @@ export function PlayView({
                 send();
               }
             }}
-            placeholder={busy ? "type away — it sends when the scene lands" : "What do you do?"}
+            placeholder={
+              sessionClosed
+                ? "the sitting is over"
+                : busy
+                  ? "type away — it sends when the scene lands"
+                  : "What do you do?"
+            }
             rows={2}
-            className="flex-1 resize-none rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-foreground"
+            disabled={sessionClosed}
+            className="flex-1 resize-none rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-foreground disabled:opacity-50"
           />
           <button
             type="button"
             onClick={send}
-            disabled={!input.trim()}
+            disabled={!input.trim() || sessionClosed}
             className="rounded-md border border-border px-4 text-sm font-medium hover:bg-muted disabled:opacity-50"
           >
             {busy ? "Queue" : "Act"}
+          </button>
+        </div>
+        <div className="mt-2 flex justify-end">
+          <button
+            type="button"
+            onClick={endSession}
+            disabled={closing || sessionClosed || busy}
+            title="End this sitting — writes the session's notes and shows next time's tease"
+            className="text-xs text-muted-foreground/70 hover:text-muted-foreground disabled:opacity-50"
+          >
+            {closing ? "closing…" : "End session"}
           </button>
         </div>
       </footer>

@@ -1,0 +1,1 @@
+ALTER TABLE "campaigns" ADD COLUMN "direction_state" jsonb;

@@ -1,0 +1,34 @@
+library_slug: arcs_budget_templates
+category: arcs
+axis: budget_prior
+# Genre arc-length priors (blueprint §7.3 "sources of arc length", entry 2): the
+# rule-library shape/budget priors that refine the Treatment `pacing` band into a
+# default {target, tolerance} for a fresh Arc-stratum row. `target`/`tolerance`
+# are episodes; `shape_note` is a one-line tendency the Director may honor within
+# tolerance. Story-first doctrine holds — these are priors, not ceilings; arc
+# length is dictated by the story, never by the sitting.
+entries:
+  - value_key: fast
+    target: 2
+    tolerance: 1
+    shape_note: |
+      Climbs and resolves inside the sitting; each installment closes on a button.
+    rationale: |
+      Fast IP (pacing ≥ 7): two-episode arcs that turn over quickly. (cf. Cowboy
+      Bebop's near-standalone bounties, early Demon Slayer's brisk missions.)
+  - value_key: moderate
+    target: 4
+    tolerance: 2
+    shape_note: |
+      Room to raise a threat and pay it off without dawdling; one clean escalation.
+    rationale: |
+      Mid-tempo (pacing 4–6): four-episode arcs with a build and a payoff. (cf.
+      Hunter x Hunter's Heavens Arena, Jujutsu Kaisen's Kyoto Goodwill Event.)
+  - value_key: slow_burn
+    target: 6
+    tolerance: 2
+    shape_note: |
+      Dread accumulates over a long plateau; the payoff earns its weight by patience.
+    rationale: |
+      Slow burn (pacing ≤ 3): six-episode arcs that trust the wait. (cf. Monster's
+      long pursuit, Vinland Saga's farmland arc, Mushishi's unhurried dwell.)

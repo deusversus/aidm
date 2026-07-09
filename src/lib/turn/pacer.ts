@@ -1,74 +1,233 @@
 import { callProbe } from "@/lib/llm/calls";
 import type { TierSelection } from "@/lib/llm/tiers";
-import { PacerBeat } from "@/lib/types/conte";
-import type { IntentOutput } from "@/lib/types/turn";
-import { z } from "zod";
+import type { PacerBeat } from "@/lib/types/conte";
+import {
+  ESCALATION_BANDS,
+  PHASE_GATES,
+  type PacerArcState,
+  PacerDirective,
+  TENSION_CLIMAX_SUGGEST,
+} from "@/lib/types/direction";
 
 /**
- * The Pacer micro-check (§7.2 thin slice — C4 ships beat classification;
- * the full Pacer with stall tables and phase gates lands C7). Timeboxed:
- * a slow Pacer never stalls Phase A — the turn proceeds without its
- * directive and the ladder logs the timeout.
+ * The Pacer (blueprint §7.2, C7): the per-turn beat director, carried whole
+ * from v3's pacing discipline (reference/aidm_v3/prompts/pacing.md). One
+ * timeboxed probe classifies the beat and PROPOSES a strength; the model is
+ * never trusted with the hard core. Code enforces v3's stall table:
+ * `override` is admitted ONLY when a phase-gate threshold is met (axiom 3),
+ * demoted when the model overreaches, and RAISED to the gate floor when the
+ * arc is stalling. The Pacer suggests phase transitions; the Director
+ * disposes — a transition is returned, never applied to state.
+ *
+ * Timeboxed exactly as C4's micro-check: a slow Pacer never stalls Phase A —
+ * the turn proceeds without a directive and the degrade ladder logs it.
  */
-
-const PacerProbe = z.object({
-  beat_classification: z.string().min(1),
-  tone: z.string().optional(),
-  /** True when this is a build-up/escalation beat (effort promotion, §3 caveat). */
-  escalation: z.boolean().default(false),
-});
 
 export const PACER_TIMEBOX_MS = 6_000;
 
+type Strength = "suggestion" | "strong" | "override";
+const STRENGTH_RANK: Record<Strength, number> = { suggestion: 0, strong: 1, override: 2 };
+
 export interface PacerResult {
   beat?: PacerBeat;
+  /** Assembled from the model note + any clamp/gate/tension annotations. */
+  pacingNote?: string;
+  /** Target phase suggested this turn (model or tension rule). Recorded as an
+   *  arc event by the integrator — never applied to state (§7 pacer suggests,
+   *  director disposes). */
+  phaseTransition?: string;
   /** Escalation beats run ≥high effort — narratively trivial ≠ functionally trivial. */
   promoteEffort: boolean;
   timedOut: boolean;
 }
 
-export async function pacerMicroCheck(
+export interface PacerInput {
+  /** Rendered intent line (e.g. "COMBAT, epicness 0.70"). */
+  intent: string;
+  playerInput: string;
+  recentBeats: string[];
+  /** Null until a Director has run — beat classification only, strength held at suggestion. */
+  arcState: PacerArcState | null;
+  campaignId?: string;
+  turnNumber?: number;
+}
+
+/**
+ * v3's stall table, code-side (axiom 3 — override is hard core, granted only
+ * on a gate threshold; never trusted to the model). `turnsInPhase` strictly
+ * greater than the threshold admits the floor. Falling/resolution carry no
+ * override row, so they never reach the override floor.
+ */
+export function stallDirective(arcState: PacerArcState): { floor: Strength; action?: string } {
+  const gate = PHASE_GATES[arcState.phase];
+  const turns = arcState.turnsInPhase;
+  if (gate.overrideAfter !== undefined && turns > gate.overrideAfter) {
+    return { floor: "override", action: gate.overrideAction };
+  }
+  if (turns > gate.strongAfter) {
+    return { floor: "strong", action: gate.strongAction };
+  }
+  return { floor: "suggestion" };
+}
+
+function normalizeStrength(value: unknown): Strength {
+  return value === "override" || value === "strong" || value === "suggestion"
+    ? value
+    : "suggestion";
+}
+
+function buildPrompt(input: PacerInput): string {
+  const lines: string[] = [];
+  const arc = input.arcState;
+  if (arc) {
+    const gate = PHASE_GATES[arc.phase];
+    const band = ESCALATION_BANDS[arc.phase];
+    lines.push(`PHASE: ${arc.phase} (turns in phase: ${arc.turnsInPhase})`);
+    lines.push(`TENSION: ${arc.tensionLevel.toFixed(2)}`);
+    lines.push(`TARGET BAND (this phase): ${band.min.toFixed(1)}–${band.max.toFixed(1)}`);
+    const gateParts = [`> ${gate.strongAfter} turns → strong: "${gate.strongAction}"`];
+    if (gate.overrideAfter !== undefined && gate.overrideAction) {
+      gateParts.push(`> ${gate.overrideAfter} turns → override: "${gate.overrideAction}"`);
+    }
+    lines.push(`STALL GATE: ${gateParts.join("; ")}`);
+    if (arc.arcName || arc.shape) {
+      const name = arc.arcName ? `"${arc.arcName}"` : "(unnamed)";
+      lines.push(`ARC: ${name}${arc.shape ? ` (shape: ${arc.shape})` : ""}`);
+    }
+  } else {
+    lines.push("PHASE: none yet (no Director has run) — classify the beat and tone only.");
+  }
+  if (input.recentBeats.length > 0) lines.push(`RECENT BEATS: ${input.recentBeats.join(" → ")}`);
+  lines.push(`PLAYER INPUT: ${input.playerInput}`);
+  lines.push(`INTENT: ${input.intent}`);
+  return lines.join("\n");
+}
+
+function buildSystem(hasArcState: boolean): string {
+  return [
+    "You are the Pacer for an anime TTRPG narrative engine — the per-turn beat director (blueprint §7.2).",
+    "Classify the beat this action opens and shape it for the writer. Rules, carried from v3's pacing discipline:",
+    "- escalation_target: a short target inside this phase's TARGET BAND (a number or a tight range).",
+    "- tone: match the beat AND the player's intent.",
+    "- must_reference: only elements that are NARRATIVELY DUE — concrete and few; never force a reference.",
+    "- avoid: only what would break pacing; concrete and few.",
+    "- foreshadowing_hint: one optional seed to plant, when the beat invites it.",
+    "- pacing_note: one actionable sentence.",
+    "- Defer to active player momentum: if the player is driving the story somewhere, go with them — gates prevent STALLING, never player agency (§7.4: expressed player word > premise-truth > the engine's inferred impulse).",
+    "- strength is a PROPOSAL (suggestion/strong/override). The engine enforces the stall table; propose override ONLY when the phase gate's override threshold is met. When in doubt, suggestion.",
+    "- phase_transition: name the target phase ONLY when a transition is genuinely due; otherwise omit.",
+    hasArcState
+      ? ""
+      : "No arc state exists yet: keep strength at suggestion and omit phase_transition.",
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+/**
+ * The full Pacer (§7.2). One timeboxed probe; the model proposes, the code
+ * enforces. Returns a conte-ready {@link PacerBeat} with a clamped strength,
+ * plus the (never-applied) phase-transition suggestion and effort promotion.
+ */
+export async function runPacer(
   selection: TierSelection,
-  args: {
-    intent: IntentOutput;
-    playerInput: string;
-    recentBeats: string[];
-    campaignId: string;
-    turnNumber: number;
-  },
+  input: PacerInput,
   timeboxMs = PACER_TIMEBOX_MS,
 ): Promise<PacerResult> {
+  const arc = input.arcState;
+
   const call = callProbe(selection, {
+    // Trace name kept as "pacer_micro" through the C7 migration so the layout
+    // integration mocks keep matching; the integrator renames on cut-over.
     name: "pacer_micro",
-    schema: PacerProbe,
-    campaignId: args.campaignId,
-    turnNumber: args.turnNumber,
-    system: [
-      "You are the Pacer's beat classifier. Name the beat this action opens",
-      "(e.g. quiet-before, escalation, confrontation, aftermath, breather,",
-      "reveal, travel, bonding) and its tone. Flag escalation=true for",
-      "build-up beats that ramp toward a peak — those must never be starved",
-      "of craft budget even when they read as small.",
-    ].join(" "),
-    prompt: [
-      `ACTION: ${args.playerInput}`,
-      `INTENT: ${args.intent.intent}, epicness ${args.intent.epicness}`,
-      args.recentBeats.length > 0 ? `RECENT BEATS: ${args.recentBeats.join(" → ")}` : "",
-    ]
-      .filter(Boolean)
-      .join("\n"),
+    schema: PacerDirective,
+    campaignId: input.campaignId,
+    turnNumber: input.turnNumber,
+    system: buildSystem(arc !== null),
+    prompt: buildPrompt(input),
     maxTokens: 1_000,
   });
 
-  const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), timeboxMs));
-  const result = await Promise.race([call.then((r) => r).catch(() => null), timeout]);
-  if (!result) {
-    return { promoteEffort: false, timedOut: true };
-  }
-  const beat: PacerBeat = PacerBeat.parse({
-    beat_classification: result.beat_classification,
-    tone: result.tone,
-    strength: "suggestion",
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<null>((resolve) => {
+    timer = setTimeout(() => resolve(null), timeboxMs);
   });
-  return { beat, promoteEffort: result.escalation, timedOut: false };
+  // A rejected probe is treated like a timeout: no directive, the turn proceeds.
+  const directive = await Promise.race([call.catch(() => null), timeout]);
+  if (timer) clearTimeout(timer);
+  if (!directive) return { promoteEffort: false, timedOut: true };
+
+  const notes: string[] = [];
+  if (directive.pacing_note) notes.push(directive.pacing_note);
+  const mustReference: string[] = [...(directive.must_reference ?? [])];
+
+  // --- Strength: model proposes, the stall table disposes (axiom 3) ---------
+  const proposed = normalizeStrength(directive.strength);
+  let strength: Strength = "suggestion";
+  let phaseTransition: string | undefined;
+
+  if (arc) {
+    strength = proposed;
+    const gate = stallDirective(arc);
+
+    // Clamp DOWN: override is admitted ONLY on the gate's override threshold.
+    if (strength === "override" && gate.floor !== "override") {
+      strength = "strong";
+      notes.push("override demoted to strong — stall-table threshold not met (axiom 3)");
+    }
+    // Raise UP: a stalling arc pulls strength to the gate floor; the table
+    // drives the nudge (v3) — the gate's action rides must_reference.
+    if (STRENGTH_RANK[gate.floor] > STRENGTH_RANK[strength]) {
+      strength = gate.floor;
+      if (gate.action) {
+        notes.push(`phase gate: ${gate.action}`);
+        if (!mustReference.includes(gate.action)) mustReference.push(gate.action);
+      }
+    }
+
+    // Model's transition suggestion (never applied to state; a no-op self-
+    // transition is dropped).
+    if (directive.phase_transition && directive.phase_transition !== arc.phase) {
+      phaseTransition = directive.phase_transition;
+    }
+
+    // v3 rule: high tension outside climax forces at least "strong" + a climax
+    // suggestion — overrides any model transition.
+    if (arc.tensionLevel > TENSION_CLIMAX_SUGGEST && arc.phase !== "climax") {
+      if (STRENGTH_RANK[strength] < STRENGTH_RANK.strong) strength = "strong";
+      phaseTransition = "climax";
+      notes.push(
+        `tension ${arc.tensionLevel.toFixed(2)} exceeds ${TENSION_CLIMAX_SUGGEST} outside climax — climax suggested`,
+      );
+    }
+  } else if (proposed !== "suggestion") {
+    // Null arc state: no Director has run — strength held at suggestion.
+    notes.push("no arc state yet — strength held at suggestion");
+  }
+
+  const beat: PacerBeat = {
+    beat_classification: directive.beat_classification,
+    escalation_target: directive.escalation_target,
+    tone: directive.tone,
+    must_reference: mustReference,
+    avoid: directive.avoid ?? [],
+    foreshadowing_hint: directive.foreshadowing_hint,
+    strength,
+  };
+
+  // Escalation beats must never be starved of craft budget (§3 caveat):
+  // promote low-effort turns when the beat carries weight and the story is
+  // climbing (escalation/climax phase, or a transition is on the table).
+  const climbing =
+    (arc !== null && (arc.phase === "escalation" || arc.phase === "climax")) ||
+    phaseTransition !== undefined;
+  const promoteEffort = strength !== "suggestion" && climbing;
+
+  return {
+    beat,
+    pacingNote: notes.length > 0 ? notes.join(" · ") : undefined,
+    phaseTransition,
+    promoteEffort,
+    timedOut: false,
+  };
 }
