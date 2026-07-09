@@ -287,6 +287,34 @@ describe.skipIf(!url)("Session lifecycle (real Postgres, scripted models)", () =
     expect(fresh?.closedAt).toBeNull();
   });
 
+  it("idle floors at the session's own openedAt: a just-opened session survives a remount even when the prior sitting's last turn is old", async () => {
+    if (!db) throw new Error("unreachable");
+    const campaignId = await makeCampaign();
+    // The prior sitting's last turn landed 65 minutes ago — exactly why a NEW
+    // sitting exists. The open session itself is 5 minutes old.
+    await insertTurn(campaignId, 1);
+    await db
+      .update(schema.turns)
+      .set({ completedAt: new Date(Date.now() - 65 * 60 * 1000) })
+      .where(eq(schema.turns.campaignId, campaignId));
+    await insertSession(campaignId, 1, {
+      openedAt: new Date(Date.now() - 5 * 60 * 1000),
+    });
+    mockStartup.mockClear();
+    mockReview.mockClear();
+
+    const result = await openSession(db, campaignId);
+
+    // Fresh no-op — NOT spuriously idle-closed (C7 audit: measuring idle from
+    // the prior turn churned session numbers + close-artifact spend).
+    expect(result.opened).toBe(false);
+    expect(result.sessionNumber).toBe(1);
+    expect(mockReview).not.toHaveBeenCalled();
+    const rows = await sessionsFor(campaignId);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.closedAt).toBeNull();
+  });
+
   it("non-pilot open: directorReview runs and the recap is returned", async () => {
     if (!db) throw new Error("unreachable");
     const campaignId = await makeCampaign();

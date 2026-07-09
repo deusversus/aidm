@@ -251,7 +251,6 @@ describe.skipIf(!url)("C7 direction wiring (real Postgres, scripted models)", ()
         return Promise.resolve({
           analysis: "The dock thread is ready to become the arc's spine.",
           tension_level: 0.55,
-          phase: "rising",
           arc_plan: {
             name: "The Quiet Bounty",
             dramatic_question: "Who wants this bounty unclaimed?",

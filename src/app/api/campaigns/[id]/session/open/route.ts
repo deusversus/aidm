@@ -1,4 +1,5 @@
 import { getCurrentUser } from "@/lib/auth";
+import { settleG2IfPending } from "@/lib/compositor/g2";
 import { getDb } from "@/lib/db";
 import { campaigns } from "@/lib/db/schema";
 import { openSession } from "@/lib/direction/session";
@@ -27,6 +28,11 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
   if (campaign.status !== "active") {
     return NextResponse.json({ error: "campaign is not active" }, { status: 409 });
   }
+
+  // openSession's caller contract: drain lagging G2 before the Settei
+  // rebuild reads the marks it would otherwise orphan (§5.8's
+  // catch-up-before-reader; same pattern as the rewind route).
+  await settleG2IfPending(db, id);
 
   const result = await openSession(db, id);
   return NextResponse.json(result);

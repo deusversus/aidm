@@ -116,8 +116,16 @@ export async function assembleForCampaign(
 /**
  * Lazy Settei freeze for a campaign with no snapshot yet (first assembly /
  * pre-C7). Best-effort: the live render already returned, so a write failure
- * never fails the assembly. rebuilt_at_turn is the current max turn — marks
- * newer than it ride Amendments until the next session-open rebuild.
+ * never fails the assembly.
+ *
+ * The watermark is max turn MINUS ONE: this path runs during Phase B of the
+ * in-flight turn N (submitTurn inserts the row before dispatch), whose G2
+ * will write marks at turnId = N AFTER this freeze. A watermark of N would
+ * orphan them from both the baked Charter and the Amendments window
+ * (gt(turnId, watermark)) until the next session open (C7 audit). Marks
+ * present at freeze time all carry turnId ≤ N−1, so N−1 bakes exactly what
+ * was rendered. rebuildSettei (session open) is different: no turn is in
+ * flight there and the route drains G2 first, so its currentMaxTurn is safe.
  */
 async function freezeSettei(
   db: Db,
@@ -139,7 +147,7 @@ async function freezeSettei(
         charter_tokens: rendered.charterTokens,
         rendered_axes: rendered.renderedAxes,
         uncovered_extremes: rendered.uncoveredExtremes,
-        rebuilt_at_turn: latest?.turnNumber ?? 0,
+        rebuilt_at_turn: Math.max(0, (latest?.turnNumber ?? 0) - 1),
         rebuilt_at: new Date().toISOString(),
       }),
     };

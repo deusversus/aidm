@@ -50,9 +50,13 @@ function bestMatch(rows: SeedRow[], query: string): SeedRow | undefined {
     return d.includes(q) || q.includes(d);
   });
   if (matches.length === 0) return undefined;
+  // Deterministic tie-break on id: the feeding selects carry no ORDER BY, so
+  // Postgres row order is unspecified — an equal-distance tie must not resolve
+  // to a different seed run-to-run (C7 audit; crash-replay stays idempotent).
   matches.sort(
     (a, b) =>
-      Math.abs(a.description.length - query.length) - Math.abs(b.description.length - query.length),
+      Math.abs(a.description.length - query.length) -
+        Math.abs(b.description.length - query.length) || a.id.localeCompare(b.id),
   );
   return matches[0];
 }
@@ -75,10 +79,20 @@ export async function plantSeed(
   if (!description) throw new Error("plantSeed: a plant op requires a description");
 
   const notes: string[] = [];
+  // Dependency pool excludes ABANDONED seeds: the gate requires deps to reach
+  // "resolved", which abandoned never does — a dependency bound to one gates
+  // the new seed forever (C7 audit). Resolved seeds stay matchable: a dep on
+  // an already-resolved seed is a legitimately open gate.
   const existing = await db
     .select()
     .from(seeds)
-    .where(and(eq(seeds.campaignId, campaignId), notTombstoned(seeds)));
+    .where(
+      and(
+        eq(seeds.campaignId, campaignId),
+        inArray(seeds.status, ["planted", "confirmed", "resolved"]),
+        notTombstoned(seeds),
+      ),
+    );
 
   const matchedIds: string[] = [];
   for (const dep of op.dependencies) {

@@ -175,14 +175,17 @@ export async function runPacer(
       strength = "strong";
       notes.push("override demoted to strong — stall-table threshold not met (axiom 3)");
     }
-    // Raise UP: a stalling arc pulls strength to the gate floor; the table
-    // drives the nudge (v3) — the gate's action rides must_reference.
+    // Raise UP: a stalling arc pulls strength to the gate floor.
     if (STRENGTH_RANK[gate.floor] > STRENGTH_RANK[strength]) {
       strength = gate.floor;
-      if (gate.action) {
-        notes.push(`phase gate: ${gate.action}`);
-        if (!mustReference.includes(gate.action)) mustReference.push(gate.action);
-      }
+    }
+    // The table drives the nudge (v3) WHENEVER the arc is stalling — not only
+    // when strength had to be raised. Keying the action on the raise direction
+    // made v3's corrective text depend on the model's strength proposal
+    // instead of on the stall itself (C7 audit).
+    if (gate.floor !== "suggestion" && gate.action) {
+      notes.push(`phase gate: ${gate.action}`);
+      if (!mustReference.includes(gate.action)) mustReference.push(gate.action);
     }
 
     // Model's transition suggestion (never applied to state; a no-op self-

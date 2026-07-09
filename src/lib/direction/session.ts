@@ -64,6 +64,14 @@ export interface OpenSessionResult {
   pilot: boolean;
 }
 
+/**
+ * CALLER CONTRACT: drain lagging G2 first (the open route does —
+ * settleG2IfPending). rebuildSettei is a READER of pencil marks (§5.8's
+ * catch-up-before-reader), and a lagging G2 writing marks after the bake
+ * would orphan them from both the Charter and the Amendments window. The
+ * drain lives at the route so this module never imports compositor/g2
+ * (which imports rollingCheckpoint from here — a cycle).
+ */
 export async function openSession(db: Db, campaignId: string): Promise<OpenSessionResult> {
   const [campaign] = await db.select().from(campaigns).where(eq(campaigns.id, campaignId));
   if (!campaign) throw new Error(`openSession: campaign ${campaignId} not found`);
@@ -84,10 +92,15 @@ export async function openSession(db: Db, campaignId: string): Promise<OpenSessi
   const isPilot = latest === null;
 
   // (1) Idempotent open: an already-open session that is still FRESH is a
-  // no-op — the play view mounts and calls this on every load.
+  // no-op — the play view mounts and calls this on every load. Idle is
+  // floored at the session's OWN openedAt (C7 audit): the previous sitting's
+  // last turn is exactly the thing a NEW sitting is >30 min after, and
+  // measuring from it spuriously auto-closed every just-opened session
+  // before its first turn, churning session numbers and close-artifact spend.
   if (latestSession && latestSession.closedAt === null) {
-    const activity = latest?.completedAt ?? latestSession.openedAt;
-    const idleMs = Date.now() - activity.getTime();
+    const turnActivity = latest?.completedAt?.getTime() ?? 0;
+    const activity = Math.max(latestSession.openedAt.getTime(), turnActivity);
+    const idleMs = Date.now() - activity;
     if (idleMs < SESSION_IDLE_TIMEOUT_MS) {
       return { sessionNumber: latestSession.sessionNumber, opened: false, pilot: false };
     }
@@ -99,53 +112,86 @@ export async function openSession(db: Db, campaignId: string): Promise<OpenSessi
   const newSessionNumber = priorMax + 1;
   const tier = resolveTier(campaign.tierModels);
 
-  // (2) Director: startup on the cold pilot, review otherwise (reads the last
-  // session memo — Learned reader #2).
-  if (isPilot) {
-    await directorStartup(db, campaignId);
-  } else {
-    await directorReview(db, campaignId, currentMaxTurn);
+  // (2) CLAIM the session row FIRST (C7 audit): the open sequence spans
+  // several model round-trips, so a read-compute-insert shape let two
+  // simultaneous mounts both run Director startup (duplicate strata rows)
+  // and collide on the unique (campaignId, sessionNumber) index as a 500.
+  // The partial unique index makes the claim single-winner; the loser
+  // returns the winner's session as a graceful idempotent no-op.
+  const claimed = await db
+    .insert(sessionRecords)
+    .values({
+      campaignId,
+      sessionNumber: newSessionNumber,
+      turnId: currentMaxTurn,
+      provenance: "session_lifecycle",
+      confidence: 1,
+    })
+    .onConflictDoNothing()
+    .returning({ id: sessionRecords.id });
+  if (claimed.length === 0) {
+    return { sessionNumber: newSessionNumber, opened: false, pilot: false };
   }
 
-  // (3) The §4.4a regeneration trigger: bake pending marks into a frozen Settei.
-  await rebuildSettei(db, campaignId, currentMaxTurn);
-
-  // (4) Assemble the fresh blocks ONCE — reused for pre-warm and the recap so
-  // the player's first real call reads a warm prefix (§5.6).
-  const blocks = await assembleForCampaign(db, campaignId);
-
-  // Pre-warm must never fail the open — the sitting starts regardless.
-  if (blocks) {
-    try {
-      await prewarmPrefix(tier, blocks.system, { campaignId });
-    } catch (err) {
-      console.warn("[session] prewarm failed on open (non-fatal)", {
-        campaignId,
-        error: err instanceof Error ? err.message : String(err),
-      });
+  try {
+    // (3) Director: startup on the cold pilot, review otherwise (the review
+    // cycle reads the last session memo in its dossier — Learned reader #2).
+    if (isPilot) {
+      await directorStartup(db, campaignId);
+    } else {
+      await directorReview(db, campaignId, currentMaxTurn);
     }
+
+    // (4) The §4.4a regeneration trigger: bake pending marks into a frozen Settei.
+    await rebuildSettei(db, campaignId, currentMaxTurn);
+
+    // (5) Assemble the fresh blocks ONCE — reused for pre-warm and the recap so
+    // the player's first real call reads a warm prefix (§5.6).
+    const blocks = await assembleForCampaign(db, campaignId);
+
+    // Pre-warm must never fail the open — the sitting starts regardless.
+    if (blocks) {
+      try {
+        await prewarmPrefix(tier, blocks.system, { campaignId });
+      } catch (err) {
+        console.warn("[session] prewarm failed on open (non-fatal)", {
+          campaignId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+
+    // (6) Recap — skipped on the pilot (cold open, nothing to recap). A recap
+    // failure never fails the open: the sitting starts without the "previously
+    // on" (§9.3 — the recap's very existence is discretionary).
+    let recap: string | undefined;
+    if (!isPilot && blocks) {
+      try {
+        recap = await composeRecap(db, campaignId, tier, blocks.system);
+      } catch (err) {
+        console.warn("[session] recap failed on open (non-fatal)", {
+          campaignId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+
+    return {
+      sessionNumber: newSessionNumber,
+      opened: true,
+      pilot: isPilot,
+      ...(recap ? { recap } : {}),
+    };
+  } catch (err) {
+    // A failed open sequence must not leave a claimed-but-unopened session:
+    // the next mount would see it fresh and no-op, and a failed pilot
+    // STARTUP would never retry — turn 1 would render without its plan.
+    await db
+      .delete(sessionRecords)
+      .where(eq(sessionRecords.id, claimed[0]?.id ?? ""))
+      .catch(() => {});
+    throw err;
   }
-
-  // (5) Recap — skipped on the pilot (cold open, nothing to recap).
-  let recap: string | undefined;
-  if (!isPilot && blocks) {
-    recap = await composeRecap(db, campaignId, tier, blocks.system);
-  }
-
-  await db.insert(sessionRecords).values({
-    campaignId,
-    sessionNumber: newSessionNumber,
-    turnId: currentMaxTurn,
-    provenance: "session_lifecycle",
-    confidence: 1,
-  });
-
-  return {
-    sessionNumber: newSessionNumber,
-    opened: true,
-    pilot: isPilot,
-    ...(recap ? { recap } : {}),
-  };
 }
 
 export async function closeSession(

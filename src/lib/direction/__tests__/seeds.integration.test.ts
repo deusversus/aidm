@@ -281,6 +281,45 @@ describe.skipIf(!url)("Direction: arcs + seeds (real Postgres)", () => {
       expect(row?.confidence).toBeCloseTo(0.9);
     });
 
+    it("plantSeed never binds a dependency to an ABANDONED seed (permanent-gate hazard)", async () => {
+      if (!db) throw new Error("unreachable");
+      const campaignId = await makeCampaign();
+
+      // An abandoned "the mole" would out-match the open, longer seed on the
+      // length tie-break — the dependency pool must exclude it (C7 audit:
+      // abandoned never reaches "resolved", so the gate would hold forever).
+      const abandoned = await plantSeed(
+        db,
+        campaignId,
+        1,
+        seedOp({ description: "the mole" }),
+        "director",
+      );
+      await settleSeed(db, campaignId, 2, {
+        op: "abandon",
+        seed_description: "the mole",
+        dependencies: [],
+      });
+      const open = await plantSeed(
+        db,
+        campaignId,
+        3,
+        seedOp({ description: "the mole inside the crew" }),
+        "director",
+      );
+
+      const gated = await plantSeed(
+        db,
+        campaignId,
+        4,
+        seedOp({ description: "the mole is unmasked", dependencies: ["the mole"] }),
+        "director",
+      );
+      const [row] = await db.select().from(schema.seeds).where(eq(schema.seeds.id, gated.seedId));
+      expect(row?.dependencies).toEqual([open.seedId]);
+      expect(row?.dependencies).not.toContain(abandoned.seedId);
+    });
+
     it("callbackReadySeeds gates on resolved dependencies", async () => {
       if (!db) throw new Error("unreachable");
       const campaignId = await makeCampaign();

@@ -281,6 +281,26 @@ export async function runDirectorCycle(
     );
   const criticalCount = critRow?.n ?? 0;
 
+  // The last session's carry-forward memo — Learned reader #2 (§7.1). Without
+  // this read, the 400-word memo written at every close was a writer with no
+  // reader in ongoing play (C7 audit, axiom 8): the startup path reads memos
+  // but only ever runs on the pilot.
+  const [lastClosed] = await db
+    .select({ memo: sessionRecords.directorMemo, n: sessionRecords.sessionNumber })
+    .from(sessionRecords)
+    .where(
+      and(
+        eq(sessionRecords.campaignId, campaignId),
+        sql`${sessionRecords.closedAt} IS NOT NULL`,
+        notTombstoned(sessionRecords),
+      ),
+    )
+    .orderBy(desc(sessionRecords.sessionNumber))
+    .limit(1);
+  const memoSection = lastClosed?.memo
+    ? [`## Your memo from session ${lastClosed.n} (carry forward)`, lastClosed.memo, ""]
+    : [];
+
   const dossier = [
     `# Director cycle — turn ${turnNumber}${opts?.trigger ? ` (${opts.trigger})` : ""}`,
     "",
@@ -303,6 +323,7 @@ export async function runDirectorCycle(
     "## Critical layer (§6.3 dailies review)",
     `${criticalCount} active critical fact(s). Demote only what has gone stale — restraint, not a purge.`,
     "",
+    ...memoSection,
     "## Pending flags routed to you",
     state.pending_flags.length > 0 ? state.pending_flags.map((f) => `- ${f}`).join("\n") : "None.",
     "",
@@ -403,6 +424,10 @@ export async function runDirectorCycle(
   // §6.3: demotion, not erasure — set demotedAt, never delete.
   for (const match of output.demote_criticals) {
     if (!match.trim()) continue;
+    // Literal containment, not pattern matching: %/_ in the model's string
+    // ("50% morale") are live ILIKE wildcards unless escaped — unescaped they
+    // over-demote facts the Director never named (C7 audit).
+    const literal = match.replace(/([\\%_])/g, "\\$1");
     await db
       .update(criticalFacts)
       .set({ demotedAt: new Date() })
@@ -411,7 +436,7 @@ export async function runDirectorCycle(
           eq(criticalFacts.campaignId, campaignId),
           isNull(criticalFacts.demotedAt),
           notTombstoned(criticalFacts),
-          sql`${criticalFacts.content} ILIKE ${`%${match}%`}`,
+          sql`${criticalFacts.content} ILIKE ${`%${literal}%`}`,
         ),
       );
   }
@@ -437,8 +462,18 @@ export async function runDirectorCycle(
     arc_events: [],
     pending_flags: [],
     last_director_turn: turnNumber,
+    // phase_state stamps from arc_plan.phase — the SAME field applyArcPlan
+    // persisted and derived phaseChanged from. Stamping the (now removed)
+    // separate top-level phase field let the Pacer's stall gates run against
+    // a different phase than the arc row's (C7 audit, two lenses).
     ...(phaseChanged
-      ? { phase_state: { arc_id: arcId, phase: output.phase, entered_at_turn: turnNumber } }
+      ? {
+          phase_state: {
+            arc_id: arcId,
+            phase: output.arc_plan.phase,
+            entered_at_turn: turnNumber,
+          },
+        }
       : {}),
   };
   await saveDirectionState(db, campaignId, newState);

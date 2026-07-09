@@ -150,6 +150,32 @@ describe("runPacer — strength clamp (axiom 3, code enforces)", () => {
     expect(res.beat?.strength).toBe("override");
     // Admitted by the gate → no demotion note.
     expect(res.pacingNote ?? "").not.toContain("demoted");
+    // The stall nudge rides regardless — the gate drives it, not the raise
+    // direction (C7 audit: a model already at the floor silently lost v3's
+    // corrective action).
+    expect(res.beat?.must_reference).toContain(PHASE_GATES.rising.overrideAction as string);
+  });
+
+  it("the gate nudge fires even when the model already proposes the floor (stalling setup, model says strong)", async () => {
+    arm({ strength: "strong", beat_classification: "wander", must_reference: [] });
+    const res = await runPacer(
+      DEV_TIER_SELECTION,
+      makeInput({ arcState: makeArc({ phase: "setup", turnsInPhase: 7 }) }),
+    );
+    expect(res.beat?.strength).toBe("strong");
+    expect(res.beat?.must_reference).toContain(PHASE_GATES.setup.strongAction);
+    expect(res.pacingNote).toContain("phase gate");
+  });
+
+  it("no nudge below the gate (setup turn 3, model says strong — advisory strength stands, no gate action)", async () => {
+    arm({ strength: "strong", beat_classification: "standoff", must_reference: [] });
+    const res = await runPacer(
+      DEV_TIER_SELECTION,
+      makeInput({ arcState: makeArc({ phase: "setup", turnsInPhase: 3 }) }),
+    );
+    expect(res.beat?.strength).toBe("strong");
+    expect(res.beat?.must_reference).not.toContain(PHASE_GATES.setup.strongAction);
+    expect(res.pacingNote ?? "").not.toContain("phase gate");
   });
 });
 

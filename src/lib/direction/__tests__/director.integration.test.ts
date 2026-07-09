@@ -94,7 +94,6 @@ function directorOutput(over: Partial<DirectorOutput> = {}): DirectorOutput {
   return {
     analysis: "investigation digest — internal, never player-facing",
     tension_level: 0.5,
-    phase: "rising",
     arc_plan: {
       name: "The Ganymede Bounty",
       dramatic_question: "Do they collect, or does it collect them?",

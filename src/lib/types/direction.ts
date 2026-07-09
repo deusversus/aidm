@@ -214,7 +214,8 @@ export const DirectorOutput = z.object({
   /** Investigation digest — internal, never player-facing (axiom 2). */
   analysis: z.string(),
   tension_level: z.number().min(0).max(1),
-  phase: PacerPhase,
+  // No top-level phase field: arc_plan.phase is the single phase authority —
+  // a second unconstrained copy let the Pacer and the arc row diverge (C7 audit).
   arc_plan: DirectorArcPlan,
   /** Delimit a story movement: closes an episode row under the active arc. */
   episode_close: z
