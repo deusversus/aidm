@@ -234,6 +234,7 @@ describe.skipIf(!url)("SZ compiler (real Postgres)", () => {
     try {
       const result = await compileSessionZero(db, hybrid.id, {
         ospSynthesizer: async () => STUB_OSP,
+        ingestor: async () => ({ writes: [], flags: [] }),
       });
       expect(result.gaps).toEqual([]);
       expect(result.contract.hybrid_recipe?.world.source_profile_ids).toEqual([
@@ -292,9 +293,32 @@ describe.skipIf(!url)("SZ compiler (real Postgres)", () => {
 
   it("compiles the scripted draft: contract + OSP persisted, handoff complete", async () => {
     if (!db) throw new Error("unreachable");
+    // The C6 rebind (§5.4): SZ facts flow through the SAME ingestion seam as
+    // gameplay. Stubbed here; its clarify must land in the OSP's deferred
+    // context (an unanswerable question becomes an uncertainty, not silence).
+    const ingestCalls: { text: string; provenance?: string; profileIds: string[] }[] = [];
+    let ospDeferred: string[] = [];
     const result = await compileSessionZero(db, campaignId, {
-      ospSynthesizer: async () => STUB_OSP,
+      ingestor: async (_db, _cid, turnNumber, text, opts) => {
+        expect(turnNumber).toBe(0);
+        ingestCalls.push({ text, provenance: opts.provenance, profileIds: opts.profileIds });
+        return {
+          writes: [{ kind: "semantic_fact", id: "x", summary: "stubbed" }],
+          clarify: "does the trawler have grav-plating?",
+          flags: ["tier-inflation watch: 'best pilot in the system'"],
+        };
+      },
+      ospSynthesizer: async (input) => {
+        ospDeferred = [...input.resolved.deferred];
+        return STUB_OSP;
+      },
     });
+    expect(ingestCalls).toHaveLength(1);
+    expect(ingestCalls[0]?.text).toContain("fishing trawler");
+    expect(ingestCalls[0]?.provenance).toBe("sz_compiler");
+    expect(ingestCalls[0]?.profileIds).toContain("test_sz_profile");
+    expect(ospDeferred.some((d) => d.includes("grav-plating"))).toBe(true);
+    expect(ospDeferred.some((d) => d.includes("tier-inflation"))).toBe(true);
     expect(result.gaps).toEqual([]);
     expect(result.contract.spark).toContain("whatever happens");
     expect(result.contract.active.treatment.darkness).toBe(8); // player's move
@@ -321,7 +345,10 @@ describe.skipIf(!url)("SZ compiler (real Postgres)", () => {
 
     // A second compile must lose the draft→active race, not double-write.
     await expect(
-      compileSessionZero(db, campaignId, { ospSynthesizer: async () => STUB_OSP }),
+      compileSessionZero(db, campaignId, {
+        ospSynthesizer: async () => STUB_OSP,
+        ingestor: async () => ({ writes: [], flags: [] }),
+      }),
     ).rejects.toThrow(/already active/);
     const factsAfter = await db
       .select()

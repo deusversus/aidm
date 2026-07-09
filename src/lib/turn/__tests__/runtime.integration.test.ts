@@ -24,6 +24,16 @@ vi.mock("@/lib/llm/voyage", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/llm/voyage")>();
   return { ...actual, embedTexts: vi.fn() };
 });
+// The Compositor write groups are exercised in compositor.integration.test.ts.
+// Here they are stubbed so this suite stays a hermetic test of the durable
+// turn: settleG1 is a no-op (its real effects are asserted there), and the
+// detached settleG2 / catch-up do no background DB work that could race this
+// suite's teardown.
+vi.mock("@/lib/compositor/g1", () => ({ settleG1: vi.fn(async () => {}) }));
+vi.mock("@/lib/compositor/g2", () => ({
+  settleG2: vi.fn(async () => {}),
+  settleG2IfPending: vi.fn(async () => {}),
+}));
 
 const url = process.env.DATABASE_URL;
 if (!url) console.warn("[runtime] DATABASE_URL not set — skipping");

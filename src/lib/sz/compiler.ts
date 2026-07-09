@@ -7,6 +7,7 @@ import {
   players,
   profiles,
 } from "@/lib/db/schema";
+import { ingestAssertion } from "@/lib/ingestion/ingest";
 import { callJudgment } from "@/lib/llm/calls";
 import { DEV_TIER_SELECTION, TierSelection } from "@/lib/llm/tiers";
 import { DNAScales } from "@/lib/types/dna";
@@ -315,10 +316,13 @@ export interface CompileResult {
   gaps: string[];
 }
 
+/** The §5.4 ingestion seam, injectable for tests (like the OSP synthesizer). */
+export type Ingestor = typeof ingestAssertion;
+
 export async function compileSessionZero(
   db: Db,
   campaignId: string,
-  opts: { ospSynthesizer?: OspSynthesizer } = {},
+  opts: { ospSynthesizer?: OspSynthesizer; ingestor?: Ingestor } = {},
 ): Promise<CompileResult> {
   const [campaign] = await db.select().from(campaigns).where(eq(campaigns.id, campaignId));
   if (!campaign) throw new Error("campaign not found");
@@ -358,6 +362,37 @@ export async function compileSessionZero(
     resolved.deferred.push(
       `hybrid premise compiled single-source (base: ${profileId}) — per-component assembly lands at M4; honor the recorded blend in prose meanwhile`,
     );
+  }
+
+  // The C6 rebind (§5.4): SZ world/cast facts flow through the SAME
+  // universal-ingestion subsystem as gameplay assertions — the resolver
+  // links against canon and never duplicates; entities mint here and the
+  // later brief admissions enrich-or-skip against them. Runs BEFORE the
+  // OSP synthesis so a compile-time CLARIFY (unanswerable now — the
+  // conversation is over) lands in the deferred context and becomes an
+  // OSP uncertainty instead of vanishing. The deterministic critical_facts
+  // sz_fact writes below are unchanged — guaranteed injection stays
+  // guaranteed regardless of what ingestion does.
+  const assertedText = [...resolved.worldFacts, ...resolved.castFacts]
+    .map((o) => o.content)
+    .join("\n");
+  if (assertedText.trim()) {
+    const ingest = opts.ingestor ?? ingestAssertion;
+    try {
+      const ingested = await ingest(db, campaignId, 0, assertedText, {
+        profileIds: draft.profileIds,
+        provenance: "sz_compiler",
+      });
+      if (ingested.clarify) resolved.deferred.push(`unresolved at the table: ${ingested.clarify}`);
+      resolved.deferred.push(...ingested.flags);
+    } catch (err) {
+      // Ingestion enriches; it never gates the handoff. The critical-facts
+      // path below still carries every assertion.
+      console.warn(
+        "[sz.compile] ingestion failed — assertions persist via critical facts only",
+        err,
+      );
+    }
   }
   const blendNote = (component: string) => {
     const pick = resolved.blendChoices.find((b) => b.component === component);
@@ -508,24 +543,30 @@ export async function compileSessionZero(
     });
 
     // Catalog admission is an explicit act (§6.5) — briefs marked for it.
+    // Conflict-safe: the ingestion resolver above may have minted the same
+    // entity from a player assertion; the brief no-ops rather than erroring
+    // the compile (the partial unique index is on campaign+type+name).
     const admitted = opening.briefs.filter((b) => b.admit_to_catalog);
     if (admitted.length > 0) {
-      await tx.insert(entities).values(
-        admitted.map((b) => ({
-          campaignId,
-          name: b.name,
-          entityType:
-            b.kind === "cast"
-              ? "npc"
-              : b.kind === "faction"
-                ? "faction"
-                : b.kind === "world"
-                  ? "location"
-                  : "thread",
-          block: b.brief,
-          ...SZ_ROW,
-        })),
-      );
+      await tx
+        .insert(entities)
+        .values(
+          admitted.map((b) => ({
+            campaignId,
+            name: b.name,
+            entityType:
+              b.kind === "cast"
+                ? "npc"
+                : b.kind === "faction"
+                  ? "faction"
+                  : b.kind === "world"
+                    ? "location"
+                    : "thread",
+            block: b.brief,
+            ...SZ_ROW,
+          })),
+        )
+        .onConflictDoNothing();
     }
 
     // Player profile, thin (§6.9): taste observations accumulate.

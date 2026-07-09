@@ -1,4 +1,6 @@
 import { assembleForCampaign } from "@/lib/blocks/campaign";
+import { settleG1 } from "@/lib/compositor/g1";
+import { settleG2, settleG2IfPending } from "@/lib/compositor/g2";
 import type { Db } from "@/lib/db";
 import { campaigns, episodicRecords, turns } from "@/lib/db/schema";
 import { DEV_TIER_SELECTION, TierSelection } from "@/lib/llm/tiers";
@@ -115,6 +117,12 @@ export async function submitTurn(
   campaignId: string,
   playerInput: string,
 ): Promise<{ turnId: string; turnNumber: number }> {
+  // §5.8: G2 catches up before its own reader. The next turn's Phase A reads
+  // the semantic layer G2 writes, so settle any turn whose G2 lagged (a
+  // detached run that crashed, or a close before it finished) before opening
+  // the new turn. Oldest first; each step is idempotent + checkpointed.
+  await settleG2IfPending(db, campaignId);
+
   const [open] = await db
     .select({ id: turns.id })
     .from(turns)
@@ -318,7 +326,7 @@ async function runPhases(
     if (narration) emit({ type: "prose", text: narration });
   }
 
-  // --- G1-minimal (§5.8): verbatim episodic + completion markers --------------
+  // --- G1 (§5.8): verbatim episodic + the must-commit write group -------------
   if (!checkpoints.g1) {
     // Idempotent: the partial unique index (campaign, turn) WHERE not
     // tombstoned makes the crash-replay double-write a no-op.
@@ -334,6 +342,19 @@ async function runPhases(
         confidence: 1,
       })
       .onConflictDoNothing();
+    // The rest of Group 1 (§5.8) — mechanical state, consequences, cast
+    // catalog, player-assertion ingestion, snapshot — must settle BEFORE the
+    // g1 checkpoint and the done event, so the next turn's Phase A reads a
+    // committed world. Each sub-step is idempotent (G1 replays on a crash
+    // between the episodic insert and this marker).
+    await settleG1(db, {
+      campaignId: turn.campaignId,
+      turnId,
+      turnNumber: turn.turnNumber,
+      conte,
+      sidecar,
+      profileIds: (campaign.premiseContract as { anchors_used?: string[] })?.anchors_used ?? [],
+    });
     await db
       .update(turns)
       .set({
@@ -350,5 +371,15 @@ async function runPhases(
     decisionPoint: sidecar?.decision_point ?? false,
     suggestedMoves: sidecar?.suggested_moves ?? [],
     degraded: conte.degraded,
+  });
+
+  // Group 2 (§5.8) is detached — it may lag. It catches up before its own
+  // reader via settleG2IfPending at the next submit; here we kick it eagerly
+  // so the common case never has to wait.
+  void settleG2(db, turnId).catch((err) => {
+    console.error("[runtime] detached G2 settle failed — will catch up next open", {
+      turnId,
+      err,
+    });
   });
 }

@@ -8,6 +8,8 @@ import {
   pencilMarks,
   turns,
 } from "@/lib/db/schema";
+import { ingestAssertion } from "@/lib/ingestion/ingest";
+import { type RepetitionReadings, measureRepetition } from "@/lib/ka/antirep";
 import { selectSakugaMode } from "@/lib/ka/sakuga";
 import { callProbe } from "@/lib/llm/calls";
 import { DEV_TIER_SELECTION, TierSelection } from "@/lib/llm/tiers";
@@ -137,6 +139,14 @@ export async function runLayout(
   // --- Parallel fan-out (§5.1 DAG) -------------------------------------------
   emit({ type: "staging", text: "gathering what matters" });
   const world = contract.active.world;
+  // §5.3 anti-repetition whitelist: IP jargon the phrase-repetition check must
+  // never flag — power-system name + on-screen stat/resource names.
+  const jargonWhitelist = [
+    world.power_system?.name,
+    world.stat_mapping.system_name,
+    ...Object.keys(world.stat_mapping.aliases),
+    ...Object.keys(world.stat_mapping.meta_resources),
+  ].filter((s): s is string => Boolean(s));
   const worldBaseline = Number.parseInt(world.power_distribution.typical_tier.slice(1), 10);
   // Protagonist tier: campaign mechanical state owns this from C6; until a
   // sheet exists, the premise's typical tier is the honest default (diff 0).
@@ -145,6 +155,49 @@ export async function runLayout(
 
   const situation = lastEpisodic?.narration.slice(-300);
   const queries = decomposeQueries(intent, playerInput, situation);
+
+  // §5.3 anti-repetition detection joins the fan-out for genga/sakuga (douga
+  // never — a trivial beat carries no measured pressure). Its own catch keeps
+  // a detection failure from ever rejecting the fan-out and blocking the turn.
+  const repetitionProbe: Promise<RepetitionReadings> =
+    tier === "douga"
+      ? Promise.resolve({})
+      : measureRepetition(db, campaignId, { jargonWhitelist }).catch((err) => {
+          console.warn(`[layout] anti-repetition detection failed (turn ${turnNumber}): ${err}`);
+          return {} as RepetitionReadings;
+        });
+
+  // §5.4 universal ingestion: a WORLD_BUILDING turn is BOTH world-building
+  // and a scene beat — extraction captures the facts (entities minted or
+  // enriched, semantic rows embedded), the conte carries integration notes
+  // so the narrated scene keeps the vibe. A CLARIFY surfaces diegetically;
+  // FLAGs are Director territory (C7 reads them; logged until then).
+  // Failure never blocks the turn. Phase-A re-runs may re-ingest (noted:
+  // duplicate semantic facts are noise, not corruption — G2's distillation
+  // dedups nothing at M1).
+  const ingestionProbe: Promise<string[]> =
+    intent.intent === "WORLD_BUILDING"
+      ? ingestAssertion(db, campaignId, turnNumber, playerInput, {
+          profileIds: contract.anchors_used,
+          provenance: "player_assertion",
+        })
+          .then((r) => {
+            for (const flag of r.flags) {
+              console.log(`[layout] ingestion FLAG (Director territory, C7): ${flag}`);
+            }
+            const notes = r.writes.map((w) => `Established fact (${w.kind}): ${w.summary}`);
+            if (r.clarify) {
+              notes.push(
+                `The assertion left a genuine ambiguity — let the scene surface it naturally: ${r.clarify}`,
+              );
+            }
+            return notes;
+          })
+          .catch((err) => {
+            console.warn(`[layout] ingestion failed (turn ${turnNumber}): ${err}`);
+            return [];
+          })
+      : Promise.resolve([]);
 
   const [
     retrieved,
@@ -156,6 +209,8 @@ export async function runLayout(
     activeConsequences,
     pacer,
     freshMarksRaw,
+    repetition,
+    worldAssertionNotes,
   ] = await Promise.all([
     turnContract.retrievalCandidates > 0
       ? fetchCandidates(db, campaignId, turnNumber, queries, turnContract.retrievalCandidates)
@@ -220,6 +275,8 @@ export async function runLayout(
           notTombstoned(pencilMarks),
         ),
       ),
+    repetitionProbe,
+    ingestionProbe,
   ]);
   applyLadder();
 
@@ -348,7 +405,12 @@ export async function runLayout(
     entity_cards: minimal ? [] : entityCards,
     spotlight_hints: [],
     active_consequences: minimal ? [] : activeConsequences.map((c) => c.description),
-    world_assertion_notes: [],
+    // World assertions survive even a minimal brief — player-authored canon
+    // is hard core, not garnish (§5.4).
+    world_assertion_notes: worldAssertionNotes,
+    // §5.3 diversity injections — measured, and dropped under a minimal brief.
+    style_drift_directive: minimal ? undefined : repetition.styleDriftDirective,
+    vocab_freshness_advisory: minimal ? undefined : repetition.vocabFreshnessAdvisory,
     sakuga_mode: sakuga?.mode,
     research_findings: [],
     degraded: ladder.state.degraded,

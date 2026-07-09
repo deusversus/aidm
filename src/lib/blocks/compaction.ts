@@ -1,7 +1,10 @@
 import type { Db } from "@/lib/db";
 import { notTombstoned } from "@/lib/db/helpers";
 import { compactedBeats, episodicRecords } from "@/lib/db/schema";
+import { callJudgment } from "@/lib/llm/calls";
+import type { TierSelection } from "@/lib/llm/tiers";
 import { and, asc, eq, gt, max } from "drizzle-orm";
+import { z } from "zod";
 import type { BeatRow, ExchangeRow } from "./assemble";
 import { approxTokens } from "./tokens";
 
@@ -26,9 +29,51 @@ export const BLOCK2_CEILING_TOKENS = 8_000;
 /** Beats-writer signature; M1's Compositor supplies the narrated version. */
 export type Compactor = (exchanges: ExchangeRow[]) => Promise<string[]>;
 
-/** M0 stub: one clipped beat per exchange. Replaced by narrated subtext-first compaction at M1. */
+/** M0 stub: one clipped beat per exchange. Superseded by `judgmentCompactor` at M1. */
 export const naiveCompactor: Compactor = async (exchanges) =>
   exchanges.map((e) => `(t${e.turnNumber}) ${e.narration.slice(0, 200)}`);
+
+/**
+ * The real M1 compactor (§6.2, subtext-first doctrine): ONE judgment-tier
+ * call over the stretch of exchanges leaving the working window, narrating
+ * what the stretch MEANT — motives, shifts, debts, what changed between the
+ * characters — never a play-by-play. 2–4 beats, each ≤120 words. These beats
+ * become the compacted history the KA reads (Block 2) in place of the
+ * verbatim turns, so the pressure is on meaning, not recital.
+ */
+const CompactBeats = z.object({
+  beats: z.array(z.string().min(1)).min(1).max(4),
+});
+
+export function judgmentCompactor(
+  selection: TierSelection,
+  ctx: { campaignId: string; turnNumber: number },
+): Compactor {
+  return async (exchanges) => {
+    const transcript = exchanges
+      .map((e) => `[Turn ${e.turnNumber}]\nPlayer: ${e.playerInput}\n\n${e.narration}`)
+      .join("\n\n");
+    const result = await callJudgment(selection, {
+      name: "compact_beats",
+      schema: CompactBeats,
+      campaignId: ctx.campaignId,
+      turnNumber: ctx.turnNumber,
+      effort: "high",
+      maxTokens: 4_000,
+      system: [
+        "You are the Chronicler's compactor. Compress this stretch of play into",
+        "2–4 narrated beats, SUBTEXT-FIRST: say what the stretch MEANT — the",
+        "motives that surfaced, the way relationships shifted, the debts and",
+        "prices incurred, what is now true that was not before — NOT a",
+        "play-by-play of who did what. Each beat is at most 120 words, past",
+        "tense, in the story's own register. These beats replace the verbatim",
+        "turns in the writer's memory: preserve meaning, discard choreography.",
+      ].join(" "),
+      prompt: `Compact this stretch into 2–4 subtext-first beats:\n\n${transcript}`,
+    });
+    return result.beats;
+  };
+}
 
 /** The watermark is derived, not stored: the last turn already compacted into Block 2. */
 export async function compactionWatermark(db: Db, campaignId: string): Promise<number> {
@@ -103,10 +148,11 @@ export async function runCompaction(
   db: Db,
   campaignId: string,
   turnId: number,
-  opts: { compactor?: Compactor; keepTail?: number } = {},
+  opts: { compactor?: Compactor; keepTail?: number; provenance?: string } = {},
 ): Promise<CompactionReport> {
   const compactor = opts.compactor ?? naiveCompactor;
   const keepTail = opts.keepTail ?? 4;
+  const provenance = opts.provenance ?? "compaction_event";
   const window = await workingWindow(db, campaignId);
   const toCompact = window.slice(0, Math.max(0, window.length - keepTail));
   if (toCompact.length === 0) {
@@ -137,7 +183,7 @@ export async function runCompaction(
       toTurn: last.turnNumber,
       position: position++,
       turnId,
-      provenance: "compaction_event",
+      provenance,
       confidence: 1,
     })),
   );
@@ -156,4 +202,69 @@ export async function runCompaction(
     b2TokensAfter,
     epochMergeDue: b2TokensAfter > BLOCK2_CEILING_TOKENS,
   };
+}
+
+// ---------------------------------------------------------------------------
+// The Compositor's compaction step (§5.8 group 2, step "compaction")
+// ---------------------------------------------------------------------------
+
+/**
+ * Trigger and keep-tail for the real compactor (§6.2). HYSTERESIS is the
+ * point: trigger (16) sits well above keep-tail (10), so each compaction
+ * event batches ~6 exchanges and the next fires ~6 turns later — the window
+ * oscillates 10–16 around §6.2's ~12-exchange target. Equal trigger/keep
+ * would trickle-compact one exchange per turn past the threshold, which is
+ * a sliding window by another name and self-invalidates the Block-2 prefix
+ * every turn (§5.6 forbids exactly that). Tunable; the C10 soak's
+ * cache-fraction assertions calibrate.
+ */
+export const COMPACTION_TRIGGER_EXCHANGES = 16;
+export const COMPACTION_KEEP_TAIL = 10;
+
+/**
+ * The Chronicler G2 compaction step: run one real (judgment-tier, subtext-
+ * first) compaction event when the working window is over the exchange or
+ * token threshold; otherwise a cheap no-op that still reports the Block-2
+ * ceiling state. The compaction event is the ONLY sanctioned blocks-2/3
+ * cache invalidation (§5.6) — the watermark advances implicitly from the new
+ * beats' `toTurn`, so nothing slides without a beat written first.
+ */
+export async function maybeCompact(
+  db: Db,
+  campaignId: string,
+  turnNumber: number,
+  selection: TierSelection,
+): Promise<CompactionReport> {
+  const window = await workingWindow(db, campaignId);
+  if (
+    !shouldCompact(window, {
+      maxExchanges: COMPACTION_TRIGGER_EXCHANGES,
+      maxTokens: WINDOW_MAX_TOKENS,
+    })
+  ) {
+    const beats = await loadBeats(db, campaignId);
+    const b2TokensAfter = beats.reduce((s, b) => s + approxTokens(b.content), 0);
+    return {
+      compacted: false,
+      exchangesCompacted: 0,
+      beatsWritten: 0,
+      b3TokensTruncated: 0,
+      b2TokensAfter,
+      epochMergeDue: b2TokensAfter > BLOCK2_CEILING_TOKENS,
+    };
+  }
+  const report = await runCompaction(db, campaignId, turnNumber, {
+    compactor: judgmentCompactor(selection, { campaignId, turnNumber }),
+    keepTail: COMPACTION_KEEP_TAIL,
+    provenance: "chronicler_compaction",
+  });
+  if (report.epochMergeDue) {
+    // Block-2 over its 8k ceiling → the epoch merge (§6.2) is due. Epoch
+    // merges land at M3; until then the condition is surfaced, never silent.
+    console.warn("[compaction] Block-2 over the 8k ceiling — epoch merge due (M3)", {
+      campaignId,
+      b2TokensAfter: report.b2TokensAfter,
+    });
+  }
+  return report;
 }

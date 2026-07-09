@@ -43,6 +43,8 @@ export function PlayView({
   const [error, setError] = useState<{ message: string; turnId: string } | null>(null);
   const [queued, setQueued] = useState<string | null>(null);
   const [pinNotice, setPinNotice] = useState<string | null>(null);
+  const [rewindOpen, setRewindOpen] = useState(false);
+  const [rewindBusy, setRewindBusy] = useState(false);
   const queuedRef = useRef<string | null>(null);
   const busyRef = useRef(false);
   // Live mirrors of state read inside long-running async closures (the C3
@@ -295,6 +297,31 @@ export function PlayView({
     setTimeout(() => setPinNotice(null), 4_000);
   };
 
+  // Rewind (§6.7): "before turn N" un-happens turn N onward — keep everything
+  // up to N-1. The durable record IS the UI state, so a reload rehydrates the
+  // rewound transcript from the (now-tombstoned-excluded) episodic layer.
+  const rewindTargets = exchanges.map((e) => e.turnNumber).slice(-10);
+  const rewindTo = async (beforeTurn: number) => {
+    setRewindBusy(true);
+    try {
+      const res = await fetch(`/api/campaigns/${campaignId}/rewind`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ toTurn: beforeTurn - 1 }),
+      });
+      if (res.ok) {
+        window.location.reload();
+        return;
+      }
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      setPinNotice(body.error ?? "Rewind failed.");
+    } catch {
+      setPinNotice("Rewind failed.");
+    }
+    setRewindBusy(false);
+    setRewindOpen(false);
+  };
+
   return (
     <main className="mx-auto flex h-screen max-w-3xl flex-col px-6 py-6">
       <header className="flex items-end justify-between border-b border-border pb-3">
@@ -304,15 +331,64 @@ export function PlayView({
             Say what you do. The studio does the rest.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={pinSelection}
-          className="rounded-md border border-border px-3 py-1 text-xs hover:bg-muted"
-          title="Select a passage in the story, then pin it — held verbatim, survives forever"
-        >
-          Pin selection
-        </button>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => setRewindOpen((o) => !o)}
+            disabled={busy}
+            className="rounded-md border border-border px-3 py-1 text-xs hover:bg-muted disabled:opacity-50"
+            title="Rewind the story to before an earlier turn — un-happens everything after it"
+          >
+            Rewind
+          </button>
+          <button
+            type="button"
+            onClick={pinSelection}
+            className="rounded-md border border-border px-3 py-1 text-xs hover:bg-muted"
+            title="Select a passage in the story, then pin it — held verbatim, survives forever"
+          >
+            Pin selection
+          </button>
+        </div>
       </header>
+
+      {rewindOpen && (
+        <div className="mt-3 space-y-2 rounded-md border border-border bg-muted/30 px-3 py-3 text-sm">
+          <p className="text-muted-foreground">
+            Rewind un-happens everything after the turn you pick — the story continues from there as
+            if the rest never played.
+          </p>
+          {rewindTargets.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {rewindTargets.map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => rewindTo(n)}
+                  disabled={rewindBusy}
+                  className="rounded-md border border-border px-3 py-1 text-xs hover:bg-muted disabled:opacity-50"
+                  title={`Rewind to before turn ${n} — un-happens everything after`}
+                >
+                  before turn {n}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground">Nothing to rewind yet.</p>
+          )}
+          <p className="text-xs italic text-muted-foreground">
+            One thing can’t be taken back: the model time already spent. Everything inside the story
+            itself reverts.
+          </p>
+          <button
+            type="button"
+            onClick={() => setRewindOpen(false)}
+            className="text-xs text-muted-foreground/70 hover:text-muted-foreground"
+          >
+            cancel
+          </button>
+        </div>
+      )}
 
       <div className="flex-1 space-y-5 overflow-y-auto py-4">
         {exchanges.map((e) => (
