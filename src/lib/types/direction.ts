@@ -150,6 +150,38 @@ export const SetteiSnapshot = z.object({
 });
 export type SetteiSnapshot = z.infer<typeof SetteiSnapshot>;
 
+// --- Sakkan drift-band state (§4.5, C8 — engine-only) --------------------------
+
+/** One axis's latest blind reading + its consecutive-drift counter. */
+export const SakkanReading = z.object({
+  observed: z.number().min(0).max(10),
+  confidence: z.number().min(0).max(1),
+  at_turn: z.number().int().nonnegative(),
+  /** Consecutive samples in drift (≥ DRIFT_THRESHOLD at ≥ DRIFT_CONFIDENCE). */
+  consecutive_drift: z.number().int().nonnegative(),
+  evidence: z.string().default(""),
+});
+export type SakkanReading = z.infer<typeof SakkanReading>;
+
+/** An active corrective note (a retake, §16) — the Amendments producer. */
+export const SakkanActiveNote = z.object({
+  axis: z.string(),
+  /** The value the premise wants (effective: active ⊕ arc_override, §4.2). */
+  active: z.number().min(0).max(10),
+  observed: z.number().min(0).max(10),
+  since_turn: z.number().int().nonnegative(),
+});
+export type SakkanActiveNote = z.infer<typeof SakkanActiveNote>;
+
+export const SakkanState = z.object({
+  last_sample_turn: z.number().int().nonnegative().default(0),
+  /** Per-axis observed record — with canonical/active read from the contract,
+   *  this IS the §12 canonical/active/observed record (data only at M1). */
+  readings: z.record(z.string(), SakkanReading).default({}),
+  active_notes: z.array(SakkanActiveNote).default([]),
+});
+export type SakkanState = z.infer<typeof SakkanState>;
+
 export const DirectionState = z.object({
   last_director_turn: z.number().int().nonnegative().default(0),
   accumulated_epicness: z.number().nonnegative().default(0),
@@ -169,6 +201,8 @@ export const DirectionState = z.object({
   /** Ingestion FLAGs routed to the Director (layout writes, dailies consume). */
   pending_flags: z.array(z.string()).default([]),
   settei: SetteiSnapshot.optional(),
+  /** §4.5 drift band (C8): readings, counters, active retakes. */
+  sakkan: SakkanState.optional(),
 });
 export type DirectionState = z.infer<typeof DirectionState>;
 

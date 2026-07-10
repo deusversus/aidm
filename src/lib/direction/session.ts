@@ -21,6 +21,7 @@ import { callbackReadySeeds } from "@/lib/direction/seeds";
 import { callJudgment, prewarmPrefix, streamNarration } from "@/lib/llm/calls";
 import { DEV_TIER_SELECTION, TierSelection } from "@/lib/llm/tiers";
 import { type SetteiInput, renderSettei } from "@/lib/renderer/settei";
+import { runSakkanSample } from "@/lib/sakkan/sakkan";
 import {
   ROLLING_CHECKPOINT_TURNS,
   SESSION_IDLE_TIMEOUT_MS,
@@ -226,6 +227,16 @@ export async function closeSession(
     yokoku = await composeYokoku(db, campaignId, tier, currentMaxTurn);
   } catch (err) {
     logComposerFailure("yokoku", campaignId, err);
+  }
+  // §4.5 cadence: the Sakkan samples at every session close. Failure-isolated
+  // like the composers (and the module's trust rule already never throws on
+  // scoring failure); a skipped sample is a skipped measurement.
+  if (currentMaxTurn > 0) {
+    try {
+      await runSakkanSample(db, campaignId, currentMaxTurn, { trigger: "session_close" });
+    } catch (err) {
+      logComposerFailure("sakkan", campaignId, err);
+    }
   }
 
   await db

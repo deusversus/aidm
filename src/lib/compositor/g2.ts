@@ -25,6 +25,7 @@ import { rollingCheckpoint } from "@/lib/direction/session";
 import { callJudgment, callProbe } from "@/lib/llm/calls";
 import { DEV_TIER_SELECTION, TierSelection } from "@/lib/llm/tiers";
 import { embedTexts } from "@/lib/llm/voyage";
+import { runSakkanSample, sakkanDue } from "@/lib/sakkan/sakkan";
 import { CATEGORY_DECAY } from "@/lib/turn/retrieval";
 import { ArcOverride } from "@/lib/types/arc";
 import { DIRECTOR_MAX_INTERVAL } from "@/lib/types/direction";
@@ -598,6 +599,24 @@ async function settleG2Inner(db: Db, turnId: string): Promise<void> {
       console.warn(`[g2] rolling checkpoint failed (turn ${turnNumber}):`, err);
     }
     g2.rolling_checkpoint = true;
+    await markDb();
+  }
+
+  // 11c. sakkan (§4.5, C8): drift sampled on cadence — every 8 turns or a
+  //      sakuga scene (session close hooks separately). Trust rule: advisory
+  //      only; a failed sample is a skipped measurement, never a wedged G2.
+  if (!g2.sakkan) {
+    try {
+      const direction = await loadDirectionState(db, campaignId);
+      if (sakkanDue(direction, turnNumber, { sakuga: turn.tier === "sakuga" })) {
+        await runSakkanSample(db, campaignId, turnNumber, {
+          trigger: turn.tier === "sakuga" ? "sakuga" : "interval",
+        });
+      }
+    } catch (err) {
+      console.warn(`[g2] sakkan sample failed (turn ${turnNumber}):`, err);
+    }
+    g2.sakkan = true;
     await markDb();
   }
 

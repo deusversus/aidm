@@ -3,6 +3,7 @@ import { notTombstoned } from "@/lib/db/helpers";
 import { campaigns, criticalFacts, entities, pencilMarks, sessionRecords } from "@/lib/db/schema";
 import { callJudgment } from "@/lib/llm/calls";
 import { DEV_TIER_SELECTION, TierSelection } from "@/lib/llm/tiers";
+import { gaugeTrend } from "@/lib/sakkan/sakkan";
 import {
   GET_TURN_NARRATIVE_TOOL,
   RECALL_SCENE_TOOL,
@@ -300,6 +301,10 @@ export async function runDirectorCycle(
   const memoSection = lastClosed?.memo
     ? [`## Your memo from session ${lastClosed.n} (carry forward)`, lastClosed.memo, ""]
     : [];
+  // Dailies consumer #2 (C8): the Sakkan's measured drift read. The static
+  // circular import (director ⇄ sakkan) is function-scope only on both sides
+  // — bindings resolve at call time, never at module init.
+  const trend = gaugeTrend(state);
 
   const dossier = [
     `# Director cycle — turn ${turnNumber}${opts?.trigger ? ` (${opts.trigger})` : ""}`,
@@ -320,6 +325,7 @@ export async function runDirectorCycle(
     "## Spotlight debts (npc/faction absent ≥ 2 scenes)",
     spotlightNote,
     "",
+    ...(trend ? ["## Gauge trend (Sakkan, §4.5 — the dailies' drift read)", trend, ""] : []),
     "## Critical layer (§6.3 dailies review)",
     `${criticalCount} active critical fact(s). Demote only what has gone stale — restraint, not a purge.`,
     "",

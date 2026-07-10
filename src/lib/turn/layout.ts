@@ -17,6 +17,7 @@ import { callProbe } from "@/lib/llm/calls";
 import { DEV_TIER_SELECTION, TierSelection } from "@/lib/llm/tiers";
 import { renderAmendments } from "@/lib/renderer/amendments";
 import { renderSceneShape } from "@/lib/renderer/scene-shape";
+import { activeSakkanNotes } from "@/lib/sakkan/sakkan";
 import { Conte } from "@/lib/types/conte";
 import { DirectionState, type PacerArcState, PacerPhase } from "@/lib/types/direction";
 import { PencilMark } from "@/lib/types/marks";
@@ -425,7 +426,9 @@ export async function runLayout(
     .map((p) => p.data);
   const amendments = renderAmendments({
     arcOverride: campaign.arcOverride as Parameters<typeof renderAmendments>[0]["arcOverride"],
-    sakkanNotes: [],
+    // C1's typed input finally has its producer (C8): active retakes ride
+    // every conte until the axis reads back in band (§4.5).
+    sakkanNotes: activeSakkanNotes(direction),
     freshMarks,
   });
   // Scene-Shape Directive (§4.4c): the Director is the producer (C7) — arc
