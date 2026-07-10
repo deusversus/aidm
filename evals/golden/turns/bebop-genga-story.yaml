@@ -1,0 +1,260 @@
+# M1-C10 golden-turn regression seed (§10.7) — captured from the 30-turn soak.
+# Turn 5, tier genga. Regenerate with: pnpm soak -- --capture-golden
+id: bebop-genga-story
+tier: genga
+captured_from:
+  campaign: 0c18362e-d4e0-48fc-9efb-4d82bac1d252
+  turn: 5
+player_input: >-
+  "The Red Sash dockworkers' syndicate runs these piers." I say it flat, watching the fixer for a
+  flinch, and start asking who answers to them.
+conte:
+  tier: genga
+  outcome:
+    cost: ''
+    modifiers:
+      - +2 Local Knowledge (docks)
+      - +2 Confident Framing
+      - +0 T9 vs T9 baseline
+    rationale: >-
+      Roll: 14 + 4 = 18 vs DC 12. The character leans on syndicate affiliation as leverage—a smart
+      play that capitalizes on established local power structures. At T9 baseline world, this is a
+      moderate social maneuver with real teeth: the fixer processes the Red Sash reference and
+      recognizes the character has done homework. The natural 14 + modifiers (local knowledge,
+      confident delivery) lands a clean success. The fixer flinches subtly—you catch it. He knows
+      the Red Sash runs these piers; your invocation of that fact reframes the dynamic from
+      'desperate bounty hunter' to 'someone with connections.' He'll answer your questions about who
+      answers to the syndicate, though he may volunteer only what's necessary. This success
+      establishes territorial leverage and signals you're not a rube—the fixer recalibrates his
+      threat assessment upward. No cost: this is straightforward social maneuvering within a T9
+      character's established capability. Narrative weight is SIGNIFICANT because this
+      recontextualization of the job and the fixer's incomplete read opens new investigative angles
+      into Fen's disappearance and the true stakes of the collection run.
+    consequence: ''
+    success_level: success
+    difficulty_class: 12
+    narrative_weight: SIGNIFICANT
+  turn_id: 5
+  degraded: false
+  memories:
+    - layer: semantic
+      content: >-
+        Del frames Fen as a 'deadbeat welder' owing back rent, a simple collection job, but Del's
+        double-take on the money-and-no-change detail suggests the read was incomplete.
+      turn_id: 1
+      confidence: 0.8
+      provenance: chronicler_g2
+    - layer: semantic
+      content: This job was understood by at least Del to be 'simple,' a framing that has now proven false.
+      turn_id: 3
+      confidence: 0.8
+      provenance: chronicler_g2
+    - layer: semantic
+      content: >-
+        Corliss Fen (bounty: 2200) was last seen at Hoshi's noodle stand on Pier Nine, left money on
+        counter without taking change, and departed before finishing his meal.
+      turn_id: 1
+      confidence: 0.8
+      provenance: chronicler_g2
+    - layer: semantic
+      content: >-
+        Fen went through the gap in the tarp at Pier Nine, moving sideways into an unlit space
+        beneath or behind the dock.
+      turn_id: 2
+      confidence: 0.8
+      provenance: chronicler_g2
+    - layer: semantic
+      content: >-
+        A gap in the tarp line near Hoshi's stand leads into an unlit maintenance alley beyond the
+        stall row—the dock's 'other face' where evening commerce ends.
+      turn_id: 1
+      confidence: 0.8
+      provenance: chronicler_g2
+  callbacks:
+    - >-
+      The money always tells—why did Fen leave exact payment with no change? (expected payoff:
+      Reveals Fen knew his own timing or someone else's arrival was imminent)
+    - >-
+      Wren's uncharacteristic silence—experience, not intuition (expected payoff: Crew learns Wren
+      has seen something like this before, or knows alleys like this exist)
+    - >-
+      Del's failed humor—grief running underneath (expected payoff: Del has lost someone to
+      something like this, or fears they will. It surfaces when the joke doesn't land.)
+  mechanics:
+    rolls:
+      - sides: 20
+        total: 18
+        rolled: 14
+        purpose: outcome vs DC 12
+        modifier: 4
+    resource_spends: []
+  canon_chunks: []
+  entity_cards: []
+  spotlight_hints:
+    - >-
+      Wren's knowledge: Turn 4 should touch Wren's moment of recognition—what they see or hear in
+      the alley that changes their bearing. Make it quiet and specific.
+    - >-
+      Del's frame shift: The moment Del stops deflecting. Not heroic, not broken—just the moment the
+      armor doesn't fit anymore. One line, if any.
+    - >-
+      Player's agency in the dark: The hand on the grip is already there. Now: what does touching
+      the weapon teach them? What does the weapon tell them about what's listening?
+  hard_constraints:
+    - >-
+      Corliss Fen (bounty: 2200) was last seen at Hoshi's noodle stand on Pier Nine, left money on
+      counter without taking change, and departed before finishing his meal.
+    - >-
+      A gap in the tarp line near Hoshi's stand leads into an unlit maintenance alley beyond the
+      stall row—the dock's 'other face' where evening commerce ends.
+    - >-
+      The player, Del, and Wren entered the dark space together after the pier's chain locks began
+      closing.
+    - >-
+      Wren stopped suddenly in the dark, sensing something ahead — Wren's usual readiness and speech
+      failed them.
+    - >-
+      Wren stated this is not a hallway, not a rent-money job, and the player should abandon their
+      original understanding of the mission.
+    - >-
+      Something in the dark ahead has become still in the way that indicates it is aware of being
+      watched.
+    - >-
+      Wren has gone completely silent in response to an unseen threat ahead in the alley, breaking
+      their usual pattern of speaking first into silence.
+    - >-
+      Something unseen and motionless waits ahead in the alley, possibly aware of them but choosing
+      not to respond to the protagonist's movement toward their weapon.
+    - >-
+      Wren has survived a room like this before and carries the cost of it; something in their body
+      remembers what came after.
+    - >-
+      Del's capacity to deflect and joke has failed him; he is genuinely frightened and no longer
+      performing competence.
+    - >-
+      The unseen presence in the alley reads human signals—it understood the cigarette as defiance,
+      marked Wren's voice breaking silence, and is now deciding its first target based on these
+      responses.
+  research_findings: []
+  charter_amendments: >-
+    ## Amendments (this scene)
+
+
+    Fresh calibration — player_meta: Player invoked hand movement before conscious volition;
+    narration honored that internal split between action and awareness as thematic rather than
+    mechanical.
+
+    Fresh calibration — player_meta: The narration operated entirely in subtext and sensation rather
+    than plot events—pressure, texture, the grammar of survival. No action resolved; instead, the
+    scene deepened the player's understanding of how to read the unseen and how fear communicates
+    itself to a listening thing.
+  active_consequences:
+    - None
+    - >-
+      You move through cleanly, but the darkness swallows detail—you catch Hoshi's silhouette ahead,
+      but miss what made him stop. Your eyes haven't adjusted yet.
+  scene_shape_directive: >-
+    ## Scene shape
+
+    Focus: spread the scene across the crew — someone besides the lead gets a beat. Player role:
+    ensemble_member.
+
+    Opposition on screen: interpersonal / episodic. Tension source: existential.
+
+    Choice weight: choices land on this scene and these relationships.
+
+    Arc "The Quiet Mark" (setup): Sensory pressure building in confined space. Sounds arriving out
+    of sync with distance. The alley describes itself through what doesn't add up. One crew member
+    breaks formation. The thing in the dark makes a choice to acknowledge them.
+
+    Director: Everything arrives a beat too late or too early—locks finishing mid-dialogue, echoes
+    traveling farther than space allows. This is rhythm, not realism.
+
+    Director: The crew hears themselves being heard before they see what listens. The feeling
+    matters more than the sight.
+
+    Director: One character's silence or movement triggers the reframe: they're no longer hunting
+    Fen. They're being hunted by what used Fen as bait.
+  style_drift_directive: >-
+    The last few scenes have all opened on a character already in motion. Change the entry — open
+    with interiority this time (unless the scene actively resists it — then write what the scene
+    wants).
+  world_assertion_notes: []
+  canonicality_directives:
+    - 'Timeline: canon_adjacent; cast: full_cast; events: influenceable.'
+    - 'NEVER contradict: Spike''s past with the Syndicate is not rewritten'
+  vocab_freshness_advisory: >-
+    these exact phrasings recur across recent scenes — retire them this beat: "hadn't caught up to",
+    "always had the first", "had the first word"
+prose: >-
+  The calculation happened before you noticed you were making it. That was the professional part of
+  you, the part that had spent enough nights on this pier to know the difference between a fight you
+  could win and a fight you could only survive: you couldn't out-wait a thing that had already
+  decided not to blink. You could, maybe, out-know a man who had.
+
+
+  You didn't draw. You didn't step forward, either. You turned — slow, the same unhurried grammar as
+  the cigarette, as the hand on the grip — and put your back to the dark for exactly as long as it
+  took to find Hoshi's silhouette still framed in the gap, stacking his last stool with the studied
+  indifference of a man who had learned that some suppers end badly and some don't, and the trick
+  was never showing which one you expected.
+
+
+  "The Red Sash runs these piers," you said. Flat. Not a question, not bait dressed as one — a fact
+  laid on the counter the way Fen had left his money, exact, no change expected. You watched him for
+  the flinch.
+
+
+  It came small. A hitch in the stacking, a half-second where the stool didn't quite land square,
+  and something behind his eyes recalculated you from scratch — desperate bounty hunter revised
+  upward into someone who'd done homework, someone worth the truth instead of the shrug. He set the
+  stool down properly this time. "You know that," he said, "and you're still standing in my light
+  asking me things instead of the men who'd actually hurt you for asking them. That tells me
+  something too."
+
+
+  "Tell me who answers to them. On this pier. Tonight."
+
+
+  Hoshi looked past you, once, toward the black beyond the tarp — not long, not obvious, but you
+  caught it, the same instinct that had made you notice the gap in the first place. He wasn't
+  looking at Wren. He was looking at whatever Wren was looking at, and something in his face said he
+  already knew its shape, or at least its neighborhood.
+
+
+  "There's a foreman," he said, quieter now, the words coming like a man paying a debt he'd rather
+  not have owed. "Runs collections for the Sash out of the container stacks past the fish market.
+  Name's Corda. If Fen skipped without his change, it's because Corda's people were already walking
+  toward him, and a man doesn't stop to count coins when that happens." He picked up the last stool,
+  held it instead of stacking it, an old man's hands finding something to do with the fear his voice
+  wouldn't carry. "That's what I've got. It's more than I've given anyone in a year. Don't make me
+  regret the arithmetic."
+
+
+  Behind you, Del exhaled like the sound itself was a relief — a name, a person, a thing you could
+  walk up to and shoot at if it came to that, instead of whatever waited past the tarp with no shape
+  and no mercy. "Corda," he repeated, testing the word the way he used to test jokes, checking if it
+  would hold weight. It held. He didn't make it funny. You noticed that more than anything else he'd
+  done all night — Del, who joked at cold noodles, saying a stranger's name like a man setting down
+  a stone he intended to pick back up later, somewhere safer.
+
+
+  Wren hadn't turned. Wren was still facing the dark, shoulders set in that rigid, borrowed
+  stillness, and when they spoke it came sideways, not to you, not quite to Hoshi either. "Corda
+  doesn't come down here himself," Wren said. "Men like that never do their own walking in the
+  dark." A pause, weighted with whatever room Wren had once stood in and never finished telling you
+  about. "Which means somebody else did. Which means what's back there answers to somebody too."
+
+
+  Hoshi didn't argue. He picked up his last two stools, one in each hand, and didn't offer anything
+  further — the wall of his routine finished, the door of him closed again, the way a man closes a
+  door he's opened wider than he meant to.
+
+
+  You had a name now. You had a direction that led away from the dark, toward daylight logic —
+  foremen, collections, hierarchies you could climb and burn. And you had a shape still watching
+  from twelve feet of black that hadn't moved, hadn't blinked, and hadn't yet decided which one of
+  you it wanted first.
+
+
+  Corda would keep till morning. The thing behind Wren might not.

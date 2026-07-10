@@ -198,55 +198,79 @@ async function callStructured<T>(
   // create() + manual parse, NOT messages.parse(): parse() throws on a
   // truncated/unparseable response BEFORE usage is readable, and a billed
   // call that never reaches the ledger breaks the choke-point promise.
-  let message: Message;
-  try {
-    message = await getAnthropic().messages.create(params);
-  } catch (err) {
-    const statusMessage = err instanceof Error ? err.message : String(err);
-    generation?.end({
-      level: "ERROR",
-      statusMessage,
-      metadata: { latencyMs: Date.now() - started },
+  //
+  // On a VALIDATION failure, one corrective retry (M1 soak): the API's
+  // strict output guarantees the grammar, not every zod constraint — a
+  // nested enum leaked an out-of-vocabulary value and killed a hard-core
+  // combat call, and a Director cycle died the same way. The model sees its
+  // own violation and re-emits once. Every attempt is metered; a second
+  // failure throws (the caller's degrade path owns it).
+  let attemptMessages = params.messages;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const attemptStarted = Date.now();
+    let message: Message;
+    try {
+      message = await getAnthropic().messages.create({ ...params, messages: attemptMessages });
+    } catch (err) {
+      const statusMessage = err instanceof Error ? err.message : String(err);
+      generation?.end({
+        level: "ERROR",
+        statusMessage,
+        metadata: { latencyMs: Date.now() - started },
+      });
+      throw err;
+    }
+    const latencyMs = Date.now() - attemptStarted;
+
+    await recordModelCall({
+      provider: "anthropic",
+      model,
+      tier,
+      usage: usageStats(message.usage),
+      latencyMs,
+      campaignId: opts.campaignId,
+      turnNumber: opts.turnNumber,
+      traceId: trace?.id,
     });
-    throw err;
-  }
-  const latencyMs = Date.now() - started;
 
-  await recordModelCall({
-    provider: "anthropic",
-    model,
-    tier,
-    usage: usageStats(message.usage),
-    latencyMs,
-    campaignId: opts.campaignId,
-    turnNumber: opts.turnNumber,
-    traceId: trace?.id,
-  });
-
-  if (message.stop_reason === "refusal") {
-    generation?.end({ level: "ERROR", statusMessage: "refusal", metadata: { latencyMs } });
-    throw new Error(`${opts.name}: model declined (stop_reason=refusal)`);
+    if (message.stop_reason === "refusal") {
+      generation?.end({ level: "ERROR", statusMessage: "refusal", metadata: { latencyMs } });
+      throw new Error(`${opts.name}: model declined (stop_reason=refusal)`);
+    }
+    const text = message.content
+      .filter((b) => b.type === "text")
+      .map((b) => b.text)
+      .join("");
+    try {
+      const parsed = opts.schema.parse(JSON.parse(text));
+      generation?.end({
+        output: parsed,
+        usage: { input: message.usage.input_tokens, output: message.usage.output_tokens },
+        metadata: { latencyMs, stopReason: message.stop_reason, correctiveRetry: attempt > 0 },
+      });
+      return parsed;
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : String(err);
+      if (attempt === 0) {
+        console.warn(
+          `[calls] ${opts.name}: structured output failed validation — one corrective retry`,
+        );
+        attemptMessages = [
+          ...attemptMessages,
+          { role: "assistant", content: text || "(empty)" },
+          {
+            role: "user",
+            content: `Your output failed validation:\n${reason}\nEmit the corrected structured output only — same schema, valid values.`,
+          },
+        ];
+        continue;
+      }
+      const statusMessage = `structured output failed to parse (stop_reason=${message.stop_reason})`;
+      generation?.end({ level: "ERROR", statusMessage, metadata: { latencyMs } });
+      throw new Error(`${opts.name}: ${statusMessage}: ${reason}`);
+    }
   }
-  const text = message.content
-    .filter((b) => b.type === "text")
-    .map((b) => b.text)
-    .join("");
-  let parsed: T;
-  try {
-    parsed = opts.schema.parse(JSON.parse(text));
-  } catch (err) {
-    const statusMessage = `structured output failed to parse (stop_reason=${message.stop_reason})`;
-    generation?.end({ level: "ERROR", statusMessage, metadata: { latencyMs } });
-    throw new Error(
-      `${opts.name}: ${statusMessage}: ${err instanceof Error ? err.message : String(err)}`,
-    );
-  }
-  generation?.end({
-    output: parsed,
-    usage: { input: message.usage.input_tokens, output: message.usage.output_tokens },
-    metadata: { latencyMs, stopReason: message.stop_reason },
-  });
-  return parsed;
+  throw new Error(`${opts.name}: unreachable (corrective-retry loop exhausted)`);
 }
 
 /** Judgment tier: outcome, validation, Sakkan scoring, relevance filter… */

@@ -27,11 +27,16 @@ import {
  */
 
 const ScaleJudgment = z.object({
-  /** 0.1–1.0 multiplier per detected context suppressor; omit undetected kinds. */
+  /** 0.1–1.0 multiplier per detected context suppressor; omit undetected kinds.
+   *  kind is a STRING in the model-facing schema, filtered to
+   *  CONTEXT_MODIFIER_KINDS in code (M1 soak: the API's strict output let an
+   *  out-of-vocabulary kind through and the zod enum killed the hard-core
+   *  combat call — model proposes, code disposes; an unknown kind drops with
+   *  a warn, never a failed turn). */
   context_modifiers: z
     .array(
       z.object({
-        kind: z.enum(CONTEXT_MODIFIER_KINDS),
+        kind: z.string(),
         multiplier: z.number().min(0.1).max(1),
         reason: z.string(),
       }),
@@ -97,7 +102,20 @@ export async function judgeScale(
     maxTokens: 4_000,
   });
 
-  const contextProduct = judged.context_modifiers.reduce((p, m) => p * m.multiplier, 1);
+  // The closed Module-12 vocabulary is enforced HERE (not by parse-rejection):
+  // unknown kinds drop with a warn; multipliers clamp into [0.1, 1] as belt
+  // (numeric ranges are another constraint the output grammar can't carry).
+  const modifiers = judged.context_modifiers
+    .filter((m) => {
+      const known = (CONTEXT_MODIFIER_KINDS as readonly string[]).includes(m.kind);
+      if (!known) {
+        console.warn(`[scale] dropped unknown context modifier kind "${m.kind}" (Module 12)`);
+      }
+      return known;
+    })
+    .map((m) => ({ ...m, multiplier: Math.min(1, Math.max(0.1, m.multiplier)) }));
+
+  const contextProduct = modifiers.reduce((p, m) => p * m.multiplier, 1);
   const effectiveRatio = rawPowerRatio(args.characterTier, judged.threat_tier) * contextProduct;
   const band = imbalanceBand(effectiveRatio);
   const flags = imbalanceFlags(effectiveRatio);
@@ -119,7 +137,7 @@ export async function judgeScale(
       : flags.triggersTensionShift
         ? "Tension shifts off raw victory: stakes live in collateral, speed, and what the win exposes."
         : "Evenly matched: every exchange matters; spend the choreography budget.",
-    ...judged.context_modifiers.map((m) => `Context: ${m.kind} ×${m.multiplier} — ${m.reason}`),
+    ...modifiers.map((m) => `Context: ${m.kind} ×${m.multiplier} — ${m.reason}`),
   ].join(" ");
 
   return {
@@ -128,7 +146,7 @@ export async function judgeScale(
     effectiveRatio,
     band,
     ...flags,
-    contextModifiers: judged.context_modifiers,
+    contextModifiers: modifiers,
     directive,
   };
 }

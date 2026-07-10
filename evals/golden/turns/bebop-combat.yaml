@@ -1,0 +1,404 @@
+# M1-C10 golden-turn regression seed (§10.7) — captured from the 30-turn soak.
+# Turn 9, tier sakuga. Regenerate with: pnpm soak -- --capture-golden
+id: bebop-combat
+tier: sakuga
+captured_from:
+  campaign: 0c18362e-d4e0-48fc-9efb-4d82bac1d252
+  turn: 9
+player_input: >-
+  I grab Wren's collar and jump backward into the dark. Del comes or doesn't—that's on her now. The
+  ladder's already behind us.
+conte:
+  tier: sakuga
+  outcome:
+    modifiers:
+      - +2 Athletic Capability
+      - +3 Narrative Setup
+      - +2 Wren's Trust
+    rationale: >-
+      Roll: 14 + 7 = 21 vs DC 10. The action succeeds cleanly. You grab Wren's collar; the retreat
+      into darkness executes without mechanical resistance. The modifiers: +2 for T9 athletic
+      baseline (routine physical action), +3 for the setup (you've established momentum, entered
+      together, the ladder is already positioned behind you as an escape route), +2 for Wren's
+      implicit trust (they stopped but did not flee; your grab is an extension of
+      already-established cooperation). At 21 vs DC 10, this is a solid success with room to spare.
+      No cost for the action itself—you're using basic athletic capability within your tier against
+      a willing (if traumatized) companion. However, the consequence flows from NARRATIVE, not
+      mechanical failure: Wren's sudden silence and the resonance with their dread suggests this
+      moment means something to them. The grab succeeds, but it catches Wren in a state of triggered
+      recognition. They move with you, but as a passenger to their own memory. Del's presence and
+      breathing remain constants—she has not abandoned you, and that rhythmic trust creates the only
+      anchor in the dark ahead.
+    consequence: >-
+      Wren's silence deepens—the grab is successful, but Wren does not resist or acknowledge the
+      action. They move with you into the dark as a dead weight of recognition rather than
+      partnership.
+    success_level: critical_success
+    difficulty_class: 10
+    narrative_weight: SIGNIFICANT
+  turn_id: 9
+  degraded: false
+  memories:
+    - layer: semantic
+      content: >-
+        The player, Del, and Wren entered the dark space together after the pier's chain locks began
+        closing.
+      turn_id: 2
+      confidence: 0.8
+      provenance: chronicler_g2
+    - layer: semantic
+      content: Something unseen and deliberate is present in the dark beyond the tarp, watched by Wren
+      turn_id: 5
+      confidence: 0.8
+      provenance: chronicler_g2
+    - layer: semantic
+      content: >-
+        Del is present with the protagonist and Wren, breathing carefully and matching the
+        protagonist's rhythm without prior agreement.
+      turn_id: 3
+      confidence: 0.8
+      provenance: chronicler_g2
+    - layer: semantic
+      content: >-
+        Wren recognizes something about this moment—it resonates with a traumatic memory or past
+        event that Wren previously couldn't articulate, triggering a specific kind of dread distinct
+        from fear.
+      turn_id: 6
+      confidence: 0.8
+      provenance: chronicler_g2
+    - layer: semantic
+      content: >-
+        Wren stopped suddenly in the dark, sensing something ahead — Wren's usual readiness and
+        speech failed them.
+      turn_id: 2
+      confidence: 0.8
+      provenance: chronicler_g2
+  callbacks:
+    - >-
+      The money always tells—why did Fen leave exact payment with no change? (expected payoff:
+      Reveals Fen knew his own timing or someone else's arrival was imminent)
+    - >-
+      Wren's uncharacteristic silence—experience, not intuition (expected payoff: Crew learns Wren
+      has seen something like this before, or knows alleys like this exist)
+    - >-
+      Del's failed humor—grief running underneath (expected payoff: Del has lost someone to
+      something like this, or fears they will. It surfaces when the joke doesn't land.)
+  mechanics:
+    rolls:
+      - sides: 20
+        total: 21
+        rolled: 14
+        purpose: outcome vs DC 10
+        modifier: 7
+    combat_results: >-
+      Scale: horror (secondary: existential). Power imbalance: balanced (effective 0.1×). Evenly
+      matched: every exchange matters; spend the choreography budget. Context: environmental ×0.6 —
+      Complete darkness eliminates visual advantage; the unseen threat operates in its native medium
+      while the protagonist must rely on proprioception and sound Context: secret_id ×0.8 — The
+      protagonist's grab of Wren signals protection/priority; pulling someone into genuine danger
+      rather than abandoning them to escape carries implicit accountability Context: genre ×0.7 —
+      The beat reads as horror—dread, sensory deprivation, a deliberate-moving presence, and Wren's
+      trauma-resonant paralysis all lock the register into existential vulnerability rather than
+      tactical dominance
+    resource_spends: []
+  pacer_beat:
+    tone: tense, defiant, with mounting dread
+    avoid:
+      - immediate rescue or safety
+      - dialogue that dilutes the physical stakes
+    strength: suggestion
+    must_reference:
+      - Del's choice in the moment
+      - the ladder's absence as a retreat point
+    escalation_target: '0.65'
+    foreshadowing_hint: The dark they're falling into has weight—something waits below, or the fall itself never ends.
+    beat_classification: Commitment Gambit
+  canon_chunks: []
+  entity_cards:
+    - >-
+      Del (npc): wisecracking crewmate; insists the job is simple; comic deflection masking unease
+
+      Engages the scene with questions and theory (money-without-change as flight marker), but
+      second-guesses himself; crouches to examine the bowl, seeking confession from objects.
+
+      Deflection failed him; the joke did not arrive. His practiced evasion is inadequate to this
+      space.
+
+      Breathing shallow and synced with protagonist; discovering mid-job that the supposed
+      simplicity of the task was false hope.
+
+      Collapsed into genuine terror. Lost his deflection and humor. Standing very still in a coat
+      that no longer fits. Now a liability and anchor point for whatever hunts them.
+
+      Processed the name 'Corda' with gravitas; shifted from humor into tactical mode. Treats the
+      information as a concrete next target.
+
+      Pattern broken: humor suppressed, replaced with anxious physical repetition; three years of
+      deflection abandoned, suggesting genuine danger has overridden coping mechanism.
+
+      Learning the family trade of unstated half-truths; holding still on the button rather than
+      continuing to turn it; present as witness to the threshold moment.
+
+      Proved capable of decisive action under pressure—saved Wren from the third Red Sash
+      operative's line of fire. Regained agency after passivity all night.
+    - >-
+      Wren (npc): quiet fellow bounty hunter; speaks first into silence; carries the arc's fatalism
+      without yet voicing the spark line
+
+      Reads the abandoned meal and tarp gap as a threshold; does not crouch or theorize, but moves
+      toward the unlit alley with quiet inevitability. Establishes Wren's role as the one who names
+      hard truths first when silence becomes statement.
+
+      Lost their usual first-word readiness; spoke only after a beat too long, flat and final.
+      Recognized the mission and space as fundamentally different from stated parameters.
+
+      Has gone uncharacteristically silent in the face of an alley-bound threat, signaling danger
+      that transcends their typical verbal dominance.
+
+      Shoulders recalibrated under fear. Broke silence with a reading of the player's gesture. First
+      words reveal prior trauma in 'a room like this'—psychological cost still accruing.
+
+      Remains facing the darkness; recognizes that Corda acts through intermediaries and that
+      something larger is moving in the black. Knowledge suggests past involvement with hierarchical
+      power structures.
+
+      Recognition of something worse than fear has arrived; shoulder rigid with understanding that
+      resonates with past trauma; past silence about 'what room' suggests this moment confirms a
+      feared recurrence.
+
+      Recognizes the approaching shape from a prior survival situation; has experience with deciding
+      whether dangerous 'he's' keep breathing; now stands rigid with flat hand held off body,
+      bracing without showing it.
+
+      Attempted to warn the player away from drawing; now silent and afraid, moving forward without
+      looking back, locked in Del's protective grip. Their unspoken knowledge suggests they knew the
+      Jericho would wake something.
+  spotlight_hints:
+    - >-
+      Wren's room in the dark (the unspoken history): They know something about hierarchies and
+      listening. Don't explain it. Let them turn back once toward the dark, a gesture that says
+      everything.
+    - >-
+      Del's interior arithmetic (the cost counter): A man deciding whether to walk into what he's
+      already calculated. No jokes. Each word a stone. When Del breaks, it's the emotional climax of
+      the arc.
+    - >-
+      The Unnamed thing (the presence in absence): Character made of silence. Moves at edge of
+      peripheral space. Never centered. Never named until it has to be. Let it move with the crew
+      when they move.
+  hard_constraints:
+    - >-
+      Corliss Fen (bounty: 2200) was last seen at Hoshi's noodle stand on Pier Nine, left money on
+      counter without taking change, and departed before finishing his meal.
+    - >-
+      A gap in the tarp line near Hoshi's stand leads into an unlit maintenance alley beyond the
+      stall row—the dock's 'other face' where evening commerce ends.
+    - >-
+      The player, Del, and Wren entered the dark space together after the pier's chain locks began
+      closing.
+    - >-
+      Wren stopped suddenly in the dark, sensing something ahead — Wren's usual readiness and speech
+      failed them.
+    - >-
+      Wren stated this is not a hallway, not a rent-money job, and the player should abandon their
+      original understanding of the mission.
+    - >-
+      Something in the dark ahead has become still in the way that indicates it is aware of being
+      watched.
+    - >-
+      Wren has gone completely silent in response to an unseen threat ahead in the alley, breaking
+      their usual pattern of speaking first into silence.
+    - >-
+      Something unseen and motionless waits ahead in the alley, possibly aware of them but choosing
+      not to respond to the protagonist's movement toward their weapon.
+    - >-
+      Wren has survived a room like this before and carries the cost of it; something in their body
+      remembers what came after.
+    - >-
+      Del's capacity to deflect and joke has failed him; he is genuinely frightened and no longer
+      performing competence.
+    - >-
+      The unseen presence in the alley reads human signals—it understood the cigarette as defiance,
+      marked Wren's voice breaking silence, and is now deciding its first target based on these
+      responses.
+    - The Red Sash dockworkers' syndicate controls the piers
+    - >-
+      Corda is a foreman who runs collections for the Red Sash out of the container stacks past the
+      fish market
+    - Fen likely fled because Corda's people were already moving toward him
+    - Something unseen and deliberate is present in the dark beyond the tarp, watched by Wren
+    - Wren suggests the presence in the dark answers to someone beyond Corda's authority
+    - >-
+      Sound and time behave strangely in this space—events are felt before heard, causality seems to
+      lag, as if the alley itself has agency in how events unfold.
+    - >-
+      The unseen thing has been still and watching, but is now becoming a perceptible shape, moving
+      with unhurried confidence characteristic of something that has never needed speed.
+    - >-
+      The player character is at a dock with Wren and Del, facing something unseen in the dark that
+      has been motionless until now.
+    - >-
+      Wren recognizes something about this moment—it resonates with a traumatic memory or past event
+      that Wren previously couldn't articulate, triggering a specific kind of dread distinct from
+      fear.
+    - >-
+      The player held a drawn hammer on an unknown breathing figure in an alley, then eased it down
+      without firing.
+    - >-
+      Wren has survived a previous situation involving deciding whether a 'he' would keep breathing,
+      and recognizes the current shape's nature.
+    - >-
+      Red Sash markings—shipping tags with three characters—appear on a stencil in the alley,
+      indicating Red Sash territorial claim and possible ownership of the approaching shape.
+    - >-
+      The shape moving toward the player is unhurried, certain, and reads the lowered hammer as
+      permission rather than restraint.
+    - >-
+      The player must choose between holding ground or giving ground in the alley, with the shape's
+      arrival imminent.
+    - >-
+      The player character carries a Jericho—a weapon that can be identified by sight alone, enough
+      to make even hardened Red Sash fighters recalculate their odds.
+    - >-
+      Three Red Sash operatives were positioned between the player and the gantry's ladder—the only
+      clean exit from the alley.
+    - >-
+      Wren attempted to stop the player from drawing ('Not the—') but could not finish the warning
+      before gunfire erupted.
+    - >-
+      Something—an entity or force that has been following the group all evening, staying exactly
+      three breaths behind them—was waiting for the gunfire. The noise of the firefight was the
+      trigger that ended its patience.
+  research_findings: []
+  charter_amendments: >-
+    ## Amendments (this scene)
+
+
+    RETAKE (strong): continuity is reading 8/10 on the page; the premise wants 3/10. Pull it down —
+    this note lifts when it reads back in band.
+
+    Fresh calibration — player_meta: Player invoked hand movement before conscious volition;
+    narration honored that internal split between action and awareness as thematic rather than
+    mechanical.
+
+    Fresh calibration — player_meta: The narration operated entirely in subtext and sensation rather
+    than plot events—pressure, texture, the grammar of survival. No action resolved; instead, the
+    scene deepened the player's understanding of how to read the unseen and how fear communicates
+    itself to a listening thing.
+
+    Fresh calibration — continuity: continuity has read 8/10 for 3 straight samples while the
+    premise wants 3/10 — pull it down and hold it there.
+  active_consequences:
+    - None
+    - >-
+      You move through cleanly, but the darkness swallows detail—you catch Hoshi's silhouette ahead,
+      but miss what made him stop. Your eyes haven't adjusted yet.
+    - >-
+      The thing moves first. Your calculated defiance works—but the cost is initiative. It has
+      already decided where to strike.
+    - >-
+      The creature's patience breaks. It moves—not fast, but WITH inevitability, as if your words
+      were permission rather than deflection. The hammer in your hands suddenly feels very small.
+    - >-
+      Your aggressive advance succeeds—you punch through their line with violence and precision—but
+      the noise, the muzzle flash, and your forward momentum ACCELERATES the shape's approach. It
+      reads your gunfire as escalation, not negotiation. You reach the gantry with rounds still hot,
+      but what emerges from the dark is NOW COMMITTED and moving with predatory certainty.
+  scene_shape_directive: >-
+    ## Scene shape
+
+    Focus: spread the scene across the crew — someone besides the lead gets a beat. Player role:
+    ensemble_member.
+
+    Opposition on screen: interpersonal / episodic. Tension source: existential.
+
+    Choice weight: choices land on this scene and these relationships.
+
+    Arc "The Quiet Mark" (escalation): Tight. Close. Three people in a tarp with a lit match. Dark
+    beyond. Unhurried grammar—every action measured twice before landing. Sound design foregrounds
+    absence: no sirens arriving, no footsteps leaving, no blink from the dark. Dialogue sideways,
+    not straight at each other. Comments made toward the dark, toward what isn't there to defend
+    itself.
+
+    Director: The half-beat delay is locked. The snare lands after the audience expects it, every
+    time. Floor beneath them is tilted.
+
+    Director: Close one seed cleanly before the next move: let Wren's silence resolve in a gesture,
+    a look back toward the dark. Something that says 'I know what's there because I've been there.'
+    Cost nothing to voice, everything to imply.
+
+    Director: Plant the next question in the frame itself. Don't wait for dialogue. The crew has a
+    name (Corda) that doesn't change anything about what's watching.
+  world_assertion_notes: []
+  canonicality_directives:
+    - 'Timeline: canon_adjacent; cast: full_cast; events: influenceable.'
+    - 'NEVER contradict: Spike''s past with the Syndicate is not rewritten'
+  vocab_freshness_advisory: >-
+    these exact phrasings recur across recent scenes — retire them this beat: "half second before
+    it", "hadn't decided yet whether", "has never once needed"
+prose: >-
+  You had Wren's collar before you finished the thought that started the reach — fingers hooking
+  into wet canvas and worn wool, weight following where your hand led it because that's what weight
+  does when the body underneath offers no argument. You didn't ask first. Asking costs a beat you
+  didn't have; whatever was coming through what used to be your firing lane wasn't waiting on
+  manners.
+
+
+  Wren came.
+
+
+  Not fought, not helped — came, the particular non-weight of someone who has already decided,
+  somewhere below deciding, that resistance and cooperation cost the same and neither's worth the
+  spending. You felt it the moment your shoulder took the drag: no lean into you, no counter-lean
+  away. A door swinging on hinges oiled a long time ago for exactly this kind of night. You'd pulled
+  people out of worse rooms. None of them had ever gone this quiet about it.
+
+
+  Backward, past the ladder. Rust-streaked rung, the same red stencil at its base you'd clocked once
+  already and not touched — and you didn't touch it now either, because the last four seconds had
+  already spent that option without asking your permission. The Sash men were down, or gone the way
+  the third one went, taking his unfinished sentence with him. The gantry stood open where you used
+  to be standing. Then it stood beside you. Then behind. Turning your back on a dark that had just
+  started moving with intent was the one motion tonight your body refused to authorize, ladder or no
+  ladder.
+
+
+  You went sideways instead, into a gap your shoulder found before your eyes did — a crate-stack
+  pocket, the kind a dock keeps for its own reasons and never puts on a manifest. Wren folded into
+  it after you like cloth already used to folding.
+
+
+  No sirens climbed the pier wall behind you. No footsteps retreated in either direction — whoever
+  of the Sash had survived didn't run so much as evaporate, leaving no sound behind them at all, as
+  if being heard leaving cost more than they had left to spend. The alley kept its silence the way
+  it kept everything else tonight: on its own schedule, not yours.
+
+
+  Del came in low a half-step after, breath ragged, no joke riding under it, none left to ride.
+  "Ladder's gone," Del said — flat, more report than complaint, the family trade half-spoken, the
+  other half swallowed. Didn't say *I could've taken it.* Didn't have to. That was the stone Del was
+  carrying now, the one to be picked back up later, somewhere safer, if somewhere safer ever came
+  around again.
+
+
+  The dark took its own time deciding what to do with the three of you crammed inside it.
+
+
+  It was wrong dark the way all of tonight had been wrong — sound arriving late, shapes arriving
+  early — but this pocket spoke its own dialect of it. The floor under your boots didn't sit level.
+  Not tilted enough to name. Just enough that your knees kept a private argument with the planking
+  your head hadn't been invited to. Somewhere under that floor, not beside you, not ahead — *under*
+  — something shifted, slow and patient, the sound of it arriving a full breath after whatever
+  caused it, same as everything tonight: late, apologetic, wrong.
+
+
+  Wren turned their head. Once. Back toward the gap you'd all just come through, the red stencil
+  catching one last scrap of light before the dark closed the distance for good. Something crossed
+  their face that wasn't fear and wasn't relief. Recognition, settled, old — the sentence they'd
+  been not-finishing all night, finished now without a single word spent on it: *I know what's down
+  here because I've been down here, and neither of us is climbing back out on a ladder that isn't
+  ours to use anymore.*
+
+
+  Then they faced forward again, into the new dark, and waited — same as you, same as Del — to learn
+  what the floor was going to do next.

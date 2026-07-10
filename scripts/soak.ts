@@ -195,6 +195,8 @@ const PersonaMove = z.object({ next_input: z.string() });
 const PERSONA_SYSTEM = [
   "You are the PLAYER at the table — the player behind a laconic bounty hunter in a Cowboy Bebop-flavored campaign.",
   "Given the last beat of narration, write ONE in-fiction action or line that continues the scene: first person, terse, grounded, a little fatalistic.",
+  "Pace like the show: after a fight or a spike, choose a QUIETER beat — talk, look, smoke, walk, ask. Escalate only when the scene genuinely demands it.",
+  "(Run #2 rode four straight combat beats — the falling beat is part of the register.)",
   "Never break character. Never address the engine or narrator. Never write meta commentary or stage directions. Under 30 words.",
 ].join(" ");
 
