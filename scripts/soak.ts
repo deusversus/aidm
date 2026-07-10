@@ -37,7 +37,13 @@ import { DEV_TIER_SELECTION, TIER_MENUS } from "@/lib/llm/tiers";
 import { flushLangfuse } from "@/lib/observability/langfuse";
 import { bebopContract } from "@/lib/renderer/__tests__/fixtures";
 import { rewindCampaign } from "@/lib/turn/rewind";
-import { type TurnEvent, attachToTurn, executeTurn, submitTurn } from "@/lib/turn/runtime";
+import {
+  type TurnEvent,
+  TurnInProgressError,
+  attachToTurn,
+  executeTurn,
+  submitTurn,
+} from "@/lib/turn/runtime";
 import { OpeningStatePackage } from "@/lib/types/opening";
 import { TURN_CONTRACTS, type TurnTier } from "@/lib/types/turn";
 import { and, desc, eq, gte } from "drizzle-orm";
@@ -322,11 +328,58 @@ interface TurnRun {
   retried: boolean;
 }
 
+/**
+ * A turn is only "past" when its ROW is terminal (soak crash #1): the
+ * awaitTerminal timeout fires while Phase B's auto-retry is still running,
+ * and proceeding past a live turn wedges the next submit on the open-turn
+ * guard. Poll the durable record until it settles (or the cap expires).
+ */
+async function waitForRowTerminal(
+  db: Db,
+  turnId: string,
+  capMs: number,
+): Promise<"complete" | "channel" | "failed" | "stuck"> {
+  const start = Date.now();
+  while (Date.now() - start < capMs) {
+    const [row] = await db
+      .select({ status: schema.turns.status })
+      .from(schema.turns)
+      .where(eq(schema.turns.id, turnId));
+    const s = row?.status ?? "missing";
+    if (s === "complete" || s === "channel" || s === "failed") return s;
+    await new Promise((r) => setTimeout(r, 3_000));
+  }
+  return "stuck";
+}
+
 async function runOneTurn(db: Db, campaignId: string, input: string): Promise<TurnRun> {
   const submitTime = Date.now();
   const { turnId, turnNumber } = await submitTurn(db, campaignId, input);
   let res = await awaitTerminal(turnId, submitTime);
   let retried = false;
+
+  if (res.terminal === "timeout") {
+    // The listener gave up but the ENGINE hasn't — the turn is durable
+    // (§5.7) and very likely mid-Phase-B-retry. Wait for the row to settle
+    // rather than walking past a live turn (that wedged run #1 at turn 3).
+    console.warn(`[soak] turn ${turnNumber} outlived the listener — waiting on the row`);
+    const settled = await waitForRowTerminal(db, turnId, 5 * 60_000);
+    if (settled === "complete" || settled === "channel") {
+      const [row] = await db
+        .select({ narration: schema.turns.narration })
+        .from(schema.turns)
+        .where(eq(schema.turns.id, turnId));
+      res = {
+        terminal: settled === "channel" ? "channel" : "done",
+        ttftMs: res.ttftMs,
+        totalMs: Date.now() - submitTime,
+        prose: row?.narration ?? res.prose,
+      };
+    } else if (settled === "failed") {
+      res = { ...res, terminal: "error" };
+    }
+    // "stuck" keeps terminal "timeout": the caller aborts gracefully.
+  }
 
   if (res.terminal === "error") {
     // The retry-route logic (§5.7): move OFF 'failed', let the checkpoint
@@ -345,6 +398,13 @@ async function runOneTurn(db: Db, campaignId: string, input: string): Promise<Tu
       console.error("[soak] retry execution crashed", { turnId, err }),
     );
     res = await awaitTerminal(turnId, retryTime);
+    if (res.terminal === "timeout") {
+      // Same live-turn discipline on the retry leg.
+      const settled = await waitForRowTerminal(db, turnId, 5 * 60_000);
+      if (settled === "complete") res = { ...res, terminal: "done" };
+      else if (settled === "channel") res = { ...res, terminal: "channel" };
+      else if (settled === "failed") res = { ...res, terminal: "error" };
+    }
   }
 
   return {
@@ -1005,65 +1065,103 @@ async function liveRun(db: Db, campaignId: string): Promise<void> {
   let combatPassage = "";
   const MAX_STEPS = TARGET_TURNS + REWIND_DEPTH + 6; // re-climb headroom + safety
 
-  while (turnNumber < TARGET_TURNS && step < MAX_STEPS) {
-    const intended = turnNumber + 1;
-    const scripted = SCRIPTED[intended];
-    const input = scripted ? scripted.input : await personaMove(campaignId, tail);
-    const label = scripted ? scripted.label : "persona";
+  // The report writes NO MATTER HOW the loop ends (soak crash #1 lost run
+  // data to an unhandled throw): abort reasons land in the report instead.
+  let abort: string | null = null;
+  try {
+    while (turnNumber < TARGET_TURNS && step < MAX_STEPS) {
+      const intended = turnNumber + 1;
+      const scripted = SCRIPTED[intended];
+      const input = scripted ? scripted.input : await personaMove(campaignId, tail);
+      const label = scripted ? scripted.label : "persona";
 
-    const since = new Date();
-    const run = await runOneTurn(db, campaignId, input);
-    step += 1;
-    turnNumber = run.turnNumber;
+      const since = new Date();
+      let run: TurnRun;
+      try {
+        run = await runOneTurn(db, campaignId, input);
+      } catch (err) {
+        if (err instanceof TurnInProgressError) {
+          // A prior turn is still open (or held failed): wait it out once,
+          // then resubmit. A failed turn holds campaigns open BY DESIGN —
+          // if it stays failed after the retry machinery, abort with data.
+          console.warn(`[soak] open turn ${err.pendingTurnId} blocks submit — waiting`);
+          const settled = await waitForRowTerminal(db, err.pendingTurnId, 5 * 60_000);
+          if (settled === "failed" || settled === "stuck") {
+            abort = `turn ${err.pendingTurnId} wedged (${settled}) — campaign held open by design`;
+            break;
+          }
+          run = await runOneTurn(db, campaignId, input);
+        } else {
+          throw err;
+        }
+      }
+      step += 1;
+      turnNumber = run.turnNumber;
+      if (run.terminal === "timeout" || run.terminal === "error") {
+        // runOneTurn already waited on the row; a surviving non-done terminal
+        // means the turn is genuinely stuck/failed — record and stop clean.
+        const record = await meterTurn(db, campaignId, run, step, label, since, coldTurns);
+        records.push(record);
+        abort = `turn ${turnNumber} ended ${run.terminal} after retry — stopping with data intact`;
+        break;
+      }
 
-    // Flush this turn's G2 so its distill/director/sakkan/compaction spend is
-    // metered before we read the ledger (catch-up-before-reader, §5.8).
-    await settleG2IfPending(db, campaignId);
-
-    const record = await meterTurn(db, campaignId, run, step, label, since, coldTurns);
-    records.push(record);
-    if (record.tier === "sakuga" && !combatPassage) combatPassage = run.prose;
-    if (run.prose.trim()) tail = run.prose;
-
-    console.log(
-      `[soak] step ${step} · turn ${turnNumber} · ${record.tier} · ${record.status} · narration ${fmtUsd(record.narrationUsd)} · ttft ${record.ttftMs ?? "—"}ms${record.failures.length ? ` · FAIL(${record.failures.length})` : ""}`,
-    );
-
-    // --- Ops, keyed to the intended turn number (before any rewind re-climb) ---
-    if (intended === PIN_AFTER_TURN && !didPin) {
-      await pinPassage(db, campaignId, turnNumber, combatPassage || run.prose);
-      didPin = true;
-      console.log(`[soak] pinned a passage from turn ${turnNumber}`);
-    }
-    if (intended === MIDPOINT_AFTER_TURN && !didMidpoint) {
-      const closed = await closeSession(db, campaignId, "explicit");
-      artifacts.yokoku = closed.yokoku;
+      // Flush this turn's G2 so its distill/director/sakkan/compaction spend is
+      // metered before we read the ledger (catch-up-before-reader, §5.8).
       await settleG2IfPending(db, campaignId);
-      const reopened = await openSession(db, campaignId);
-      artifacts.session2Opened = reopened.opened;
-      artifacts.recap = reopened.recap;
-      coldTurns.add(turnNumber + 1); // session 2's first turn is cold again
-      didMidpoint = true;
+
+      const record = await meterTurn(db, campaignId, run, step, label, since, coldTurns);
+      records.push(record);
+      if (record.tier === "sakuga" && !combatPassage) combatPassage = run.prose;
+      if (run.prose.trim()) tail = run.prose;
+
       console.log(
-        `[soak] midpoint: session closed (yokoku ${closed.yokoku ? "yes" : "no"}) → reopened (recap ${reopened.recap ? "yes" : "no"})`,
+        `[soak] step ${step} · turn ${turnNumber} · ${record.tier} · ${record.status} · narration ${fmtUsd(record.narrationUsd)} · ttft ${record.ttftMs ?? "—"}ms${record.failures.length ? ` · FAIL(${record.failures.length})` : ""}`,
       );
+
+      // --- Ops, keyed to the intended turn number (before any rewind re-climb) ---
+      if (intended === PIN_AFTER_TURN && !didPin) {
+        await pinPassage(db, campaignId, turnNumber, combatPassage || run.prose);
+        didPin = true;
+        console.log(`[soak] pinned a passage from turn ${turnNumber}`);
+      }
+      if (intended === MIDPOINT_AFTER_TURN && !didMidpoint) {
+        const closed = await closeSession(db, campaignId, "explicit");
+        artifacts.yokoku = closed.yokoku;
+        await settleG2IfPending(db, campaignId);
+        const reopened = await openSession(db, campaignId);
+        artifacts.session2Opened = reopened.opened;
+        artifacts.recap = reopened.recap;
+        coldTurns.add(turnNumber + 1); // session 2's first turn is cold again
+        didMidpoint = true;
+        console.log(
+          `[soak] midpoint: session closed (yokoku ${closed.yokoku ? "yes" : "no"}) → reopened (recap ${reopened.recap ? "yes" : "no"})`,
+        );
+      }
+      if (intended === REWIND_AFTER_TURN && !didRewind) {
+        artifacts.rewound = await rewindTwo(db, campaignId, turnNumber);
+        turnNumber = artifacts.rewound.toTurn; // re-climb from here
+        didRewind = true;
+        console.log(
+          `[soak] rewound to turn ${artifacts.rewound.toTurn} (${artifacts.rewound.tombstoned} writes tombstoned) — re-climbing`,
+        );
+      }
     }
-    if (intended === REWIND_AFTER_TURN && !didRewind) {
-      artifacts.rewound = await rewindTwo(db, campaignId, turnNumber);
-      turnNumber = artifacts.rewound.toTurn; // re-climb from here
-      didRewind = true;
-      console.log(
-        `[soak] rewound to turn ${artifacts.rewound.toTurn} (${artifacts.rewound.tombstoned} writes tombstoned) — re-climbing`,
-      );
-    }
+  } catch (err) {
+    abort = `unexpected: ${err instanceof Error ? err.message : String(err)}`;
+    console.error("[soak] run aborted — writing the report with data so far", err);
   }
 
   // Final drain so the checklist reads a settled world.
-  await settleG2IfPending(db, campaignId);
+  await settleG2IfPending(db, campaignId).catch(() => {});
 
   const checklist = await buildChecklist(db, campaignId, records, artifacts);
   const spend = await attributeSpend(db, campaignId, records);
-  const report = buildReport(campaignId, records, checklist, spend);
+  let report = buildReport(campaignId, records, checklist, spend);
+  if (abort) {
+    report += `\n## ABORTED\n\n${abort}\n`;
+    console.error(`[soak] ABORTED: ${abort}`);
+  }
 
   const reportPath = join(process.cwd(), "docs", "retros", "M1-soak.md");
   writeFileSync(reportPath, report);

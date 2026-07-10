@@ -197,7 +197,11 @@ export async function runKeyAnimator(
       selection: args.selection,
       system: args.system,
       messages,
-      maxTokens: args.maxTokens + 8_000, // adaptive thinking spends from this budget too
+      // Adaptive thinking spends from this budget too. 16k headroom, not 8k:
+      // the M1 soak caught a sakuga scene truncating when a hard beat's
+      // thinking alone ate the 8k (fourth sighting of the class — conductor
+      // 8k, OSP 16k, C5 KA, now sakuga). A ceiling, never a target (§5.5).
+      maxTokens: args.maxTokens + 16_000,
       effort: args.effort === "xhigh" ? "xhigh" : args.effort === "low" ? "low" : "high",
       tools,
       campaignId: args.campaignId,
