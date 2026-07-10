@@ -64,9 +64,11 @@ export type LayoutResult =
       /** Degrade rungs fired (§5.5) — Phase B consumes cap_research_* (C5). */
       ladderSteps: LadderStep[];
       turnRowId: string;
+      /** §5.4 ingestion verdicts for honest in-stream surfacing (C9). */
+      assertion?: { writes: string[]; clarify?: string; flags: string[] };
     }
   | {
-      /** §5.4 channel input — not a scene turn; responders land C6/C9. */
+      /** §5.4 channel input — the runtime dispatches booth/override (C9). */
       kind: "channel";
       intent: IntentOutput;
     };
@@ -212,7 +214,12 @@ export async function runLayout(
   // Failure never blocks the turn. Phase-A re-runs may re-ingest (noted:
   // duplicate semantic facts are noise, not corruption — G2's distillation
   // dedups nothing at M1).
-  const ingestionProbe: Promise<{ notes: string[]; flags: string[] }> =
+  const ingestionProbe: Promise<{
+    notes: string[];
+    flags: string[];
+    writes: string[];
+    clarify?: string;
+  }> =
     intent.intent === "WORLD_BUILDING"
       ? ingestAssertion(db, campaignId, turnNumber, playerInput, {
           profileIds: contract.anchors_used,
@@ -225,13 +232,18 @@ export async function runLayout(
                 `The assertion left a genuine ambiguity — let the scene surface it naturally: ${r.clarify}`,
               );
             }
-            return { notes, flags: r.flags };
+            return {
+              notes,
+              flags: r.flags,
+              writes: r.writes.map((w) => w.summary),
+              ...(r.clarify ? { clarify: r.clarify } : {}),
+            };
           })
           .catch((err) => {
             console.warn(`[layout] ingestion failed (turn ${turnNumber}): ${err}`);
-            return { notes: [], flags: [] };
+            return { notes: [], flags: [], writes: [] };
           })
-      : Promise.resolve({ notes: [], flags: [] });
+      : Promise.resolve({ notes: [], flags: [], writes: [] });
 
   const [
     retrieved,
@@ -542,6 +554,11 @@ export async function runLayout(
   const effort: TurnEffort =
     pacer.promoteEffort && turnContract.effort === "low" ? "high" : turnContract.effort;
 
+  const hasAssertion =
+    worldAssertionNotes.writes.length > 0 ||
+    worldAssertionNotes.clarify !== undefined ||
+    worldAssertionNotes.flags.length > 0;
+
   return {
     kind: "conte",
     conte,
@@ -549,5 +566,14 @@ export async function runLayout(
     effort,
     ladderSteps: [...ladder.state.fired],
     turnRowId: row.id,
+    ...(hasAssertion
+      ? {
+          assertion: {
+            writes: worldAssertionNotes.writes,
+            ...(worldAssertionNotes.clarify ? { clarify: worldAssertionNotes.clarify } : {}),
+            flags: worldAssertionNotes.flags,
+          },
+        }
+      : {}),
   };
 }

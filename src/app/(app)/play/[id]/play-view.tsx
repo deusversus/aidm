@@ -1,11 +1,53 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+type ChannelIntent = "META_FEEDBACK" | "OVERRIDE_COMMAND" | "OP_COMMAND";
+
+/** A story turn — the default transcript item (kind absent on server-hydrated rows). */
 interface Exchange {
+  kind?: "story";
   turnNumber: number;
   playerInput: string;
   narration: string;
+}
+
+/**
+ * An out-of-fiction channel exchange (§5.4): the booth, an override, or an op
+ * command. Held in the same transcript array so it renders in place; reload
+ * replays the same events, so the shape rehydrates identically.
+ */
+interface ChannelExchange {
+  kind: "channel";
+  turnNumber: number;
+  playerInput: string;
+  /** The streamed studio reply (booth) — empty for a bare command ack. */
+  narration: string;
+  intent: ChannelIntent;
+  responder?: "director" | "ka";
+  closed?: boolean;
+  acknowledgement?: string;
+}
+
+type TranscriptItem = Exchange | ChannelExchange;
+
+/** Phase-A world-assertion feedback (§5.4, editor posture): surfaced honestly, not gated. */
+interface AssertionNotice {
+  writes: string[];
+  clarify?: string;
+  flags: string[];
+}
+
+interface Pin {
+  id: string;
+  content: string;
+  sourceTurn: number;
+}
+
+interface Override {
+  id: string;
+  content: string;
 }
 
 interface OpenTurn {
@@ -29,11 +71,12 @@ export function PlayView({
 }: {
   campaignId: string;
   title: string;
-  initialExchanges: Exchange[];
+  /** Story rows from episodic + channel rows from the turns table (C9). */
+  initialExchanges: TranscriptItem[];
   openTurn: OpenTurn | null;
   suggestionAffordance: string;
 }) {
-  const [exchanges, setExchanges] = useState<Exchange[]>(initialExchanges);
+  const [exchanges, setExchanges] = useState<TranscriptItem[]>(initialExchanges);
   const [pendingInput, setPendingInput] = useState<string | null>(null);
   const [streamText, setStreamText] = useState("");
   const [staging, setStaging] = useState<string | null>(null);
@@ -45,6 +88,17 @@ export function PlayView({
   const [pinNotice, setPinNotice] = useState<string | null>(null);
   const [rewindOpen, setRewindOpen] = useState(false);
   const [rewindBusy, setRewindBusy] = useState(false);
+  // §5.4 world-assertion feedback: informational, cleared on the next submission.
+  const [assertion, setAssertion] = useState<AssertionNotice | null>(null);
+  // §9.2 on-demand summon: one probe → the existing chips rail.
+  const [summoning, setSummoning] = useState(false);
+  // §5.4/§7.5 studio-notes panel: pins + standing rules, fetched lazily, exit-sign quiet.
+  const [notesOpen, setNotesOpen] = useState(false);
+  const [notesLoaded, setNotesLoaded] = useState(false);
+  const [notesBusy, setNotesBusy] = useState(false);
+  const [pinList, setPinList] = useState<Pin[]>([]);
+  const [overrideList, setOverrideList] = useState<Override[]>([]);
+  const [overrideDraft, setOverrideDraft] = useState("");
   // §9.4 session lifecycle: recap opens the sitting, yokoku closes it.
   const [recap, setRecap] = useState<string | null>(null);
   const [yokoku, setYokoku] = useState<string | null>(null);
@@ -65,7 +119,7 @@ export function PlayView({
   // biome-ignore lint/correctness/useExhaustiveDependencies: scroll follows content
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [exchanges, streamText, staging, chips]);
+  }, [exchanges, streamText, staging, chips, assertion]);
 
   const attachStream = useCallback(
     async (turnId: string, playerInput: string, retries = 0) => {
@@ -110,6 +164,15 @@ export function PlayView({
               decisionPoint?: boolean;
               suggestedMoves?: string[];
               retryable?: boolean;
+              // §5.4 channel-turn terminal fields.
+              intent?: ChannelIntent;
+              responder?: "director" | "ka";
+              closed?: boolean;
+              acknowledgement?: string;
+              // §5.4 Phase-A world-assertion feedback.
+              writes?: string[];
+              clarify?: string;
+              flags?: string[];
             };
             if (event === "prose" && payload.text) {
               acc += payload.text;
@@ -137,11 +200,31 @@ export function PlayView({
               ) {
                 setChips(payload.suggestedMoves);
               }
+            } else if (event === "assertion") {
+              // §5.4 editor posture: writes/clarify/flags surfaced honestly,
+              // never gating the scene (which already handled it diegetically).
+              setAssertion({
+                writes: payload.writes ?? [],
+                clarify: payload.clarify,
+                flags: payload.flags ?? [],
+              });
             } else if (event === "channel") {
               terminal = true;
               setPendingInput(null);
               setStreamText("");
-              setPinNotice("The studio heard you — the meta booth opens in a later build.");
+              setExchanges((x) => [
+                ...x,
+                {
+                  kind: "channel",
+                  turnNumber: payload.turnNumber ?? 0,
+                  playerInput,
+                  narration: acc,
+                  intent: payload.intent ?? "META_FEEDBACK",
+                  responder: payload.responder,
+                  closed: payload.closed,
+                  acknowledgement: payload.acknowledgement,
+                },
+              ]);
             } else if (event === "error") {
               terminal = true;
               hadError = true;
@@ -200,6 +283,7 @@ export function PlayView({
       setBusy(true);
       setError(null);
       setChips([]);
+      setAssertion(null);
       setPendingInput(message);
       try {
         const res = await fetch(`/api/campaigns/${campaignId}/turns`, {
@@ -368,6 +452,84 @@ export function PlayView({
     setRewindOpen(false);
   };
 
+  // §9.2 on-demand summon: one probe-tier call → the existing chips rail. A
+  // pending turn (409) is quiet — the summon simply does nothing this beat.
+  const summonSuggestions = async () => {
+    if (busy || sessionClosed || summoning) return;
+    setSummoning(true);
+    try {
+      const res = await fetch(`/api/campaigns/${campaignId}/suggestions`, { method: "POST" });
+      if (res.ok) {
+        const body = (await res.json()) as { moves?: string[] };
+        if (body.moves && body.moves.length > 0) setChips(body.moves);
+      }
+    } catch {
+      // Quiet: the summon is an optional affordance, never a blocking error.
+    }
+    setSummoning(false);
+  };
+
+  // §5.4 studio notes: pins + standing rules. Fetched lazily on first open so
+  // the panel costs nothing until the player reaches for it (§7.5).
+  const refreshNotes = async () => {
+    setNotesBusy(true);
+    try {
+      const [p, o] = await Promise.all([
+        fetch(`/api/campaigns/${campaignId}/pins`),
+        fetch(`/api/campaigns/${campaignId}/overrides`),
+      ]);
+      if (p.ok) setPinList(((await p.json()) as { pins?: Pin[] }).pins ?? []);
+      if (o.ok) setOverrideList(((await o.json()) as { overrides?: Override[] }).overrides ?? []);
+    } catch {
+      // Non-fatal: the panel just shows what it last had.
+    }
+    setNotesBusy(false);
+  };
+
+  const toggleNotes = () => {
+    const next = !notesOpen;
+    setNotesOpen(next);
+    if (next && !notesLoaded) {
+      setNotesLoaded(true);
+      void refreshNotes();
+    }
+  };
+
+  const removePin = async (pinId: string) => {
+    const res = await fetch(`/api/campaigns/${campaignId}/pins`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pinId }),
+    });
+    if (res.ok) setPinList((l) => l.filter((p) => p.id !== pinId));
+  };
+
+  const removeOverride = async (overrideId: string) => {
+    const res = await fetch(`/api/campaigns/${campaignId}/overrides`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ overrideId }),
+    });
+    if (res.ok) setOverrideList((l) => l.filter((o) => o.id !== overrideId));
+  };
+
+  const addOverride = async () => {
+    const content = overrideDraft.trim();
+    if (!content) return;
+    setNotesBusy(true);
+    const res = await fetch(`/api/campaigns/${campaignId}/overrides`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content }),
+    });
+    if (res.ok) {
+      setOverrideDraft("");
+      await refreshNotes();
+    } else {
+      setNotesBusy(false);
+    }
+  };
+
   return (
     <main className="mx-auto flex h-screen max-w-3xl flex-col px-6 py-6">
       <header className="flex items-end justify-between border-b border-border pb-3">
@@ -377,7 +539,22 @@ export function PlayView({
             Say what you do. The studio does the rest.
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap justify-end gap-2">
+          <Link
+            href={`/bible/${campaignId}`}
+            className="rounded-md border border-border px-3 py-1 text-xs hover:bg-muted"
+            title="The Series Bible — the studio's living record of what it heard"
+          >
+            Series Bible
+          </Link>
+          <button
+            type="button"
+            onClick={toggleNotes}
+            className="rounded-md border border-border px-3 py-1 text-xs hover:bg-muted"
+            title="Studio notes — your pins and standing rules"
+          >
+            Studio notes
+          </button>
           <button
             type="button"
             onClick={() => setRewindOpen((o) => !o)}
@@ -397,6 +574,100 @@ export function PlayView({
           </button>
         </div>
       </header>
+
+      {notesOpen && (
+        <div className="mt-3 space-y-4 rounded-md border border-border bg-muted/30 px-3 py-3 text-sm">
+          <div className="flex items-center justify-between">
+            <p className="text-[10px] uppercase tracking-widest text-muted-foreground/60">
+              studio notes
+            </p>
+            <button
+              type="button"
+              onClick={() => setNotesOpen(false)}
+              className="text-xs text-muted-foreground/70 hover:text-muted-foreground"
+            >
+              close
+            </button>
+          </div>
+
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-muted-foreground">Pins</p>
+            {pinList.length > 0 ? (
+              <ul className="space-y-1">
+                {pinList.map((p) => (
+                  <li key={p.id} className="flex items-start justify-between gap-2">
+                    <span className="text-xs leading-6 text-muted-foreground">
+                      “{p.content}”
+                      {p.sourceTurn > 0 && (
+                        <span className="text-muted-foreground/50"> · turn {p.sourceTurn}</span>
+                      )}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => void removePin(p.id)}
+                      className="shrink-0 text-xs text-muted-foreground/60 hover:text-foreground"
+                      title="Remove this pin"
+                    >
+                      remove
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-xs text-muted-foreground/60">
+                {notesBusy ? "loading…" : "No pins yet."}
+              </p>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-muted-foreground">Standing rules</p>
+            {overrideList.length > 0 ? (
+              <ul className="space-y-1">
+                {overrideList.map((o) => (
+                  <li key={o.id} className="flex items-start justify-between gap-2">
+                    <span className="text-xs leading-6 text-muted-foreground">{o.content}</span>
+                    <button
+                      type="button"
+                      onClick={() => void removeOverride(o.id)}
+                      className="shrink-0 text-xs text-muted-foreground/60 hover:text-foreground"
+                      title="Retire this standing rule"
+                    >
+                      remove
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-xs text-muted-foreground/60">
+                {notesBusy ? "loading…" : "No standing rules."}
+              </p>
+            )}
+            <div className="flex gap-2 pt-1">
+              <input
+                value={overrideDraft}
+                onChange={(e) => setOverrideDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    void addOverride();
+                  }
+                }}
+                placeholder="Add a standing rule the studio always honors…"
+                className="flex-1 rounded-md border border-border bg-background px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-foreground"
+              />
+              <button
+                type="button"
+                onClick={() => void addOverride()}
+                disabled={!overrideDraft.trim() || notesBusy}
+                className="rounded-md border border-border px-3 py-1 text-xs hover:bg-muted disabled:opacity-50"
+              >
+                Add
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {rewindOpen && (
         <div className="mt-3 space-y-2 rounded-md border border-border bg-muted/30 px-3 py-3 text-sm">
@@ -447,16 +718,63 @@ export function PlayView({
             </p>
           </div>
         )}
-        {exchanges.map((e) => (
-          <div key={e.turnNumber} className="space-y-3">
-            <div className="flex justify-end">
-              <div className="max-w-[80%] whitespace-pre-wrap rounded-lg bg-foreground px-3 py-2 text-sm text-background">
-                {e.playerInput}
+        {exchanges.map((e, i) => {
+          if (e.kind === "channel") {
+            const label =
+              e.responder === "director"
+                ? "THE DIRECTOR"
+                : e.responder === "ka"
+                  ? "THE WRITER"
+                  : "THE STUDIO";
+            // Override/op commands are a one-line confirmation, not a room.
+            if (e.intent === "OVERRIDE_COMMAND" || e.intent === "OP_COMMAND") {
+              return (
+                <div
+                  key={`channel-${e.turnNumber}-${i}`}
+                  className="rounded-md border border-border bg-muted/20 px-4 py-2 text-sm"
+                >
+                  <p className="mb-1 text-[10px] uppercase tracking-widest text-muted-foreground/60">
+                    standing rule set
+                  </p>
+                  <p className="text-xs italic text-muted-foreground/70">“{e.playerInput}”</p>
+                  <p className="mt-1 text-muted-foreground">{e.acknowledgement ?? e.narration}</p>
+                </div>
+              );
+            }
+            // The booth: a bracketed studio room, clearly out of the fiction.
+            return (
+              <div
+                key={`channel-${e.turnNumber}-${i}`}
+                className="space-y-2 rounded-md border border-dashed border-border bg-muted/20 px-4 py-3"
+              >
+                <p className="text-[10px] uppercase tracking-widest text-muted-foreground/60">
+                  {label} · booth
+                </p>
+                <p className="text-sm text-muted-foreground">{e.playerInput}</p>
+                {e.narration && (
+                  <p className="whitespace-pre-wrap text-sm italic leading-7 text-foreground/90">
+                    {e.narration}
+                  </p>
+                )}
+                {e.closed && (
+                  <p className="text-[11px] italic text-muted-foreground/60">
+                    booth resolved — calibrations recorded
+                  </p>
+                )}
               </div>
+            );
+          }
+          return (
+            <div key={`story-${e.turnNumber}-${i}`} className="space-y-3">
+              <div className="flex justify-end">
+                <div className="max-w-[80%] whitespace-pre-wrap rounded-lg bg-foreground px-3 py-2 text-sm text-background">
+                  {e.playerInput}
+                </div>
+              </div>
+              <div className="whitespace-pre-wrap text-[15px] leading-7">{e.narration}</div>
             </div>
-            <div className="whitespace-pre-wrap text-[15px] leading-7">{e.narration}</div>
-          </div>
-        ))}
+          );
+        })}
         {pendingInput && (
           <div className="flex justify-end">
             <div className="max-w-[80%] whitespace-pre-wrap rounded-lg bg-foreground px-3 py-2 text-sm text-background opacity-80">
@@ -471,6 +789,26 @@ export function PlayView({
           </div>
         )}
         {staging && <p className="text-xs italic text-muted-foreground">{staging}…</p>}
+        {assertion &&
+          (assertion.writes.length > 0 || assertion.clarify || assertion.flags.length > 0) && (
+            <div className="space-y-1">
+              {assertion.writes.length > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  Canon updated: {assertion.writes.join("; ")}
+                </p>
+              )}
+              {assertion.clarify && (
+                <p className="rounded-md border border-amber-900/40 bg-amber-950/20 px-3 py-2 text-xs text-amber-200/90">
+                  The studio needs a beat of clarity: {assertion.clarify}
+                </p>
+              )}
+              {assertion.flags.length > 0 && (
+                <p className="text-xs text-muted-foreground/60">
+                  Noted for the Director: {assertion.flags.join("; ")}
+                </p>
+              )}
+            </div>
+          )}
         {chips.length > 0 && (
           <div className="flex flex-wrap gap-2">
             {chips.map((c) => (
@@ -565,7 +903,20 @@ export function PlayView({
             {busy ? "Queue" : "Act"}
           </button>
         </div>
-        <div className="mt-2 flex justify-end">
+        <div className="mt-2 flex items-center justify-between">
+          <div>
+            {suggestionAffordance !== "never" && (
+              <button
+                type="button"
+                onClick={() => void summonSuggestions()}
+                disabled={busy || sessionClosed || summoning}
+                title="Ask the studio for a few premise-true next moves"
+                className="text-xs text-muted-foreground/70 hover:text-muted-foreground disabled:opacity-50"
+              >
+                {summoning ? "thinking…" : "Suggest moves"}
+              </button>
+            )}
+          </div>
           <button
             type="button"
             onClick={endSession}

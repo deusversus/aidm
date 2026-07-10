@@ -1,4 +1,5 @@
 import { assembleForCampaign } from "@/lib/blocks/campaign";
+import { closeBoothIfOpen, mintOverride, runBoothExchange } from "@/lib/booth/booth";
 import { settleG1 } from "@/lib/compositor/g1";
 import { settleG2, settleG2IfPending } from "@/lib/compositor/g2";
 import type { Db } from "@/lib/db";
@@ -33,7 +34,19 @@ export type TurnEvent =
       suggestedMoves: string[];
       degraded: boolean;
     }
-  | { type: "channel"; intent: string }
+  // §5.4 channel terminal (C9): booth replies stream as prose first; the
+  // terminal event carries the responder/close state (META_FEEDBACK) or the
+  // override acknowledgement (OVERRIDE_COMMAND / OP_COMMAND).
+  | {
+      type: "channel";
+      intent: string;
+      responder?: "director" | "ka";
+      closed?: boolean;
+      acknowledgement?: string;
+    }
+  // §5.4 world assertions surfaced honestly in-stream (C9): the C6
+  // subsystem's front end. Live-only; the prose carries them diegetically.
+  | { type: "assertion"; writes: string[]; clarify?: string; flags: string[] }
   | { type: "error"; message: string; retryable: boolean };
 
 interface BusEntry {
@@ -232,15 +245,65 @@ async function runPhases(
       emit({ type: "staging", text: e.text }),
     );
     if (result.kind === "channel") {
+      // §5.4 channel responders (C9). META_FEEDBACK → the booth (streams its
+      // reply as prose); OVERRIDE_COMMAND/OP_COMMAND → the override ledger
+      // with minimal ceremony (§7.4). A responder failure is still terminal:
+      // the channel turn lands with an apologetic acknowledgement, never a
+      // wedged campaign. Channel rows keep status "channel" — they never
+      // enter episodic records, Block 3, or compaction (out-of-fiction).
+      const intent = result.intent.intent;
+      let channelText = "";
+      let meta: {
+        responder?: "director" | "ka";
+        closed?: boolean;
+        acknowledgement?: string;
+      } = {};
+      try {
+        if (intent === "META_FEEDBACK") {
+          const booth = await runBoothExchange(
+            db,
+            turn.campaignId,
+            turn.turnNumber,
+            turn.playerInput,
+            (text) => emit({ type: "prose", text }),
+          );
+          channelText = booth.reply;
+          meta = { responder: booth.responder, closed: booth.closed };
+        } else {
+          const minted = await mintOverride(db, turn.campaignId, turn.turnNumber, turn.playerInput);
+          meta = { acknowledgement: minted.acknowledgement };
+        }
+      } catch (err) {
+        console.warn(`[runtime] channel responder failed (turn ${turn.turnNumber}):`, err);
+        meta = { acknowledgement: "The studio lost that one mid-air — say it again?" };
+      }
       await db
         .update(turns)
-        .set({ status: "channel", completedAt: new Date() })
+        .set({
+          status: "channel",
+          completedAt: new Date(),
+          ...(channelText ? { narration: channelText } : {}),
+          // Replay metadata rides the sidecar jsonb — channel rows never
+          // parse as CommitScene anywhere (G2 settles "complete" rows only).
+          sidecar: { channel: intent, ...meta },
+        })
         .where(eq(turns.id, turnId));
-      emit({ type: "channel", intent: result.intent.intent });
+      emit({ type: "channel", intent, ...meta });
       return;
     }
     conte = result.conte;
     ladderSteps = result.ladderSteps;
+    // §5.4 assertion surfacing (C9): the accept/clarify/flag verdicts reach
+    // the player honestly, alongside the prose that integrates them.
+    if (result.assertion) {
+      emit({ type: "assertion", ...result.assertion });
+    }
+    // Returning to the fiction closes an open booth (§5.4): its calibrations
+    // must not wait for the cap. Detached — the extraction feeds FUTURE
+    // turns' amendments; this turn's Layout has already read the marks.
+    void closeBoothIfOpen(db, turn.campaignId, turn.turnNumber).catch((err) =>
+      console.warn(`[runtime] booth close failed (turn ${turn.turnNumber}):`, err),
+    );
   } else {
     // Crash-replay: the checkpointed conte IS the turn — same dice (§5.7).
     conte = Conte.parse(turn.conte);

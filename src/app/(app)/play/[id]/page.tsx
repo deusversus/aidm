@@ -47,6 +47,45 @@ export default async function PlayPage({ params }: { params: Promise<{ id: strin
     .orderBy(desc(episodicRecords.turnNumber))
     .limit(12);
 
+  // Channel turns live OUTSIDE the episodic layer by design (§5.4 — booth
+  // text never enters the story window), so the transcript rehydrates them
+  // from the turns table; their replay metadata rides the sidecar jsonb (C9).
+  const channelRows = await db
+    .select({
+      turnNumber: turns.turnNumber,
+      playerInput: turns.playerInput,
+      narration: turns.narration,
+      sidecar: turns.sidecar,
+    })
+    .from(turns)
+    .where(and(eq(turns.campaignId, id), eq(turns.status, "channel")))
+    .orderBy(desc(turns.turnNumber))
+    .limit(12);
+  const channelItems = channelRows.map((t) => {
+    const meta = (t.sidecar ?? {}) as {
+      channel?: string;
+      responder?: "director" | "ka";
+      closed?: boolean;
+      acknowledgement?: string;
+    };
+    return {
+      kind: "channel" as const,
+      turnNumber: t.turnNumber,
+      playerInput: t.playerInput,
+      narration: t.narration ?? "",
+      intent: (meta.channel ?? "META_FEEDBACK") as
+        | "META_FEEDBACK"
+        | "OVERRIDE_COMMAND"
+        | "OP_COMMAND",
+      ...(meta.responder ? { responder: meta.responder } : {}),
+      ...(meta.closed !== undefined ? { closed: meta.closed } : {}),
+      ...(meta.acknowledgement ? { acknowledgement: meta.acknowledgement } : {}),
+    };
+  });
+  const initialItems = [...recent.map((r) => ({ kind: "story" as const, ...r })), ...channelItems]
+    .sort((a, b) => a.turnNumber - b.turnNumber)
+    .slice(-16);
+
   // An open turn (in-flight, or failed awaiting retry) resumes on load.
   const [openTurn] = await db
     .select({ id: turns.id, status: turns.status, playerInput: turns.playerInput })
@@ -66,7 +105,7 @@ export default async function PlayPage({ params }: { params: Promise<{ id: strin
     <PlayView
       campaignId={id}
       title={campaign.title}
-      initialExchanges={[...recent].reverse()}
+      initialExchanges={initialItems}
       openTurn={openTurn ?? null}
       suggestionAffordance={contract?.suggestion_affordance ?? "on_request_only"}
     />

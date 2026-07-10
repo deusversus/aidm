@@ -74,6 +74,10 @@ export const campaigns = pgTable(
     /** Direction machinery state (§7, C7): trigger accumulators, pilot plan,
      *  scene-shape base, session-frozen Settei snapshot. DirectionState type. */
     directionState: jsonb(),
+    /** Meta-booth conversation (§5.4, C9): cross-turn out-of-fiction exchange,
+     *  capped + resolved into marks/overrides. BoothState type. Never enters
+     *  the story window. */
+    boothState: jsonb(),
     /** SZ durable draft (§8): the conversation, resumable across sittings. */
     szTranscript: jsonb(),
     /** SZ quiet-extraction accumulator: observations gathered mid-conversation. */

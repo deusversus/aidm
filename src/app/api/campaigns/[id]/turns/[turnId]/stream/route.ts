@@ -68,7 +68,20 @@ export async function GET(
             retryable: true,
           });
         } else if (turn.status === "channel") {
-          send("channel", {});
+          // Channel replay metadata rides the sidecar jsonb (§5.4, C9):
+          // {channel: intent, responder?, closed?, acknowledgement?}.
+          const meta = (turn.sidecar ?? {}) as {
+            channel?: string;
+            responder?: string;
+            closed?: boolean;
+            acknowledgement?: string;
+          };
+          send("channel", {
+            intent: meta.channel ?? "META_FEEDBACK",
+            ...(meta.responder ? { responder: meta.responder } : {}),
+            ...(meta.closed !== undefined ? { closed: meta.closed } : {}),
+            ...(meta.acknowledgement ? { acknowledgement: meta.acknowledgement } : {}),
+          });
         } else {
           const sidecar = turn.sidecar as CommitScene | null;
           send("done", {
