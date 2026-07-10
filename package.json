@@ -30,6 +30,7 @@
     "evals:ci": "tsx evals/run.ts --ci",
     "grounding:check": "tsx scripts/grounding-check.ts",
     "research": "tsx --env-file=.env.local scripts/research.ts",
+    "soak": "tsx --env-file=.env.local scripts/soak.ts",
     "langfuse:latest": "tsx --env-file=.env.local scripts/langfuse-latest.ts"
   },
   "dependencies": {

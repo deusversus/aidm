@@ -67,4 +67,6 @@ manual_rubric:
     - shonen power-up speech
     - numeric damage calcs
 
-mockllm_fixture_dir: evals/fixtures/llm/gameplay/solo-leveling-ability/
+# §10.7 golden-turn regression seed for this scenario (replaces the v4-era
+# mockllm_fixture_dir). Populated by `pnpm soak -- --capture-golden`.
+golden_turn_fixture: evals/golden/turns/solo-leveling-ability.yaml

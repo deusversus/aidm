@@ -68,4 +68,6 @@ manual_rubric:
     Average ≥ 3.5, min dim ≥ 3.0 is my default acceptance for social
     beats in the Bebop register.
 
-mockllm_fixture_dir: evals/fixtures/llm/gameplay/bebop-social/
+# §10.7 golden-turn regression seed for this scenario (replaces the v4-era
+# mockllm_fixture_dir). Populated by `pnpm soak -- --capture-golden`.
+golden_turn_fixture: evals/golden/turns/bebop-social.yaml

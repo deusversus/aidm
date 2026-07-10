@@ -61,4 +61,6 @@ manual_rubric:
     - generic bazaar filler
     - "colorful vendors hawking wares"
 
-mockllm_fixture_dir: evals/fixtures/llm/gameplay/bebop-exploration/
+# §10.7 golden-turn regression seed for this scenario (replaces the v4-era
+# mockllm_fixture_dir). Populated by `pnpm soak -- --capture-golden`.
+golden_turn_fixture: evals/golden/turns/bebop-exploration.yaml

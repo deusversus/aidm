@@ -55,4 +55,6 @@ manual_rubric:
     - "anime power-up monologue"
     - "HP damage numbers"
 
-mockllm_fixture_dir: evals/fixtures/llm/gameplay/bebop-combat/
+# §10.7 golden-turn regression seed for this scenario (replaces the v4-era
+# mockllm_fixture_dir). Populated by `pnpm soak -- --capture-golden`.
+golden_turn_fixture: evals/golden/turns/bebop-combat.yaml

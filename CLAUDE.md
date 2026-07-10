@@ -109,6 +109,14 @@ This file is loaded into context on every Claude session in this repo. It's the 
 - `src/lib/llm/` — `anthropic.ts` singleton; tiers/calls/voyage land C4 (the metered choke point)
 - `src/lib/observability/` — Langfuse wrapper + cost meter (C4)
 - `src/lib/blocks/` — four-block cache plumbing, append-only Block 3 (C5)
+- `src/lib/turn/` — the turn engine: Layout DAG, KA + durable runtime, retrieval/heat, Pacer, rewind (M1 C4–C7)
+- `src/lib/compositor/` — Chronicler write groups G1/G2 (M1 C6)
+- `src/lib/ingestion/` — §5.4 universal ingestion: extractor → resolver → editor posture (M1 C6)
+- `src/lib/sz/` — Session Zero conductor + compiler (M1 C3)
+- `src/lib/direction/` — Director, arcs/seeds, session lifecycle (M1 C7)
+- `src/lib/sakkan/` — the shared blind scorer (M1 C1) + the §4.5 drift band (M1 C8)
+- `src/lib/booth/` — meta booth + override channel responders (M1 C9)
+- `src/lib/bible/` — Series Bible composition (M1 C9)
 - `src/lib/ka/` — salvaged sakuga/diversity craft logic
 - `rule_library/` — guidance chunks + `anchors/` + `exemplars/` grounding data (C6)
 - `evals/golden/` — hand-scored profile fixtures (Bebop, Solo Leveling); harness returns C6

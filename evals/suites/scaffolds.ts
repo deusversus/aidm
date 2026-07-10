@@ -30,7 +30,7 @@ export const scaffolds: Suite[] = [
   scaffold(
     "flywheel-round-trip",
     "M1",
-    "§6.8 needs all nine layers live with writers+readers (M1); planted content must surface via each layer's reader",
+    "§6.8 the M1 gate is IMPLEMENTED as a vitest integration suite, not an eval-harness suite: src/lib/turn/__tests__/flywheel.integration.test.ts drives the real turn loop (real Postgres, scripted trio) with one named test per layer — nine layers + the §6.9 player profile — each proving writer→reader by surfacing planted content through the layer's reader. This scaffold stays skipped and points there",
   ),
   scaffold(
     "flywheel-prospective",
