@@ -193,16 +193,26 @@ const PERSONA_SYSTEM = [
 ].join(" ");
 
 async function personaMove(campaignId: string, tail: string): Promise<string> {
-  const { next_input } = await callProbe(DEV_TIER_SELECTION, {
-    name: "soak_persona",
-    schema: PersonaMove,
-    system: PERSONA_SYSTEM,
-    prompt: `The scene so far ends:\n\n${tail.slice(-500)}\n\nWrite your next move.`,
-    campaignId,
-    maxTokens: 200,
-  });
-  const move = next_input.trim();
-  return move.length > 0 ? move : "I keep moving, eyes open.";
+  // The persona is DISPOSABLE (C10 audit): a probe failure that escapes the
+  // SDK's own retries must never discard a user-gated 30-turn run — one
+  // manual retry, then a deterministic in-character fallback.
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const { next_input } = await callProbe(DEV_TIER_SELECTION, {
+        name: "soak_persona",
+        schema: PersonaMove,
+        system: PERSONA_SYSTEM,
+        prompt: `The scene so far ends:\n\n${tail.slice(-500)}\n\nWrite your next move.`,
+        campaignId,
+        maxTokens: 200,
+      });
+      const move = next_input.trim();
+      if (move.length > 0) return move;
+    } catch (err) {
+      console.warn(`[soak] persona probe failed (attempt ${attempt + 1}/2):`, err);
+    }
+  }
+  return "I keep moving, eyes open.";
 }
 
 // ---------------------------------------------------------------------------
@@ -320,15 +330,21 @@ async function runOneTurn(db: Db, campaignId: string, input: string): Promise<Tu
 
   if (res.terminal === "error") {
     // The retry-route logic (§5.7): move OFF 'failed', let the checkpoint
-    // markers decide where to resume, re-execute. Same dice.
+    // markers decide where to resume, re-execute. Same dice. ORDER MATTERS
+    // (C10 audit — the C5 stale-buffer lesson): executeTurn's synchronous
+    // prefix resets the event buffer BEFORE the first await, so it must be
+    // kicked BEFORE awaitTerminal attaches — attaching first replays the
+    // prior run's buffered terminal 'error' and resolves instantly to a
+    // stale failure while the real retry runs detached and wedges the next
+    // submit. Events published between the kick and the attach are buffered
+    // and replayed, so nothing is lost by this ordering.
     retried = true;
     await db.update(schema.turns).set({ status: "queued" }).where(eq(schema.turns.id, turnId));
     const retryTime = Date.now();
-    const p = awaitTerminal(turnId, retryTime); // attaches synchronously
     void executeTurn(db, turnId).catch((err) =>
       console.error("[soak] retry execution crashed", { turnId, err }),
     );
-    res = await p;
+    res = await awaitTerminal(turnId, retryTime);
   }
 
   return {
@@ -449,8 +465,13 @@ async function meterTurn(
     failures.push(`turn ${run.turnNumber}: hit the ${TURN_TIMEOUT_MS}ms timeout`);
 
   // Cost assertion at the served model (not the Fable worst case, which a
-  // Sonnet run passes vacuously — §10.8 / M1-loop C10). Story turns only.
-  const isStory = tier === "douga" || tier === "genga" || tier === "sakuga";
+  // Sonnet run passes vacuously — §10.8 / M1-loop C10). Story turns only —
+  // gated on STATUS, not tier (C10 audit): a channel turn keeps its
+  // submit-default 'genga' tier but its booth reply is out-of-fiction with
+  // no turn contract; applying the story ceiling + §5.6 cache floor to it
+  // recorded false hard failures. Channel spend still totals in turnUsd.
+  const isStory =
+    status === "complete" && (tier === "douga" || tier === "genga" || tier === "sakuga");
   if (primary && isStory) {
     const turnTier = asTier(tier);
     const ceiling = turnCostModel(turnTier, servedModel).coldUsd;
