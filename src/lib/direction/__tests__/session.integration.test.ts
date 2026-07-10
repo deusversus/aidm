@@ -1,3 +1,4 @@
+import { assembleForCampaign } from "@/lib/blocks/campaign";
 import * as schema from "@/lib/db/schema";
 import {
   closeSession,
@@ -454,5 +455,47 @@ describe.skipIf(!url)("Session lifecycle (real Postgres, scripted models)", () =
     // The mark's direction rides Block 1's standing calibration (correct
     // DB→PencilMark map: id + provenance present so the row parses).
     expect(stored?.settei?.text).toContain("less flowery please");
+  });
+
+  it("lazy Settei freeze watermarks by G2 settlement: settled turn → N, in-flight turn → N−1", async () => {
+    if (!db) throw new Error("unreachable");
+    const readWatermark = async (campaignId: string) => {
+      const [row] = await db
+        .select({ d: schema.campaigns.directionState })
+        .from(schema.campaigns)
+        .where(eq(schema.campaigns.id, campaignId));
+      return (row?.d as DirectionState | null)?.settei?.rebuilt_at_turn;
+    };
+
+    // Settled: turn 5 complete with its G2 finished — its marks were baked,
+    // so the watermark must be 5 (an N−1 double-counted them into Amendments;
+    // C7 re-audit — the prewarm route assembles with no turn in flight).
+    const settled = await makeCampaign();
+    await db.insert(schema.turns).values({
+      campaignId: settled,
+      turnNumber: 5,
+      tier: "genga",
+      status: "complete",
+      playerInput: "x",
+      narration: "y",
+      checkpoints: { phase_a: true, phase_b: true, g1: true, g2: { media: true } },
+    });
+    await assembleForCampaign(db, settled);
+    expect(await readWatermark(settled)).toBe(5);
+
+    // In flight: turn 3 mid-execution — its G2 marks land AFTER the freeze,
+    // so the watermark must be 2 (an N orphaned them from both surfaces;
+    // C7 audit).
+    const inflight = await makeCampaign();
+    await db.insert(schema.turns).values({
+      campaignId: inflight,
+      turnNumber: 3,
+      tier: "genga",
+      status: "phase_a_complete",
+      playerInput: "x",
+      checkpoints: { phase_a: true },
+    });
+    await assembleForCampaign(db, inflight);
+    expect(await readWatermark(inflight)).toBe(2);
   });
 });

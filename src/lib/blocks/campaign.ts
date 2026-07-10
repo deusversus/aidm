@@ -118,14 +118,18 @@ export async function assembleForCampaign(
  * pre-C7). Best-effort: the live render already returned, so a write failure
  * never fails the assembly.
  *
- * The watermark is max turn MINUS ONE: this path runs during Phase B of the
- * in-flight turn N (submitTurn inserts the row before dispatch), whose G2
- * will write marks at turnId = N AFTER this freeze. A watermark of N would
- * orphan them from both the baked Charter and the Amendments window
- * (gt(turnId, watermark)) until the next session open (C7 audit). Marks
- * present at freeze time all carry turnId ≤ N−1, so N−1 bakes exactly what
- * was rendered. rebuildSettei (session open) is different: no turn is in
- * flight there and the route drains G2 first, so its currentMaxTurn is safe.
+ * The watermark follows the latest turn's G2 settlement, because turn N's G2
+ * writes marks at turnId = N and the watermark must land exactly between
+ * baked and pending (C7 audit + re-audit — both flat choices were wrong):
+ *   - G2 of turn N fully settled (status complete + g2.media marker): its
+ *     marks existed at render time and were BAKED → watermark N, so
+ *     gt(turnId, N) keeps them out of Amendments (a flat N−1 double-counted
+ *     them — the prewarm route assembles with no turn in flight).
+ *   - Otherwise (turn in flight / failed / G2 lagging): turn N's marks land
+ *     AFTER this freeze → watermark N−1, so they ride Amendments (a flat N
+ *     orphaned them from both surfaces until the next session open).
+ * rebuildSettei (session open) is the simple case: the route drains G2 first,
+ * so its currentMaxTurn is always the settled kind.
  */
 async function freezeSettei(
   db: Db,
@@ -135,11 +139,19 @@ async function freezeSettei(
 ): Promise<void> {
   try {
     const [latest] = await db
-      .select({ turnNumber: turns.turnNumber })
+      .select({
+        turnNumber: turns.turnNumber,
+        status: turns.status,
+        checkpoints: turns.checkpoints,
+      })
       .from(turns)
       .where(eq(turns.campaignId, campaignId))
       .orderBy(desc(turns.turnNumber))
       .limit(1);
+    const n = latest?.turnNumber ?? 0;
+    const g2Settled =
+      latest?.status === "complete" &&
+      (latest.checkpoints as { g2?: { media?: boolean } } | null)?.g2?.media === true;
     const next: DirectionState = {
       ...(direction ?? DirectionState.parse({})),
       settei: SetteiSnapshot.parse({
@@ -147,7 +159,7 @@ async function freezeSettei(
         charter_tokens: rendered.charterTokens,
         rendered_axes: rendered.renderedAxes,
         uncovered_extremes: rendered.uncoveredExtremes,
-        rebuilt_at_turn: Math.max(0, (latest?.turnNumber ?? 0) - 1),
+        rebuilt_at_turn: g2Settled ? n : Math.max(0, n - 1),
         rebuilt_at: new Date().toISOString(),
       }),
     };
