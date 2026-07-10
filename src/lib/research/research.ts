@@ -7,6 +7,7 @@
 
 import type { Db } from "@/lib/db";
 import { profiles } from "@/lib/db/schema";
+import { getVoyage } from "@/lib/llm/voyage";
 import { Profile } from "@/lib/types/profile";
 import { eq } from "drizzle-orm";
 import type { z } from "zod";
@@ -153,6 +154,12 @@ export async function researchTitle(
       };
     }
   }
+
+  // Embedding preflight — after the reuse early-return (the cached path
+  // embeds nothing and must stay key-free), before everything paid. A missing
+  // Voyage key fails here at $0, not after the synthesis run (2026-07-10:
+  // a full pipeline died at the final corpus embed on exactly this).
+  if (!options.skipCorpus) getVoyage();
 
   // 3. Wiki + scope — alternate titles feed discovery (kimetsu-no-yaiba).
   const alternates = [media.title.romaji, media.title.native, ...media.synonyms].filter(

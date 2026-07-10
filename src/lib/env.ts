@@ -46,7 +46,17 @@ let cached: Env | undefined;
 export const env = new Proxy({} as Env, {
   get(_target, prop) {
     cached ??= envSchema.parse(process.env);
-    return cached[prop as keyof Env];
+    const value = cached[prop as keyof Env];
+    // Self-heal a stale snapshot: the parse-once cache would otherwise report
+    // a key missing for the process's whole lifetime even if process.env
+    // gains it later (each bundled module instance carries its own `cached`,
+    // so one early parse against a partial env would poison every later read).
+    // If the cache says undefined but live process.env disagrees, re-parse.
+    if (value === undefined && typeof prop === "string" && process.env[prop] !== undefined) {
+      cached = envSchema.parse(process.env);
+      return cached[prop as keyof Env];
+    }
+    return value;
   },
   has(_target, prop) {
     cached ??= envSchema.parse(process.env);

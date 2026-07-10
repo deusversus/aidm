@@ -47,6 +47,17 @@ describe("env Proxy", () => {
     expect(env.VOYAGE_API_KEY).toBeUndefined();
   });
 
+  it("re-parses when a cached-undefined key later appears in process.env", async () => {
+    // The parse-once cache must not report a key missing forever after one
+    // parse against a partial process.env — it heals on the next read.
+    process.env.DATABASE_URL = "postgres://u:p@h:5432/d";
+    Reflect.deleteProperty(process.env, "VOYAGE_API_KEY");
+    const { env } = await import("./env");
+    expect(env.VOYAGE_API_KEY).toBeUndefined();
+    process.env.VOYAGE_API_KEY = "pa-late-arrival";
+    expect(env.VOYAGE_API_KEY).toBe("pa-late-arrival");
+  });
+
   it("ownKeys works for spread/destructure", async () => {
     process.env.DATABASE_URL = "postgres://u:p@h:5432/d";
     const { env } = await import("./env");
