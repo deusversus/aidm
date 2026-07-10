@@ -440,14 +440,24 @@ describe.skipIf(!url)("Meta booth + override channel (real Postgres, scripted mo
     expect(await readBoothState(campaignId)).toBeNull();
   });
 
-  it("mintOverride is idempotent per turn: a crash-replay re-acknowledges without duplicating the rule", async () => {
+  it("mintOverride dedupes a crash-replay (same content) but never drops a DISTINCT same-turn rule", async () => {
     if (!db) throw new Error("unreachable");
     const campaignId = await makeCampaign();
+    // Crash-replay: identical content at the same turn → one row, same ack.
     const first = await mintOverride(db, campaignId, 4, "never harm the dog");
     const second = await mintOverride(db, campaignId, 4, "never harm the dog");
     expect(second.acknowledgement).toBe(first.acknowledgement);
+    expect(await overridesFor(campaignId)).toHaveLength(1);
+    // The Studio-notes panel mints at the latest turn: a second DISTINCT rule
+    // at the same turn must persist (C9 re-audit — a turn-only key silently
+    // dropped it behind a false success ack).
+    await mintOverride(db, campaignId, 4, "keep the romance slow-burn");
     const rows = await overridesFor(campaignId);
-    expect(rows).toHaveLength(1);
+    expect(rows).toHaveLength(2);
+    expect(rows.map((r) => r.content).sort()).toEqual([
+      "keep the romance slow-burn",
+      "never harm the dog",
+    ]);
   });
 
   it("router failure defaults to the director — the booth never blocks", async () => {

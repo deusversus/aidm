@@ -288,9 +288,12 @@ export async function mintOverride(
   turnNumber: number,
   content: string,
 ): Promise<{ acknowledgement: string }> {
-  // §5.7 crash-replay idempotency (C9 audit): one channel turn mints ONE
-  // rule — a replayed dispatch finds its own row by (campaign, turn,
-  // provenance) and re-acknowledges instead of duplicating the ledger.
+  // §5.7 crash-replay idempotency (C9 audit): a replayed dispatch repeats
+  // the SAME content — dedupe on it. The key must be content-aware (C9
+  // re-audit): the Studio-notes panel mints at the campaign's latest turn,
+  // so a turn-only key silently dropped a SECOND distinct rule added
+  // without an intervening story turn — the player's highest-authority
+  // input vanishing behind a false success ack.
   const [existing] = await db
     .select({ id: overrides.id })
     .from(overrides)
@@ -299,6 +302,7 @@ export async function mintOverride(
         eq(overrides.campaignId, campaignId),
         eq(overrides.turnId, turnNumber),
         eq(overrides.provenance, "player_override"),
+        eq(overrides.content, content),
       ),
     )
     .limit(1);
