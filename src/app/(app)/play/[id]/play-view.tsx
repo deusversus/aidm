@@ -723,6 +723,33 @@ export function PlayView({
             </p>
           </div>
         )}
+        {exchanges.length === 0 &&
+          !pendingInput &&
+          !busy &&
+          !error &&
+          !openTurn &&
+          !sessionClosed && (
+            <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
+              <p className="text-[10px] uppercase tracking-widest text-muted-foreground/60">
+                episode 1
+              </p>
+              <h2 className="text-xl font-semibold tracking-tight">The table is set.</h2>
+              <p className="max-w-md text-sm text-muted-foreground">
+                {title} compiled from your Session Zero. The pilot opens cold — begin, or open with
+                your own first action below.
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  if (busyRef.current || errorRef.current?.turnId || sessionClosed) return;
+                  submitRef.current("Begin.");
+                }}
+                className="mt-2 rounded-md border border-border bg-foreground px-4 py-2 text-sm font-medium text-background hover:opacity-90"
+              >
+                Begin the cold open
+              </button>
+            </div>
+          )}
         {exchanges.map((e, i) => {
           if (e.kind === "channel") {
             const label =
