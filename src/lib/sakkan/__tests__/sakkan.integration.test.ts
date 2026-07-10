@@ -260,6 +260,27 @@ describe.skipIf(!url)("Sakkan sample (real Postgres, scripted scorer)", () => {
     expect(st.sakkan?.active_notes).toHaveLength(0);
   });
 
+  it("one window is one sample: a re-sample at the same turn no-ops (11c + session close; crash-replay)", async () => {
+    if (!db) throw new Error("unreachable");
+    const campaignId = await makeCampaign({ directionState: { settei: settei(["darkness"]) } });
+    await seedProse(campaignId, cleanSix());
+
+    // G2 step 11c samples turn 8: one drift read, counter 1 — a spike.
+    mockScore.mockResolvedValueOnce([axisScore("darkness", 3, 0.9)]);
+    expect(await runSakkanSample(db, campaignId, 8)).toEqual({ scored: 1, notesActive: 0 });
+
+    // The session closes on the SAME turn (or a crashed G2 replays): the
+    // identical prose window carries no new temporal evidence — the guard
+    // no-ops, the counter stays at 1, no retake fires from a single spike,
+    // and the scorer is not re-billed (C8 audit — all three findings' root).
+    mockScore.mockResolvedValueOnce([axisScore("darkness", 3, 0.9)]);
+    expect(await runSakkanSample(db, campaignId, 8, { trigger: "session_close" })).toBeNull();
+    const st = await readState(campaignId);
+    expect(st.sakkan?.readings.darkness?.consecutive_drift).toBe(1);
+    expect(st.sakkan?.active_notes).toHaveLength(0);
+    expect(mockScore).toHaveBeenCalledTimes(1);
+  });
+
   it("a low-confidence drift read holds the counter and leaves the note untouched", async () => {
     if (!db) throw new Error("unreachable");
     const campaignId = await makeCampaign({ directionState: { settei: settei(["darkness"]) } });

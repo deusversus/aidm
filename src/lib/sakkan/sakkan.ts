@@ -87,8 +87,10 @@ function isCovered(axis: string): axis is AxisName {
  * MARK_CONSECUTIVE — once, not every sample after) → save DirectionState
  * (last_sample_turn, readings, active_notes).
  *
- * Fewer than 1 usable turn of prose, or zero scoreable axes → no-op (returns
- * null); the counters neither advance nor reset on a skipped sample.
+ * Fewer than 1 usable turn of prose, zero scoreable axes, or a turn already
+ * sampled (last_sample_turn ≥ turnNumber — one window is one sample, whoever
+ * asks) → no-op (returns null); the counters neither advance nor reset on a
+ * skipped sample.
  */
 export async function runSakkanSample(
   db: Db,
@@ -113,6 +115,16 @@ export async function runSakkanSample(
   );
 
   const state = await loadDirectionState(db, campaignId);
+
+  // Same-turn idempotency guard (C8 audit — the root of all three findings):
+  // one prose window is ONE sample, whoever asks. Without this, a session
+  // close re-scored the window G2 step 11c had just sampled (and a crashed
+  // G2 replay re-scored a sakuga sample), double-advancing the counters and
+  // promoting a single spike to "drift" — §4.5's two-consecutive-samples
+  // contract is temporal evidence, and the same turn carries no new evidence.
+  // This also makes G2's marker-AFTER ordering strictly right: a crash before
+  // the state save retries legitimately; a crash after no-ops here.
+  if ((state.sakkan?.last_sample_turn ?? 0) >= turnNumber) return null;
 
   // Scored set (§4.5): the Charter's currently rendered axes ∩ COVERED, plus any
   // axis carrying an active note (dedup). Uncovered axes are SKIPPED with a warn
@@ -241,8 +253,8 @@ export async function runSakkanSample(
     }
   }
 
-  // Marks first, then the state save (single writer at sample time, §4.5; G2
-  // sequencing + re-entry idempotency is the integrator's concern). Writing the
+  // Marks first, then the state save (single writer at sample time, §4.5;
+  // same-turn re-entry is guarded at the top of this function). Writing the
   // mark ahead of the counter save favours never losing a calibration over an
   // occasional double on an interrupted replay.
   if (marksToWrite.length > 0) {
