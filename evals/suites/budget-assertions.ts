@@ -15,11 +15,26 @@ import type { Suite, SuiteResult } from "../types";
  */
 
 export const BUDGET_ASSUMPTIONS = {
-  /** Opportunistic turn-to-turn hit rate assumed until M2 telemetry (§5.6). */
+  /** Opportunistic turn-to-turn hit rate assumed until M2 telemetry (§5.6).
+   *  M1 soak MEASURED 0.24 mean on a young campaign (B3 dominates while
+   *  B1+B2 are thin; improves as compaction fills cached B2) — the 0.7
+   *  assumption stands as the mature-campaign target, telemetry at M2. */
   assumedCacheHitRate: 0.7,
   /** Uncached per-turn tail: the conte + player input (Block 4). */
   dynamicTokensPerTurn: 3_000,
 } as const;
+
+/**
+ * Adaptive thinking bills as OUTPUT and the original cost model omitted it —
+ * the M1 soak measured every genga/sakuga ceiling breach tracing to thinking
+ * spend, not prose (§3: thinking depth is deliberate, so it belongs in the
+ * model, not in a widened margin). Measured allowances, M1 soak run #3.
+ */
+export const THINKING_ALLOWANCE_TOKENS: Record<TurnTier, number> = {
+  douga: 1_000,
+  genga: 5_000,
+  sakuga: 14_000,
+};
 
 /** Per-turn dollar ceilings at the most expensive menu model, COLD. */
 export const COLD_TURN_CEILING_USD: Record<TurnTier, number> = {
@@ -42,7 +57,7 @@ export function turnCostModel(
 ): TurnCostModel {
   const contract = TURN_CONTRACTS[tier];
   const prefix = Math.max(0, contract.promptBudgetTokens - assumptions.dynamicTokensPerTurn);
-  const out = contract.outputBudgetTokens;
+  const out = contract.outputBudgetTokens + THINKING_ALLOWANCE_TOKENS[tier];
   const coldUsd = estimateCostUsd(model, {
     input_tokens: assumptions.dynamicTokensPerTurn,
     output_tokens: out,

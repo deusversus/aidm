@@ -1,158 +1,360 @@
 # M1-C10 golden-turn regression seed (§10.7) — captured from the 30-turn soak.
-# Turn 5, tier genga. Regenerate with: pnpm soak -- --capture-golden
+# Turn 30, tier genga. Regenerate with: pnpm soak -- --capture-golden
 id: bebop-genga-story
 tier: genga
 captured_from:
-  campaign: 0c18362e-d4e0-48fc-9efb-4d82bac1d252
-  turn: 5
+  campaign: aa99e4c6-9c24-4623-9a9d-63a778c0bda2
+  turn: 30
 player_input: >-
-  "The Red Sash dockworkers' syndicate runs these piers." I say it flat, watching the fixer for a
-  flinch, and start asking who answers to them.
+  I lean back, let the smoke from my cigarette drift toward the ceiling. Watch the rain hit the
+  glass. Wait to see if he fills the quiet.
 conte:
   tier: genga
   outcome:
-    cost: ''
     modifiers:
-      - +2 Local Knowledge (docks)
-      - +2 Confident Framing
-      - +0 T9 vs T9 baseline
+      - +2 Established Rapport
+      - +3 Player Setup (Tetsu's Tell)
+      - '-1 Neutral Power Tier'
     rationale: >-
-      Roll: 14 + 4 = 18 vs DC 12. The character leans on syndicate affiliation as leverage—a smart
-      play that capitalizes on established local power structures. At T9 baseline world, this is a
-      moderate social maneuver with real teeth: the fixer processes the Red Sash reference and
-      recognizes the character has done homework. The natural 14 + modifiers (local knowledge,
-      confident delivery) lands a clean success. The fixer flinches subtly—you catch it. He knows
-      the Red Sash runs these piers; your invocation of that fact reframes the dynamic from
-      'desperate bounty hunter' to 'someone with connections.' He'll answer your questions about who
-      answers to the syndicate, though he may volunteer only what's necessary. This success
-      establishes territorial leverage and signals you're not a rube—the fixer recalibrates his
-      threat assessment upward. No cost: this is straightforward social maneuvering within a T9
-      character's established capability. Narrative weight is SIGNIFICANT because this
-      recontextualization of the job and the fixer's incomplete read opens new investigative angles
-      into Fen's disappearance and the true stakes of the collection run.
-    consequence: ''
-    success_level: success
+      Roll: 7 + 4 = 11 vs DC 12. The natural 7 falls short of the DC, but lands in partial_success
+      territory (11 ≥ DC−4). This is a scene about control through silence—a classic noir/drama
+      beat. The player has earned setup: Tetsu's refusal, his aborted reach toward the coat pocket,
+      his price standing unretracted. The silence itself is a weapon here. At parity (T9 vs T9), no
+      cost or fatigue applies; this is a social duel, not a drain. The partial success means Tetsu
+      *does* break—but on his terms, not yours. He yields ground (speaks), but controls what truth
+      emerges. The complication: whatever he says next will be closer to his core vulnerability,
+      which changes the negotiation's temperature. You got him to flinch; you didn't get him to
+      fold. That's earned pressure with a dramatic hook.
+    consequence: Tetsu speaks, but not what you wanted—he pivots to something harder, something true.
+    success_level: partial_success
     difficulty_class: 12
     narrative_weight: SIGNIFICANT
-  turn_id: 5
+  turn_id: 30
   degraded: false
   memories:
     - layer: semantic
       content: >-
-        Del frames Fen as a 'deadbeat welder' owing back rent, a simple collection job, but Del's
-        double-take on the money-and-no-change detail suggests the read was incomplete.
-      turn_id: 1
-      confidence: 0.8
-      provenance: chronicler_g2
-    - layer: semantic
-      content: This job was understood by at least Del to be 'simple,' a framing that has now proven false.
-      turn_id: 3
+        The lead (player character) tests whether Tetsu will 'spend the last of what he's got' by
+        asking 'Whose' without inflection
+      turn_id: 29
       confidence: 0.8
       provenance: chronicler_g2
     - layer: semantic
       content: >-
-        Corliss Fen (bounty: 2200) was last seen at Hoshi's noodle stand on Pier Nine, left money on
-        counter without taking change, and departed before finishing his meal.
-      turn_id: 1
+        Tetsu explicitly states 'That's not for me' regarding the wrapped object, refusing to
+        clarify whose it is for
+      turn_id: 29
       confidence: 0.8
       provenance: chronicler_g2
     - layer: semantic
       content: >-
-        Fen went through the gap in the tarp at Pier Nine, moving sideways into an unlit space
-        beneath or behind the dock.
-      turn_id: 2
+        Tetsu reached toward something small and hard-edged inside his coat, then stopped halfway
+        and returned his hand to his knee without explanation.
+      turn_id: 22
       confidence: 0.8
       provenance: chronicler_g2
     - layer: semantic
       content: >-
-        A gap in the tarp line near Hoshi's stand leads into an unlit maintenance alley beyond the
-        stall row—the dock's 'other face' where evening commerce ends.
-      turn_id: 1
+        Tetsu carries something small and hard-edged in his coat's inside pocket, which he touched
+        but did not retrieve.
+      turn_id: 21
+      confidence: 0.8
+      provenance: chronicler_g2
+    - layer: semantic
+      content: >-
+        Tetsu did not retract or adjust his stated price after the silence; he absorbed the
+        rejection without speaking again
+      turn_id: 25
       confidence: 0.8
       provenance: chronicler_g2
   callbacks:
     - >-
-      The money always tells—why did Fen leave exact payment with no change? (expected payoff:
-      Reveals Fen knew his own timing or someone else's arrival was imminent)
+      The envelope's contents and whether the fresh column will be filled tonight or left blank and
+      deferred to next arc (expected payoff: Determines whether the ledger truly closes or suspends;
+      signals next arc's entrance or campaign pause)
     - >-
-      Wren's uncharacteristic silence—experience, not intuition (expected payoff: Crew learns Wren
-      has seen something like this before, or knows alleys like this exist)
+      The crane figure's true identity, role, and why they knew exactly when to appear (expected
+      payoff: Reframes bounty from hunt to collision)
     - >-
-      Del's failed humor—grief running underneath (expected payoff: Del has lost someone to
-      something like this, or fears they will. It surfaces when the joke doesn't land.)
+      The noodle vendor's three-week signal pattern and who hired him to set the table (expected
+      payoff: Clarifies whether crew is protected or exposed)
   mechanics:
     rolls:
       - sides: 20
-        total: 18
-        rolled: 14
+        total: 11
+        rolled: 7
         purpose: outcome vs DC 12
         modifier: 4
     resource_spends: []
+  pacer_beat:
+    tone: withdrawn authority—let silence weaponize; cool, patient, dominant through inaction
+    avoid:
+      - rushing the moment with NPC monologue
+      - breaking character to exposition
+    strength: strong
+    must_reference:
+      - the interrogation anchor (his presence across the table)
+      - the decision pressure (what hangs unresolved)
+      - Begin falling
+    escalation_target: '0.92'
+    foreshadowing_hint: >-
+      His hesitation now plants what he'll *fail* to say later—a crack in his certainty that
+      matters.
+    beat_classification: climax_silent_pressure
   canon_chunks: []
   entity_cards: []
   spotlight_hints:
     - >-
-      Wren's knowledge: Turn 4 should touch Wren's moment of recognition—what they see or hear in
-      the alley that changes their bearing. Make it quiet and specific.
+      Tetsu's hand-path: Track reach-toward-coat, reach-toward-holster, fold-cloth as escalation of
+      internal pressure. Do not repeat gesture; collapse into single descriptor. Let position signal
+      state change, not repetition.
     - >-
-      Del's frame shift: The moment Del stops deflecting. Not heroic, not broken—just the moment the
-      armor doesn't fit anymore. One line, if any.
+      Mireille's gaze toward envelope: One readable gesture in a closed face. This is her
+      arithmetic. Do not explain it. Let it sit as the final open question between her and the
+      silence.
     - >-
-      Player's agency in the dark: The hand on the grip is already there. Now: what does touching
-      the weapon teach them? What does the weapon tell them about what's listening?
+      The rain as time-marker: Rain has sustained turns 24–27. If it stops at turn 28, frame shifts.
+      If it continues, suspension deepens. Use rain-change as sole environmental signal for state
+      shift.
   hard_constraints:
     - >-
-      Corliss Fen (bounty: 2200) was last seen at Hoshi's noodle stand on Pier Nine, left money on
-      counter without taking change, and departed before finishing his meal.
+      Tetsu remains unnervingly still and patient at the crane, hand near his holster but making no
+      move, suggesting prior understanding or rehearsed confrontation.
     - >-
-      A gap in the tarp line near Hoshi's stand leads into an unlit maintenance alley beyond the
-      stall row—the dock's 'other face' where evening commerce ends.
+      The player character's slow stand, meant as defiance, was received by Tetsu as confirmation
+      that he was right about the confrontation's inevitable shape.
     - >-
-      The player, Del, and Wren entered the dark space together after the pier's chain locks began
-      closing.
+      Mireille, the ledger-keeper at the dock counter, has been watching the protagonist for three
+      weeks and is now openly evaluating her competence and reliability in a moment of decision.
     - >-
-      Wren stopped suddenly in the dark, sensing something ahead — Wren's usual readiness and speech
-      failed them.
+      The fixer refused to answer the protagonist's question about waiting or moving, redirecting
+      the moment of choice back to her by his silence and deflected attention.
+    - A target was identified and tracked for three weeks across the dock before being eliminated.
     - >-
-      Wren stated this is not a hallway, not a rent-money job, and the player should abandon their
-      original understanding of the mission.
+      The protagonist works Dock 7 on Ganymede with Tetsu and Mireille; they have kept working an
+      hour past shift for three weeks waiting for someone with a face they haven't clearly seen.
     - >-
-      Something in the dark ahead has become still in the way that indicates it is aware of being
-      watched.
+      The noodle stand vendor has set an untouched bowl at the counter facing Dock 7, with
+      chopsticks placed deliberately—a signal or trap.
     - >-
-      Wren has gone completely silent in response to an unseen threat ahead in the alley, breaking
-      their usual pattern of speaking first into silence.
+      The dock exists in a state of unnatural stillness: smoke doesn't disperse, broth stays hot,
+      shadows fall wrong, wind never comes.
     - >-
-      Something unseen and motionless waits ahead in the alley, possibly aware of them but choosing
-      not to respond to the protagonist's movement toward their weapon.
+      The vendor poured out the third waiting bowl into the gutter—a deliberate signal that whatever
+      was expected to arrive won't be fed or welcomed.
     - >-
-      Wren has survived a room like this before and carries the cost of it; something in their body
-      remembers what came after.
+      Neither Mireille nor the figure has drawn a weapon; both are performing a choreography of
+      restraint and negotiation.
     - >-
-      Del's capacity to deflect and joke has failed him; he is genuinely frightened and no longer
-      performing competence.
+      The scene ends unresolved—the last inch between them remains uncrossed, the next move still
+      unsigned.
     - >-
-      The unseen presence in the alley reads human signals—it understood the cigarette as defiance,
-      marked Wren's voice breaking silence, and is now deciding its first target based on these
-      responses.
+      Three weeks of the protagonist's sustained composure and successful moves have accumulated
+      into a trial moment where Mireille must decide if this pattern represents genuine capability
+      or lucky runs.
+    - >-
+      The protagonist has drawn and fired the Jericho, killing the first ambusher and wounding the
+      second with a leg shot; the third was subdued with the pistol's frame.
+    - >-
+      Three ambushers were waiting on the gantry lattice for three weeks, positioned to intercept
+      movement toward the gantry rather than away from the counter.
+    - >-
+      Tetsu draws and trains his weapon on the darkness beyond the gantry with cold finality,
+      breaking three weeks of rehearsed restraint.
+    - >-
+      The fixer's hands rise, not in surrender but in visible shock that his trusted men have 'moved
+      the line' without orders; his control has fractured.
+    - >-
+      A floodlight in a previously dark window across the black water activates immediately after
+      the gunfire ceases, and something moves behind it—an unseen observer now openly watching.
+    - >-
+      The protagonist is being observed by a cold light across the water, possibly a surveillance
+      beam or intentional watcher.
+    - >-
+      Tetsu lowered his gun—not in surrender, but as a gesture of trust and agreement with the
+      protagonist's silent reading of the situation.
+    - >-
+      Mireille's earlier verdict, spoken over a closed ledger and open ledger with a bowl turned
+      right-side up, has now been confirmed by the unfolding events.
+    - >-
+      Mireille records three kills in the ledger with blank names, tracked only by weight, distance,
+      and wound angle.
+    - >-
+      A window across the water is visible from the berth but remains unspoken of—a location or
+      witness tied to the operation.
+    - A fixer went into the water feet-first off the dock; two others were left breathing.
+    - The crew has decided not to kill again unless there is no other way left.
+    - >-
+      The math of Tetsu's debt never sits still—his rate is flat against a debt that grows, minus
+      what the job costs him.
+    - Mireille has not eaten; she sends her cut home first and eats only what remains afterward.
+    - >-
+      Mireille has been operating this way—paying home first, hunger second—for at least three
+      weeks, probably longer.
+    - >-
+      A job exists with an established debt and a payoff amount, but the payment conversation cannot
+      happen tonight.
+    - >-
+      Someone's blood has recently entered black water — a death or disposal has just occurred in or
+      near this berth.
+    - >-
+      Tetsu carries something small and hard-edged in his coat's inside pocket, which he touched but
+      did not retrieve.
+    - >-
+      An anonymous gloved hand delivered a thin envelope through the hatch; it was not the boy or
+      vendor from before.
+    - >-
+      Mireille has opened a fresh page in the ledger and positioned the pencil ready to write, but
+      has not yet filled in any entry.
+    - >-
+      Mireille's refusal was signaled through gesture: pencil held flat, ledger closed decisively,
+      envelope left sealed
+    - >-
+      The broth was ladled at the precise moment she sat down to eat it—temperature held
+      deliberately hot, suggesting premeditation and surveillance.
+    - >-
+      She killed the floodlight banks in careful sequence over the past three weeks, and someone out
+      at the dock has just tested whether they stayed dark.
+    - >-
+      A man-sized figure stands at the base of the crane, motionless in deliberate exposure,
+      positioned in the counter's single sightline—he wants to be seen.
+    - >-
+      Tetsu has shifted his hand near his holster and stopped eating; Mireille has abandoned her
+      ledger and stopped writing—both are aware of the threat.
+    - The Red Sash dockworkers' syndicate controls the piers
+    - Anders runs the Red Sash on this specific pier
+    - The Red Sash answers to a Consortium office in the high city
+    - The Consortium office handles shipping records and customs stamps
+    - >-
+      Mireille lays down her ledger—flat, cover up, pencil crossed—after three weeks of keeping it
+      tucked and her hands free for retreat.
+    - >-
+      The upturned bowl at the counter, empty and right-side up, was left open by a man who spent
+      all night deciding whether to feed the thing that came walking out of the dark.
+    - >-
+      Mireille speaks her verdict aloud: the woman is not asking for trust, but asking to be watched
+      and judged—that is the only kind of leader worth the overtime.
+    - The protagonist shot or killed three men on the dock with borrowed calm and control.
+    - >-
+      Mireille has been waiting for the signal to leave and reads the lighting of a cigarette as the
+      order of departure.
+    - >-
+      The fixer has lost control of the dock and can no longer stop them; his silence is submission,
+      not strategy.
+    - >-
+      A searchlight from across the black water has fixed on the protagonist and stopped sweeping;
+      someone is actively observing and cataloguing her.
+    - >-
+      The protagonist must choose between crossing into open water under the searchlight's gaze or
+      holding position to make the watcher wait.
+    - The fixer is dead, shot from across the water by an unknown sniper positioned at a lit window.
+    - >-
+      Someone in the lit window across the water fired the shot and briefly revealed themselves:
+      barrel, shoulder, a figure leaning back from the kill.
+    - >-
+      The protagonist has been on a dock within the last hour, an operation that resulted in at
+      least one death to be recorded in Mireille's ledger.
+    - >-
+      Mireille maintains a ledger recording operations by weight, distance, and angle—names
+      deliberately omitted.
+    - >-
+      Mireille's hand trembled while smoking, a tell she caught and suppressed, revealing stress
+      fractures beneath her composure.
+    - A job remains unfinished—a window unnamed since the dock, not yet closed.
+    - >-
+      The three of them—Mireille, Tetsu, and an unnamed third—operate in a place where every word
+      costs something and silence is preferred to speech.
+    - >-
+      Tetsu reached toward something small and hard-edged inside his coat, then stopped halfway and
+      returned his hand to his knee without explanation.
+    - >-
+      Someone killed from a window, clean and close, with perfect timing—a skilled marksman or
+      assassin.
+    - Anders is shipping something; someone in his office signs off on it.
+    - >-
+      Mireille will give counsel but refuses to write down or sign a name to the play—the pencil and
+      blank page are her boundary.
+    - >-
+      The choice is between a fast, close kill (the hand at the window) and a slower, safer, more
+      distant kill (the office functionary).
+    - >-
+      Mireille spoke 'Not tonight'—the same words Tetsu had used earlier, but now they belonged to
+      her and meant refusal
+    - >-
+      Mireille is intently observing the player character's hand and its failures—the failed
+      strikes, raw thumb, the cupping motion—rather than looking away politely.
+    - >-
+      An envelope with an unbroken seal sits where a gloved hand left it; the room's tension holds
+      around this unopened object.
+    - An envelope with an unbroken seal sits on the table between Tetsu and the player character.
+    - >-
+      The player character challenges Tetsu's authority to refuse the question—"I just
+      did"—establishing a contest of will over the ledger and envelope.
+    - >-
+      Tetsu refuses to open the envelope himself, placing the burden on the player character: 'You
+      want it opened, you open it.'
+    - Mireille possesses a closed ledger that has not been opened or surrendered.
+    - >-
+      Tetsu's hand remains near his holster but has not moved to draw; he is holding back a
+      decision.
+    - An envelope lies on the table, examined once by Mireille with precise, minimal cost.
+    - Tetsu names eighty-six as the real number, spoken flat and worn smooth from repeated counting
+    - >-
+      Tetsu produces a small, square-edged object wrapped in soft cloth from his coat, sets it
+      face-down on his knee without unwrapping it
+    - >-
+      /override From here on, keep the body count low — I want captures, not kills, unless there's
+      no other way.
   research_findings: []
   charter_amendments: >-
     ## Amendments (this scene)
 
 
-    Fresh calibration — player_meta: Player invoked hand movement before conscious volition;
-    narration honored that internal split between action and awareness as thematic rather than
-    mechanical.
+    RETAKE (strong): continuity is reading 9/10 on the page; the premise wants 3/10. Pull it down —
+    this note lifts when it reads back in band.
 
-    Fresh calibration — player_meta: The narration operated entirely in subtext and sensation rather
-    than plot events—pressure, texture, the grammar of survival. No action resolved; instead, the
-    scene deepened the player's understanding of how to read the unseen and how fear communicates
-    itself to a listening thing.
+    RETAKE (strong): register is reading 9/10 on the page; the premise wants 7/10. Pull it down —
+    this note lifts when it reads back in band.
+
+    Fresh calibration — noir restraint: cut interpreting and explanations; let gesture and action
+    land without narration
+
+    Fresh calibration — silence as scene: more dead air; fewer characters filling silence with
+    dialogue; tolerate discomfort of extended beats
+
+    Fresh calibration — smoke and gesture as emotional carrier: let cigarette motif carry weight
+    without decoration or dialogue gloss
+
+    Fresh calibration — dialogue economy: clipped exchanges driven by withholding, not chattiness;
+    shorter lines; every word costs the speaker
   active_consequences:
-    - None
     - >-
-      You move through cleanly, but the darkness swallows detail—you catch Hoshi's silhouette ahead,
-      but miss what made him stop. Your eyes haven't adjusted yet.
+      The match gutters and dies on the first strike. You have to try twice more, and in that
+      hesitation, Mireille sees something crack in your composure—the signal she was waiting for
+      arrives *delayed*, and in that delay, uncertainty blooms between you.
+    - >-
+      Tetsu's hand moves slightly closer to his holster—a micro-commitment that locks both of you
+      into the next escalation.
+    - Tetsu's answer comes with a price—knowledge of his actual ceiling reveals vulnerability.
+    - >-
+      The crane arm moves. Not the standard sweep—a precise, purposeful rotation toward the
+      floodlights. In that moment, you taste the broth correctly: it's still at perfect temperature,
+      despite sitting untouched. Someone wanted you to eat it NOW. The figure at the crane is
+      silhouetted, moving with the confidence of someone who knows you're watching. They want to be
+      seen.
+    - >-
+      The figure does not flinch at your approach—he was expecting exactly this. Your slow stand
+      reads as acknowledgment rather than dominance. He shifts his weight, slight but visible,
+      moving first.
+    - >-
+      Mireille interprets your stillness as confidence—or bluff. She will test it. The next move
+      becomes hers to make, and she will not flinch.
+    - >-
+      The advance commits you—Tetsu's patience breaks, and the rehearsed confrontation becomes REAL.
+      No retreat now.
+    - >-
+      The floodlit watcher now has a clear visual lock on your position. Mireille's acknowledgment
+      is secure—but you've broadcast your exit to a third party.
   scene_shape_directive: >-
     ## Scene shape
 
@@ -163,98 +365,86 @@ conte:
 
     Choice weight: choices land on this scene and these relationships.
 
-    Arc "The Quiet Mark" (setup): Sensory pressure building in confined space. Sounds arriving out
-    of sync with distance. The alley describes itself through what doesn't add up. One crew member
-    breaks formation. The thing in the dark makes a choice to acknowledge them.
+    Arc "The Ledger Closes" (climax): Coda-threshold pause. Silence sustains. Mireille's question
+    ('So what's it going to be?') hangs unanswered. Tetsu's hand near holster, not envelope.
+    Envelope visible, sealed, watched. Rain as sole time-marker. No exterior pressure, no knocks, no
+    new signals. The three separate in the same room. If rain stops, frame shifts. If player reaches
+    for envelope, bridge begins. If player sits still, suspension deepens.
 
-    Director: Everything arrives a beat too late or too early—locks finishing mid-dialogue, echoes
-    traveling farther than space allows. This is rhythm, not realism.
+    Director: Pauses between lines longer than the lines themselves. Dialogue as afterthought, not
+    initiation.
 
-    Director: The crew hears themselves being heard before they see what listens. The feeling
-    matters more than the sight.
+    Director: Tetsu's hand-path (coat → holster) shows escalation of internal pressure, not
+    decision.
 
-    Director: One character's silence or movement triggers the reframe: they're no longer hunting
-    Fen. They're being hunted by what used Fen as bait.
+    Director: Mireille's gaze toward envelope is her arithmetic—closed face, one readable gesture
+    remaining.
   style_drift_directive: >-
-    The last few scenes have all opened on a character already in motion. Change the entry — open
-    with interiority this time (unless the scene actively resists it — then write what the scene
-    wants).
+    The last few scenes have all opened on a character already in motion. Change the entry —
+    fragment the beat into short cuts this time (unless the scene actively resists it — then write
+    what the scene wants).
   world_assertion_notes: []
   canonicality_directives:
     - 'Timeline: canon_adjacent; cast: full_cast; events: influenceable.'
     - 'NEVER contradict: Spike''s past with the Syndicate is not rewritten'
   vocab_freshness_advisory: >-
-    these exact phrasings recur across recent scenes — retire them this beat: "hadn't caught up to",
-    "always had the first", "had the first word"
+    these exact phrasings recur across recent scenes — retire them this beat: "its own kind of",
+    "it's found for an", "found for an hour"
 prose: >-
-  The calculation happened before you noticed you were making it. That was the professional part of
-  you, the part that had spent enough nights on this pier to know the difference between a fight you
-  could win and a fight you could only survive: you couldn't out-wait a thing that had already
-  decided not to blink. You could, maybe, out-know a man who had.
+  Rain.
 
 
-  You didn't draw. You didn't step forward, either. You turned — slow, the same unhurried grammar as
-  the cigarette, as the hand on the grip — and put your back to the dark for exactly as long as it
-  took to find Hoshi's silhouette still framed in the gap, stacking his last stool with the studied
-  indifference of a man who had learned that some suppers end badly and some don't, and the trick
-  was never showing which one you expected.
+  She doesn't say anything.
 
 
-  "The Red Sash runs these piers," you said. Flat. Not a question, not bait dressed as one — a fact
-  laid on the counter the way Fen had left his money, exact, no change expected. You watched him for
-  the flinch.
+  Smoke goes up. Doesn't say anything either.
 
 
-  It came small. A hitch in the stacking, a half-second where the stool didn't quite land square,
-  and something behind his eyes recalculated you from scratch — desperate bounty hunter revised
-  upward into someone who'd done homework, someone worth the truth instead of the shrug. He set the
-  stool down properly this time. "You know that," he said, "and you're still standing in my light
-  asking me things instead of the men who'd actually hurt you for asking them. That tells me
-  something too."
+  Tetsu's jaw works. The wrapped thing sits face-down on his knee, and his hand doesn't go near it,
+  doesn't go near the coat, doesn't go near the holster this time. Just sits.
 
 
-  "Tell me who answers to them. On this pier. Tonight."
+  He looks at the window. Dark now. Has been dark an hour.
 
 
-  Hoshi looked past you, once, toward the black beyond the tarp — not long, not obvious, but you
-  caught it, the same instinct that had made you notice the gap in the first place. He wasn't
-  looking at Wren. He was looking at whatever Wren was looking at, and something in his face said he
-  already knew its shape, or at least its neighborhood.
+  "Wasn't a job," he says.
 
 
-  "There's a foreman," he said, quieter now, the words coming like a man paying a debt he'd rather
-  not have owed. "Runs collections for the Sash out of the container stacks past the fish market.
-  Name's Corda. If Fen skipped without his change, it's because Corda's people were already walking
-  toward him, and a man doesn't stop to count coins when that happens." He picked up the last stool,
-  held it instead of stacking it, an old man's hands finding something to do with the fear his voice
-  wouldn't carry. "That's what I've got. It's more than I've given anyone in a year. Don't make me
-  regret the arithmetic."
+  Three words. He doesn't add to them right away, and she doesn't fill the gap he leaves — lets it
+  sit the way she's let everything sit tonight, because filling it would cost her the thing she's
+  spent all night buying.
 
 
-  Behind you, Del exhaled like the sound itself was a relief — a name, a person, a thing you could
-  walk up to and shoot at if it came to that, instead of whatever waited past the tarp with no shape
-  and no mercy. "Corda," he repeated, testing the word the way he used to test jokes, checking if it
-  would hold weight. It held. He didn't make it funny. You noticed that more than anything else he'd
-  done all night — Del, who joked at cold noodles, saying a stranger's name like a man setting down
-  a stone he intended to pick back up later, somewhere safer.
+  Mireille's pencil doesn't move. But her eyes come up off the ledger.
 
 
-  Wren hadn't turned. Wren was still facing the dark, shoulders set in that rigid, borrowed
-  stillness, and when they spoke it came sideways, not to you, not quite to Hoshi either. "Corda
-  doesn't come down here himself," Wren said. "Men like that never do their own walking in the
-  dark." A pause, weighted with whatever room Wren had once stood in and never finished telling you
-  about. "Which means somebody else did. Which means what's back there answers to somebody too."
+  "Eighty-six," Tetsu says, "was never the number for this. That's the number I owe out. Different
+  column." He looks at the wrapped cloth on his knee like it might answer for him. "This was
+  supposed to clear it."
 
 
-  Hoshi didn't argue. He picked up his last two stools, one in each hand, and didn't offer anything
-  further — the wall of his routine finished, the door of him closed again, the way a man closes a
-  door he's opened wider than he meant to.
+  Nobody asks clear what.
 
 
-  You had a name now. You had a direction that led away from the dark, toward daylight logic —
-  foremen, collections, hierarchies you could climb and burn. And you had a shape still watching
-  from twelve feet of black that hadn't moved, hadn't blinked, and hadn't yet decided which one of
-  you it wanted first.
+  "Bought the job three weeks back. Not took. Bought." He says it flat, the way he says everything
+  now, but there's a crack under the flat that wasn't there an hour ago. "Told the broker I'd cover
+  Mireille's cut too, quiet, so she wouldn't have to ask."
 
 
-  Corda would keep till morning. The thing behind Wren might not.
+  Mireille's face doesn't move. Something behind it does.
+
+
+  "You didn't tell her," the lead says. Not a question.
+
+
+  "No."
+
+
+  Rain finds the glass. Same seam. No new information in it.
+
+
+  Tetsu picks the wrapped thing up off his knee. Doesn't unwrap it. Sets it on the table instead,
+  between the envelope and the closed ledger, three objects now where there'd been one.
+
+
+  "That's not for me," he says again. Same words as before. This time nobody lets it pass.

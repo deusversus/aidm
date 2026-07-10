@@ -546,19 +546,35 @@ async function meterTurn(
     const absolute = assertTurnCost(turnTier, narrationUsd);
     if (absolute) failures.push(`turn ${run.turnNumber}: ${absolute}`);
 
-    // Within-turn cache-read floor (§5.6 guaranteed reads). Applies to warm
-    // tiers that do research round-trips; the pilot and each session's first
-    // turn are COLD by construction (cache creation), reported not failed.
-    const warmExpected =
-      TURN_CONTRACTS[turnTier].kaResearchCalls > 0 && !coldTurns.has(run.turnNumber);
-    if (cacheReadFrac !== null) {
-      if (warmExpected && cacheReadFrac < CACHE_READ_FLOOR) {
+    // Cache-read accounting, recalibrated (run #2's live diagnosis): the
+    // §5.6 GUARANTEED reads are the WITHIN-TURN research round-trips — every
+    // narration call after the first reads the prefix the first call wrote,
+    // whatever the turn-to-turn state was. THOSE carry the assertion. The
+    // primary call's fraction is the TURN-TO-TURN rate: B1+B2 read while B3
+    // re-creates as the growing tail (by design — the 3-breakpoint scheme),
+    // so early-campaign fractions run low and improve as compaction moves
+    // bulk into cached B2. Per the plan: within-turn ASSERTED, turn-to-turn
+    // REPORTED vs the 0.7 assumption (a flag, never a failure).
+    const followUps = narrRows
+      .slice()
+      .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
+      .slice(1);
+    for (const call of followUps) {
+      const frac = readable(call) > 0 ? call.cacheReadInputTokens / readable(call) : null;
+      if (frac !== null && frac < CACHE_READ_FLOOR) {
         failures.push(
-          `turn ${run.turnNumber} (${tier}): cache-read frac ${cacheReadFrac.toFixed(2)} < ${CACHE_READ_FLOOR} floor`,
+          `turn ${run.turnNumber} (${tier}): WITHIN-turn research read frac ${frac.toFixed(2)} < ${CACHE_READ_FLOOR} floor (§5.6 guaranteed read missed)`,
         );
-      } else if (coldTurns.has(run.turnNumber)) {
+      }
+    }
+    if (cacheReadFrac !== null) {
+      if (coldTurns.has(run.turnNumber)) {
         flags.push(
-          `cold turn — cache-read frac ${cacheReadFrac.toFixed(2)} (prefix creation expected)`,
+          `cold turn — turn-to-turn cache-read frac ${cacheReadFrac.toFixed(2)} (prefix creation expected)`,
+        );
+      } else if (cacheReadFrac < BUDGET_ASSUMPTIONS.assumedCacheHitRate) {
+        flags.push(
+          `turn-to-turn cache-read frac ${cacheReadFrac.toFixed(2)} vs the ${BUDGET_ASSUMPTIONS.assumedCacheHitRate} assumption (reported, §5.6 — B3 re-creates by design)`,
         );
       }
     }

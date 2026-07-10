@@ -1,309 +1,320 @@
 # M1-C10 golden-turn regression seed (§10.7) — captured from the 30-turn soak.
-# Turn 9, tier sakuga. Regenerate with: pnpm soak -- --capture-golden
+# Turn 23, tier sakuga. Regenerate with: pnpm soak -- --capture-golden
 id: bebop-combat
 tier: sakuga
 captured_from:
-  campaign: 0c18362e-d4e0-48fc-9efb-4d82bac1d252
-  turn: 9
+  campaign: aa99e4c6-9c24-4623-9a9d-63a778c0bda2
+  turn: 23
 player_input: >-
-  I grab Wren's collar and jump backward into the dark. Del comes or doesn't—that's on her now. The
-  ladder's already behind us.
+  I strike a match. Light the last cigarette in my pack. The flame's steadier than my hands have any
+  right to be.
 conte:
   tier: sakuga
   outcome:
     modifiers:
-      - +2 Athletic Capability
-      - +3 Narrative Setup
-      - +2 Wren's Trust
+      - +2 Practiced Routine
+      - +3 Narrative Composure
+      - '+5 Anime Logic: Cigarette as Signal'
     rationale: >-
-      Roll: 14 + 7 = 21 vs DC 10. The action succeeds cleanly. You grab Wren's collar; the retreat
-      into darkness executes without mechanical resistance. The modifiers: +2 for T9 athletic
-      baseline (routine physical action), +3 for the setup (you've established momentum, entered
-      together, the ladder is already positioned behind you as an escape route), +2 for Wren's
-      implicit trust (they stopped but did not flee; your grab is an extension of
-      already-established cooperation). At 21 vs DC 10, this is a solid success with room to spare.
-      No cost for the action itself—you're using basic athletic capability within your tier against
-      a willing (if traumatized) companion. However, the consequence flows from NARRATIVE, not
-      mechanical failure: Wren's sudden silence and the resonance with their dread suggests this
-      moment means something to them. The grab succeeds, but it catches Wren in a state of triggered
-      recognition. They move with you, but as a passenger to their own memory. Del's presence and
-      breathing remain constants—she has not abandoned you, and that rhythmic trust creates the only
-      anchor in the dark ahead.
-    consequence: >-
-      Wren's silence deepens—the grab is successful, but Wren does not resist or acknowledge the
-      action. They move with you into the dark as a dead weight of recognition rather than
-      partnership.
+      Roll: 11 + 10 = 21 vs DC 5. This is not a mechanical test—it is a statement. The player is
+      performing a beat of character: steadying hands through ritual, signaling readiness without
+      words. At T9 baseline, lighting a cigarette is trivial mechanics (DC 5), but the narrative
+      context elevates it. The one-handed flint strike established precedent. The silence,
+      Mireille's ledger closing, the three-week wait culminating in THIS gesture—this is earned. The
+      natural 11, plus the modest modifiers for practiced routine (+2), the character's deliberate
+      refusal of performance anxiety (+3), and the anime logic that a lit cigarette is a VALID
+      SIGNAL between operatives (+5), yields 21. Success. The match catches. The cigarette ignites.
+      Mireille reads it. The scene resolves with the weight of preparation behind it. No cost. No
+      complication. Just the quiet authority of someone who knows exactly what they are doing and
+      lets the world catch up to their certainty—except here, certainty is the action itself. The
+      hands are steady because they have already decided. The flame doesn't waver. Mireille moves.
+      The signal was received. Story advances cleanly because the player earned this moment through
+      roleplay, not dice luck. The silence speaks. The ledger closes. Departure is imminent. This is
+      success, and it costs nothing, because routine mastery never does—especially when that routine
+      is the hinge of an operation about to turn irrevocably forward.
     success_level: critical_success
-    difficulty_class: 10
+    difficulty_class: 5
     narrative_weight: SIGNIFICANT
-  turn_id: 9
+  turn_id: 23
   degraded: false
   memories:
     - layer: semantic
       content: >-
-        The player, Del, and Wren entered the dark space together after the pier's chain locks began
-        closing.
-      turn_id: 2
-      confidence: 0.8
-      provenance: chronicler_g2
-    - layer: semantic
-      content: Something unseen and deliberate is present in the dark beyond the tarp, watched by Wren
-      turn_id: 5
+        Mireille has been waiting for the signal to leave and reads the lighting of a cigarette as
+        the order of departure.
+      turn_id: 9
       confidence: 0.8
       provenance: chronicler_g2
     - layer: semantic
       content: >-
-        Del is present with the protagonist and Wren, breathing carefully and matching the
-        protagonist's rhythm without prior agreement.
+        The woman lights a cigarette without looking at Mireille, refusing performance and letting
+        the silence speak instead.
+      turn_id: 7
+      confidence: 0.8
+      provenance: chronicler_g2
+    - layer: semantic
+      content: >-
+        The player character lit a cigarette one-handed with flint, a deliberate move signaling
+        composure rather than nerves.
       turn_id: 3
       confidence: 0.8
       provenance: chronicler_g2
     - layer: semantic
       content: >-
-        Wren recognizes something about this moment—it resonates with a traumatic memory or past
-        event that Wren previously couldn't articulate, triggering a specific kind of dread distinct
-        from fear.
-      turn_id: 6
+        Mireille lays down her ledger—flat, cover up, pencil crossed—after three weeks of keeping it
+        tucked and her hands free for retreat.
+      turn_id: 7
       confidence: 0.8
       provenance: chronicler_g2
     - layer: semantic
       content: >-
-        Wren stopped suddenly in the dark, sensing something ahead — Wren's usual readiness and
-        speech failed them.
-      turn_id: 2
+        Mireille sat watching the exchange with the ledger closed and resting on her knee, not
+        moving to open it, observing the two of them like data about to resolve itself.
+      turn_id: 22
       confidence: 0.8
       provenance: chronicler_g2
   callbacks:
     - >-
-      The money always tells—why did Fen leave exact payment with no change? (expected payoff:
-      Reveals Fen knew his own timing or someone else's arrival was imminent)
+      The crane figure's true identity, role, and why they knew exactly when to appear (expected
+      payoff: Reframes bounty from hunt to collision)
     - >-
-      Wren's uncharacteristic silence—experience, not intuition (expected payoff: Crew learns Wren
-      has seen something like this before, or knows alleys like this exist)
+      The noodle vendor's three-week signal pattern and who hired him to set the table (expected
+      payoff: Clarifies whether crew is protected or exposed)
     - >-
-      Del's failed humor—grief running underneath (expected payoff: Del has lost someone to
-      something like this, or fears they will. It surfaces when the joke doesn't land.)
+      The missing bounty's current status and relation to the crane figure (expected payoff:
+      Completes the triangle: job, crew, third party)
   mechanics:
     rolls:
       - sides: 20
         total: 21
-        rolled: 14
-        purpose: outcome vs DC 10
-        modifier: 7
+        rolled: 11
+        purpose: outcome vs DC 5
+        modifier: 10
     combat_results: >-
-      Scale: horror (secondary: existential). Power imbalance: balanced (effective 0.1×). Evenly
-      matched: every exchange matters; spend the choreography budget. Context: environmental ×0.6 —
-      Complete darkness eliminates visual advantage; the unseen threat operates in its native medium
-      while the protagonist must rely on proprioception and sound Context: secret_id ×0.8 — The
-      protagonist's grab of Wren signals protection/priority; pulling someone into genuine danger
-      rather than abandoning them to escape carries implicit accountability Context: genre ×0.7 —
-      The beat reads as horror—dread, sensory deprivation, a deliberate-moving presence, and Wren's
-      trauma-resonant paralysis all lock the register into existential vulnerability rather than
-      tactical dominance
+      Scale: slice_of_life (secondary: mystery). Power imbalance: balanced (effective 0.8×). Evenly
+      matched: every exchange matters; spend the choreography budget. Context: genre ×0.9 —
+      slice_of_life/mystery register emphasizes restraint, reading, and psychological weight over
+      kinetic display; the scene's power lives in what is NOT performed Context: mentor ×0.85 — the
+      character is signaling and teaching through deliberate gesture rather than asserting
+      dominance; the match-light is communication, not flex
     resource_spends: []
   pacer_beat:
-    tone: tense, defiant, with mounting dread
+    tone: quiet defiance; trembling control
     avoid:
-      - immediate rescue or safety
-      - dialogue that dilutes the physical stakes
-    strength: suggestion
-    must_reference:
-      - Del's choice in the moment
-      - the ladder's absence as a retreat point
-    escalation_target: '0.65'
-    foreshadowing_hint: The dark they're falling into has weight—something waits below, or the fall itself never ends.
-    beat_classification: Commitment Gambit
+      - external intervention
+      - dialogue that breaks the moment
+    strength: strong
+    must_reference: []
+    escalation_target: '0.15'
+    foreshadowing_hint: The steadiness of the flame—or the lack thereof—echoes a choice yet to come.
+    beat_classification: setup_ritual_grounding
   canon_chunks: []
-  entity_cards:
-    - >-
-      Del (npc): wisecracking crewmate; insists the job is simple; comic deflection masking unease
-
-      Engages the scene with questions and theory (money-without-change as flight marker), but
-      second-guesses himself; crouches to examine the bowl, seeking confession from objects.
-
-      Deflection failed him; the joke did not arrive. His practiced evasion is inadequate to this
-      space.
-
-      Breathing shallow and synced with protagonist; discovering mid-job that the supposed
-      simplicity of the task was false hope.
-
-      Collapsed into genuine terror. Lost his deflection and humor. Standing very still in a coat
-      that no longer fits. Now a liability and anchor point for whatever hunts them.
-
-      Processed the name 'Corda' with gravitas; shifted from humor into tactical mode. Treats the
-      information as a concrete next target.
-
-      Pattern broken: humor suppressed, replaced with anxious physical repetition; three years of
-      deflection abandoned, suggesting genuine danger has overridden coping mechanism.
-
-      Learning the family trade of unstated half-truths; holding still on the button rather than
-      continuing to turn it; present as witness to the threshold moment.
-
-      Proved capable of decisive action under pressure—saved Wren from the third Red Sash
-      operative's line of fire. Regained agency after passivity all night.
-    - >-
-      Wren (npc): quiet fellow bounty hunter; speaks first into silence; carries the arc's fatalism
-      without yet voicing the spark line
-
-      Reads the abandoned meal and tarp gap as a threshold; does not crouch or theorize, but moves
-      toward the unlit alley with quiet inevitability. Establishes Wren's role as the one who names
-      hard truths first when silence becomes statement.
-
-      Lost their usual first-word readiness; spoke only after a beat too long, flat and final.
-      Recognized the mission and space as fundamentally different from stated parameters.
-
-      Has gone uncharacteristically silent in the face of an alley-bound threat, signaling danger
-      that transcends their typical verbal dominance.
-
-      Shoulders recalibrated under fear. Broke silence with a reading of the player's gesture. First
-      words reveal prior trauma in 'a room like this'—psychological cost still accruing.
-
-      Remains facing the darkness; recognizes that Corda acts through intermediaries and that
-      something larger is moving in the black. Knowledge suggests past involvement with hierarchical
-      power structures.
-
-      Recognition of something worse than fear has arrived; shoulder rigid with understanding that
-      resonates with past trauma; past silence about 'what room' suggests this moment confirms a
-      feared recurrence.
-
-      Recognizes the approaching shape from a prior survival situation; has experience with deciding
-      whether dangerous 'he's' keep breathing; now stands rigid with flat hand held off body,
-      bracing without showing it.
-
-      Attempted to warn the player away from drawing; now silent and afraid, moving forward without
-      looking back, locked in Del's protective grip. Their unspoken knowledge suggests they knew the
-      Jericho would wake something.
+  entity_cards: []
   spotlight_hints:
     - >-
-      Wren's room in the dark (the unspoken history): They know something about hierarchies and
-      listening. Don't explain it. Let them turn back once toward the dark, a gesture that says
-      everything.
+      Noodle vendor (spotlight debt closed): Exit with dignity in turn 22. Character does not return
+      to this arc. Treat as new if appears next arc.
     - >-
-      Del's interior arithmetic (the cost counter): A man deciding whether to walk into what he's
-      already calculated. No jokes. Each word a stone. When Del breaks, it's the emotional climax of
-      the arc.
+      Tetsu's pocket-thing: Unspoken throughout coda. Hand reaches, stops, returns to knee. Weight
+      implied, never named. Visible in final image.
     - >-
-      The Unnamed thing (the presence in absence): Character made of silence. Moves at edge of
-      peripheral space. Never centered. Never named until it has to be. Let it move with the crew
-      when they move.
+      Mireille's ledger anchor: Holds her still. Closed at turn end. Will reopen with fresh column
+      next cycle. Ledger is engine of recursion.
   hard_constraints:
     - >-
-      Corliss Fen (bounty: 2200) was last seen at Hoshi's noodle stand on Pier Nine, left money on
-      counter without taking change, and departed before finishing his meal.
+      Tetsu remains unnervingly still and patient at the crane, hand near his holster but making no
+      move, suggesting prior understanding or rehearsed confrontation.
     - >-
-      A gap in the tarp line near Hoshi's stand leads into an unlit maintenance alley beyond the
-      stall row—the dock's 'other face' where evening commerce ends.
+      The player character's slow stand, meant as defiance, was received by Tetsu as confirmation
+      that he was right about the confrontation's inevitable shape.
     - >-
-      The player, Del, and Wren entered the dark space together after the pier's chain locks began
-      closing.
+      Mireille, the ledger-keeper at the dock counter, has been watching the protagonist for three
+      weeks and is now openly evaluating her competence and reliability in a moment of decision.
     - >-
-      Wren stopped suddenly in the dark, sensing something ahead — Wren's usual readiness and speech
-      failed them.
+      The fixer refused to answer the protagonist's question about waiting or moving, redirecting
+      the moment of choice back to her by his silence and deflected attention.
+    - A target was identified and tracked for three weeks across the dock before being eliminated.
     - >-
-      Wren stated this is not a hallway, not a rent-money job, and the player should abandon their
-      original understanding of the mission.
+      The protagonist works Dock 7 on Ganymede with Tetsu and Mireille; they have kept working an
+      hour past shift for three weeks waiting for someone with a face they haven't clearly seen.
     - >-
-      Something in the dark ahead has become still in the way that indicates it is aware of being
-      watched.
+      The noodle stand vendor has set an untouched bowl at the counter facing Dock 7, with
+      chopsticks placed deliberately—a signal or trap.
     - >-
-      Wren has gone completely silent in response to an unseen threat ahead in the alley, breaking
-      their usual pattern of speaking first into silence.
+      The dock exists in a state of unnatural stillness: smoke doesn't disperse, broth stays hot,
+      shadows fall wrong, wind never comes.
     - >-
-      Something unseen and motionless waits ahead in the alley, possibly aware of them but choosing
-      not to respond to the protagonist's movement toward their weapon.
+      The vendor poured out the third waiting bowl into the gutter—a deliberate signal that whatever
+      was expected to arrive won't be fed or welcomed.
     - >-
-      Wren has survived a room like this before and carries the cost of it; something in their body
-      remembers what came after.
+      Neither Mireille nor the figure has drawn a weapon; both are performing a choreography of
+      restraint and negotiation.
     - >-
-      Del's capacity to deflect and joke has failed him; he is genuinely frightened and no longer
-      performing competence.
+      The scene ends unresolved—the last inch between them remains uncrossed, the next move still
+      unsigned.
     - >-
-      The unseen presence in the alley reads human signals—it understood the cigarette as defiance,
-      marked Wren's voice breaking silence, and is now deciding its first target based on these
-      responses.
+      Three weeks of the protagonist's sustained composure and successful moves have accumulated
+      into a trial moment where Mireille must decide if this pattern represents genuine capability
+      or lucky runs.
+    - >-
+      The protagonist has drawn and fired the Jericho, killing the first ambusher and wounding the
+      second with a leg shot; the third was subdued with the pistol's frame.
+    - >-
+      Three ambushers were waiting on the gantry lattice for three weeks, positioned to intercept
+      movement toward the gantry rather than away from the counter.
+    - >-
+      Tetsu draws and trains his weapon on the darkness beyond the gantry with cold finality,
+      breaking three weeks of rehearsed restraint.
+    - >-
+      The fixer's hands rise, not in surrender but in visible shock that his trusted men have 'moved
+      the line' without orders; his control has fractured.
+    - >-
+      A floodlight in a previously dark window across the black water activates immediately after
+      the gunfire ceases, and something moves behind it—an unseen observer now openly watching.
+    - >-
+      The protagonist is being observed by a cold light across the water, possibly a surveillance
+      beam or intentional watcher.
+    - >-
+      Tetsu lowered his gun—not in surrender, but as a gesture of trust and agreement with the
+      protagonist's silent reading of the situation.
+    - >-
+      Mireille's earlier verdict, spoken over a closed ledger and open ledger with a bowl turned
+      right-side up, has now been confirmed by the unfolding events.
+    - >-
+      Mireille records three kills in the ledger with blank names, tracked only by weight, distance,
+      and wound angle.
+    - >-
+      A window across the water is visible from the berth but remains unspoken of—a location or
+      witness tied to the operation.
+    - A fixer went into the water feet-first off the dock; two others were left breathing.
+    - The crew has decided not to kill again unless there is no other way left.
+    - >-
+      The math of Tetsu's debt never sits still—his rate is flat against a debt that grows, minus
+      what the job costs him.
+    - Mireille has not eaten; she sends her cut home first and eats only what remains afterward.
+    - >-
+      Mireille has been operating this way—paying home first, hunger second—for at least three
+      weeks, probably longer.
+    - >-
+      A job exists with an established debt and a payoff amount, but the payment conversation cannot
+      happen tonight.
+    - >-
+      Someone's blood has recently entered black water — a death or disposal has just occurred in or
+      near this berth.
+    - >-
+      Tetsu carries something small and hard-edged in his coat's inside pocket, which he touched but
+      did not retrieve.
+    - >-
+      The broth was ladled at the precise moment she sat down to eat it—temperature held
+      deliberately hot, suggesting premeditation and surveillance.
+    - >-
+      She killed the floodlight banks in careful sequence over the past three weeks, and someone out
+      at the dock has just tested whether they stayed dark.
+    - >-
+      A man-sized figure stands at the base of the crane, motionless in deliberate exposure,
+      positioned in the counter's single sightline—he wants to be seen.
+    - >-
+      Tetsu has shifted his hand near his holster and stopped eating; Mireille has abandoned her
+      ledger and stopped writing—both are aware of the threat.
     - The Red Sash dockworkers' syndicate controls the piers
+    - Anders runs the Red Sash on this specific pier
+    - The Red Sash answers to a Consortium office in the high city
+    - The Consortium office handles shipping records and customs stamps
     - >-
-      Corda is a foreman who runs collections for the Red Sash out of the container stacks past the
-      fish market
-    - Fen likely fled because Corda's people were already moving toward him
-    - Something unseen and deliberate is present in the dark beyond the tarp, watched by Wren
-    - Wren suggests the presence in the dark answers to someone beyond Corda's authority
+      Mireille lays down her ledger—flat, cover up, pencil crossed—after three weeks of keeping it
+      tucked and her hands free for retreat.
     - >-
-      Sound and time behave strangely in this space—events are felt before heard, causality seems to
-      lag, as if the alley itself has agency in how events unfold.
+      The upturned bowl at the counter, empty and right-side up, was left open by a man who spent
+      all night deciding whether to feed the thing that came walking out of the dark.
     - >-
-      The unseen thing has been still and watching, but is now becoming a perceptible shape, moving
-      with unhurried confidence characteristic of something that has never needed speed.
+      Mireille speaks her verdict aloud: the woman is not asking for trust, but asking to be watched
+      and judged—that is the only kind of leader worth the overtime.
+    - The protagonist shot or killed three men on the dock with borrowed calm and control.
     - >-
-      The player character is at a dock with Wren and Del, facing something unseen in the dark that
-      has been motionless until now.
+      Mireille has been waiting for the signal to leave and reads the lighting of a cigarette as the
+      order of departure.
     - >-
-      Wren recognizes something about this moment—it resonates with a traumatic memory or past event
-      that Wren previously couldn't articulate, triggering a specific kind of dread distinct from
-      fear.
+      The fixer has lost control of the dock and can no longer stop them; his silence is submission,
+      not strategy.
     - >-
-      The player held a drawn hammer on an unknown breathing figure in an alley, then eased it down
-      without firing.
+      A searchlight from across the black water has fixed on the protagonist and stopped sweeping;
+      someone is actively observing and cataloguing her.
     - >-
-      Wren has survived a previous situation involving deciding whether a 'he' would keep breathing,
-      and recognizes the current shape's nature.
+      The protagonist must choose between crossing into open water under the searchlight's gaze or
+      holding position to make the watcher wait.
+    - The fixer is dead, shot from across the water by an unknown sniper positioned at a lit window.
     - >-
-      Red Sash markings—shipping tags with three characters—appear on a stencil in the alley,
-      indicating Red Sash territorial claim and possible ownership of the approaching shape.
+      Someone in the lit window across the water fired the shot and briefly revealed themselves:
+      barrel, shoulder, a figure leaning back from the kill.
     - >-
-      The shape moving toward the player is unhurried, certain, and reads the lowered hammer as
-      permission rather than restraint.
+      The protagonist has been on a dock within the last hour, an operation that resulted in at
+      least one death to be recorded in Mireille's ledger.
     - >-
-      The player must choose between holding ground or giving ground in the alley, with the shape's
-      arrival imminent.
+      Mireille maintains a ledger recording operations by weight, distance, and angle—names
+      deliberately omitted.
     - >-
-      The player character carries a Jericho—a weapon that can be identified by sight alone, enough
-      to make even hardened Red Sash fighters recalculate their odds.
+      Mireille's hand trembled while smoking, a tell she caught and suppressed, revealing stress
+      fractures beneath her composure.
+    - A job remains unfinished—a window unnamed since the dock, not yet closed.
     - >-
-      Three Red Sash operatives were positioned between the player and the gantry's ladder—the only
-      clean exit from the alley.
+      The three of them—Mireille, Tetsu, and an unnamed third—operate in a place where every word
+      costs something and silence is preferred to speech.
     - >-
-      Wren attempted to stop the player from drawing ('Not the—') but could not finish the warning
-      before gunfire erupted.
+      Tetsu reached toward something small and hard-edged inside his coat, then stopped halfway and
+      returned his hand to his knee without explanation.
     - >-
-      Something—an entity or force that has been following the group all evening, staying exactly
-      three breaths behind them—was waiting for the gunfire. The noise of the firefight was the
-      trigger that ended its patience.
+      /override From here on, keep the body count low — I want captures, not kills, unless there's
+      no other way.
   research_findings: []
   charter_amendments: >-
     ## Amendments (this scene)
 
 
-    RETAKE (strong): continuity is reading 8/10 on the page; the premise wants 3/10. Pull it down —
+    RETAKE (strong): continuity is reading 9/10 on the page; the premise wants 3/10. Pull it down —
     this note lifts when it reads back in band.
 
-    Fresh calibration — player_meta: Player invoked hand movement before conscious volition;
-    narration honored that internal split between action and awareness as thematic rather than
-    mechanical.
+    RETAKE (strong): register is reading 9/10 on the page; the premise wants 7/10. Pull it down —
+    this note lifts when it reads back in band.
 
-    Fresh calibration — player_meta: The narration operated entirely in subtext and sensation rather
-    than plot events—pressure, texture, the grammar of survival. No action resolved; instead, the
-    scene deepened the player's understanding of how to read the unseen and how fear communicates
-    itself to a listening thing.
+    Fresh calibration — noir restraint: cut interpreting and explanations; let gesture and action
+    land without narration
 
-    Fresh calibration — continuity: continuity has read 8/10 for 3 straight samples while the
-    premise wants 3/10 — pull it down and hold it there.
+    Fresh calibration — silence as scene: more dead air; fewer characters filling silence with
+    dialogue; tolerate discomfort of extended beats
+
+    Fresh calibration — smoke and gesture as emotional carrier: let cigarette motif carry weight
+    without decoration or dialogue gloss
+
+    Fresh calibration — dialogue economy: clipped exchanges driven by withholding, not chattiness;
+    shorter lines; every word costs the speaker
   active_consequences:
-    - None
     - >-
-      You move through cleanly, but the darkness swallows detail—you catch Hoshi's silhouette ahead,
-      but miss what made him stop. Your eyes haven't adjusted yet.
+      The crane arm moves. Not the standard sweep—a precise, purposeful rotation toward the
+      floodlights. In that moment, you taste the broth correctly: it's still at perfect temperature,
+      despite sitting untouched. Someone wanted you to eat it NOW. The figure at the crane is
+      silhouetted, moving with the confidence of someone who knows you're watching. They want to be
+      seen.
     - >-
-      The thing moves first. Your calculated defiance works—but the cost is initiative. It has
-      already decided where to strike.
+      The figure does not flinch at your approach—he was expecting exactly this. Your slow stand
+      reads as acknowledgment rather than dominance. He shifts his weight, slight but visible,
+      moving first.
     - >-
-      The creature's patience breaks. It moves—not fast, but WITH inevitability, as if your words
-      were permission rather than deflection. The hammer in your hands suddenly feels very small.
+      Mireille interprets your stillness as confidence—or bluff. She will test it. The next move
+      becomes hers to make, and she will not flinch.
     - >-
-      Your aggressive advance succeeds—you punch through their line with violence and precision—but
-      the noise, the muzzle flash, and your forward momentum ACCELERATES the shape's approach. It
-      reads your gunfire as escalation, not negotiation. You reach the gantry with rounds still hot,
-      but what emerges from the dark is NOW COMMITTED and moving with predatory certainty.
+      The advance commits you—Tetsu's patience breaks, and the rehearsed confrontation becomes REAL.
+      No retreat now.
+    - >-
+      The floodlit watcher now has a clear visual lock on your position. Mireille's acknowledgment
+      is secure—but you've broadcast your exit to a third party.
+    - The silence becomes a negotiation—Mireille's evaluation shifts from assessment to recognition.
+    - >-
+      The watcher moves first—revealing themselves, their position, or their intent before you act.
+      Control passes to them momentarily.
+    - >-
+      The cigarette burns steadily, but Mireille's hand trembles slightly as she exhales—a tell she
+      cannot quite suppress. The woman notices. The silence deepens, no longer neutral but weighted
+      with the knowledge that Mireille is not as composed as she performs.
   scene_shape_directive: >-
     ## Scene shape
 
@@ -314,91 +325,99 @@ conte:
 
     Choice weight: choices land on this scene and these relationships.
 
-    Arc "The Quiet Mark" (escalation): Tight. Close. Three people in a tarp with a lit match. Dark
-    beyond. Unhurried grammar—every action measured twice before landing. Sound design foregrounds
-    absence: no sirens arriving, no footsteps leaving, no blink from the dark. Dialogue sideways,
-    not straight at each other. Comments made toward the dark, toward what isn't there to defend
-    itself.
+    Arc "The Ledger Closes" (setup): Opening beat: small precise action signals new baseline (tired,
+    not defeated). Middle: pocket-thing unspoken, ledger closed, rain meter louder than breath.
+    Closing beat: acceptance that gap is what they have instead of bridge—single motion signals
+    continuation. Final image: recursion made visible without naming (fresh column, wrapped cloth,
+    new envelope)—nothing closes, only pauses.
 
-    Director: The half-beat delay is locked. The snare lands after the audience expects it, every
-    time. Floor beneath them is tilted.
+    Director: Tetsu's hand stopping mid-reach toward inside pocket is physical heart of coda—do not
+    explain, do not name.
 
-    Director: Close one seed cleanly before the next move: let Wren's silence resolve in a gesture,
-    a look back toward the dark. Something that says 'I know what's there because I've been there.'
-    Cost nothing to voice, everything to imply.
+    Director: Mireille's ledger closed at turn end, reopened next cycle with fresh column—ledger
+    generates repetition by design.
 
-    Director: Plant the next question in the frame itself. Don't wait for dialogue. The crew has a
-    name (Corda) that doesn't change anything about what's watching.
+    Director: Rain literal weather doing its job, no metaphor—the dome has no other voice.
+  style_drift_directive: >-
+    The last few scenes have all opened on a character already in motion. Change the entry — shift
+    to second-person moment this time (unless the scene actively resists it — then write what the
+    scene wants).
   world_assertion_notes: []
   canonicality_directives:
     - 'Timeline: canon_adjacent; cast: full_cast; events: influenceable.'
     - 'NEVER contradict: Spike''s past with the Syndicate is not rewritten'
   vocab_freshness_advisory: >-
-    these exact phrasings recur across recent scenes — retire them this beat: "half second before
-    it", "hadn't decided yet whether", "has never once needed"
+    recent scenes are converging in texture — vary sentence rhythm and sensory register; these exact
+    phrasings recur across recent scenes — retire them this beat: "rain keeps its static", "keeps
+    its static going", "its static going against"
 prose: >-
-  You had Wren's collar before you finished the thought that started the reach — fingers hooking
-  into wet canvas and worn wool, weight following where your hand led it because that's what weight
-  does when the body underneath offers no argument. You didn't ask first. Asking costs a beat you
-  didn't have; whatever was coming through what used to be your firing lane wasn't waiting on
-  manners.
+  The match catches on the first stroke.
 
 
-  Wren came.
+  You don't remember losing the first one — there's a black sliver of spent wood in your palm you
+  didn't put there — but this one flares clean, no wobble in it, and you touch it to the last
+  cigarette in the pack before the flame has time to think about doing anything less than what you
+  need it to do.
 
 
-  Not fought, not helped — came, the particular non-weight of someone who has already decided,
-  somewhere below deciding, that resistance and cooperation cost the same and neither's worth the
-  spending. You felt it the moment your shoulder took the drag: no lean into you, no counter-lean
-  away. A door swinging on hinges oiled a long time ago for exactly this kind of night. You'd pulled
-  people out of worse rooms. None of them had ever gone this quiet about it.
+  The pack goes back in your pocket empty. You don't remark on it. Nobody does. It's just a fact
+  now, filed the way facts get filed in this room — no ceremony for a finished thing, just the plain
+  arithmetic of one less than there was an hour ago.
 
 
-  Backward, past the ladder. Rust-streaked rung, the same red stencil at its base you'd clocked once
-  already and not touched — and you didn't touch it now either, because the last four seconds had
-  already spent that option without asking your permission. The Sash men were down, or gone the way
-  the third one went, taking his unfinished sentence with him. The gantry stood open where you used
-  to be standing. Then it stood beside you. Then behind. Turning your back on a dark that had just
-  started moving with intent was the one motion tonight your body refused to authorize, ladder or no
-  ladder.
+  Smoke goes up thin. Breaks apart before it reaches anything.
 
 
-  You went sideways instead, into a gap your shoulder found before your eyes did — a crate-stack
-  pocket, the kind a dock keeps for its own reasons and never puts on a manifest. Wren folded into
-  it after you like cloth already used to folding.
+  Across the berth, Tetsu's hand moves. Two inches, no more, toward the inside of his coat — the
+  place where something small and square-edged has ridden against his ribs all night — and stops
+  there, same as it's stopped three times already. Fingers press once through the fabric. Feel the
+  shape of the thing. Come back to his knee.
 
 
-  No sirens climbed the pier wall behind you. No footsteps retreated in either direction — whoever
-  of the Sash had survived didn't run so much as evaporate, leaving no sound behind them at all, as
-  if being heard leaving cost more than they had left to spend. The alley kept its silence the way
-  it kept everything else tonight: on its own schedule, not yours.
+  He doesn't look at what he almost reached for.
 
 
-  Del came in low a half-step after, breath ragged, no joke riding under it, none left to ride.
-  "Ladder's gone," Del said — flat, more report than complaint, the family trade half-spoken, the
-  other half swallowed. Didn't say *I could've taken it.* Didn't have to. That was the stone Del was
-  carrying now, the one to be picked back up later, somewhere safer, if somewhere safer ever came
-  around again.
+  Mireille has the ledger open across her knee. Not writing. Looking at the last line — weight,
+  distance, angle, no name — the way you look at a number you've already decided not to argue with
+  tonight.
 
 
-  The dark took its own time deciding what to do with the three of you crammed inside it.
+  She closes the cover. Pencil still inside it this time, caught between the pages, and she doesn't
+  fish it back out.
 
 
-  It was wrong dark the way all of tonight had been wrong — sound arriving late, shapes arriving
-  early — but this pocket spoke its own dialect of it. The floor under your boots didn't sit level.
-  Not tilted enough to name. Just enough that your knees kept a private argument with the planking
-  your head hadn't been invited to. Somewhere under that floor, not beside you, not ahead — *under*
-  — something shifted, slow and patient, the sound of it arriving a full breath after whatever
-  caused it, same as everything tonight: late, apologetic, wrong.
+  Water keeps finding the same line down the glass, over and over, patient in a way that isn't a
+  metaphor for anything. It's just weather. Scheduled, budgeted, indifferent.
 
 
-  Wren turned their head. Once. Back toward the gap you'd all just come through, the red stencil
-  catching one last scrap of light before the dark closed the distance for good. Something crossed
-  their face that wasn't fear and wasn't relief. Recognition, settled, old — the sentence they'd
-  been not-finishing all night, finished now without a single word spent on it: *I know what's down
-  here because I've been down here, and neither of us is climbing back out on a ladder that isn't
-  ours to use anymore.*
+  Nobody talks for a while. Long enough that the quiet stops being a held thing and turns into
+  furniture — something the room simply has now, the way it has a table and a window and three
+  people too spent to spend words on each other.
 
 
-  Then they faced forward again, into the new dark, and waited — same as you, same as Del — to learn
-  what the floor was going to do next.
+  You watch the coal instead of the smoke. Small orange point going smaller. Think, without meaning
+  to, that the flame held steady and that it shouldn't have, not after tonight, not with hands that
+  did what these did.
+
+
+  A knock. Two knuckles, once, low on the frame.
+
+
+  Tetsu's up before the second one lands. Opens the hatch on the same wet dark from before, and it
+  isn't the boy this time, isn't the vendor — just a gloved hand, holding out a thin envelope
+  through the gap, gone again before the door's shut the rest of the way. No face attached to it
+  worth remembering.
+
+
+  He sets it on the table. Doesn't open it. Doesn't hand it to anyone.
+
+
+  Mireille looks at it a long moment. Then reaches over, without asking, and opens the ledger back
+  to a fresh page — blank, waiting, weight and distance and angle not yet filled in because there's
+  nothing yet to fill them with.
+
+
+  She leaves the line empty.
+
+
+  Sets the pencil across it, not writing, just resting there — ready.
