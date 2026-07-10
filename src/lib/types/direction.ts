@@ -206,6 +206,53 @@ export const DirectionState = z.object({
 });
 export type DirectionState = z.infer<typeof DirectionState>;
 
+/**
+ * Rewind DirectionState to turn N (§6.7 — turns are revocable; C8 re-audit).
+ * Turn-anchored fields clamp to the surviving timeline and dead-timeline
+ * evidence drops; without this, a rewind left last_sample_turn /
+ * last_director_turn pointing past the tip — silently disabling the Sakkan
+ * (the same-turn guard) and the Director trigger (negative turns_since)
+ * until play re-passed the pre-rewind high-water mark. Accumulators reset:
+ * their evidence may reference un-happened turns. Soft prose state (notes,
+ * tension, pilot plan) survives — the next Director cycle re-plans it.
+ * Pure; the rewind transaction applies it atomically with the sweep.
+ */
+export function rewindDirectionState(state: DirectionState, toTurn: number): DirectionState {
+  return {
+    ...state,
+    last_director_turn: Math.min(state.last_director_turn, toTurn),
+    accumulated_epicness: 0,
+    arc_events: [],
+    ...(state.phase_state
+      ? {
+          phase_state: {
+            ...state.phase_state,
+            entered_at_turn: Math.min(state.phase_state.entered_at_turn, toTurn),
+          },
+        }
+      : {}),
+    ...(state.settei
+      ? {
+          settei: {
+            ...state.settei,
+            rebuilt_at_turn: Math.min(state.settei.rebuilt_at_turn, toTurn),
+          },
+        }
+      : {}),
+    ...(state.sakkan
+      ? {
+          sakkan: {
+            last_sample_turn: Math.min(state.sakkan.last_sample_turn, toTurn),
+            readings: Object.fromEntries(
+              Object.entries(state.sakkan.readings).filter(([, r]) => r.at_turn <= toTurn),
+            ),
+            active_notes: state.sakkan.active_notes.filter((n) => n.since_turn <= toTurn),
+          },
+        }
+      : {}),
+  };
+}
+
 // --- Director output (model-facing; strict structured output) ------------------
 // Flat where a union would be cleaner: strict output schemas stay closed and
 // simple (no discriminated unions, no records) — the engine re-shapes.

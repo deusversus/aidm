@@ -2,6 +2,7 @@ import type { Db } from "@/lib/db";
 import { notTombstoned } from "@/lib/db/helpers";
 import {
   arcs,
+  campaigns,
   compactedBeats,
   consequences,
   criticalFacts,
@@ -20,6 +21,7 @@ import {
   stateSnapshots,
   turns,
 } from "@/lib/db/schema";
+import { DirectionState, rewindDirectionState } from "@/lib/types/direction";
 import { and, asc, desc, eq, gt, inArray, isNull, lte } from "drizzle-orm";
 
 /**
@@ -174,6 +176,25 @@ export async function rewindCampaign(
       // No surviving version = a pre-versioning legacy row — leave it be.
       if (newest && newest.block !== s.block) {
         await tx.update(entities).set({ block: newest.block }).where(eq(entities.id, s.id));
+      }
+    }
+
+    // 1b. DirectionState's turn-anchored fields clamp to the surviving
+    //     timeline (C8 re-audit): a stale last_sample_turn silently disabled
+    //     the Sakkan's same-turn guard, and a stale last_director_turn made
+    //     turns_since negative — both engines dead until play re-passed the
+    //     pre-rewind high-water mark. Same transaction as the sweep.
+    const [campaignRow] = await tx
+      .select({ directionState: campaigns.directionState })
+      .from(campaigns)
+      .where(eq(campaigns.id, campaignId));
+    if (campaignRow?.directionState) {
+      const parsed = DirectionState.safeParse(campaignRow.directionState);
+      if (parsed.success) {
+        await tx
+          .update(campaigns)
+          .set({ directionState: rewindDirectionState(parsed.data, toTurn) })
+          .where(eq(campaigns.id, campaignId));
       }
     }
 

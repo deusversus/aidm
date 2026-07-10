@@ -75,6 +75,65 @@ const spendConte = (turnNumber: number, amount: number) => ({
 
 type MpState = { resources?: { MP?: { current?: number; max?: number } } } | undefined;
 
+describe("rewindDirectionState (pure, §6.7 + C8 re-audit)", () => {
+  it("clamps turn-anchored fields, drops dead-timeline evidence, keeps soft state", async () => {
+    const { DirectionState, rewindDirectionState } = await import("@/lib/types/direction");
+    const state = DirectionState.parse({
+      last_director_turn: 20,
+      accumulated_epicness: 1.4,
+      arc_events: ["sakuga_moment"],
+      tension_level: 0.7,
+      director_notes: ["hold the noir patience"],
+      phase_state: { arc_id: "a1", phase: "rising", entered_at_turn: 14 },
+      settei: {
+        text: "x",
+        charter_tokens: 10,
+        rendered_axes: ["darkness"],
+        uncovered_extremes: [],
+        rebuilt_at_turn: 20,
+        rebuilt_at: "2026-07-09T00:00:00.000Z",
+      },
+      sakkan: {
+        last_sample_turn: 20,
+        readings: {
+          darkness: {
+            observed: 3,
+            confidence: 0.9,
+            at_turn: 16,
+            consecutive_drift: 2,
+            evidence: "e",
+          },
+          comedy: { observed: 5, confidence: 0.8, at_turn: 8, consecutive_drift: 0, evidence: "e" },
+        },
+        active_notes: [
+          { axis: "darkness", active: 7, observed: 3, since_turn: 16 },
+          { axis: "comedy", active: 4, observed: 6, since_turn: 9 },
+        ],
+      },
+    });
+
+    const rewound = rewindDirectionState(state, 10);
+
+    // Turn anchors clamp to the surviving timeline — the Sakkan's same-turn
+    // guard and the Director's turns_since both work again from turn 11.
+    expect(rewound.last_director_turn).toBe(10);
+    expect(rewound.sakkan?.last_sample_turn).toBe(10);
+    expect(rewound.phase_state?.entered_at_turn).toBe(10);
+    expect(rewound.settei?.rebuilt_at_turn).toBe(10);
+    // Dead-timeline evidence drops; surviving evidence stays.
+    expect(rewound.sakkan?.readings.darkness).toBeUndefined();
+    expect(rewound.sakkan?.readings.comedy).toBeDefined();
+    expect(rewound.sakkan?.active_notes).toEqual([
+      { axis: "comedy", active: 4, observed: 6, since_turn: 9 },
+    ]);
+    // Accumulators reset (their evidence may be un-happened); soft state survives.
+    expect(rewound.accumulated_epicness).toBe(0);
+    expect(rewound.arc_events).toEqual([]);
+    expect(rewound.tension_level).toBeCloseTo(0.7);
+    expect(rewound.director_notes).toEqual(["hold the noir patience"]);
+  });
+});
+
 describe.skipIf(!url)("rewindCampaign (real Postgres)", () => {
   const playerId = `test_player_${crypto.randomUUID()}`;
   let campaignId: string;
