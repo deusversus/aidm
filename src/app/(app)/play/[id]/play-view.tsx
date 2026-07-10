@@ -430,7 +430,12 @@ export function PlayView({
   // Rewind (§6.7): "before turn N" un-happens turn N onward — keep everything
   // up to N-1. The durable record IS the UI state, so a reload rehydrates the
   // rewound transcript from the (now-tombstoned-excluded) episodic layer.
-  const rewindTargets = exchanges.map((e) => e.turnNumber).slice(-10);
+  // Story turns only: a booth exchange is out-of-fiction (§5.4) — "before a
+  // booth line" is not a place in the story (C9 audit).
+  const rewindTargets = exchanges
+    .filter((e) => e.kind !== "channel")
+    .map((e) => e.turnNumber)
+    .slice(-10);
   const rewindTo = async (beforeTurn: number) => {
     setRewindBusy(true);
     try {

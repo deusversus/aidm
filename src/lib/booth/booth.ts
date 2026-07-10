@@ -12,7 +12,7 @@ import {
   BoothState,
 } from "@/lib/types/booth";
 import { PremiseContract } from "@/lib/types/premise";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 
 /**
  * The channel responders (blueprint §5.4, C9): the meta booth and the
@@ -90,6 +90,22 @@ export async function runBoothExchange(
   const selection = resolveSelection(campaign.tierModels);
   const state = BoothState.parse(campaign.boothState ?? {});
 
+  // §5.7 crash-replay idempotency (C9 audit): the exchange pair persists in
+  // ONE update, so a studio entry at this turn means this exchange already
+  // ran — replay the stored reply instead of re-running the responder
+  // (re-billing) and duplicating the pair. (A crash exactly between a
+  // cap-close and the runtime's status write re-runs as a FRESH booth —
+  // bounded: the old booth already resolved and wrote its marks.)
+  const replayed = state.exchanges.find((e) => e.role === "studio" && e.at_turn === turnNumber);
+  if (replayed) {
+    emit(replayed.text);
+    return {
+      reply: replayed.text,
+      responder: replayed.responder ?? "director",
+      closed: false,
+    };
+  }
+
   // (2) ROUTE — probe tier; explicit summon wins; failure defaults to
   // director with a warn (a routing failure must never block the booth).
   const recent = state.exchanges.slice(-4);
@@ -152,7 +168,12 @@ export async function runBoothExchange(
   });
   stream.on("text", (t) => emit(t));
   const result = await done();
+  // A refused or empty reply must not persist as a hollow exchange (C9
+  // audit): throw — the runtime's catch lands the turn with the apologetic
+  // acknowledgement and the booth state stays untouched for a clean retry.
+  if (result.refused) throw new Error("booth responder refused");
   const reply = result.prose;
+  if (!reply.trim()) throw new Error("booth responder returned empty prose");
 
   // (4) PERSIST — append the exchange pair; stamp opened_at_turn once (on the
   // first exchange, when the state was empty). Single update.
@@ -267,14 +288,30 @@ export async function mintOverride(
   turnNumber: number,
   content: string,
 ): Promise<{ acknowledgement: string }> {
-  await db.insert(overrides).values({
-    campaignId,
-    content,
-    active: true,
-    turnId: turnNumber,
-    provenance: "player_override",
-    confidence: 1,
-  });
+  // §5.7 crash-replay idempotency (C9 audit): one channel turn mints ONE
+  // rule — a replayed dispatch finds its own row by (campaign, turn,
+  // provenance) and re-acknowledges instead of duplicating the ledger.
+  const [existing] = await db
+    .select({ id: overrides.id })
+    .from(overrides)
+    .where(
+      and(
+        eq(overrides.campaignId, campaignId),
+        eq(overrides.turnId, turnNumber),
+        eq(overrides.provenance, "player_override"),
+      ),
+    )
+    .limit(1);
+  if (!existing) {
+    await db.insert(overrides).values({
+      campaignId,
+      content,
+      active: true,
+      turnId: turnNumber,
+      provenance: "player_override",
+      confidence: 1,
+    });
+  }
   return {
     acknowledgement: `Standing rule recorded: "${content}" — in force from the next scene.`,
   };

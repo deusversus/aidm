@@ -396,6 +396,60 @@ describe.skipIf(!url)("Meta booth + override channel (real Postgres, scripted mo
     expect(streamOpts.system).toEqual([{ type: "text", text: "BLOCK1" }]);
   });
 
+  it("same-turn replay returns the persisted reply without re-running the responder (§5.7)", async () => {
+    if (!db) throw new Error("unreachable");
+    const campaignId = await makeCampaign();
+    await setBoothState(campaignId, 3, [
+      { role: "player", text: "meta: pacing?", at_turn: 3 },
+      { role: "studio", text: "Already answered this.", responder: "ka", at_turn: 3 },
+    ]);
+    const emitted: string[] = [];
+
+    const res = await runBoothExchange(db, campaignId, 3, "meta: pacing?", (t) => emitted.push(t));
+
+    expect(res.reply).toBe("Already answered this.");
+    expect(res.responder).toBe("ka");
+    expect(emitted.join("")).toBe("Already answered this.");
+    // No re-billing, no duplicated pair (C9 audit: crash-replay idempotency).
+    expect(mockStream).not.toHaveBeenCalled();
+    expect(mockProbe).not.toHaveBeenCalled();
+    const state = (await readBoothState(campaignId)) as { exchanges: unknown[] };
+    expect(state.exchanges).toHaveLength(2);
+  });
+
+  it("a refused or empty responder reply throws — never persisted as a hollow exchange", async () => {
+    if (!db) throw new Error("unreachable");
+    const campaignId = await makeCampaign();
+    mockStream.mockImplementation(
+      () =>
+        ({
+          stream: { on: () => {} },
+          done: async () => ({
+            message: { content: [], stop_reason: "refusal" },
+            prose: "",
+            sidecar: null,
+            fallbackUsed: false,
+            refused: true,
+            costUsd: 0,
+          }),
+        }) as never,
+    );
+    await expect(runBoothExchange(db, campaignId, 1, "meta: hm", () => {})).rejects.toThrow(
+      /refused/,
+    );
+    expect(await readBoothState(campaignId)).toBeNull();
+  });
+
+  it("mintOverride is idempotent per turn: a crash-replay re-acknowledges without duplicating the rule", async () => {
+    if (!db) throw new Error("unreachable");
+    const campaignId = await makeCampaign();
+    const first = await mintOverride(db, campaignId, 4, "never harm the dog");
+    const second = await mintOverride(db, campaignId, 4, "never harm the dog");
+    expect(second.acknowledgement).toBe(first.acknowledgement);
+    const rows = await overridesFor(campaignId);
+    expect(rows).toHaveLength(1);
+  });
+
   it("router failure defaults to the director — the booth never blocks", async () => {
     if (!db) throw new Error("unreachable");
     const campaignId = await makeCampaign();

@@ -6,7 +6,7 @@ import { callJudgment, callProbe, streamNarration } from "@/lib/llm/calls";
 import type { TierSelection } from "@/lib/llm/tiers";
 import { embedTexts } from "@/lib/llm/voyage";
 import { bebopContract } from "@/lib/renderer/__tests__/fixtures";
-import { type TurnEvent, attachToTurn, submitTurn } from "@/lib/turn/runtime";
+import { type TurnEvent, attachToTurn, executeTurn, submitTurn } from "@/lib/turn/runtime";
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
@@ -289,6 +289,42 @@ describe.skipIf(!url)("C9 channel wiring (real Postgres, scripted models)", () =
     expect(terminal.acknowledgement).toContain("say it again");
     const [row] = await db.select().from(schema.turns).where(eq(schema.turns.id, turnId));
     expect(row?.status).toBe("channel"); // terminal, never wedged
+  });
+
+  it("channel crash-replay dispatches from the checkpoint WITHOUT re-triaging (§5.7)", async () => {
+    if (!db) throw new Error("unreachable");
+    const campaignId = await makeCampaign();
+    // A channel turn that classified, then crashed before its terminal write:
+    // status still queued, the classification checkpointed.
+    const [row] = await db
+      .insert(schema.turns)
+      .values({
+        campaignId,
+        turnNumber: 1,
+        tier: "genga",
+        status: "queued",
+        playerInput: "meta: hello again",
+        checkpoints: { channel_intent: "META_FEEDBACK" },
+      })
+      .returning({ id: schema.turns.id });
+    if (!row) throw new Error("turn insert failed");
+    mockBooth.mockImplementation(async (_db, _cid, _turn, _input, emit) => {
+      emit("replayed reply");
+      return { reply: "replayed reply", responder: "director", closed: false };
+    });
+
+    const events: TurnEvent[] = [];
+    const detach = attachToTurn(row.id, (e) => events.push(e));
+    await executeTurn(db, row.id);
+    detach();
+
+    // The stashed classification skipped Layout entirely: no intent probe.
+    expect(mockProbe).not.toHaveBeenCalled();
+    expect(mockBooth).toHaveBeenCalledTimes(1);
+    const terminal = events.at(-1);
+    expect(terminal).toMatchObject({ type: "channel", intent: "META_FEEDBACK", turnNumber: 1 });
+    const [after] = await db.select().from(schema.turns).where(eq(schema.turns.id, row.id));
+    expect(after?.status).toBe("channel");
   });
 
   it(

@@ -40,6 +40,7 @@ export type TurnEvent =
   | {
       type: "channel";
       intent: string;
+      turnNumber: number;
       responder?: "director" | "ka";
       closed?: boolean;
       acknowledgement?: string;
@@ -235,7 +236,64 @@ async function runPhases(
     ladder?: LadderStep[];
     trailer_fallback?: boolean;
     error?: string;
+    channel_intent?: string;
   };
+
+  // §5.4 channel responders (C9). META_FEEDBACK → the booth (streams its
+  // reply as prose); OVERRIDE_COMMAND/OP_COMMAND → the override ledger with
+  // minimal ceremony (§7.4). RE-ENTRANT like every phase (C9 audit): the
+  // classification is CHECKPOINTED (channel_intent) before the responder
+  // runs, so a crash-replay never re-triages (nor re-classifies a channel
+  // input as story), and both responders are idempotent per turn — the
+  // booth replays its persisted exchange, mintOverride finds its own row.
+  // A responder failure is still terminal: the channel turn lands with an
+  // apologetic acknowledgement, never a wedged campaign. Channel rows keep
+  // status "channel" — they never enter episodic, Block 3, or compaction.
+  const dispatchChannel = async (intent: string): Promise<void> => {
+    let channelText = "";
+    let meta: {
+      responder?: "director" | "ka";
+      closed?: boolean;
+      acknowledgement?: string;
+    } = {};
+    try {
+      if (intent === "META_FEEDBACK") {
+        const booth = await runBoothExchange(
+          db,
+          turn.campaignId,
+          turn.turnNumber,
+          turn.playerInput,
+          (text) => emit({ type: "prose", text }),
+        );
+        channelText = booth.reply;
+        meta = { responder: booth.responder, closed: booth.closed };
+      } else {
+        const minted = await mintOverride(db, turn.campaignId, turn.turnNumber, turn.playerInput);
+        meta = { acknowledgement: minted.acknowledgement };
+      }
+    } catch (err) {
+      console.warn(`[runtime] channel responder failed (turn ${turn.turnNumber}):`, err);
+      meta = { acknowledgement: "The studio lost that one mid-air — say it again?" };
+    }
+    await db
+      .update(turns)
+      .set({
+        status: "channel",
+        completedAt: new Date(),
+        ...(channelText ? { narration: channelText } : {}),
+        // Replay metadata rides the sidecar jsonb — channel rows never
+        // parse as CommitScene anywhere (G2 settles "complete" rows only).
+        sidecar: { channel: intent, ...meta },
+      })
+      .where(eq(turns.id, turnId));
+    emit({ type: "channel", intent, turnNumber: turn.turnNumber, ...meta });
+  };
+
+  // Crash-replay of a channel turn: the stashed classification skips Layout.
+  if (checkpoints.channel_intent) {
+    await dispatchChannel(checkpoints.channel_intent);
+    return;
+  }
 
   // --- Phase A (checkpointed by runLayout itself) ----------------------------
   let conte: Conte;
@@ -245,50 +303,14 @@ async function runPhases(
       emit({ type: "staging", text: e.text }),
     );
     if (result.kind === "channel") {
-      // §5.4 channel responders (C9). META_FEEDBACK → the booth (streams its
-      // reply as prose); OVERRIDE_COMMAND/OP_COMMAND → the override ledger
-      // with minimal ceremony (§7.4). A responder failure is still terminal:
-      // the channel turn lands with an apologetic acknowledgement, never a
-      // wedged campaign. Channel rows keep status "channel" — they never
-      // enter episodic records, Block 3, or compaction (out-of-fiction).
       const intent = result.intent.intent;
-      let channelText = "";
-      let meta: {
-        responder?: "director" | "ka";
-        closed?: boolean;
-        acknowledgement?: string;
-      } = {};
-      try {
-        if (intent === "META_FEEDBACK") {
-          const booth = await runBoothExchange(
-            db,
-            turn.campaignId,
-            turn.turnNumber,
-            turn.playerInput,
-            (text) => emit({ type: "prose", text }),
-          );
-          channelText = booth.reply;
-          meta = { responder: booth.responder, closed: booth.closed };
-        } else {
-          const minted = await mintOverride(db, turn.campaignId, turn.turnNumber, turn.playerInput);
-          meta = { acknowledgement: minted.acknowledgement };
-        }
-      } catch (err) {
-        console.warn(`[runtime] channel responder failed (turn ${turn.turnNumber}):`, err);
-        meta = { acknowledgement: "The studio lost that one mid-air — say it again?" };
-      }
       await db
         .update(turns)
         .set({
-          status: "channel",
-          completedAt: new Date(),
-          ...(channelText ? { narration: channelText } : {}),
-          // Replay metadata rides the sidecar jsonb — channel rows never
-          // parse as CommitScene anywhere (G2 settles "complete" rows only).
-          sidecar: { channel: intent, ...meta },
+          checkpoints: sql`${turns.checkpoints} || ${JSON.stringify({ channel_intent: intent })}::jsonb`,
         })
         .where(eq(turns.id, turnId));
-      emit({ type: "channel", intent, ...meta });
+      await dispatchChannel(intent);
       return;
     }
     conte = result.conte;

@@ -78,6 +78,7 @@ export async function GET(
           };
           send("channel", {
             intent: meta.channel ?? "META_FEEDBACK",
+            turnNumber: turn.turnNumber,
             ...(meta.responder ? { responder: meta.responder } : {}),
             ...(meta.closed !== undefined ? { closed: meta.closed } : {}),
             ...(meta.acknowledgement ? { acknowledgement: meta.acknowledgement } : {}),
