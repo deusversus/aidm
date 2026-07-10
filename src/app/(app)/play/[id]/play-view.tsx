@@ -104,6 +104,10 @@ export function PlayView({
   const [yokoku, setYokoku] = useState<string | null>(null);
   const [sessionClosed, setSessionClosed] = useState(false);
   const [closing, setClosing] = useState(false);
+  // A deep-tier KA can think for minutes before prose streams (sakuga on
+  // Opus: observed 3m+). The staging line shows elapsed time past 30s so a
+  // long think reads as work, not a hang.
+  const [elapsed, setElapsed] = useState(0);
   const openedRef = useRef(false);
   const queuedRef = useRef<string | null>(null);
   const busyRef = useRef(false);
@@ -120,6 +124,16 @@ export function PlayView({
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [exchanges, streamText, staging, chips, assertion]);
+
+  useEffect(() => {
+    if (!busy) {
+      setElapsed(0);
+      return;
+    }
+    const started = Date.now();
+    const tick = setInterval(() => setElapsed(Math.floor((Date.now() - started) / 1000)), 1000);
+    return () => clearInterval(tick);
+  }, [busy]);
 
   const attachStream = useCallback(
     async (turnId: string, playerInput: string, retries = 0) => {
@@ -820,14 +834,28 @@ export function PlayView({
             <span className="animate-pulse">▋</span>
           </div>
         )}
-        {staging && <p className="text-xs italic text-muted-foreground">{staging}…</p>}
+        {staging && (
+          <p className="text-xs italic text-muted-foreground">
+            {staging}…
+            {elapsed >= 30 &&
+              ` ${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, "0")}`}
+          </p>
+        )}
         {assertion &&
           (assertion.writes.length > 0 || assertion.clarify || assertion.flags.length > 0) && (
             <div className="space-y-1">
               {assertion.writes.length > 0 && (
-                <p className="text-xs text-muted-foreground">
-                  Canon updated: {assertion.writes.join("; ")}
-                </p>
+                <details className="text-xs text-muted-foreground">
+                  <summary className="cursor-pointer select-none">
+                    Canon updated — {assertion.writes.length} write
+                    {assertion.writes.length === 1 ? "" : "s"}
+                  </summary>
+                  <ul className="mt-1 list-disc space-y-0.5 pl-5 text-muted-foreground/80">
+                    {assertion.writes.map((w, i) => (
+                      <li key={`${i}-${w.slice(0, 24)}`}>{w}</li>
+                    ))}
+                  </ul>
+                </details>
               )}
               {assertion.clarify && (
                 <p className="rounded-md border border-amber-900/40 bg-amber-950/20 px-3 py-2 text-xs text-amber-200/90">
