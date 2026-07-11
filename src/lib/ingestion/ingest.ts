@@ -8,10 +8,15 @@ import {
   entityVersions,
   semanticMemories,
 } from "@/lib/db/schema";
-import { isProtagonistName, normalizeIdentity } from "@/lib/entity-identity";
+import { identityKey, isProtagonistName } from "@/lib/entity-identity";
+import {
+  MERGE_AUTO_CONFIDENCE,
+  MERGE_CANDIDATE_MAX_DISTANCE,
+  pairLikelySame,
+} from "@/lib/entity/janitor";
 import { callProbe } from "@/lib/llm/calls";
 import { DEV_TIER_SELECTION, TierSelection } from "@/lib/llm/tiers";
-import { embedTexts } from "@/lib/llm/voyage";
+import { cosineSimilarity, embedTexts } from "@/lib/llm/voyage";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 
@@ -230,35 +235,128 @@ export async function ingestAssertion(
   const PROTAGONIST_KEY = "#protagonist#";
   const catalog = new Map<string, EntityRef>();
   for (const e of entityRows) {
-    catalog.set(normalizeIdentity(e.name), e);
+    // Empty-normalization guard (§6.5, M2 C1): an all-punctuation name ("???")
+    // normalizes to "" — never register the empty key, or two such names collide
+    // into one row (M1-audit note). identityKey returns null there.
+    const key = identityKey(e.name);
+    if (key) catalog.set(key, e);
     if (e.entityType === "npc" && isProtagonistName(e.name)) catalog.set(PROTAGONIST_KEY, e);
   }
-  const lookupEntity = (rawName: string): EntityRef | undefined =>
-    catalog.get(normalizeIdentity(rawName)) ??
-    (isProtagonistName(rawName) ? catalog.get(PROTAGONIST_KEY) : undefined);
+  const lookupEntity = (rawName: string): EntityRef | undefined => {
+    const key = identityKey(rawName);
+    return (
+      (key ? catalog.get(key) : undefined) ??
+      (isProtagonistName(rawName) ? catalog.get(PROTAGONIST_KEY) : undefined)
+    );
+  };
 
-  // Canon lookup embeddings, only for names absent from the catalog at entry.
-  const canonQueryNames = [
+  // Names embedded ONCE per assertion (§5.4 step 2 + §6.5 mint-time guard): the
+  // unmatched candidate names (each a canon-lookup subject and a mint-guard
+  // subject) plus the same-type catalog names the guard compares them against.
+  const candidateNames = [
     ...new Set(
       writable
         .map((f) => f.entity_name?.trim())
         .filter((n): n is string => !!n && !lookupEntity(n)),
     ),
   ];
-  const canonEmbeddings =
-    canonQueryNames.length > 0 && opts.profileIds.length > 0
-      ? await embedTexts(canonQueryNames, {
+  const candidateTypes = new Set<string>(
+    writable
+      .filter((f) => {
+        const n = f.entity_name?.trim();
+        return !!n && !lookupEntity(n);
+      })
+      .map((f) => entityTypeForKind(f.kind)),
+  );
+  // Only same-type catalog names can be guard targets; an empty same-type
+  // catalog means the guard is skipped entirely (bounded added latency).
+  const guardCatalogEntities = entityRows.filter((e) => candidateTypes.has(e.entityType));
+  const namesToEmbed = [
+    ...new Set([...candidateNames, ...guardCatalogEntities.map((e) => e.name)]),
+  ];
+  const nameEmbeddings =
+    namesToEmbed.length > 0
+      ? await embedTexts(namesToEmbed, {
           inputType: "query",
           patience: "interactive",
           campaignId,
           turnNumber,
         })
       : [];
-  const canonEmbByName = new Map<string, number[]>();
-  canonQueryNames.forEach((n, i) => {
-    const emb = canonEmbeddings[i];
-    if (emb) canonEmbByName.set(normalizeIdentity(n), emb);
+  const nameEmbByKey = new Map<string, number[]>();
+  namesToEmbed.forEach((n, i) => {
+    const key = identityKey(n);
+    const emb = nameEmbeddings[i];
+    if (key && emb) nameEmbByKey.set(key, emb);
   });
+
+  /**
+   * §6.5 mint-time semantic guard (M2 C1): before minting an unmatched name,
+   * find the nearest same-type catalog entity by name embedding; a near-hit the
+   * deterministic tier missed (different spelling, same meaning) that one probe
+   * confirms means ENRICH that row instead of minting a parallel one. Reads the
+   * live `catalog` (grows as this assertion mints), so a second new name for the
+   * same thing within one assertion also folds in.
+   */
+  const mintGuardMatch = async (
+    candName: string,
+    candType: string,
+    candBlock: string,
+  ): Promise<EntityRef | undefined> => {
+    const ck = identityKey(candName);
+    if (!ck) return undefined;
+    const candEmb = nameEmbByKey.get(ck);
+    if (!candEmb) return undefined;
+    const seen = new Set<string>();
+    let best: { ref: EntityRef; distance: number } | undefined;
+    for (const ref of catalog.values()) {
+      if (ref.entityType !== candType || seen.has(ref.id)) continue;
+      seen.add(ref.id);
+      const ek = identityKey(ref.name);
+      if (!ek || ek === ck) continue;
+      const emb = nameEmbByKey.get(ek);
+      if (!emb) continue;
+      const distance = 1 - cosineSimilarity(candEmb, emb);
+      if (!best || distance < best.distance) best = { ref, distance };
+    }
+    if (!best || best.distance >= MERGE_CANDIDATE_MAX_DISTANCE) return undefined;
+    const verdict = await pairLikelySame(db, selection, {
+      campaignId,
+      turnNumber,
+      a: {
+        id: best.ref.id,
+        name: best.ref.name,
+        entityType: best.ref.entityType,
+        block: best.ref.block,
+      },
+      b: { name: candName, block: candBlock },
+    });
+    // AUTO bar, not the suggest floor (C1 audit #4): a false enrich silently
+    // swallows a genuine new entity with no recovery affordance, while a
+    // false mint is caught by the janitor at session close. Mid-band mints.
+    return verdict.same && verdict.confidence >= MERGE_AUTO_CONFIDENCE ? best.ref : undefined;
+  };
+
+  // Enrich a resolved catalog entity (append + version row) — shared by the
+  // deterministic-match path and the semantic mint-guard path.
+  const enrichExisting = async (target: EntityRef, content: string): Promise<void> => {
+    const newBlock = target.block ? `${target.block}\n- ${content}` : content;
+    const [{ maxVersion } = { maxVersion: null }] = await db
+      .select({ maxVersion: sql<number | null>`max(${entityVersions.version})` })
+      .from(entityVersions)
+      .where(eq(entityVersions.entityId, target.id));
+    const version = (maxVersion ? Number(maxVersion) : 0) + 1;
+    await db.update(entities).set({ block: newBlock }).where(eq(entities.id, target.id));
+    await db
+      .insert(entityVersions)
+      .values({ entityId: target.id, version, block: newBlock, ...envelope });
+    target.block = newBlock;
+    writes.push({
+      kind: "entity_enriched",
+      id: target.id,
+      summary: `Enriched ${target.entityType} "${target.name}"`,
+    });
+  };
 
   // Semantic-layer embeddings for every writable fact (§5.4 step 3), batched.
   const semanticEmbeddings = await embedTexts(
@@ -275,34 +373,25 @@ export async function ingestAssertion(
 
     const name = fact.entity_name?.trim();
     if (name) {
-      const existing = lookupEntity(name);
+      const entityType = entityTypeForKind(fact.kind);
+      // Deterministic match, then the semantic mint-guard (different spelling,
+      // same meaning), then mint.
+      const existing = lookupEntity(name) ?? (await mintGuardMatch(name, entityType, fact.content));
       if (existing) {
-        // Matched existing catalog entity → enrich (append + version row).
-        const newBlock = existing.block ? `${existing.block}\n- ${fact.content}` : fact.content;
-        const [{ maxVersion } = { maxVersion: null }] = await db
-          .select({ maxVersion: sql<number | null>`max(${entityVersions.version})` })
-          .from(entityVersions)
-          .where(eq(entityVersions.entityId, existing.id));
-        const version = (maxVersion ? Number(maxVersion) : 0) + 1;
-        await db.update(entities).set({ block: newBlock }).where(eq(entities.id, existing.id));
-        await db
-          .insert(entityVersions)
-          .values({ entityId: existing.id, version, block: newBlock, ...envelope });
-        existing.block = newBlock;
-        writes.push({
-          kind: "entity_enriched",
-          id: existing.id,
-          summary: `Enriched ${existing.entityType} "${existing.name}"`,
-        });
+        // A guard hit registers the candidate name so later facts naming it
+        // this assertion resolve directly (no repeat probe).
+        const key = identityKey(name);
+        if (key && !catalog.has(key)) catalog.set(key, existing);
+        await enrichExisting(existing, fact.content);
       } else {
         // Unmatched named entity → resolve against canon, then mint.
+        const nk = identityKey(name);
         const resolved = await resolveCanon(
           db,
           opts.profileIds,
           name,
-          canonEmbByName.get(normalizeIdentity(name)),
+          nk ? nameEmbByKey.get(nk) : undefined,
         );
-        const entityType = entityTypeForKind(fact.kind);
         const block = resolved
           ? `[canon:${resolved.profileId}] ${resolved.content.slice(0, CANON_BLOCK_CHARS).trim()}`
           : fact.content;
@@ -318,7 +407,7 @@ export async function ingestAssertion(
           .values({ entityId: created.id, version: 1, block, ...envelope })
           .onConflictDoNothing();
         const ref = { id: created.id, name, entityType, block };
-        catalog.set(normalizeIdentity(name), ref);
+        if (nk) catalog.set(nk, ref);
         if (entityType === "npc" && isProtagonistName(name)) catalog.set(PROTAGONIST_KEY, ref);
         writes.push({
           kind: "entity_created",

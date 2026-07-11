@@ -18,6 +18,7 @@ import {
   saveDirectionState,
 } from "@/lib/direction/director";
 import { callbackReadySeeds } from "@/lib/direction/seeds";
+import { reviewCatalog } from "@/lib/entity/janitor";
 import { callJudgment, prewarmPrefix, streamNarration } from "@/lib/llm/calls";
 import { DEV_TIER_SELECTION, TierSelection } from "@/lib/llm/tiers";
 import { type SetteiInput, renderSettei } from "@/lib/renderer/settei";
@@ -236,6 +237,16 @@ export async function closeSession(
       await runSakkanSample(db, campaignId, currentMaxTurn, { trigger: "session_close" });
     } catch (err) {
       logComposerFailure("sakkan", campaignId, err);
+    }
+  }
+  // §6.5 janitor (M2 C1): review the live catalog for same-type semantic
+  // near-dupes the deterministic tier can't see. Failure-isolated like the
+  // composers and the Sakkan sample — a hygiene failure never blocks the close.
+  if (currentMaxTurn > 0) {
+    try {
+      await reviewCatalog(db, campaignId, currentMaxTurn, tier);
+    } catch (err) {
+      logComposerFailure("janitor", campaignId, err);
     }
   }
 

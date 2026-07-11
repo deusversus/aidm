@@ -16,6 +16,18 @@ export function normalizeIdentity(name: string): string {
     .replace(/\s+/g, " ");
 }
 
+/**
+ * Identity key for map/dedup use (§6.5, M2 C1 empty-normalization guard):
+ * null when normalization empties the name (all-punctuation "???" / "!!!"),
+ * so two such names never collide on the "" key and merge into one row (the
+ * M1-audit note). Keying call sites treat null as "no key" — keep the row
+ * separate, never register the empty key.
+ */
+export function identityKey(name: string): string | null {
+  const norm = normalizeIdentity(name);
+  return norm.length > 0 ? norm : null;
+}
+
 /** Placeholder names the self-insert protagonist arrives under. Qualifiers like
  *  "(unnamed)" are stripped before this set is consulted. */
 const PROTAGONIST_IDENTITIES = new Set([

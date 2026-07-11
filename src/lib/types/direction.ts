@@ -182,6 +182,26 @@ export const SakkanState = z.object({
 });
 export type SakkanState = z.infer<typeof SakkanState>;
 
+/**
+ * A janitor-detected near-duplicate pair the machine won't auto-merge (§6.5,
+ * M2 C1). Confidence sits between the suggest and auto thresholds; resolution
+ * is player word only. survivor/dupe orientation is the janitor's proposal —
+ * survivor keeps the row, dupe tombstones into it.
+ */
+export const MergeSuggestion = z.object({
+  survivor_id: z.string().uuid(),
+  dupe_id: z.string().uuid(),
+  survivor_name: z.string(),
+  dupe_name: z.string(),
+  entity_type: z.string(),
+  /** One sentence for the notes panel: why the janitor thinks they're the same. */
+  reason: z.string(),
+  /** The probe's same-entity confidence (suggest band: below auto, above noise). */
+  confidence: z.number().min(0).max(1),
+  at_turn: z.number().int().nonnegative(),
+});
+export type MergeSuggestion = z.infer<typeof MergeSuggestion>;
+
 export const DirectionState = z.object({
   last_director_turn: z.number().int().nonnegative().default(0),
   accumulated_epicness: z.number().nonnegative().default(0),
@@ -200,6 +220,13 @@ export const DirectionState = z.object({
   spotlight_directives: z.array(z.object({ name: z.string(), note: z.string() })).default([]),
   /** Ingestion FLAGs routed to the Director (layout writes, dailies consume). */
   pending_flags: z.array(z.string()).default([]),
+  /**
+   * §6.5 janitor output (M2 C1): ambiguous near-duplicate pairs the machine
+   * won't auto-merge — surfaced to the player in the notes panel, resolved
+   * only by player word (accept → merge:player, dismiss → dropped). Cleared
+   * when either entity is tombstoned; rewind clamps by at_turn.
+   */
+  merge_suggestions: z.array(MergeSuggestion).default([]),
   settei: SetteiSnapshot.optional(),
   /** §4.5 drift band (C8): readings, counters, active retakes. */
   sakkan: SakkanState.optional(),
@@ -223,6 +250,9 @@ export function rewindDirectionState(state: DirectionState, toTurn: number): Dir
     last_director_turn: Math.min(state.last_director_turn, toTurn),
     accumulated_epicness: 0,
     arc_events: [],
+    // Suggestions referencing un-happened turns die with the dead timeline;
+    // their entity ids may point at rows the rewind sweep just tombstoned.
+    merge_suggestions: state.merge_suggestions.filter((s) => s.at_turn <= toTurn),
     ...(state.phase_state
       ? {
           phase_state: {

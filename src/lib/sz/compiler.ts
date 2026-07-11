@@ -8,7 +8,7 @@ import {
   players,
   profiles,
 } from "@/lib/db/schema";
-import { isProtagonistName, marksSelfInsert, normalizeIdentity } from "@/lib/entity-identity";
+import { identityKey, isProtagonistName, marksSelfInsert } from "@/lib/entity-identity";
 import { ingestAssertion } from "@/lib/ingestion/ingest";
 import { callJudgment } from "@/lib/llm/calls";
 import { DEV_TIER_SELECTION, TierSelection } from "@/lib/llm/tiers";
@@ -391,11 +391,20 @@ export function dedupeAdmissions(admitted: AdmitBrief[]): CatalogAdmission[] {
     blocks: { text: string; capability: boolean }[];
   }
   const groups = new Map<string, Group>();
+  let noKeyCounter = 0;
   for (const b of admitted) {
     const entityType = entityTypeForBriefKind(b.kind);
     const placeholder = isProtagonistName(b.name) || marksSelfInsert(b.name);
     const isProtagonist = entityType === "npc" && (placeholder || marksSelfInsert(b.brief));
-    const key = isProtagonist ? PROTAGONIST_KEY : `${entityType}::${normalizeIdentity(b.name)}`;
+    // Empty-normalization guard (§6.5, M2 C1): an all-punctuation name ("???")
+    // normalizes to "" — give each its own key so two such names stay distinct
+    // rows instead of collapsing on the shared empty key (M1-audit note).
+    const idKey = identityKey(b.name);
+    const key = isProtagonist
+      ? PROTAGONIST_KEY
+      : idKey
+        ? `${entityType}::${idKey}`
+        : `${entityType}::#nokey#${noKeyCounter++}`;
     let group = groups.get(key);
     if (!group) {
       group = { entityType, blocks: [] };

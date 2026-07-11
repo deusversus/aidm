@@ -437,4 +437,105 @@ describe.skipIf(!url)("Universal ingestion (real Postgres, scripted extractor)",
       expect(m.confidence).toBe(1);
     }
   });
+
+  it("mint-time guard: a semantic near-dup enriches the existing row instead of minting (§6.5)", async () => {
+    if (!db) throw new Error("unreachable");
+    // The live exhibit: an existing thread the deterministic tier can't match to
+    // a differently-named assertion about the same connection.
+    await db.insert(schema.entities).values({
+      campaignId,
+      name: "Path-Crossing with Lloyd",
+      entityType: "thread",
+      block: "The protagonist and Lloyd keep crossing paths.",
+      turnId: 0,
+      provenance: "sz_compiler",
+      confidence: 1,
+    });
+    // All names embed to basis(0) → the candidate sits within the guard's
+    // distance; the probe confirms "same" at the AUTO bar → ENRICH. (C1 audit
+    // #4: the guard enriches only above MERGE_AUTO_CONFIDENCE — a false enrich
+    // silently swallows a new entity, while a false mint gets janitor'd.)
+    const scriptPair = (confidence: number, name: string) =>
+      mockProbe.mockImplementation(
+        // biome-ignore lint/suspicious/noExplicitAny: harness spans the generic probe signature
+        (_s: any, o: any) =>
+          (o.name === "entity_merge_pair"
+            ? Promise.resolve({ same: true, confidence, reason: "same forming bond" })
+            : Promise.resolve({
+                facts: [
+                  {
+                    kind: "thread",
+                    entity_name: name,
+                    content: "Their bond deepens after the duel.",
+                    posture: "accept",
+                  },
+                ],
+              })) as never,
+      );
+
+    scriptPair(0.95, "Lloyd and the protagonist's connection");
+    const res = await ingestAssertion(db, campaignId, 9, "the bond with lloyd deepens", {
+      profileIds: [],
+    });
+
+    expect(res.writes.some((w) => w.kind === "entity_enriched")).toBe(true);
+    expect(res.writes.some((w) => w.kind === "entity_created")).toBe(false);
+    const threads = await db
+      .select()
+      .from(schema.entities)
+      .where(
+        and(eq(schema.entities.campaignId, campaignId), eq(schema.entities.entityType, "thread")),
+      );
+    expect(threads).toHaveLength(1); // guard prevented the parallel mint
+    expect(threads[0]?.block).toContain("Their bond deepens after the duel.");
+
+    // Mid-band (suggest < confidence < auto): the guard MINTS — ambiguity is
+    // the janitor's territory at session close, never a silent swallow.
+    scriptPair(0.8, "The Lloyd Entanglement");
+    const mid = await ingestAssertion(db, campaignId, 10, "the entanglement deepens", {
+      profileIds: [],
+    });
+    expect(mid.writes.some((w) => w.kind === "entity_created")).toBe(true);
+    const threadsAfter = await db
+      .select()
+      .from(schema.entities)
+      .where(
+        and(eq(schema.entities.campaignId, campaignId), eq(schema.entities.entityType, "thread")),
+      );
+    expect(threadsAfter).toHaveLength(2);
+  });
+
+  it("empty-normalization guard: '???' and '!!!' stay separate rows (§6.5)", async () => {
+    if (!db) throw new Error("unreachable");
+    // Both names normalize to "" — the keying guard must give each its own
+    // identity (they are not the same entity), and the mint-guard skips them.
+    armExtractor([
+      {
+        kind: "cast_fact",
+        entity_name: "???",
+        content: "A cloaked figure watches from the rafters.",
+        posture: "accept",
+      },
+      {
+        kind: "cast_fact",
+        entity_name: "!!!",
+        content: "A second figure signals from the street.",
+        posture: "accept",
+      },
+    ]);
+
+    const res = await ingestAssertion(db, campaignId, 10, "two strangers appear", {
+      profileIds: [],
+    });
+
+    expect(res.writes.filter((w) => w.kind === "entity_created")).toHaveLength(2);
+    const npcs = await db
+      .select()
+      .from(schema.entities)
+      .where(
+        and(eq(schema.entities.campaignId, campaignId), eq(schema.entities.entityType, "npc")),
+      );
+    expect(npcs).toHaveLength(2);
+    expect(npcs.map((r) => r.name).sort()).toEqual(["!!!", "???"]);
+  });
 });

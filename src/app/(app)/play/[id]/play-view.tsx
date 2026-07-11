@@ -51,6 +51,18 @@ interface Override {
   content: string;
 }
 
+/** A janitor-proposed near-duplicate pair (§6.5, C1) — resolved by player word. */
+interface MergeSuggestion {
+  survivor_id: string;
+  dupe_id: string;
+  survivor_name: string;
+  dupe_name: string;
+  entity_type: string;
+  reason: string;
+  confidence: number;
+  at_turn: number;
+}
+
 interface OpenTurn {
   id: string;
   status: string;
@@ -99,6 +111,7 @@ export function PlayView({
   const [notesBusy, setNotesBusy] = useState(false);
   const [pinList, setPinList] = useState<Pin[]>([]);
   const [overrideList, setOverrideList] = useState<Override[]>([]);
+  const [mergeList, setMergeList] = useState<MergeSuggestion[]>([]);
   const [overrideDraft, setOverrideDraft] = useState("");
   // §9.4 session lifecycle: recap opens the sitting, yokoku closes it.
   const [recap, setRecap] = useState<string | null>(null);
@@ -529,12 +542,15 @@ export function PlayView({
   const refreshNotes = async () => {
     setNotesBusy(true);
     try {
-      const [p, o] = await Promise.all([
+      const [p, o, m] = await Promise.all([
         fetchWithAuthRetry(`/api/campaigns/${campaignId}/pins`),
         fetchWithAuthRetry(`/api/campaigns/${campaignId}/overrides`),
+        fetchWithAuthRetry(`/api/campaigns/${campaignId}/merges`),
       ]);
       if (p.ok) setPinList(((await p.json()) as { pins?: Pin[] }).pins ?? []);
       if (o.ok) setOverrideList(((await o.json()) as { overrides?: Override[] }).overrides ?? []);
+      if (m.ok)
+        setMergeList(((await m.json()) as { suggestions?: MergeSuggestion[] }).suggestions ?? []);
     } catch {
       // Non-fatal: the panel just shows what it last had.
     }
@@ -583,6 +599,39 @@ export function PlayView({
     } else {
       setNotesBusy(false);
     }
+  };
+
+  // §6.5 merge suggestion (C1): the janitor found a near-dup it wouldn't
+  // auto-take. Accepting invokes the merge primitive (merge:player); the
+  // primitive clears the suggestion, so a refresh drops the row.
+  const acceptMerge = async (s: MergeSuggestion) => {
+    setNotesBusy(true);
+    const res = await fetchWithAuthRetry(`/api/campaigns/${campaignId}/merges`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ survivor_id: s.survivor_id, dupe_id: s.dupe_id }),
+    });
+    if (res.ok) {
+      setPinNotice(`Merged — “${s.dupe_name}” folded into “${s.survivor_name}.”`);
+      setTimeout(() => setPinNotice(null), 4_000);
+      await refreshNotes();
+    } else {
+      setNotesBusy(false);
+      setPinNotice("Merge failed.");
+      setTimeout(() => setPinNotice(null), 4_000);
+    }
+  };
+
+  // Dismiss drops the suggestion without merging — player word declines the pair.
+  const dismissMerge = async (s: MergeSuggestion) => {
+    setNotesBusy(true);
+    const res = await fetchWithAuthRetry(`/api/campaigns/${campaignId}/merges`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ survivor_id: s.survivor_id, dupe_id: s.dupe_id }),
+    });
+    if (res.ok) await refreshNotes();
+    else setNotesBusy(false);
   };
 
   return (
@@ -721,6 +770,48 @@ export function PlayView({
               </button>
             </div>
           </div>
+
+          {mergeList.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-muted-foreground">Possible duplicates</p>
+              <ul className="space-y-2">
+                {mergeList.map((s) => (
+                  <li key={`${s.survivor_id}-${s.dupe_id}`} className="space-y-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="text-xs leading-6 text-muted-foreground">
+                        {s.dupe_name} <span className="text-muted-foreground/50">→</span>{" "}
+                        {s.survivor_name}
+                        <span className="text-muted-foreground/50"> · {s.entity_type}</span>
+                      </span>
+                      <span className="flex shrink-0 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => void acceptMerge(s)}
+                          disabled={notesBusy}
+                          className="text-xs text-muted-foreground/60 hover:text-foreground disabled:opacity-50"
+                          title="Merge these into one thread"
+                        >
+                          merge
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void dismissMerge(s)}
+                          disabled={notesBusy}
+                          className="text-xs text-muted-foreground/60 hover:text-foreground disabled:opacity-50"
+                          title="Not the same — leave them apart"
+                        >
+                          dismiss
+                        </button>
+                      </span>
+                    </div>
+                    <p className="text-[11px] italic leading-5 text-muted-foreground/70">
+                      {s.reason}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
       )}
 
