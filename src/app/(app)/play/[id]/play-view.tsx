@@ -69,6 +69,55 @@ interface OpenTurn {
   playerInput: string;
 }
 
+/** The decided post-compile capabilities (M2 C5): tier menus + suggestion affordance. */
+type TierKey = "narration" | "judgment" | "probe";
+type TierMenus = Record<TierKey, string[]>;
+type Tiers = Record<TierKey, string>;
+
+interface SettingsResponse {
+  tiers: Tiers | null;
+  suggestion_affordance: string;
+  menus: TierMenus;
+}
+
+/** claude-opus-4-8 → "Opus 4.8": strip the prefix, title-case the name, dot the version. */
+function friendlyModel(id: string): string {
+  const [name, ...version] = id.replace(/^claude-/, "").split("-");
+  if (!name) return id;
+  const title = name.charAt(0).toUpperCase() + name.slice(1);
+  return version.length > 0 ? `${title} ${version.join(".")}` : title;
+}
+
+/** The SZ conductor's plain cost framing (§8), per tier — static, informational. */
+const TIER_COST_FRAMING: Record<TierKey, Record<string, string>> = {
+  narration: {
+    "claude-sonnet-5": "excellent, standard cost",
+    "claude-opus-4-8": "deeper, ~2x",
+    "claude-fable-5": "the frontier, ~3x, automatic fallback protection",
+  },
+  judgment: {
+    "claude-haiku-4-5": "fast, lowest cost",
+    "claude-sonnet-5": "sharper, standard cost",
+    "claude-opus-4-8": "deepest, ~2x",
+  },
+  probe: {
+    "claude-haiku-4-5": "fast, lowest cost",
+    "claude-sonnet-5": "sharper, a step up",
+  },
+};
+
+const TIER_LABELS: Record<TierKey, string> = {
+  narration: "Narration — the writer",
+  judgment: "Judgment — the rulings",
+  probe: "Probe — the quick checks",
+};
+
+const AFFORDANCE_OPTIONS: { value: string; label: string; note: string }[] = [
+  { value: "default_on", label: "Always", note: "suggested moves appear at each decision point" },
+  { value: "on_request_only", label: "On request", note: "only when you ask for them" },
+  { value: "never", label: "Never", note: "the studio never offers moves" },
+];
+
 /**
  * The play view client: submits turns, streams SSE progress, renders
  * decision-point chips (dismissible, never in prose), typed errors with
@@ -113,6 +162,19 @@ export function PlayView({
   const [overrideList, setOverrideList] = useState<Override[]>([]);
   const [mergeList, setMergeList] = useState<MergeSuggestion[]>([]);
   const [overrideDraft, setOverrideDraft] = useState("");
+  // M2 C5 settings drawer: the decided post-compile capabilities. Menus/tiers
+  // load lazily on first open (mirrors the notes panel). `affordance` is local
+  // state seeded from the prop so a drawer change gates chips without a reload.
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
+  const [settingsBusy, setSettingsBusy] = useState(false);
+  const [menus, setMenus] = useState<TierMenus | null>(null);
+  const [tiers, setTiers] = useState<Tiers | null>(null);
+  const [affordance, setAffordance] = useState(suggestionAffordance);
+  // Narration is the one player-facing voice: its change waits on an explicit
+  // studio-handoff confirm (cache rebuilds cold, voice may shift). This holds
+  // the proposed model until the player confirms.
+  const [narrationConfirm, setNarrationConfirm] = useState<string | null>(null);
   // §9.4 session lifecycle: recap opens the sitting, yokoku closes it.
   const [recap, setRecap] = useState<string | null>(null);
   const [yokoku, setYokoku] = useState<string | null>(null);
@@ -132,7 +194,11 @@ export function PlayView({
   const lastActivityRef = useRef(Date.now());
   const bottomRef = useRef<HTMLDivElement>(null);
   const resumedRef = useRef(false);
+  // Live mirror so a mid-turn suggestion-affordance change gates THIS turn's
+  // chips without a reload (the same closure-staleness guard as errorRef).
+  const affordanceRef = useRef(suggestionAffordance);
   errorRef.current = error;
+  affordanceRef.current = affordance;
 
   // Input typed during a turn queues in memory; a 4-minute sakuga turn plus a
   // reload used to eat it. Mirror the queue to sessionStorage (per campaign)
@@ -246,12 +312,13 @@ export function PlayView({
               ]);
               setStreamText("");
               setPendingInput(null);
-              // §9.2: chips appear by default ONLY when SZ set default_on.
+              // §9.2: chips appear by default ONLY when the affordance is
+              // default_on. Read live (ref) so a drawer change gates this turn.
               if (
                 payload.decisionPoint &&
                 payload.suggestedMoves &&
                 payload.suggestedMoves.length > 0 &&
-                suggestionAffordance === "default_on"
+                affordanceRef.current === "default_on"
               ) {
                 setChips(payload.suggestedMoves);
               }
@@ -329,7 +396,7 @@ export function PlayView({
         void submitRef.current(q);
       }
     },
-    [campaignId, suggestionAffordance],
+    [campaignId],
   );
 
   const submit = useCallback(
@@ -634,6 +701,86 @@ export function PlayView({
     else setNotesBusy(false);
   };
 
+  // M2 C5: the decided capabilities' surface. Menus/tiers/affordance fetched
+  // lazily on first open (mirrors the notes panel) — costs nothing until reached.
+  const loadSettings = async () => {
+    setSettingsBusy(true);
+    try {
+      const res = await fetchWithAuthRetry(`/api/campaigns/${campaignId}/settings`);
+      if (res.ok) {
+        const body = (await res.json()) as SettingsResponse;
+        setMenus(body.menus);
+        setTiers(body.tiers);
+        setAffordance(body.suggestion_affordance);
+      }
+    } catch {
+      // Non-fatal: the drawer shows "unavailable" and reopens clean.
+    }
+    setSettingsBusy(false);
+  };
+
+  const toggleSettings = () => {
+    const next = !settingsOpen;
+    setSettingsOpen(next);
+    if (next && !settingsLoaded) {
+      setSettingsLoaded(true);
+      void loadSettings();
+    }
+  };
+
+  // The single PATCH path (§13.1 / §9.2): the strict server body accepts only
+  // tier keys and suggestion_affordance. Local state updates on success only;
+  // the studio-handoff `note` (present iff narration changed) rides pinNotice.
+  const patchSetting = async (patch: Record<string, string>): Promise<boolean> => {
+    setSettingsBusy(true);
+    let ok = false;
+    try {
+      const res = await fetchWithAuthRetry(`/api/campaigns/${campaignId}/settings`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      });
+      if (res.ok) {
+        ok = true;
+        // Reconcile from what the server CONFIRMED, never the request body —
+        // a write the route couldn't apply must not show as applied (C5
+        // audit #1: the drawer never promises what the record didn't do).
+        const body = (await res.json().catch(() => ({}))) as {
+          note?: string;
+          changes?: { field: string; to: string }[];
+        };
+        for (const change of body.changes ?? []) {
+          if (change.field.startsWith("tier.")) {
+            const tier = change.field.slice(5);
+            setTiers((t) => (t ? { ...t, [tier]: change.to } : t));
+          } else if (change.field === "suggestion_affordance") {
+            setAffordance(change.to);
+          }
+        }
+        if (body.note) {
+          setPinNotice(body.note);
+          setTimeout(() => setPinNotice(null), 6_000);
+        }
+      }
+    } catch {
+      // Fall through to the error notice below.
+    }
+    if (!ok) {
+      setPinNotice("Couldn't update settings — try again.");
+      setTimeout(() => setPinNotice(null), 4_000);
+    }
+    setSettingsBusy(false);
+    return ok;
+  };
+
+  // Narration is player-facing voice: the handoff warning gates the change
+  // (before, not after). Confirm applies; cancel reverts the select.
+  const confirmNarration = async () => {
+    if (!narrationConfirm) return;
+    const ok = await patchSetting({ narration: narrationConfirm });
+    if (ok) setNarrationConfirm(null);
+  };
+
   return (
     <main className="mx-auto flex h-screen max-w-3xl flex-col px-6 py-6">
       <header className="flex items-end justify-between border-b border-border pb-3">
@@ -658,6 +805,14 @@ export function PlayView({
             title="Studio notes — your pins and standing rules"
           >
             Studio notes
+          </button>
+          <button
+            type="button"
+            onClick={toggleSettings}
+            className="rounded-md border border-border px-3 py-1 text-xs hover:bg-muted"
+            title="Settings — model tiers and move suggestions"
+          >
+            Settings
           </button>
           <button
             type="button"
@@ -812,6 +967,141 @@ export function PlayView({
               </ul>
             </div>
           )}
+        </div>
+      )}
+
+      {settingsOpen && (
+        <div className="mt-3 space-y-4 rounded-md border border-border bg-muted/30 px-3 py-3 text-sm">
+          <div className="flex items-center justify-between">
+            <p className="text-[10px] uppercase tracking-widest text-muted-foreground/60">
+              settings
+            </p>
+            <button
+              type="button"
+              onClick={() => setSettingsOpen(false)}
+              className="text-xs text-muted-foreground/70 hover:text-muted-foreground"
+            >
+              close
+            </button>
+          </div>
+
+          {menus && tiers ? (
+            <div className="space-y-4">
+              <div className="space-y-1">
+                <label
+                  htmlFor="tier-narration"
+                  className="text-xs font-medium text-muted-foreground"
+                >
+                  {TIER_LABELS.narration}
+                </label>
+                <select
+                  id="tier-narration"
+                  value={narrationConfirm ?? tiers.narration}
+                  disabled={settingsBusy}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setNarrationConfirm(v === tiers.narration ? null : v);
+                  }}
+                  className="w-full rounded-md border border-border bg-background px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-foreground disabled:opacity-50"
+                >
+                  {menus.narration.map((id) => (
+                    <option key={id} value={id}>
+                      {friendlyModel(id)}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[11px] text-muted-foreground/60">
+                  {TIER_COST_FRAMING.narration[narrationConfirm ?? tiers.narration] ?? ""}
+                </p>
+                {narrationConfirm && (
+                  <div className="space-y-2 rounded-md border border-amber-900/40 bg-amber-950/20 px-3 py-2">
+                    <p className="text-[11px] leading-5 text-amber-200/90">
+                      Studio handoff: the prompt cache rebuilds cold and the voice may shift —
+                      change the writer to {friendlyModel(narrationConfirm)}?
+                    </p>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => void confirmNarration()}
+                        disabled={settingsBusy}
+                        className="rounded-md border border-border px-3 py-1 text-xs hover:bg-muted disabled:opacity-50"
+                      >
+                        change
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setNarrationConfirm(null)}
+                        className="text-xs text-muted-foreground/70 hover:text-muted-foreground"
+                      >
+                        cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {(["judgment", "probe"] as const).map((tier) => (
+                <div key={tier} className="space-y-1">
+                  <label
+                    htmlFor={`tier-${tier}`}
+                    className="text-xs font-medium text-muted-foreground"
+                  >
+                    {TIER_LABELS[tier]}
+                  </label>
+                  <select
+                    id={`tier-${tier}`}
+                    value={tiers[tier]}
+                    disabled={settingsBusy}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      if (v !== tiers[tier]) void patchSetting({ [tier]: v });
+                    }}
+                    className="w-full rounded-md border border-border bg-background px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-foreground disabled:opacity-50"
+                  >
+                    {menus[tier].map((id) => (
+                      <option key={id} value={id}>
+                        {friendlyModel(id)}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-[11px] text-muted-foreground/60">
+                    {TIER_COST_FRAMING[tier][tiers[tier]] ?? ""}
+                  </p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground/60">
+              {settingsBusy ? "loading…" : "Tiers unavailable."}
+            </p>
+          )}
+
+          <div className="space-y-1">
+            <p className="text-xs font-medium text-muted-foreground">Move suggestions</p>
+            <div className="flex flex-wrap gap-2">
+              {AFFORDANCE_OPTIONS.map((o) => (
+                <button
+                  key={o.value}
+                  type="button"
+                  disabled={settingsBusy}
+                  onClick={() => {
+                    if (affordance !== o.value)
+                      void patchSetting({ suggestion_affordance: o.value });
+                  }}
+                  className={`rounded-md border px-3 py-1 text-xs disabled:opacity-50 ${
+                    affordance === o.value
+                      ? "border-foreground bg-muted text-foreground"
+                      : "border-border text-muted-foreground hover:bg-muted"
+                  }`}
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
+            <p className="text-[11px] text-muted-foreground/60">
+              {AFFORDANCE_OPTIONS.find((o) => o.value === affordance)?.note ?? ""}
+            </p>
+          </div>
         </div>
       )}
 
@@ -1092,7 +1382,7 @@ export function PlayView({
         </div>
         <div className="mt-2 flex items-center justify-between">
           <div>
-            {suggestionAffordance !== "never" && (
+            {affordance !== "never" && (
               <button
                 type="button"
                 onClick={() => void summonSuggestions()}

@@ -78,6 +78,11 @@ export const campaigns = pgTable(
      *  capped + resolved into marks/overrides. BoothState type. Never enters
      *  the story window. */
     boothState: jsonb(),
+    /** M2 C5 settings audit trail: [{at, field, from, to}] — the decided
+     *  capabilities (§13.1 tier change, §9.2 affordance) leave a record.
+     *  ONLY tiers + suggestion_affordance are writable post-compile; every
+     *  other contract field waits for M4's gated studio view (§13.4). */
+    settingsLog: jsonb().notNull().default([]),
     /** SZ durable draft (§8): the conversation, resumable across sittings. */
     szTranscript: jsonb(),
     /** SZ quiet-extraction accumulator: observations gathered mid-conversation. */
