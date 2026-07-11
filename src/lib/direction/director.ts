@@ -346,7 +346,10 @@ export async function runDirectorCycle(
   const executeTool = async (name: string, input: unknown): Promise<string> => {
     switch (name) {
       case "search_lore":
-        return executeSearchLore(db, profileIds, input as { query: string; page_type?: string });
+        return executeSearchLore(db, profileIds, input as { query: string; page_type?: string }, {
+          campaignId,
+          turnNumber,
+        });
       case "recall_scene":
         return executeRecallScene(db, campaignId, input as { turn_number: number });
       case "get_turn_narrative":

@@ -268,6 +268,7 @@ export async function runLayout(
           intent,
           `${queries[0] ?? playerInput} ${situation ?? ""}`.trim(),
           turnContract.canonFanOut,
+          { campaignId, turnNumber },
         )
       : Promise.resolve([]),
     // §5.1 douga row: retrieval is NONE — critical block only. Entity cards

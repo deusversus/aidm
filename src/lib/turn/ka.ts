@@ -285,6 +285,7 @@ export async function runKeyAnimator(
                   db,
                   args.profileIds,
                   block.input as { query: string; page_type?: string },
+                  { campaignId: args.campaignId, turnNumber: args.turnNumber },
                 )
               : block.name === "recall_scene"
                 ? await executeRecallScene(

@@ -67,9 +67,15 @@ export async function executeSearchLore(
   db: Db,
   profileIds: string[],
   input: { query: string; page_type?: string },
+  ctx: { campaignId?: string; turnNumber?: number } = {},
 ): Promise<string> {
   if (profileIds.length === 0) return "No canon corpus loaded for this campaign.";
-  const [emb] = await embedTexts([input.query], { inputType: "query", patience: "interactive" });
+  const [emb] = await embedTexts([input.query], {
+    inputType: "query",
+    patience: "interactive",
+    campaignId: ctx.campaignId,
+    turnNumber: ctx.turnNumber,
+  });
   if (!emb) return "Lore search unavailable (embedding failed) — write from what you have.";
   const vec = `[${emb.join(",")}]`;
   const rows = await db

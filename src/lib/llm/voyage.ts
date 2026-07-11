@@ -74,12 +74,19 @@ export async function embedTexts(texts: string[], opts: EmbedOptions = {}): Prom
   if (!res) throw new Error("embedTexts: unreachable");
   const latencyMs = Date.now() - started;
 
+  // Voyage bills input tokens only. The SDK normally camelCases the wire field
+  // (total_tokens → totalTokens), but read BOTH: a raw snake_case passthrough
+  // meters every embed at 0 tokens / $0, silently corrupting the ledger while
+  // the response actually carried usage (§3 "if it isn't metered…").
+  const usage = res.usage as { totalTokens?: number; total_tokens?: number } | undefined;
+  const embedTokens = usage?.totalTokens ?? usage?.total_tokens ?? 0;
+
   // Meter before validating — a malformed response is still a billed one.
   await recordModelCall({
     provider: "voyage",
     model: EMBEDDING_MODEL,
     tier: "embedding",
-    usage: { input_tokens: res.usage?.totalTokens ?? 0, output_tokens: 0 },
+    usage: { input_tokens: embedTokens, output_tokens: 0 },
     latencyMs,
     campaignId: opts.campaignId,
     turnNumber: opts.turnNumber,

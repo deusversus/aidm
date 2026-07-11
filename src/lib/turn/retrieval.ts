@@ -150,7 +150,12 @@ export async function fetchCandidates(
   if (budget <= 0 || queries.length === 0) return [];
   const fetchTotal = budget * 2;
   const perQuery = Math.max(3, Math.floor(fetchTotal / queries.length) + 1);
-  const embeddings = await embedTexts(queries, { inputType: "query", patience: "interactive" });
+  const embeddings = await embedTexts(queries, {
+    inputType: "query",
+    patience: "interactive",
+    campaignId,
+    turnNumber: currentTurn,
+  });
 
   const heat = heatExpr(currentTurn);
   const byKey = new Map<string, MemoryCandidate>();
@@ -312,6 +317,7 @@ export async function fetchCanon(
   intent: IntentOutput,
   queryText: string,
   fanOut: boolean,
+  ctx: { campaignId?: string; turnNumber?: number } = {},
 ): Promise<CanonChunk[]> {
   if (profileIds.length === 0 || !queryText.trim()) return [];
   let config = INTENT_LORE_CONFIG[intent.intent] ?? INTENT_LORE_CONFIG.DEFAULT;
@@ -325,7 +331,12 @@ export async function fetchCanon(
   }
   if (!config) return [];
   const limit = Math.min(fanOut ? 3 : config.limit, 3);
-  const [emb] = await embedTexts([queryText], { inputType: "query", patience: "interactive" });
+  const [emb] = await embedTexts([queryText], {
+    inputType: "query",
+    patience: "interactive",
+    campaignId: ctx.campaignId,
+    turnNumber: ctx.turnNumber,
+  });
   if (!emb) return [];
   const vec = toVec(emb);
   const rows = await db
