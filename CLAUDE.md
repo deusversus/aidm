@@ -56,6 +56,7 @@ This file is loaded into context on every Claude session in this repo. It's the 
 - Audit prompts are specific: what to check, what's out of scope, report format, under 800 words.
 - Findings get addressed before pushing; structural findings re-run the audit.
 - "Clean commit" is a valid outcome. Don't manufacture findings.
+- **The push gate is the FULL remote gate**: `pnpm lint && pnpm typecheck && pnpm test && pnpm evals:ci` — CI runs these same gates (plus a db:migrate setup step), and `evals:ci` is NOT part of `pnpm test`. After pushing, confirm the remote run went green (`gh run list --limit 1`). (Learned 2026-07-11: CI was red for seven pushes because evals:ci never ran locally.)
 
 ### Commits
 

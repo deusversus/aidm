@@ -36,11 +36,19 @@ export const THINKING_ALLOWANCE_TOKENS: Record<TurnTier, number> = {
   sakuga: 14_000,
 };
 
-/** Per-turn dollar ceilings at the most expensive menu model, COLD. */
+/**
+ * Per-turn dollar ceilings at the most expensive menu model, COLD.
+ * Recalibrated 2026-07-11: C10 folded the thinking allowances above into the
+ * model (correctly — thinking depth is deliberate spend) but left these at
+ * their pre-thinking values, so the gate went red on the commit that improved
+ * the model (genga modeled $0.68 vs a $0.55 ceiling; CI red for 7 pushes).
+ * Ceilings sit ~10% over the honest cold model — regression-catching margin,
+ * never quality headroom (§0: budgets catch waste, never trim depth).
+ */
 export const COLD_TURN_CEILING_USD: Record<TurnTier, number> = {
-  douga: 0.45,
-  genga: 0.55,
-  sakuga: 1.0,
+  douga: 0.5,
+  genga: 0.75,
+  sakuga: 1.5,
 };
 
 export interface TurnCostModel {
