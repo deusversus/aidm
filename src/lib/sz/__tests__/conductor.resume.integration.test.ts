@@ -4,7 +4,13 @@ import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { type ConductorDraft, SZ_KICKOFF, draftMessages, runConductorTurn } from "../conductor";
+import {
+  type ConductorDraft,
+  type Observation,
+  SZ_KICKOFF,
+  draftMessages,
+  runConductorTurn,
+} from "../conductor";
 
 /**
  * Draft-resume round-trip (M1-C3): the transcript + extraction state
@@ -57,6 +63,35 @@ function scriptedRound(blocks: ContentBlock[], stopReason: "end_turn" | "tool_us
 }
 
 const mockStream = vi.mocked(streamNarration);
+
+const obs = (kind: Observation["kind"], content: string): Observation => ({
+  kind,
+  content,
+  confidence: 0.9,
+});
+
+/** The gate's JSON output rode back to the model as this tool_use's tool_result. */
+function toolResultFor(draft: ConductorDraft, toolUseId: string): string {
+  for (const m of draft.transcript) {
+    if (m.role !== "user" || !Array.isArray(m.content)) continue;
+    for (const b of m.content as { type: string; tool_use_id?: string; content?: string }[]) {
+      if (b.type === "tool_result" && b.tool_use_id === toolUseId) return b.content ?? "";
+    }
+  }
+  throw new Error(`no tool_result for ${toolUseId}`);
+}
+
+/** A fully-set table EXCEPT the protagonist's name (the C4 gate's one new bar). */
+const TABLE_MINUS_NAME: Observation[] = [
+  obs("spark", "the moment before the leap, when they go anyway"),
+  obs("finitude", "finite — it ends"),
+  obs("death_physics", "death is real, sudden, cheap"),
+  obs("lethality_posture", "a little more intense than default"),
+  obs(
+    "tier_selection",
+    '{"narration":"claude-sonnet-5","judgment":"claude-haiku-4-5","probe":"claude-haiku-4-5"}',
+  ),
+];
 
 describe.skipIf(!url)("SZ conductor draft-resume (real Postgres, scripted model)", () => {
   const playerId = `test_player_${crypto.randomUUID()}`;
@@ -166,5 +201,96 @@ describe.skipIf(!url)("SZ conductor draft-resume (real Postgres, scripted model)
     const shown = draftMessages(draft);
     expect(shown.some((m) => m.role === "player" && m.text.includes("cowboy bebop"))).toBe(true);
     expect(shown.some((m) => m.text === SZ_KICKOFF)).toBe(false);
+  });
+
+  it("propose_contract gate (M2 C4): an unnamed table returns {ready:false} with the PC gap, readyToCompile stays false", async () => {
+    if (!db) throw new Error("unreachable");
+    mockStream.mockReset();
+    const draft: ConductorDraft = {
+      transcript: [],
+      observations: TABLE_MINUS_NAME,
+      profileIds: ["seeded-profile"], // gate reads only the boolean, not the row
+      readyToCompile: false,
+    };
+    const [c] = await db
+      .insert(schema.campaigns)
+      .values({ playerId, title: "gate unnamed", status: "draft", szTranscript: draft })
+      .returning();
+    if (!c) throw new Error("insert failed");
+    try {
+      mockStream
+        .mockReturnValueOnce(
+          scriptedRound(
+            [
+              {
+                type: "tool_use",
+                id: "pc_1",
+                name: "propose_contract",
+                input: { campaign_title: "Untitled" },
+              },
+            ],
+            "tool_use",
+          ),
+        )
+        .mockReturnValueOnce(
+          scriptedRound([{ type: "text", text: "One thing left — who are they?" }], "end_turn"),
+        );
+      const result = await runConductorTurn(db, c.id, "I think we're ready", () => {});
+      expect(result.readyToCompile).toBe(false);
+      const parsed = JSON.parse(toolResultFor(result, "pc_1"));
+      expect(parsed.ready).toBe(false);
+      expect(parsed.gaps.some((g: string) => g.includes("protagonist is unnamed"))).toBe(true);
+    } finally {
+      await db.delete(schema.campaigns).where(eq(schema.campaigns.id, c.id));
+    }
+  });
+
+  it("propose_contract gate (M2 C4): a named table with a deferral elsewhere returns {ready:true} carrying the open item", async () => {
+    if (!db) throw new Error("unreachable");
+    mockStream.mockReset();
+    const draft: ConductorDraft = {
+      transcript: [],
+      observations: [
+        ...TABLE_MINUS_NAME,
+        obs("pc_name", "Kaelen — he chose it himself"),
+        obs("deferred", "who the recurring antagonist is — director's territory"),
+      ],
+      profileIds: ["seeded-profile"],
+      readyToCompile: false,
+    };
+    const [c] = await db
+      .insert(schema.campaigns)
+      .values({ playerId, title: "gate named", status: "draft", szTranscript: draft })
+      .returning();
+    if (!c) throw new Error("insert failed");
+    try {
+      mockStream
+        .mockReturnValueOnce(
+          scriptedRound(
+            [
+              {
+                type: "tool_use",
+                id: "pc_1",
+                name: "propose_contract",
+                input: { campaign_title: "The Long Quiet" },
+              },
+            ],
+            "tool_use",
+          ),
+        )
+        .mockReturnValueOnce(
+          scriptedRound(
+            [{ type: "text", text: "The table's set. Here's what we've got…" }],
+            "end_turn",
+          ),
+        );
+      const result = await runConductorTurn(db, c.id, "okay, we're set", () => {});
+      expect(result.readyToCompile).toBe(true);
+      const parsed = JSON.parse(toolResultFor(result, "pc_1"));
+      expect(parsed.ready).toBe(true);
+      expect(parsed.open_items.some((o: string) => o.includes("recurring antagonist"))).toBe(true);
+    } finally {
+      await db.delete(schema.campaigns).where(eq(schema.campaigns.id, c.id));
+    }
   });
 });

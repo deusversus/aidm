@@ -65,3 +65,19 @@ export function marksSelfInsert(text: string): boolean {
   const t = text.toLowerCase();
   return SELF_INSERT_MARKERS.some((m) => t.includes(m));
 }
+
+/**
+ * True when an entity's structured `state` carries the SZ compiler's durable
+ * self-insert marker (§6.5, M2 C4). A REAL-named PC row ("Kaelen") fails
+ * `isProtagonistName`, so after C4 the resolver's sentinel aliasing keys off
+ * this marker: without it, a named PC row would lose the protagonist alias and
+ * "the protagonist" assertions would exact-miss it, re-opening the turn-3 dupe
+ * hole. The compiler stamps `state.is_player_protagonist = true` at admission.
+ */
+export function marksPlayerProtagonistState(state: unknown): boolean {
+  return (
+    typeof state === "object" &&
+    state !== null &&
+    (state as { is_player_protagonist?: unknown }).is_player_protagonist === true
+  );
+}

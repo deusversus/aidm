@@ -303,6 +303,46 @@ describe.skipIf(!url)("Universal ingestion (real Postgres, scripted extractor)",
     expect(pcRows[0]?.block).toContain("rotates his enchanted wells");
   });
 
+  it("resolver (M2 C4): 'the protagonist' aliases to a REAL-named PC row via the state marker", async () => {
+    if (!db) throw new Error("unreachable");
+    // After C4 the PC row carries a REAL name ("Kaelen") — isProtagonistName
+    // MISSES it, so the sentinel aliasing must key off the compiler's durable
+    // state marker. Without it, "the protagonist" exact-misses and mints a
+    // second PC row (the turn-3 dupe hole C4 exists to close).
+    await db.insert(schema.entities).values({
+      campaignId,
+      name: "Kaelen",
+      entityType: "npc",
+      block: "The player's self-insert; a wandering blade.",
+      state: { is_player_protagonist: true },
+      turnId: 0,
+      provenance: "sz_compiler",
+      confidence: 1,
+    });
+    armExtractor([
+      {
+        kind: "cast_fact",
+        entity_name: "the protagonist",
+        content: "The protagonist keeps his blade wrapped in oilcloth.",
+        posture: "accept",
+      },
+    ]);
+    const result = await ingestAssertion(db, campaignId, 3, "I keep my blade wrapped", {
+      profileIds: [],
+    });
+    expect(result.writes.some((w) => w.kind === "entity_enriched")).toBe(true);
+    expect(result.writes.some((w) => w.kind === "entity_created")).toBe(false);
+    const npcs = await db
+      .select()
+      .from(schema.entities)
+      .where(
+        and(eq(schema.entities.campaignId, campaignId), eq(schema.entities.entityType, "npc")),
+      );
+    expect(npcs).toHaveLength(1); // enriched the one row — never a parallel PC
+    expect(npcs[0]?.name).toBe("Kaelen");
+    expect(npcs[0]?.block).toContain("oilcloth");
+  });
+
   it("ACCEPT default: a bare world fact writes a semantic row with the exact envelope", async () => {
     if (!db) throw new Error("unreachable");
     armExtractor([

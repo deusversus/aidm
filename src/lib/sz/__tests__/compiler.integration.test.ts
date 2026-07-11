@@ -1,7 +1,7 @@
 import * as schema from "@/lib/db/schema";
 import { bebopContract } from "@/lib/renderer/__tests__/fixtures";
 import { renderSettei } from "@/lib/renderer/settei";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -96,6 +96,10 @@ const SCRIPTED_OBSERVATIONS: Observation[] = [
     "The moment someone says 'whatever happens, happens' and walks toward the thing anyway.",
   ),
   obs("finitude", "finite — they want the story to trend toward an end"),
+  // M2 C4: the protagonist is NAMED — the gap verdict blocks an unnamed,
+  // un-deferred PC. A real name in the shared fixture; the dedup fixture below
+  // overrides it with the deferral form to prove that path also compiles.
+  obs("pc_name", "Jules — the player's own bounty hunter, named after the source"),
   obs("death_physics", "death is real, sudden, and cheap; nobody gets a speech"),
   obs("lethality_posture", "a little more intense than default; losses stay lost"),
   obs("hard_line", "no harm to children on-screen"),
@@ -169,6 +173,76 @@ describe("suggestion affordance resolution (anchored, never guessed from prose)"
       obs("suggestion_affordance", "player chose default_on, wrapped diegetically"),
     ]);
     expect(r.suggestionAffordance).toBe("default_on");
+  });
+});
+
+describe("protagonist name resolution + gap (M2 C4, deterministic)", () => {
+  it("gap verdict blocks an unnamed, un-deferred protagonist", () => {
+    const gaps = gapVerdict(
+      resolveObservations(SCRIPTED_OBSERVATIONS.filter((o) => o.kind !== "pc_name")),
+      true,
+    );
+    expect(gaps.some((g) => g.includes("protagonist is unnamed"))).toBe(true);
+  });
+
+  it("resolves anchored-first: 'Kaelen — he chose it himself' → 'Kaelen'", () => {
+    const r = resolveObservations([obs("pc_name", "Kaelen — he chose it himself")]);
+    expect(r.pcName).toBe("Kaelen");
+    expect(r.pcNameDeferred).toBe(false);
+  });
+
+  it("honorific-led names survive the sentence-period cut (audit #2)", () => {
+    expect(resolveObservations([obs("pc_name", "Dr. Elara Voss — the title matters")]).pcName).toBe(
+      "Dr. Elara Voss",
+    );
+    expect(resolveObservations([obs("pc_name", "Lt. Col. Roy Mustang")]).pcName).toBe(
+      "Lt. Col. Roy Mustang",
+    );
+    expect(resolveObservations([obs("pc_name", "Kaelen. He chose it himself.")]).pcName).toBe(
+      "Kaelen",
+    );
+    expect(resolveObservations([obs("pc_name", "Ka'el")]).pcName).toBe("Ka'el");
+  });
+
+  it("an explicit deferral overrides an OSP-invented brief name (audit #1)", () => {
+    const out = dedupeAdmissions(
+      [
+        {
+          name: "Kaelen",
+          kind: "cast",
+          brief: "The player's self-insert; a name the OSP invented despite the deferral.",
+        },
+      ],
+      undefined,
+      { nameDeferred: true },
+    );
+    const pc = out.find((a) => a.isPlayerProtagonist);
+    expect(pc?.name).toBe("The Protagonist");
+  });
+
+  it("the deferral form defers and records a note", () => {
+    const r = resolveObservations([
+      obs("pc_name", "deferred — the player wants it to emerge in play"),
+    ]);
+    expect(r.pcName).toBeUndefined();
+    expect(r.pcNameDeferred).toBe(true);
+    expect(r.deferred.some((d) => d.includes("protagonist name deferred"))).toBe(true);
+  });
+
+  it("latest wins on a rename, and a later real name clears an earlier deferral", () => {
+    const renamed = resolveObservations([
+      obs("pc_name", "Kaelen"),
+      obs("pc_name", "Seryn — she renamed the character mid-conversation"),
+    ]);
+    expect(renamed.pcName).toBe("Seryn");
+    expect(renamed.pcNameDeferred).toBe(false);
+
+    const undeferred = resolveObservations([
+      obs("pc_name", "deferred — undecided for now"),
+      obs("pc_name", "Kaelen"),
+    ]);
+    expect(undeferred.pcName).toBe("Kaelen");
+    expect(undeferred.pcNameDeferred).toBe(false);
   });
 });
 
@@ -350,6 +424,10 @@ describe.skipIf(!url)("SZ compiler (real Postgres)", () => {
       transcript: [],
       observations: [
         ...SCRIPTED_OBSERVATIONS,
+        // Latest-wins override to the deferral form: this fixture's protagonist
+        // stays "The Protagonist" (unnamed by the player's own word), which the
+        // dedup assertions below depend on — and proves the deferred path compiles.
+        obs("pc_name", "deferred — the player wants the name to emerge in play"),
         obs("cast_fact", "The protagonist was orphaned in the lower wards and never named."),
         obs("cast_fact", "The protagonist can channel stormlight into a blade — a rare ability."),
         obs("world_fact", "The lower wards raised the protagonist and half the crew."),
@@ -426,6 +504,122 @@ describe.skipIf(!url)("SZ compiler (real Postgres)", () => {
       // dedup leaves them as two rows (M2 semantic-alias territory).
       const threads = rows.filter((e) => e.entityType === "thread");
       expect(threads).toHaveLength(2);
+    } finally {
+      await db.delete(schema.campaigns).where(eq(schema.campaigns.id, campaign.id));
+    }
+  });
+
+  it("a named PC seeds the protagonist row EXACTLY that name, state-stamped; the OSP gets the name (M2 C4)", async () => {
+    if (!db) throw new Error("unreachable");
+    const named: ConductorDraft = {
+      transcript: [],
+      observations: [
+        ...SCRIPTED_OBSERVATIONS.filter((o) => o.kind !== "pc_name"),
+        obs("pc_name", "Kaelen — he chose it himself"),
+      ],
+      profileIds: ["test_sz_profile"],
+      readyToCompile: true,
+    };
+    const [campaign] = await db
+      .insert(schema.campaigns)
+      .values({ playerId, title: "named pc fixture", status: "draft", szTranscript: named })
+      .returning();
+    if (!campaign) throw new Error("insert failed");
+    const NAMED_STUB = {
+      ...STUB_OSP,
+      briefs: [
+        {
+          name: "The Protagonist (unnamed)",
+          kind: "cast" as const,
+          brief: "The player's self-insert; a wandering blade who carries a dead mentor's compass.",
+          admit_to_catalog: true,
+        },
+      ],
+    };
+    let seenPcName: string | undefined;
+    try {
+      const result = await compileSessionZero(db, campaign.id, {
+        ospSynthesizer: async (input) => {
+          seenPcName = input.resolved.pcName;
+          return NAMED_STUB;
+        },
+        ingestor: async () => ({ writes: [], flags: [] }),
+      });
+      expect(result.gaps).toEqual([]);
+      // The OSP synthesizer receives the name (briefs/opening can use it).
+      expect(seenPcName).toBe("Kaelen");
+
+      const npcs = await db
+        .select()
+        .from(schema.entities)
+        .where(
+          and(eq(schema.entities.campaignId, campaign.id), eq(schema.entities.entityType, "npc")),
+        );
+      expect(npcs).toHaveLength(1);
+      // The row is named EXACTLY the player's word.
+      expect(npcs[0]?.name).toBe("Kaelen");
+      // …and stamped so the resolver's protagonist alias survives the real name.
+      expect((npcs[0]?.state as { is_player_protagonist?: boolean })?.is_player_protagonist).toBe(
+        true,
+      );
+    } finally {
+      await db.delete(schema.campaigns).where(eq(schema.campaigns.id, campaign.id));
+    }
+  });
+
+  it("a deferred PC compiles: row stays 'The Protagonist', the deferral note is recorded (M2 C4)", async () => {
+    if (!db) throw new Error("unreachable");
+    const deferredDraft: ConductorDraft = {
+      transcript: [],
+      observations: [
+        ...SCRIPTED_OBSERVATIONS.filter((o) => o.kind !== "pc_name"),
+        obs("pc_name", "deferred — the player wants the name to emerge in play"),
+      ],
+      profileIds: ["test_sz_profile"],
+      readyToCompile: true,
+    };
+    const [campaign] = await db
+      .insert(schema.campaigns)
+      .values({
+        playerId,
+        title: "deferred pc fixture",
+        status: "draft",
+        szTranscript: deferredDraft,
+      })
+      .returning();
+    if (!campaign) throw new Error("insert failed");
+    const DEFERRED_STUB = {
+      ...STUB_OSP,
+      briefs: [
+        {
+          name: "player's protagonist",
+          kind: "cast" as const,
+          brief: "The self-insert lead, as yet unnamed.",
+          admit_to_catalog: true,
+        },
+      ],
+    };
+    let seenDeferred: string[] = [];
+    try {
+      const result = await compileSessionZero(db, campaign.id, {
+        ospSynthesizer: async (input) => {
+          seenDeferred = [...input.resolved.deferred];
+          return DEFERRED_STUB;
+        },
+        ingestor: async () => ({ writes: [], flags: [] }),
+      });
+      expect(result.gaps).toEqual([]);
+      // The deferral surfaces to the OSP (and the conductor's open-items summary).
+      expect(seenDeferred.some((d) => d.includes("protagonist name deferred"))).toBe(true);
+
+      const npcs = await db
+        .select()
+        .from(schema.entities)
+        .where(
+          and(eq(schema.entities.campaignId, campaign.id), eq(schema.entities.entityType, "npc")),
+        );
+      expect(npcs).toHaveLength(1);
+      expect(npcs[0]?.name).toBe("The Protagonist");
     } finally {
       await db.delete(schema.campaigns).where(eq(schema.campaigns.id, campaign.id));
     }

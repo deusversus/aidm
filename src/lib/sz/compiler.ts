@@ -49,6 +49,15 @@ const STALE_COMPILE_CLAIM_MS = 5 * 60 * 1000;
 export interface ResolvedObservations {
   spark?: string;
   finitude?: "finite" | "indefinite" | "undecided";
+  /**
+   * §8 + M2 C4: the protagonist's name, anchored-first like finitude
+   * ("Kaelen — he chose it himself" resolves to "Kaelen"). A content
+   * beginning "deferred" is the player's explicit word that the name
+   * emerges in play — pcNameDeferred records it; the gap verdict blocks
+   * an unnamed, un-deferred protagonist.
+   */
+  pcName?: string;
+  pcNameDeferred: boolean;
   deathPhysics?: string;
   lethalityPosture?: string;
   hardLines: string[];
@@ -92,6 +101,7 @@ export function resolveFinitude(content: string): Finitude | undefined {
 
 export function resolveObservations(observations: Observation[]): ResolvedObservations {
   const resolved: ResolvedObservations = {
+    pcNameDeferred: false,
     hardLines: [],
     calibration: {},
     presentationGrants: [],
@@ -110,6 +120,38 @@ export function resolveObservations(observations: Observation[]): ResolvedObserv
         const value = resolveFinitude(obs.content);
         if (value) resolved.finitude = value;
         else resolved.deferred.push(`ambiguous finitude: ${obs.content.slice(0, 80)}`);
+        break;
+      }
+      case "pc_name": {
+        // Anchored-first, same discipline as finitude: the name (or the word
+        // "deferred") leads; color follows a separator. Latest wins — a player
+        // who renames mid-conversation gets their newest word.
+        const content = obs.content.trim();
+        if (/^["'“]?deferred\b/i.test(content)) {
+          resolved.pcNameDeferred = true;
+          resolved.pcName = undefined;
+          resolved.deferred.push(`protagonist name deferred to play: ${content.slice(0, 80)}`);
+        } else {
+          let name = content.split(/\s+[—–-]\s|\n/)[0]?.trim() ?? "";
+          // Sentence-period color cuts, but honorifics survive: a ". " only
+          // terminates the name when the word before it is ≥4 chars — so
+          // "Kaelen. He chose it" cuts and "Dr. Elara Voss" / "Lt. Col. Roy
+          // Mustang" stay whole (C4 audit #2).
+          for (const m of name.matchAll(/(\S+)\.\s/g)) {
+            const word = (m[1] ?? "").replace(/[^A-Za-z'’]/g, "");
+            if (word.length >= 4 && m.index !== undefined) {
+              name = name.slice(0, m.index + (m[1] ?? "").length);
+              break;
+            }
+          }
+          // Strip wrapping quotes only — internal apostrophes are part of the
+          // name (Ka'el stays Ka'el, either apostrophe form; C4 audit #4).
+          name = name.replace(/^["'“”‘’]+|["'“”‘’]+$/g, "").trim();
+          if (name) {
+            resolved.pcName = name;
+            resolved.pcNameDeferred = false;
+          }
+        }
         break;
       }
       case "death_physics":
@@ -231,6 +273,10 @@ export function gapVerdict(resolved: ResolvedObservations, hasProfile: boolean):
   if (!hasProfile) gaps.push("no researched profile — the World never loaded");
   if (!resolved.spark) gaps.push("the spark was never gathered (§8's one mandatory question)");
   if (!resolved.finitude) gaps.push("finitude undetermined — the Series contract is sacrosanct");
+  if (!resolved.pcName && !resolved.pcNameDeferred)
+    gaps.push(
+      "the protagonist is unnamed and the player has not deferred it — ask, or record their explicit deferral (M2 C4)",
+    );
   if (!resolved.deathPhysics) gaps.push("death physics ungathered (intensity contract)");
   if (!resolved.lethalityPosture) gaps.push("lethality posture ungathered (intensity contract)");
   if (!resolved.tierSelection)
@@ -313,6 +359,15 @@ export const defaultOspSynthesizer: OspSynthesizer = async ({
     prompt: [
       `Title: ${title}`,
       `Director personality: ${directorPersonality}`,
+      // M2 C4: the protagonist's name (the premise's second pole) reaches the
+      // OSP so briefs and the opening use it; a deferral tells the synthesizer
+      // NOT to invent one.
+      `Protagonist (the player's character): ${
+        resolved.pcName ??
+        (resolved.pcNameDeferred
+          ? "(name deferred to play — do NOT invent one; refer to them by role)"
+          : "(unnamed)")
+      }`,
       `THE SPARK (verbatim): ${spark}`,
       `Finitude: ${resolved.finitude}`,
       `Death physics: ${resolved.deathPhysics}`,
@@ -370,6 +425,13 @@ export interface CatalogAdmission {
   name: string;
   entityType: CatalogEntityType;
   block: string;
+  /**
+   * M2 C4: the self-insert protagonist row is stamped with a durable state
+   * marker so the ingestion resolver aliases "the protagonist" to it even when
+   * it carries a REAL name (isProtagonistName misses "Kaelen"). The compile's
+   * admission insert reads this to write `state.is_player_protagonist`.
+   */
+  isPlayerProtagonist?: boolean;
 }
 
 /**
@@ -382,8 +444,17 @@ export interface CatalogAdmission {
  *      merge into one row (the exact-name index misses these near-duplicates).
  * Insertion order is preserved (Map iteration order). This is the whole of the
  * deterministic fix — semantic aliasing across DIFFERENT names is out of scope.
+ *
+ * `pcName` (M2 C4): the player's resolved protagonist name flows in from Session
+ * Zero and NAMES the merged self-insert row exactly — a real extracted name is
+ * the fallback, and "The Protagonist" only when the name was deferred. The
+ * change is additive; existing callers pass no pcName and keep prior behavior.
  */
-export function dedupeAdmissions(admitted: AdmitBrief[]): CatalogAdmission[] {
+export function dedupeAdmissions(
+  admitted: AdmitBrief[],
+  pcName?: string,
+  opts: { nameDeferred?: boolean } = {},
+): CatalogAdmission[] {
   const PROTAGONIST_KEY = "npc::#protagonist#";
   interface Group {
     entityType: CatalogEntityType;
@@ -419,9 +490,16 @@ export function dedupeAdmissions(admitted: AdmitBrief[]): CatalogAdmission[] {
       const identity = group.blocks.filter((x) => !x.capability).map((x) => x.text);
       const capability = group.blocks.filter((x) => x.capability).map((x) => x.text);
       return {
-        name: group.realName ?? "The Protagonist",
+        // The player's word (pcName) names the row; a real extracted name is
+        // the fallback. An EXPLICIT deferral overrides everything — the OSP is
+        // told not to invent a name, but a smuggled brief name must not win
+        // over the player's word either (C4 audit #1: code disposes).
+        name: opts.nameDeferred
+          ? "The Protagonist"
+          : (pcName ?? group.realName ?? "The Protagonist"),
         entityType: "npc" as const,
         block: [...identity, ...capability].join("\n\n"),
+        isPlayerProtagonist: true,
       };
     }
     return {
@@ -707,7 +785,9 @@ export async function compileSessionZero(
       // OSP named twice; near-duplicate names the exact-name index misses)
       // collapse BEFORE insert. DIFFERENT names for the same thing are M2
       // semantic-alias territory — dedupeAdmissions leaves them as-is.
-      const deduped = dedupeAdmissions(admitted);
+      const deduped = dedupeAdmissions(admitted, resolved.pcName, {
+        nameDeferred: resolved.pcNameDeferred,
+      });
       if (deduped.length > 0) {
         const created = await tx
           .insert(entities)
@@ -717,6 +797,9 @@ export async function compileSessionZero(
               name: e.name,
               entityType: e.entityType,
               block: e.block,
+              // §6.5/M2 C4: the durable self-insert marker keeps the resolver's
+              // protagonist alias attached to a REAL-named PC row.
+              ...(e.isPlayerProtagonist ? { state: { is_player_protagonist: true } } : {}),
               ...SZ_ROW,
             })),
           )

@@ -46,6 +46,7 @@ WHAT YOU GATHER, AS CONVERSATION (record each with record_observation as it surf
 - presentation vocabulary: derive from the premise what expressive formatting fits (diegetic System windows for a Solo Leveling world; bare prose for Berserk) and confirm the feel, not the mechanics.
 - suggestion affordance: some players want suggested moves at decision points, some never — ask once, casually. Record with the CHOSEN value first: content must BEGIN with exactly "default_on", "on_request_only", or "never" — any color after it.
 - tier selection: present the model menus in plain terms — narration (the writer): Sonnet 5 (excellent, standard cost) / Opus 4.8 (deeper, ~2x) / Fable 5 (the frontier, ~3x, with automatic fallback protection); judgment and probe tiers likewise. Their pick is their cost/intelligence throttle and they can change it anytime — note that changing later resets the story's prompt cache and may shift the voice slightly (a "studio handoff"). Record with kind "tier_selection", content as JSON: {"narration": "claude-sonnet-5" | "claude-opus-4-8" | "claude-fable-5", "judgment": "claude-haiku-4-5" | "claude-sonnet-5" | "claude-opus-4-8", "probe": "claude-haiku-4-5" | "claude-sonnet-5"}.
+- the protagonist's identity (M2 C4 — the campaign compiled a cast row literally named "The Protagonist (unnamed)" once; never again): their NAME is part of setting the table — ask naturally, in the premise's own register, never as a form field. Record kind "pc_name" with the CHOSEN name first: content must BEGIN with the exact name — any color after it. If the player explicitly wants the name to emerge in play, that is their word: record pc_name with content beginning exactly "deferred" plus their reasoning. Also draw out, as conversation (2-3 beats, never a checklist): who is already IN their life (extant relationships become live threads) and what past presses on them (backstory hooks become the Director's seed material) — record as cast_facts. Age is texture: gather it only when the premise makes it load-bearing.
 - world facts the player asserts are WORLD-BUILDING, always: record them (kind "world_fact" / "cast_fact"). The player's words are never just answers to your questions. Keep identities LINKED: if the player names someone previously discussed by role, record the link explicitly ("Mother's name is Milia — same person as the prior Mother facts"); if they reveal something they earlier deferred, record the fact and say in it that it resolves the earlier deferral — a resolved question must never survive as an open one.
 - the player themselves: what they loved and when, who they were when it found them, the patterns in what lights them up — record durable taste observations (kind "player_taste") as they surface. These follow the player across campaigns; a returning player is a regular, not a stranger.
 
@@ -53,7 +54,7 @@ STEERING HONESTY. If their stated taste and their actual choices diverge, you ma
 
 BOUNDARIES. Details the player defers are recorded as deferred (kind "deferred") — you NEVER improvise them; they are the Director's territory in play. You do not write the story here; you set the table for it.
 
-WHEN THE TABLE IS SET — spark recorded, finitude chosen, intensity contract gathered, tiers picked, calibration settled — say what you heard in one warm paragraph (the player must recognize themselves in it) and call propose_contract. If they correct anything, keep talking; the contract waits.`;
+WHEN THE TABLE IS SET — spark recorded, finitude chosen, intensity contract gathered, tiers picked, calibration settled, the protagonist NAMED (or their name explicitly deferred by the player) — call propose_contract. Its result carries any OPEN ITEMS (deferred details, resolutions the compiler had to guess at): weave them honestly into your one warm summary paragraph — the player must recognize themselves in it AND see what is being left open — then wait. If they correct anything, keep talking; the contract waits.`;
 
 // ---------------------------------------------------------------------------
 // Tools
@@ -62,6 +63,7 @@ WHEN THE TABLE IS SET — spark recorded, finitude chosen, intensity contract ga
 export const ObservationKind = z.enum([
   "spark",
   "finitude",
+  "pc_name",
   "death_physics",
   "lethality_posture",
   "hard_line",
@@ -205,9 +207,28 @@ async function executeTool(
   if (name === "propose_contract") {
     const { campaign_title } = (input ?? {}) as { campaign_title?: string };
     if (campaign_title?.trim()) draft.title = campaign_title.trim();
+    // M2 C4: the gate runs HERE, deterministically, before the player is told
+    // the table is set — and the compile's guesses/deferrals surface as OPEN
+    // ITEMS for the conductor's summary. The compiler never ships a silent guess.
+    const { gapVerdict, resolveObservations } = await import("./compiler");
+    const resolved = resolveObservations(draft.observations);
+    const gaps = gapVerdict(resolved, draft.profileIds.length > 0);
+    if (gaps.length > 0) {
+      draft.readyToCompile = false;
+      return JSON.stringify({
+        ready: false,
+        gaps,
+        guidance: "The table is NOT set — gather these before proposing again.",
+      });
+    }
     draft.readyToCompile = true;
     emit({ type: "ready_to_compile" });
-    return "The table is set. Compilation will run when the player confirms.";
+    return JSON.stringify({
+      ready: true,
+      open_items: resolved.deferred,
+      guidance:
+        "The table is set. Weave the open items honestly into your summary — the player sees what stays open. Compilation runs when they confirm.",
+    });
   }
   if (name === "research_title") {
     const { title, anilist_id } = input as { title: string; anilist_id?: number };

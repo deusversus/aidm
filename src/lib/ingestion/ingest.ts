@@ -8,7 +8,7 @@ import {
   entityVersions,
   semanticMemories,
 } from "@/lib/db/schema";
-import { identityKey, isProtagonistName } from "@/lib/entity-identity";
+import { identityKey, isProtagonistName, marksPlayerProtagonistState } from "@/lib/entity-identity";
 import {
   MERGE_AUTO_CONFIDENCE,
   MERGE_CANDIDATE_MAX_DISTANCE,
@@ -479,6 +479,9 @@ export async function ingestAssertion(
         entityType: entities.entityType,
         block: entities.block,
         turnId: entities.turnId,
+        // §6.5/M2 C4: the self-insert marker registers the protagonist sentinel
+        // for a REAL-named PC row (isProtagonistName misses "Kaelen").
+        state: entities.state,
       })
       .from(entities)
       .where(and(eq(entities.campaignId, campaignId), notTombstoned(entities))),
@@ -540,7 +543,15 @@ export async function ingestAssertion(
     // into one row (M1-audit note). identityKey returns null there.
     const key = identityKey(e.name);
     if (key) catalog.set(key, e);
-    if (e.entityType === "npc" && isProtagonistName(e.name)) catalog.set(PROTAGONIST_KEY, e);
+    // The sentinel binds every protagonist spelling to the one PC row. A row the
+    // SZ compiler marked as the player's self-insert (state) registers it even
+    // when its NAME is real ("Kaelen") — otherwise C4's named PC re-opens the
+    // turn-3 dupe hole this guard exists to close (M2 C4).
+    if (
+      e.entityType === "npc" &&
+      (marksPlayerProtagonistState(e.state) || isProtagonistName(e.name))
+    )
+      catalog.set(PROTAGONIST_KEY, e);
   }
   const lookupEntity = (rawName: string): EntityRef | undefined => {
     const key = identityKey(rawName);
