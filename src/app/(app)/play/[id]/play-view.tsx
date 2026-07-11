@@ -1,5 +1,6 @@
 "use client";
 
+import { fetchWithAuthRetry } from "@/lib/client/fetch-with-auth";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -120,6 +121,11 @@ export function PlayView({
   const resumedRef = useRef(false);
   errorRef.current = error;
 
+  // Input typed during a turn queues in memory; a 4-minute sakuga turn plus a
+  // reload used to eat it. Mirror the queue to sessionStorage (per campaign)
+  // so a reload rehydrates it — the resumed open turn's flush then drains it.
+  const queueStorageKey = `aidm:play:queued:${campaignId}`;
+
   // biome-ignore lint/correctness/useExhaustiveDependencies: scroll follows content
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -134,6 +140,28 @@ export function PlayView({
     const tick = setInterval(() => setElapsed(Math.floor((Date.now() - started) / 1000)), 1000);
     return () => clearInterval(tick);
   }, [busy]);
+
+  useEffect(() => {
+    try {
+      const saved = sessionStorage.getItem(queueStorageKey);
+      if (saved) {
+        queuedRef.current = saved;
+        setQueued(saved);
+      }
+    } catch {
+      // sessionStorage can throw in locked-down contexts — the queue simply
+      // doesn't persist; play is unaffected.
+    }
+  }, [queueStorageKey]);
+
+  useEffect(() => {
+    try {
+      if (queued) sessionStorage.setItem(queueStorageKey, queued);
+      else sessionStorage.removeItem(queueStorageKey);
+    } catch {
+      // Same as hydration: non-fatal, persistence is best-effort.
+    }
+  }, [queued, queueStorageKey]);
 
   const attachStream = useCallback(
     async (turnId: string, playerInput: string, retries = 0) => {
@@ -300,7 +328,7 @@ export function PlayView({
       setAssertion(null);
       setPendingInput(message);
       try {
-        const res = await fetch(`/api/campaigns/${campaignId}/turns`, {
+        const res = await fetchWithAuthRetry(`/api/campaigns/${campaignId}/turns`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ message }),
@@ -355,7 +383,9 @@ export function PlayView({
     openedRef.current = true;
     void (async () => {
       try {
-        const res = await fetch(`/api/campaigns/${campaignId}/session/open`, { method: "POST" });
+        const res = await fetchWithAuthRetry(`/api/campaigns/${campaignId}/session/open`, {
+          method: "POST",
+        });
         if (!res.ok) return;
         const body = (await res.json()) as { recap?: string };
         if (body.recap) setRecap(body.recap);
@@ -369,7 +399,7 @@ export function PlayView({
     if (closing || sessionClosed) return;
     setClosing(true);
     try {
-      const res = await fetch(`/api/campaigns/${campaignId}/session/close`, {
+      const res = await fetchWithAuthRetry(`/api/campaigns/${campaignId}/session/close`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ trigger: "explicit" }),
@@ -411,7 +441,9 @@ export function PlayView({
     if (!error?.turnId) return;
     const turnId = error.turnId;
     setError(null);
-    await fetch(`/api/campaigns/${campaignId}/turns/${turnId}/retry`, { method: "POST" });
+    await fetchWithAuthRetry(`/api/campaigns/${campaignId}/turns/${turnId}/retry`, {
+      method: "POST",
+    });
     void attachStream(turnId, pendingInput ?? "(retried turn)");
   };
 
@@ -419,7 +451,9 @@ export function PlayView({
   const onFocus = () => {
     const idleMs = Date.now() - lastActivityRef.current;
     if (idleMs > 4 * 60_000) {
-      void fetch(`/api/campaigns/${campaignId}/prewarm`, { method: "POST" }).catch(() => {});
+      void fetchWithAuthRetry(`/api/campaigns/${campaignId}/prewarm`, { method: "POST" }).catch(
+        () => {},
+      );
     }
     lastActivityRef.current = Date.now();
   };
@@ -432,7 +466,7 @@ export function PlayView({
       return;
     }
     const source = exchanges.find((e) => e.narration.includes(selection));
-    const res = await fetch(`/api/campaigns/${campaignId}/pins`, {
+    const res = await fetchWithAuthRetry(`/api/campaigns/${campaignId}/pins`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ content: selection, sourceTurn: source?.turnNumber ?? 0 }),
@@ -453,7 +487,7 @@ export function PlayView({
   const rewindTo = async (beforeTurn: number) => {
     setRewindBusy(true);
     try {
-      const res = await fetch(`/api/campaigns/${campaignId}/rewind`, {
+      const res = await fetchWithAuthRetry(`/api/campaigns/${campaignId}/rewind`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ toTurn: beforeTurn - 1 }),
@@ -477,7 +511,9 @@ export function PlayView({
     if (busy || sessionClosed || summoning) return;
     setSummoning(true);
     try {
-      const res = await fetch(`/api/campaigns/${campaignId}/suggestions`, { method: "POST" });
+      const res = await fetchWithAuthRetry(`/api/campaigns/${campaignId}/suggestions`, {
+        method: "POST",
+      });
       if (res.ok) {
         const body = (await res.json()) as { moves?: string[] };
         if (body.moves && body.moves.length > 0) setChips(body.moves);
@@ -494,8 +530,8 @@ export function PlayView({
     setNotesBusy(true);
     try {
       const [p, o] = await Promise.all([
-        fetch(`/api/campaigns/${campaignId}/pins`),
-        fetch(`/api/campaigns/${campaignId}/overrides`),
+        fetchWithAuthRetry(`/api/campaigns/${campaignId}/pins`),
+        fetchWithAuthRetry(`/api/campaigns/${campaignId}/overrides`),
       ]);
       if (p.ok) setPinList(((await p.json()) as { pins?: Pin[] }).pins ?? []);
       if (o.ok) setOverrideList(((await o.json()) as { overrides?: Override[] }).overrides ?? []);
@@ -515,7 +551,7 @@ export function PlayView({
   };
 
   const removePin = async (pinId: string) => {
-    const res = await fetch(`/api/campaigns/${campaignId}/pins`, {
+    const res = await fetchWithAuthRetry(`/api/campaigns/${campaignId}/pins`, {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ pinId }),
@@ -524,7 +560,7 @@ export function PlayView({
   };
 
   const removeOverride = async (overrideId: string) => {
-    const res = await fetch(`/api/campaigns/${campaignId}/overrides`, {
+    const res = await fetchWithAuthRetry(`/api/campaigns/${campaignId}/overrides`, {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ overrideId }),
@@ -536,7 +572,7 @@ export function PlayView({
     const content = overrideDraft.trim();
     if (!content) return;
     setNotesBusy(true);
-    const res = await fetch(`/api/campaigns/${campaignId}/overrides`, {
+    const res = await fetchWithAuthRetry(`/api/campaigns/${campaignId}/overrides`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ content }),

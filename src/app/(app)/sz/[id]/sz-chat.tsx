@@ -1,5 +1,6 @@
 "use client";
 
+import { fetchWithAuthRetry } from "@/lib/client/fetch-with-auth";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -54,12 +55,27 @@ export function SzChat({
       setError(null);
       setStreamText("");
       let acc = "";
+      // A conductor turn is NOT idempotent — the server has no SZ turn dedup,
+      // so re-POSTing re-runs it. We may retry ONLY before any byte arrives;
+      // once the stream is flowing (often mid-research) a drop must never
+      // auto-resend. Tracked here so the catch can tell the two apart.
+      let receivedBytes = false;
+      let streamDropped = false;
       try {
-        const res = await fetch(`/api/sz/${campaignId}/turn`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ message }),
-        });
+        const postTurn = () =>
+          fetchWithAuthRetry(`/api/sz/${campaignId}/turn`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ message }),
+          });
+        let res: Response;
+        try {
+          res = await postTurn();
+        } catch {
+          // The initial connection failed before any bytes — nothing ran
+          // server-side yet, so one retry is safe (and honors §8's no dead air).
+          res = await postTurn();
+        }
         if (!res.ok || !res.body) {
           const body = (await res.json().catch(() => null)) as { error?: string } | null;
           throw new Error(body?.error ?? `turn failed (${res.status})`);
@@ -67,39 +83,60 @@ export function SzChat({
         const reader = res.body.getReader();
         const decoder = new TextDecoder();
         let buffer = "";
-        for (;;) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          buffer += decoder.decode(value, { stream: true });
-          const frames = buffer.split("\n\n");
-          buffer = frames.pop() ?? "";
-          for (const frame of frames) {
-            let event = "message";
-            let data = "";
-            for (const line of frame.split("\n")) {
-              if (line.startsWith("event: ")) event = line.slice(7);
-              else if (line.startsWith("data: ")) data += line.slice(6);
-            }
-            if (!data) continue;
-            const payload = JSON.parse(data) as {
-              text?: string;
-              message?: string;
-              readyToCompile?: boolean;
-            };
-            if (event === "text" && payload.text) {
-              acc += payload.text;
-              setStreamText(acc);
-              setStaging(null);
-            } else if (event === "staging" && payload.text) {
-              setStaging(payload.text);
-            } else if (event === "ready_to_compile") {
-              setReady(true);
-            } else if (event === "error") {
-              throw new Error(payload.message ?? "conductor turn failed");
+        try {
+          for (;;) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            receivedBytes = true;
+            buffer += decoder.decode(value, { stream: true });
+            const frames = buffer.split("\n\n");
+            buffer = frames.pop() ?? "";
+            for (const frame of frames) {
+              let event = "message";
+              let data = "";
+              for (const line of frame.split("\n")) {
+                if (line.startsWith("event: ")) event = line.slice(7);
+                else if (line.startsWith("data: ")) data += line.slice(6);
+              }
+              if (!data) continue;
+              const payload = JSON.parse(data) as {
+                text?: string;
+                message?: string;
+                readyToCompile?: boolean;
+              };
+              if (event === "text" && payload.text) {
+                acc += payload.text;
+                setStreamText(acc);
+                setStaging(null);
+              } else if (event === "staging" && payload.text) {
+                setStaging(payload.text);
+              } else if (event === "ready_to_compile") {
+                setReady(true);
+              } else if (event === "error") {
+                // The server explicitly signalled failure — it persisted
+                // nothing, so this is a genuine rollback, not a lost stream.
+                throw Object.assign(new Error(payload.message ?? "conductor turn failed"), {
+                  server: true,
+                });
+              }
             }
           }
+        } catch (streamErr) {
+          // A server error event (persisted nothing) or a drop before the first
+          // byte falls through to the rollback path. A transport drop AFTER
+          // bytes is the honest-uncertainty case: the conductor is likely still
+          // finishing server-side and will persist, so we never resend — a
+          // reload will show where it landed.
+          if ((streamErr as { server?: boolean })?.server || !receivedBytes) throw streamErr;
+          streamDropped = true;
         }
-        if (acc.trim()) setMessages((m) => [...m, { role: "conductor", text: acc }]);
+        if (streamDropped) {
+          setError(
+            "The connection dropped mid-turn. The conductor may still be finishing on its side — reload to pick up where it landed. Don't resend: that starts a fresh turn.",
+          );
+        } else if (acc.trim()) {
+          setMessages((m) => [...m, { role: "conductor", text: acc }]);
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : "the conductor lost the thread — try again");
         // The server persisted nothing for a failed turn — showing the
@@ -164,7 +201,7 @@ export function SzChat({
     setError(null);
     setGaps([]);
     try {
-      const res = await fetch(`/api/sz/${campaignId}/compile`, { method: "POST" });
+      const res = await fetchWithAuthRetry(`/api/sz/${campaignId}/compile`, { method: "POST" });
       const body = (await res.json()) as { ok?: boolean; gaps?: string[]; error?: string };
       if (body.ok) {
         router.refresh();

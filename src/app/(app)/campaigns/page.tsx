@@ -58,7 +58,7 @@ export default async function CampaignsPage() {
       {active.length > 0 && (
         <section className="space-y-2">
           <h2 className="text-[10px] uppercase tracking-widest text-muted-foreground/60">Active</h2>
-          <ShelfList rows={active} hrefFor={(id) => `/play/${id}`} />
+          <ShelfList rows={active} hrefFor={(id) => `/play/${id}`} showTranscript />
         </section>
       )}
 
@@ -83,7 +83,15 @@ export default async function CampaignsPage() {
   );
 }
 
-function ShelfList({ rows, hrefFor }: { rows: ShelfRow[]; hrefFor: (id: string) => string }) {
+function ShelfList({
+  rows,
+  hrefFor,
+  showTranscript = false,
+}: {
+  rows: ShelfRow[];
+  hrefFor: (id: string) => string;
+  showTranscript?: boolean;
+}) {
   return (
     <ul className="divide-y divide-border rounded-md border border-border">
       {rows.map((c) => (
@@ -95,6 +103,15 @@ function ShelfList({ rows, hrefFor }: { rows: ShelfRow[]; hrefFor: (id: string) 
             <span className="font-medium">{c.title}</span>
             <span className="text-xs text-muted-foreground">{statusLabel(c.status)}</span>
           </Link>
+          {showTranscript && (
+            <Link
+              href={`/sz/${c.id}/transcript`}
+              className="shrink-0 text-xs text-muted-foreground/70 hover:text-foreground"
+              title="Read this campaign's Session Zero — the conversation that set the table"
+            >
+              session zero
+            </Link>
+          )}
           <ShelfActions campaignId={c.id} status={c.status} />
         </li>
       ))}
