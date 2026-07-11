@@ -1,0 +1,42 @@
+# Exemplar passages — didacticism (ambiguous 0 ↔ didactic 10)
+# Sourcing per blueprint §4.7: synthesized in-register, never verbatim source.
+axis: didacticism
+exemplars:
+  - id: didacticism_b1_kino
+    axis: didacticism
+    band: 1
+    anchor_show: Kino's Journey
+    author: claude-opus-4-8
+    method: synthesized
+    text: >-
+      The country ran on one plain law: every citizen, on turning forty,
+      chose a single memory to keep and surrendered the rest to the archive.
+      They were not unhappy. The baker gave the traveler bread and could not
+      say who had taught him the trade, and did not seem to mind not saying.
+      "Is it cruel?" she asked the talking motorcycle that night, at the edge
+      of the fields. "I don't know," it said. "Do they seem to suffer?" They
+      did not. They also did not seem to love anything longer than a season.
+      In the morning she refueled, checked the gun at her hip, and rode out
+      through the gate. She did not tell them to change. She did not tell them
+      they were right. The road went on, and behind her the country kept its
+      one law, and the matter stayed exactly as open as she had found it.
+  - id: didacticism_b9_mha
+    axis: didacticism
+    band: 9
+    anchor_show: My Hero Academia
+    author: claude-opus-4-8
+    method: synthesized
+    text: >-
+      The kid was shaking so hard his gift would not spark, and the older
+      hero knelt to his level, unhurried, as if the scaffold groaning
+      overhead were a matter for later. "Listen. A hero is not someone who feels
+      no fear," he said. "A hero is someone who moves while afraid, so that
+      someone smaller does not have to." The words landed the way true things
+      do. The boy breathed. He set his feet. When the beam came down he was
+      already under it, arms up, gift flaring — not because the fear had left
+      him but because he had decided, out loud, in his own chest, what kind of
+      person the fear would find. Afterward there were cameras and noise. But
+      the lesson was already whole, and everyone watching understood it the
+      same, which was the point. Some meanings are not
+      to be puzzled over. They are to be lived, and handed down, exactly as
+      given.

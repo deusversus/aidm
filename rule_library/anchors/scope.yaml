@@ -1,0 +1,29 @@
+axis: scope
+scale: "intimate (0) ↔ cosmic (10) — the FELT scale of stakes inside a scene, not structural commitment (Mushishi feels cosmic single-village)"
+bands:
+  "1":
+    excerpt_ref: scope_b1_usagidrop
+    shows:
+      - title: Usagi Drop
+        note: the entire stakes of the world fit inside one child's fever and one adult's fear of failing her
+      - title: Non Non Biyori
+        note: the horizon is a single rural afternoon; nothing larger is ever reached for
+      - title: Sweetness and Lightning
+        note: the drama tops out honestly at whether dinner turns out
+  "5":
+    shows:
+      - title: Attack on Titan
+        note: humanity behind walls — civilizational stakes, but still bounded by the horizon
+      - title: Fullmetal Alchemist Brotherhood
+        note: a nation's fate on the table, kept felt at human scale
+      - title: Code Geass
+        note: a rebellion for a country; grand and total, but not yet cosmic
+  "9":
+    excerpt_ref: scope_b9_gunbuster
+    shows:
+      - title: Gunbuster
+        note: relativity turns a few days' flight into decades of loss — the cosmos felt as homecoming grief
+      - title: Tengen Toppa Gurren Lagann
+        note: mechs hurl galaxies as shuriken; scale escalates until existence itself is the arena
+      - title: Legend of the Galactic Heroes
+        note: fleets as starfields, one death a footnote in an epoch the narrator surveys from centuries off

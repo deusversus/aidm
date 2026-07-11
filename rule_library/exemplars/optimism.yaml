@@ -1,0 +1,42 @@
+# Exemplar passages — optimism (cynical 0 ↔ hopeful 10)
+# Sourcing per blueprint §4.7: synthesized in-register, never verbatim source.
+axis: optimism
+exemplars:
+  - id: optimism_b1_nhk
+    axis: optimism
+    band: 1
+    anchor_show: Welcome to the NHK
+    author: claude-opus-4-8
+    method: synthesized
+    text: >-
+      He had a plan again, which was the first sign the plan was doomed.
+      Wake at six, apply for the thing, become a person — he'd drawn it on
+      a napkin like all the others, and the others lived in a drawer, a
+      little graveyard of napkins. Because here was the truth he'd worked
+      out at four in the morning, and four-a.m. truths are the real ones:
+      somewhere there was an organization, vast and patient and possibly
+      even kind, whose whole quiet business was arranging that boys like
+      him stayed exactly where they were. Every open door had a second door
+      behind it, locked. Every helping hand billed by the hour. Try, and
+      the trying was noted and filed and used; the effort itself was the
+      crop they harvested. He lay back down. A fan turned somewhere. The
+      ceiling, at least, asked nothing and promised nothing back.
+  - id: optimism_b9_furuba
+    axis: optimism
+    band: 9
+    anchor_show: Fruits Basket
+    author: claude-opus-4-8
+    method: synthesized
+    text: >-
+      It was a small thing, the rice she left outside his door, and he
+      nearly stepped over it the way he stepped over everything offered to
+      him — because things offered were things that could be taken back.
+      But she was still there at the end of the hall, not asking him to be
+      mended, not flinching from the parts of him the family kept behind a
+      locked screen: only waiting, with that stubborn open face, to see
+      whether he would eat. And the astonishing thing, the thing that undid
+      him, was that he did — and nothing was withdrawn. The next morning
+      there was rice again. And the next. For years he had believed
+      kindness was a loan someone would return to collect. He was
+      beginning, against everything he knew, to suspect it might be true:
+      that reaching out is answered, that the world could hold his weight.

@@ -1,7 +1,25 @@
 import { approxTokens } from "@/lib/blocks/tokens";
+import type { AxisName } from "@/lib/types/grounding";
 import type { PencilMark } from "@/lib/types/marks";
-import { describe, expect, it } from "vitest";
-import { renderAmendments } from "../amendments";
+import { describe, expect, it, vi } from "vitest";
+
+// M2-C6 closed real coverage at all 24 axes; the uncovered-extreme surfacing
+// test recreates the future-axis gap by carving one axis back out. Every
+// other test in this file sees the same 23-axis set — none renders
+// avant_garde as an extreme except the gap test itself.
+vi.mock("@/lib/types/grounding", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/types/grounding")>();
+  return {
+    ...actual,
+    COVERED_AXES: actual.COVERED_AXES.filter((a) => a !== "avant_garde"),
+  };
+});
+import {
+  AMENDMENTS_ESCALATED_TOKEN_MAX,
+  AMENDMENTS_TOKEN_MAX,
+  PUNCH_THROUGH_TURNS,
+  renderAmendments,
+} from "../amendments";
 import { renderSceneShape } from "../scene-shape";
 import {
   SETTEI_MAX_RENDERED_AXES,
@@ -9,6 +27,7 @@ import {
   extremeAxes,
   rankAxes,
   renderSettei,
+  shadedAxes,
 } from "../settei";
 import { BEBOP_DNA, bebopContract } from "./fixtures";
 
@@ -115,7 +134,7 @@ describe("renderAmendments (§4.4b)", () => {
         transition_signal: "Spike walks out of the church",
         dna: { darkness: 9 },
       },
-      sakkanNotes: [{ axis: "darkness", active: 9, observed: 6 }],
+      sakkanNotes: [{ axis: "darkness", active: 9, observed: 6, since_turn: 40 }],
       freshMarks: [mark("register", "keep it plainer")],
     });
     expect(a.text).toContain("darkness plays at 9/10");
@@ -136,7 +155,7 @@ describe("renderAmendments (§4.4b)", () => {
       mark(`topic_${i}`, `a long calibration direction about restraint number ${i}`),
     );
     const a = renderAmendments({
-      sakkanNotes: [{ axis: "comedy", active: 1, observed: 5 }],
+      sakkanNotes: [{ axis: "comedy", active: 1, observed: 5, since_turn: 10 }],
       freshMarks: marks,
     });
     expect(a.tokens).toBeLessThanOrEqual(250);
@@ -156,5 +175,155 @@ describe("renderSceneShape (§4.4c)", () => {
     expect(s.text).toContain("someone besides the lead gets a beat");
     expect(s.text).toContain("Terra Firma");
     expect(s.text).toContain("debt comes due");
+  });
+});
+
+describe("learned shading (§12, §6.6)", () => {
+  // A contract where emotional_register is a low extreme that ranks 7th: six
+  // covered axes sit at the |Δ5|=4 max (value 9), emotional_register at 2 (Δ3),
+  // everything else centered. Without shading the ≤6 cut leaves it out.
+  const D5 = ["darkness", "comedy", "intimacy", "interiority", "cruelty", "epistemics"] as const;
+  const shadingContract = () => {
+    const contract = bebopContract();
+    for (const axis of Object.keys(contract.active.treatment) as AxisName[]) {
+      contract.active.treatment[axis] = 5;
+    }
+    for (const axis of D5) contract.active.treatment[axis] = 9;
+    contract.active.treatment.emotional_register = 2;
+    return contract;
+  };
+  const understatement: PencilMark = {
+    id: "mark_understatement",
+    kind: "craft_note",
+    topic: "understatement",
+    direction: "keep the emotional register understated — no melodrama",
+    evidence: "player note",
+    turn_id: 5,
+    provenance: "meta_booth",
+    confidence: 0.9,
+  };
+
+  it("lifts a mark-implicated axis into the rendered ≤6, dropping something else", () => {
+    const base = renderSettei({ contract: shadingContract(), marks: [] });
+    expect(base.renderedAxes).not.toContain("emotional_register");
+    expect(base.renderedAxes.length).toBe(6);
+
+    const shaded = renderSettei({ contract: shadingContract(), marks: [understatement] });
+    expect(shaded.renderedAxes).toContain("emotional_register");
+    // Budget holds: still ≤6 — the boost displaces an axis, never expands the set.
+    expect(shaded.renderedAxes.length).toBeLessThanOrEqual(SETTEI_MAX_RENDERED_AXES);
+    // Exemplar pick priority follows the same ranking: the low-extreme passage rides.
+    expect(shaded.exemplarIds).toContain("emotional_register_b1_haibane");
+    // The mark still renders verbatim (shading is additive, §6.6).
+    expect(shaded.text).toContain("no melodrama");
+  });
+
+  it("reads marks only; the render mutates neither contract nor marks (§6.6)", () => {
+    expect([...shadedAxes([understatement])]).toContain("emotional_register");
+    // A bare axis-name topic (the Sakkan's own writer #3) is implicated directly.
+    expect([...shadedAxes([mark("comedy", "note")])]).toContain("comedy");
+
+    const contract = shadingContract();
+    const before = structuredClone(contract);
+    const marks = [understatement];
+    const marksBefore = structuredClone(marks);
+    renderSettei({ contract, marks });
+    expect(contract).toEqual(before);
+    expect(marks).toEqual(marksBefore);
+  });
+});
+
+describe("corrective punch-through (§12, M2-C6)", () => {
+  const NOW = 15;
+  const occurrences = (text: string, needle: string) => text.split(needle).length - 1;
+
+  it("escalates the most-overdue unclosed note only, leading the block with its exemplar", () => {
+    const a = renderAmendments({
+      // darkness is the older, wider-off retake; intimacy is also eligible but younger.
+      sakkanNotes: [
+        { axis: "intimacy", active: 9, observed: 4, since_turn: 11 },
+        { axis: "darkness", active: 9, observed: 3, since_turn: 8 },
+      ],
+      freshMarks: [],
+      currentTurn: NOW,
+      lastSampleTurn: NOW - 1,
+    });
+    // Exactly one escalation, and it is the most-overdue (darkness, 7 scenes).
+    expect(occurrences(a.text, "ESCALATED")).toBe(1);
+    expect(a.text).toContain("RETAKE (ESCALATED — off-register 7 scenes): darkness");
+    // The escalated axis renders as the escalation, never also as a plain retake.
+    expect(a.text).not.toContain("RETAKE (strong): darkness");
+    // Its extreme exemplar is quoted inline.
+    expect(a.text).toContain("so it feels like this:");
+    expect(a.text).toContain("The village had stopped burning");
+    // The younger eligible note stays a plain retake, and the escalation leads.
+    expect(a.text).toContain("RETAKE (strong): intimacy");
+    expect(a.text.indexOf("ESCALATED")).toBeLessThan(a.text.indexOf("RETAKE (strong): intimacy"));
+    // Budget respected at the raised escalation ceiling.
+    expect(a.tokens).toBeLessThanOrEqual(AMENDMENTS_ESCALATED_TOKEN_MAX);
+  });
+
+  it("escalates at exactly PUNCH_THROUGH_TURNS, not one short", () => {
+    const atThreshold = renderAmendments({
+      sakkanNotes: [
+        { axis: "darkness", active: 9, observed: 3, since_turn: NOW - PUNCH_THROUGH_TURNS },
+      ],
+      freshMarks: [],
+      currentTurn: NOW,
+      lastSampleTurn: NOW - 1,
+    });
+    expect(atThreshold.text).toContain("ESCALATED");
+
+    const oneShort = renderAmendments({
+      sakkanNotes: [
+        { axis: "darkness", active: 9, observed: 3, since_turn: NOW - PUNCH_THROUGH_TURNS + 1 },
+      ],
+      freshMarks: [],
+      currentTurn: NOW,
+      lastSampleTurn: NOW - 1,
+    });
+    expect(oneShort.text).not.toContain("ESCALATED");
+    expect(oneShort.text).toContain("RETAKE (strong): darkness");
+  });
+
+  it("does not escalate without a re-measurement after the note (measured, not vibed)", () => {
+    // Persistence alone is not evidence: the last sample PRE-dates the note,
+    // so the gauge has never re-read the axis since the correction fired.
+    const unmeasured = renderAmendments({
+      sakkanNotes: [{ axis: "darkness", active: 9, observed: 3, since_turn: NOW - 5 }],
+      freshMarks: [],
+      currentTurn: NOW,
+      lastSampleTurn: NOW - 6,
+    });
+    expect(unmeasured.text).not.toContain("ESCALATED");
+    expect(unmeasured.text).toContain("RETAKE (strong): darkness");
+
+    // No lastSampleTurn at all -> never escalate.
+    const noSample = renderAmendments({
+      sakkanNotes: [{ axis: "darkness", active: 9, observed: 3, since_turn: NOW - 5 }],
+      freshMarks: [],
+      currentTurn: NOW,
+    });
+    expect(noSample.text).not.toContain("ESCALATED");
+  });
+
+  it("does not escalate a note back in band, nor without a current turn", () => {
+    // Old but closed (|Δ|=1, inside the band): a plain retake at most, never escalated.
+    const closed = renderAmendments({
+      sakkanNotes: [{ axis: "darkness", active: 9, observed: 8, since_turn: 1 }],
+      freshMarks: [],
+      currentTurn: NOW,
+      lastSampleTurn: NOW - 1,
+    });
+    expect(closed.text).not.toContain("ESCALATED");
+    expect(closed.tokens).toBeLessThanOrEqual(AMENDMENTS_TOKEN_MAX);
+
+    // No currentTurn → nothing can be aged → no escalation (the plain channel).
+    const noTurn = renderAmendments({
+      sakkanNotes: [{ axis: "darkness", active: 9, observed: 3, since_turn: 1 }],
+      freshMarks: [],
+    });
+    expect(noTurn.text).not.toContain("ESCALATED");
+    expect(noTurn.text).toContain("RETAKE (strong): darkness");
   });
 });

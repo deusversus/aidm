@@ -1,0 +1,29 @@
+axis: conflict_style
+scale: "instinctive (0) ↔ tactical (10) — decision-making texture; social battles too, not just combat"
+bands:
+  "1":
+    excerpt_ref: conflict_style_b1_megalobox
+    shows:
+      - title: Megalo Box
+        note: wins on nerve and a read he cannot explain; a plan would only slow the swing
+      - title: One Piece
+        note: the captain's plan is to swing first and let the world rearrange around the instinct
+      - title: Kill la Kill
+        note: conflict resolved by headlong momentum; hesitation is the only real defeat
+  "5":
+    shows:
+      - title: Hunter x Hunter
+        note: elaborate tactical setups, but detonated on instinct when the read runs out
+      - title: Fullmetal Alchemist Brotherhood
+        note: improvises hard under fire, yet the alchemy itself is always premeditated
+      - title: Jujutsu Kaisen
+        note: cursed-technique chess played at brawl speed — plan and reflex braided
+  "9":
+    excerpt_ref: conflict_style_b9_deathnote
+    shows:
+      - title: Death Note
+        note: combat is entirely cognitive; every move a feint inside a feint, the win decided moves before the act
+      - title: Code Geass
+        note: the commander's gambits cascade; victory is engineered first, then revealed as inevitable
+      - title: Kaiji
+        note: no fists — just a mind grinding the odds of a rigged game until the trap turns

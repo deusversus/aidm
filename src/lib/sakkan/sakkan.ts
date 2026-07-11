@@ -293,8 +293,16 @@ export function activeSakkanNotes(state: DirectionState): SakkanNote[] {
   const notes: SakkanNote[] = [];
   for (const n of state.sakkan?.active_notes ?? []) {
     // active_notes store axis as a raw string; only surface grounded axes to the
-    // typed Amendments producer (renderAmendments takes AxisName).
-    if (isCovered(n.axis)) notes.push({ axis: n.axis, active: n.active, observed: n.observed });
+    // typed Amendments producer (renderAmendments takes AxisName). since_turn
+    // rides along — the age the punch-through escalation measures (§12, M2-C6).
+    if (isCovered(n.axis)) {
+      notes.push({
+        axis: n.axis,
+        active: n.active,
+        observed: n.observed,
+        since_turn: n.since_turn,
+      });
+    }
   }
   return notes;
 }

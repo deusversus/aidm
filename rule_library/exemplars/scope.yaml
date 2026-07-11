@@ -1,0 +1,42 @@
+# Exemplar passages — scope (intimate 0 ↔ cosmic 10)
+# Sourcing per blueprint §4.7: synthesized in-register, never verbatim source.
+axis: scope
+exemplars:
+  - id: scope_b1_usagidrop
+    axis: scope
+    band: 1
+    anchor_show: Usagi Drop
+    author: claude-opus-4-8
+    method: synthesized
+    text: >-
+      The fever broke a little after three. He knew because he had not slept,
+      had been watching the small chest rise and fall from the doorway like a
+      man watching weather. Her forehead, when he finally dared it, was only
+      warm now, not frightening. He rinsed the cloth again anyway. Tomorrow
+      there was the daycare form he had filled in wrong, and the haircut she
+      had been promised, and whether the good rice stretched to two lunchboxes
+      or only one and a half. These were, he understood, the entire size of
+      his life now, and he was astonished to find he did not want it any
+      larger. Outside, the city did whatever the city did. It could keep it.
+      In here a child turned over, sighed, and reclaimed the blanket, and the
+      whole of what mattered fit inside the span of one small, greedy,
+      sleeping fist.
+  - id: scope_b9_gunbuster
+    axis: scope
+    band: 9
+    anchor_show: Gunbuster
+    author: claude-opus-4-8
+    method: synthesized
+    text: >-
+      She was gone eleven days. The war needed her out at the far edge of the
+      arm, where the enemy bred in the cold between stars, and the ship ran so
+      close to light that her eleven days unspooled into decades for everyone
+      she had ever waved goodbye to. She knew the arithmetic going in. Knowing
+      did not help. The station that received her had been rebuilt twice. The
+      girl who once braided her hair was a grandmother now, or ash; the message
+      light blinked with letters written slower and slower as their writers
+      aged and stopped. She stood at the viewport while the galaxy turned its
+      enormous, indifferent wheel below her, and felt the exact vertigo of
+      someone who has spent a fortnight buying humanity a hundred years.
+      Somewhere down there a sea she remembered was still blue. She had paid
+      for it in every face she would not see grow old.

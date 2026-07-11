@@ -1,0 +1,29 @@
+axis: reflexivity
+scale: "straight (0) ↔ meta-aware (10) — may characters reference genre and narration break the fourth wall"
+bands:
+  "1":
+    excerpt_ref: reflexivity_b1_vinland
+    shows:
+      - title: Vinland Saga
+        note: a period world sealed against irony; it never sees its own genre
+      - title: Monster
+        note: a thriller that never once winks at the audience
+      - title: Mushishi
+        note: the supernatural filed as sober natural history, never a nod
+  "5":
+    shows:
+      - title: "Kaguya-sama: Love is War"
+        note: a narrator names the tropes the couple enact; the wall holds
+      - title: One-Punch Man
+        note: genre-savvy about heroism without ever breaking frame
+      - title: Bakemonogatari
+        note: verbal meta and knowing asides threaded through a straight plot
+  "9":
+    excerpt_ref: reflexivity_b9_tutu
+    shows:
+      - title: Princess Tutu
+        note: characters learn they are written roles and defy the script
+      - title: Re:Creators
+        note: fictional beings confront their authors; the wall is the battlefield
+      - title: Gintama
+        note: the fourth wall is a door left permanently open; parody is native

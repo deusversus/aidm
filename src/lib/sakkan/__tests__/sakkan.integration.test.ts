@@ -101,7 +101,9 @@ describe("Sakkan pure helpers", () => {
         ],
       },
     });
-    expect(activeSakkanNotes(state)).toEqual([{ axis: "darkness", active: 7, observed: 3 }]);
+    expect(activeSakkanNotes(state)).toEqual([
+      { axis: "darkness", active: 7, observed: 3, since_turn: 16 },
+    ]);
   });
 
   it("gaugeTrend renders observed-vs-wanted with the retake line; empty readings → ''", () => {

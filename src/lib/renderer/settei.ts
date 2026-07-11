@@ -28,6 +28,72 @@ export const SETTEI_TOKEN_TARGET = { min: 600, max: 900 };
 
 /** DNAScales key order — the deterministic tiebreak for equal distances. */
 const AXIS_ORDER = Object.keys(DNAScales.shape) as AxisName[];
+const AXIS_NAME_SET = new Set<string>(AXIS_ORDER);
+
+/**
+ * Learned shading (§12, §6.6): calibration vocabulary → the axis it implicates.
+ * A standing mark whose topic/direction names or clearly implicates an axis
+ * lifts that axis's SELECTION rank in the Settei — RENDER-TIME ONLY; the
+ * contract and the marks themselves are never touched (§6.6: shade, never
+ * mutate). Deliberately small and conservative — 2–4 keywords per axis, and a
+ * miss (no boost) is the safe default; a false boost is the only real cost.
+ * Keywords with a space or hyphen match as a phrase (substring); a bare stem
+ * matches a whole token by prefix, so "restrain" catches "restraint" /
+ * "restrained" without firing inside unrelated words.
+ */
+const AXIS_LEXICON: Partial<Record<AxisName, string[]>> = {
+  emotional_register: ["understat", "restrain", "muted", "overwrought"],
+  comedy: ["banter", "levity", "comedic", "slapstick"],
+  darkness: ["grimdark", "bleak", "morbid"],
+  cruelty: ["cruel", "brutal", "sadis", "merciless"],
+  intimacy: ["intimac", "tender", "closeness"],
+  interiority: ["introspect", "monologue", "interiori"],
+  pacing: ["brisk", "breakneck", "languid"],
+  register: ["ornate", "elevated", "vernacular", "lyrical"],
+  optimism: ["hopeful", "cynic", "nihilis"],
+  epistemics: ["myster", "cryptic", "withhold"],
+  moral_complexity: ["ambiguit", "morally", "moral gray", "moral grey"],
+  didacticism: ["didactic", "preachy", "moraliz"],
+  agency: ["fatalis", "helpless", "proactive"],
+  scope: ["cosmic", "galactic", "world-ending"],
+  conflict_style: ["tactical", "instinctiv", "strategic"],
+  density: ["layered", "subplot", "interwoven"],
+  empathy: ["empath", "sympathet", "compassion"],
+  fidelity: ["stylized", "absurdis", "photoreal"],
+  avant_garde: ["experimental", "avant", "surreal"],
+  temporal_structure: ["flashback", "nonlinear", "time loop"],
+  continuity: ["serializ", "standalone", "episodic"],
+  reflexivity: ["fourth wall", "self-aware", "metafiction"],
+  accessibility: ["accessible", "beginner", "hand-holding"],
+  power_treatment: ["cost of power", "hollow victory", "pyrrhic"],
+};
+
+const EMPTY_SHADE: ReadonlySet<AxisName> = new Set();
+
+/**
+ * The axes a set of standing marks implicates (learned shading, §12). Two
+ * signals: an axis-kind mark whose topic IS an axis name (the Sakkan's own
+ * writer #3), and lexicon keywords found in a mark's topic/direction prose.
+ * Read-only — computes a rank boost, never a mutation.
+ */
+export function shadedAxes(marks: PencilMark[]): Set<AxisName> {
+  const shaded = new Set<AxisName>();
+  for (const m of activeMarks(marks)) {
+    if (AXIS_NAME_SET.has(m.topic)) shaded.add(m.topic as AxisName);
+    const text = `${m.topic} ${m.direction}`.toLowerCase();
+    const tokens = text.split(/[^a-z]+/).filter(Boolean);
+    for (const [axis, keywords] of Object.entries(AXIS_LEXICON) as [AxisName, string[]][]) {
+      if (shaded.has(axis)) continue;
+      const hit = keywords.some((kw) =>
+        kw.includes(" ") || kw.includes("-")
+          ? text.includes(kw)
+          : tokens.some((t) => t.startsWith(kw)),
+      );
+      if (hit) shaded.add(axis);
+    }
+  }
+  return shaded;
+}
 
 const AXIS_GROUPS: Record<string, AxisName[]> = {
   "tempo and structure": ["pacing", "continuity", "density", "temporal_structure"],
@@ -72,13 +138,20 @@ export function extremeAxes(treatment: DNAScales): AxisName[] {
   return AXIS_ORDER.filter((a) => treatment[a] <= 3 || treatment[a] >= 7);
 }
 
-/** Rank: |distance from 5| desc → arcRelevance desc → schema order. */
+/** Rank: shaded first → |distance from 5| desc → arcRelevance desc → schema order. */
 export function rankAxes(
   treatment: DNAScales,
   axes: AxisName[],
   arcRelevance: Partial<Record<AxisName, number>> = {},
+  shaded: ReadonlySet<AxisName> = EMPTY_SHADE,
 ): AxisName[] {
   return [...axes].sort((a, b) => {
+    // Learned shading (§12): a mark-implicated axis wins the primary tier, so a
+    // shaded extreme is lifted into the ≤6 window even from rank 7-8 (something
+    // else drops — prescription budget, axiom 4). Player calibration is a strong
+    // signal (§6.6); inside each tier the premise's strongest pressure still leads.
+    const sh = (shaded.has(b) ? 1 : 0) - (shaded.has(a) ? 1 : 0);
+    if (sh !== 0) return sh;
     const d = Math.abs(treatment[b] - 5) - Math.abs(treatment[a] - 5);
     if (d !== 0) return d;
     const r = (arcRelevance[b] ?? 0) - (arcRelevance[a] ?? 0);
@@ -139,7 +212,11 @@ export function renderSettei(input: SetteiInput): Settei {
   // Gap rule (plan C1): no code path presses an ungrounded axis — craft
   // pressure included, not just exemplars. Uncovered extremes are surfaced
   // loudly so the gap-rule authoring can fire; they are never silently cut.
-  const ranked = rankAxes(treatment, extremeAxes(treatment), input.arcRelevance);
+  // Learned shading (§12): standing marks lift the axes they implicate ahead of
+  // the ≤6 cut and, downstream, ahead in the exemplar pick (which walks this
+  // ranked order) — render-time only; input.marks and the contract are untouched.
+  const shaded = shadedAxes(input.marks);
+  const ranked = rankAxes(treatment, extremeAxes(treatment), input.arcRelevance, shaded);
   const uncoveredExtremes = ranked.filter((a) => !COVERED_AXES.includes(a));
   const rendered = ranked
     .filter((a) => COVERED_AXES.includes(a))

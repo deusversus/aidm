@@ -1,0 +1,31 @@
+axis: avant_garde
+scale: "traditional (0) ↔ experimental (10) — formal invention; how much the storytelling FORM is itself the statement"
+bands:
+  "1":
+    excerpt_ref: avant_garde_b1_haikyuu
+    shows:
+      - title: Haikyuu!!
+        note: the sports template at textbook cleanliness; invention lives in the spike, never the form
+      - title: Spice and Wolf
+        note: an economics-and-courtship two-hander told in plain, linear, unshowy scenes
+      - title: Aria the Animation
+        note: utopian slice-of-life on rails; the grammar never once calls attention to itself
+  "5":
+    shows:
+      - title: Cowboy Bebop
+        note: genre-of-the-week formal play, but each episode's grammar stays classical
+      - title: Durarara!!
+        note: braided nonlinear POV that always resolves into a legible ensemble
+      - title: Steins;Gate
+        note: time-loop architecture delivered through wholly conventional scene-craft
+  "9":
+    excerpt_ref: avant_garde_b9_tatami
+    shows:
+      - title: The Tatami Galaxy
+        note: the recursive relived year IS the statement; the torrential form refuses linearity
+      - title: FLCL
+        note: manga panels mid-frame and tempo lurches; adolescence rendered as formal riot
+      - title: Serial Experiments Lain
+        note: image and meaning deliberately desynced; the layering is the argument
+      - title: Paranoia Agent
+        note: an anthology that dissolves its own premise as it goes

@@ -1,0 +1,29 @@
+axis: accessibility
+scale: "demanding (0) ↔ casual (10) — how much the work hand-holds the viewer; One Piece is dense but accessible"
+bands:
+  "1":
+    excerpt_ref: accessibility_b1_gits
+    shows:
+      - title: Ghost in the Shell
+        note: drops cyberbrain politics and Cartesian doubt unglossed; keep pace or fall behind
+      - title: Texhnolyze
+        note: near-wordless, unexplained, and in no hurry to help — the viewer does all the reaching
+      - title: Monogatari
+        note: a torrent of pun, allusion, and half-finished reference that never stops to define itself
+  "5":
+    shows:
+      - title: Fullmetal Alchemist Brotherhood
+        note: dense worldbuilding, but it always explains exactly what you need, exactly when
+      - title: Steins;Gate
+        note: front-loads its jargon, then patiently pays every term back
+      - title: Hunter x Hunter
+        note: welcoming for stretches, until an arc abruptly asks for real attention
+  "9":
+    excerpt_ref: accessibility_b9_onepiece
+    shows:
+      - title: One Piece
+        note: dense as an ocean, yet every rule, stake, and feeling is restated the moment you would need it
+      - title: Pokemon
+        note: a self-contained lesson each week; a child can enter at any episode and belong
+      - title: Spy x Family
+        note: the premise re-explains itself with a wink; the barrier to entry is zero

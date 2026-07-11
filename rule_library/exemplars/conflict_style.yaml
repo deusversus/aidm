@@ -1,0 +1,41 @@
+# Exemplar passages — conflict_style (instinctive 0 ↔ tactical 10)
+# Sourcing per blueprint §4.7: synthesized in-register, never verbatim source.
+axis: conflict_style
+exemplars:
+  - id: conflict_style_b1_megalobox
+    axis: conflict_style
+    band: 1
+    anchor_show: Megalo Box
+    author: claude-opus-4-8
+    method: synthesized
+    text: >-
+      His corner had a plan. It involved angles, and the other man's bad knee,
+      and a patient count of rounds. He listened to none of it, the way he
+      never did, because somewhere between the last word and the bell his chest
+      had already made up its mind, and it did not use words. He did not read
+      the man. He did not count. He felt the opening the way you feel a stair
+      that is not there in the dark — the body knowing before the mind is
+      invited — and he was already moving into it, low, ugly, certain. There
+      was no if. There was no then. There was only the swing that had decided
+      itself somewhere under the ribs, and the roaring rest of him running to
+      catch up. It landed because he had not stopped to ask whether it would.
+      Asking, he had learned, was how you missed.
+  - id: conflict_style_b9_deathnote
+    axis: conflict_style
+    band: 9
+    anchor_show: Death Note
+    author: claude-opus-4-8
+    method: synthesized
+    text: >-
+      He let his hand shake as he signed the register, because a man with
+      nothing to hide does not steady it. That was the fourth layer: the
+      detective would find the tremor, read it as fear of suspicion rather than
+      guilt, and file him one degree safer — precisely one degree closer to
+      where he needed to stand. He had spent a week modeling the detective
+      modeling him, a mirror facing a mirror, and the trick was to be the
+      version three reflections deep, the one who anticipates the anticipation
+      of the anticipation. If tea was offered, refuse it. If the refusal drew a
+      glance, accept the second cup. Every gesture was a move; every silence
+      was a move; even the appearance of having no plan was a plan. He smiled
+      exactly as much as an innocent man would, no more, and watched the trap
+      he had laid three days ago begin, very gently, to close.

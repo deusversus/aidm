@@ -1,0 +1,42 @@
+# Exemplar passages — accessibility (demanding 0 ↔ casual 10)
+# Sourcing per blueprint §4.7: synthesized in-register, never verbatim source.
+axis: accessibility
+exemplars:
+  - id: accessibility_b1_gits
+    axis: accessibility
+    band: 1
+    anchor_show: Ghost in the Shell
+    author: claude-opus-4-8
+    method: synthesized
+    text: >-
+      They ran a dive on the ghost before it cooled. Standard: two of the
+      section jacked into the dead courier's residual and let his last four
+      minutes loop while the coroner pretended not to watch. The barrier ice
+      was military grade, which told them more than the corpse would — nobody
+      laces a runner's stack with that unless the runner is a mailbox, not a
+      man. She pulled the thread anyway. Somewhere in the loop a face resolved,
+      then dissolved into the usual Cartesian nausea, the old question
+      surfacing the way it always did down there: copy the ghost cleanly and
+      was there ever only one. She logged it and said nothing. The rookie would
+      ask. The rookie always asked, and you either kept pace with the answer or
+      you put in for a transfer to something with less recursion in it. She lit
+      a cigarette in the rain and let him work out which.
+  - id: accessibility_b9_onepiece
+    axis: accessibility
+    band: 9
+    anchor_show: One Piece
+    author: claude-opus-4-8
+    method: synthesized
+    text: >-
+      Here is the thing you need to know, and do not worry, it is the only
+      thing: the big man in the coat had promised to protect the little town,
+      and the little town had spat on him for it, and he had decided — out
+      loud, so nobody could possibly miss it — to protect them anyway. That is
+      the whole rule of him. Remember it and you will never once be lost. So
+      when the cannon came, and the crew shouted the plan twice because the
+      first time was during an explosion, and the cook reminded everyone again
+      that their captain does not know the word retreat because he has
+      literally never learned it — you already understood exactly why he
+      stepped in front of the blast, grinning, arms wide, hat tipped back. Big
+      feelings, said plainly, on purpose. Nobody in this story is ever left
+      behind, least of all you, the one watching it.

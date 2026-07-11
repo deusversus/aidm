@@ -1,0 +1,41 @@
+# Exemplar passages — density (single clear thread 0 ↔ many layered threads 10)
+# Sourcing per blueprint §4.7: synthesized in-register, never verbatim source.
+axis: density
+exemplars:
+  - id: density_b1_aria
+    axis: density
+    band: 1
+    anchor_show: Aria the Animation
+    author: claude-opus-4-8
+    method: synthesized
+    text: >-
+      The morning held exactly one task, and she gave it everything. A
+      single passenger — an old woman going to the far quay to see a bridge
+      she had crossed as a bride — and one boat to carry her there. So the
+      girl set the oar and did nothing else with her attention. Not the
+      church bells layering the hour, not the cat asleep on the mooring
+      post, not tomorrow's lesson or yesterday's small failure: only the
+      water, the weight of the hull, and the one correction the current
+      asked for at each turning. The old woman said nothing and needed
+      nothing said. They slid under the bridge. "There," the girl said,
+      because that was the whole of it, and it was enough, and the canal
+      closed smooth behind them like a held breath finally let go.
+  - id: density_b9_oddtaxi
+    axis: density
+    band: 9
+    anchor_show: Odd Taxi
+    author: claude-opus-4-8
+    method: synthesized
+    text: >-
+      The fare talked, and the driver — jowled, walrus-slow behind the
+      wheel — listened to four stories at once and let none of them reach
+      his face. The girl in back was crying about an audition, which was
+      really about the producer, who was really about the money the
+      producer owed the man two cars back, who was the same man the
+      comedian on the radio owed, the comedian whose missing sister had
+      last been seen, the driver happened to know, climbing into a cab
+      exactly like this one. Every thread pulled a different direction and
+      all of them ran through his mirror. He signaled, changed lanes, said
+      "Mm" at the right second, and kept each strand apart in his head the
+      way you keep tangled line apart — patiently, by feel, without ever
+      once yanking the knot tighter.

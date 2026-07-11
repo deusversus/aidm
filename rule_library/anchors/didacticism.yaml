@@ -1,0 +1,29 @@
+axis: didacticism
+scale: "ambiguous (0) ↔ didactic (10) — does the work resolve its meaning or resist interpretation"
+bands:
+  "1":
+    excerpt_ref: didacticism_b1_kino
+    shows:
+      - title: Kino's Journey
+        note: the facts of each country are plain; the verdict is withheld by design
+      - title: Mushishi
+        note: encounters that never moralize; whether to intervene stays an open wound
+      - title: Girls' Last Tour
+        note: a dying world offered without a thesis about what its dying means
+  "5":
+    shows:
+      - title: Fullmetal Alchemist Brotherhood
+        note: states equivalent exchange as a creed, then spends the show complicating it
+      - title: Vinland Saga
+        note: argues its pacifism rather than declaring it; the conclusion is earned, not handed over
+      - title: Fruits Basket
+        note: its lessons are spoken aloud, but the wounds underneath stay complicated
+  "9":
+    excerpt_ref: didacticism_b9_mha
+    shows:
+      - title: My Hero Academia
+        note: the hero-creed is stated aloud, restated as resolve, then confirmed by the narration
+      - title: Gurren Lagann
+        note: shouts its thesis — willpower drills through fate — without a flicker of irony
+      - title: Naruto
+        note: the bonds-and-perseverance gospel, sermonized mid-battle, every arc

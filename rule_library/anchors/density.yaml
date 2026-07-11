@@ -1,0 +1,29 @@
+axis: density
+scale: "single clear thread (0) ↔ many layered threads (10) — how many simultaneous concerns a scene juggles"
+bands:
+  "1":
+    excerpt_ref: density_b1_aria
+    shows:
+      - title: Aria the Animation
+        note: one gondola, one small wonder; the frame never widens
+      - title: Mushishi
+        note: one traveler, one ailment, one quiet resolution per tale
+      - title: Girls' Last Tour
+        note: two people, one road, exactly one thing weighed at a time
+  "5":
+    shows:
+      - title: Cowboy Bebop
+        note: an episodic bounty with a single past-thread humming beneath
+      - title: Spy x Family
+        note: two clean threads — the mission and the household, rarely more
+      - title: Fullmetal Alchemist Brotherhood
+        note: a main quest with a disciplined rotation of subplots
+  "9":
+    excerpt_ref: density_b9_oddtaxi
+    shows:
+      - title: Odd Taxi
+        note: a dozen mundane-crime threads all routed through one cab
+      - title: Durarara!!
+        note: a single night braids courier, gang, broker, and urban myth
+      - title: Legend of the Galactic Heroes
+        note: two war fronts, court intrigue, and private loyalty in every scene

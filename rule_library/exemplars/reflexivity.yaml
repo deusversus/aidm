@@ -1,0 +1,42 @@
+# Exemplar passages — reflexivity (straight 0 ↔ meta-aware 10)
+# Sourcing per blueprint §4.7: synthesized in-register, never verbatim source.
+axis: reflexivity
+exemplars:
+  - id: reflexivity_b1_vinland
+    axis: reflexivity
+    band: 1
+    anchor_show: Vinland Saga
+    author: claude-opus-4-8
+    method: synthesized
+    text: >-
+      The frost had reached the far field, and that was the morning's
+      entire argument: whether to cut what was left standing or gamble
+      another day on the sky. The old man wanted it cut. His son wanted the
+      gamble. Between them lay the thing neither would say aloud — the
+      boundary stone the neighbors had shifted in spring, and the hard
+      winter coming that would make every last stalk matter. The father
+      spat, took up the scythe, and the question answered itself in the
+      swing of the blade. No one in that field was anything
+      larger than their own bad luck and the cold in their hands, and
+      nothing framed them but the weather. There was the grass, and the
+      edge, and the stone waiting under the snow for spring to make it a
+      killing matter.
+  - id: reflexivity_b9_tutu
+    axis: reflexivity
+    band: 9
+    anchor_show: Princess Tutu
+    author: claude-opus-4-8
+    method: synthesized
+    text: >-
+      The story wanted her to fall, so she was falling; that was what the
+      story was for. She had felt the sentence arrive before her foot
+      slipped — a pressure behind the scene, a pen deciding —
+      and she understood, the way you understand a draft under a door, that
+      somewhere a dead man's unfinished tale kept writing its parts, and
+      that hers was to love, and be forgotten by the third act. Knowing it
+      changed nothing about the falling. But it changed her. A written girl
+      who knows she is written has one move the author never scripted, and
+      she made it: she reached, mid-fall, for the boy whose grief the tale
+      had promised to someone else, and took the wrong hand on purpose. The
+      narration stuttered. "Once upon a time," it began again, less certain
+      — and for one turned page, the ending stayed undecided.

@@ -1,0 +1,29 @@
+axis: fidelity
+scale: "grounded realism (0) ↔ absurd stylization (10) — how far reality may bend for effect"
+bands:
+  "1":
+    excerpt_ref: fidelity_b1_silverspoon
+    shows:
+      - title: Silver Spoon
+        note: agriculture without romance — labor, economics, and slaughter
+      - title: A Silent Voice
+        note: contemporary shame and repair; consequences behave as they would
+      - title: Grave of the Fireflies
+        note: war at the scale of a swollen belly and a fruit-drop tin
+  "5":
+    shows:
+      - title: Cowboy Bebop
+        note: lived-in noir realism lit by operatic set-pieces
+      - title: Fullmetal Alchemist Brotherhood
+        note: grounded stakes with alchemy that keeps its own rules
+      - title: My Hero Academia
+        note: an ordinary-feeling world running on cartoon-power physics
+  "9":
+    excerpt_ref: fidelity_b9_jojo
+    shows:
+      - title: JoJo's Bizarre Adventure
+        note: physics and fashion bend to the pose, played dead straight
+      - title: Kill la Kill
+        note: a world whose physics is cloth and momentum, dialed past sense
+      - title: Redline
+        note: spectacle escalated until physics is merely a suggestion

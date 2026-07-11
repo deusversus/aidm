@@ -1,5 +1,6 @@
 import { streamNarration } from "@/lib/llm/calls";
 import { DEV_TIER_SELECTION } from "@/lib/llm/tiers";
+import { PUNCH_THROUGH_TURNS, renderAmendments } from "@/lib/renderer/amendments";
 import { renderSettei } from "@/lib/renderer/settei";
 import { scoreAxes } from "@/lib/sakkan/score";
 import type { AxisName } from "@/lib/types/grounding";
@@ -117,6 +118,77 @@ export const rendererEfficacy: Suite = {
         }
       }
     }
+
+    // --- Corrective punch-through (§12, M2-C6) -------------------------------
+    // The escalated Amendments note must pull the target axis at least as far
+    // as the plain note, and clearly past the no-correction baseline. Isolates
+    // the Amendments channel: a flat, pressure-free Settei is the shared base
+    // for all three arms, so only the corrective note varies. Directional, not
+    // strict (model variance, §0.9) — one band of tolerance on each assertion.
+    const PUNCH = { axis: "darkness" as AxisName, active: 9, observed: 3 };
+    const flat = bebopContract();
+    for (const axis of Object.keys(DNAScales.shape) as AxisName[]) {
+      flat.active.treatment[axis] = 5;
+    }
+    const baseCharter = renderSettei({ contract: flat, marks: [] }).text;
+    const note = {
+      axis: PUNCH.axis,
+      active: PUNCH.active,
+      observed: PUNCH.observed,
+      since_turn: 1,
+    };
+    const plainAmend = renderAmendments({ sakkanNotes: [note], freshMarks: [] });
+    const escalatedAmend = renderAmendments({
+      sakkanNotes: [note],
+      freshMarks: [],
+      currentTurn: 1 + PUNCH_THROUGH_TURNS,
+      // The re-measurement tether (C6 audit #1): a post-note sample happened.
+      lastSampleTurn: PUNCH_THROUGH_TURNS,
+    });
+    const withAmend = (amend: string) => (amend ? `${baseCharter}\n\n${amend}` : baseCharter);
+
+    const [pBaseline, pPlain, pEsc] = await Promise.all([
+      narrate(withAmend("")),
+      narrate(withAmend(plainAmend.text)),
+      narrate(withAmend(escalatedAmend.text)),
+    ]);
+    // Mean-of-2 on the target axis: single-sample scorer noise (±1) can swamp
+    // a one-band signal.
+    const scoreTarget = async (prose: string, tag: string) => {
+      const [s1, s2] = await Promise.all([
+        scoreAxes(DEV_TIER_SELECTION, { sample: prose, axes: [PUNCH.axis], name: `punch_${tag}` }),
+        scoreAxes(DEV_TIER_SELECTION, {
+          sample: prose,
+          axes: [PUNCH.axis],
+          name: `punch_${tag}2`,
+        }),
+      ]);
+      const g = (s: typeof s1) => s.find((x) => x.axis === PUNCH.axis)?.score;
+      const a = g(s1);
+      const b = g(s2);
+      return a === undefined ? b : b === undefined ? a : (a + b) / 2;
+    };
+    const [bScore, plScore, esScore] = await Promise.all([
+      scoreTarget(pBaseline, "baseline"),
+      scoreTarget(pPlain, "plain"),
+      scoreTarget(pEsc, "escalated"),
+    ]);
+    if (bScore === undefined || plScore === undefined || esScore === undefined) {
+      failures.push("punch-through: scorer returned no score");
+    } else {
+      details.push(
+        `punch-through darkness→${PUNCH.active}: baseline ${bScore} | plain ${plScore} | escalated ${esScore}`,
+      );
+      if (esScore < plScore - 1) {
+        failures.push(`punch-through: escalated ${esScore} fell >1 band below plain ${plScore}`);
+      }
+      if (esScore - bScore < 1) {
+        failures.push(
+          `punch-through: escalated ${esScore} did not clear baseline ${bScore} by a band`,
+        );
+      }
+    }
+
     return {
       name: this.name,
       gate: this.gate,

@@ -17,7 +17,11 @@ import type { Suite, SuiteResult } from "./types";
  */
 
 const ci = process.argv.includes("--ci");
-const suites: Suite[] = [
+// Positional args select suites by name (spend-surgical LLM runs: §0.9 —
+// `pnpm evals not-another-anime` judges the library without buying every
+// other paid suite). No args = all suites, as before.
+const requested = [...new Set(process.argv.slice(2).filter((a) => !a.startsWith("-")))];
+const allSuites: Suite[] = [
   budgetAssertions,
   goldenProfile,
   notAnotherAnime,
@@ -25,6 +29,12 @@ const suites: Suite[] = [
   authorshipDetection,
   ...scaffolds,
 ];
+const suites =
+  requested.length > 0 ? allSuites.filter((s) => requested.includes(s.name)) : allSuites;
+if (requested.length > 0 && suites.length !== requested.length) {
+  const known = new Set(allSuites.map((s) => s.name));
+  throw new Error(`unknown suite(s): ${requested.filter((r) => !known.has(r)).join(", ")}`);
+}
 
 const results: SuiteResult[] = [];
 for (const suite of suites) {

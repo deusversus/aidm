@@ -1,0 +1,44 @@
+# Exemplar passages — fidelity (grounded realism 0 ↔ absurd stylization 10)
+# Sourcing per blueprint §4.7: synthesized in-register, never verbatim source.
+axis: fidelity
+exemplars:
+  - id: fidelity_b1_silverspoon
+    axis: fidelity
+    band: 1
+    anchor_show: Silver Spoon
+    author: claude-opus-4-8
+    method: synthesized
+    text: >-
+      Nobody had told him the barn began at five, or that cold could have a
+      smell, or that a calf's tongue was that rough. City hands, the
+      foreman said, not unkindly, and set him to the shovels. By eight he
+      had learned the arithmetic no cartoon of a farm had ever mentioned:
+      what feed cost, what milk fetched, how narrow the gap between them,
+      how one sick animal could close it for good. He had also named the
+      runt piglet, which the older students watched him do with the pity
+      you'd give a boy signing a contract he can't read. Months on, when
+      the ham reached the table — good ham, honestly raised — he found he
+      could not lift his chopsticks, and nobody laughed, because each of
+      them had learned the same lesson the same way. Out here, nothing was
+      drawn. Everything was paid for.
+  - id: fidelity_b9_jojo
+    axis: fidelity
+    band: 9
+    anchor_show: JoJo's Bizarre Adventure
+    author: claude-opus-4-8
+    method: synthesized
+    text: >-
+      They faced each other across the rooftop at the exact distance men of
+      consequence choose, and neither had touched the other, and both were
+      already bleeding. Behind the challenger crouched a translucent giant
+      with knuckles like cathedral bells; behind the man in the immaculate
+      white suit coiled something that had no business existing and existed
+      magnificently anyway. "You believe," said the man in white, adjusting
+      a cufflink the size of the argument, "that your next move is a feint
+      to the left. Permit me to correct the timeline of your mistake."
+      Gravity took the afternoon off. A pigeon flew backward. The
+      challenger's fist, arriving one instant before he threw it, met a
+      wall of pressed air that smelled of roses and finality — and he
+      grinned, blood bright on his teeth, because a man who has already
+      lost this exchange has nothing left to do but pose beautifully and
+      continue.

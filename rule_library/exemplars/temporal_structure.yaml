@@ -1,0 +1,42 @@
+# Exemplar passages — temporal_structure (linear 0 ↔ non-linear 10)
+# Sourcing per blueprint §4.7: synthesized in-register, never verbatim source.
+axis: temporal_structure
+exemplars:
+  - id: temporal_structure_b1_sorayori
+    axis: temporal_structure
+    band: 1
+    anchor_show: A Place Further Than the Universe
+    author: claude-opus-4-8
+    method: synthesized
+    text: >-
+      First they missed the bus, so they ran, and the running was how the
+      day truly began. Then the harbor. Then the argument over who would
+      speak to the man with the ship, then the man saying no, then a second
+      man saying yes. One thing led to the next led to the next; that was
+      the only law the journey obeyed. She would not think backward — not
+      into the grief she was chasing to the bottom of the world — only
+      forward: the ticket in her hand, then the gangway, then the rail,
+      then the widening band of grey water. Someone said she could still
+      change her mind. She watched the dock shrink behind them and knew
+      that she couldn't, and didn't want to, and that tomorrow would be,
+      very simply, the next thing after today.
+  - id: temporal_structure_b9_tatami
+    axis: temporal_structure
+    band: 9
+    anchor_show: The Tatami Galaxy
+    author: claude-opus-4-8
+    method: synthesized
+    text: >-
+      I chose the tennis circle that April, and it went as it always goes:
+      the same two years unspooling toward the same clock tower, the same
+      missed chance with the same black-haired girl, the fortune-teller's
+      promise of a golden opportunity coming true only in the shape of its
+      loss. So I was returned to the fork — I am always returned to the
+      fork — and this time chose the film society, and lived those
+      identical two years down a different corridor, and arrived,
+      breathless, at the same tower, the same girl, the same clock tolling
+      the same refusal. Cycling club. Secret society. Disciples of a
+      smirking guru. Every branch promised a fresh rose-colored campus
+      life; every branch set me down, precisely, here. Two years relived
+      and relived, and the calendar behind me was not a line at all, but a
+      wheel that would not stop turning.

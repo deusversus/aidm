@@ -79,16 +79,10 @@ export const V0_AXES: AxisName[] = [
 ];
 
 /**
- * Axes with authored extreme coverage — grows via the grounding-gap rule
- * (M1 plan C1): no code path may press or exemplar-inject an uncovered
- * axis. M1-C1 added the four the golden profiles render in their exemplar
- * top-3 (empathy, continuity, power_treatment, agency). Full 24-axis
- * coverage is the M2 build-out.
+ * Axes with authored extreme coverage — grew via the grounding-gap rule
+ * (M1 plan C1) until M2-C6 completed the build-out: FULL coverage, every
+ * axis, both extremes, judge-gated (§4.7, §12). The coverage invariant in
+ * grounding.ts now guards all 24; a new axis added to DNAScales without
+ * authored grounding fails the loader by construction.
  */
-export const COVERED_AXES: AxisName[] = [
-  ...V0_AXES,
-  "empathy",
-  "continuity",
-  "power_treatment",
-  "agency",
-];
+export const COVERED_AXES: AxisName[] = [...AXIS_NAMES];

@@ -459,6 +459,12 @@ export async function runLayout(
     // every conte until the axis reads back in band (§4.5).
     sakkanNotes: activeSakkanNotes(direction),
     freshMarks,
+    // Punch-through (§12, M2-C6): the current turn ages each retake, and the
+    // last sample turn tethers escalation to a real RE-MEASUREMENT — a note
+    // that outlived a post-note gauge read is measured failure, elapsed
+    // turns alone are not (C6 audit #1).
+    currentTurn: turnNumber,
+    ...(direction.sakkan ? { lastSampleTurn: direction.sakkan.last_sample_turn } : {}),
   });
   // Scene-Shape Directive (§4.4c): the Director is the producer (C7) — arc
   // line from the active arc, trajectory + notes from the last cycle. The

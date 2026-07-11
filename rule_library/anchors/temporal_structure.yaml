@@ -1,0 +1,29 @@
+axis: temporal_structure
+scale: "linear (0) ↔ non-linear (10) — flashbacks, loops, and parallel timelines as the structuring principle"
+bands:
+  "1":
+    excerpt_ref: temporal_structure_b1_sorayori
+    shows:
+      - title: A Place Further Than the Universe
+        note: a strict forward march to the ice; no time-jumps at all
+      - title: Hajime no Ippo
+        note: each bout built on the last, in plain chronological order
+      - title: Spice and Wolf
+        note: a road told town after town, cause then effect, in sequence
+  "5":
+    shows:
+      - title: Violet Evergarden
+        note: a present-forward line threaded with commissioned memory
+      - title: Cowboy Bebop
+        note: episodic present pierced by structured flashes of the past
+      - title: Vinland Saga
+        note: a linear saga that opens on a framed, out-of-order prologue
+  "9":
+    excerpt_ref: temporal_structure_b9_tatami
+    shows:
+      - title: The Tatami Galaxy
+        note: the same two years relived down each divergent club choice
+      - title: Steins;Gate
+        note: one afternoon looped and re-looped across shifting world-lines
+      - title: Baccano!
+        note: an ensemble braided out of order across decades at once

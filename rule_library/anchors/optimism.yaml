@@ -1,0 +1,29 @@
+axis: optimism
+scale: "cynical (0) ↔ hopeful (10) — does the world reward effort; thematic valence, distinct from darkness"
+bands:
+  "1":
+    excerpt_ref: optimism_b1_nhk
+    shows:
+      - title: Welcome to the NHK
+        note: every ladder out is another rung of the trap he built
+      - title: Kaiji
+        note: the house is designed so effort only ever feeds the strong
+      - title: Texhnolyze
+        note: the city grinds all striving down to the same grey silt
+  "5":
+    shows:
+      - title: Cowboy Bebop
+        note: a world neither kind nor cruel; sometimes trying pays, often not
+      - title: Fullmetal Alchemist Brotherhood
+        note: effort is rewarded, but only at exact and stated cost
+      - title: Spice and Wolf
+        note: a transactional world that pays wit and work their fair rate
+  "9":
+    excerpt_ref: optimism_b9_furuba
+    shows:
+      - title: Fruits Basket
+        note: relentless kindness is answered; the guarded heart yields
+      - title: Haikyuu!!
+        note: the sport reliably rewards those who keep reaching for the ball
+      - title: Gurren Lagann
+        note: spirit drills through every despair the plot can raise

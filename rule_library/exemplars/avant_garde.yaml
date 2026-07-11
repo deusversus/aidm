@@ -1,0 +1,42 @@
+# Exemplar passages — avant_garde (traditional 0 ↔ experimental 10)
+# Sourcing per blueprint §4.7: synthesized in-register, never verbatim source.
+axis: avant_garde
+exemplars:
+  - id: avant_garde_b1_haikyuu
+    axis: avant_garde
+    band: 1
+    anchor_show: Haikyuu!!
+    author: claude-opus-4-8
+    method: synthesized
+    text: >-
+      The serve went up and the gym went quiet the way it always did, the
+      whole bright rectangle of it holding one breath. He read the receive
+      off the setter's shoulders before she had even turned — half a step,
+      no more, but the half step was the game. The ball came clean to her
+      fingertips. She set it high to the left because the block was cheating
+      right; he had told her it would two points ago, and she had nodded and
+      filed it away. Now the wing was already climbing, hand cocked, and the
+      rally narrowed to one plain arithmetic: reach, swing, the wet crack of
+      a spike finding the seam between two late hands. It dropped. The gym
+      exhaled. Nobody had done a single thing a coach could not diagram on a
+      whiteboard — and that was the beauty of it, the honest ordinary beauty
+      of a thing done right.
+  - id: avant_garde_b9_tatami
+    axis: avant_garde
+    band: 9
+    anchor_show: The Tatami Galaxy
+    author: claude-opus-4-8
+    method: synthesized
+    text: >-
+      Consider the version of me who took the other stairwell. He is
+      happier; I have decided this out of spite. In his reel the club I did
+      not join has already made him its treasurer, and a girl whose name I
+      will never earn is laughing at a joke I will never make, and the spring
+      is the exact rose color the fortune-teller promised for two hundred
+      coins I did not have. Rewind. No — the same two years again,
+      differently. I take the third door and the corridor keeps producing
+      doors, one per regret, each opening on another me pressing his ear to
+      another wall, and behind every wall the identical muffled party to
+      which none of us is invited. Fast-forward past the part where I explain
+      this. The clock resets. The corridor is patient. I am, once more,
+      precisely late, and the doors go on, and on.
