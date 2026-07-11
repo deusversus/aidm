@@ -8,6 +8,7 @@ import {
   players,
   profiles,
 } from "@/lib/db/schema";
+import { isProtagonistName, marksSelfInsert, normalizeIdentity } from "@/lib/entity-identity";
 import { ingestAssertion } from "@/lib/ingestion/ingest";
 import { callJudgment } from "@/lib/llm/calls";
 import { DEV_TIER_SELECTION, TierSelection } from "@/lib/llm/tiers";
@@ -173,9 +174,27 @@ export function resolveObservations(observations: Observation[]): ResolvedObserv
         resolved.presentationGrants.push(obs.content);
         break;
       case "suggestion_affordance": {
-        const value = SuggestionAffordance.options.find((o) => obs.content.includes(o));
-        resolved.suggestionAffordance =
-          value ?? (obs.content.toLowerCase().includes("never") ? "never" : "on_request_only");
+        // Same discipline as resolveFinitude — enum tokens appear inside prose
+        // ("…never as a fourth-wall voice" compiled to "never", live
+        // 2026-07-10). Anchored value wins; a unique whole-token hit resolves;
+        // anything else defers to the safe default and says so.
+        const text = obs.content.toLowerCase();
+        const anchored = SuggestionAffordance.options.find((o) =>
+          new RegExp(`^\\s*["'“]?${o}\\b`).test(text),
+        );
+        // "never" is everyday prose (the live misparse) — it only counts
+        // anchored. The snake_case tokens can't occur naturally, so a unique
+        // unanchored hit of those still resolves.
+        const hits = SuggestionAffordance.options.filter(
+          (o) => o !== "never" && new RegExp(`\\b${o}\\b`).test(text),
+        );
+        const value = anchored ?? (hits.length === 1 ? hits[0] : undefined);
+        if (value) {
+          resolved.suggestionAffordance = value;
+        } else {
+          resolved.suggestionAffordance = "on_request_only";
+          resolved.deferred.push(`ambiguous suggestion affordance: ${obs.content.slice(0, 80)}`);
+        }
         break;
       }
       case "tier_selection": {
@@ -311,6 +330,98 @@ export const defaultOspSynthesizer: OspSynthesizer = async ({
     maxTokens: 16_000,
   });
 };
+
+// --- Compile-time catalog dedup (§6.5: one entity per campaign+type+identity)-
+// The DB unique index is EXACT (campaign, type, name); near-duplicate briefs
+// slip it, so overlapping admissions are collapsed HERE, deterministically,
+// before insert. LIMIT (deterministic only): DIFFERENT names meaning the same
+// thing ("Lloyd and protagonist connection" vs "Path-Crossing with Lloyd") are
+// M2 semantic-alias territory — left as separate rows, never guessed together.
+
+type BriefKind = "cast" | "world" | "faction" | "thread";
+type CatalogEntityType = "npc" | "faction" | "location" | "thread";
+
+function entityTypeForBriefKind(kind: BriefKind): CatalogEntityType {
+  return kind === "cast"
+    ? "npc"
+    : kind === "faction"
+      ? "faction"
+      : kind === "world"
+        ? "location"
+        : "thread";
+}
+
+/**
+ * Canonical identity key for the near-duplicate merge: lowercased, apostrophes
+ * dropped (so "player's" ≡ "players"), punctuation → single spaces, trimmed.
+ * Word boundaries survive — this is equality, not fuzzy matching.
+ */
+/** Capability material sorts AFTER identity material in the merged protagonist
+ *  block (§6.5: identity first, then what they can do). */
+const CAPABILITY_RE =
+  /\b(abilit\w*|powers?|skills?|wields?|combat|magic\w*|weapons?|spells?|prowess|fighter|fights?|strength|techniques?|arsenal)\b/i;
+
+interface AdmitBrief {
+  name: string;
+  kind: BriefKind;
+  brief: string;
+}
+export interface CatalogAdmission {
+  name: string;
+  entityType: CatalogEntityType;
+  block: string;
+}
+
+/**
+ * Collapse overlapping catalog admissions before insert (§6.5 identity guard):
+ *   a. self-insert protagonist briefs — matched by placeholder NAME or by a
+ *      self-insert DESCRIPTION — fold into ONE npc, identity material first and
+ *      capability material after; the survivor keeps a real extracted name if
+ *      one exists, else "The Protagonist".
+ *   b. remaining briefs sharing an entityType AND an equal normalized name
+ *      merge into one row (the exact-name index misses these near-duplicates).
+ * Insertion order is preserved (Map iteration order). This is the whole of the
+ * deterministic fix — semantic aliasing across DIFFERENT names is out of scope.
+ */
+export function dedupeAdmissions(admitted: AdmitBrief[]): CatalogAdmission[] {
+  const PROTAGONIST_KEY = "npc::#protagonist#";
+  interface Group {
+    entityType: CatalogEntityType;
+    realName?: string;
+    blocks: { text: string; capability: boolean }[];
+  }
+  const groups = new Map<string, Group>();
+  for (const b of admitted) {
+    const entityType = entityTypeForBriefKind(b.kind);
+    const placeholder = isProtagonistName(b.name) || marksSelfInsert(b.name);
+    const isProtagonist = entityType === "npc" && (placeholder || marksSelfInsert(b.brief));
+    const key = isProtagonist ? PROTAGONIST_KEY : `${entityType}::${normalizeIdentity(b.name)}`;
+    let group = groups.get(key);
+    if (!group) {
+      group = { entityType, blocks: [] };
+      groups.set(key, group);
+    }
+    // A real extracted name claims the survivor slot; a placeholder never does.
+    if (!(isProtagonist && placeholder)) group.realName ??= b.name;
+    group.blocks.push({ text: b.brief, capability: CAPABILITY_RE.test(b.brief) });
+  }
+  return [...groups.entries()].map(([key, group]) => {
+    if (key === PROTAGONIST_KEY) {
+      const identity = group.blocks.filter((x) => !x.capability).map((x) => x.text);
+      const capability = group.blocks.filter((x) => x.capability).map((x) => x.text);
+      return {
+        name: group.realName ?? "The Protagonist",
+        entityType: "npc" as const,
+        block: [...identity, ...capability].join("\n\n"),
+      };
+    }
+    return {
+      name: group.realName ?? "",
+      entityType: group.entityType,
+      block: group.blocks.map((x) => x.text).join("\n\n"),
+    };
+  });
+}
 
 // --- Compile -----------------------------------------------------------------
 
@@ -583,22 +694,20 @@ export async function compileSessionZero(
       // entity from a player assertion; the brief no-ops rather than erroring
       // the compile (the partial unique index is on campaign+type+name).
       const admitted = opening.briefs.filter((b) => b.admit_to_catalog);
-      if (admitted.length > 0) {
+      // §6.5 identity guard: overlapping briefs (a self-insert protagonist the
+      // OSP named twice; near-duplicate names the exact-name index misses)
+      // collapse BEFORE insert. DIFFERENT names for the same thing are M2
+      // semantic-alias territory — dedupeAdmissions leaves them as-is.
+      const deduped = dedupeAdmissions(admitted);
+      if (deduped.length > 0) {
         const created = await tx
           .insert(entities)
           .values(
-            admitted.map((b) => ({
+            deduped.map((e) => ({
               campaignId,
-              name: b.name,
-              entityType:
-                b.kind === "cast"
-                  ? "npc"
-                  : b.kind === "faction"
-                    ? "faction"
-                    : b.kind === "world"
-                      ? "location"
-                      : "thread",
-              block: b.brief,
+              name: e.name,
+              entityType: e.entityType,
+              block: e.block,
               ...SZ_ROW,
             })),
           )

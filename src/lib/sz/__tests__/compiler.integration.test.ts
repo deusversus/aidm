@@ -5,7 +5,7 @@ import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { compileSessionZero, gapVerdict, resolveObservations } from "../compiler";
+import { compileSessionZero, dedupeAdmissions, gapVerdict, resolveObservations } from "../compiler";
 import type { ConductorDraft, Observation } from "../conductor";
 
 /** Real-DB compile: scripted draft → contract + OSP → persisted handoff. */
@@ -20,6 +20,74 @@ const obs = (kind: Observation["kind"], content: string): Observation => ({
   kind,
   content,
   confidence: 0.9,
+});
+
+// The dedup rules are pure — exercised without a DB so they run everywhere.
+describe("dedupeAdmissions (§6.5 identity guard, deterministic)", () => {
+  it("folds self-insert protagonist briefs into ONE npc, identity before capability", () => {
+    // Today's real defect: the OSP minted the self-insert twice, under two
+    // placeholder names, from a backstory brief and a capabilities brief.
+    const out = dedupeAdmissions([
+      {
+        name: "The Protagonist (unnamed)",
+        kind: "cast",
+        brief: "Raised in the lower wards; carries a dead mentor's compass.",
+      },
+      {
+        name: "player's protagonist",
+        kind: "cast",
+        brief: "A duelist whose ability channels stormlight into a blade.",
+      },
+    ]);
+    expect(out).toHaveLength(1);
+    expect(out[0]?.entityType).toBe("npc");
+    expect(out[0]?.name).toBe("The Protagonist");
+    expect(out[0]?.block).toContain("lower wards");
+    expect(out[0]?.block).toContain("stormlight");
+    // Identity material precedes capability material in the merged block.
+    expect(out[0]?.block.indexOf("lower wards")).toBeLessThan(
+      out[0]?.block.indexOf("stormlight") ?? -1,
+    );
+  });
+
+  it("keeps a real extracted name when the description flags the self-insert", () => {
+    const out = dedupeAdmissions([
+      { name: "Kaelen", kind: "cast", brief: "The player's protagonist; a wandering smith." },
+      { name: "protagonist", kind: "cast", brief: "Fights with an ability drawn from grief." },
+    ]);
+    expect(out).toHaveLength(1);
+    expect(out[0]?.name).toBe("Kaelen");
+  });
+
+  it("merges near-duplicate names of the same type; leaves distinct entities alone", () => {
+    const out = dedupeAdmissions([
+      { name: "The Trawler", kind: "world", brief: "A converted fishing boat." },
+      { name: "the trawler.", kind: "world", brief: "Its hold smells of brine and fuel." },
+      { name: "Ganymede Dock", kind: "world", brief: "A closing-time berth." },
+    ]);
+    expect(out).toHaveLength(2);
+    const trawler = out.find((e) => e.name === "The Trawler");
+    expect(trawler?.block).toContain("fishing boat");
+    expect(trawler?.block).toContain("brine");
+  });
+
+  it("does NOT merge DIFFERENT names for the same meaning (M2 alias territory)", () => {
+    const out = dedupeAdmissions([
+      { name: "Lloyd and protagonist connection", kind: "thread", brief: "Their paths tangle." },
+      { name: "Path-Crossing with Lloyd", kind: "thread", brief: "Lloyd keeps reappearing." },
+    ]);
+    expect(out).toHaveLength(2);
+  });
+
+  it("does not mistake a non-protagonist NPC for the self-insert", () => {
+    const out = dedupeAdmissions([
+      { name: "Lloyd", kind: "cast", brief: "The protagonist's rival and foil." },
+      { name: "The Protagonist", kind: "cast", brief: "The player's self-insert lead." },
+    ]);
+    expect(out).toHaveLength(2);
+    expect(out.some((e) => e.name === "Lloyd")).toBe(true);
+    expect(out.some((e) => e.name === "The Protagonist")).toBe(true);
+  });
 });
 
 const SCRIPTED_OBSERVATIONS: Observation[] = [
@@ -78,6 +146,31 @@ const STUB_OSP = {
   ],
   orphan_facts: ["the player hums the OP when happy"],
 };
+
+describe("suggestion affordance resolution (anchored, never guessed from prose)", () => {
+  it("does not read prose 'never' as the value (live misparse 2026-07-10)", () => {
+    const r = resolveObservations([
+      obs(
+        "suggestion_affordance",
+        "Yes to suggested moves at decision points, but diegetically wrapped as the protagonist's own system — never as a fourth-wall voice.",
+      ),
+    ]);
+    expect(r.suggestionAffordance).toBe("on_request_only");
+    expect(r.deferred.some((d) => d.includes("ambiguous suggestion affordance"))).toBe(true);
+  });
+
+  it("anchored 'never' resolves", () => {
+    const r = resolveObservations([obs("suggestion_affordance", "never — player declined chips")]);
+    expect(r.suggestionAffordance).toBe("never");
+  });
+
+  it("snake_case token resolves unanchored", () => {
+    const r = resolveObservations([
+      obs("suggestion_affordance", "player chose default_on, wrapped diegetically"),
+    ]);
+    expect(r.suggestionAffordance).toBe("default_on");
+  });
+});
 
 describe.skipIf(!url)("SZ compiler (real Postgres)", () => {
   const playerId = `test_player_${crypto.randomUUID()}`;
@@ -244,6 +337,97 @@ describe.skipIf(!url)("SZ compiler (real Postgres)", () => {
       expect(result.contract.anchors_used).toContain("test_sz_profile");
     } finally {
       await db.delete(schema.campaigns).where(eq(schema.campaigns.id, hybrid.id));
+    }
+  });
+
+  it("binds ONE protagonist npc from overlapping self-insert briefs (§6.5)", async () => {
+    if (!db) throw new Error("unreachable");
+    // Today's live defect: two cast_facts about the self-insert (one backstory-
+    // flavored, one capabilities-flavored) plus world facts mentioning him, and
+    // the OSP minted the protagonist TWICE under two placeholder names — plus a
+    // pair of same-relationship threads under DIFFERENT names.
+    const draft: ConductorDraft = {
+      transcript: [],
+      observations: [
+        ...SCRIPTED_OBSERVATIONS,
+        obs("cast_fact", "The protagonist was orphaned in the lower wards and never named."),
+        obs("cast_fact", "The protagonist can channel stormlight into a blade — a rare ability."),
+        obs("world_fact", "The lower wards raised the protagonist and half the crew."),
+      ],
+      profileIds: ["test_sz_profile"],
+      readyToCompile: true,
+    };
+    const [campaign] = await db
+      .insert(schema.campaigns)
+      .values({
+        playerId,
+        title: "protagonist dedup fixture",
+        status: "draft",
+        szTranscript: draft,
+      })
+      .returning();
+    if (!campaign) throw new Error("insert failed");
+    const PROTAGONIST_STUB = {
+      ...STUB_OSP,
+      briefs: [
+        {
+          name: "The Protagonist (unnamed)",
+          kind: "cast" as const,
+          brief: "Orphaned in the lower wards; carries a dead mentor's compass. Never named.",
+          admit_to_catalog: true,
+        },
+        {
+          name: "player's protagonist",
+          kind: "cast" as const,
+          brief: "A duelist whose ability channels stormlight into a blade.",
+          admit_to_catalog: true,
+        },
+        {
+          name: "Lloyd and protagonist connection",
+          kind: "thread" as const,
+          brief: "Their paths keep tangling on the docks.",
+          admit_to_catalog: true,
+        },
+        {
+          name: "Path-Crossing with Lloyd",
+          kind: "thread" as const,
+          brief: "Lloyd reappears wherever the crew lands.",
+          admit_to_catalog: true,
+        },
+      ],
+    };
+    try {
+      const result = await compileSessionZero(db, campaign.id, {
+        ospSynthesizer: async () => PROTAGONIST_STUB,
+        // No-op ingestor: the dedup under test is the brief-admission path, kept
+        // isolated from ingestion-minted entities (§6.5 fix scope).
+        ingestor: async () => ({ writes: [], flags: [] }),
+      });
+      expect(result.gaps).toEqual([]);
+
+      const rows = await db
+        .select()
+        .from(schema.entities)
+        .where(eq(schema.entities.campaignId, campaign.id));
+      const npcs = rows.filter((e) => e.entityType === "npc");
+      // Exactly ONE protagonist npc, carrying BOTH facts' material.
+      expect(npcs).toHaveLength(1);
+      expect(npcs[0]?.name).toBe("The Protagonist");
+      expect(npcs[0]?.block).toContain("lower wards");
+      expect(npcs[0]?.block).toContain("stormlight");
+      // Its version-1 row mirrors the merged block (rewind base intact).
+      const versions = await db
+        .select()
+        .from(schema.entityVersions)
+        .where(eq(schema.entityVersions.entityId, npcs[0]?.id ?? ""));
+      expect(versions).toHaveLength(1);
+      expect(versions[0]?.block).toBe(npcs[0]?.block);
+      // The two same-relationship threads have DIFFERENT names — deterministic
+      // dedup leaves them as two rows (M2 semantic-alias territory).
+      const threads = rows.filter((e) => e.entityType === "thread");
+      expect(threads).toHaveLength(2);
+    } finally {
+      await db.delete(schema.campaigns).where(eq(schema.campaigns.id, campaign.id));
     }
   });
 

@@ -8,6 +8,7 @@ import {
   entityVersions,
   semanticMemories,
 } from "@/lib/db/schema";
+import { isProtagonistName, normalizeIdentity } from "@/lib/entity-identity";
 import { callProbe } from "@/lib/llm/calls";
 import { DEV_TIER_SELECTION, TierSelection } from "@/lib/llm/tiers";
 import { embedTexts } from "@/lib/llm/voyage";
@@ -220,17 +221,28 @@ export async function ingestAssertion(
   }
 
   // --- Resolver embeddings (§5.4 step 2) -------------------------------------
-  // In-memory catalog, keyed case-insensitively; grows as this call mints
-  // entities so a second fact naming the same NEW entity enriches, not dupes.
+  // In-memory catalog keyed by NORMALIZED name (§6.5 identity guard — the live
+  // turn-3 defect: "the protagonist" exact-missed "The Protagonist (unnamed)"
+  // and minted a third PC row). Protagonist-flavored npcs also register under
+  // a sentinel so every placeholder spelling resolves to the same row. Grows
+  // as this call mints entities so a second fact naming the same NEW entity
+  // enriches, not dupes.
+  const PROTAGONIST_KEY = "#protagonist#";
   const catalog = new Map<string, EntityRef>();
-  for (const e of entityRows) catalog.set(e.name.toLowerCase(), e);
+  for (const e of entityRows) {
+    catalog.set(normalizeIdentity(e.name), e);
+    if (e.entityType === "npc" && isProtagonistName(e.name)) catalog.set(PROTAGONIST_KEY, e);
+  }
+  const lookupEntity = (rawName: string): EntityRef | undefined =>
+    catalog.get(normalizeIdentity(rawName)) ??
+    (isProtagonistName(rawName) ? catalog.get(PROTAGONIST_KEY) : undefined);
 
   // Canon lookup embeddings, only for names absent from the catalog at entry.
   const canonQueryNames = [
     ...new Set(
       writable
         .map((f) => f.entity_name?.trim())
-        .filter((n): n is string => !!n && !catalog.has(n.toLowerCase())),
+        .filter((n): n is string => !!n && !lookupEntity(n)),
     ),
   ];
   const canonEmbeddings =
@@ -245,7 +257,7 @@ export async function ingestAssertion(
   const canonEmbByName = new Map<string, number[]>();
   canonQueryNames.forEach((n, i) => {
     const emb = canonEmbeddings[i];
-    if (emb) canonEmbByName.set(n.toLowerCase(), emb);
+    if (emb) canonEmbByName.set(normalizeIdentity(n), emb);
   });
 
   // Semantic-layer embeddings for every writable fact (§5.4 step 3), batched.
@@ -263,7 +275,7 @@ export async function ingestAssertion(
 
     const name = fact.entity_name?.trim();
     if (name) {
-      const existing = catalog.get(name.toLowerCase());
+      const existing = lookupEntity(name);
       if (existing) {
         // Matched existing catalog entity → enrich (append + version row).
         const newBlock = existing.block ? `${existing.block}\n- ${fact.content}` : fact.content;
@@ -288,7 +300,7 @@ export async function ingestAssertion(
           db,
           opts.profileIds,
           name,
-          canonEmbByName.get(name.toLowerCase()),
+          canonEmbByName.get(normalizeIdentity(name)),
         );
         const entityType = entityTypeForKind(fact.kind);
         const block = resolved
@@ -305,7 +317,9 @@ export async function ingestAssertion(
           .insert(entityVersions)
           .values({ entityId: created.id, version: 1, block, ...envelope })
           .onConflictDoNothing();
-        catalog.set(name.toLowerCase(), { id: created.id, name, entityType, block });
+        const ref = { id: created.id, name, entityType, block };
+        catalog.set(normalizeIdentity(name), ref);
+        if (entityType === "npc" && isProtagonistName(name)) catalog.set(PROTAGONIST_KEY, ref);
         writes.push({
           kind: "entity_created",
           id: created.id,

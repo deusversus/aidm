@@ -236,6 +236,42 @@ describe.skipIf(!url)("Universal ingestion (real Postgres, scripted extractor)",
     expect(CANON_MATCH_DISTANCE).toBe(0.45);
   });
 
+  it("resolver: protagonist placeholder spellings enrich the ONE PC row (§6.5)", async () => {
+    if (!db) throw new Error("unreachable");
+    // The live turn-3 defect: catalog held "The Protagonist (unnamed)" and an
+    // assertion about "the protagonist" exact-missed it, minting a third row.
+    await db.insert(schema.entities).values({
+      campaignId,
+      name: "The Protagonist (unnamed)",
+      entityType: "npc",
+      block: "Player's self-insert; street-rat.",
+      turnId: 0,
+      provenance: "sz_compiler",
+      confidence: 1,
+    });
+    armExtractor([
+      {
+        kind: "cast_fact",
+        entity_name: "the protagonist",
+        content: "The protagonist rotates his enchanted wells to stay hidden.",
+        posture: "accept",
+      },
+    ]);
+    const result = await ingestAssertion(db, campaignId, 3, "I rotate the wells.", {
+      profileIds: [],
+    });
+    expect(result.writes.some((w) => w.kind === "entity_enriched")).toBe(true);
+    expect(result.writes.some((w) => w.kind === "entity_created")).toBe(false);
+    const pcRows = await db
+      .select()
+      .from(schema.entities)
+      .where(
+        and(eq(schema.entities.campaignId, campaignId), eq(schema.entities.entityType, "npc")),
+      );
+    expect(pcRows).toHaveLength(1);
+    expect(pcRows[0]?.block).toContain("rotates his enchanted wells");
+  });
+
   it("ACCEPT default: a bare world fact writes a semantic row with the exact envelope", async () => {
     if (!db) throw new Error("unreachable");
     armExtractor([
