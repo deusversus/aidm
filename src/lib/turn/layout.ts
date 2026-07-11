@@ -73,7 +73,10 @@ export type LayoutResult =
       intent: IntentOutput;
     };
 
-const INTENT_SYSTEM = [
+// Exported so the C2 authorship-detection eval drives the REAL intent probe
+// with the byte-identical contract text (never a drifting copy). Exporting a
+// const does not change the frozen contract.
+export const INTENT_SYSTEM = [
   "You are the Phase-A parse: classify the player's input for the turn",
   "engine. intent: the PRIMARY channel (COMBAT/SOCIAL/EXPLORATION/ABILITY/",
   "INVENTORY/WORLD_BUILDING for story actions; META_FEEDBACK for",
@@ -85,8 +88,13 @@ const INTENT_SYSTEM = [
   "named_attack, unleashed_form, last_stand, power_reveal, breaking_point.",
   "These route the scene to full craft budget — NEVER flag ordinary",
   "approach descriptors (stealth, caution, speed, thoroughness); almost",
-  "every turn has NO flags. confidence: your certainty in the primary",
-  "intent.",
+  "every turn has NO flags. contains_world_assertion: true when the input",
+  "ASSERTS a fact about the world, its people, or its past — regardless of",
+  "intent. A single text is often action AND authorship at once: a battle",
+  "scream like 'FOR EVERYONE YOUR MASTER KILLED!' is COMBAT that also",
+  "asserts the enemy HAS a master — flag it. Statements of the character's",
+  "own feelings, plans, or observations of what is already established are",
+  "NOT assertions. confidence: your certainty in the primary intent.",
 ].join(" ");
 
 export async function runLayout(
@@ -214,16 +222,20 @@ export async function runLayout(
   // Failure never blocks the turn. Phase-A re-runs may re-ingest (noted:
   // duplicate semantic facts are noise, not corruption — G2's distillation
   // dedups nothing at M1).
+  // C2 (ratified 2026-07-10): the gate is intent OR the orthogonal
+  // authorship flag — the Red Sash class (assertions inside SOCIAL/COMBAT
+  // actions) ingests too, with the active arc line riding as dossier.
   const ingestionProbe: Promise<{
     notes: string[];
     flags: string[];
     writes: string[];
     clarify?: string;
   }> =
-    intent.intent === "WORLD_BUILDING"
+    intent.intent === "WORLD_BUILDING" || intent.contains_world_assertion
       ? ingestAssertion(db, campaignId, turnNumber, playerInput, {
           profileIds: contract.anchors_used,
           provenance: "player_assertion",
+          ...(activeArc ? { arcLine: `${activeArc.name} — ${activeArc.dramaticQuestion}` } : {}),
         })
           .then((r) => {
             const notes = r.writes.map((w) => `Established fact (${w.kind}): ${w.summary}`);

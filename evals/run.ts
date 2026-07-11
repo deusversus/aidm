@@ -1,6 +1,7 @@
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { flushLangfuse } from "@/lib/observability/langfuse";
+import { authorshipDetection } from "./suites/authorship-detection";
 import { budgetAssertions } from "./suites/budget-assertions";
 import { goldenProfile } from "./suites/golden-profile";
 import { notAnotherAnime } from "./suites/not-another-anime";
@@ -21,6 +22,7 @@ const suites: Suite[] = [
   goldenProfile,
   notAnotherAnime,
   rendererEfficacy,
+  authorshipDetection,
   ...scaffolds,
 ];
 

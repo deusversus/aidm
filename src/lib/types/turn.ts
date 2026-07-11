@@ -37,6 +37,13 @@ export const IntentOutput = z.object({
   action: nullableOptionalString,
   epicness: z.number().min(0).max(1),
   special_conditions: z.array(z.string()).default([]),
+  /**
+   * §5.4 authorship detection (M2 C2, ratified 2026-07-10): a single text is
+   * often action AND authorship at once — the mid-battle scream that mints
+   * "the monster has a master" is COMBAT carrying new canon. Orthogonal to
+   * intent; fires on ANY channel. Default false keeps pre-C2 records parsing.
+   */
+  contains_world_assertion: z.boolean().default(false),
   confidence: z.number().min(0).max(1),
   // Same null→undefined guard as target/action above: Haiku emits null for
   // "omit when unknown" (live layout probe, 2026-07-07).

@@ -13,6 +13,7 @@ function intent(overrides: Partial<IntentOutput> = {}): IntentOutput {
     intent: "DEFAULT",
     epicness: 0.3,
     special_conditions: [],
+    contains_world_assertion: false,
     confidence: 0.9,
     ...overrides,
   };

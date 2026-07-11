@@ -78,12 +78,21 @@ const ExtractedFact = z.object({
   posture: Posture,
   /** CLARIFY: the single question to ask. FLAG: the craft concern. ACCEPT: omitted. */
   posture_reason: nullableOptionalString,
+  /**
+   * §5.4 relational resolution (M2 C2): when the fact's entity is defined by
+   * its relation to an EXISTING catalog entity ("my mother", "your master"),
+   * this carries the anchor's exact catalog name. A relational reference that
+   * RESOLVES to a cataloged entity uses entity_name directly (enrich path);
+   * this field rides only on genuinely NEW entities, seeding the relation
+   * into the minted row's state.
+   */
+  related_to_entity: nullableOptionalString,
 });
 
 export const IngestionExtraction = z.object({ facts: z.array(ExtractedFact).default([]) });
 export type IngestionExtraction = z.infer<typeof IngestionExtraction>;
 
-const EXTRACTOR_SYSTEM = [
+export const EXTRACTOR_SYSTEM = [
   "You are the world-assertion editor for a collaborative story engine. The",
   "player has spoken; your job is to capture the world facts their words",
   "assert, NOT to answer a quiz. The player's language is always",
@@ -96,6 +105,17 @@ const EXTRACTOR_SYSTEM = [
   "entity_name ONLY when the fact is about a nameable catalog entity",
   "(a faction, a person/NPC, a place, or an ongoing thread) — the exact name",
   "the player used; and a posture.",
+  "",
+  "RELATIONAL RESOLUTION (§5.4 dossier): the assertion often names an entity by",
+  "its RELATION — 'my mother', 'your master', 'the twelve'. Resolve it against",
+  "the CAMPAIGN DOSSIER below. If that entity is ALREADY cataloged, set",
+  "entity_name to its EXACT dossier name — this enriches the one existing row;",
+  "never mint a parallel. ONLY when the relation names a GENUINELY NEW entity do",
+  "you give it a fresh descriptive entity_name AND set related_to_entity to the",
+  "EXACT dossier name of the anchor it hangs off (a newly-revealed 'The",
+  "Monster's Master' hangs off the monster's cataloged name). Likewise BIND to a",
+  "live THREAD when the assertion extends one: reuse that thread's exact name",
+  "rather than opening a parallel thread.",
   "",
   "POSTURE is the editor's stance (§5.4):",
   "- accept (DEFAULT, the overwhelming majority): the player authored canon.",
@@ -113,6 +133,111 @@ const EXTRACTOR_SYSTEM = [
   "",
   "When in doubt, accept. There is no REJECT.",
 ].join(" ");
+
+/** Total catalog entities rendered into the dossier before truncation (§5.4 C2). */
+const DOSSIER_ENTITY_CAP = 30;
+/** Per-entity one-line block head budget (~100 chars). */
+const DOSSIER_BLOCK_HEAD_CHARS = 100;
+
+/** The catalog shape the dossier renders — a row plus its age proxy (turnId). */
+export interface DossierEntity {
+  name: string;
+  entityType: string;
+  block: string;
+  turnId: number;
+}
+
+function blockHead(block: string): string {
+  const flat = block.replace(/\s+/g, " ").trim();
+  if (!flat) return "";
+  return flat.length > DOSSIER_BLOCK_HEAD_CHARS
+    ? `${flat.slice(0, DOSSIER_BLOCK_HEAD_CHARS).trimEnd()}…`
+    : flat;
+}
+
+/**
+ * The context dossier (§5.4 C2): "knowing what to do with that assertion
+ * requires context of the campaign so far — what npcs exist already, what arcs
+ * or threads are active" (user requirement). Entities render with one-line
+ * block heads, grouped — the PLAYER'S PROTAGONIST first (the premise's second
+ * pole), then npcs/factions/locations, then THREADS as their own group (the
+ * Director's live material the extractor must extend, not fork). The active arc
+ * line rides on top when present.
+ *
+ * Bounded (§0.9, no silent caps): protagonist + threads are always included;
+ * the rest fill the remaining budget most-recent-first by turnId, and a
+ * truncation warns rather than silently dropping catalog.
+ */
+export function renderDossier(
+  entityRows: DossierEntity[],
+  arcLine: string | undefined,
+  turnNumber: number,
+): string {
+  const isProt = (e: DossierEntity) => e.entityType === "npc" && isProtagonistName(e.name);
+  const protagonist = entityRows.filter(isProt);
+  const threads = entityRows.filter((e) => e.entityType === "thread");
+  const others = entityRows
+    .filter((e) => !isProt(e) && e.entityType !== "thread")
+    .sort((a, b) => b.turnId - a.turnId);
+
+  const budget = Math.max(0, DOSSIER_ENTITY_CAP - protagonist.length - threads.length);
+  const keptOthers = others.slice(0, budget);
+  if (others.length > keptOthers.length) {
+    console.warn(
+      `[ingestion] dossier truncated at ${DOSSIER_ENTITY_CAP}: dropped ${others.length - keptOthers.length} of ${others.length} non-thread entities (turn ${turnNumber})`,
+    );
+  }
+
+  const line = (e: DossierEntity) => {
+    const head = blockHead(e.block);
+    return head ? `- ${e.name}: ${head}` : `- ${e.name}`;
+  };
+  const group = (label: string, rows: DossierEntity[]) =>
+    rows.length > 0 ? `${label}:\n${rows.map(line).join("\n")}` : "";
+
+  const npcs = keptOthers.filter((e) => e.entityType === "npc");
+  const factions = keptOthers.filter((e) => e.entityType === "faction");
+  const locations = keptOthers.filter((e) => e.entityType === "location");
+  const misc = keptOthers.filter(
+    (e) => e.entityType !== "npc" && e.entityType !== "faction" && e.entityType !== "location",
+  );
+
+  const sections = [
+    arcLine ? `ACTIVE ARC: ${arcLine}` : "",
+    group("THE PLAYER'S PROTAGONIST", protagonist),
+    group("NPCS", npcs),
+    group("FACTIONS", factions),
+    group("LOCATIONS", locations),
+    group("OTHER ENTITIES", misc),
+    group("THREADS (the Director's live material — extend these, do not fork parallels)", threads),
+  ].filter(Boolean);
+
+  if (sections.length === 0) return "CAMPAIGN DOSSIER: (empty — no catalog yet)";
+  return `CAMPAIGN DOSSIER (resolve relational references to these EXACT names):\n\n${sections.join("\n\n")}`;
+}
+
+/**
+ * The extractor's per-call prompt (§5.4 pipeline step 1): established critical
+ * facts (the clarify anchor), the campaign dossier, then the player assertion.
+ * Exported so the C2 acceptance eval builds the byte-identical prompt the
+ * runtime extractor sees.
+ */
+export function buildExtractorPrompt(args: {
+  criticalFacts: string[];
+  entityRows: DossierEntity[];
+  arcLine?: string;
+  turnNumber: number;
+  text: string;
+}): string {
+  return [
+    args.criticalFacts.length > 0
+      ? `ESTABLISHED CRITICAL FACTS (a direct contradiction is the only reason to clarify):\n${args.criticalFacts.map((c) => `- ${c}`).join("\n")}`
+      : "ESTABLISHED CRITICAL FACTS: (none yet)",
+    renderDossier(args.entityRows, args.arcLine, args.turnNumber),
+    "",
+    `PLAYER ASSERTION:\n${args.text}`,
+  ].join("\n");
+}
 
 function entityTypeForKind(kind: FactKind): "npc" | "faction" | "location" | "thread" {
   switch (kind) {
@@ -157,7 +282,13 @@ export async function ingestAssertion(
   campaignId: string,
   turnNumber: number,
   text: string,
-  opts: { profileIds: string[]; provenance?: string },
+  opts: {
+    profileIds: string[];
+    provenance?: string;
+    /** §5.4 dossier (M2 C2): the active arc line ("name — dramatic question"),
+     *  passed by the turn path (layout has it in hand; SZ has no arc yet). */
+    arcLine?: string;
+  },
 ): Promise<IngestionResult> {
   const [campaign] = await db.select().from(campaigns).where(eq(campaigns.id, campaignId));
   if (!campaign) throw new Error("campaign not found");
@@ -179,6 +310,7 @@ export async function ingestAssertion(
         name: entities.name,
         entityType: entities.entityType,
         block: entities.block,
+        turnId: entities.turnId,
       })
       .from(entities)
       .where(and(eq(entities.campaignId, campaignId), notTombstoned(entities))),
@@ -191,16 +323,13 @@ export async function ingestAssertion(
     campaignId,
     turnNumber,
     system: EXTRACTOR_SYSTEM,
-    prompt: [
-      criticalRows.length > 0
-        ? `ESTABLISHED CRITICAL FACTS (a direct contradiction is the only reason to clarify):\n${criticalRows.map((c) => `- ${c.content}`).join("\n")}`
-        : "ESTABLISHED CRITICAL FACTS: (none yet)",
-      entityRows.length > 0
-        ? `EXISTING CATALOG ENTITIES (reuse the exact name when the assertion is about one):\n${entityRows.map((e) => `- ${e.name} (${e.entityType})`).join("\n")}`
-        : "EXISTING CATALOG ENTITIES: (none yet)",
-      "",
-      `PLAYER ASSERTION:\n${text}`,
-    ].join("\n"),
+    prompt: buildExtractorPrompt({
+      criticalFacts: criticalRows.map((c) => c.content),
+      entityRows,
+      arcLine: opts.arcLine,
+      turnNumber,
+      text,
+    }),
     maxTokens: 2_000,
   });
 
@@ -395,9 +524,31 @@ export async function ingestAssertion(
         const block = resolved
           ? `[canon:${resolved.profileId}] ${resolved.content.slice(0, CANON_BLOCK_CHARS).trim()}`
           : fact.content;
+        // §5.4 relational consumption (M2 C2): a genuinely NEW entity defined by
+        // its relation to a cataloged anchor ("The Monster's Master" → the
+        // monster) seeds that relation into state, matching G1's turn-keyed
+        // relationships shape. An unresolvable anchor is ignored — the relation
+        // text still lives in the block/content.
+        const anchorName = fact.related_to_entity?.trim();
+        const anchor = anchorName ? lookupEntity(anchorName) : undefined;
+        const relationState = anchor
+          ? {
+              relationships: {
+                [String(turnNumber)]:
+                  `related to ${anchor.name}: ${fact.content.slice(0, 120).trim()}`,
+              },
+            }
+          : undefined;
         const [created] = await db
           .insert(entities)
-          .values({ campaignId, name, entityType, block, ...envelope })
+          .values({
+            campaignId,
+            name,
+            entityType,
+            block,
+            ...(relationState ? { state: relationState } : {}),
+            ...envelope,
+          })
           .returning({ id: entities.id });
         if (!created) throw new Error("ingestAssertion: entity insert failed");
         // Creation writes version 1 so a rewind can always restore the block

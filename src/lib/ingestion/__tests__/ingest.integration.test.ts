@@ -47,12 +47,23 @@ interface ScriptedFact {
   content: string;
   posture: string;
   posture_reason?: string;
+  /** §5.4 C2 relational anchor — the exact catalog name a NEW entity hangs off. */
+  related_to_entity?: string;
 }
 
 /** Script the single extractor probe call for one assertion. */
 function armExtractor(facts: ScriptedFact[]) {
   // biome-ignore lint/suspicious/noExplicitAny: harness spans the generic probe signature
   mockProbe.mockImplementation((_s: any, _o: any) => Promise.resolve({ facts }) as never);
+}
+
+/** The prompt the extractor probe was called with — for dossier inspection. */
+function extractorPrompt(): string {
+  const call = mockProbe.mock.calls.find(
+    (c) => (c[1] as { name?: string })?.name === "world_assertion_extract",
+  );
+  if (!call) throw new Error("extractor probe was not called");
+  return (call[1] as { prompt: string }).prompt;
 }
 
 describe.skipIf(!url)("Universal ingestion (real Postgres, scripted extractor)", () => {
@@ -537,5 +548,191 @@ describe.skipIf(!url)("Universal ingestion (real Postgres, scripted extractor)",
       );
     expect(npcs).toHaveLength(2);
     expect(npcs.map((r) => r.name).sort()).toEqual(["!!!", "???"]);
+  });
+
+  it("dossier (C2): protagonist line, thread group, and arc line ride the extractor prompt", async () => {
+    if (!db) throw new Error("unreachable");
+    // A placeholder-named PC (isProtagonistName over npc rows) + a live thread.
+    await db.insert(schema.entities).values([
+      {
+        campaignId,
+        name: "The Protagonist (unnamed)",
+        entityType: "npc",
+        block: "Street-rat turned reluctant blade; hunts the raiders who razed his village.",
+        turnId: 0,
+        provenance: "sz_compiler",
+        confidence: 1,
+      },
+      {
+        campaignId,
+        name: "The Debt to Lloyd",
+        entityType: "thread",
+        block: "An unpaid favor hangs between them, sharpening every meeting.",
+        turnId: 2,
+        provenance: "sz_compiler",
+        confidence: 1,
+      },
+    ]);
+    armExtractor([]); // we only inspect the prompt the extractor received
+    await ingestAssertion(db, campaignId, 11, "I ready my blade", {
+      profileIds: [],
+      arcLine: "The Reckoning — will he avenge his mother?",
+    });
+
+    const prompt = extractorPrompt();
+    expect(prompt).toContain("THE PLAYER'S PROTAGONIST");
+    expect(prompt).toContain("The Protagonist (unnamed)");
+    // Block head rides the line (~100 chars), grouped under the protagonist.
+    expect(prompt).toContain("Street-rat turned reluctant blade");
+    // Threads are their own labeled group (the Director's live material).
+    expect(prompt).toContain("THREADS");
+    expect(prompt).toContain("The Debt to Lloyd");
+    expect(prompt).toContain("ACTIVE ARC: The Reckoning — will he avenge his mother?");
+  });
+
+  it("relational binding (C2): exact catalog name enriches; a new relation mints with state seeded", async () => {
+    if (!db) throw new Error("unreachable");
+    await db.insert(schema.entities).values([
+      {
+        campaignId,
+        name: "The Protagonist's Mother",
+        entityType: "npc",
+        block: "Slain in the raid on his village.",
+        turnId: 0,
+        provenance: "sz_compiler",
+        confidence: 1,
+      },
+      {
+        campaignId,
+        name: "The Gaunt Warden",
+        entityType: "npc",
+        block: "The towering monster the crew now duels.",
+        turnId: 1,
+        provenance: "player_assertion",
+        confidence: 1,
+      },
+    ]);
+
+    // (a) A relational reference that RESOLVES to the catalog → enrich the one row.
+    armExtractor([
+      {
+        kind: "cast_fact",
+        entity_name: "The Protagonist's Mother",
+        content: "His mother sang to him every night before the fire took her.",
+        posture: "accept",
+      },
+    ]);
+    const enrich = await ingestAssertion(db, campaignId, 11, "for my mother, who sang to me", {
+      profileIds: [],
+    });
+    expect(enrich.writes.some((w) => w.kind === "entity_enriched")).toBe(true);
+    expect(enrich.writes.some((w) => w.kind === "entity_created")).toBe(false);
+
+    // (b) A genuinely NEW entity + related_to_entity → mint with the relation
+    // seeded into state (turn-keyed, G1's shape).
+    armExtractor([
+      {
+        kind: "thread",
+        entity_name: "The Warden's Master",
+        content: "The Gaunt Warden answers to a hidden master who ordered the massacre.",
+        posture: "accept",
+        related_to_entity: "The Gaunt Warden",
+      },
+    ]);
+    const mint = await ingestAssertion(db, campaignId, 12, "for everyone your master killed", {
+      profileIds: [],
+    });
+    expect(mint.writes.some((w) => w.kind === "entity_created")).toBe(true);
+
+    const [master] = await db
+      .select()
+      .from(schema.entities)
+      .where(
+        and(
+          eq(schema.entities.campaignId, campaignId),
+          eq(schema.entities.name, "The Warden's Master"),
+        ),
+      );
+    expect(master?.entityType).toBe("thread");
+    const state = (master?.state ?? {}) as { relationships?: Record<string, string> };
+    expect(state.relationships?.["12"]).toContain("related to The Gaunt Warden");
+  });
+
+  it("the scream (C2 golden): mother enriches, master mints bound to the monster — no parallel mother", async () => {
+    if (!db) throw new Error("unreachable");
+    await db.insert(schema.entities).values([
+      {
+        campaignId,
+        name: "The Protagonist's Mother",
+        entityType: "npc",
+        block: "Died in the massacre he swears to avenge.",
+        turnId: 0,
+        provenance: "sz_compiler",
+        confidence: 1,
+      },
+      {
+        campaignId,
+        name: "The Gaunt Warden",
+        entityType: "npc",
+        block: "The monster looming over the battlefield.",
+        turnId: 1,
+        provenance: "player_assertion",
+        confidence: 1,
+      },
+    ]);
+    const scream =
+      "I WILL NOT LOSE! FOR MY MOTHER! FOR THE CHILDREN THAT DIED! FOR EVERYONE YOUR MASTER KILLED!";
+    // The dossier resolves "my mother" to the catalog; "your master" is NEW
+    // canon bound to the monster the fight is against.
+    armExtractor([
+      {
+        kind: "cast_fact",
+        entity_name: "The Protagonist's Mother",
+        content: "The protagonist's mother is among the dead he fights to avenge.",
+        posture: "accept",
+      },
+      {
+        kind: "world_fact",
+        content: "Children died in the massacre the protagonist is avenging.",
+        posture: "accept",
+      },
+      {
+        kind: "thread",
+        entity_name: "The Warden's Master",
+        content: "The Gaunt Warden serves a hidden master who ordered the killings.",
+        posture: "accept",
+        related_to_entity: "The Gaunt Warden",
+      },
+    ]);
+    const res = await ingestAssertion(db, campaignId, 13, scream, {
+      profileIds: [],
+      arcLine: "The Reckoning — will he avenge the fallen?",
+    });
+
+    // Mother: enriched, and exactly one mother-named npc row survives.
+    expect(res.writes.some((w) => w.kind === "entity_enriched")).toBe(true);
+    const npcs = await db
+      .select()
+      .from(schema.entities)
+      .where(
+        and(eq(schema.entities.campaignId, campaignId), eq(schema.entities.entityType, "npc")),
+      );
+    expect(npcs.filter((r) => /mother/i.test(r.name)).map((r) => r.name)).toEqual([
+      "The Protagonist's Mother",
+    ]);
+
+    // Master: minted as a thread bound to the monster (new canon landed).
+    const [master] = await db
+      .select()
+      .from(schema.entities)
+      .where(
+        and(
+          eq(schema.entities.campaignId, campaignId),
+          eq(schema.entities.name, "The Warden's Master"),
+        ),
+      );
+    expect(master?.entityType).toBe("thread");
+    const state = (master?.state ?? {}) as { relationships?: Record<string, string> };
+    expect(state.relationships?.["13"]).toContain("related to The Gaunt Warden");
   });
 });
