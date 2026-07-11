@@ -238,7 +238,11 @@ export async function runLayout(
           ...(activeArc ? { arcLine: `${activeArc.name} — ${activeArc.dramaticQuestion}` } : {}),
         })
           .then((r) => {
-            const notes = r.writes.map((w) => `Established fact (${w.kind}): ${w.summary}`);
+            const notes = r.writes.map((w) =>
+              w.kind === "entity_revised" || w.kind === "critical_fact_replaced"
+                ? `Corrected canon (${w.kind}): ${w.summary}`
+                : `Established fact (${w.kind}): ${w.summary}`,
+            );
             if (r.clarify) {
               notes.push(
                 `The assertion left a genuine ambiguity — let the scene surface it naturally: ${r.clarify}`,

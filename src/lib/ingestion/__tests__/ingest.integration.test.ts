@@ -1,9 +1,9 @@
 import * as schema from "@/lib/db/schema";
-import { callProbe } from "@/lib/llm/calls";
+import { callJudgment, callProbe } from "@/lib/llm/calls";
 import { EMBEDDING_DIMENSIONS } from "@/lib/llm/embedding-config";
 import { embedTexts } from "@/lib/llm/voyage";
 import { bebopContract } from "@/lib/renderer/__tests__/fixtures";
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -14,12 +14,16 @@ import { CANON_MATCH_DISTANCE, ingestAssertion } from "../ingest";
  * extractor and deterministic basis-vector embeddings. Pins: the "The
  * Syndicate" resolver (canon link, no duplicate on re-mention), the ACCEPT
  * default with the exact provenance envelope, CLARIFY writing nothing, FLAG
- * writing + surfacing, and the envelope on every write.
+ * writing + surfacing, the envelope on every write, and the M2 C3 correction
+ * semantics — a player correction cleans the record (block revise + version
+ * trail, critical-fact tombstone-and-replace), never appends a contradiction.
  */
 
 vi.mock("@/lib/llm/calls", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/llm/calls")>();
-  return { ...actual, callProbe: vi.fn() };
+  // callProbe = the extractor + merge-pair; callJudgment = the C3 revise. The
+  // janitor's pairLikelySame uses callProbe, so no test relies on real judgment.
+  return { ...actual, callProbe: vi.fn(), callJudgment: vi.fn() };
 });
 vi.mock("@/lib/llm/voyage", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/llm/voyage")>();
@@ -32,6 +36,7 @@ const pool = url ? new Pool({ connectionString: url, max: 4 }) : undefined;
 const db = pool ? drizzle(pool, { schema, casing: "snake_case" }) : undefined;
 
 const mockProbe = vi.mocked(callProbe);
+const mockJudgment = vi.mocked(callJudgment);
 const mockEmbed = vi.mocked(embedTexts);
 
 /** Basis vector: 1 at index i, orthogonal to every other basis vector. */
@@ -49,12 +54,24 @@ interface ScriptedFact {
   posture_reason?: string;
   /** §5.4 C2 relational anchor — the exact catalog name a NEW entity hangs off. */
   related_to_entity?: string;
+  /** §5.4 C3 correction — retire established material rather than append. */
+  corrects_existing?: boolean;
+  /** §5.4 C3 — the verbatim established line/critical fact being retired. */
+  supersedes?: string;
 }
 
 /** Script the single extractor probe call for one assertion. */
 function armExtractor(facts: ScriptedFact[]) {
   // biome-ignore lint/suspicious/noExplicitAny: harness spans the generic probe signature
   mockProbe.mockImplementation((_s: any, _o: any) => Promise.resolve({ facts }) as never);
+}
+
+/** Script the single C3 revise judgment call — the clean block it returns. */
+function armRevise(revisedBlock: string) {
+  mockJudgment.mockImplementation(
+    // biome-ignore lint/suspicious/noExplicitAny: harness spans the generic judgment signature
+    (_s: any, _o: any) => Promise.resolve({ revised_block: revisedBlock }) as never,
+  );
 }
 
 /** The prompt the extractor probe was called with — for dossier inspection. */
@@ -108,14 +125,17 @@ describe.skipIf(!url)("Universal ingestion (real Postgres, scripted extractor)",
   beforeEach(async () => {
     if (!db) throw new Error("unreachable");
     mockProbe.mockReset();
+    mockJudgment.mockReset();
     mockEmbed.mockReset();
     // Default: every text embeds to basis(0). Tests override as needed.
     mockEmbed.mockImplementation(async (texts: string[]) => texts.map(() => basis(0)));
-    // Deleting entities cascades entity_versions; clean semantic + canon too.
+    // Deleting entities cascades entity_versions; clean semantic + canon +
+    // critical facts (C3 seeds those) too.
     await db
       .delete(schema.semanticMemories)
       .where(eq(schema.semanticMemories.campaignId, campaignId));
     await db.delete(schema.entities).where(eq(schema.entities.campaignId, campaignId));
+    await db.delete(schema.criticalFacts).where(eq(schema.criticalFacts.campaignId, campaignId));
     await db.delete(schema.canonChunks).where(eq(schema.canonChunks.profileId, profileId));
   });
 
@@ -734,5 +754,355 @@ describe.skipIf(!url)("Universal ingestion (real Postgres, scripted extractor)",
     expect(master?.entityType).toBe("thread");
     const state = (master?.state ?? {}) as { relationships?: Record<string, string> };
     expect(state.relationships?.["13"]).toContain("related to The Gaunt Warden");
+  });
+
+  // --- M2 C3: correction semantics — player word cleans the record ----------
+
+  /** Seed a catalog entity WITH its v1 version row, as the creation path would. */
+  async function seedEntityWithV1(row: {
+    name: string;
+    entityType: string;
+    block: string;
+    turnId?: number;
+  }): Promise<typeof schema.entities.$inferSelect> {
+    if (!db) throw new Error("unreachable");
+    const turnId = row.turnId ?? 0;
+    const [ent] = await db
+      .insert(schema.entities)
+      .values({
+        campaignId,
+        name: row.name,
+        entityType: row.entityType,
+        block: row.block,
+        turnId,
+        provenance: "sz_compiler",
+        confidence: 1,
+      })
+      .returning();
+    if (!ent) throw new Error("seed entity failed");
+    await db.insert(schema.entityVersions).values({
+      entityId: ent.id,
+      version: 1,
+      block: row.block,
+      turnId,
+      provenance: "sz_compiler",
+      confidence: 1,
+    });
+    return ent;
+  }
+
+  it("correction (C3 acceptance): 'died of fever, not the plague' leaves ONE cause of death, v1+v2 trail", async () => {
+    if (!db) throw new Error("unreachable");
+    const ent = await seedEntityWithV1({
+      name: "Lady Marest",
+      entityType: "npc",
+      block: "A noblewoman of the western march.\n- She died of the plague during the long winter.",
+    });
+    armExtractor([
+      {
+        kind: "cast_fact",
+        entity_name: "Lady Marest",
+        content: "Lady Marest died of fever during the long winter.",
+        posture: "accept",
+        corrects_existing: true,
+        supersedes: "She died of the plague during the long winter.",
+      },
+    ]);
+    armRevise("A noblewoman of the western march.\n- She died of fever during the long winter.");
+
+    const res = await ingestAssertion(
+      db,
+      campaignId,
+      20,
+      "actually she died of fever, not the plague",
+      { profileIds: [] },
+    );
+
+    expect(res.writes.some((w) => w.kind === "entity_revised")).toBe(true);
+    expect(res.writes.some((w) => w.kind === "entity_enriched")).toBe(false);
+
+    const [row] = await db.select().from(schema.entities).where(eq(schema.entities.id, ent.id));
+    // Exactly one cause of death survives: fever in, plague gone.
+    expect(row?.block).toContain("fever");
+    expect(row?.block).not.toContain("plague");
+    // The untouched line survives verbatim.
+    expect(row?.block).toContain("A noblewoman of the western march.");
+
+    // Version trail: original v1 + revised v2 (record obeyed, prior state kept).
+    const versions = await db
+      .select()
+      .from(schema.entityVersions)
+      .where(eq(schema.entityVersions.entityId, ent.id))
+      .orderBy(schema.entityVersions.version);
+    expect(versions.map((v) => v.version)).toEqual([1, 2]);
+    expect(versions[0]?.block).toContain("plague"); // history preserves the error
+    expect(versions[1]?.block).toContain("fever");
+    expect(versions[1]?.turnId).toBe(20);
+    expect(versions[1]?.provenance).toBe("player_assertion");
+  });
+
+  it("correction: a multi-line block keeps every non-target line verbatim", async () => {
+    if (!db) throw new Error("unreachable");
+    const block = [
+      "- She was born in the coastal city of Vael.",
+      "- She trained under the swordmaster Coran.",
+      "- She died of the plague during the long winter.",
+      "- Her blade passed to her daughter.",
+    ].join("\n");
+    const ent = await seedEntityWithV1({ name: "Sera Voss", entityType: "npc", block });
+    armExtractor([
+      {
+        kind: "cast_fact",
+        entity_name: "Sera Voss",
+        content: "Sera Voss died of fever during the long winter.",
+        posture: "accept",
+        corrects_existing: true,
+        supersedes: "She died of the plague during the long winter.",
+      },
+    ]);
+    armRevise(
+      [
+        "- She was born in the coastal city of Vael.",
+        "- She trained under the swordmaster Coran.",
+        "- She died of fever during the long winter.",
+        "- Her blade passed to her daughter.",
+      ].join("\n"),
+    );
+
+    const res = await ingestAssertion(db, campaignId, 21, "no, it was fever", { profileIds: [] });
+    expect(res.writes.some((w) => w.kind === "entity_revised")).toBe(true);
+
+    const [row] = await db.select().from(schema.entities).where(eq(schema.entities.id, ent.id));
+    // Full lines survive verbatim (assert whole lines, not substrings).
+    expect(row?.block).toContain("- She was born in the coastal city of Vael.");
+    expect(row?.block).toContain("- She trained under the swordmaster Coran.");
+    expect(row?.block).toContain("- Her blade passed to her daughter.");
+    expect(row?.block).toContain("- She died of fever during the long winter.");
+    expect(row?.block).not.toContain("plague");
+  });
+
+  it("correction: a gutted revision is rejected → falls back to append with a flag", async () => {
+    if (!db) throw new Error("unreachable");
+    const block = [
+      "- She was born in the coastal city of Vael.",
+      "- She trained under the swordmaster Coran.",
+      "- She died of the plague during the long winter.",
+      "- Her blade passed to her daughter.",
+    ].join("\n");
+    const ent = await seedEntityWithV1({ name: "Mara Vane", entityType: "npc", block });
+    armExtractor([
+      {
+        kind: "cast_fact",
+        entity_name: "Mara Vane",
+        content: "Mara Vane died of fever during the long winter.",
+        posture: "accept",
+        corrects_existing: true,
+        supersedes: "She died of the plague during the long winter.",
+      },
+    ]);
+    // The revision guts the block (loses every non-target line) → sanity gate rejects.
+    armRevise("- She died of fever.");
+
+    const res = await ingestAssertion(db, campaignId, 22, "actually fever", { profileIds: [] });
+
+    // No clean revision: the fact fell back to append.
+    expect(res.writes.some((w) => w.kind === "entity_revised")).toBe(false);
+    expect(res.writes.some((w) => w.kind === "entity_enriched")).toBe(true);
+    expect(res.flags.some((f) => /appended instead/.test(f))).toBe(true);
+
+    const [row] = await db.select().from(schema.entities).where(eq(schema.entities.id, ent.id));
+    // The fact is never lost — appended as a new line; the original survives.
+    expect(row?.block).toContain("Mara Vane died of fever during the long winter.");
+    expect(row?.block).toContain("plague"); // append doesn't destroy prior material
+  });
+
+  it("correction: a generic supersedes strips protection from ONE line only (audit #1)", async () => {
+    if (!db) throw new Error("unreachable");
+    // "She" matches three of four lines — only the FIRST match loses gate
+    // protection; a revision gutting the others must still be rejected.
+    const block = [
+      "- She was born in the coastal city of Vael.",
+      "- She trained under the swordmaster Coran.",
+      "- She died of the plague during the long winter.",
+      "- Her blade passed to her daughter.",
+    ].join("\n");
+    await seedEntityWithV1({ name: "Mara Vane", entityType: "npc", block });
+    armExtractor([
+      {
+        kind: "cast_fact",
+        entity_name: "Mara Vane",
+        content: "Mara Vane died of fever.",
+        posture: "accept",
+        corrects_existing: true,
+        supersedes: "She",
+      },
+    ]);
+    armRevise("- She died of fever.");
+
+    const res = await ingestAssertion(db, campaignId, 23, "actually fever", { profileIds: [] });
+    expect(res.writes.some((w) => w.kind === "entity_revised")).toBe(false);
+    expect(res.flags.some((f) => /appended instead/.test(f))).toBe(true);
+  });
+
+  it("correction: one correction retires at most ONE critical fact (audit #2)", async () => {
+    if (!db) throw new Error("unreachable");
+    await db.insert(schema.criticalFacts).values([
+      {
+        campaignId,
+        content: "The queen died of the plague.",
+        category: "world_state",
+        turnId: 1,
+        provenance: "sz_fact",
+        confidence: 1,
+      },
+      {
+        campaignId,
+        content: "The queen rules from Aldermoor.",
+        category: "world_state",
+        turnId: 1,
+        provenance: "sz_fact",
+        confidence: 1,
+      },
+    ]);
+    armExtractor([
+      {
+        kind: "world_fact",
+        content: "The queen died of fever.",
+        posture: "accept",
+        corrects_existing: true,
+        supersedes: "the queen",
+      },
+    ]);
+
+    const res = await ingestAssertion(db, campaignId, 24, "actually the queen died of fever", {
+      profileIds: [],
+    });
+    expect(res.writes.filter((w) => w.kind === "critical_fact_replaced")).toHaveLength(1);
+    const live = await db
+      .select()
+      .from(schema.criticalFacts)
+      .where(and(eq(schema.criticalFacts.campaignId, campaignId)));
+    const tombstoned = live.filter((r) => r.tombstonedAt);
+    expect(tombstoned).toHaveLength(1);
+    // The unrelated critical fact survives untombstoned.
+    expect(
+      live.some((r) => !r.tombstonedAt && r.content === "The queen rules from Aldermoor."),
+    ).toBe(true);
+  });
+
+  it("correction: corrects_existing=false on an enrich still appends — no judgment call", async () => {
+    if (!db) throw new Error("unreachable");
+    const ent = await seedEntityWithV1({
+      name: "The Ashen Circle",
+      entityType: "faction",
+      block: "A cabal of exiled mages.",
+    });
+    armExtractor([
+      {
+        kind: "faction",
+        entity_name: "The Ashen Circle",
+        content: "The Ashen Circle now controls the northern passes.",
+        posture: "accept",
+        // corrects_existing omitted → a plain enrich.
+      },
+    ]);
+    const res = await ingestAssertion(db, campaignId, 23, "they hold the passes now", {
+      profileIds: [],
+    });
+
+    expect(res.writes.some((w) => w.kind === "entity_enriched")).toBe(true);
+    expect(res.writes.some((w) => w.kind === "entity_revised")).toBe(false);
+    expect(mockJudgment).not.toHaveBeenCalled();
+
+    const [row] = await db.select().from(schema.entities).where(eq(schema.entities.id, ent.id));
+    expect(row?.block).toContain("A cabal of exiled mages.");
+    expect(row?.block).toContain("controls the northern passes");
+  });
+
+  it("correction: supersedes an established critical fact → tombstone + replace with envelope", async () => {
+    if (!db) throw new Error("unreachable");
+    const [cf] = await db
+      .insert(schema.criticalFacts)
+      .values({
+        campaignId,
+        content: "The queen died of the plague.",
+        category: "sz_fact",
+        turnId: 0,
+        provenance: "player_assertion",
+        confidence: 1,
+      })
+      .returning();
+    if (!cf) throw new Error("critical fact seed failed");
+
+    armExtractor([
+      {
+        kind: "world_fact",
+        content: "The queen died of fever, not the plague.",
+        posture: "accept",
+        corrects_existing: true,
+        supersedes: "The queen died of the plague.",
+      },
+    ]);
+    const res = await ingestAssertion(db, campaignId, 24, "the queen died of fever, not plague", {
+      profileIds: [],
+    });
+
+    expect(res.writes.some((w) => w.kind === "critical_fact_replaced")).toBe(true);
+
+    // Old row tombstoned (never deleted).
+    const [old] = await db
+      .select()
+      .from(schema.criticalFacts)
+      .where(eq(schema.criticalFacts.id, cf.id));
+    expect(old?.tombstonedAt).not.toBeNull();
+
+    // Replacement present, live, category inherited, envelope carried.
+    const live = await db
+      .select()
+      .from(schema.criticalFacts)
+      .where(
+        and(
+          eq(schema.criticalFacts.campaignId, campaignId),
+          isNull(schema.criticalFacts.tombstonedAt),
+        ),
+      );
+    expect(live).toHaveLength(1);
+    const repl = live[0];
+    expect(repl?.content).toContain("fever");
+    expect(repl?.content).not.toBe(old?.content);
+    expect(repl?.category).toBe("sz_fact"); // inherited from the retired row
+    expect(repl?.turnId).toBe(24);
+    expect(repl?.provenance).toBe("player_assertion");
+    expect(repl?.confidence).toBe(1);
+  });
+
+  it("correction: the revise judgment call carries campaignId + turnNumber (metering)", async () => {
+    if (!db) throw new Error("unreachable");
+    await seedEntityWithV1({
+      name: "Captain Rho",
+      entityType: "npc",
+      block: "- He fell at the siege of Duncairn.",
+    });
+    armExtractor([
+      {
+        kind: "cast_fact",
+        entity_name: "Captain Rho",
+        content: "Captain Rho survived the siege of Duncairn.",
+        posture: "accept",
+        corrects_existing: true,
+        supersedes: "He fell at the siege of Duncairn.",
+      },
+    ]);
+    armRevise("- He survived the siege of Duncairn.");
+
+    await ingestAssertion(db, campaignId, 25, "no, he lived", { profileIds: [] });
+
+    const call = mockJudgment.mock.calls.find(
+      (c) => (c[1] as { name?: string })?.name === "block_revise",
+    );
+    expect(call).toBeDefined();
+    const opts = call?.[1] as { campaignId?: string; turnNumber?: number };
+    expect(opts.campaignId).toBe(campaignId);
+    expect(opts.turnNumber).toBe(25);
   });
 });

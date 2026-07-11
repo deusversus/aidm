@@ -14,7 +14,7 @@ import {
   MERGE_CANDIDATE_MAX_DISTANCE,
   pairLikelySame,
 } from "@/lib/entity/janitor";
-import { callProbe } from "@/lib/llm/calls";
+import { callJudgment, callProbe } from "@/lib/llm/calls";
 import { DEV_TIER_SELECTION, TierSelection } from "@/lib/llm/tiers";
 import { cosineSimilarity, embedTexts } from "@/lib/llm/voyage";
 import { and, eq, inArray, sql } from "drizzle-orm";
@@ -46,8 +46,29 @@ const CANON_BLOCK_CHARS = 600;
 /** Title + content-head window scanned for the entity name when confirming a canon link. */
 const CANON_HEAD_CHARS = 240;
 
+/**
+ * Normalized-containment match (§5.4 correction semantics, M2 C3): lowercase +
+ * collapse whitespace, then test either-direction substring. Conservative by
+ * design — no fuzzy scoring — this is how a player correction binds to the
+ * exact dossier line or critical fact it retires. Empty operands never match.
+ */
+const normalizeForMatch = (s: string): string => s.toLowerCase().replace(/\s+/g, " ").trim();
+function normalizedContains(a: string, b: string): boolean {
+  const na = normalizeForMatch(a);
+  const nb = normalizeForMatch(b);
+  return na.length > 0 && nb.length > 0 && (na.includes(nb) || nb.includes(na));
+}
+
 export interface IngestedWrite {
-  kind: "entity_created" | "entity_enriched" | "semantic_fact" | "critical_fact";
+  kind:
+    | "entity_created"
+    | "entity_enriched"
+    /** §5.4 correction (M2 C3): the living block was REVISED, not appended — the record obeyed. */
+    | "entity_revised"
+    | "semantic_fact"
+    | "critical_fact"
+    /** §5.4 correction (M2 C3): a critical fact was tombstoned and replaced by player word. */
+    | "critical_fact_replaced";
   id: string;
   summary: string;
 }
@@ -87,6 +108,23 @@ const ExtractedFact = z.object({
    * into the minted row's state.
    */
   related_to_entity: nullableOptionalString,
+  /**
+   * §5.4 correction semantics (M2 C3): true when this fact CORRECTS
+   * established material — the player is retiring something wrong, not
+   * adding something new ("actually, she died of fever, not the plague").
+   * An entity-bound correction routes the enrich path through a revise
+   * judgment (full block in, clean block out) instead of append; a
+   * correction matching a critical fact tombstones-and-replaces it.
+   * Deliberate correction is PLAYER AUTHORITY — never clarify it away;
+   * clarify remains only for ACCIDENTAL-looking direct contradictions.
+   */
+  corrects_existing: z.preprocess((v) => (v === null ? undefined : v), z.boolean().default(false)),
+  /**
+   * The verbatim established text this correction retires, when the
+   * extractor can quote it (a dossier block line or a critical fact).
+   * Optional — the revise judgment works from the full block regardless.
+   */
+  supersedes: nullableOptionalString,
 });
 
 export const IngestionExtraction = z.object({ facts: z.array(ExtractedFact).default([]) });
@@ -117,12 +155,25 @@ export const EXTRACTOR_SYSTEM = [
   "live THREAD when the assertion extends one: reuse that thread's exact name",
   "rather than opening a parallel thread.",
   "",
+  "CORRECTION (§5.4, player authority — the highest law): when the player",
+  "DELIBERATELY retires established material — 'actually…', 'no — it was…',",
+  "'she died of fever, not the plague', or any explicit overwrite of something",
+  "the dossier or critical facts already assert — that is accept WITH",
+  "corrects_existing=true. Quote the exact established text being retired in",
+  "supersedes (the dossier block line or the critical fact) whenever you can see",
+  "it. Reserve corrects_existing for genuine retirement of something now WRONG —",
+  "ordinary new detail that merely adds to the record is a plain accept, not a",
+  "correction. A deliberate correction is the player rewriting canon; it is NEVER",
+  "clarified away.",
+  "",
   "POSTURE is the editor's stance (§5.4):",
   "- accept (DEFAULT, the overwhelming majority): the player authored canon.",
   "  Take it as true. Player words outrank the engine's inference.",
   "- clarify: ONLY for a genuine LOCAL PHYSICAL ambiguity (which of two",
-  "  established places did they mean?) or a DIRECT contradiction of an",
-  "  established critical fact. Set posture_reason to the SINGLE plain",
+  "  established places did they mean?) or an ACCIDENTAL-looking direct",
+  "  contradiction of an established critical fact (the player seems not to",
+  "  realize they've crossed canon). A DELIBERATE correction is never clarified",
+  "  — it is accept + corrects_existing. Set posture_reason to the SINGLE plain",
   "  question to ask the player. Nothing is written for a clarify fact — use",
   "  it sparingly; do not clarify mere novelty.",
   "- flag: the fact is accepted AND written, but carries a non-blocking craft",
@@ -133,6 +184,119 @@ export const EXTRACTOR_SYSTEM = [
   "",
   "When in doubt, accept. There is no REJECT.",
 ].join(" ");
+
+const RevisedBlock = z.object({ revised_block: z.string() });
+
+export const REVISE_SYSTEM = [
+  "You are the record-keeper for a collaborative story engine. A player has",
+  "CORRECTED established canon. Their word is PLAYER AUTHORITY (confidence 1) and",
+  "the living dossier block must OBEY it — the record changes, it does not merely",
+  "acquire a contradiction beside the error.",
+  "",
+  "Return the block rewritten so that:",
+  "- the material the correction contradicts is RETIRED — gone, not annotated;",
+  "  leaving the wrong fact next to the right one is a FAILURE;",
+  "- the corrected fact is integrated exactly WHERE the retired material stood,",
+  "  in the block's own voice;",
+  "- EVERY other line survives VERBATIM — same wording, same order. Do not",
+  "  reword, reorder, summarize, condense, or add anything the correction did",
+  "  not assert.",
+  "",
+  "You are not an editor improving prose; you are the record obeying one",
+  "correction and changing nothing else. When a specific line is named as the one",
+  "being retired, retire exactly that line and leave the rest untouched.",
+].join(" ");
+
+/**
+ * §5.4 correction semantics (M2 C3): the revise judgment. A corrects_existing
+ * fact that resolves to a cataloged entity routes here instead of the
+ * dedup-append: the FULL current block plus the correction go in, a clean
+ * block comes out. Conservative by contract — change ONLY what the correction
+ * touches; every non-target line survives verbatim (the acceptance test
+ * asserts it). Judgment tier; the caller writes the version row.
+ *
+ * Code disposes: the output is sanity-gated before it is trusted — an empty
+ * block, or one that fails to preserve at least half of the original's
+ * non-target lines verbatim, is rejected (throw), and the caller falls back to
+ * a plain append so the player's fact is never lost.
+ */
+export async function reviseBlock(
+  selection: TierSelection,
+  args: {
+    campaignId: string;
+    turnNumber: number;
+    entityName: string;
+    currentBlock: string;
+    correction: string;
+    /** The verbatim text being retired, when the extractor quoted it. */
+    supersedes?: string;
+  },
+): Promise<{ revisedBlock: string }> {
+  const supersedes = args.supersedes?.trim();
+  const parts = [
+    `ENTITY: ${args.entityName}`,
+    "",
+    "CURRENT BLOCK (verbatim):",
+    args.currentBlock,
+    "",
+  ];
+  if (supersedes) {
+    parts.push(
+      `THE LINE BEING RETIRED (retire exactly this; the correction takes its place):\n${supersedes}`,
+      "",
+    );
+  }
+  parts.push(
+    `THE PLAYER'S CORRECTION (player authority, confidence 1):\n${args.correction}`,
+    "",
+    "Return the full revised block: retire only what the correction contradicts; keep every other line verbatim, in the same order.",
+  );
+
+  const { revised_block } = await callJudgment(selection, {
+    name: "block_revise",
+    schema: RevisedBlock,
+    campaignId: args.campaignId,
+    turnNumber: args.turnNumber,
+    system: REVISE_SYSTEM,
+    prompt: parts.join("\n"),
+    // Blocks run < 2k chars; 2k tokens is generous headroom for a full rewrite.
+    maxTokens: 2_000,
+  });
+
+  const revised = revised_block.trim();
+  if (!revised || revised.length < 10) {
+    throw new Error("reviseBlock: model returned an empty or degenerate block");
+  }
+  // Gross-addition cap (audit #4): the gate below guards deletion, not
+  // addition — this blocks wholesale hallucination without policing wording.
+  const grossCeiling = args.currentBlock.length + args.correction.length * 2 + 200;
+  if (revised.length > grossCeiling) {
+    throw new Error(
+      `reviseBlock: sanity gate — revision grew ${revised.length} chars vs ceiling ${grossCeiling}`,
+    );
+  }
+
+  // Non-target lines = the original block's lines minus AT MOST ONE line the
+  // correction retires (a correction retires ONE line by contract — a generic
+  // supersedes matching many lines must not strip them all of protection,
+  // audit #1); at least half must survive VERBATIM or the rewrite is a gutting.
+  const originalLines = args.currentBlock
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0);
+  const targetIndex = supersedes
+    ? originalLines.findIndex((l) => normalizedContains(l, supersedes))
+    : -1;
+  const nonTarget = originalLines.filter((_, i) => i !== targetIndex);
+  const survivors = nonTarget.filter((l) => revised.includes(l)).length;
+  if (nonTarget.length > 0 && survivors < nonTarget.length / 2) {
+    throw new Error(
+      `reviseBlock: sanity gate — only ${survivors}/${nonTarget.length} non-target lines survived verbatim`,
+    );
+  }
+
+  return { revisedBlock: revised };
+}
 
 /** Total catalog entities rendered into the dossier before truncation (§5.4 C2). */
 const DOSSIER_ENTITY_CAP = 30;
@@ -231,7 +395,7 @@ export function buildExtractorPrompt(args: {
 }): string {
   return [
     args.criticalFacts.length > 0
-      ? `ESTABLISHED CRITICAL FACTS (a direct contradiction is the only reason to clarify):\n${args.criticalFacts.map((c) => `- ${c}`).join("\n")}`
+      ? `ESTABLISHED CRITICAL FACTS (an ACCIDENTAL contradiction is a reason to clarify; a DELIBERATE correction of one of these is accept + corrects_existing, quoting it in supersedes):\n${args.criticalFacts.map((c) => `- ${c}`).join("\n")}`
       : "ESTABLISHED CRITICAL FACTS: (none yet)",
     renderDossier(args.entityRows, args.arcLine, args.turnNumber),
     "",
@@ -301,7 +465,11 @@ export async function ingestAssertion(
   // --- Context: the editor sees the critical facts + the existing catalog ---
   const [criticalRows, entityRows] = await Promise.all([
     db
-      .select({ content: criticalFacts.content })
+      .select({
+        id: criticalFacts.id,
+        content: criticalFacts.content,
+        category: criticalFacts.category,
+      })
       .from(criticalFacts)
       .where(and(eq(criticalFacts.campaignId, campaignId), notTombstoned(criticalFacts))),
     db
@@ -336,6 +504,9 @@ export async function ingestAssertion(
   const writes: IngestedWrite[] = [];
   const flags: string[] = [];
   const clarifyQuestions: string[] = [];
+  // §5.4 correction (M2 C3): critical facts already tombstoned-and-replaced this
+  // assertion, so a second fact can't double-retire the same row.
+  const tombstonedCriticalIds = new Set<string>();
 
   // CLARIFY writes NOTHING (§5.4): peel those off first.
   const writable = extraction.facts.filter((f) => {
@@ -466,15 +637,21 @@ export async function ingestAssertion(
     return verdict.same && verdict.confidence >= MERGE_AUTO_CONFIDENCE ? best.ref : undefined;
   };
 
+  // The entity's next version number — every block mutation (enrich or revise)
+  // stacks a new row so a rewind can restore any prior state.
+  const nextVersion = async (entityId: string): Promise<number> => {
+    const [{ maxVersion } = { maxVersion: null }] = await db
+      .select({ maxVersion: sql<number | null>`max(${entityVersions.version})` })
+      .from(entityVersions)
+      .where(eq(entityVersions.entityId, entityId));
+    return (maxVersion ? Number(maxVersion) : 0) + 1;
+  };
+
   // Enrich a resolved catalog entity (append + version row) — shared by the
   // deterministic-match path and the semantic mint-guard path.
   const enrichExisting = async (target: EntityRef, content: string): Promise<void> => {
     const newBlock = target.block ? `${target.block}\n- ${content}` : content;
-    const [{ maxVersion } = { maxVersion: null }] = await db
-      .select({ maxVersion: sql<number | null>`max(${entityVersions.version})` })
-      .from(entityVersions)
-      .where(eq(entityVersions.entityId, target.id));
-    const version = (maxVersion ? Number(maxVersion) : 0) + 1;
+    const version = await nextVersion(target.id);
     await db.update(entities).set({ block: newBlock }).where(eq(entities.id, target.id));
     await db
       .insert(entityVersions)
@@ -485,6 +662,45 @@ export async function ingestAssertion(
       id: target.id,
       summary: `Enriched ${target.entityType} "${target.name}"`,
     });
+  };
+
+  // §5.4 correction (M2 C3): a corrects_existing fact rewrites the living block
+  // instead of appending — the record OBEYS the player's word, and the version
+  // row preserves the prior state. Returns false on ANY failure (revise throw,
+  // sanity rejection, corrective-retry exhaustion) so the caller falls back to
+  // a plain append; the fact is never lost.
+  const reviseExisting = async (
+    target: EntityRef,
+    fact: (typeof writable)[number],
+  ): Promise<boolean> => {
+    try {
+      const { revisedBlock } = await reviseBlock(selection, {
+        campaignId,
+        turnNumber,
+        entityName: target.name,
+        currentBlock: target.block,
+        correction: fact.content,
+        ...(fact.supersedes?.trim() ? { supersedes: fact.supersedes.trim() } : {}),
+      });
+      const version = await nextVersion(target.id);
+      await db.update(entities).set({ block: revisedBlock }).where(eq(entities.id, target.id));
+      await db
+        .insert(entityVersions)
+        .values({ entityId: target.id, version, block: revisedBlock, ...envelope });
+      target.block = revisedBlock;
+      const head = revisedBlock.replace(/\s+/g, " ").trim().slice(0, 80);
+      writes.push({
+        kind: "entity_revised",
+        id: target.id,
+        summary: `Corrected ${target.entityType} "${target.name}": ${head}`,
+      });
+      return true;
+    } catch (err) {
+      console.warn(
+        `[ingestion] reviseBlock failed for "${target.name}" (turn ${turnNumber}): ${err}`,
+      );
+      return false;
+    }
   };
 
   // Semantic-layer embeddings for every writable fact (§5.4 step 3), batched.
@@ -511,7 +727,20 @@ export async function ingestAssertion(
         // this assertion resolve directly (no repeat probe).
         const key = identityKey(name);
         if (key && !catalog.has(key)) catalog.set(key, existing);
-        await enrichExisting(existing, fact.content);
+        // §5.4 correction: a corrects_existing fact rewrites the living block
+        // (the record obeys); a failed revision falls back to append so the
+        // fact is never lost, with a flag for the Director to reconcile.
+        if (fact.corrects_existing) {
+          const revised = await reviseExisting(existing, fact);
+          if (!revised) {
+            await enrichExisting(existing, fact.content);
+            flags.push(
+              "A player correction could not be applied cleanly — appended instead; the Director should reconcile.",
+            );
+          }
+        } else {
+          await enrichExisting(existing, fact.content);
+        }
       } else {
         // Unmatched named entity → resolve against canon, then mint.
         const nk = identityKey(name);
@@ -565,6 +794,38 @@ export async function ingestAssertion(
           id: created.id,
           summary: `Created ${entityType} "${name}"${resolved ? ` (linked to canon: ${resolved.profileId})` : ""}`,
         });
+      }
+    }
+
+    // §5.4 critical-fact correction (M2 C3): a corrects_existing fact whose
+    // supersedes (or, absent that, its content) matches an established critical
+    // fact tombstones that row and inserts the replacement — the substrate's own
+    // idiom (never a silent mutation), and independent of the entity path: a
+    // single correction can hit BOTH an entity block and a critical fact.
+    // ONE correction retires ONE critical fact (audit #2: a generic needle must
+    // not sweep unrelated rows) — first un-retired match, deterministic order.
+    if (fact.corrects_existing) {
+      const needle = fact.supersedes?.trim() || fact.content;
+      const cf = criticalRows.find(
+        (row) => !tombstonedCriticalIds.has(row.id) && normalizedContains(row.content, needle),
+      );
+      if (cf) {
+        tombstonedCriticalIds.add(cf.id);
+        await db
+          .update(criticalFacts)
+          .set({ tombstonedAt: new Date() })
+          .where(eq(criticalFacts.id, cf.id));
+        const [replacement] = await db
+          .insert(criticalFacts)
+          .values({ campaignId, content: fact.content, category: cf.category, ...envelope })
+          .returning({ id: criticalFacts.id });
+        if (replacement) {
+          writes.push({
+            kind: "critical_fact_replaced",
+            id: replacement.id,
+            summary: `Replaced critical fact: ${fact.content.slice(0, 80)}`,
+          });
+        }
       }
     }
 
