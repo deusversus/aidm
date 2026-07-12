@@ -365,6 +365,59 @@ export async function fetchCanon(
 
 // --- Entity cards, callbacks, hard core --------------------------------------
 
+/** Latest interiority beat clipped into the card's inner-life line (§7.5). */
+const INTERIORITY_LATEST_CHARS = 100;
+
+interface EntityCardRow {
+  name: string;
+  entityType: string;
+  block: string;
+  state: unknown;
+}
+
+/** The most recent turn-keyed relationships entry (§7.5) — highest numeric turn key. */
+function latestRelationship(rel: unknown): string | undefined {
+  if (!rel || typeof rel !== "object") return undefined;
+  const entries = Object.entries(rel as Record<string, unknown>)
+    .filter((e): e is [string, string] => typeof e[1] === "string")
+    .map(([k, v]) => [Number(k), v] as const)
+    .filter(([k]) => Number.isFinite(k));
+  if (entries.length === 0) return undefined;
+  entries.sort((a, b) => a[0] - b[0]);
+  return entries[entries.length - 1]?.[1];
+}
+
+/**
+ * Render one present-cast card (§6.5 base line) plus the M2 C8 depth lines the
+ * KA reads before writing the scene: a `voice:` line when a canon-stamped voice
+ * card rides state (§4.7 speaking-cast fingerprint), and an `interiority:` line
+ * once inner life has accumulated (§7.5 scar tissue — who has beats, and the
+ * latest one). Zero-noise by construction: a texture NPC with neither renders
+ * exactly the base line M1 shipped, so per-card growth stays bounded (the voice
+ * card is clipped ~200 at stamp time; the latest beat clips here).
+ */
+export function renderEntityCard(row: EntityCardRow): string {
+  const base = `${row.name} (${row.entityType}): ${row.block}`;
+  const state =
+    row.state && typeof row.state === "object" ? (row.state as Record<string, unknown>) : {};
+  const lines = [base];
+
+  const voiceCard = typeof state.voice_card === "string" ? state.voice_card.trim() : "";
+  if (voiceCard) lines.push(`  voice: ${voiceCard}`);
+
+  const beats = typeof state.interiorityEvents === "number" ? state.interiorityEvents : 0;
+  if (beats > 0) {
+    const latest = latestRelationship(state.relationships);
+    const clipped =
+      latest && latest.length > INTERIORITY_LATEST_CHARS
+        ? `${latest.slice(0, INTERIORITY_LATEST_CHARS).trimEnd()}…`
+        : latest;
+    const suffix = clipped ? `; latest: ${clipped}` : "";
+    lines.push(`  interiority: ${beats} ${beats === 1 ? "beat" : "beats"}${suffix}`);
+  }
+  return lines.join("\n");
+}
+
 /** Catalog entities named in the input (thin M1 presence detection). */
 export async function fetchEntityCards(
   db: Db,
@@ -373,14 +426,19 @@ export async function fetchEntityCards(
   cap = 4,
 ): Promise<string[]> {
   const rows = await db
-    .select({ name: entities.name, block: entities.block, entityType: entities.entityType })
+    .select({
+      name: entities.name,
+      block: entities.block,
+      entityType: entities.entityType,
+      state: entities.state,
+    })
     .from(entities)
     .where(and(eq(entities.campaignId, campaignId), notTombstoned(entities)));
   const input = playerInput.toLowerCase();
   return rows
     .filter((r) => input.includes(r.name.toLowerCase()))
     .slice(0, cap)
-    .map((r) => `${r.name} (${r.entityType}): ${r.block}`);
+    .map(renderEntityCard);
 }
 
 /**

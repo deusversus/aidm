@@ -6,6 +6,7 @@ import {
   criticalFacts,
   entities,
   entityVersions,
+  profiles,
   semanticMemories,
 } from "@/lib/db/schema";
 import { identityKey, isProtagonistName, marksPlayerProtagonistState } from "@/lib/entity-identity";
@@ -17,6 +18,7 @@ import {
 import { callJudgment, callProbe } from "@/lib/llm/calls";
 import { DEV_TIER_SELECTION, TierSelection } from "@/lib/llm/tiers";
 import { cosineSimilarity, embedTexts } from "@/lib/llm/voyage";
+import { VoiceCard } from "@/lib/types/profile";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 
@@ -45,6 +47,37 @@ export const CANON_MATCH_DISTANCE = 0.45;
 const CANON_BLOCK_CHARS = 600;
 /** Title + content-head window scanned for the entity name when confirming a canon link. */
 const CANON_HEAD_CHARS = 240;
+/** Bounded (~200 char) voice fingerprint stamped onto a canon-linked speaking-cast row. */
+const VOICE_CARD_FINGERPRINT_CHARS = 200;
+
+/** Narrow parse over the profile jsonb — only the voice cards the stamp reads. */
+const ProfileVoiceCards = z.object({
+  ip_mechanics: z.object({ voice_cards: z.array(VoiceCard) }),
+});
+
+/**
+ * §4.7/§6.5 (M2 C8): compress a research voice card into the ~200-char
+ * fingerprint the KA reads on speaking-cast turns — how the character sounds,
+ * not their biography. Stamped into `state.voice_card` when a new NPC links to
+ * canon (below), rendered as a `voice:` line by fetchEntityCards.
+ */
+function voiceCardFingerprint(card: z.infer<typeof VoiceCard>): string {
+  const phrase = card.signature_phrases.find((p) => p.trim().length > 0);
+  const text = [
+    card.speech_patterns,
+    card.dialogue_rhythm,
+    card.emotional_expression.toLowerCase(),
+    phrase ? `e.g. "${phrase}"` : "",
+  ]
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .join("; ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return text.length > VOICE_CARD_FINGERPRINT_CHARS
+    ? `${text.slice(0, VOICE_CARD_FINGERPRINT_CHARS).trimEnd()}…`
+    : text;
+}
 
 /**
  * Normalized-containment match (§5.4 correction semantics, M2 C3): lowercase +
@@ -714,6 +747,36 @@ export async function ingestAssertion(
     }
   };
 
+  // §4.7/§6.5 voice-card stamp (M2 C8): when a speaking-cast entity links to
+  // canon below, the matching profile voice card rides its state so the KA
+  // hears the character. Profiles load once, lazily (only when a canon-linked
+  // NPC actually needs a card), keyed by profile; the match is identityKey
+  // equality against the card's character name (semantic name-matching is out
+  // of scope, same discipline as the deterministic identity tier).
+  let voiceCardsByProfile: Map<string, z.infer<typeof VoiceCard>[]> | undefined;
+  const voiceCardFor = async (
+    profileId: string,
+    entityName: string,
+  ): Promise<string | undefined> => {
+    if (!voiceCardsByProfile) {
+      voiceCardsByProfile = new Map();
+      if (opts.profileIds.length > 0) {
+        const rows = await db
+          .select({ id: profiles.id, profile: profiles.profile })
+          .from(profiles)
+          .where(inArray(profiles.id, opts.profileIds));
+        for (const r of rows) {
+          const parsed = ProfileVoiceCards.safeParse(r.profile);
+          voiceCardsByProfile.set(r.id, parsed.success ? parsed.data.ip_mechanics.voice_cards : []);
+        }
+      }
+    }
+    const key = identityKey(entityName);
+    if (!key) return undefined;
+    const card = voiceCardsByProfile.get(profileId)?.find((c) => identityKey(c.name) === key);
+    return card ? voiceCardFingerprint(card) : undefined;
+  };
+
   // Semantic-layer embeddings for every writable fact (§5.4 step 3), batched.
   const semanticEmbeddings = await embedTexts(
     writable.map((f) => f.content),
@@ -771,14 +834,21 @@ export async function ingestAssertion(
         // text still lives in the block/content.
         const anchorName = fact.related_to_entity?.trim();
         const anchor = anchorName ? lookupEntity(anchorName) : undefined;
-        const relationState = anchor
-          ? {
-              relationships: {
-                [String(turnNumber)]:
-                  `related to ${anchor.name}: ${fact.content.slice(0, 120).trim()}`,
-              },
-            }
-          : undefined;
+        // §4.7/§6.5 (M2 C8): a speaking-cast (npc) row that linked to canon
+        // inherits its profile voice card. Only the canon-link mint carries it —
+        // the SZ compiler's brief admission does not link canon, so this ingest
+        // site is the single writer.
+        const voiceCard =
+          resolved && entityType === "npc"
+            ? await voiceCardFor(resolved.profileId, name)
+            : undefined;
+        const state: Record<string, unknown> = {};
+        if (anchor) {
+          state.relationships = {
+            [String(turnNumber)]: `related to ${anchor.name}: ${fact.content.slice(0, 120).trim()}`,
+          };
+        }
+        if (voiceCard) state.voice_card = voiceCard;
         const [created] = await db
           .insert(entities)
           .values({
@@ -786,7 +856,7 @@ export async function ingestAssertion(
             name,
             entityType,
             block,
-            ...(relationState ? { state: relationState } : {}),
+            ...(Object.keys(state).length > 0 ? { state } : {}),
             ...envelope,
           })
           .returning({ id: entities.id });

@@ -3,6 +3,7 @@ import type { TierSelection } from "@/lib/llm/tiers";
 import type { PacerBeat } from "@/lib/types/conte";
 import {
   ESCALATION_BANDS,
+  PACER_PHASES,
   PHASE_GATES,
   type PacerArcState,
   PacerDirective,
@@ -27,6 +28,50 @@ export const PACER_TIMEBOX_MS = 6_000;
 
 type Strength = "suggestion" | "strong" | "override";
 const STRENGTH_RANK: Record<Strength, number> = { suggestion: 0, strong: 1, override: 2 };
+
+/**
+ * Beat-shape variety (§7.2, §5.3, M2-C8 — the live watch item: both live turns
+ * ran the same shape end to end). The beat_classification is a freeform string,
+ * but the golden fixtures carry it as `<shape>_<flavor>` (`climax_silent_pressure`,
+ * `setup_ritual_grounding`), and the shape prefix draws from the {@link PACER_PHASES}
+ * vocabulary — the only enum the classification is built on. So "share one
+ * classification" means: the last three completed turns all lead with the same
+ * shape token. Detection normalizes to that token (which also catches a rut whose
+ * flavors differ but whose shape is stuck).
+ */
+export function beatShapeToken(classification: string): string {
+  // Live classifications are freeform (the probe's string, no enum) — skip
+  // leading articles so "the reckoning"/"the calm"/"the chase" never read as
+  // one rut on the shared token "the" (C8 audit #3).
+  const words = classification
+    .trim()
+    .toLowerCase()
+    .split(/[_\s-]+/)
+    .filter((w) => !["the", "a", "an"].includes(w));
+  return words[0] || classification.trim().toLowerCase();
+}
+
+/** The shape shared by the last 3 completed beats, or undefined (varied, or < 3). */
+export function repeatedBeatShape(recentBeats: string[]): string | undefined {
+  if (recentBeats.length < 3) return undefined;
+  const shapes = recentBeats.slice(-3).map(beatShapeToken);
+  const first = shapes[0];
+  return first && shapes.every((s) => s === first) ? first : undefined;
+}
+
+/**
+ * Two contrasting shapes from the vocabulary, excluding the rut — walked from
+ * just past the repeated shape in the phase cycle so the picks contrast with it
+ * (`climax` → `falling, resolution`). A non-vocabulary rut falls back to the
+ * cycle's head.
+ */
+export function beatShapeAlternatives(shape: string): [string, string] {
+  const vocab = PACER_PHASES;
+  const idx = vocab.indexOf(shape as (typeof vocab)[number]);
+  const ordered = idx >= 0 ? [...vocab.slice(idx + 1), ...vocab.slice(0, idx)] : [...vocab];
+  const picked = ordered.filter((p) => p !== shape).slice(0, 2);
+  return [picked[0] ?? vocab[0], picked[1] ?? vocab[1]];
+}
 
 export interface PacerResult {
   beat?: PacerBeat;
@@ -208,12 +253,37 @@ export async function runPacer(
     notes.push("no arc state yet — strength held at suggestion");
   }
 
+  // Beat-shape variety (§7.2/§5.3): three same-shape scenes running earns an
+  // ADVISORY nudge on the beat's `avoid` channel (the pacing anti-pattern list
+  // the KA reads in the conte). Independent of arc state and strength — variety
+  // is craft pressure, never the hard core (axiom 3), so it never elevates
+  // strength; it only ever appends to `avoid`.
+  const avoid = [...(directive.avoid ?? [])];
+  const rut = repeatedBeatShape(input.recentBeats);
+  if (rut) {
+    // Vocabulary ruts get contrasting named alternatives; a freeform rut
+    // (the normal live case) gets the honest generic nudge — fake phase-name
+    // alternatives for a scene-shape rut mislead (C8 audit #3).
+    const inVocab = (PACER_PHASES as readonly string[]).includes(rut);
+    if (inVocab) {
+      const [alt1, alt2] = beatShapeAlternatives(rut);
+      avoid.push(
+        `the last three scenes all landed as ${rut} — vary the shape: consider ${alt1} or ${alt2}`,
+      );
+    } else {
+      avoid.push(
+        `the last three scenes all landed the same way (${rut}) — vary the scene's shape this turn`,
+      );
+    }
+    notes.push(`beat-shape variety: three ${rut} scenes running — advised variety`);
+  }
+
   const beat: PacerBeat = {
     beat_classification: directive.beat_classification,
     escalation_target: directive.escalation_target,
     tone: directive.tone,
     must_reference: mustReference,
-    avoid: directive.avoid ?? [],
+    avoid,
     foreshadowing_hint: directive.foreshadowing_hint,
     strength,
   };

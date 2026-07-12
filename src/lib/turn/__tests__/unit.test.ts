@@ -12,7 +12,13 @@ import {
   rawPowerRatio,
   tierBand,
 } from "../power";
-import { CATEGORY_DECAY, DECAY_CURVES, computeHeat, decomposeQueries } from "../retrieval";
+import {
+  CATEGORY_DECAY,
+  DECAY_CURVES,
+  computeHeat,
+  decomposeQueries,
+  renderEntityCard,
+} from "../retrieval";
 import { classifyTier, isChannelInput } from "../triage";
 
 const intent = (over: Partial<IntentOutput>): IntentOutput => ({
@@ -227,6 +233,84 @@ describe("heat economy (§6.4, v3 curves)", () => {
     for (const curve of Object.values(CATEGORY_DECAY)) {
       expect(DECAY_CURVES[curve]).toBeDefined();
     }
+  });
+});
+
+describe("entity card render (§6.5 base + M2 C8 depth lines)", () => {
+  it("a texture NPC with no voice card and no interiority renders exactly the base line", () => {
+    const card = renderEntityCard({
+      name: "Dock Hand",
+      entityType: "npc",
+      block: "A silent figure coiling rope.",
+      state: {},
+    });
+    expect(card).toBe("Dock Hand (npc): A silent figure coiling rope.");
+    expect(card).not.toContain("voice:");
+    expect(card).not.toContain("interiority:");
+  });
+
+  it("a stamped voice card surfaces as a bounded voice: line", () => {
+    const card = renderEntityCard({
+      name: "Vicious",
+      entityType: "npc",
+      block: "[canon:cowboy_bebop] The rival.",
+      state: { voice_card: "clipped, menacing; slow deliberate cadence; restrained" },
+    });
+    expect(card).toContain("Vicious (npc): [canon:cowboy_bebop] The rival.");
+    expect(card).toContain("\n  voice: clipped, menacing; slow deliberate cadence; restrained");
+  });
+
+  it("interiority surfaces beat count + the LATEST relationships entry, clipped", () => {
+    const card = renderEntityCard({
+      name: "Jet",
+      entityType: "npc",
+      block: "The steady hand.",
+      state: {
+        interiorityEvents: 4,
+        // Highest turn key wins regardless of insertion order.
+        relationships: { "2": "trust +1", "9": "quiet resentment after the betrayal", "5": "wary" },
+      },
+    });
+    expect(card).toContain("interiority: 4 beats; latest: quiet resentment after the betrayal");
+  });
+
+  it("beat count with no relationships entry omits the latest clause; singular 'beat'", () => {
+    const card = renderEntityCard({
+      name: "Faye",
+      entityType: "npc",
+      block: "The gambler.",
+      state: { interiorityEvents: 1 },
+    });
+    expect(card).toContain("interiority: 1 beat");
+    expect(card).not.toContain("latest:");
+  });
+
+  it("the latest relationships entry is clipped to ~100 chars", () => {
+    const long = "a".repeat(150);
+    const card = renderEntityCard({
+      name: "Ed",
+      entityType: "npc",
+      block: "The hacker.",
+      state: { interiorityEvents: 2, relationships: { "3": long } },
+    });
+    const line = card.split("\n").find((l) => l.includes("interiority:")) ?? "";
+    expect(line).toContain("…");
+    expect(line.length).toBeLessThan(140);
+  });
+
+  it("voice and interiority lines coexist when both are present", () => {
+    const card = renderEntityCard({
+      name: "Spike",
+      entityType: "npc",
+      block: "The lead.",
+      state: {
+        voice_card: "dry, unhurried; trailing sentences",
+        interiorityEvents: 3,
+        relationships: { "7": "haunted by Julia" },
+      },
+    });
+    expect(card).toContain("\n  voice: dry, unhurried; trailing sentences");
+    expect(card).toContain("\n  interiority: 3 beats; latest: haunted by Julia");
   });
 });
 

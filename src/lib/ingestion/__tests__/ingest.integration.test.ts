@@ -116,6 +116,7 @@ describe.skipIf(!url)("Universal ingestion (real Postgres, scripted extractor)",
     try {
       await db.delete(schema.campaigns).where(eq(schema.campaigns.id, campaignId));
       await db.delete(schema.canonChunks).where(eq(schema.canonChunks.profileId, profileId));
+      await db.delete(schema.profiles).where(eq(schema.profiles.id, profileId));
       await db.delete(schema.players).where(eq(schema.players.id, playerId));
     } finally {
       await pool.end();
@@ -265,6 +266,109 @@ describe.skipIf(!url)("Universal ingestion (real Postgres, scripted extractor)",
     expect(row?.block).toContain("rival bounty crew");
     expect(row?.block).not.toContain("canon:");
     expect(CANON_MATCH_DISTANCE).toBe(0.45);
+  });
+
+  // --- M2 C8: voice-card stamp — a canon-linked speaking-cast row hears itself -
+
+  /** A profile carrying one voice card (for "Vicious"); the narrow parse the
+   *  stamp uses only reads ip_mechanics.voice_cards. */
+  async function seedProfileWithVicious(): Promise<void> {
+    if (!db) throw new Error("unreachable");
+    await db
+      .insert(schema.profiles)
+      .values({
+        id: profileId,
+        title: "Cowboy Bebop",
+        profile: {
+          ip_mechanics: {
+            voice_cards: [
+              {
+                name: "Vicious",
+                speech_patterns: "Clipped, imperative, contemptuous — never wastes a word.",
+                humor_type: "none",
+                signature_phrases: ["I'm the only one who can keep you alive."],
+                dialogue_rhythm: "Long silences, then a single cutting line.",
+                emotional_expression: "Restrained",
+              },
+            ],
+          },
+        },
+      })
+      .onConflictDoNothing();
+  }
+
+  it("voice card (C8): a canon-linked NPC is stamped with the profile's bounded voice fingerprint", async () => {
+    if (!db) throw new Error("unreachable");
+    await seedProfileWithVicious();
+    // Canon chunk naming Vicious; the name embeds to basis(0) = the chunk, so
+    // resolveCanon links (distance 0 < 0.45) and the mint carries the card.
+    await db.insert(schema.canonChunks).values({
+      profileId,
+      pageType: "characters",
+      title: "Vicious",
+      content:
+        "Vicious is a cold, ruthless member of the Red Dragon Syndicate and Spike's former partner turned nemesis.",
+      embedding: basis(0),
+      turnId: 0,
+      provenance: "sz_research",
+      confidence: 1,
+    });
+    armExtractor([
+      {
+        kind: "cast_fact",
+        entity_name: "Vicious",
+        content: "Vicious steps out of the shadows, katana drawn.",
+        posture: "accept",
+      },
+    ]);
+    const res = await ingestAssertion(db, campaignId, 5, "vicious appears", {
+      profileIds: [profileId],
+    });
+    expect(res.writes.some((w) => w.kind === "entity_created")).toBe(true);
+
+    const [row] = await db
+      .select()
+      .from(schema.entities)
+      .where(and(eq(schema.entities.campaignId, campaignId), eq(schema.entities.name, "Vicious")));
+    expect(row?.block).toContain("canon:"); // linked, not invented
+    const state = (row?.state ?? {}) as { voice_card?: string };
+    expect(typeof state.voice_card).toBe("string");
+    expect(state.voice_card).toContain("Clipped, imperative");
+    // Bounded: the fingerprint clips at ~200 chars (+1 for a possible ellipsis).
+    expect((state.voice_card ?? "").length).toBeLessThanOrEqual(201);
+  });
+
+  it("voice card (C8): a canon-linked NPC with no matching card gets no stamp", async () => {
+    if (!db) throw new Error("unreachable");
+    await seedProfileWithVicious();
+    // Julia links to canon but has no voice card in the profile → no stamp.
+    await db.insert(schema.canonChunks).values({
+      profileId,
+      pageType: "characters",
+      title: "Julia",
+      content: "Julia is the woman both Spike and Vicious loved, caught between the two.",
+      embedding: basis(0),
+      turnId: 0,
+      provenance: "sz_research",
+      confidence: 1,
+    });
+    armExtractor([
+      {
+        kind: "cast_fact",
+        entity_name: "Julia",
+        content: "Julia waits on the rooftop in the rain.",
+        posture: "accept",
+      },
+    ]);
+    await ingestAssertion(db, campaignId, 6, "julia waits", { profileIds: [profileId] });
+
+    const [row] = await db
+      .select()
+      .from(schema.entities)
+      .where(and(eq(schema.entities.campaignId, campaignId), eq(schema.entities.name, "Julia")));
+    expect(row?.block).toContain("canon:"); // still a canon link…
+    const state = (row?.state ?? {}) as { voice_card?: string };
+    expect(state.voice_card).toBeUndefined(); // …but no card matched, so no stamp
   });
 
   it("resolver: protagonist placeholder spellings enrich the ONE PC row (§6.5)", async () => {

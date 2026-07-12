@@ -202,6 +202,17 @@ export function renderSettei(input: SetteiInput): Settei {
   for (const line of canonicality.accepted_divergences) {
     hardCore.push(`Accepted divergence (player-blessed): ${line}`);
   }
+  // The control key (§7.5): loss of control is a stake ONLY the player cuts, at
+  // SZ, as a composition choice. When cut, the KA earns a BOUNDED permission —
+  // the declared circumstance, kept brief, framed by the inviolable default.
+  // When NO key exists, NOTHING renders: absolute agency is the standing law,
+  // never a stated rule (§7.5 — no key exists unless the player cuts it).
+  const controlKey = contract.intensity.control_key;
+  if (controlKey) {
+    hardCore.push(
+      `Control key (player-cut, §7.5): in the declared circumstance — ${controlKey.circumstances}${controlKey.notes ? ` (${controlKey.notes})` : ""} — the player character may briefly slip the player's control; narrate that loss of agency, kept short and bounded to exactly this circumstance. Outside it the player's agency is absolute and inviolable; /meta re-opens the dialectic and /override melts the key instantly.`,
+    );
+  }
 
   const identity = [
     "## What this story is",

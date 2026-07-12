@@ -1,4 +1,5 @@
 import type { Suite, SuiteResult } from "../types";
+import { controlKey } from "./control-key";
 import { fingerprintReliability } from "./fingerprint-reliability";
 
 /**
@@ -23,6 +24,8 @@ function scaffold(name: string, gate: string, reason: string): Suite {
 export const scaffolds: Suite[] = [
   // §10.1 — LIVE at C7: the Gauge-v2 reliability meter (the integrator runs it).
   fingerprintReliability,
+  // §7.5 — LIVE at C8: the control key honored in play (the integrator meters it).
+  controlKey,
   scaffold(
     "drift-soak",
     "M2",

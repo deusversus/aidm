@@ -32,8 +32,10 @@ export const BUDGET_ASSUMPTIONS = {
  */
 export const THINKING_ALLOWANCE_TOKENS: Record<TurnTier, number> = {
   douga: 1_000,
-  genga: 5_000,
-  sakuga: 14_000,
+  // Recalibrated from live telemetry 2026-07-11 (C8): genga p95 5296 / max
+  // 7548; sakuga p95 14695 / max 15488 — allowances cover p95 with margin.
+  genga: 6_000,
+  sakuga: 16_000,
 };
 
 /**
@@ -47,8 +49,11 @@ export const THINKING_ALLOWANCE_TOKENS: Record<TurnTier, number> = {
  */
 export const COLD_TURN_CEILING_USD: Record<TurnTier, number> = {
   douga: 0.5,
-  genga: 0.75,
-  sakuga: 1.5,
+  // Re-raised with the C8 allowance bump (model: genga $0.7275, sakuga
+  // $1.455 cold at Fable) — the ~10% regression margin restored (C8 audit
+  // #6: the bump had silently compressed it to 3%).
+  genga: 0.8,
+  sakuga: 1.6,
 };
 
 export interface TurnCostModel {

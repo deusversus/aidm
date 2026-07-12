@@ -7,7 +7,15 @@ import {
   type PacerPhase,
 } from "@/lib/types/direction";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { PACER_TIMEBOX_MS, type PacerInput, runPacer, stallDirective } from "../pacer";
+import {
+  PACER_TIMEBOX_MS,
+  type PacerInput,
+  beatShapeAlternatives,
+  beatShapeToken,
+  repeatedBeatShape,
+  runPacer,
+  stallDirective,
+} from "../pacer";
 
 /**
  * The full Pacer (§7.2, C7): pure clamp logic over v3's play-tested stall
@@ -276,6 +284,112 @@ describe("runPacer — timebox (a slow Pacer never stalls Phase A)", () => {
     expect(res.timedOut).toBe(true);
     expect(res.beat).toBeUndefined();
     expect(res.promoteEffort).toBe(false);
+  });
+});
+
+describe("beat-shape vocabulary helpers (§7.2/§5.3)", () => {
+  it("normalizes a compound classification to its shape prefix", () => {
+    expect(beatShapeToken("climax_silent_pressure")).toBe("climax");
+    expect(beatShapeToken("Setup Ritual Grounding")).toBe("setup");
+    expect(beatShapeToken("investigation")).toBe("investigation");
+  });
+
+  it("leading articles never form a rut token (C8 audit #3)", () => {
+    expect(beatShapeToken("the reckoning")).toBe("reckoning");
+    expect(beatShapeToken("a quiet moment")).toBe("quiet");
+    // Three different "the …" beats are NOT a rut.
+    expect(repeatedBeatShape(["the reckoning", "the calm", "the chase"])).toBeUndefined();
+    // But three genuinely same-shaped freeform beats are.
+    expect(repeatedBeatShape(["the chase begins", "chase through rain", "a chase again"])).toBe(
+      "chase",
+    );
+  });
+
+  it("detects a 3-run only when all three shapes match", () => {
+    expect(repeatedBeatShape(["climax_a", "climax_b", "climax_c"])).toBe("climax");
+    // Flavors differ, shape is stuck — still a rut.
+    expect(repeatedBeatShape(["climax_silent", "climax_ambush", "climax_reveal"])).toBe("climax");
+    expect(repeatedBeatShape(["climax_a", "rising_b", "climax_c"])).toBeUndefined();
+    expect(repeatedBeatShape(["climax_a", "climax_b"])).toBeUndefined();
+  });
+
+  it("offers two vocabulary alternatives, never the repeated shape", () => {
+    const [a, b] = beatShapeAlternatives("climax");
+    expect(a).not.toBe("climax");
+    expect(b).not.toBe("climax");
+    expect(a).not.toBe(b);
+    expect(PACER_PHASES).toContain(a);
+    expect(PACER_PHASES).toContain(b);
+  });
+});
+
+describe("runPacer — beat-shape variety (§7.2/§5.3: the live watch item)", () => {
+  it("three same-shape scenes running → advisory on `avoid` naming two alternatives", async () => {
+    arm({ strength: "suggestion", beat_classification: "climax_reveal", avoid: [] });
+    const res = await runPacer(
+      DEV_TIER_SELECTION,
+      makeInput({
+        arcState: null,
+        recentBeats: ["climax_silent_pressure", "climax_ambush", "climax_reveal"],
+      }),
+    );
+    const advisory = res.beat?.avoid.find((a) => a.includes("vary the shape"));
+    expect(advisory).toBeDefined();
+    expect(advisory).toContain("the last three scenes all landed as climax");
+    expect(advisory).toMatch(/consider \w+ or \w+/);
+    // The rut itself is never offered as an alternative.
+    expect(advisory).not.toMatch(/consider climax|or climax/);
+  });
+
+  it("a freeform (non-vocabulary) rut gets the honest generic nudge, never fake phase alternatives (C8 audit #3)", async () => {
+    arm({ strength: "suggestion", beat_classification: "standoff_tense", avoid: [] });
+    const res = await runPacer(
+      DEV_TIER_SELECTION,
+      makeInput({
+        arcState: null,
+        recentBeats: ["standoff_alley", "standoff_rooftop", "standoff_tense"],
+      }),
+    );
+    const advisory = res.beat?.avoid.find((a) => a.includes("landed the same way"));
+    expect(advisory).toBeDefined();
+    expect(advisory).toContain("(standoff)");
+    // No phase-vocabulary alternatives smuggled in for a shape they can't replace.
+    expect(advisory).not.toMatch(/consider \w+ or \w+/);
+  });
+
+  it("two same + one different → no pressure (the 2-same guard)", async () => {
+    arm({ strength: "suggestion", beat_classification: "rising_probe", avoid: [] });
+    const res = await runPacer(
+      DEV_TIER_SELECTION,
+      makeInput({
+        arcState: null,
+        recentBeats: ["climax_silent", "climax_ambush", "rising_probe"],
+      }),
+    );
+    expect(res.beat?.avoid.some((a) => a.includes("vary the shape"))).toBe(false);
+  });
+
+  it("fewer than three completed beats → no pressure", async () => {
+    arm({ strength: "suggestion", beat_classification: "setup_quiet", avoid: [] });
+    const res = await runPacer(
+      DEV_TIER_SELECTION,
+      makeInput({ arcState: null, recentBeats: ["setup_a", "setup_b"] }),
+    );
+    expect(res.beat?.avoid.some((a) => a.includes("vary the shape"))).toBe(false);
+  });
+
+  it("the variety directive never elevates strength (advisory only, axiom 3)", async () => {
+    // A non-stalling arc that sits at suggestion: the rut must not push it up.
+    arm({ strength: "suggestion", beat_classification: "setup_quiet", avoid: [] });
+    const res = await runPacer(
+      DEV_TIER_SELECTION,
+      makeInput({
+        arcState: makeArc({ phase: "setup", turnsInPhase: 1 }),
+        recentBeats: ["setup_a", "setup_b", "setup_c"],
+      }),
+    );
+    expect(res.beat?.strength).toBe("suggestion");
+    expect(res.beat?.avoid.some((a) => a.includes("vary the shape"))).toBe(true);
   });
 });
 

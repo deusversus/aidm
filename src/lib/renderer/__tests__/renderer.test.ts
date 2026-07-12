@@ -125,6 +125,46 @@ describe("renderSettei (§4.4a)", () => {
   });
 });
 
+describe("the control key in the Settei (§7.5, M2-C8)", () => {
+  const keyed = () =>
+    bebopContract({
+      intensity: {
+        death_physics: "death is real, sudden, and cheap — nobody gets a speech",
+        lethality_posture: "trends toward an end; losses stay lost",
+        hard_lines: [],
+        control_key: {
+          circumstances: "when a bondmate dies in front of him and the bloodrage takes hold",
+        },
+      },
+    });
+
+  it("renders a bounded permission block when the player cut a key", () => {
+    const s = renderSettei({ contract: keyed(), marks: [] });
+    expect(s.text).toContain("Control key");
+    // The declared circumstance, the brief-duration bound, the inviolable frame.
+    expect(s.text).toContain("the bloodrage takes hold");
+    expect(s.text).toContain("briefly slip the player's control");
+    expect(s.text).toContain("/override melts the key");
+    expect(s.charterTokens).toBeGreaterThanOrEqual(SETTEI_TOKEN_TARGET.min);
+    expect(s.charterTokens).toBeLessThanOrEqual(SETTEI_TOKEN_TARGET.max);
+  });
+
+  it("renders NOTHING new when no key exists (absolute agency is the default, not a rule)", () => {
+    // bebopContract's intensity carries no control_key.
+    const s = renderSettei({ contract: bebopContract(), marks: [] });
+    expect(s.text).not.toContain("Control key");
+    expect(s.text).not.toContain("slip the player's control");
+  });
+
+  it("the keyed block is Block-1 freight, never charter budget (budget holds)", () => {
+    const keyless = renderSettei({ contract: bebopContract(), marks: [] });
+    const withKey = renderSettei({ contract: keyed(), marks: [] });
+    // Charter is byte-identical; only the world-rules command freight grew.
+    expect(withKey.charterTokens).toBe(keyless.charterTokens);
+    expect(withKey.tokens).toBeGreaterThan(keyless.tokens);
+  });
+});
+
 describe("renderAmendments (§4.4b)", () => {
   it("renders override pressure, retake direction, and fresh marks inside budget", () => {
     const a = renderAmendments({

@@ -37,7 +37,9 @@ Non-negotiables:
 - THE DIE ALREADY FELL: the storyboard carries the judged outcome and its arithmetic. Narrate THAT outcome — never soften a failure into a win, never tax a success the judgment didn't tax. Failure is part of the story now.
 - RESEARCH, THEN WRITE: you may have research tools this turn (budgeted). Use them BEFORE the prose when the scene touches canon or past detail you are not sure of; never mid-prose. If the budget is spent, write from what you have and keep uncertain specifics out of frame.
 - THE TRAILER: when the prose is complete, call commit_scene exactly once — cast changes (admission is deliberate; most scenes admit no one), decision_point, seed mentions, notable beats. Never mention the tool, the storyboard, or any machinery in the prose.
-- Prose is the ONLY thing the player sees. No headers, no meta, no summaries of what you did.`;
+- Prose is the ONLY thing the player sees. No headers, no meta, no summaries of what you did.
+
+The scene is not finished when the prose ends. It is finished when commit_scene is called. A long scene makes the trailer easy to forget — end the prose, then IMMEDIATELY call commit_scene, every scene, without exception. (Measured 2026-07-11: half of long-form scenes dropped it; the fallback reconstruction is lossier than your own record.)`;
 
 /** Deterministic Block-4 rendering: the conte as the KA's storyboard. */
 export function renderConte(conte: Conte, playerInput: string): string {
