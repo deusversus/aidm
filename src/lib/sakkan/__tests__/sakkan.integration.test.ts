@@ -89,6 +89,31 @@ describe("Sakkan pure helpers", () => {
     expect(sakkanDue(sampled, 18)).toBe(true); // 18 - 10 = 8 ≥ 8
   });
 
+  it("sakkanDue: an open retake shortens the interval to +4 (C7)", () => {
+    // An open note earns a faster re-read: the interval drops from 8 to 4.
+    const noted = DirectionState.parse({
+      sakkan: {
+        last_sample_turn: 10,
+        readings: {},
+        active_notes: [{ axis: "darkness", active: 7, observed: 3, since_turn: 10 }],
+      },
+    });
+    expect(sakkanDue(noted, 13)).toBe(false); // 13 - 10 = 3 < 4
+    expect(sakkanDue(noted, 14)).toBe(true); // 14 - 10 = 4 ≥ 4
+
+    // No open note → the standing 8-turn interval still governs.
+    const noNotes = DirectionState.parse({
+      sakkan: { last_sample_turn: 10, readings: {}, active_notes: [] },
+    });
+    expect(sakkanDue(noNotes, 14)).toBe(false); // 14 - 10 = 4 < 8
+    expect(sakkanDue(noNotes, 18)).toBe(true); // 18 - 10 = 8 ≥ 8
+
+    // sakuga / sessionClose still fire immediately — the shorter interval never
+    // gates them, and never gates them out below it either.
+    expect(sakkanDue(noted, 11, { sakuga: true })).toBe(true);
+    expect(sakkanDue(noted, 11, { sessionClose: true })).toBe(true);
+  });
+
   it("activeSakkanNotes maps to the Amendments SakkanNote shape and drops uncovered axes", () => {
     const state = DirectionState.parse({
       sakkan: {
@@ -260,6 +285,39 @@ describe.skipIf(!url)("Sakkan sample (real Postgres, scripted scorer)", () => {
     st = await readState(campaignId);
     expect(st.sakkan?.readings.darkness?.consecutive_drift).toBe(0);
     expect(st.sakkan?.active_notes).toHaveLength(0);
+  });
+
+  it("axis cap: noted axes survive truncation, cap warns, never throws (C7 audit #1)", async () => {
+    if (!db) throw new Error("unreachable");
+    // 6 rendered + 4 noted (disjoint) = a 10-axis union over the scorer's cap
+    // of 8. Pre-fix this THREW every sample and stranded the notes forever.
+    const noted = ["density", "scope", "optimism", "fidelity"];
+    const campaignId = await makeCampaign({
+      directionState: {
+        settei: settei(["darkness", "comedy", "pacing", "register", "intimacy", "empathy"]),
+        sakkan: {
+          last_sample_turn: 0,
+          readings: {},
+          active_notes: noted.map((axis) => ({
+            axis,
+            active: 7,
+            observed: 3,
+            since_turn: 4,
+          })),
+        },
+      },
+    });
+    await seedProse(campaignId, cleanSix());
+
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    mockScore.mockResolvedValueOnce(noted.map((a) => axisScore(a, 7, 0.9)));
+    const result = await runSakkanSample(db, campaignId, 8);
+    expect(result).not.toBeNull();
+    const scoredAxes = (mockScore.mock.calls[0]?.[1] as { axes: string[] }).axes;
+    expect(scoredAxes).toHaveLength(8);
+    for (const axis of noted) expect(scoredAxes).toContain(axis); // noted lead — expiry needs the read
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("[sakkan] axis cap"));
+    warn.mockRestore();
   });
 
   it("one window is one sample: a re-sample at the same turn no-ops (11c + session close; crash-replay)", async () => {

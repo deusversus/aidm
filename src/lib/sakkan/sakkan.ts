@@ -13,7 +13,7 @@ import type {
 import { type AxisName, COVERED_AXES } from "@/lib/types/grounding";
 import { PremiseContract, effectivePremise } from "@/lib/types/premise";
 import { and, desc, eq } from "drizzle-orm";
-import { scoreAxes } from "./score";
+import { MAX_SCORED_AXES, scoreAxes } from "./score";
 
 /**
  * The Sakkan (blueprint §4.5, §16 — the sakuga kantoku): drift is MEASURED,
@@ -40,6 +40,15 @@ import { scoreAxes } from "./score";
  */
 
 export const SAKKAN_INTERVAL_TURNS = 8;
+/**
+ * The shorter cadence while a retake is open (§4.5, C7): an active corrective
+ * note deserves a faster re-read than the standing interval, so the drift band
+ * can confirm the correction landed — or that it hasn't — before turn +8. This
+ * is what makes C6's punch-through re-measurement tether reachable: the note's
+ * age (since_turn) is what the Amendments escalation reads, and an 8-turn blind
+ * spot would let it escalate against a gap already closed.
+ */
+export const SAKKAN_NOTED_INTERVAL_TURNS = 4;
 export const SAKKAN_SAMPLE_TURNS = 6;
 export const DRIFT_THRESHOLD = 2;
 export const DRIFT_CONFIDENCE = 0.6;
@@ -49,8 +58,12 @@ export const MARK_CONSECUTIVE = 3;
 export const SAKKAN_PROVENANCE = "sakkan";
 
 /**
- * Cadence (§4.5): every SAKKAN_INTERVAL_TURNS since the last sample, OR a
- * sakuga scene just landed, OR the session is closing. Pure.
+ * Cadence (§4.5, C7): every SAKKAN_INTERVAL_TURNS since the last sample — OR
+ * the shorter SAKKAN_NOTED_INTERVAL_TURNS while a retake is open (an open note
+ * earns a faster re-read) — OR a sakuga scene just landed, OR the session is
+ * closing. The interval is read from the DirectionState's own active_notes, so
+ * the signature is unchanged and the G2 call site keeps passing the state it
+ * already holds. Pure.
  */
 export function sakkanDue(
   state: DirectionState,
@@ -62,7 +75,9 @@ export function sakkanDue(
   if (turnNumber <= 0) return false;
   if (opts.sakuga || opts.sessionClose) return true;
   const last = state.sakkan?.last_sample_turn ?? 0;
-  return turnNumber - last >= SAKKAN_INTERVAL_TURNS;
+  const hasOpenNote = (state.sakkan?.active_notes?.length ?? 0) > 0;
+  const interval = hasOpenNote ? SAKKAN_NOTED_INTERVAL_TURNS : SAKKAN_INTERVAL_TURNS;
+  return turnNumber - last >= interval;
 }
 
 /** campaigns.tier_models → TierSelection, falling back to the infra default (director's pattern). */
@@ -126,20 +141,30 @@ export async function runSakkanSample(
   // the state save retries legitimately; a crash after no-ops here.
   if ((state.sakkan?.last_sample_turn ?? 0) >= turnNumber) return null;
 
-  // Scored set (§4.5): the Charter's currently rendered axes ∩ COVERED, plus any
-  // axis carrying an active note (dedup). Uncovered axes are SKIPPED with a warn
-  // — the gap rule guards the scorer (score.ts THROWS on them); the Sakkan
-  // degrades gracefully rather than wedging the sample.
+  // Scored set (§4.5): NOTED axes first — a retake only expires on an in-band
+  // READ, so an unscored noted axis can never clear (C7 audit #1: three notes
+  // stranded off the rendered top-6 would deadlock every later sample against
+  // the scorer's axis cap) — then the Charter's rendered axes, dedup, ∩ COVERED.
+  // Over the cap: truncate WITH a warn (loud, never a throw, never silent);
+  // deferred axes rotate in as notes expire on later samples.
   const requested = [
     ...new Set([
-      ...(state.settei?.rendered_axes ?? []),
       ...(state.sakkan?.active_notes ?? []).map((n) => n.axis),
+      ...(state.settei?.rendered_axes ?? []),
     ]),
   ];
-  const axes: AxisName[] = [];
+  const covered: AxisName[] = [];
   for (const a of requested) {
-    if (isCovered(a)) axes.push(a);
+    if (isCovered(a)) covered.push(a);
     else console.warn(`[sakkan] skipping uncovered axis "${a}" (grounding-gap rule)`);
+  }
+  const axes = covered.slice(0, MAX_SCORED_AXES);
+  if (covered.length > axes.length) {
+    console.warn(
+      `[sakkan] axis cap: scoring ${axes.length}/${covered.length}, deferred ${covered
+        .slice(MAX_SCORED_AXES)
+        .join(", ")} (turn ${turnNumber})`,
+    );
   }
 
   // Prose sample (§4.5): the last SAKKAN_SAMPLE_TURNS complete, non-degraded

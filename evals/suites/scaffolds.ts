@@ -1,8 +1,12 @@
 import type { Suite, SuiteResult } from "../types";
+import { fingerprintReliability } from "./fingerprint-reliability";
 
 /**
  * §10 suites that gate later milestones — scaffolded now (axiom 8: the
  * whole shape), each skipping with its reason until its machinery lands.
+ * As each lands it graduates from a `scaffold(...)` stub to its real suite,
+ * imported here — run.ts spreads `...scaffolds`, so no registration edit is
+ * needed when one goes live (fingerprint-reliability, C7, is the first).
  */
 
 function scaffold(name: string, gate: string, reason: string): Suite {
@@ -17,11 +21,8 @@ function scaffold(name: string, gate: string, reason: string): Suite {
 }
 
 export const scaffolds: Suite[] = [
-  scaffold(
-    "fingerprint-reliability",
-    "M2",
-    "§10.1 test-retest anchor scoring needs the Sakkan (M2); demotes unreliable axes",
-  ),
+  // §10.1 — LIVE at C7: the Gauge-v2 reliability meter (the integrator runs it).
+  fingerprintReliability,
   scaffold(
     "drift-soak",
     "M2",
