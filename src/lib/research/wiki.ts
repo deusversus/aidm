@@ -47,6 +47,12 @@ const WIKI_URL_OVERRIDES: Record<string, string> = {
   "fairy tail": "https://fairytail.fandom.com",
   "sword art online": "https://swordartonline.fandom.com",
   "re:zero": "https://rezero.fandom.com",
+  rezero: "https://rezero.fandom.com",
+  "re zero": "https://rezero.fandom.com",
+  "re: zero": "https://rezero.fandom.com",
+  "re:zero kara hajimeru isekai seikatsu": "https://rezero.fandom.com",
+  "re:zero starting life in another world": "https://rezero.fandom.com",
+  "re:zero -starting life in another world-": "https://rezero.fandom.com",
   "death note": "https://deathnote.fandom.com",
   "code geass": "https://codegeass.fandom.com",
   "chainsaw man": "https://chainsaw-man.fandom.com",
@@ -57,6 +63,10 @@ const WIKI_URL_OVERRIDES: Record<string, string> = {
   "solo leveling": "https://solo-leveling.fandom.com",
   overlord: "https://overlordmaruyama.fandom.com",
   konosuba: "https://konosuba.fandom.com",
+  "kono subarashii sekai ni shukufuku wo!": "https://konosuba.fandom.com",
+  "kono subarashii sekai ni shukufuku wo": "https://konosuba.fandom.com",
+  "god's blessing on this wonderful world!": "https://konosuba.fandom.com",
+  "god's blessing on this wonderful world": "https://konosuba.fandom.com",
   frieren: "https://frieren.fandom.com",
   "frieren beyond journey's end": "https://frieren.fandom.com",
   "sousou no frieren": "https://frieren.fandom.com",
@@ -82,6 +92,20 @@ const WIKI_URL_OVERRIDES: Record<string, string> = {
   berserk: "https://berserk.fandom.com",
   "princess mononoke": "https://ghibli.fandom.com",
   akira: "https://akira.fandom.com",
+  // SV1 (2026-07-12): colon/slash/semicolon-titled staples whose real host the
+  // slug filter can't reach. The Fate franchise shares one wiki (typemoon —
+  // the TYPE-MOON Wiki, high confidence). Oshi no Ko / Steins;Gate hosts match
+  // what sanitized derivation already produces, so the override only reorders
+  // discovery; the relevance gate + sitename check remain the backstop.
+  "fate/zero": "https://typemoon.fandom.com",
+  "fate/stay night": "https://typemoon.fandom.com",
+  "fate/stay night unlimited blade works": "https://typemoon.fandom.com",
+  "fate/stay night: unlimited blade works": "https://typemoon.fandom.com",
+  "fate/apocrypha": "https://typemoon.fandom.com",
+  "oshi no ko": "https://oshinoko.fandom.com",
+  "【oshi no ko】": "https://oshinoko.fandom.com",
+  "steins;gate": "https://steins-gate.fandom.com",
+  "steins gate": "https://steins-gate.fandom.com",
 };
 
 const COURTESY_DELAY_MS = 200;
@@ -89,10 +113,15 @@ const TIMEOUT_MS = 15_000;
 const STOPWORDS = new Set(["the", "and", "of", "no", "wo", "ni", "wa", "san"]);
 
 async function mwApi<T>(base: string, params: Record<string, string>): Promise<T | null> {
-  const url = new URL(`${base}/api.php`);
-  url.searchParams.set("format", "json");
-  for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
   try {
+    // URL construction lives INSIDE the guard (SV1): a malformed base — a colon
+    // or slash that survived derivation, or a bad override — must degrade to a
+    // skipped probe, never throw the whole research run. findWiki pre-gates
+    // discovery candidates (isProbeableBase); this belt also covers the
+    // page/category callers that receive an already-validated base.
+    const url = new URL(`${base}/api.php`);
+    url.searchParams.set("format", "json");
+    for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
     await new Promise((r) => setTimeout(r, COURTESY_DELAY_MS));
     const res = await fetch(url, { signal: AbortSignal.timeout(TIMEOUT_MS) });
     if (!res.ok) return null;
@@ -140,13 +169,45 @@ export async function checkWikiRelevance(base: string, titles: string[]): Promis
   return false;
 }
 
-function slugCandidates(title: string): string[] {
-  const clean = title.toLowerCase().replace(/[^a-z0-9\s:-]/g, "");
-  const full = clean.replace(/[\s:]+/g, "");
-  const hyphen = clean.replace(/[\s:]+/g, "-").replace(/-+/g, "-");
-  const preColon = clean.split(":")[0]?.trim().replace(/\s+/g, "") ?? "";
-  const firstWord = clean.split(/\s+/).find((w) => w.length >= 4 && !STOPWORDS.has(w)) ?? "";
+/**
+ * Hostname-legal slug candidates (SV1, M2-sz-voice.md). Every candidate is
+ * lowercased and reduced to [a-z0-9-] BEFORE it can reach a hostname — colons,
+ * slashes, semicolons, spaces, and punctuation are token separators, never
+ * characters in the output. The old form kept `:` (via `[^a-z0-9\s:-]`), so
+ * "Re:ZERO …" derived `https://re:zero.fandom.com`, whose colon `new URL`
+ * reads as an invalid port and throws on — the live 2026-07-12 research crash.
+ * `full` collapses word tokens ("rezerokara…"); `hyphen` joins them
+ * ("re-zero-kara-…"); `preColon` keeps the pre-":" segment (v3's
+ * "Title: Subtitle" heuristic, itself sanitized); `firstWord` is the
+ * distinctive-word fallback.
+ */
+export function slugCandidates(title: string): string[] {
+  const lower = title.toLowerCase();
+  const words = lower.split(/[^a-z0-9]+/).filter(Boolean);
+  const full = words.join("");
+  const hyphen = words.join("-");
+  const preColon = (lower.split(":")[0] ?? "")
+    .split(/[^a-z0-9]+/)
+    .filter(Boolean)
+    .join("");
+  const firstWord = words.find((w) => w.length >= 4 && !STOPWORDS.has(w)) ?? "";
   return [...new Set([full, hyphen, preColon, firstWord].filter((s) => s.length >= 3))];
+}
+
+/**
+ * Hostname-legality gate for a discovery candidate (SV1). Derivation already
+ * sanitizes, but a malformed override or an odd alternate title could still
+ * yield a base `new URL` rejects — e.g. the live `https://re:zero.fandom.com`,
+ * whose colon reads as an invalid port. A candidate that fails this gate is
+ * skipped in findWiki, never fatal. Exported for the SV1 regression suite.
+ */
+export function isProbeableBase(base: string): boolean {
+  try {
+    const u = new URL(`${base}/api.php`);
+    return u.protocol === "https:" && u.port === "" && u.hostname.endsWith(".fandom.com");
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -171,6 +232,11 @@ export async function findWiki(
   for (const base of bases) {
     if (seen.has(base)) continue;
     seen.add(base);
+    if (!isProbeableBase(base)) {
+      // SV1: an invalid candidate is skipped, never a thrown research run.
+      console.warn(`[wiki] skipping malformed wiki candidate: ${base}`);
+      continue;
+    }
     if (await checkWikiRelevance(base, allTitles)) {
       const stats = await mwApi<{ query?: { statistics?: { articles?: number } } }>(base, {
         action: "query",
