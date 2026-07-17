@@ -181,6 +181,7 @@ describe.skipIf(!url)("Layout (real Postgres, scripted models)", () => {
   it("genga DAG: retrieval → filter → outcome; conte assembled; checkpoint + boosts written", async () => {
     if (!db) throw new Error("unreachable");
     mockEmbed.mockImplementation(async (texts: string[]) => texts.map(() => basis(0)));
+    let judgePrompt = "";
     const calls = armHarness({
       intent_triage: GENGA_INTENT,
       pacer_micro: { beat_classification: "investigation", tone: "wary", escalation: false },
@@ -195,12 +196,15 @@ describe.skipIf(!url)("Layout (real Postgres, scripted models)", () => {
       },
       // The judge CONTRADICTS its own math (claims failure on a clean make):
       // the code must recompute the band from the die and correct it.
-      outcome_judgment: {
-        success_level: "failure",
-        difficulty_class: 10,
-        modifiers: ["+5 Prepared"],
-        narrative_weight: "SIGNIFICANT",
-        rationale: "scripted",
+      outcome_judgment: (prompt: string) => {
+        judgePrompt = prompt;
+        return {
+          success_level: "failure",
+          difficulty_class: 10,
+          modifiers: ["+5 Prepared"],
+          narrative_weight: "SIGNIFICANT",
+          rationale: "scripted",
+        };
       },
     });
 
@@ -246,6 +250,11 @@ describe.skipIf(!url)("Layout (real Postgres, scripted models)", () => {
     expect(conte.hard_constraints.some((c) => c.includes("Finitude"))).toBe(true);
     expect(conte.hard_constraints.some((c) => c.includes("corgi"))).toBe(true);
 
+    // SV3 no-regression half: a tier-less contract plays AT baseline — power
+    // context reaches the judge, but no OP framing renders.
+    expect(judgePrompt).toContain("POWER CONTEXT");
+    expect(judgePrompt).not.toContain("OP MODE");
+
     // Callbacks from the seed ledger; entity card via presence detection.
     expect(conte.callbacks.some((c) => c.includes("bounty"))).toBe(true);
     expect(conte.entity_cards.some((c) => c.includes("Vicious"))).toBe(true);
@@ -289,6 +298,59 @@ describe.skipIf(!url)("Layout (real Postgres, scripted models)", () => {
     expect(result.conte.hard_constraints.some((c) => c.includes("corgi"))).toBe(true);
     expect(result.effort).toBe("low");
     expect(result.ladderSteps).toHaveLength(0);
+  });
+
+  it("SV3: the contract's pc_power_tier reaches the outcome judge — OP context renders at gap ≥3", async () => {
+    if (!db) throw new Error("unreachable");
+    // Bebop's world baseline is T9; a T5 contract is 4 tiers above — the
+    // §5.1 OP machinery (trivial-DC framing) must fire through the REAL
+    // layout wiring, not just the pure helper.
+    const [opCampaign] = await db
+      .insert(schema.campaigns)
+      .values({
+        playerId,
+        title: "OP tier fixture",
+        status: "active",
+        premiseContract: { ...bebopContract(), pc_power_tier: "T5" },
+        tierModels: {
+          narration: "claude-sonnet-5",
+          judgment: "claude-sonnet-5",
+          probe: "claude-haiku-4-5",
+        },
+      })
+      .returning();
+    if (!opCampaign) throw new Error("campaign insert failed");
+    try {
+      mockEmbed.mockImplementation(async (texts: string[]) => texts.map(() => basis(0)));
+      let judgePrompt = "";
+      armHarness({
+        intent_triage: GENGA_INTENT,
+        pacer_micro: { beat_classification: "action", tone: "casual", escalation: false },
+        relevance_filter: { scores: [] },
+        outcome_judgment: (prompt: string) => {
+          judgePrompt = prompt;
+          return {
+            success_level: "success",
+            difficulty_class: 5,
+            modifiers: [],
+            narrative_weight: "MINOR",
+            rationale: "scripted",
+          };
+        },
+      });
+      const result = await runLayout(
+        db,
+        opCampaign.id,
+        5,
+        "I clear the blockade with one sweep",
+        () => {},
+      );
+      expect(result.kind).toBe("conte");
+      expect(judgePrompt).toContain("OP MODE ACTIVE");
+      expect(judgePrompt).toContain("DC 5");
+    } finally {
+      await db.delete(schema.campaigns).where(eq(schema.campaigns.id, opCampaign.id));
+    }
   });
 
   it("channel inputs route out before the story pipeline (§5.4)", async () => {

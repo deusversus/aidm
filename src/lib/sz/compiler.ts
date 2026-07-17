@@ -12,6 +12,7 @@ import { identityKey, isProtagonistName, marksSelfInsert } from "@/lib/entity-id
 import { ingestAssertion } from "@/lib/ingestion/ingest";
 import { callJudgment } from "@/lib/llm/calls";
 import { DEV_TIER_SELECTION, TierSelection } from "@/lib/llm/tiers";
+import { Composition } from "@/lib/types/composition";
 import { DNAScales } from "@/lib/types/dna";
 import { OpeningStatePackage } from "@/lib/types/opening";
 import {
@@ -21,7 +22,7 @@ import {
   PresentationVocabulary,
   SuggestionAffordance,
 } from "@/lib/types/premise";
-import { Profile } from "@/lib/types/profile";
+import { PowerTier, Profile } from "@/lib/types/profile";
 import { and, eq, inArray, lt, or } from "drizzle-orm";
 import { z } from "zod";
 import type { ConductorDraft, Observation } from "./conductor";
@@ -72,6 +73,15 @@ export interface ResolvedObservations {
   controlKey?: string;
   calibration: Partial<Record<keyof DNAScales, number>>;
   canonicality?: Partial<Canonicality>;
+  /**
+   * SV3 (§8): the chosen starting power tier against the world's baseline.
+   * Absent = the player plays at baseline (also the pre-SV3 default). The
+   * baseline rides along for OSP context; the contract carries the tier.
+   */
+  pcPowerTier?: z.infer<typeof PowerTier>;
+  pcPowerBaseline?: z.infer<typeof PowerTier>;
+  /** SV3: OP-composition moves — active-layer Framing overrides, latest-wins per axis. */
+  framingChoices: { axis: keyof Composition; value: string }[];
   presentationGrants: string[];
   suggestionAffordance?: z.infer<typeof SuggestionAffordance>;
   tierSelection?: TierSelection;
@@ -113,6 +123,7 @@ export function resolveObservations(observations: Observation[]): ResolvedObserv
     pcConceptDeferred: false,
     hardLines: [],
     calibration: {},
+    framingChoices: [],
     presentationGrants: [],
     blendChoices: [],
     worldFacts: [],
@@ -205,6 +216,43 @@ export function resolveObservations(observations: Observation[]): ResolvedObserv
           }
         } catch {
           resolved.deferred.push(`unparseable calibration: ${obs.content.slice(0, 80)}`);
+        }
+        break;
+      }
+      case "pc_power_tier": {
+        try {
+          const parsed = z
+            .object({ tier: PowerTier, baseline: PowerTier.optional() })
+            .parse(JSON.parse(obs.content));
+          resolved.pcPowerTier = parsed.tier;
+          resolved.pcPowerBaseline = parsed.baseline;
+        } catch {
+          resolved.deferred.push(`unparseable power tier: ${obs.content.slice(0, 80)}`);
+        }
+        break;
+      }
+      case "framing_choice": {
+        // Calibration's idiom for the Framing component: any of the 13 axes,
+        // the value validated against THAT axis's enum — the model proposes,
+        // the schema disposes. Latest wins per axis.
+        try {
+          const parsed = z
+            .object({ axis: z.string(), value: z.string() })
+            .parse(JSON.parse(obs.content));
+          const axisSchema =
+            parsed.axis in Composition.shape
+              ? Composition.shape[parsed.axis as keyof Composition]
+              : undefined;
+          if (axisSchema?.safeParse(parsed.value).success) {
+            resolved.framingChoices = [
+              ...resolved.framingChoices.filter((f) => f.axis !== parsed.axis),
+              { axis: parsed.axis as keyof Composition, value: parsed.value },
+            ];
+          } else {
+            resolved.deferred.push(`unrecognized framing choice: ${obs.content.slice(0, 80)}`);
+          }
+        } catch {
+          resolved.deferred.push(`unparseable framing choice: ${obs.content.slice(0, 80)}`);
         }
         break;
       }
@@ -415,6 +463,13 @@ export const defaultOspSynthesizer: OspSynthesizer = async ({
       }`,
       `THE SPARK (verbatim): ${spark}`,
       `Finitude: ${resolved.finitude}`,
+      // SV3: the chosen tier shapes the opening — an OP protagonist must not
+      // get a struggle-scene cold open the premise already outgrew.
+      `Power tier: ${
+        resolved.pcPowerTier
+          ? `${resolved.pcPowerTier} chosen against world baseline ${resolved.pcPowerBaseline ?? "(profile typical)"}`
+          : "(world baseline — no elevated tier chosen)"
+      }`,
       `Death physics: ${resolved.deathPhysics}`,
       `Lethality: ${resolved.lethalityPosture}`,
       `Hard lines: ${resolved.hardLines.join("; ") || "(none)"}`,
@@ -719,6 +774,11 @@ export async function compileSessionZero(
     for (const [axis, value] of Object.entries(resolved.calibration)) {
       active.treatment[axis as keyof DNAScales] = value as number;
     }
+    // SV3: OP-composition moves are active-layer Framing overrides — the
+    // canonical layer keeps the source's own framing, same as calibration.
+    for (const { axis, value } of resolved.framingChoices) {
+      (active.framing as Record<string, string>)[axis] = value;
+    }
 
     const contract = PremiseContract.parse({
       campaign_id: campaignId,
@@ -737,6 +797,7 @@ export async function compileSessionZero(
         ...(resolved.controlKey ? { control_key: { circumstances: resolved.controlKey } } : {}),
       },
       suggestion_affordance: resolved.suggestionAffordance ?? "on_request_only",
+      ...(resolved.pcPowerTier ? { pc_power_tier: resolved.pcPowerTier } : {}),
       anchors_used: draft.profileIds,
     });
 

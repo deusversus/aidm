@@ -1,5 +1,6 @@
 import * as schema from "@/lib/db/schema";
 import { streamNarration } from "@/lib/llm/calls";
+import { researchTitle } from "@/lib/research/research";
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
@@ -21,6 +22,10 @@ import {
 vi.mock("@/lib/llm/calls", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/llm/calls")>();
   return { ...actual, streamNarration: vi.fn() };
+});
+vi.mock("@/lib/research/research", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/research/research")>();
+  return { ...actual, researchTitle: vi.fn() };
 });
 
 const url = process.env.DATABASE_URL;
@@ -63,6 +68,7 @@ function scriptedRound(blocks: ContentBlock[], stopReason: "end_turn" | "tool_us
 }
 
 const mockStream = vi.mocked(streamNarration);
+const mockResearch = vi.mocked(researchTitle);
 
 const obs = (kind: Observation["kind"], content: string): Observation => ({
   kind,
@@ -248,6 +254,73 @@ describe.skipIf(!url)("SZ conductor draft-resume (real Postgres, scripted model)
       expect(parsed.gaps.some((g: string) => g.includes("protagonist is unnamed"))).toBe(true);
     } finally {
       await db.delete(schema.campaigns).where(eq(schema.campaigns.id, c.id));
+    }
+  });
+
+  it("research_title's tool result carries the profile's power_distribution (SV3 baseline plumbing)", async () => {
+    if (!db) throw new Error("unreachable");
+    mockStream.mockReset();
+    // The POWER TIER beat instructs the model to use the research result's
+    // typical_tier as the baseline — this pins that the field actually
+    // ARRIVES (it nests under ip_mechanics in the stored Profile; a
+    // top-level read silently drops it, audit-verify catch 2026-07-12).
+    const profileId = `test_power_profile_${crypto.randomUUID()}`;
+    await db.insert(schema.profiles).values({
+      id: profileId,
+      title: "Cowboy Bebop",
+      profile: {
+        ip_mechanics: {
+          power_distribution: {
+            peak_tier: "T6",
+            typical_tier: "T9",
+            floor_tier: "T10",
+            gradient: "flat",
+          },
+        },
+      },
+    });
+    mockResearch.mockResolvedValue({
+      profileId,
+      title: "Cowboy Bebop",
+      scope: "standard",
+      seasonsMerged: 1,
+      wikiBase: null,
+      pagesFetched: 3,
+      chunksWritten: 0,
+      confidence: 90,
+      notes: [],
+    });
+    const [c] = await db
+      .insert(schema.campaigns)
+      .values({ playerId, title: "research plumb", status: "draft" })
+      .returning();
+    if (!c) throw new Error("insert failed");
+    try {
+      mockStream
+        .mockReturnValueOnce(
+          scriptedRound(
+            [
+              {
+                type: "tool_use",
+                id: "rt_1",
+                name: "research_title",
+                input: { title: "Cowboy Bebop" },
+              },
+            ],
+            "tool_use",
+          ),
+        )
+        .mockReturnValueOnce(
+          scriptedRound([{ type: "text", text: "Bebop's loaded — T9 world." }], "end_turn"),
+        );
+      const result = await runConductorTurn(db, c.id, "let's play cowboy bebop", () => {});
+      const parsed = JSON.parse(toolResultFor(result, "rt_1"));
+      expect(parsed.verified).toBe(true);
+      expect(parsed.power_distribution?.typical_tier).toBe("T9");
+      expect(parsed.power_distribution?.peak_tier).toBe("T6");
+    } finally {
+      await db.delete(schema.campaigns).where(eq(schema.campaigns.id, c.id));
+      await db.delete(schema.profiles).where(eq(schema.profiles.id, profileId));
     }
   });
 

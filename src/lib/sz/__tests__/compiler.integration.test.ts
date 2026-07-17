@@ -333,6 +333,44 @@ describe("character concept resolution + gap (SV2, deterministic)", () => {
   });
 });
 
+describe("power tier + framing choices (SV3, deterministic)", () => {
+  it("power tier resolves with its baseline, latest-wins; malformed and off-ladder defer", () => {
+    const r = resolveObservations([
+      obs("pc_power_tier", '{"tier": "T7", "baseline": "T8"}'),
+      obs("pc_power_tier", '{"tier": "T5", "baseline": "T8"}'),
+    ]);
+    expect(r.pcPowerTier).toBe("T5");
+    expect(r.pcPowerBaseline).toBe("T8");
+
+    const prose = resolveObservations([obs("pc_power_tier", "far above baseline, T3-ish")]);
+    expect(prose.pcPowerTier).toBeUndefined();
+    expect(prose.deferred.some((d) => d.includes("unparseable power tier"))).toBe(true);
+    // Off the T1-T10 ladder never lands a garbage tier on the contract.
+    const off = resolveObservations([obs("pc_power_tier", '{"tier": "T11", "baseline": "T8"}')]);
+    expect(off.pcPowerTier).toBeUndefined();
+    expect(off.deferred.some((d) => d.includes("unparseable power tier"))).toBe(true);
+  });
+
+  it("framing choices validate per-axis and win latest; junk defers, never overwrites", () => {
+    const r = resolveObservations([
+      obs("framing_choice", '{"axis": "tension_source", "value": "burden"}'),
+      obs("framing_choice", '{"axis": "tension_source", "value": "existential"}'),
+      obs("framing_choice", '{"axis": "narrative_focus", "value": "mundane"}'),
+      obs("framing_choice", '{"axis": "mode", "value": "op_dominant"}'),
+      // A junk VALUE on a real axis defers and must not clobber the settled pick.
+      obs("framing_choice", '{"axis": "tension_source", "value": "vibes"}'),
+      // A junk AXIS defers; non-JSON defers.
+      obs("framing_choice", '{"axis": "power_level", "value": "high"}'),
+      obs("framing_choice", "make it feel like a legend"),
+    ]);
+    expect(r.framingChoices).toContainEqual({ axis: "tension_source", value: "existential" });
+    expect(r.framingChoices).toContainEqual({ axis: "narrative_focus", value: "mundane" });
+    expect(r.framingChoices).toContainEqual({ axis: "mode", value: "op_dominant" });
+    expect(r.framingChoices).toHaveLength(3);
+    expect(r.deferred.filter((d) => d.includes("framing choice"))).toHaveLength(3);
+  });
+});
+
 describe.skipIf(!url)("SZ compiler (real Postgres)", () => {
   const playerId = `test_player_${crypto.randomUUID()}`;
   let campaignId: string;
@@ -716,6 +754,49 @@ describe.skipIf(!url)("SZ compiler (real Postgres)", () => {
     }
   });
 
+  it("a gap-≥2 table compiles: tier on the contract, framing moves override ACTIVE only (SV3)", async () => {
+    if (!db) throw new Error("unreachable");
+    const opDraft: ConductorDraft = {
+      transcript: [],
+      observations: [
+        ...SCRIPTED_OBSERVATIONS,
+        obs("pc_power_tier", '{"tier": "T5", "baseline": "T8"}'),
+        obs("framing_choice", '{"axis": "tension_source", "value": "burden"}'),
+        obs("framing_choice", '{"axis": "mode", "value": "op_dominant"}'),
+      ],
+      profileIds: ["test_sz_profile"],
+      readyToCompile: true,
+    };
+    const [campaign] = await db
+      .insert(schema.campaigns)
+      .values({ playerId, title: "op tier fixture", status: "draft", szTranscript: opDraft })
+      .returning();
+    if (!campaign) throw new Error("insert failed");
+    let seenTier: string | undefined;
+    try {
+      const result = await compileSessionZero(db, campaign.id, {
+        ospSynthesizer: async (input) => {
+          seenTier = input.resolved.pcPowerTier;
+          return STUB_OSP;
+        },
+        ingestor: async () => ({ writes: [], flags: [] }),
+      });
+      expect(result.gaps).toEqual([]);
+      // The circuit's contract half: the chosen tier lands, typed.
+      expect(result.contract.pc_power_tier).toBe("T5");
+      // Framing moves land as ACTIVE-layer overrides; canonical keeps the
+      // source's own framing (calibration's exact discipline).
+      expect(result.contract.active.framing.tension_source).toBe("burden");
+      expect(result.contract.active.framing.mode).toBe("op_dominant");
+      expect(result.contract.canonical.framing.tension_source).toBe("existential");
+      expect(result.contract.canonical.framing.mode).toBe("standard");
+      // The OSP hears about the elevation (no struggle-scene cold opens).
+      expect(seenTier).toBe("T5");
+    } finally {
+      await db.delete(schema.campaigns).where(eq(schema.campaigns.id, campaign.id));
+    }
+  });
+
   it("gap verdict blocks a sparkless handoff (§8)", () => {
     const gaps = gapVerdict(
       resolveObservations(SCRIPTED_OBSERVATIONS.filter((o) => o.kind !== "spark")),
@@ -792,6 +873,9 @@ describe.skipIf(!url)("SZ compiler (real Postgres)", () => {
     expect(result.contract.spark).toContain("whatever happens");
     expect(result.contract.active.treatment.darkness).toBe(8); // player's move
     expect(result.contract.canonical.treatment.darkness).toBe(7); // profile untouched
+    // SV3 no-regression: a tier-less draft compiles with NO pc_power_tier —
+    // layout falls back to the world baseline exactly as before.
+    expect(result.contract.pc_power_tier).toBeUndefined();
     expect(result.contract.intensity.hard_lines).toContain("no harm to children on-screen");
 
     const [campaign] = await db

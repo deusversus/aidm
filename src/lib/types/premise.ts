@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { ArcOverride } from "./arc";
 import { Composition } from "./composition";
 import { DNAScales } from "./dna";
-import { AuthorVoice, IPMechanics, VoiceCard } from "./profile";
+import { AuthorVoice, IPMechanics, PowerTier, VoiceCard } from "./profile";
 
 /**
  * The Premise Instrument (blueprint §4): five components × four time
@@ -253,6 +253,14 @@ export const PremiseContract = z.object({
   finitude: Finitude,
   intensity: IntensityContract,
   suggestion_affordance: SuggestionAffordance,
+  /**
+   * §8/SV3: the player's chosen starting power tier, gathered at the SZ
+   * power-tier beat against the world's baseline. Absent = the world's
+   * typical tier (pre-SV3 campaigns, or the player waved it off). Layout
+   * reads this to drive the §5.1 OP-mode machinery; a future character
+   * sheet owns LIVE progression — this is the starting contract.
+   */
+  pc_power_tier: PowerTier.optional(),
   /** Anchor shows used during SZ calibration (§4.6). */
   anchors_used: z.array(z.string()).default([]),
 });

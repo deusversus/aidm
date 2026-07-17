@@ -26,6 +26,21 @@ export function tierBand(tier: number): TierBand {
 }
 
 /**
+ * The character's effective tier (SV3, §8): the SZ-chosen contract tier
+ * rules; the world's baseline is the default for tier-less contracts
+ * (pre-SV3 campaigns, or the player waved the beat off). A future
+ * character sheet owns LIVE progression; this is the starting contract.
+ */
+export function characterTierFor(
+  pcPowerTier: string | undefined,
+  worldBaselineTier: number,
+): number {
+  if (!pcPowerTier) return worldBaselineTier;
+  const n = Number.parseInt(pcPowerTier.slice(1), 10);
+  return Number.isNaN(n) ? worldBaselineTier : n;
+}
+
+/**
  * Character tiers above world baseline (positive = character stronger,
  * since lower tier number = more powerful).
  */

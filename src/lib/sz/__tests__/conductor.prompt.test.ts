@@ -60,4 +60,17 @@ describe("conductor system prompt spec (SV2 — the voice)", () => {
     const bar = CONDUCTOR_SYSTEM.slice(CONDUCTOR_SYSTEM.indexOf("WHEN THE TABLE IS SET"));
     expect(bar).toContain("CONCEPT");
   });
+
+  it("THE POWER TIER beat exists, walks the four options, records both kinds (SV3)", () => {
+    expect(CONDUCTOR_SYSTEM).toContain("THE POWER TIER");
+    for (const walk of ["below baseline", "at baseline", "far above"]) {
+      expect(CONDUCTOR_SYSTEM).toContain(walk);
+    }
+    // The gap-≥2 composition offer, with v3's parsing-table flavor.
+    expect(CONDUCTOR_SYSTEM).toContain("2+ TIERS ABOVE BASELINE");
+    expect(CONDUCTOR_SYSTEM).toContain('"pc_power_tier"');
+    expect(CONDUCTOR_SYSTEM).toContain('"framing_choice"');
+    expect(ObservationKind.options).toContain("pc_power_tier");
+    expect(ObservationKind.options).toContain("framing_choice");
+  });
 });

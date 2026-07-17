@@ -4,6 +4,7 @@ import { LADDER_STEPS, createDegradeClock } from "../degrade";
 import { rollD20, successBand, sumModifiers } from "../dice";
 import {
   SCALE_COMPATIBILITY,
+  characterTierFor,
   imbalanceBand,
   imbalanceFlags,
   opModeActive,
@@ -106,6 +107,21 @@ describe("power: the OP-premise table (§5.1 DC floor)", () => {
     expect(tierBand(7)).toBe("superhuman");
     expect(tierBand(5)).toBe("planetary");
     expect(tierBand(1)).toBe("boundless");
+  });
+
+  it("SV3: the contract tier drives the circuit; tier-less falls back to baseline", () => {
+    // The SZ-chosen tier rules — a T5 pick in a T8 world puts OP mode live.
+    expect(characterTierFor("T5", 8)).toBe(5);
+    expect(powerContext(characterTierFor("T5", 8), 8)).toContain("OP MODE ACTIVE");
+    expect(powerContext(characterTierFor("T5", 8), 8)).toContain("DC 5");
+    // 2 above: strong, not OP — the composition shift is SZ's job, not the floor's.
+    expect(powerContext(characterTierFor("T6", 8), 8)).not.toContain("OP MODE ACTIVE");
+    // Tier-less contracts (pre-SV3 campaigns, waved-off beat) run at baseline
+    // exactly as before — diff 0, no OP framing.
+    expect(characterTierFor(undefined, 8)).toBe(8);
+    expect(powerContext(characterTierFor(undefined, 8), 8)).not.toContain("OP MODE");
+    // Garbage never crashes a turn: an unparseable tier is baseline.
+    expect(characterTierFor("Tx", 8)).toBe(8);
   });
 });
 

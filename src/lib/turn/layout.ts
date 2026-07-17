@@ -27,7 +27,7 @@ import { and, desc, eq, gt, sql } from "drizzle-orm";
 import { type LadderStep, PHASE_A_BUDGET_MS, createDegradeClock } from "./degrade";
 import { judgeOutcome, syntheticOutcome, validateOutcome } from "./outcome";
 import { runPacer } from "./pacer";
-import { powerContext } from "./power";
+import { characterTierFor, powerContext } from "./power";
 import {
   decomposeQueries,
   fetchCallbacks,
@@ -195,9 +195,10 @@ export async function runLayout(
     ...Object.keys(world.stat_mapping.meta_resources),
   ].filter((s): s is string => Boolean(s));
   const worldBaseline = Number.parseInt(world.power_distribution.typical_tier.slice(1), 10);
-  // Protagonist tier: campaign mechanical state owns this from C6; until a
-  // sheet exists, the premise's typical tier is the honest default (diff 0).
-  const characterTier = worldBaseline;
+  // SV3 (docs/plans/M2-sz-voice.md): the SZ-chosen tier drives the §5.1
+  // OP-mode machinery; baseline for tier-less contracts. A character sheet
+  // owns live progression when one exists — this is the starting contract.
+  const characterTier = characterTierFor(contract.pc_power_tier, worldBaseline);
   const pContext = powerContext(characterTier, worldBaseline);
 
   const situation = lastEpisodic?.narration.slice(-300);
