@@ -295,7 +295,7 @@ export async function runConductorTurn(
   if (taste.length > 0) {
     system.push({
       type: "text",
-      text: `RETURNING PLAYER. Taste notes from past campaigns — greet them like a regular and let this shape your instincts, but never recite the list back:\n${taste.map((t) => `- ${t}`).join("\n")}`,
+      text: `RETURNING PLAYER. Taste notes from past campaigns — greet them like a regular, and hold these LIGHTLY: they are who this player has been at other tables, not who they are being today. Recognition, never presumption — do not frame the new campaign through a past one's preferences, and never make the player push back against an assumption to claim a departure. These are material for questions ("same appetite as last time, or something different?"), never defaults; what the player says THIS time outranks every line below. Never recite the list back:\n${taste.map((t) => `- ${t}`).join("\n")}`,
     });
   }
 

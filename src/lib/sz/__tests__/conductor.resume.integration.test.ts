@@ -154,9 +154,13 @@ describe.skipIf(!url)("SZ conductor draft-resume (real Postgres, scripted model)
     expect(draft.transcript).toHaveLength(4);
     expect(draft.transcript[0]?.content).toBe(SZ_KICKOFF);
 
-    // The §6.9 returning-player block rode along in the system array.
+    // The §6.9 returning-player block rode along in the system array — and
+    // carries the posture: taste is recognition material, never a default for
+    // the new campaign (§0 authority ordering; user-named 2026-07-12).
     const call = mockStream.mock.calls[0]?.[0];
-    expect(call?.system.some((b) => b.text.includes("found-family"))).toBe(true);
+    const tasteBlock = call?.system.find((b) => b.text.includes("found-family"));
+    expect(tasteBlock).toBeDefined();
+    expect(tasteBlock?.text).toContain("Recognition, never presumption");
 
     // Persisted, not just in memory.
     const [row] = await db
