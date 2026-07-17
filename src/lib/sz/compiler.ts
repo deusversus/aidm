@@ -58,6 +58,14 @@ export interface ResolvedObservations {
    */
   pcName?: string;
   pcNameDeferred: boolean;
+  /**
+   * SV2: the character concept — seat choice + big idea, the player's own
+   * words VERBATIM (never anchored-parsed; it's prose, not an enum). The
+   * never-assume-the-canon-seat gate: absent and un-deferred blocks the
+   * handoff, same discipline as the name.
+   */
+  pcConcept?: string;
+  pcConceptDeferred: boolean;
   deathPhysics?: string;
   lethalityPosture?: string;
   hardLines: string[];
@@ -90,7 +98,7 @@ type Finitude = "finite" | "indefinite" | "undecided";
  * verdict blocks a guessed contract, it never ships one.
  */
 export function resolveFinitude(content: string): Finitude | undefined {
-  const anchored = /^\s*["'“]?(indefinite|undecided|finite)\b/i.exec(content);
+  const anchored = /^\s*["'“‘]?(indefinite|undecided|finite)\b/i.exec(content);
   if (anchored) return anchored[1]?.toLowerCase() as Finitude;
   const hits = new Set<Finitude>();
   if (/\bindefinite(ly)?\b/i.test(content)) hits.add("indefinite");
@@ -102,6 +110,7 @@ export function resolveFinitude(content: string): Finitude | undefined {
 export function resolveObservations(observations: Observation[]): ResolvedObservations {
   const resolved: ResolvedObservations = {
     pcNameDeferred: false,
+    pcConceptDeferred: false,
     hardLines: [],
     calibration: {},
     presentationGrants: [],
@@ -111,6 +120,12 @@ export function resolveObservations(observations: Observation[]): ResolvedObserv
     playerTaste: [],
     deferred: [],
   };
+  // Deferral notes surface as open items only if still deferred AFTER
+  // latest-wins resolution — a player who defers, then decides, must never
+  // see a stale "left open" line in the conductor's summary (SV2; the C4
+  // name path gains the same discipline).
+  let nameDeferralNote: string | undefined;
+  let conceptDeferralNote: string | undefined;
   for (const obs of observations) {
     switch (obs.kind) {
       case "spark":
@@ -127,10 +142,10 @@ export function resolveObservations(observations: Observation[]): ResolvedObserv
         // "deferred") leads; color follows a separator. Latest wins — a player
         // who renames mid-conversation gets their newest word.
         const content = obs.content.trim();
-        if (/^["'“]?deferred\b/i.test(content)) {
+        if (/^["'“‘]?deferred\b/i.test(content)) {
           resolved.pcNameDeferred = true;
           resolved.pcName = undefined;
-          resolved.deferred.push(`protagonist name deferred to play: ${content.slice(0, 80)}`);
+          nameDeferralNote = `protagonist name deferred to play: ${content.slice(0, 80)}`;
         } else {
           let name = content.split(/\s+[—–-]\s|\n/)[0]?.trim() ?? "";
           // Sentence-period color cuts, but honorifics survive: a ". " only
@@ -151,6 +166,20 @@ export function resolveObservations(observations: Observation[]): ResolvedObserv
             resolved.pcName = name;
             resolved.pcNameDeferred = false;
           }
+        }
+        break;
+      }
+      case "pc_concept": {
+        // Verbatim, latest-wins — the concept is prose, never parsed. Only
+        // the deferral sentinel is anchored, same form as pc_name.
+        const content = obs.content.trim();
+        if (/^["'“‘]?deferred\b/i.test(content)) {
+          resolved.pcConceptDeferred = true;
+          resolved.pcConcept = undefined;
+          conceptDeferralNote = `character concept deferred to play: ${content.slice(0, 80)}`;
+        } else if (content) {
+          resolved.pcConcept = content;
+          resolved.pcConceptDeferred = false;
         }
         break;
       }
@@ -222,7 +251,7 @@ export function resolveObservations(observations: Observation[]): ResolvedObserv
         // anything else defers to the safe default and says so.
         const text = obs.content.toLowerCase();
         const anchored = SuggestionAffordance.options.find((o) =>
-          new RegExp(`^\\s*["'“]?${o}\\b`).test(text),
+          new RegExp(`^\\s*["'“‘]?${o}\\b`).test(text),
         );
         // "never" is everyday prose (the live misparse) — it only counts
         // anchored. The snake_case tokens can't occur naturally, so a unique
@@ -263,6 +292,9 @@ export function resolveObservations(observations: Observation[]): ResolvedObserv
         break;
     }
   }
+  if (resolved.pcNameDeferred && nameDeferralNote) resolved.deferred.push(nameDeferralNote);
+  if (resolved.pcConceptDeferred && conceptDeferralNote)
+    resolved.deferred.push(conceptDeferralNote);
   return resolved;
 }
 
@@ -276,6 +308,10 @@ export function gapVerdict(resolved: ResolvedObservations, hasProfile: boolean):
   if (!resolved.pcName && !resolved.pcNameDeferred)
     gaps.push(
       "the protagonist is unnamed and the player has not deferred it — ask, or record their explicit deferral (M2 C4)",
+    );
+  if (!resolved.pcConcept && !resolved.pcConceptDeferred)
+    gaps.push(
+      "the character's concept was never gathered and the player has not deferred it — who are they in this? Ask for the big idea, or record their explicit deferral (SV2)",
     );
   if (!resolved.deathPhysics) gaps.push("death physics ungathered (intensity contract)");
   if (!resolved.lethalityPosture) gaps.push("lethality posture ungathered (intensity contract)");
@@ -367,6 +403,15 @@ export const defaultOspSynthesizer: OspSynthesizer = async ({
         (resolved.pcNameDeferred
           ? "(name deferred to play — do NOT invent one; refer to them by role)"
           : "(unnamed)")
+      }`,
+      // SV2: the concept (seat + big idea, the player's own words) anchors the
+      // protagonist brief and the Director inputs; a deferral tells the
+      // synthesizer the character EMERGES — never pre-shape them.
+      `Character concept (verbatim): ${
+        resolved.pcConcept ??
+        (resolved.pcConceptDeferred
+          ? "(deferred to play — do NOT invent one; let the character emerge)"
+          : "(not gathered)")
       }`,
       `THE SPARK (verbatim): ${spark}`,
       `Finitude: ${resolved.finitude}`,

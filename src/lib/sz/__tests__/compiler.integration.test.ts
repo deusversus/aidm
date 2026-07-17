@@ -100,6 +100,12 @@ const SCRIPTED_OBSERVATIONS: Observation[] = [
   // un-deferred PC. A real name in the shared fixture; the dedup fixture below
   // overrides it with the deferral form to prove that path also compiles.
   obs("pc_name", "Jules — the player's own bounty hunter, named after the source"),
+  // SV2: the concept gate blocks a conceptless, un-deferred table — the shared
+  // fixture carries one (seat + big idea, verbatim).
+  obs(
+    "pc_concept",
+    "Someone new beside the canon crew — a washed-up bounty hunter who can't stop paying other people's debts",
+  ),
   obs("death_physics", "death is real, sudden, and cheap; nobody gets a speech"),
   obs("lethality_posture", "a little more intense than default; losses stay lost"),
   obs("hard_line", "no harm to children on-screen"),
@@ -243,6 +249,87 @@ describe("protagonist name resolution + gap (M2 C4, deterministic)", () => {
     ]);
     expect(undeferred.pcName).toBe("Kaelen");
     expect(undeferred.pcNameDeferred).toBe(false);
+    // SV2: the resolved deferral leaves no stale open item behind — the
+    // summary must never claim the name is being left open when it isn't.
+    expect(undeferred.deferred.some((d) => d.includes("protagonist name deferred"))).toBe(false);
+  });
+});
+
+describe("character concept resolution + gap (SV2, deterministic)", () => {
+  it("gap verdict blocks a conceptless, un-deferred table", () => {
+    const gaps = gapVerdict(
+      resolveObservations(SCRIPTED_OBSERVATIONS.filter((o) => o.kind !== "pc_concept")),
+      true,
+    );
+    expect(gaps.some((g) => g.includes("concept was never gathered"))).toBe(true);
+  });
+
+  it("resolves VERBATIM, latest-wins — never parsed, never truncated", () => {
+    const concept =
+      "Replace the protagonist: the Straw Hats exist, but the captain's seat is mine. A cook who fights only to feed people.";
+    const r = resolveObservations([
+      obs("pc_concept", "someone new beside the cast — an early draft"),
+      obs("pc_concept", concept),
+    ]);
+    expect(r.pcConcept).toBe(concept);
+    expect(r.pcConceptDeferred).toBe(false);
+    // The canon-seat choice rides the concept AND its canonicality
+    // observation — both resolve from the same exchange.
+    const seat = resolveObservations([
+      obs("pc_concept", concept),
+      obs(
+        "canonicality",
+        '{"timeline_mode": "canon_adjacent", "canon_cast_mode": "replaced_protagonist"}',
+      ),
+    ]);
+    expect(seat.canonicality?.canon_cast_mode).toBe("replaced_protagonist");
+  });
+
+  it("the deferral form defers, notes it, and passes the gate", () => {
+    const r = resolveObservations([
+      ...SCRIPTED_OBSERVATIONS.filter((o) => o.kind !== "pc_concept"),
+      obs("pc_concept", "deferred — the player wants the character to emerge in play"),
+    ]);
+    expect(r.pcConcept).toBeUndefined();
+    expect(r.pcConceptDeferred).toBe(true);
+    expect(r.deferred.some((d) => d.includes("character concept deferred"))).toBe(true);
+    expect(gapVerdict(r, true).some((g) => g.includes("concept"))).toBe(false);
+  });
+
+  it("a later concrete concept clears an earlier deferral AND its note", () => {
+    const r = resolveObservations([
+      obs("pc_concept", "deferred — not sure yet"),
+      obs("pc_concept", "A talentless underdog who trains harder than anyone"),
+    ]);
+    expect(r.pcConcept).toContain("underdog");
+    expect(r.pcConceptDeferred).toBe(false);
+    expect(r.deferred.some((d) => d.includes("character concept deferred"))).toBe(false);
+  });
+
+  it("mid-string 'deferred' in verbatim prose is NOT a deferral (the sentinel is anchored)", () => {
+    // The concept is free prose — the player's own words may contain the
+    // sentinel word. Only a LEADING "deferred" is the player's deferral.
+    const prose = "a knight whose dream was deferred until now";
+    const r = resolveObservations([obs("pc_concept", prose)]);
+    expect(r.pcConcept).toBe(prose);
+    expect(r.pcConceptDeferred).toBe(false);
+    // Same discipline on the name path (C4 family).
+    const named = resolveObservations([
+      obs("pc_name", "Kaelen — he deferred the choice for years"),
+    ]);
+    expect(named.pcName).toBe("Kaelen");
+    expect(named.pcNameDeferred).toBe(false);
+  });
+
+  it("a curly-single-quoted deferral still defers (the anchor knows every quote form)", () => {
+    // Models quote-wrap despite anchoring instructions; the quote-strip on the
+    // name path already anticipates ‘…’ — the deferral anchor must too.
+    const r = resolveObservations([obs("pc_concept", "‘deferred — let the character emerge’")]);
+    expect(r.pcConcept).toBeUndefined();
+    expect(r.pcConceptDeferred).toBe(true);
+    const name = resolveObservations([obs("pc_name", "‘deferred — no name yet’")]);
+    expect(name.pcName).toBeUndefined();
+    expect(name.pcNameDeferred).toBe(true);
   });
 });
 
@@ -537,17 +624,21 @@ describe.skipIf(!url)("SZ compiler (real Postgres)", () => {
       ],
     };
     let seenPcName: string | undefined;
+    let seenPcConcept: string | undefined;
     try {
       const result = await compileSessionZero(db, campaign.id, {
         ospSynthesizer: async (input) => {
           seenPcName = input.resolved.pcName;
+          seenPcConcept = input.resolved.pcConcept;
           return NAMED_STUB;
         },
         ingestor: async () => ({ writes: [], flags: [] }),
       });
       expect(result.gaps).toEqual([]);
-      // The OSP synthesizer receives the name (briefs/opening can use it).
+      // The OSP synthesizer receives the name (briefs/opening can use it) —
+      // and the concept (SV2: the protagonist brief's anchor).
       expect(seenPcName).toBe("Kaelen");
+      expect(seenPcConcept).toContain("bounty hunter");
 
       const npcs = await db
         .select()

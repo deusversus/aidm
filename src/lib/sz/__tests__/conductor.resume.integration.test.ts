@@ -81,10 +81,12 @@ function toolResultFor(draft: ConductorDraft, toolUseId: string): string {
   throw new Error(`no tool_result for ${toolUseId}`);
 }
 
-/** A fully-set table EXCEPT the protagonist's name (the C4 gate's one new bar). */
+/** A fully-set table EXCEPT the protagonist's name (the C4 gate's bar; the
+ *  SV2 concept is present so the name is the ONLY gap). */
 const TABLE_MINUS_NAME: Observation[] = [
   obs("spark", "the moment before the leap, when they go anyway"),
   obs("finitude", "finite — it ends"),
+  obs("pc_concept", "the moment-before-the-leap kid — all nerve, no plan, goes anyway"),
   obs("death_physics", "death is real, sudden, cheap"),
   obs("lethality_posture", "a little more intense than default"),
   obs(
@@ -244,6 +246,51 @@ describe.skipIf(!url)("SZ conductor draft-resume (real Postgres, scripted model)
       const parsed = JSON.parse(toolResultFor(result, "pc_1"));
       expect(parsed.ready).toBe(false);
       expect(parsed.gaps.some((g: string) => g.includes("protagonist is unnamed"))).toBe(true);
+    } finally {
+      await db.delete(schema.campaigns).where(eq(schema.campaigns.id, c.id));
+    }
+  });
+
+  it("propose_contract gate (SV2): a conceptless table returns {ready:false} with the concept gap", async () => {
+    if (!db) throw new Error("unreachable");
+    mockStream.mockReset();
+    const draft: ConductorDraft = {
+      transcript: [],
+      observations: [
+        ...TABLE_MINUS_NAME.filter((o) => o.kind !== "pc_concept"),
+        obs("pc_name", "Kaelen — he chose it himself"),
+      ],
+      profileIds: ["seeded-profile"],
+      readyToCompile: false,
+    };
+    const [c] = await db
+      .insert(schema.campaigns)
+      .values({ playerId, title: "gate conceptless", status: "draft", szTranscript: draft })
+      .returning();
+    if (!c) throw new Error("insert failed");
+    try {
+      mockStream
+        .mockReturnValueOnce(
+          scriptedRound(
+            [
+              {
+                type: "tool_use",
+                id: "pc_1",
+                name: "propose_contract",
+                input: { campaign_title: "Untitled" },
+              },
+            ],
+            "tool_use",
+          ),
+        )
+        .mockReturnValueOnce(
+          scriptedRound([{ type: "text", text: "So — who ARE they in this?" }], "end_turn"),
+        );
+      const result = await runConductorTurn(db, c.id, "ready when you are", () => {});
+      expect(result.readyToCompile).toBe(false);
+      const parsed = JSON.parse(toolResultFor(result, "pc_1"));
+      expect(parsed.ready).toBe(false);
+      expect(parsed.gaps.some((g: string) => g.includes("concept was never gathered"))).toBe(true);
     } finally {
       await db.delete(schema.campaigns).where(eq(schema.campaigns.id, c.id));
     }
