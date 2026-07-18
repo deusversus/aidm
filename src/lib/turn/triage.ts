@@ -15,7 +15,10 @@ import {
 
 const NEVER_DOUGA = new Set(["COMBAT", "SOCIAL", "ABILITY"]);
 
-export function classifyTier(intent: IntentOutput): TurnTier {
+export function classifyTier(
+  intent: IntentOutput,
+  opts: { opening?: boolean; climbing?: boolean } = {},
+): TurnTier {
   const flagged = intent.special_conditions.length > 0;
   if (
     intent.intent === "COMBAT" ||
@@ -24,7 +27,21 @@ export function classifyTier(intent: IntentOutput): TurnTier {
   ) {
     return "sakuga";
   }
-  if (intent.epicness < TRIAGE_THRESHOLDS.dougaMaxEpicness && !NEVER_DOUGA.has(intent.intent)) {
+  // C9: two deterministic genga floors.
+  // opening — the cold open carries the pilot plan's full craft load, and
+  //   "Begin." emitted epicness 0.2 live: the floor holds however routine
+  //   the words look.
+  // climbing — escalation/climax arc phases never starve a beat of craft
+  //   (§3: narratively trivial ≠ functionally trivial). This tier floor
+  //   REPLACES the Pacer's promoteEffort output, which was unsatisfiable
+  //   at runtime: douga never consulted the Pacer, and every consulted
+  //   tier already runs ≥ high effort (C9 audit).
+  if (
+    !opts.opening &&
+    !opts.climbing &&
+    intent.epicness < TRIAGE_THRESHOLDS.dougaMaxEpicness &&
+    !NEVER_DOUGA.has(intent.intent)
+  ) {
     return "douga";
   }
   return "genga";

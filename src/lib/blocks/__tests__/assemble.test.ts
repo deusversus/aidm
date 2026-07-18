@@ -34,7 +34,7 @@ describe("assembleBlocks (§5.6)", () => {
     const { system } = assembleBlocks(inputs());
     expect(system).toHaveLength(3);
     for (const block of system) {
-      expect(block.cache_control).toEqual({ type: "ephemeral" });
+      expect(block.cache_control).toEqual({ type: "ephemeral", ttl: "1h" });
       expect(block.type).toBe("text");
     }
   });

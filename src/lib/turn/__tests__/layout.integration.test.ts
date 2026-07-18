@@ -159,6 +159,18 @@ describe.skipIf(!url)("Layout (real Postgres, scripted models)", () => {
       block: "Cold, patient, already speaking in past tense.",
       ...env,
     });
+    // A COMPLETED story turn so the shared campaign is past its cold open —
+    // the C9 opening floor treats "no completed story turn yet" as still
+    // the opening (correct in production; runLayout-only fixtures never
+    // reach status 'complete' on their own).
+    await db.insert(schema.turns).values({
+      campaignId,
+      turnNumber: 2,
+      tier: "genga",
+      status: "complete",
+      playerInput: "prior scene",
+      conte: { tier: "genga", stub: true },
+    });
   });
 
   afterAll(async () => {
@@ -277,6 +289,49 @@ describe.skipIf(!url)("Layout (real Postgres, scripted models)", () => {
         and(eq(schema.heatBoosts.campaignId, campaignId), eq(schema.heatBoosts.turnNumber, 5)),
       );
     expect(boosts.length).toBeGreaterThan(0);
+  });
+
+  it("C9 opening guard is WIRED: turn 1 at routine epicness routes genga, not douga", async () => {
+    if (!db) throw new Error("unreachable");
+    // Binds the layout→classifyTier opening argument (audit: reverting the
+    // callsite to classifyTier(intent) left the whole suite green). Fresh
+    // campaign so turn 1 really is the cold open.
+    const [fresh] = await db
+      .insert(schema.campaigns)
+      .values({
+        playerId,
+        title: "Opening guard fixture",
+        status: "active",
+        premiseContract: bebopContract(),
+        tierModels: {
+          narration: "claude-sonnet-5",
+          judgment: "claude-sonnet-5",
+          probe: "claude-haiku-4-5",
+        },
+      })
+      .returning();
+    if (!fresh) throw new Error("campaign insert failed");
+    try {
+      mockEmbed.mockImplementation(async (texts: string[]) => texts.map(() => basis(0)));
+      armHarness({
+        intent_triage: { ...GENGA_INTENT, intent: "DEFAULT", epicness: 0.05 },
+        pacer_micro: { beat_classification: "quiet", tone: "calm", escalation: false },
+        relevance_filter: { scores: [] },
+        outcome_judgment: {
+          success_level: "success",
+          difficulty_class: 5,
+          modifiers: [],
+          narrative_weight: "MINOR",
+          rationale: "scripted",
+        },
+      });
+      const result = await runLayout(db, fresh.id, 1, "Begin.", () => {});
+      expect(result.kind).toBe("conte");
+      if (result.kind !== "conte") return;
+      expect(result.conte.tier).toBe("genga");
+    } finally {
+      await db.delete(schema.campaigns).where(eq(schema.campaigns.id, fresh.id));
+    }
   });
 
   it("douga contract: no consultants, synthetic success, hard core still present", async () => {

@@ -112,7 +112,7 @@ Cadence per the working agreement: work → subagent audit → fix → push, per
 - **TTL per-block decision** (§5.6, explicitly assigned to M2): measured inter-turn gap distribution — live-campaign telemetry first per §0.9, soak data supplementing — decides 5-min vs 1-h TTL per block; the decision lands in code with the analysis in the commit message.
 - **TTFT targets set from reality:** live traces establish real time-to-first-token per tier; §5.5 budgets updated from aspiration to measurement; cheap wins only (no engine rework) — the heartbeat already covers the experience floor.
 - **Douga threshold calibration:** a hand-labeled set (~30 turns from soaks + live play) tunes `TRIAGE_THRESHOLDS` and the intent-probe anchors (the turn-12 epicness 0.3-vs-0.2 miss is the seed case); the third golden turn seed (douga) lands once a real douga fires. Routing stays parked (§13.6).
-- Historical NULL metering rows: **explicitly declined** — pre-tagging history isn't worth a backfill; the ledger notes the cutover date instead.
+- Historical NULL metering rows: **explicitly declined** — pre-tagging history isn't worth a backfill; the ledger notes the cutover date instead. **Cutover recorded: 2026-07-18 (the C9 commit)** — model_calls rows before it were metered at the 5m cache-write rate (1.25×) then in force; rows after it at the 1h rate (2×). Pre-C9 rows were correct for the writes they made; the two eras are not directly comparable on the cache-write component.
 - Tests: budget assertions carry the decided TTLs and measured TTFT floors; triage calibration fixtures.
 
 ### C10 — The drift soak (the gate) + the cadence learns from M1

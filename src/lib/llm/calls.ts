@@ -446,6 +446,14 @@ export function streamNarration(opts: NarrationOptions) {
 
   const stream = getAnthropic().messages.stream(body, requestOptions);
 
+  // C9: true TTFT was unmeasured everywhere — latencyMs is call-total and
+  // the §5.5 ttft targets were aspiration. Captured here to trace metadata
+  // (zero schema change); the C10 soak reads it and sets the targets.
+  let ttftMs: number | undefined;
+  stream.on("text", () => {
+    ttftMs ??= Date.now() - started;
+  });
+
   async function done(): Promise<NarrationResult> {
     let message: Message;
     try {
@@ -519,6 +527,7 @@ export function streamNarration(opts: NarrationOptions) {
       usage: { input: message.usage.input_tokens, output: message.usage.output_tokens },
       metadata: {
         latencyMs,
+        ttftMs,
         stopReason: message.stop_reason,
         fallbackUsed,
         servedBy: message.model,

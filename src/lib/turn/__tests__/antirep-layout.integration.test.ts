@@ -102,6 +102,17 @@ describe.skipIf(!url)("Layout ← anti-repetition wiring (real Postgres)", () =>
         ...ENV,
       });
     }
+    // A COMPLETED story turn so the campaign is past its cold open — the
+    // C9 opening floor otherwise routes the douga probe to genga (no
+    // completed story turn = the opening hasn't landed).
+    await db.insert(schema.turns).values({
+      campaignId,
+      turnNumber: 3,
+      tier: "genga",
+      status: "complete",
+      playerInput: "prior scene",
+      conte: { tier: "genga", stub: true },
+    });
   });
 
   afterAll(async () => {

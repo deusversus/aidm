@@ -153,7 +153,12 @@ export function assembleBlocks(inputs: BlockInputs): AssembledBlocks {
     .join("\n\n");
   const b3 = `${pinText}## Recent play (verbatim)\n\n${windowText}`;
 
-  const breakpoint = { cache_control: { type: "ephemeral" as const } };
+  // C9 (§5.6, measured 2026-07-18): live inter-turn think-time runs 19-65
+  // minutes within a sitting (p50 ~36m) — ZERO gaps fell under 5 minutes,
+  // 80% under 1 hour. A 5m TTL never survives a real player; every
+  // breakpoint writes at 1h (2x write premium, priced in llm/pricing.ts;
+  // the §5.6 pre-warm covers the over-an-hour tail).
+  const breakpoint = { cache_control: { type: "ephemeral" as const, ttl: "1h" as const } };
   const system: TextBlockParam[] = [
     { type: "text", text: b1, ...breakpoint },
     { type: "text", text: b2, ...breakpoint },

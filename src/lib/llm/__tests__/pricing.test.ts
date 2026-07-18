@@ -10,7 +10,9 @@ describe("pricing table (2026-07 rates)", () => {
     expect(pricingFor("voyage-3.5").inputPer1M).toBeCloseTo(0.06);
   });
 
-  it("cache rates follow Anthropic's multipliers (read 0.1×, 5m write 1.25×)", () => {
+  it("cache rates follow Anthropic's multipliers (read 0.1×, 1h write 2×)", () => {
+    // C9 (2026-07-18): every breakpoint writes at the 1-hour TTL — measured
+    // live think-time made the 5m rate (1.25×) a rate this engine never pays.
     for (const model of [
       "claude-fable-5",
       "claude-opus-4-8",
@@ -19,7 +21,7 @@ describe("pricing table (2026-07 rates)", () => {
     ]) {
       const p = pricingFor(model);
       expect(p.cacheReadPer1M).toBeCloseTo(p.inputPer1M * 0.1);
-      expect(p.cacheCreationPer1M).toBeCloseTo(p.inputPer1M * 1.25);
+      expect(p.cacheCreationPer1M).toBeCloseTo(p.inputPer1M * 2);
     }
   });
 
@@ -34,7 +36,7 @@ describe("pricing table (2026-07 rates)", () => {
       cache_read_input_tokens: 1_000_000,
       cache_creation_input_tokens: 1_000_000,
     });
-    expect(cost).toBeCloseTo(3 + 15 + 0.3 + 3.75);
+    expect(cost).toBeCloseTo(3 + 15 + 0.3 + 6);
   });
 
   it("a realistic cached narration turn prices sanely", () => {

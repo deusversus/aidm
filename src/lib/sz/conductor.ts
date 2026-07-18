@@ -308,7 +308,8 @@ export async function runConductorTurn(
   const [player] = await db.select().from(players).where(eq(players.id, campaign.playerId));
   const taste = (player?.profile as { taste?: string[] } | null)?.taste ?? [];
   const system: Parameters<typeof streamNarration>[0]["system"] = [
-    { type: "text", text: CONDUCTOR_SYSTEM, cache_control: { type: "ephemeral" } },
+    // C9: 1h TTL — SZ think-time is the same human as play think-time.
+    { type: "text", text: CONDUCTOR_SYSTEM, cache_control: { type: "ephemeral", ttl: "1h" } },
   ];
   if (taste.length > 0) {
     system.push({

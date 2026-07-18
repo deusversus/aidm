@@ -179,13 +179,21 @@ export const TURN_CONTRACTS: Record<TurnTier, TurnContract> = {
 };
 
 /**
- * Triage thresholds (§5.1): douga when epicness < 0.2 with no
- * combat/social/ability intent and no special-condition flags; sakuga when
- * epicness ≥ 0.7, combat, or flags; genga is the default. The triage
- * decision itself is the Phase-A probe's output — these constants keep the
- * numbers in one home.
+ * Triage thresholds (§5.1): douga when epicness < 0.3 with no
+ * combat/social/ability intent, no special-condition flags, and neither
+ * genga floor active (the cold open and escalation/climax arc phases both
+ * floor at genga — triage.ts). Sakuga when epicness ≥ 0.7, combat, or
+ * flags; genga is the default. The triage decision itself is the Phase-A
+ * probe's output — these constants keep the numbers in one home.
  */
 export const TRIAGE_THRESHOLDS = {
-  dougaMaxEpicness: 0.2,
+  // C9 calibration (39 live+soak turns, persisted epicness, 2026-07-18):
+  // the probe's emitted floor is 0.2 — douga at <0.2 was STRUCTURALLY
+  // unreachable (zero douga in the whole corpus; every ash-tap and
+  // rain-watching beat routed genga). At <0.3 the hand-labeled routine
+  // class (emitted 0.2-0.25) routes douga while the mixed 0.3 band
+  // (substantive turns emit 0.3 too) stays genga. The probe anchors
+  // (layout INTENT_SYSTEM) teach the routine class toward 0.1-0.2.
+  dougaMaxEpicness: 0.3,
   sakugaMinEpicness: 0.7,
 } as const;

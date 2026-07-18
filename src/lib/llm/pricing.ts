@@ -8,7 +8,9 @@
  * silently corrupt the ledger.
  *
  * Rates as of 2026-07 (user-confirmed model set). Cache math per Anthropic:
- * read = 0.1× input, 5-minute-TTL write = 1.25× input.
+ * read = 0.1× input; write = 2× input at the 1-HOUR TTL every breakpoint
+ * now uses (C9, measured 2026-07-18: no live inter-turn gap fits 5 minutes;
+ * the 1.25× 5m rate no longer occurs in this engine).
  */
 
 export interface ModelPricing {
@@ -18,7 +20,7 @@ export interface ModelPricing {
   outputPer1M: number;
   /** USD per 1M cache-read input tokens. */
   cacheReadPer1M: number;
-  /** USD per 1M cache-creation input tokens (5m TTL). */
+  /** USD per 1M cache-creation input tokens (1h TTL — the engine's only write). */
   cacheCreationPer1M: number;
 }
 
@@ -27,13 +29,13 @@ const PRICING: Record<string, ModelPricing> = {
     inputPer1M: 10,
     outputPer1M: 50,
     cacheReadPer1M: 1,
-    cacheCreationPer1M: 12.5,
+    cacheCreationPer1M: 20,
   },
   "claude-opus-4-8": {
     inputPer1M: 5,
     outputPer1M: 25,
     cacheReadPer1M: 0.5,
-    cacheCreationPer1M: 6.25,
+    cacheCreationPer1M: 10,
   },
   // List price; an intro rate ($2/$10) runs through 2026-08-31 — we meter
   // at list, a deliberate over-estimate that self-corrects in September.
@@ -41,13 +43,13 @@ const PRICING: Record<string, ModelPricing> = {
     inputPer1M: 3,
     outputPer1M: 15,
     cacheReadPer1M: 0.3,
-    cacheCreationPer1M: 3.75,
+    cacheCreationPer1M: 6,
   },
   "claude-haiku-4-5": {
     inputPer1M: 1,
     outputPer1M: 5,
     cacheReadPer1M: 0.1,
-    cacheCreationPer1M: 1.25,
+    cacheCreationPer1M: 2,
   },
   // Voyage bills input tokens only (embeddings have no output tokens).
   "voyage-3.5": {

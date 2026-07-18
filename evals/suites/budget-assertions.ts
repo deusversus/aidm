@@ -48,12 +48,15 @@ export const THINKING_ALLOWANCE_TOKENS: Record<TurnTier, number> = {
  * never quality headroom (§0: budgets catch waste, never trim depth).
  */
 export const COLD_TURN_CEILING_USD: Record<TurnTier, number> = {
-  douga: 0.5,
-  // Re-raised with the C8 allowance bump (model: genga $0.7275, sakuga
-  // $1.455 cold at Fable) — the ~10% regression margin restored (C8 audit
-  // #6: the bump had silently compressed it to 3%).
-  genga: 0.8,
-  sakuga: 1.6,
+  // C9 re-set: the 1h-TTL decision raises every cold write from 1.25x to
+  // 2x input (measured think-time made 5m worthless — see pricing.ts), so
+  // the honest cold model rose to douga $0.65 / genga $0.93 / sakuga $1.77
+  // at Fable. Ceilings sit ~10% over — regression margin, never headroom.
+  // The EXPECTED per-turn cost falls despite this: 1h caching converts
+  // most real turns from full-prefix rewrites into 0.1x reads.
+  douga: 0.72,
+  genga: 1.05,
+  sakuga: 1.95,
 };
 
 export interface TurnCostModel {

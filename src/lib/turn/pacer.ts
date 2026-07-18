@@ -81,10 +81,13 @@ export interface PacerResult {
    *  arc event by the integrator — never applied to state (§7 pacer suggests,
    *  director disposes). */
   phaseTransition?: string;
-  /** Escalation beats run ≥high effort — narratively trivial ≠ functionally trivial. */
-  promoteEffort: boolean;
   timedOut: boolean;
 }
+// §3's "escalation beats run ≥ high" guard moved to triage (C9): the tier
+// floor fires on the arc's escalation/climax phase BEFORE routing, where a
+// low-effort turn can actually be prevented. The old promoteEffort output
+// here was unsatisfiable — douga never consulted the Pacer, and every
+// consulted tier already runs ≥ high.
 
 export interface PacerInput {
   /** Rendered intent line (e.g. "COMBAT, epicness 0.70"). */
@@ -200,7 +203,7 @@ export async function runPacer(
   // A rejected probe is treated like a timeout: no directive, the turn proceeds.
   const directive = await Promise.race([call.catch(() => null), timeout]);
   if (timer) clearTimeout(timer);
-  if (!directive) return { promoteEffort: false, timedOut: true };
+  if (!directive) return { timedOut: true };
 
   const notes: string[] = [];
   if (directive.pacing_note) notes.push(directive.pacing_note);
@@ -288,19 +291,10 @@ export async function runPacer(
     strength,
   };
 
-  // Escalation beats must never be starved of craft budget (§3 caveat):
-  // promote low-effort turns when the beat carries weight and the story is
-  // climbing (escalation/climax phase, or a transition is on the table).
-  const climbing =
-    (arc !== null && (arc.phase === "escalation" || arc.phase === "climax")) ||
-    phaseTransition !== undefined;
-  const promoteEffort = strength !== "suggestion" && climbing;
-
   return {
     beat,
     pacingNote: notes.length > 0 ? notes.join(" · ") : undefined,
     phaseTransition,
-    promoteEffort,
     timedOut: false,
   };
 }

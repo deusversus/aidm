@@ -82,8 +82,11 @@ export const INTENT_SYSTEM = [
   "INVENTORY/WORLD_BUILDING for story actions; META_FEEDBACK for",
   "out-of-fiction talk to the studio; OVERRIDE_COMMAND for standing-rule",
   "demands; OP_COMMAND for explicit mechanical cheats/admin). epicness 0-1:",
-  "how large this beat wants to play (0.1 = walking to the shop, 0.5 = a",
-  "charged confrontation, 0.9 = the season's peak). special_conditions:",
+  "how large this beat wants to play. 0.1-0.2 = a ROUTINE beat: lighting a",
+  "cigarette, watching the rain, pouring coffee, a wordless transition —",
+  "atmosphere the scene carries on a small canvas. 0.5 = a charged",
+  "confrontation. 0.9 = the season's peak. A bare 'continue' inherits the",
+  "running scene's full weight — never routine. special_conditions:",
   "TROPE flags only, from this vocabulary: transformation, sacrifice_play,",
   "named_attack, unleashed_form, last_stand, power_reveal, breaking_point.",
   "These route the scene to full craft budget — NEVER flag ordinary",
@@ -170,7 +173,14 @@ export async function runLayout(
     .map((r) => (r.conte as Conte | null)?.pacer_beat?.beat_classification)
     .filter((b): b is string => Boolean(b));
 
-  const tier = classifyTier(intent);
+  // C9 floors: opening also covers a channel-consumed turn 1 (no completed
+  // STORY turn in the window ⇒ the cold open hasn't happened yet — a false
+  // positive merely over-crafts a routine beat, never the reverse), and
+  // climbing carries §3's escalation guard at tier level.
+  const opening = turnNumber === 1 || recentTurnRows.every((r) => r.conte == null);
+  const climbing =
+    arcState !== null && (arcState.phase === "escalation" || arcState.phase === "climax");
+  const tier = classifyTier(intent, { opening, climbing });
   const turnContract = TURN_CONTRACTS[tier];
   const ladder = createDegradeClock(PHASE_A_BUDGET_MS[tier] ?? 12_000, (step, ms) => {
     console.warn(`[layout] degrade ladder fired: ${step} at ${ms}ms (turn ${turnNumber})`);
@@ -329,7 +339,7 @@ export async function runLayout(
           campaignId,
           turnNumber,
         })
-      : Promise.resolve<import("./pacer").PacerResult>({ promoteEffort: false, timedOut: false }),
+      : Promise.resolve<import("./pacer").PacerResult>({ timedOut: false }),
     // Amendments window (§4.4a/b): marks since the last session-open Settei
     // rebuild ride the Amendments; the rebuild bakes them into the Charter.
     // Pre-C7 campaigns (no snapshot yet) keep the legacy 10-turn window.
@@ -575,8 +585,11 @@ export async function runLayout(
   // Boost accumulation: write-only seam until C6's G2 UPDATE binds.
   await recordBoosts(db, campaignId, turnNumber, filtered);
 
-  const effort: TurnEffort =
-    pacer.promoteEffort && turnContract.effort === "low" ? "high" : turnContract.effort;
+  // §3's escalation promotion is realized at TIER level (the climbing floor
+  // above): every pacer-consulted tier already runs ≥ high effort, so the
+  // old effort-level promotion here was unsatisfiable (C9 audit — dead at
+  // both the computation and consumption ends).
+  const effort: TurnEffort = turnContract.effort;
 
   const hasAssertion =
     worldAssertionNotes.writes.length > 0 ||

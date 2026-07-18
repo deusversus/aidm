@@ -255,7 +255,6 @@ describe("runPacer — null arc state (no Director has run)", () => {
     expect(res.beat?.must_reference).toEqual(["the open hatch"]);
     expect(res.beat?.avoid).toEqual(["rushing the reveal"]);
     expect(res.phaseTransition).toBeUndefined();
-    expect(res.promoteEffort).toBe(false);
     expect(res.pacingNote).toContain("no arc state");
   });
 });
@@ -270,7 +269,6 @@ describe("runPacer — timebox (a slow Pacer never stalls Phase A)", () => {
     );
     expect(res.timedOut).toBe(true);
     expect(res.beat).toBeUndefined();
-    expect(res.promoteEffort).toBe(false);
     expect(res.phaseTransition).toBeUndefined();
   });
 
@@ -283,7 +281,6 @@ describe("runPacer — timebox (a slow Pacer never stalls Phase A)", () => {
     );
     expect(res.timedOut).toBe(true);
     expect(res.beat).toBeUndefined();
-    expect(res.promoteEffort).toBe(false);
   });
 });
 
@@ -393,39 +390,31 @@ describe("runPacer — beat-shape variety (§7.2/§5.3: the live watch item)", (
   });
 });
 
-describe("runPacer — promoteEffort truth table (§3: trivial ≠ functionally trivial)", () => {
-  it("escalation phase, gate-raised to strong → promote", async () => {
+describe("runPacer — the strength gate under climbing phases (§3 record)", () => {
+  // The §3 escalation guard moved to TRIAGE at C9 (the climbing tier
+  // floor — see triage-calibration.test.ts): promoteEffort was
+  // unsatisfiable at runtime (douga never consulted the Pacer; consulted
+  // tiers already run ≥ high). What remains the Pacer's job is the
+  // strength gate: deep-in-phase beats rise from suggestion to strong.
+  it("escalation phase, deep in phase → gate raises to strong", async () => {
     arm({ strength: "suggestion" });
     const res = await runPacer(
       DEV_TIER_SELECTION,
       makeInput({ arcState: makeArc({ phase: "escalation", turnsInPhase: 7 }) }),
     );
     expect(res.beat?.strength).toBe("strong");
-    expect(res.promoteEffort).toBe(true);
   });
 
-  it("escalation phase but still suggestion → no promote", async () => {
+  it("escalation phase early → still a suggestion", async () => {
     arm({ strength: "suggestion" });
     const res = await runPacer(
       DEV_TIER_SELECTION,
       makeInput({ arcState: makeArc({ phase: "escalation", turnsInPhase: 2 }) }),
     );
     expect(res.beat?.strength).toBe("suggestion");
-    expect(res.promoteEffort).toBe(false);
   });
 
-  it("rising phase at strong but not climbing → no promote", async () => {
-    arm({ strength: "suggestion" });
-    const res = await runPacer(
-      DEV_TIER_SELECTION,
-      makeInput({ arcState: makeArc({ phase: "rising", turnsInPhase: 9 }) }),
-    );
-    expect(res.beat?.strength).toBe("strong");
-    expect(res.phaseTransition).toBeUndefined();
-    expect(res.promoteEffort).toBe(false);
-  });
-
-  it("a set transition makes a strong beat promote even mid-rising", async () => {
+  it("a set transition rides out even mid-rising", async () => {
     arm({ strength: "strong", phase_transition: "escalation" });
     const res = await runPacer(
       DEV_TIER_SELECTION,
@@ -433,16 +422,5 @@ describe("runPacer — promoteEffort truth table (§3: trivial ≠ functionally 
     );
     expect(res.phaseTransition).toBe("escalation");
     expect(res.beat?.strength).toBe("strong");
-    expect(res.promoteEffort).toBe(true);
-  });
-
-  it("climax phase, gate-raised to strong → promote", async () => {
-    arm({ strength: "suggestion" });
-    const res = await runPacer(
-      DEV_TIER_SELECTION,
-      makeInput({ arcState: makeArc({ phase: "climax", turnsInPhase: 5 }) }),
-    );
-    expect(res.beat?.strength).toBe("strong");
-    expect(res.promoteEffort).toBe(true);
   });
 });

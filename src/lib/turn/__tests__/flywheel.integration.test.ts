@@ -525,7 +525,7 @@ describe.skipIf(!url)(
     // (§6 layer 9: Critical → guaranteed injection every turn).
     it(
       "layer 9 CRITICAL → an sz_fact is injected into a douga turn's hard_constraints",
-      { timeout: 30_000 },
+      { timeout: 60_000 },
       async () => {
         if (!db) throw new Error("unreachable");
         const campaignId = await makeCampaign();
@@ -541,9 +541,12 @@ describe.skipIf(!url)(
         });
         armModels({ intent: "EXPLORATION", epicness: 0.1 }); // → douga tier
 
+        // Turn 1 is the cold open — the C9 opening guard floors it to genga
+        // — so the douga probe runs on turn 2.
+        await collectTurn(db, campaignId, "I step aboard and take stock.");
         await collectTurn(db, campaignId, "I glance around the quiet hold.");
 
-        const conte = await readConte(db, campaignId, 1);
+        const conte = await readConte(db, campaignId, 2);
         expect(conte.tier).toBe("douga");
         expect(conte.hard_constraints.some((c) => c.includes(CRITICAL))).toBe(true);
         await settleG2IfPending(db, campaignId);
