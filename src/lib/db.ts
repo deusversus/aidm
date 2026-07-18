@@ -27,6 +27,13 @@ export function getDb(): Db {
     connectionString: env.DATABASE_URL,
     max: 10,
   });
+  // An idle client dropped by the platform (Railway proxy terminations —
+  // observed twice in the M2 drift soak, 2026-07-18) emits 'error' on the
+  // POOL; with no listener Node raises an uncaught 'error' event and kills
+  // the process mid-turn. Log and let the pool replace the client.
+  _pool.on("error", (err) => {
+    console.warn("[db] idle client error — pool replaces the connection:", err.message);
+  });
   _db = drizzle(_pool, { schema, casing: "snake_case" });
 
   // Graceful shutdown — Railway sends SIGTERM on redeploy. Drain the pool so

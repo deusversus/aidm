@@ -58,6 +58,15 @@ This file is loaded into context on every Claude session in this repo. It's the 
 - "Clean commit" is a valid outcome. Don't manufacture findings.
 - **The push gate is the FULL remote gate**: `pnpm lint && pnpm typecheck && pnpm test && pnpm evals:ci` — CI runs these same gates (plus a db:migrate setup step), and `evals:ci` is NOT part of `pnpm test`. After pushing, confirm the remote run went green (`gh run list --limit 1`). Gate commands run BARE or `&&`-chained on their own exit codes — piping a gate through grep/tail in the same chain as commit/push swallows the failure (it happened: a red vitest run pushed on 2026-07-11; the failure was flaky, the hole was real). (Learned 2026-07-11: CI was red for seven pushes because evals:ci never ran locally.)
 
+### Presentation pass (player-facing changes; C10 discipline)
+
+The soak proves the engine, never the experience (M1 retro). Any change a player can see gets, before its commit:
+
+- **Browser-verify every touched surface** with real campaign data — not a fixture, not "typecheck green." Structural DOM checks count when the screenshot pipe flakes; a claim without either is a violation.
+- **The long-turn case:** a deep-tier KA can think minutes before prose streams — check the staging line, elapsed timer, and that the surface doesn't read as hung.
+- **The dropped-stream case:** kill or lose the stream mid-turn and confirm the surface recovers honestly (retry affordance, no frozen half-scene presented as done).
+- Both themes if the surface styles anything; `pnpm env:parity` if the change adds env keys.
+
 ### Commits
 
 - **Thorough over tiny.** Each commit is a substantial, coherent unit — more coverage per audit cycle.

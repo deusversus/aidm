@@ -203,11 +203,13 @@ export async function runKeyAnimator(
       selection: args.selection,
       system: args.system,
       messages,
-      // Adaptive thinking spends from this budget too. 16k headroom, not 8k:
-      // the M1 soak caught a sakuga scene truncating when a hard beat's
-      // thinking alone ate the 8k (fourth sighting of the class — conductor
-      // 8k, OSP 16k, C5 KA, now sakuga). A ceiling, never a target (§5.5).
-      maxTokens: args.maxTokens + 16_000,
+      // Adaptive thinking spends from this budget too. 24k headroom: the M1
+      // soak caught sakuga truncating at 8k (fourth sighting); the M2 drift
+      // soak caught Sonnet sakuga truncating at 16k TWICE on one hard beat
+      // (eighth sighting — turn 9, both attempts exactly at the cap). A
+      // ceiling that fails a turn trims depth (§0 inversion); this one is
+      // a runaway guard only. Only produced tokens bill (§5.5).
+      maxTokens: args.maxTokens + 24_000,
       effort: args.effort === "xhigh" ? "xhigh" : args.effort === "low" ? "low" : "high",
       tools,
       campaignId: args.campaignId,

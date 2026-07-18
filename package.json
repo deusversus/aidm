@@ -2,7 +2,7 @@
   "name": "aidm",
   "version": "0.0.1",
   "private": true,
-  "description": "AIDM v5 — an engine for co-telling long-form fiction that stays true to a premise",
+  "description": "AIDM v5 \u2014 an engine for co-telling long-form fiction that stays true to a premise",
   "type": "module",
   "engines": {
     "node": ">=22"
@@ -31,7 +31,9 @@
     "grounding:check": "tsx scripts/grounding-check.ts",
     "research": "tsx --env-file=.env.local scripts/research.ts",
     "soak": "tsx --env-file=.env.local scripts/soak.ts",
-    "langfuse:latest": "tsx --env-file=.env.local scripts/langfuse-latest.ts"
+    "langfuse:latest": "tsx --env-file=.env.local scripts/langfuse-latest.ts",
+    "env:parity": "tsx --env-file=.env.local scripts/env-parity.ts",
+    "drift-soak": "tsx --env-file=.env.local scripts/drift-soak.ts"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.114",

@@ -33,6 +33,14 @@ const envSchema = z.object({
 
 export type Env = z.infer<typeof envSchema>;
 
+/** Schema key names (no parse, build-safe) — the env-parity check's expected set. */
+export const ENV_KEYS = Object.keys(envSchema.shape) as (keyof Env)[];
+
+/** Keys with schema defaults — absent on the deploy target is fine for these. */
+export const ENV_KEYS_WITH_DEFAULTS = Object.entries(envSchema.shape)
+  .filter(([, s]) => s instanceof z.ZodDefault)
+  .map(([k]) => k);
+
 // Lazy validation. Parsing at module import breaks Next.js production builds,
 // which import route handlers during page-data collection without runtime env
 // set. Instead, validate on first property access — which only happens at
