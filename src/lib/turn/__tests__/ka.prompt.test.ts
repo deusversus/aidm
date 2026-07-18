@@ -1,0 +1,72 @@
+import { renderPresentationGrants } from "@/lib/blocks/assemble";
+import { describe, expect, it } from "vitest";
+import { KA_CONTRACT } from "../ka";
+
+/**
+ * SV4 camera spec (user-directed 2026-07-18): the KA holds cinematographic
+ * awareness as a standing faculty, not per-failure rules — prose is a
+ * camera; the player follows the edit like they'd follow anime's visual
+ * grammar. Pinned like any contract: load-bearing phrases asserted so a
+ * regression is a diff, not a drift. Failure mode: T6 Return by Design
+ * (2026-07-17) — a flashback in the live-readout channel read as an
+ * unplaced present-tense scene.
+ */
+
+describe("KA contract camera faculty (SV4)", () => {
+  it("the camera section exists and names the faculty, not a rule list", () => {
+    expect(KA_CONTRACT).toContain("## The camera");
+    expect(KA_CONTRACT).toContain("Prose is a camera");
+    // Awareness spans framing, coverage, and the edit — the three choices
+    // the KA is always making whether it knows it or not.
+    for (const word of ["framing", "coverage", "the edit"]) {
+      expect(KA_CONTRACT).toContain(word);
+    }
+    // Illustrative techniques present as examples (intercut/simultaneity,
+    // flashback), never as the boundary of the toolkit.
+    expect(KA_CONTRACT).toContain("intercut");
+    expect(KA_CONTRACT).toContain("flashback");
+    // The toolkit is licensed UNDER the charter, never against it (audit:
+    // a linear premise's "no flashbacks" pressure shares this block).
+    expect(KA_CONTRACT).toContain("The whole toolkit is yours");
+    expect(KA_CONTRACT).toContain("the charter above has already decided");
+  });
+
+  it("the one law: legibility of the edit, visible at the cut", () => {
+    expect(KA_CONTRACT).toContain("legibility of the edit");
+    expect(KA_CONTRACT).toContain("visible AT the cut");
+    // Deliberate ambiguity stays licensed — mystery is craft, not a violation.
+    expect(KA_CONTRACT).toContain("on purpose");
+  });
+
+  it("established channels keep their contracts (the T6 class)", () => {
+    expect(KA_CONTRACT).toContain("keeps its contract");
+    expect(KA_CONTRACT).toContain("mark the variant");
+  });
+
+  it("the trailer discipline still closes the contract (recency preserved)", () => {
+    // The camera section must not displace the measured trailer-drop close
+    // from last position (C8: 50% drop rate at long scenes — recency is the fix).
+    const camera = KA_CONTRACT.indexOf("## The camera");
+    const close = KA_CONTRACT.indexOf("The scene is not finished when the prose ends");
+    expect(camera).toBeGreaterThan(-1);
+    expect(close).toBeGreaterThan(camera);
+    // LAST position, not merely after-the-camera: the contract must END on
+    // the trailer close — any future section appended below it re-breaks
+    // the measured 50% drop rate.
+    expect(KA_CONTRACT.trimEnd().endsWith("lossier than your own record.)")).toBe(true);
+  });
+});
+
+describe("presentation grants channel contract (SV4, Settei-side)", () => {
+  it("grants render with the tense/diegesis contract attached", () => {
+    const text = renderPresentationGrants(["diegetic System status windows", "bare prose"]);
+    expect(text).toContain("## Presentation vocabulary");
+    expect(text).toContain("- diegetic System status windows");
+    expect(text).toContain("tense and diegesis it was granted for");
+    expect(text).toContain("mark the variant");
+  });
+
+  it("no grants, no contract — renders nothing", () => {
+    expect(renderPresentationGrants([])).toBe("");
+  });
+});

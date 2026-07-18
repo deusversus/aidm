@@ -7,7 +7,7 @@ import { DirectionState, SetteiSnapshot } from "@/lib/types/direction";
 import { PencilMark, activeMarks } from "@/lib/types/marks";
 import { PremiseContract } from "@/lib/types/premise";
 import { and, asc, desc, eq } from "drizzle-orm";
-import { type AssembledBlocks, assembleBlocks } from "./assemble";
+import { type AssembledBlocks, assembleBlocks, renderPresentationGrants } from "./assemble";
 import { compactionWatermark, loadBeats, workingWindow } from "./compaction";
 
 /**
@@ -92,11 +92,7 @@ export async function assembleForCampaign(
     });
   }
 
-  const grants = contract.presentation_vocabulary.grants;
-  const presentation =
-    grants.length > 0
-      ? `\n\n## Presentation vocabulary (granted — use at your judgment, never as obligation)\n${grants.map((g) => `- ${g}`).join("\n")}`
-      : "";
+  const presentation = renderPresentationGrants(contract.presentation_vocabulary.grants);
 
   const block1 = `${setteiText}${presentation}\n\n${KA_CONTRACT}`;
 

@@ -31,6 +31,17 @@ export interface ExchangeRow {
   narration: string;
 }
 
+/**
+ * §8 presentation grants, rendered for Block 1 — with the channel contract
+ * (SV4): a granted device carries the tense/diegesis it was granted for,
+ * the Settei-side half of the KA contract's camera law. Empty grants render
+ * nothing (no channels granted, no contract needed).
+ */
+export function renderPresentationGrants(grants: string[]): string {
+  if (grants.length === 0) return "";
+  return `\n\n## Presentation vocabulary (granted — use at your judgment, never as obligation)\n${grants.map((g) => `- ${g}`).join("\n")}\nEach grant carries the tense and diegesis it was granted for. A channel the campaign has taught the player to read one way never silently carries another time or another speaker — when a granted device does double duty, mark the variant so the cut is visible (the camera law, below).`;
+}
+
 export interface BeatRow {
   position: number;
   content: string;

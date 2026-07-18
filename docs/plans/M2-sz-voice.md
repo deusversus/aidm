@@ -43,6 +43,18 @@
 - **The circuit closes**: layout reads `contract.pc_power_tier ?? worldBaseline` — the hardcode dies with a comment pointing here. At gap ≥3 the OP-mode machinery activates exactly as v3 shipped it.
 - Tests: compiler resolution (tier + framing choices, latest-wins, malformed-JSON deferrals); layout consumes the chosen tier (OP context renders at gap ≥3, DC floor engages); a scripted gap-≥2 transcript records a configuration; keyless/tier-less drafts default to baseline exactly as today (no regression for existing campaigns).
 
+## SV4 — the camera: cinematographic awareness as a standing faculty
+
+*User-directed 2026-07-18. Failure mode (live, Return by Design T6, 2026-07-17): a first-life death flashback rendered in the same `>` readout channel five turns had established as present-tense tactical reads — the player experienced his own SZ backstory as "a scenario I don't recall being in." The class is broader than temporal cuts (intercut simultaneity, close-ups, POV — every scene the KA chooses framing, coverage, and edit without knowing they're choices), so the fix is a FACULTY, not per-failure rules — the user's direction: make the agent AWARE of the lens; the player must follow the edit the way they'd follow anime visually. Pillar: §8 presentation-vocabulary-as-authorial-judgment; the register's own vocabulary (Conte = storyboard, Layout = camera placement) finally taken literally.*
+
+- KA_CONTRACT gains "## The camera": prose-as-camera awareness (framing / coverage / edit), one law — legibility of the edit, visible at the cut, entry and exit, with deliberate ambiguity explicitly licensed — and the channel contract: an established device never silently carries another tense or speaker. Techniques appear as illustrations, never as an enumerated boundary.
+- The Block-1 presentation-grants render gains the Settei-side half of the channel contract, extracted to pure `renderPresentationGrants` for test reach.
+- Prompt-spec tests pin both halves; the trailer-discipline close keeps LAST position in the contract (the C8 recency fix is load-bearing — measured 50% drop without it).
+
+## Ledger additions (2026-07-18)
+
+4. **beat_craft has no reader** — `rule_library/beat_craft/phases.yaml` is carried v3-audit-closure content whose consumer (`getBeatCraftGuidance`) only ever existed in the shelved v4 tree; v5 renders phase craft via the Pacer beat + scene-shape directives instead. A writer-with-no-reader hiding in the library: wire a reader or retire the file to reference. Home: M2 C10 presentation pass, else M3.
+
 ## Acceptance
 
 1. SV1: a live re-research of Re:ZERO writes a profile (the user's stuck draft resumes).
