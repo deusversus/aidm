@@ -1,8 +1,10 @@
 "use client";
 
 import { fetchWithAuthRetry } from "@/lib/client/fetch-with-auth";
+import { plainProse } from "@/lib/client/plain-prose";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { NarrationProse } from "./narration-prose";
 
 type ChannelIntent = "META_FEEDBACK" | "OVERRIDE_COMMAND" | "OP_COMMAND";
 
@@ -545,7 +547,10 @@ export function PlayView({
       setPinNotice("Select a passage in the story first.");
       return;
     }
-    const source = exchanges.find((e) => e.narration.includes(selection));
+    // The player selects RENDERED text (no markdown syntax); stored
+    // narration is raw markdown — match on the plaintext projection.
+    const normalized = selection.replace(/\s+/g, " ").trim();
+    const source = exchanges.find((e) => plainProse(e.narration).includes(normalized));
     const res = await fetchWithAuthRetry(`/api/campaigns/${campaignId}/pins`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -785,6 +790,13 @@ export function PlayView({
     <main className="mx-auto flex h-screen max-w-3xl flex-col px-6 py-6">
       <header className="flex items-end justify-between border-b border-border pb-3">
         <div>
+          <Link
+            href="/campaigns"
+            className="text-[10px] uppercase tracking-widest text-muted-foreground/60 hover:text-muted-foreground"
+            title="Back to the shelf — your campaigns"
+          >
+            ← campaigns
+          </Link>
           <h1 className="text-lg font-semibold tracking-tight">{title}</h1>
           <p className="text-xs text-muted-foreground">
             Say what you do. The studio does the rest.
@@ -1149,9 +1161,10 @@ export function PlayView({
             <p className="mb-1 text-[10px] uppercase tracking-widest text-muted-foreground/60">
               previously
             </p>
-            <p className="whitespace-pre-wrap text-sm italic leading-7 text-muted-foreground">
-              {recap}
-            </p>
+            <NarrationProse
+              text={recap}
+              className="text-sm italic leading-7 text-muted-foreground [&_em]:not-italic"
+            />
           </div>
         )}
         {exchanges.length === 0 &&
@@ -1215,9 +1228,10 @@ export function PlayView({
                 </p>
                 <p className="text-sm text-muted-foreground">{e.playerInput}</p>
                 {e.narration && (
-                  <p className="whitespace-pre-wrap text-sm italic leading-7 text-foreground/90">
-                    {e.narration}
-                  </p>
+                  <NarrationProse
+                    text={e.narration}
+                    className="text-sm italic leading-7 text-foreground/90 [&_em]:not-italic"
+                  />
                 )}
                 {e.closed && (
                   <p className="text-[11px] italic text-muted-foreground/60">
@@ -1234,7 +1248,7 @@ export function PlayView({
                   {e.playerInput}
                 </div>
               </div>
-              <div className="whitespace-pre-wrap text-[15px] leading-7">{e.narration}</div>
+              <NarrationProse text={e.narration} />
             </div>
           );
         })}
@@ -1245,12 +1259,7 @@ export function PlayView({
             </div>
           </div>
         )}
-        {streamText && (
-          <div className="whitespace-pre-wrap text-[15px] leading-7">
-            {streamText}
-            <span className="animate-pulse">▋</span>
-          </div>
-        )}
+        {streamText && <NarrationProse text={streamText} streaming />}
         {staging && (
           <p className="text-xs italic text-muted-foreground">
             {staging}…
@@ -1335,9 +1344,10 @@ export function PlayView({
             <p className="mb-1 text-[10px] uppercase tracking-widest text-muted-foreground/60">
               next time
             </p>
-            <p className="whitespace-pre-wrap text-sm italic leading-7 text-muted-foreground">
-              {yokoku}
-            </p>
+            <NarrationProse
+              text={yokoku}
+              className="text-sm italic leading-7 text-muted-foreground [&_em]:not-italic"
+            />
           </div>
         )}
         {sessionClosed && (
