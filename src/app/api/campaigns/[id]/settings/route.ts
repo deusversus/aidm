@@ -1,7 +1,9 @@
 import { getCurrentUser } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import { campaigns } from "@/lib/db/schema";
+import { env } from "@/lib/env";
 import { TIER_MENUS, TierSelection } from "@/lib/llm/tiers";
+import { availableVoices, ttsConfigured } from "@/lib/tts/elevenlabs";
 import { PremiseContract, SuggestionAffordance } from "@/lib/types/premise";
 import { eq, sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
@@ -29,6 +31,10 @@ const SettingsPatch = z
     judgment: z.enum(TIER_MENUS.judgment).optional(),
     probe: z.enum(TIER_MENUS.probe).optional(),
     suggestion_affordance: SuggestionAffordance.optional(),
+    /** §9.5 voice preference (listen button) — a machinery preference like
+     *  the tier menus, NOT a premise-contract field; validated against the
+     *  available voice set in the handler. */
+    voice_id: z.string().min(1).optional(),
   })
   .strict();
 
@@ -51,10 +57,22 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   }
   const tiers = TierSelection.safeParse(campaign.tierModels);
   const contract = campaign.premiseContract as { suggestion_affordance?: string } | null;
+  // §9.5 voice options: the player's library when the key permits, the
+  // curated premades otherwise; absent entirely when TTS is off.
+  const voice = ttsConfigured() ? await availableVoices() : null;
   return NextResponse.json({
     tiers: tiers.success ? tiers.data : null,
     suggestion_affordance: contract?.suggestion_affordance ?? "on_request_only",
     menus: TIER_MENUS,
+    ...(voice
+      ? {
+          voices: voice.voices,
+          voice_source: voice.source,
+          voice_id:
+            (campaign.voiceSettings as { voice_id?: string } | null)?.voice_id ??
+            env.ELEVENLABS_VOICE_ID,
+        }
+      : {}),
   });
 }
 
@@ -68,13 +86,39 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const body = SettingsPatch.safeParse(await req.json().catch(() => ({})));
   if (!body.success) {
     return NextResponse.json(
-      { error: "only tier menus and suggestion_affordance are writable (M4 owns the rest)" },
+      {
+        error:
+          "only tier menus, suggestion_affordance, and voice_id are writable (M4 owns the rest)",
+      },
       { status: 400 },
     );
   }
   const patch = body.data;
   if (Object.keys(patch).length === 0) {
     return NextResponse.json({ error: "empty patch" }, { status: 400 });
+  }
+
+  // Ownership BEFORE voice validation (audit): a non-owner must see 404 —
+  // never trigger the upstream voices fetch, never learn from the 422/404
+  // split whether a voice id exists. The transaction re-checks under lock.
+  const [owned] = await db
+    .select({ playerId: campaigns.playerId })
+    .from(campaigns)
+    .where(eq(campaigns.id, id));
+  if (!owned || owned.playerId !== user.id) {
+    return NextResponse.json({ error: "not found" }, { status: 404 });
+  }
+
+  // Voice validation happens OUTSIDE the row lock (it may call ElevenLabs):
+  // the id must come from the available set — never an arbitrary string.
+  if (patch.voice_id) {
+    if (!ttsConfigured()) {
+      return NextResponse.json({ error: "voice not configured — cannot apply" }, { status: 422 });
+    }
+    const { voices } = await availableVoices();
+    if (!voices.some((v) => v.voice_id === patch.voice_id)) {
+      return NextResponse.json({ error: "unknown voice — cannot apply" }, { status: 422 });
+    }
   }
 
   // Row lock: the log append and the two jsonb writes are read-modify-write.
@@ -129,6 +173,18 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       }
     }
 
+    // §9.5 voice preference: a jsonb beside tierModels, never the contract.
+    let nextVoice: { voice_id: string } | null = null;
+    if (patch.voice_id) {
+      const currentVoice =
+        (campaign.voiceSettings as { voice_id?: string } | null)?.voice_id ??
+        env.ELEVENLABS_VOICE_ID;
+      if (currentVoice !== patch.voice_id) {
+        changes.push({ at: now, field: "voice_id", from: currentVoice, to: patch.voice_id });
+        nextVoice = { voice_id: patch.voice_id };
+      }
+    }
+
     if (changes.length === 0) return { status: 200 as const, changes, narrationChanged: false };
 
     await tx
@@ -136,6 +192,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       .set({
         ...(nextTiers ? { tierModels: nextTiers } : {}),
         ...(nextContract ? { premiseContract: nextContract } : {}),
+        ...(nextVoice ? { voiceSettings: nextVoice } : {}),
         settingsLog: [...log, ...changes],
         updatedAt: new Date(),
       })

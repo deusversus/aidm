@@ -17,6 +17,18 @@ import { GET, PATCH } from "../route";
 vi.mock("@/lib/auth", () => ({ getCurrentUser: vi.fn() }));
 const mockUser = vi.mocked(getCurrentUser);
 
+// The ElevenLabs HTTP boundary is stubbed (like auth); the DB stays real.
+// availableVoices is replaced wholesale because its internal listVoices call
+// can't be intercepted through the module seam.
+vi.mock("@/lib/tts/elevenlabs", async (importOriginal) => {
+  const orig = await importOriginal<typeof import("@/lib/tts/elevenlabs")>();
+  return {
+    ...orig,
+    ttsConfigured: () => true,
+    availableVoices: async () => ({ voices: orig.CURATED_VOICES, source: "curated" as const }),
+  };
+});
+
 const url = process.env.DATABASE_URL;
 if (!url) console.warn("[settings-route] DATABASE_URL not set — skipping");
 const pool = url ? new Pool({ connectionString: url, max: 2 }) : undefined;
@@ -143,6 +155,59 @@ describe.skipIf(!url)("settings route (M2 C5, real Postgres)", () => {
       .from(schema.campaigns)
       .where(eq(schema.campaigns.id, campaignId));
     expect(row?.log).toEqual([]);
+  });
+
+  it("voice change round-trips: DB voiceSettings updated, log carries the change, no handoff note", async () => {
+    if (!db) throw new Error("unreachable");
+    const rachel = "21m00Tcm4TlvDq8ikWAM";
+    const res = await PATCH(patchReq({ voice_id: rachel }), params(campaignId));
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { changes: { field: string; to: string }[]; note?: string };
+    expect(body.changes).toEqual([expect.objectContaining({ field: "voice_id", to: rachel })]);
+    expect(body.note).toBeUndefined();
+
+    const [row] = await db
+      .select({ vs: schema.campaigns.voiceSettings, log: schema.campaigns.settingsLog })
+      .from(schema.campaigns)
+      .where(eq(schema.campaigns.id, campaignId));
+    expect(row?.vs).toEqual({ voice_id: rachel });
+    expect(row?.log).toHaveLength(1);
+  });
+
+  it("a voice id outside the available set is 422, never written", async () => {
+    if (!db) throw new Error("unreachable");
+    const res = await PATCH(patchReq({ voice_id: "not-a-real-voice" }), params(campaignId));
+    expect(res.status).toBe(422);
+    const [row] = await db
+      .select({ vs: schema.campaigns.voiceSettings })
+      .from(schema.campaigns)
+      .where(eq(schema.campaigns.id, campaignId));
+    expect(row?.vs).toBeNull();
+  });
+
+  it("a non-owner's voice patch is 404 BEFORE validation — no voice-membership oracle", async () => {
+    mockUser.mockResolvedValue({ id: "user_someone_else", email: null });
+    const res = await PATCH(patchReq({ voice_id: "not-a-real-voice" }), params(campaignId));
+    expect(res.status).toBe(404);
+  });
+
+  it("GET carries the voice options and the campaign's chosen voice", async () => {
+    if (!db) throw new Error("unreachable");
+    const domi = "AZnzlk1XvdvUeBnXmlld";
+    await db
+      .update(schema.campaigns)
+      .set({ voiceSettings: { voice_id: domi } })
+      .where(eq(schema.campaigns.id, campaignId));
+    const res = await GET(new Request("http://test/settings"), params(campaignId));
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      voices: { voice_id: string }[];
+      voice_source: string;
+      voice_id: string;
+    };
+    expect(body.voice_source).toBe("curated");
+    expect(body.voices.length).toBeGreaterThan(0);
+    expect(body.voice_id).toBe(domi);
   });
 
   it("GET returns tiers, affordance, and the menus; foreign campaigns 404", async () => {

@@ -69,6 +69,9 @@ export const campaigns = pgTable(
     openingPackage: jsonb(),
     /** Player-facing tier menus (§3): { narration, judgment, probe } model selections. */
     tierModels: jsonb(),
+    /** §9.5 voice preferences (listen button): { voice_id } — machinery
+     *  preference beside tierModels, never a premise-contract field. */
+    voiceSettings: jsonb(),
     /** At most one active override, latest wins (§4.2); ArcOverride type. */
     arcOverride: jsonb(),
     /** Direction machinery state (§7, C7): trigger accumulators, pilot plan,

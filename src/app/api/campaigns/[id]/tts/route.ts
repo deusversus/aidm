@@ -1,7 +1,7 @@
 import { getCurrentUser } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import { campaigns, modelCalls, turns } from "@/lib/db/schema";
-import { synthesize, ttsConfigured } from "@/lib/tts/elevenlabs";
+import { PREVIEW_LINE, availableVoices, synthesize, ttsConfigured } from "@/lib/tts/elevenlabs";
 import { speechText } from "@/lib/tts/speech-text";
 import { and, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
@@ -32,7 +32,45 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     return NextResponse.json({ error: "not found" }, { status: 404 });
   }
 
-  const turnNumber = Number(new URL(req.url).searchParams.get("turn"));
+  const params2 = new URL(req.url).searchParams;
+
+  // Preview mode: speak the FIXED sample line in a candidate voice — the
+  // voice id must come from the available set (no-open-proxy invariant:
+  // clients supply neither text nor arbitrary voice ids).
+  const previewVoice = params2.get("preview");
+  if (previewVoice) {
+    const { voices } = await availableVoices();
+    if (!voices.some((v) => v.voice_id === previewVoice)) {
+      return NextResponse.json({ error: "unknown voice" }, { status: 400 });
+    }
+    try {
+      const upstream = await synthesize(PREVIEW_LINE, previewVoice);
+      db.insert(modelCalls)
+        .values({
+          campaignId: id,
+          provider: "elevenlabs",
+          model: process.env.ELEVENLABS_MODEL_ID ?? "eleven_multilingual_v2",
+          tier: "tts",
+          inputTokens: PREVIEW_LINE.length,
+          costUsd: "0",
+        })
+        .then(
+          () => {},
+          (err) => console.warn("[tts] preview usage row failed (non-fatal)", err),
+        );
+      return new Response(upstream.body, {
+        headers: {
+          "Content-Type": "audio/mpeg",
+          "Cache-Control": "private, max-age=604800, immutable",
+        },
+      });
+    } catch (err) {
+      console.error("[tts] preview synthesis failed", err);
+      return NextResponse.json({ error: "voice synthesis failed" }, { status: 502 });
+    }
+  }
+
+  const turnNumber = Number(params2.get("turn"));
   if (!Number.isInteger(turnNumber) || turnNumber < 1) {
     return NextResponse.json({ error: "turn required" }, { status: 400 });
   }
@@ -48,9 +86,13 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   const text = speechText(turn.narration);
   if (!text) return NextResponse.json({ error: "nothing to speak" }, { status: 422 });
 
+  // The campaign's chosen voice (settings drawer) — server-trusted, never
+  // a client parameter; falls back to the env default.
+  const chosenVoice = (campaign.voiceSettings as { voice_id?: string } | null)?.voice_id;
+
   let upstream: Response;
   try {
-    upstream = await synthesize(text);
+    upstream = await synthesize(text, chosenVoice);
   } catch (err) {
     console.error("[tts] synthesis failed", err);
     return NextResponse.json({ error: "voice synthesis failed" }, { status: 502 });

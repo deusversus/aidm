@@ -25,10 +25,14 @@ export function ListenButton({
   campaignId,
   turnNumber,
   narration,
+  voiceId = "",
 }: {
   campaignId: string;
   turnNumber: number;
   narration: string;
+  /** Cache-bust only — the SERVER resolves the voice from the campaign row;
+   *  this just keeps a voice change from replaying the old voice's cache. */
+  voiceId?: string;
 }) {
   const [state, setState] = useState<"idle" | "loading" | "playing" | "error">("idle");
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -75,7 +79,7 @@ export function ListenButton({
     currentStop?.();
     setState("loading");
     const audio = new Audio(
-      `/api/campaigns/${campaignId}/tts?turn=${turnNumber}&v=${fingerprint(narration)}`,
+      `/api/campaigns/${campaignId}/tts?turn=${turnNumber}&v=${fingerprint(narration + voiceId)}`,
     );
     audioRef.current = audio;
     current = audio;

@@ -2,6 +2,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import { notTombstoned } from "@/lib/db/helpers";
 import { campaigns, episodicRecords, turns } from "@/lib/db/schema";
+import { env } from "@/lib/env";
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
@@ -110,6 +111,10 @@ export default async function PlayPage({ params }: { params: Promise<{ id: strin
       suggestionAffordance={contract?.suggestion_affordance ?? "on_request_only"}
       // §9.5 voice: present only when the key is configured — no key, no button.
       ttsAvailable={Boolean(process.env.ELEVENLABS_API_KEY)}
+      ttsVoiceId={
+        (campaign.voiceSettings as { voice_id?: string } | null)?.voice_id ??
+        env.ELEVENLABS_VOICE_ID
+      }
     />
   );
 }

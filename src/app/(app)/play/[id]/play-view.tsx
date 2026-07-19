@@ -77,10 +77,20 @@ type TierKey = "narration" | "judgment" | "probe";
 type TierMenus = Record<TierKey, string[]>;
 type Tiers = Record<TierKey, string>;
 
+interface VoiceOpt {
+  voice_id: string;
+  name: string;
+  hint: string;
+}
+
 interface SettingsResponse {
   tiers: Tiers | null;
   suggestion_affordance: string;
   menus: TierMenus;
+  /** §9.5 voice options — present only when TTS is configured. */
+  voices?: VoiceOpt[];
+  voice_source?: "library" | "curated";
+  voice_id?: string;
 }
 
 /** claude-opus-4-8 → "Opus 4.8": strip the prefix, title-case the name, dot the version. */
@@ -134,6 +144,7 @@ export function PlayView({
   openTurn,
   suggestionAffordance,
   ttsAvailable = false,
+  ttsVoiceId = "",
 }: {
   campaignId: string;
   title: string;
@@ -143,6 +154,8 @@ export function PlayView({
   suggestionAffordance: string;
   /** §9.5 voice: the listen button renders only when the key is configured. */
   ttsAvailable?: boolean;
+  /** The campaign's chosen narrator voice (cache-busts listen URLs). */
+  ttsVoiceId?: string;
 }) {
   const [exchanges, setExchanges] = useState<TranscriptItem[]>(initialExchanges);
   const [pendingInput, setPendingInput] = useState<string | null>(null);
@@ -181,6 +194,12 @@ export function PlayView({
   // studio-handoff confirm (cache rebuilds cold, voice may shift). This holds
   // the proposed model until the player confirms.
   const [narrationConfirm, setNarrationConfirm] = useState<string | null>(null);
+  // §9.5 voice preference: options load with the drawer; voiceId also rides
+  // every listen URL so a change busts the per-turn audio cache.
+  const [voiceOptions, setVoiceOptions] = useState<VoiceOpt[] | null>(null);
+  const [voiceSource, setVoiceSource] = useState<"library" | "curated" | null>(null);
+  const [voiceId, setVoiceId] = useState(ttsVoiceId);
+  const [previewing, setPreviewing] = useState(false);
   // §9.4 session lifecycle: recap opens the sitting, yokoku closes it.
   const [recap, setRecap] = useState<string | null>(null);
   const [yokoku, setYokoku] = useState<string | null>(null);
@@ -721,6 +740,11 @@ export function PlayView({
         setMenus(body.menus);
         setTiers(body.tiers);
         setAffordance(body.suggestion_affordance);
+        if (body.voices) {
+          setVoiceOptions(body.voices);
+          setVoiceSource(body.voice_source ?? null);
+          if (body.voice_id) setVoiceId(body.voice_id);
+        }
       }
     } catch {
       // Non-fatal: the drawer shows "unavailable" and reopens clean.
@@ -1118,6 +1142,63 @@ export function PlayView({
               {AFFORDANCE_OPTIONS.find((o) => o.value === affordance)?.note ?? ""}
             </p>
           </div>
+
+          {voiceOptions && voiceOptions.length > 0 && (
+            <div className="space-y-1">
+              <label htmlFor="voice-select" className="text-xs font-medium text-muted-foreground">
+                Narrator voice
+              </label>
+              <div className="flex items-center gap-2">
+                <select
+                  id="voice-select"
+                  value={voiceId}
+                  disabled={settingsBusy}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v !== voiceId)
+                      void patchSetting({ voice_id: v }).then((ok) => {
+                        if (ok) setVoiceId(v);
+                      });
+                  }}
+                  className="w-full rounded-md border border-border bg-background px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-foreground disabled:opacity-50"
+                >
+                  {/* A saved library voice can drop out of the option set
+                      (voices_read revoked, transient ElevenLabs blip) — show
+                      it honestly rather than displaying the wrong selection. */}
+                  {voiceId && !voiceOptions.some((v) => v.voice_id === voiceId) ? (
+                    <option value={voiceId}>saved voice — library unavailable right now</option>
+                  ) : null}
+                  {voiceOptions.map((v) => (
+                    <option key={v.voice_id} value={v.voice_id}>
+                      {v.name}
+                      {v.hint ? ` — ${v.hint}` : ""}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  disabled={previewing || settingsBusy}
+                  onClick={() => {
+                    setPreviewing(true);
+                    const a = new Audio(
+                      `/api/campaigns/${campaignId}/tts?preview=${encodeURIComponent(voiceId)}`,
+                    );
+                    a.onended = () => setPreviewing(false);
+                    a.onerror = () => setPreviewing(false);
+                    void a.play().catch(() => setPreviewing(false));
+                  }}
+                  className="whitespace-nowrap rounded-md border border-border px-3 py-1 text-xs hover:bg-muted disabled:opacity-50"
+                >
+                  {previewing ? "…" : "▷ preview"}
+                </button>
+              </div>
+              <p className="text-[11px] text-muted-foreground/60">
+                {voiceSource === "curated"
+                  ? "Showing the starter set — grant the API key voices_read (ElevenLabs dashboard) and your whole voice library appears here."
+                  : "Your ElevenLabs voice library — add voices there and they appear here."}
+              </p>
+            </div>
+          )}
         </div>
       )}
 
@@ -1259,6 +1340,7 @@ export function PlayView({
                     campaignId={campaignId}
                     turnNumber={e.turnNumber}
                     narration={e.narration}
+                    voiceId={voiceId}
                   />
                 </div>
               )}
