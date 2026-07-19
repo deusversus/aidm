@@ -18,8 +18,11 @@ export async function synthesize(text: string): Promise<Response> {
   if (!key) throw new Error("ELEVENLABS_API_KEY not configured");
   const voice = env.ELEVENLABS_VOICE_ID;
   const model = env.ELEVENLABS_MODEL_ID;
+  // optimize_streaming_latency=3: every latency optimization that costs no
+  // quality — the first audio chunk arrives in seconds instead of after the
+  // whole scene renders; the element plays progressively from there.
   const res = await fetch(
-    `https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voice)}/stream`,
+    `https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voice)}/stream?optimize_streaming_latency=3`,
     {
       method: "POST",
       headers: {

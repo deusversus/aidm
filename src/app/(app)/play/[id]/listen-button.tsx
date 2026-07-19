@@ -30,8 +30,9 @@ export function ListenButton({
   turnNumber: number;
   narration: string;
 }) {
-  const [state, setState] = useState<"idle" | "loading" | "playing">("idle");
+  const [state, setState] = useState<"idle" | "loading" | "playing" | "error">("idle");
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const errorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     return () => {
@@ -44,7 +45,7 @@ export function ListenButton({
     };
   }, []);
 
-  const stop = (which?: HTMLAudioElement) => {
+  const stop = (which?: HTMLAudioElement, failed = false) => {
     // A stale element's late onended/onerror must never kill a NEWER
     // playback (audit #2): only the current element may stop the show.
     if (which && which !== audioRef.current) return;
@@ -53,7 +54,20 @@ export function ListenButton({
       current = null;
       currentStop = null;
     }
-    setState("idle");
+    if (failed) {
+      // A silent bounce back to "listen" reads as a broken button (live
+      // finding: an upstream quota 502 gave zero feedback). Brief, honest,
+      // self-clearing — and a NEW error re-arms the timer so a stale one
+      // can't truncate its 3 seconds (audit).
+      if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
+      setState("error");
+      errorTimerRef.current = setTimeout(() => {
+        errorTimerRef.current = null;
+        setState((s) => (s === "error" ? "idle" : s));
+      }, 3_000);
+    } else {
+      setState("idle");
+    }
   };
 
   const start = async () => {
@@ -67,23 +81,29 @@ export function ListenButton({
     current = audio;
     currentStop = stop;
     audio.onended = () => stop(audio);
-    audio.onerror = () => stop(audio);
+    audio.onerror = () => stop(audio, true);
     try {
       await audio.play();
       if (audioRef.current === audio) setState("playing");
     } catch {
-      stop(audio);
+      stop(audio, true);
     }
   };
 
   return (
     <button
       type="button"
-      onClick={() => (state === "idle" ? start() : stop())}
+      onClick={() => (state === "idle" || state === "error" ? start() : stop())}
       className="text-[11px] uppercase tracking-widest text-muted-foreground/60 transition-colors hover:text-muted-foreground"
       aria-label={state === "playing" ? "stop narration audio" : "listen to this narration"}
     >
-      {state === "idle" ? "▷ listen" : state === "loading" ? "… loading" : "■ stop"}
+      {state === "idle"
+        ? "▷ listen"
+        : state === "loading"
+          ? "… loading"
+          : state === "error"
+            ? "✕ voice unavailable"
+            : "■ stop"}
     </button>
   );
 }
