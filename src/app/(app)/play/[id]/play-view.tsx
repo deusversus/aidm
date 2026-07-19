@@ -4,6 +4,7 @@ import { fetchWithAuthRetry } from "@/lib/client/fetch-with-auth";
 import { plainProse } from "@/lib/client/plain-prose";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { ListenButton } from "./listen-button";
 import { NarrationProse } from "./narration-prose";
 
 type ChannelIntent = "META_FEEDBACK" | "OVERRIDE_COMMAND" | "OP_COMMAND";
@@ -132,6 +133,7 @@ export function PlayView({
   initialExchanges,
   openTurn,
   suggestionAffordance,
+  ttsAvailable = false,
 }: {
   campaignId: string;
   title: string;
@@ -139,6 +141,8 @@ export function PlayView({
   initialExchanges: TranscriptItem[];
   openTurn: OpenTurn | null;
   suggestionAffordance: string;
+  /** §9.5 voice: the listen button renders only when the key is configured. */
+  ttsAvailable?: boolean;
 }) {
   const [exchanges, setExchanges] = useState<TranscriptItem[]>(initialExchanges);
   const [pendingInput, setPendingInput] = useState<string | null>(null);
@@ -1249,6 +1253,15 @@ export function PlayView({
                 </div>
               </div>
               <NarrationProse text={e.narration} />
+              {ttsAvailable && e.narration.trim() && (
+                <div className="flex justify-end">
+                  <ListenButton
+                    campaignId={campaignId}
+                    turnNumber={e.turnNumber}
+                    narration={e.narration}
+                  />
+                </div>
+              )}
             </div>
           );
         })}

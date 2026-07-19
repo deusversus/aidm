@@ -32,13 +32,24 @@ function dockerfileArgs(): string[] {
   return [...scope.matchAll(/^ARG\s+([A-Z0-9_]+)/gm)].map((m) => m[1] ?? "").filter(Boolean);
 }
 
+/** Opt-in feature keys: absent everywhere = the feature is off, not a
+ *  parity failure. Reported as info so the gap stays visible. */
+const FEATURE_KEYS = new Set(["ELEVENLABS_API_KEY"]);
+
 function main(): void {
   const deployed = new Set(railwayVariableNames());
   const defaults = new Set(ENV_KEYS_WITH_DEFAULTS);
   const failures: string[] = [];
 
+  const featureOff = ENV_KEYS.filter((k) => FEATURE_KEYS.has(k) && !deployed.has(k));
+  if (featureOff.length > 0) {
+    console.log(`(info) feature keys not deployed (feature off): ${featureOff.join(", ")}`);
+  }
+
   // Schema keys the deploy is missing (defaults excluded — absent is fine).
-  const missing = ENV_KEYS.filter((k) => !deployed.has(k) && !defaults.has(k) && k !== "NODE_ENV");
+  const missing = ENV_KEYS.filter(
+    (k) => !deployed.has(k) && !defaults.has(k) && !FEATURE_KEYS.has(k) && k !== "NODE_ENV",
+  );
   if (missing.length > 0) {
     failures.push(`Railway is missing schema keys: ${missing.join(", ")}`);
   }

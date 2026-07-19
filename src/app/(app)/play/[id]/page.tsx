@@ -108,6 +108,8 @@ export default async function PlayPage({ params }: { params: Promise<{ id: strin
       initialExchanges={initialItems}
       openTurn={openTurn ?? null}
       suggestionAffordance={contract?.suggestion_affordance ?? "on_request_only"}
+      // §9.5 voice: present only when the key is configured — no key, no button.
+      ttsAvailable={Boolean(process.env.ELEVENLABS_API_KEY)}
     />
   );
 }

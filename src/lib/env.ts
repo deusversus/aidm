@@ -23,6 +23,12 @@ const envSchema = z.object({
   ANTHROPIC_API_KEY: z.string().optional(),
   VOYAGE_API_KEY: z.string().optional(),
 
+  // --- Voice (the media multi-provider exception, §9.5 — TTS side project) ---
+  // Absent key = the listen button never renders; no fallback, no error.
+  ELEVENLABS_API_KEY: z.string().optional(),
+  ELEVENLABS_VOICE_ID: z.string().default("JBFqnCBsd6RMkjVDRZzb"),
+  ELEVENLABS_MODEL_ID: z.string().default("eleven_multilingual_v2"),
+
   // --- Observability ---
   LANGFUSE_PUBLIC_KEY: z.string().optional(),
   LANGFUSE_SECRET_KEY: z.string().optional(),
