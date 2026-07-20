@@ -73,6 +73,11 @@ describe("the exit (M2R2)", () => {
       "PRESSURE SURVIVES THE SCENE",
       "END ON THE THING THAT ASKS",
       "THE PLAYER'S INPUT IS THE FLOOR",
+      // The entrance law (2026-07-20 recalibration: the first exit-faculty
+      // reply drove PAST the player's authored hours — the pendulum's far
+      // swing; motion must never cost the player their own screen time).
+      "The player owns the scene's entrance; the world owns its exit",
+      "weighted the way THEY weighted it",
     ]) {
       expect(KA_CONTRACT).toContain(phrase);
     }
