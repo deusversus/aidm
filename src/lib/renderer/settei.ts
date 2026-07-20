@@ -1,6 +1,7 @@
 import { approxTokens } from "@/lib/blocks/tokens";
 import { loadGrounding } from "@/lib/rules/grounding";
 import { guidanceFor } from "@/lib/rules/guidance";
+import type { Composition } from "@/lib/types/composition";
 import { DNAScales } from "@/lib/types/dna";
 import { type AxisName, COVERED_AXES } from "@/lib/types/grounding";
 import { type PencilMark, activeMarks } from "@/lib/types/marks";
@@ -25,6 +26,28 @@ import type { PremiseContract } from "@/lib/types/premise";
 export const SETTEI_MAX_RENDERED_AXES = 6;
 export const SETTEI_MAX_EXEMPLARS = 3;
 export const SETTEI_TOKEN_TARGET = { min: 600, max: 900 };
+
+/**
+ * The §4.4c fields' Block-1 reader (M2R2 deliverable 4): escalation_pattern +
+ * story_time_density render as one "How it moves" line in the identity block —
+ * standing premise facts, deliberately NOT in the per-scene shape (≤150
+ * budget). Note: on maxed charters this may trip the trim ladder (drop a third
+ * exemplar) — that is the accepted trade per the plan.
+ */
+const ESCALATION_LINE: Record<Composition["escalation_pattern"], string> = {
+  linear: "stakes climb a steady step at a time — most scenes bank a little more than they spend",
+  exponential: "each arc multiplies the last — driving toward the next threshold IS the register",
+  waves:
+    "peaks and true troughs — drive hard inside a wave; a trough breathes, but something is always moving under it",
+  stable:
+    "stakes hold level — motion is texture and revelation, not escalation; rest endings are this premise's licensed grammar",
+};
+const STORY_TIME_LINE: Record<Composition["story_time_density"], string> = {
+  incident: "the clock is hours and days, always audible — scenes hand off in near-real-time",
+  days: "a short span — momentum carries scene into scene; little is skipped",
+  months: "a seasonal arc — time may breathe between scenes; consequences can land 'later'",
+  years: "an epic timeline — a season turning is motion as surely as a knock at the door",
+};
 
 /** DNAScales key order — the deterministic tiebreak for equal distances. */
 const AXIS_ORDER = Object.keys(DNAScales.shape) as AxisName[];
@@ -217,10 +240,12 @@ export function renderSettei(input: SetteiInput): Settei {
     );
   }
 
+  const framing = contract.active.framing;
   const identity = [
     "## What this story is",
     `A ${world.world_setting.genre.join(", ")} story. ${voice.director_personality}`,
     `The spark — the player's own words, the moment this campaign exists to multiply: "${contract.spark}"`,
+    `How it moves: ${ESCALATION_LINE[framing.escalation_pattern]}; ${STORY_TIME_LINE[framing.story_time_density]}.`,
   ];
 
   // Gap rule (plan C1): no code path presses an ungrounded axis — craft

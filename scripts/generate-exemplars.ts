@@ -7,6 +7,7 @@
  *
  * Usage: pnpm exec tsx --env-file=.env.local scripts/generate-exemplars.ts <axis> <band> "<show>"
  */
+import { STRUCTURED_SMALL } from "@/lib/llm/budgets";
 import { callJudgment } from "@/lib/llm/calls";
 import { DEV_TIER_SELECTION } from "@/lib/llm/tiers";
 import { flushLangfuse } from "@/lib/observability/langfuse";
@@ -46,7 +47,7 @@ const result = await callJudgment(selection, {
     "",
     "Write 2–3 candidate passages.",
   ].join("\n"),
-  maxTokens: 2_000,
+  maxTokens: STRUCTURED_SMALL,
 });
 
 for (const [i, text] of result.passages.entries()) {

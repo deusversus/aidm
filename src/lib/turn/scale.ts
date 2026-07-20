@@ -1,3 +1,4 @@
+import { STRUCTURED_RICH } from "@/lib/llm/budgets";
 import { callJudgment } from "@/lib/llm/calls";
 import type { TierSelection } from "@/lib/llm/tiers";
 import type { IntentOutput } from "@/lib/types/turn";
@@ -99,7 +100,7 @@ export async function judgeScale(
       .filter(Boolean)
       .join("\n"),
     effort: "high",
-    maxTokens: 4_000,
+    maxTokens: STRUCTURED_RICH,
   });
 
   // The closed Module-12 vocabulary is enforced HERE (not by parse-rejection):

@@ -7,6 +7,7 @@
  * — and gated by the live NAA judge before it enters the profile.
  */
 
+import { LOOPED_LARGE, STRUCTURED_RICH, STRUCTURED_SMALL } from "@/lib/llm/budgets";
 import { callJudgment } from "@/lib/llm/calls";
 import { DEV_TIER_SELECTION } from "@/lib/llm/tiers";
 import { loadGrounding } from "@/lib/rules/grounding";
@@ -85,7 +86,7 @@ export async function interpretTonal(media: AniListMedia): Promise<TonalInterpre
       system: `${INTERPRET_SYSTEM} Calibrate the 0-10 treatment axes against these witness anchors (same scales the engine measures with):\n${witnessAnchorBlock()}`,
       prompt: block,
       effort: "high",
-      maxTokens: 12_000,
+      maxTokens: LOOPED_LARGE,
     }),
     callJudgment(SELECTION, {
       name: "research_interpret_framing",
@@ -110,7 +111,7 @@ export async function interpretTonal(media: AniListMedia): Promise<TonalInterpre
       ].join(" "),
       prompt: block,
       effort: "high",
-      maxTokens: 8_000,
+      maxTokens: STRUCTURED_RICH,
     }),
     callJudgment(SELECTION, {
       name: "research_interpret_world",
@@ -121,7 +122,7 @@ export async function interpretTonal(media: AniListMedia): Promise<TonalInterpre
       system: `${INTERPRET_SYSTEM} Trope flags are structural facts about the source; visual style feeds reference conditioning later — be concrete.`,
       prompt: block,
       effort: "low",
-      maxTokens: 8_000,
+      maxTokens: STRUCTURED_RICH,
     }),
   ]);
   return {
@@ -150,7 +151,7 @@ export async function synthesizePowerSystem(
       "Synthesize the source's power system from its technique pages. `limitations` is the field the engine enforces as HARD RULES — be precise about costs, triggers, and what the system cannot do.",
     prompt: excerpts,
     effort: "high",
-    maxTokens: 8_000,
+    maxTokens: STRUCTURED_RICH,
   });
 }
 
@@ -173,7 +174,7 @@ export async function synthesizeVoiceCards(
       "Build voice cards for the main cast from wiki-sourced quotes. Where a main-cast member has no quotes, derive the card from what the quotes of OTHERS reveal plus the character's role — mark speech_patterns conservatively rather than inventing tics.",
     prompt: `Quotes:\n${quoteBlock}\n\nMain cast needing gap-fill: ${gapFillMainCast.join(", ") || "(none)"}`,
     effort: "high",
-    maxTokens: 8_000,
+    maxTokens: STRUCTURED_RICH,
   });
   return result.cards;
 }
@@ -209,7 +210,7 @@ export async function naaGate(title: string, voiceText: string): Promise<boolean
         "Judge directing-voice text for a story engine. It passes only if every sentence is something that could NOT apply to a different anime — named-show specificity of craft, not generic 'balance humor and heart' advice.",
       prompt: `Claimed source: ${title}\n\n${voiceText}`,
       effort: "low",
-      maxTokens: 2_000,
+      maxTokens: STRUCTURED_SMALL,
     });
   let fails = (await judge()).ip_specific ? 0 : 1;
   for (let i = 0; i < 2 && fails > 0 && fails < 2; i++) {
@@ -268,7 +269,7 @@ export async function synthesizeNarrative(
       `Synopsis: ${(assembled.synopsis ?? "").slice(0, 1_200)}`,
     ].join("\n"),
     effort: "high",
-    maxTokens: 8_000,
+    maxTokens: STRUCTURED_RICH,
   });
   const gated = `${result.director_personality}\n\nVoice sample: ${result.author_voice.example_voice}`;
   if (!(await naaGate(title, gated))) {
@@ -307,7 +308,7 @@ export async function synthesizeStatMapping(
       "Does this source have a CANONICAL on-screen stat system (status windows, hunter ranks with numbers, explicit levels)? If yes, map its stats onto D&D-style internals. If no, say has_canonical_stats=false with confidence 0 — most works have none, and inventing one is a defect.",
     prompt: `Title: ${title}\n\n${excerpts}`,
     effort: "low",
-    maxTokens: 6_000,
+    maxTokens: STRUCTURED_RICH,
   });
   // v3's bar: apply only at ≥90 confidence; below it, the default stands.
   return result.has_canonical_stats && result.confidence >= 90 ? result : DEFAULT_STAT_MAPPING;

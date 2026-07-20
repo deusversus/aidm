@@ -1,4 +1,5 @@
 import * as schema from "@/lib/db/schema";
+import { LOOPED_LARGE } from "@/lib/llm/budgets";
 import { callJudgment } from "@/lib/llm/calls";
 import { bebopContract } from "@/lib/renderer/__tests__/fixtures";
 import { ArcOverride } from "@/lib/types/arc";
@@ -347,7 +348,7 @@ describe.skipIf(!url)("Director (real Postgres, scripted model)", () => {
     expect(callOpts?.tools?.length).toBeGreaterThan(0);
     expect(callOpts?.maxToolRounds).toBe(DIRECTOR_MAX_TOOL_ROUNDS);
     expect(callOpts?.effort).toBe("high");
-    expect(callOpts?.maxTokens).toBe(16_000);
+    expect(callOpts?.maxTokens).toBe(LOOPED_LARGE);
 
     // M2R R2: the dossier carries the Series contract — finitude's behavioral
     // consumer (§8) plus the series-horizon line (the budget's reader).

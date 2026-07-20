@@ -2,6 +2,7 @@ import type { Db } from "@/lib/db";
 import { notTombstoned } from "@/lib/db/helpers";
 import { campaigns, entities } from "@/lib/db/schema";
 import { isProtagonistName } from "@/lib/entity-identity";
+import { CLASSIFY } from "@/lib/llm/budgets";
 import { callProbe } from "@/lib/llm/calls";
 import type { TierSelection } from "@/lib/llm/tiers";
 import { cosineSimilarity, embedTexts } from "@/lib/llm/voyage";
@@ -99,7 +100,7 @@ export async function pairLikelySame(
     turnNumber: args.turnNumber,
     system: PAIR_SYSTEM,
     prompt,
-    maxTokens: 400,
+    maxTokens: CLASSIFY,
   });
 }
 

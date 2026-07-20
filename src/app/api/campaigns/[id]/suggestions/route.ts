@@ -2,6 +2,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import { notTombstoned } from "@/lib/db/helpers";
 import { campaigns, episodicRecords, turns } from "@/lib/db/schema";
+import { STRUCTURED_SMALL } from "@/lib/llm/budgets";
 import { callProbe } from "@/lib/llm/calls";
 import { DEV_TIER_SELECTION, TierSelection } from "@/lib/llm/tiers";
 import { OPEN_TURN_STATUSES } from "@/lib/turn/rewind";
@@ -83,6 +84,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     prompt: `${tail}\n\noffer 2-3 concrete, premise-true next moves the player could take — short imperative phrases, no numbering`,
     campaignId: id,
     turnNumber: lastScene?.turnNumber,
+    maxTokens: STRUCTURED_SMALL,
   });
   return NextResponse.json({ moves });
 }

@@ -74,7 +74,7 @@ type Block =
 
 function kaRound(
   blocks: Block[],
-  stopReason: "end_turn" | "tool_use",
+  stopReason: "end_turn" | "tool_use" | "max_tokens",
   opts: { failMidStream?: boolean; gate?: Promise<void> } = {},
 ) {
   return {
@@ -209,6 +209,42 @@ describe.skipIf(!url)("Turn Runtime (real Postgres, scripted models)", () => {
       .where(eq(schema.episodicRecords.campaignId, campaignId));
     expect(episodic).toHaveLength(1);
     expect(episodic[0]?.narration).toContain("hatch was already open");
+  });
+
+  it("a truncated attempt retries at DOUBLE the output budget — same dice, bigger jar (M2R2)", async () => {
+    if (!db) throw new Error("unreachable");
+    let call = 0;
+    mockStream.mockImplementation(() => {
+      call += 1;
+      // Attempt 1: adaptive thinking ate the cap — stop_reason max_tokens
+      // makes the KA throw its truncation error.
+      if (call === 1) return kaRound([{ type: "text", text: "The scene beg" }], "max_tokens");
+      return kaRound(
+        [
+          { type: "text", text: "The scene lands whole this time. " },
+          {
+            type: "tool_use",
+            id: "toolu_retry",
+            name: "commit_scene",
+            input: { ...SIDECAR, decision_point: false, suggested_moves: undefined },
+          },
+        ],
+        "end_turn",
+      );
+    });
+
+    const { turnId } = await submitTurn(db, campaignId, "I open the door");
+    await new Promise<void>((resolve) => {
+      attachToTurn(turnId, (e) => {
+        if (e.type === "error" || e.type === "done") resolve();
+      });
+    });
+
+    const [row] = await db.select().from(schema.turns).where(eq(schema.turns.id, turnId));
+    expect(row?.status).toBe("complete");
+    const first = mockStream.mock.calls[0]?.[0] as { maxTokens: number };
+    const second = mockStream.mock.calls[1]?.[0] as { maxTokens: number };
+    expect(second.maxTokens).toBe(first.maxTokens * 2);
   });
 
   it("kill between phases: Phase B fails twice → failed; retry reuses the SAME dice; one episodic row", async () => {

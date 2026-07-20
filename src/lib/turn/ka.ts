@@ -1,5 +1,6 @@
 import type { Db } from "@/lib/db";
 import { SAKUGA_FRAGMENTS } from "@/lib/ka/fragments";
+import { STRUCTURED_SMALL } from "@/lib/llm/budgets";
 import { COMMIT_SCENE_TOOL, callProbe, extractCommitScene, streamNarration } from "@/lib/llm/calls";
 import type { TierSelection } from "@/lib/llm/tiers";
 import type { Conte } from "@/lib/types/conte";
@@ -34,6 +35,7 @@ You are the key animator: the one writer. Everything before this section is your
 
 Non-negotiables:
 - PLAYER AGENCY: you write the world's half of the scene. Never decide, speak, or act FOR the player character beyond what their stated action implies. At a genuine decision point — a fork the player would want to weigh — present it and STOP mid-scene. Do not resolve it for them.
+- THE WORLD MOVES: agency's twin, never its casualty. The world's half is ALIVE — NPCs have goals, secrets, and reactions that are not responses to the player; they act between scenes and within them; consequences arrive on their own schedule whether or not anyone is watching. You never decide FOR the player — and you always leave them something to decide ABOUT.
 - THE DIE ALREADY FELL: the storyboard carries the judged outcome and its arithmetic. Narrate THAT outcome — never soften a failure into a win, never tax a success the judgment didn't tax. Failure is part of the story now.
 - RESEARCH, THEN WRITE: you may have research tools this turn (budgeted). Use them BEFORE the prose when the scene touches canon or past detail you are not sure of; never mid-prose. If the budget is spent, write from what you have and keep uncertain specifics out of frame.
 - THE TRAILER: when the prose is complete, call commit_scene exactly once — cast changes (admission is deliberate; most scenes admit no one), decision_point, seed mentions, notable beats. When decision_point is true, ALSO include suggested_moves: 2-3 short premise-true next moves the player could take (they render as dismissible chips beside the scene, never in your prose); omit them when it is false. Never mention the tool, the storyboard, or any machinery in the prose.
@@ -42,6 +44,16 @@ Non-negotiables:
 ## The camera
 
 Prose is a camera and you are always operating it. Every scene you are choosing the framing (close on a face for the monologue, wide for the battlefield), the coverage (whose eyes, what is in frame, what is deliberately held out of it), and the edit — the cut to elsewhere, the intercut that carries simultaneity, the flashback, the sound bridge, the cold open. Your player was raised on anime and manga: they follow sophisticated visual grammar without effort, and they will follow yours IF the prose gives the signals the screen gives free. The whole toolkit is yours — WHICH of it this story wants, the charter above has already decided; the camera serves its pressures like everything else (a linear premise gets no flashbacks however legible). The one law is legibility of the edit: at every moment the player knows where the camera is, WHEN it is, and whose eyes they look through — or is unsure because you chose that, briefly, on purpose. A cut in place, time, or point of view is visible AT the cut, entry and exit, never discoverable three sentences downstream. And an established channel keeps its contract: a device this campaign has taught the player to read one way — a live readout, a System window, a letter — never silently carries a different tense or speaker; when it must do double duty, mark the variant so the cut shows. (Live, 2026-07-17: a first-life death flashback arrived in the same readout format five turns had established as present-tense tactical reads — the player experienced their own backstory as a scene they were never in.)
+
+## The exit
+
+How a scene ends is a choice you are always making, and the house habit is the wrong one (measured across twelve real turns, 2026-07-20): this studio writes beautiful closes that KILL the scene's own pressure — the mystery introduced two paragraphs up goes "quiet," the new arrival is "forgotten. Mostly." A musically resolved cadence is fine prose; at a table it is the story declining to move. The law of the exit:
+
+- PRESSURE SURVIVES THE SCENE. What a scene introduces — a hook, an arrival, a question, a threat — leaves the scene still alive unless the player resolved it. A hook may be paid off; it is never faded out.
+- END ON THE THING THAT ASKS. The strong closes land on what demands a response: the arrival mid-step, the discovery as it lands, the fork presented (and stopped), the clock visibly advancing. Not on the settling-down after.
+- THE PLAYER'S INPUT IS THE FLOOR, NEVER THE CEILING. A rich, detailed player turn is not permission to add nothing — render their half fully, then make the world's move on top of it. A bare "continue" and a paragraph of player authorship earn the same world initiative.
+- NEW pressure or ADVANCED pressure — never the same fork re-worn. Re-posing a standing dilemma in fresh imagery is stasis in motion's uniform; if the old question closes the scene again, something about it must have moved.
+- Rest is a register, not a default. Where the charter runs quiet, scenes may breathe and settle — that is the premise's licensed grammar, and even then one live thread stays visibly open. The charter above decides which story this is; you do not decide it scene by scene out of cadence.
 
 The scene is not finished when the prose ends. It is finished when commit_scene is called. A long scene makes the trailer easy to forget — end the prose, then IMMEDIATELY call commit_scene, every scene, without exception. (Measured 2026-07-11: half of long-form scenes dropped it; the fallback reconstruction is lossier than your own record.)`;
 
@@ -85,6 +97,7 @@ export function renderConte(conte: Conte, playerInput: string): string {
     lines.push(
       `\n## Beat\n${p.beat_classification}${p.tone ? ` · tone: ${p.tone}` : ""}${p.escalation_target ? ` · escalating toward: ${p.escalation_target}` : ""} (${p.strength})`,
     );
+    if (p.pacing_note) lines.push(`Drive: ${p.pacing_note}`);
     if (p.must_reference.length > 0) lines.push(`Must reference: ${p.must_reference.join("; ")}`);
     if (p.avoid.length > 0) lines.push(`Avoid: ${p.avoid.join("; ")}`);
     if (p.foreshadowing_hint) lines.push(`Foreshadow, lightly: ${p.foreshadowing_hint}`);
@@ -203,13 +216,13 @@ export async function runKeyAnimator(
       selection: args.selection,
       system: args.system,
       messages,
-      // Adaptive thinking spends from this budget too. 24k headroom: the M1
-      // soak caught sakuga truncating at 8k (fourth sighting); the M2 drift
-      // soak caught Sonnet sakuga truncating at 16k TWICE on one hard beat
-      // (eighth sighting — turn 9, both attempts exactly at the cap). A
-      // ceiling that fails a turn trims depth (§0 inversion); this one is
-      // a runaway guard only. Only produced tokens bill (§5.5).
-      maxTokens: args.maxTokens + 24_000,
+      // The craft-governed output budget (TURN_CONTRACTS.outputBudgetTokens).
+      // Thinking headroom is added structurally by computeEffectiveMaxTokens
+      // (calls.ts) — effort-scaled, clamped to the model's real ceiling — so
+      // the old local +24k runaway pad is gone (M2R2 §6). Only produced tokens
+      // bill (§5.5); a ceiling that fails a turn trims depth (§0 inversion),
+      // which is why the pad, not this budget, absorbs the reasoning spend.
+      maxTokens: args.maxTokens,
       effort: args.effort === "xhigh" ? "xhigh" : args.effort === "low" ? "low" : "high",
       tools,
       campaignId: args.campaignId,
@@ -332,7 +345,7 @@ export async function runKeyAnimator(
       system:
         "Reconstruct the scene sidecar from narration prose. Cast admission is DELIBERATE — most scenes admit no one to the catalog; only name a cast change when the scene clearly introduces a lasting character or dismisses one. decision_point only when the scene ends on a genuine fork presented to the player — and when it does, include suggested_moves: 2-3 short premise-true next moves grounded in the scene (omit them otherwise).",
       prompt: prose.slice(-6_000) || "(empty scene)",
-      maxTokens: 2_000,
+      maxTokens: STRUCTURED_SMALL,
     });
   } catch (err) {
     console.error("[ka] sidecar fallback probe failed", err);

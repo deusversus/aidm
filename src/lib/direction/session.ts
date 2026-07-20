@@ -20,6 +20,7 @@ import {
 } from "@/lib/direction/director";
 import { callbackReadySeeds } from "@/lib/direction/seeds";
 import { reviewCatalog } from "@/lib/entity/janitor";
+import { PROSE_COMPOSER, STRUCTURED_RICH } from "@/lib/llm/budgets";
 import { callJudgment, prewarmPrefix, streamNarration } from "@/lib/llm/calls";
 import { DEV_TIER_SELECTION, TierSelection } from "@/lib/llm/tiers";
 import { type SetteiInput, renderSettei } from "@/lib/renderer/settei";
@@ -517,10 +518,17 @@ async function collectNarration(
     messages: [{ role: "user", content: prompt }],
     // NO tools: recap/yokoku are player-facing prose, never a commit_scene.
     tools: [],
-    maxTokens: 4000,
+    maxTokens: PROSE_COMPOSER,
     campaignId,
   });
   const result = await done();
+  // A clipped composer is still returned (recap/yokoku are skippable, never
+  // blocking) but the clip is honest, not silent (M2R2 §6).
+  if (result.message.stop_reason === "max_tokens") {
+    console.warn(`[session] ${name} truncated at max_tokens — returning clipped prose`, {
+      campaignId,
+    });
+  }
   const text = result.prose.trim();
   if (result.refused || text.length === 0 || SKIP_RE.test(text)) return undefined;
   return text;
@@ -769,7 +777,7 @@ async function composeMemo(
     system: MEMO_SYSTEM,
     prompt: parts.join("\n\n"),
     effort: "medium",
-    maxTokens: 8000,
+    maxTokens: STRUCTURED_RICH,
     campaignId,
   });
   const trimmed = memo.trim();
@@ -828,7 +836,7 @@ async function composeVoiceJournal(
     system: JOURNAL_SYSTEM,
     prompt: parts.join("\n\n"),
     effort: "medium",
-    maxTokens: 8000,
+    maxTokens: STRUCTURED_RICH,
     campaignId,
   });
   const trimmed = journal.trim();

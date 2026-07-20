@@ -1,6 +1,7 @@
 import type { Db } from "@/lib/db";
 import { notTombstoned } from "@/lib/db/helpers";
 import { compactedBeats, episodicRecords } from "@/lib/db/schema";
+import { STRUCTURED_RICH } from "@/lib/llm/budgets";
 import { callJudgment } from "@/lib/llm/calls";
 import type { TierSelection } from "@/lib/llm/tiers";
 import { and, asc, eq, gt, max } from "drizzle-orm";
@@ -59,7 +60,7 @@ export function judgmentCompactor(
       campaignId: ctx.campaignId,
       turnNumber: ctx.turnNumber,
       effort: "high",
-      maxTokens: 4_000,
+      maxTokens: STRUCTURED_RICH,
       system: [
         "You are the Chronicler's compactor. Compress this stretch of play into",
         "2–4 narrated beats, SUBTEXT-FIRST: say what the stretch MEANT — the",

@@ -1,6 +1,7 @@
 import type { Db } from "@/lib/db";
 import { notTombstoned } from "@/lib/db/helpers";
 import { campaigns, criticalFacts, entities, pencilMarks, sessionRecords } from "@/lib/db/schema";
+import { LOOPED_LARGE } from "@/lib/llm/budgets";
 import { callJudgment } from "@/lib/llm/calls";
 import { DEV_TIER_SELECTION, TierSelection } from "@/lib/llm/tiers";
 import { gaugeTrend } from "@/lib/sakkan/sakkan";
@@ -400,9 +401,9 @@ export async function runDirectorCycle(
     schema: DirectorOutput,
     campaignId,
     turnNumber,
-    // 16k, not 8k: adaptive thinking spends from this budget (three prior
-    // sightings of an 8k ceiling truncating a live judgment mid-emit).
-    maxTokens: 16_000,
+    // A tool-loop call emitting a large contract; thinking headroom is added
+    // structurally on top (computeEffectiveMaxTokens), not folded in here.
+    maxTokens: LOOPED_LARGE,
     effort: "high",
     system: directorPersona(contract),
     prompt: dossier,
@@ -622,7 +623,7 @@ export async function directorStartup(db: Db, campaignId: string): Promise<void>
     schema: StartupPlan,
     campaignId,
     turnNumber: 0,
-    maxTokens: 16_000,
+    maxTokens: LOOPED_LARGE,
     effort: "high",
     system: directorPersona(contract),
     prompt: dossier,

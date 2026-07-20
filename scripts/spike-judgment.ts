@@ -20,6 +20,7 @@ const result = await callJudgment(DEV_TIER_SELECTION, {
     "You are the outcome judge for an anime-flavored story engine. Judge plausibility with anime logic, not simulationist realism.",
   prompt:
     "A veteran bounty hunter (competent, unarmed) tries to talk his way past a bored dock guard on Ganymede. Judge the outcome.",
+  // deliberate smoke-size: a dev connectivity spike, not a budget class.
   maxTokens: 500,
 });
 

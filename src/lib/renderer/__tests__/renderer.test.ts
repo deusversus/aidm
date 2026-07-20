@@ -125,6 +125,26 @@ describe("renderSettei (§4.4a)", () => {
   });
 });
 
+describe('the premise governor "How it moves" line (§4.4c reader, M2R2)', () => {
+  it("renders the escalation + story-time distillation for the fixture's framing", () => {
+    // Bebop's framing: escalation_pattern "stable", story_time_density "months".
+    const settei = renderSettei({ contract: bebopContract(), marks: [] });
+    expect(settei.text).toContain("How it moves:");
+    expect(settei.text).toContain("stakes hold level");
+    expect(settei.text).toContain("a seasonal arc");
+  });
+
+  it("the escalation distillation tracks the framing value", () => {
+    const contract = bebopContract();
+    contract.active.framing.escalation_pattern = "exponential";
+    contract.active.framing.story_time_density = "incident";
+    const settei = renderSettei({ contract, marks: [] });
+    expect(settei.text).toContain("each arc multiplies the last");
+    expect(settei.text).toContain("scenes hand off in near-real-time");
+    expect(settei.text).not.toContain("stakes hold level");
+  });
+});
+
 describe("the control key in the Settei (§7.5, M2-C8)", () => {
   const keyed = () =>
     bebopContract({

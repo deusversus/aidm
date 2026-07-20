@@ -1,6 +1,7 @@
 import { renderPresentationGrants } from "@/lib/blocks/assemble";
+import { Conte } from "@/lib/types/conte";
 import { describe, expect, it } from "vitest";
-import { KA_CONTRACT } from "../ka";
+import { KA_CONTRACT, renderConte } from "../ka";
 
 /**
  * SV4 camera spec (user-directed 2026-07-18): the KA holds cinematographic
@@ -62,6 +63,45 @@ describe("KA contract camera faculty (SV4)", () => {
     // the trailer close — any future section appended below it re-breaks
     // the measured 50% drop rate.
     expect(KA_CONTRACT.trimEnd().endsWith("lossier than your own record.)")).toBe(true);
+  });
+});
+
+describe("the exit (M2R2)", () => {
+  it("the exit faculty carries its load-bearing laws", () => {
+    for (const phrase of [
+      "## The exit",
+      "PRESSURE SURVIVES THE SCENE",
+      "END ON THE THING THAT ASKS",
+      "THE PLAYER'S INPUT IS THE FLOOR",
+    ]) {
+      expect(KA_CONTRACT).toContain(phrase);
+    }
+  });
+
+  it("the world-moves twin pairs with agency (Sacred Rule #3 restored)", () => {
+    expect(KA_CONTRACT).toContain("THE WORLD MOVES");
+    expect(KA_CONTRACT).toContain("something to decide ABOUT");
+  });
+
+  it("the trailer close still ENDS the contract (recency pin holds under the exit section)", () => {
+    // The exit section sits BEFORE the trailer close (which the C8 recency fix
+    // keeps last); a new faculty must never displace it from final position.
+    expect(KA_CONTRACT.trimEnd().endsWith("lossier than your own record.)")).toBe(true);
+  });
+
+  it("renderConte surfaces the pacing_note as the Drive line", () => {
+    const conte = Conte.parse({
+      turn_id: 1,
+      tier: "genga",
+      pacer_beat: {
+        beat_classification: "the knock",
+        strength: "suggestion",
+        pacing_note: "end on the door opening, not the silence after",
+      },
+    });
+    const storyboard = renderConte(conte, "I wait by the door");
+    expect(storyboard).toContain("Drive: ");
+    expect(storyboard).toContain("end on the door opening, not the silence after");
   });
 });
 

@@ -10,6 +10,7 @@ import {
 } from "@/lib/db/schema";
 import { identityKey, isProtagonistName, marksSelfInsert } from "@/lib/entity-identity";
 import { ingestAssertion } from "@/lib/ingestion/ingest";
+import { LOOPED_LARGE } from "@/lib/llm/budgets";
 import { callJudgment } from "@/lib/llm/calls";
 import { DEV_TIER_SELECTION, TierSelection } from "@/lib/llm/tiers";
 import { Composition } from "@/lib/types/composition";
@@ -480,9 +481,9 @@ export const defaultOspSynthesizer: OspSynthesizer = async ({
       `Deferred (Director's territory — likely uncertainties): ${resolved.deferred.join("; ") || "(none)"}`,
     ].join("\n"),
     effort: "high",
-    // Adaptive thinking spends from this budget; the reconciliation probe
-    // caught an 8k truncation live. Ceiling, not target.
-    maxTokens: 16_000,
+    // OSP synthesis emits a large contract; thinking headroom is added
+    // structurally (computeEffectiveMaxTokens). Ceiling, not target.
+    maxTokens: LOOPED_LARGE,
   });
 };
 

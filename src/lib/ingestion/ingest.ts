@@ -15,6 +15,7 @@ import {
   MERGE_CANDIDATE_MAX_DISTANCE,
   pairLikelySame,
 } from "@/lib/entity/janitor";
+import { STRUCTURED_SMALL } from "@/lib/llm/budgets";
 import { callJudgment, callProbe } from "@/lib/llm/calls";
 import { DEV_TIER_SELECTION, TierSelection } from "@/lib/llm/tiers";
 import { cosineSimilarity, embedTexts } from "@/lib/llm/voyage";
@@ -292,8 +293,8 @@ export async function reviseBlock(
     turnNumber: args.turnNumber,
     system: REVISE_SYSTEM,
     prompt: parts.join("\n"),
-    // Blocks run < 2k chars; 2k tokens is generous headroom for a full rewrite.
-    maxTokens: 2_000,
+    // Blocks run < 2k chars; STRUCTURED_SMALL is generous for a full rewrite.
+    maxTokens: STRUCTURED_SMALL,
   });
 
   const revised = revised_block.trim();
@@ -540,7 +541,7 @@ export async function ingestAssertion(
       turnNumber,
       text,
     }),
-    maxTokens: 2_000,
+    maxTokens: STRUCTURED_SMALL,
   });
 
   const writes: IngestedWrite[] = [];

@@ -22,6 +22,7 @@ import {
 } from "@/lib/direction/director";
 import { overdueSeeds, overdueTensionBump } from "@/lib/direction/seeds";
 import { rollingCheckpoint } from "@/lib/direction/session";
+import { CLASSIFY, STRUCTURED_RICH } from "@/lib/llm/budgets";
 import { callJudgment, callProbe } from "@/lib/llm/calls";
 import { DEV_TIER_SELECTION, TierSelection } from "@/lib/llm/tiers";
 import { embedTexts } from "@/lib/llm/voyage";
@@ -191,7 +192,7 @@ async function settleG2Inner(db: Db, turnId: string): Promise<void> {
       campaignId,
       turnNumber,
       effort: "high",
-      maxTokens: 8_000,
+      maxTokens: STRUCTURED_RICH,
       system: DISTILL_SYSTEM,
       prompt: `PLAYER INPUT:\n${turn.playerInput}\n\nNARRATION:\n${narration}`,
     });
@@ -431,6 +432,7 @@ async function settleG2Inner(db: Db, turnId: string): Promise<void> {
         system:
           "An arc override holds a temporary tonal/framing shift until a specific in-fiction event occurs. Judge whether THIS scene satisfies the transition signal. Answer transitioned=true only on a clear crossing.",
         prompt: `TRANSITION SIGNAL: ${override.transition_signal}\n\nSCENE:\n${narration}`,
+        maxTokens: CLASSIFY,
       });
       await db.transaction(async (tx) => {
         if (check.transitioned) {

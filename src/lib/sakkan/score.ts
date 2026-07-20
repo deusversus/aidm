@@ -1,3 +1,4 @@
+import { STRUCTURED_RICH } from "@/lib/llm/budgets";
 import { callJudgment } from "@/lib/llm/calls";
 import type { TierSelection } from "@/lib/llm/tiers";
 import { loadGrounding } from "@/lib/rules/grounding";
@@ -131,7 +132,7 @@ export async function scoreAxes(
     ].join(" "),
     prompt: `Axes (each 0–10):\n${axisBlock}\n\nProse sample:\n---\n${opts.sample}\n---\nScore every listed axis.`,
     effort: "low",
-    maxTokens: 6_000,
+    maxTokens: STRUCTURED_RICH,
     campaignId: opts.campaignId,
     turnNumber: opts.turnNumber,
   });

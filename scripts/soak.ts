@@ -158,6 +158,7 @@ async function personaMove(campaignId: string, tail: string): Promise<string> {
         system: PERSONA_SYSTEM,
         prompt: `The scene so far ends:\n\n${tail.slice(-500)}\n\nWrite your next move.`,
         campaignId,
+        // deliberate smoke-size: the soak's synthetic player persona, not a budget class.
         maxTokens: 200,
       });
       const move = next_input.trim();

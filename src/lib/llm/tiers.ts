@@ -35,13 +35,25 @@ export const DEV_TIER_SELECTION: TierSelection = {
  * Per-model API capabilities. Haiku 4.5 predates the 4.6-era adaptive
  * thinking and effort controls — sending either returns a 400. Fable's
  * thinking is always-on: the param is OMITTED entirely (explicit configs
- * other than adaptive are rejected).
+ * other than adaptive are rejected) — its `adaptiveThinking: false` means
+ * "don't send the param," NOT "doesn't think" (the docs class it as adaptive
+ * thinking, always on). `effortControl` is the honest "does it reason?"
+ * discriminator: only Haiku has neither.
+ *
+ * `maxOutput` is the synchronous Messages API output ceiling, used to clamp
+ * the structural thinking pad (computeEffectiveMaxTokens). Values verified
+ * 2026-07-20 from the models overview (platform.claude.com/docs models page).
  */
-export const MODEL_CAPS: Record<string, { adaptiveThinking: boolean; effortControl: boolean }> = {
-  "claude-fable-5": { adaptiveThinking: false, effortControl: true },
-  "claude-opus-4-8": { adaptiveThinking: true, effortControl: true },
-  "claude-sonnet-5": { adaptiveThinking: true, effortControl: true },
-  "claude-haiku-4-5": { adaptiveThinking: false, effortControl: false },
+export interface ModelCaps {
+  adaptiveThinking: boolean;
+  effortControl: boolean;
+  maxOutput: number;
+}
+export const MODEL_CAPS: Record<string, ModelCaps> = {
+  "claude-fable-5": { adaptiveThinking: false, effortControl: true, maxOutput: 128_000 },
+  "claude-opus-4-8": { adaptiveThinking: true, effortControl: true, maxOutput: 128_000 },
+  "claude-sonnet-5": { adaptiveThinking: true, effortControl: true, maxOutput: 128_000 },
+  "claude-haiku-4-5": { adaptiveThinking: false, effortControl: false, maxOutput: 64_000 },
 };
 
 /**

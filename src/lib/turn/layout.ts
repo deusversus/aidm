@@ -13,6 +13,7 @@ import { saveDirectionState } from "@/lib/direction/director";
 import { ingestAssertion } from "@/lib/ingestion/ingest";
 import { type RepetitionReadings, measureRepetition } from "@/lib/ka/antirep";
 import { selectSakugaMode } from "@/lib/ka/sakuga";
+import { STRUCTURED_SMALL } from "@/lib/llm/budgets";
 import { callProbe } from "@/lib/llm/calls";
 import { DEV_TIER_SELECTION, TierSelection } from "@/lib/llm/tiers";
 import { renderAmendments } from "@/lib/renderer/amendments";
@@ -136,7 +137,7 @@ export async function runLayout(
       ]
         .filter(Boolean)
         .join("\n"),
-      maxTokens: 1_500,
+      maxTokens: STRUCTURED_SMALL,
     }),
     getActiveArc(db, campaignId),
     db
@@ -530,7 +531,14 @@ export async function runLayout(
     scene_shape_directive: minimal ? "" : sceneShapeText,
     // §5.5 rung 2: "proceed without its directive" — the beat is dropped
     // when the rung fired, even though the probe itself already resolved.
-    pacer_beat: ladder.has("timebox_pacer") ? undefined : pacer.beat,
+    // pacingNote (model note + any gate note) rides the beat into the conte
+    // (M2R2 — was computed at pacer.ts:304 and never written).
+    pacer_beat:
+      ladder.has("timebox_pacer") || !pacer.beat
+        ? undefined
+        : // beat.pacing_note is the raw model note; the joined pacer.pacingNote
+          // (strength bookkeeping included) stays engine-side (M2R2 audit).
+          pacer.beat,
     canonicality_directives: canonicalityDirectives,
     // Pilot constraints (§8 handoff, ratified pilot-as-normal-turn): the
     // OSP's forbidden opening moves + the Director's cold-open constraints

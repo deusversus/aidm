@@ -341,6 +341,7 @@ async function runPhases(
     const contract = TURN_CONTRACTS[conte.tier as TurnTier] ?? TURN_CONTRACTS.genga;
 
     let lastError: unknown;
+    let truncatedLastAttempt = false;
     for (let attempt = 0; attempt < 2; attempt++) {
       if (attempt > 0) {
         emit({ type: "reset" });
@@ -355,7 +356,10 @@ async function runPhases(
           system: blocks.system,
           selection,
           effort: contract.effort,
-          maxTokens: contract.outputBudgetTokens,
+          // Retry-same-dice, bigger jar (M2R2 audit): a truncation-caused
+          // retry doubles the OUTPUT budget — the cap is plumbing, never
+          // story state; the structured layer got the same law in calls.ts.
+          maxTokens: contract.outputBudgetTokens * (truncatedLastAttempt ? 2 : 1),
           kaResearchCalls: contract.kaResearchCalls,
           ladderSteps,
           profileIds: (campaign.premiseContract as { anchors_used?: string[] })?.anchors_used ?? [],
@@ -386,6 +390,7 @@ async function runPhases(
         break;
       } catch (err) {
         lastError = err;
+        truncatedLastAttempt = err instanceof Error && err.message.includes("narration truncated");
         console.error(`[runtime] Phase B attempt ${attempt + 1} failed`, { turnId, err });
       }
     }

@@ -63,6 +63,8 @@ export const PacerBeat = z.object({
   must_reference: z.array(z.string()).default([]),
   avoid: z.array(z.string()).default([]),
   foreshadowing_hint: z.string().optional(),
+  /** The Pacer's per-turn drive/breather note (M2R2 — was computed and dropped). */
+  pacing_note: z.string().optional(),
   strength: z.enum(["suggestion", "strong", "override"]),
 });
 export type PacerBeat = z.infer<typeof PacerBeat>;

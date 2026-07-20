@@ -1,5 +1,6 @@
 import type { Db } from "@/lib/db";
 import { campaigns, players, profiles } from "@/lib/db/schema";
+import { PROSE_COMPOSER } from "@/lib/llm/budgets";
 import { streamNarration } from "@/lib/llm/calls";
 import { DEV_TIER_SELECTION, TierSelection } from "@/lib/llm/tiers";
 import { researchTitle } from "@/lib/research/research";
@@ -334,10 +335,10 @@ export async function runConductorTurn(
         role: m.role,
         content: m.content as never,
       })),
-      // Adaptive thinking spends from THIS budget too (the C1 NAA lesson):
-      // 2k truncated a long reply mid-word live. A ceiling, not a target —
-      // only produced tokens bill.
-      maxTokens: 8_000,
+      // A player-facing prose composer; thinking headroom is added structurally
+      // (computeEffectiveMaxTokens). A ceiling, not a target — only produced
+      // tokens bill (the C1 NAA lesson: a flat 2k once truncated a reply live).
+      maxTokens: PROSE_COMPOSER,
       tools: CONDUCTOR_TOOLS,
       campaignId,
     });
@@ -350,6 +351,14 @@ export async function runConductorTurn(
       emit({ type: "text", text: t });
     });
     const result = await done();
+    // A clipped conductor turn is still surfaced (the conversation continues),
+    // but the clip is honest, not silent (M2R2 §6).
+    if (result.message.stop_reason === "max_tokens") {
+      console.warn("[sz] conductor turn truncated at max_tokens — surfacing clipped reply", {
+        campaignId,
+        round,
+      });
+    }
     if (result.prose.trim()) streamedAny = true;
 
     const toolUses =

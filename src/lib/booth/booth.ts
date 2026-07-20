@@ -2,6 +2,7 @@ import { assembleForCampaign } from "@/lib/blocks/campaign";
 import type { Db } from "@/lib/db";
 import { appendPlayerTaste } from "@/lib/db/helpers";
 import { campaigns, overrides, pencilMarks, players } from "@/lib/db/schema";
+import { CLASSIFY, PROSE_COMPOSER, STRUCTURED_RICH } from "@/lib/llm/budgets";
 import { callJudgment, callProbe, streamNarration } from "@/lib/llm/calls";
 import { DEV_TIER_SELECTION, TierSelection } from "@/lib/llm/tiers";
 import {
@@ -121,6 +122,7 @@ export async function runBoothExchange(
     turnNumber,
     system: BOOTH_ROUTER_SYSTEM,
     prompt: routerPrompt,
+    maxTokens: CLASSIFY,
   }).catch((err) => {
     console.warn(
       `[booth] router failed — defaulting to director: ${err instanceof Error ? err.message : String(err)}`,
@@ -161,7 +163,7 @@ export async function runBoothExchange(
     selection,
     system: blocks?.system ?? [],
     messages: [{ role: "user", content: userMessage }],
-    maxTokens: 4_000,
+    maxTokens: PROSE_COMPOSER,
     // No trailer: a booth reply is player-facing conversation, not a scene.
     // Empty tools drops tool_choice (an empty tools array is an API 400).
     tools: [],
@@ -170,6 +172,14 @@ export async function runBoothExchange(
   });
   stream.on("text", (t) => emit(t));
   const result = await done();
+  // A clipped reply is still returned (the booth must not stall), but the clip
+  // is honest, not silent (M2R2 §6).
+  if (result.message.stop_reason === "max_tokens") {
+    console.warn("[booth] responder truncated at max_tokens — returning clipped reply", {
+      campaignId,
+      turnNumber,
+    });
+  }
   // A refused or empty reply must not persist as a hollow exchange (C9
   // audit): throw — the runtime's catch lands the turn with the apologetic
   // acknowledgement and the booth state stays untouched for a clean retry.
@@ -239,7 +249,7 @@ export async function closeBoothIfOpen(
       campaignId,
       turnNumber,
       effort: "medium",
-      maxTokens: 6_000,
+      maxTokens: STRUCTURED_RICH,
       system: BOOTH_RESOLUTION_SYSTEM,
       prompt: [
         knownTaste.length > 0

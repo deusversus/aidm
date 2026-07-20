@@ -19,6 +19,7 @@ import {
   FABLE_FALLBACK_MODEL,
   FABLE_MODEL,
   MODEL_CAPS,
+  type ModelCaps,
   SERVER_SIDE_FALLBACK_BETA,
   type TierSelection,
 } from "./tiers";
@@ -36,6 +37,57 @@ import {
  */
 
 export type Effort = "low" | "medium" | "high" | "xhigh" | "max";
+
+/**
+ * Thinking headroom added on top of a call's declared OUTPUT budget (M2R2 §6).
+ * Adaptive/always-on thinking bills against max_tokens, so a flat cap sized to
+ * the artifact truncates the reasoning first — the clip then reads downstream
+ * as a parse failure and retries into the same jar. The pad is that jar's lid,
+ * scaled by how hard the model was asked to think.
+ *
+ * Only a model that does NO server-side reasoning gets 0 (Haiku — neither
+ * adaptive thinking nor effort control). Fable's thinking is always-on even
+ * though its adaptiveThinking flag is false (the flag means "don't send the
+ * param"); effortControl is the honest discriminator, so it is padded like the
+ * adaptive models.
+ */
+function thinkingPad(caps: ModelCaps | undefined, effort?: Effort): number {
+  if (!caps || (!caps.adaptiveThinking && !caps.effortControl)) return 0;
+  switch (effort) {
+    case "low":
+      return 8_000;
+    case "medium":
+      return 12_000;
+    case "high":
+      // 24k, not 16k (M2R2 audit): genga — the DEFAULT narration tier — ran
+      // effort high under the old flat +24k pad; a 16k pad silently shrank
+      // its ceiling below the measured deep-scene thinking sizes. Ceilings
+      // are free until used.
+      return 24_000;
+    case "xhigh":
+    case "max":
+      return 32_000;
+    default:
+      return 8_000; // an adaptive call with no declared effort still reasons
+  }
+}
+
+/**
+ * The value actually sent to the SDK's max_tokens: the declared output budget
+ * plus structural thinking headroom, clamped to the model's real output
+ * ceiling. Callers declare only what they intend to PRODUCE (a budgets.ts
+ * class); the reasoning room is this mechanism's job, uniformly, at the choke
+ * point. Unknown models get no pad and no clamp (the budget passes through).
+ */
+export function computeEffectiveMaxTokens(
+  outputBudget: number,
+  model: string,
+  effort?: Effort,
+): number {
+  const caps = MODEL_CAPS[model];
+  const padded = outputBudget + thinkingPad(caps, effort);
+  return caps ? Math.min(padded, caps.maxOutput) : padded;
+}
 
 interface CallContext {
   campaignId?: string;
@@ -80,7 +132,9 @@ async function callStructured<T>(
   opts: StructuredCallOptions<T>,
 ): Promise<T> {
   const model = selection[tier];
-  const caps = MODEL_CAPS[model] ?? { adaptiveThinking: false, effortControl: false };
+  const caps = MODEL_CAPS[model];
+  const outputBudget = opts.maxTokens ?? 1024;
+  const effectiveCap = computeEffectiveMaxTokens(outputBudget, model, opts.effort);
   const lf = getLangfuse();
   const trace = lf?.trace({
     name: opts.name,
@@ -109,11 +163,11 @@ async function callStructured<T>(
       try {
         invMessage = await getAnthropic().messages.create({
           model,
-          max_tokens: opts.maxTokens ?? 1024,
+          max_tokens: effectiveCap,
           ...(opts.system ? { system: opts.system } : {}),
           messages,
           tools: opts.tools,
-          ...(caps.adaptiveThinking ? { thinking: { type: "adaptive" } } : {}),
+          ...(caps?.adaptiveThinking ? { thinking: { type: "adaptive" } } : {}),
         });
       } catch (err) {
         const statusMessage = err instanceof Error ? err.message : String(err);
@@ -185,14 +239,14 @@ async function callStructured<T>(
 
   const params: MessageCreateParamsNonStreaming = {
     model,
-    max_tokens: opts.maxTokens ?? 1024,
+    max_tokens: effectiveCap,
     ...(opts.system ? { system: opts.system } : {}),
     messages,
     output_config: {
       format: zodOutputFormat(opts.schema),
-      ...(opts.effort && caps.effortControl ? { effort: opts.effort } : {}),
+      ...(opts.effort && caps?.effortControl ? { effort: opts.effort } : {}),
     },
-    ...(caps.adaptiveThinking ? { thinking: { type: "adaptive" } } : {}),
+    ...(caps?.adaptiveThinking ? { thinking: { type: "adaptive" } } : {}),
   };
 
   // create() + manual parse, NOT messages.parse(): parse() throws on a
@@ -206,11 +260,16 @@ async function callStructured<T>(
   // own violation and re-emits once. Every attempt is metered; a second
   // failure throws (the caller's degrade path owns it).
   let attemptMessages = params.messages;
+  let attemptCap = effectiveCap;
   for (let attempt = 0; attempt < 2; attempt++) {
     const attemptStarted = Date.now();
     let message: Message;
     try {
-      message = await getAnthropic().messages.create({ ...params, messages: attemptMessages });
+      message = await getAnthropic().messages.create({
+        ...params,
+        messages: attemptMessages,
+        max_tokens: attemptCap,
+      });
     } catch (err) {
       const statusMessage = err instanceof Error ? err.message : String(err);
       generation?.end({
@@ -237,6 +296,18 @@ async function callStructured<T>(
       generation?.end({ level: "ERROR", statusMessage: "refusal", metadata: { latencyMs } });
       throw new Error(`${opts.name}: model declined (stop_reason=refusal)`);
     }
+    // A truncated emit is never silent (M2R2 §6): warn loudly and tag the
+    // trace. A clip may parse (a padded output) or fail below; either way the
+    // budget, not the schema, is the real story.
+    const truncated = message.stop_reason === "max_tokens";
+    if (truncated) {
+      console.warn("[llm] TRUNCATED at max_tokens", {
+        name: opts.name,
+        outputBudget,
+        effectiveCap: attemptCap,
+        model,
+      });
+    }
     const text = message.content
       .filter((b) => b.type === "text")
       .map((b) => b.text)
@@ -246,7 +317,12 @@ async function callStructured<T>(
       generation?.end({
         output: parsed,
         usage: { input: message.usage.input_tokens, output: message.usage.output_tokens },
-        metadata: { latencyMs, stopReason: message.stop_reason, correctiveRetry: attempt > 0 },
+        metadata: {
+          latencyMs,
+          stopReason: message.stop_reason,
+          correctiveRetry: attempt > 0,
+          truncated,
+        },
       });
       return parsed;
     } catch (err) {
@@ -263,10 +339,13 @@ async function callStructured<T>(
             content: `Your output failed validation:\n${reason}\nEmit the corrected structured output only — same schema, valid values.`,
           },
         ];
+        // When the clip caused this failure, the jar was too small: double the
+        // OUTPUT budget once (still clamped) so the retry has room to land.
+        if (truncated) attemptCap = computeEffectiveMaxTokens(outputBudget * 2, model, opts.effort);
         continue;
       }
       const statusMessage = `structured output failed to parse (stop_reason=${message.stop_reason})`;
-      generation?.end({ level: "ERROR", statusMessage, metadata: { latencyMs } });
+      generation?.end({ level: "ERROR", statusMessage, metadata: { latencyMs, truncated } });
       throw new Error(`${opts.name}: ${statusMessage}: ${reason}`);
     }
   }
@@ -408,7 +487,8 @@ export function extractCommitScene(message: Message): CommitScene | null {
  */
 export function streamNarration(opts: NarrationOptions) {
   const model = opts.selection.narration;
-  const caps = MODEL_CAPS[model] ?? { adaptiveThinking: false, effortControl: false };
+  const caps = MODEL_CAPS[model];
+  const effectiveCap = computeEffectiveMaxTokens(opts.maxTokens, model, opts.effort);
   const isFable = model === FABLE_MODEL;
   const name = opts.name ?? "narration";
   const lf = getLangfuse();
@@ -426,12 +506,12 @@ export function streamNarration(opts: NarrationOptions) {
   const tools = opts.tools ?? [COMMIT_SCENE_TOOL];
   const params: MessageStreamParams = {
     model,
-    max_tokens: opts.maxTokens,
+    max_tokens: effectiveCap,
     system: opts.system,
     messages: opts.messages,
     ...(tools.length > 0 ? { tools, tool_choice: { type: "auto" as const } } : {}),
-    ...(caps.adaptiveThinking ? { thinking: { type: "adaptive" } } : {}),
-    ...(opts.effort && caps.effortControl ? { output_config: { effort: opts.effort } } : {}),
+    ...(caps?.adaptiveThinking ? { thinking: { type: "adaptive" } } : {}),
+    ...(opts.effort && caps?.effortControl ? { output_config: { effort: opts.effort } } : {}),
   };
 
   // `fallbacks` postdates SDK 0.90's types; the API accepts it under the
@@ -518,6 +598,15 @@ export function streamNarration(opts: NarrationOptions) {
     if (refused) {
       console.warn("[narration] whole-chain refusal — empty prose, no sidecar", { name, model });
     }
+    const truncated = message.stop_reason === "max_tokens";
+    if (truncated) {
+      console.warn("[llm] TRUNCATED at max_tokens", {
+        name,
+        outputBudget: opts.maxTokens,
+        effectiveCap,
+        model,
+      });
+    }
     const prose = message.content
       .filter((b) => b.type === "text")
       .map((b) => b.text)
@@ -529,6 +618,7 @@ export function streamNarration(opts: NarrationOptions) {
         latencyMs,
         ttftMs,
         stopReason: message.stop_reason,
+        truncated,
         fallbackUsed,
         servedBy: message.model,
         cacheReadInputTokens: message.usage.cache_read_input_tokens,

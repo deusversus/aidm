@@ -1,3 +1,4 @@
+import { STRUCTURED_SMALL } from "@/lib/llm/budgets";
 import { callProbe } from "@/lib/llm/calls";
 import type { TierSelection } from "@/lib/llm/tiers";
 import type { PacerBeat } from "@/lib/types/conte";
@@ -167,7 +168,7 @@ export function buildSystem(hasArcState: boolean): string {
     "- must_reference: only elements that are NARRATIVELY DUE — concrete and few; never force a reference.",
     "- avoid: only what would break pacing; concrete and few.",
     "- foreshadowing_hint: one optional seed to plant, when the beat invites it.",
-    "- pacing_note: one actionable sentence.",
+    "- pacing_note: one actionable sentence. When the beat wants a driving close, NAME the concrete pressure this scene should END on (an arrival, a discovery landing, a clock advancing) — vary it turn to turn, grounded in what is live; never re-pose the standing fork the recent beats already posed. When the beat is a breather, say so plainly.",
     "- Defer to active player momentum: if the player is driving the story somewhere, go with them — gates prevent STALLING, never player agency (§7.4: expressed player word > premise-truth > the engine's inferred impulse).",
     "- strength is a PROPOSAL (suggestion/strong/override). The engine enforces the stall table; propose override ONLY when the phase gate's override threshold is met. When in doubt, suggestion.",
     "- CANONICALITY shapes pacing (v3 rule #10): canon_adjacent timeline + observable events → the external canon timeline provides structure; lean on upcoming canon events as natural escalation anchors. alternate timeline or influenceable events → the timeline is mutable; pacing is fully player-driven. inspired timeline or background events → no external timeline exists; pacing rests entirely on player action and Director planning.",
@@ -201,7 +202,7 @@ export async function runPacer(
     turnNumber: input.turnNumber,
     system: buildSystem(arc !== null),
     prompt: buildPrompt(input),
-    maxTokens: 1_000,
+    maxTokens: STRUCTURED_SMALL,
   });
 
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -297,6 +298,10 @@ export async function runPacer(
     avoid,
     foreshadowing_hint: directive.foreshadowing_hint,
     strength,
+    // The RAW model note only (M2R2 audit): the joined pacingNote below
+    // carries engine strength-bookkeeping, which must never reach the
+    // writer's Drive line — gate actions already ride must_reference.
+    ...(directive.pacing_note ? { pacing_note: directive.pacing_note } : {}),
   };
 
   return {

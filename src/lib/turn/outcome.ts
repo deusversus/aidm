@@ -1,3 +1,4 @@
+import { STRUCTURED_RICH, STRUCTURED_SMALL } from "@/lib/llm/budgets";
 import { callJudgment } from "@/lib/llm/calls";
 import type { TierSelection } from "@/lib/llm/tiers";
 import type { PreResolvedMechanics } from "@/lib/types/conte";
@@ -103,7 +104,7 @@ export async function judgeOutcome(
       .filter(Boolean)
       .join("\n"),
     effort: "high",
-    maxTokens: 6_000,
+    maxTokens: STRUCTURED_RICH,
   });
 
   // The code owns the arithmetic: recompute the band from the actual die and
@@ -179,7 +180,7 @@ export async function validateOutcome(
         `COST: ${args.outcome.cost ?? "(none)"} · CONSEQUENCE: ${args.outcome.consequence ?? "(none)"}`,
         `RATIONALE: ${args.outcome.rationale}`,
       ].join("\n"),
-      maxTokens: 2_000,
+      maxTokens: STRUCTURED_SMALL,
     });
   } catch (err) {
     console.warn("[layout] validation call failed — treating as valid", err);

@@ -8,6 +8,7 @@ import {
   semanticMemories,
 } from "@/lib/db/schema";
 import { callbackReadySeeds } from "@/lib/direction/seeds";
+import { STRUCTURED_SMALL } from "@/lib/llm/budgets";
 import { callJudgment } from "@/lib/llm/calls";
 import type { TierSelection } from "@/lib/llm/tiers";
 import { embedTexts } from "@/lib/llm/voyage";
@@ -284,7 +285,7 @@ export async function relevanceFilter(
       ]
         .filter(Boolean)
         .join("\n"),
-      maxTokens: 2_000,
+      maxTokens: STRUCTURED_SMALL,
     });
     const scoreByIndex = new Map(ranked.scores.map((s) => [s.index, s.score]));
     return candidates

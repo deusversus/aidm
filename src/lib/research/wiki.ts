@@ -9,6 +9,7 @@
  * wikis, restoring those probes is the fix, not prompt tuning.
  */
 
+import { STRUCTURED_RICH } from "@/lib/llm/budgets";
 import { callJudgment } from "@/lib/llm/calls";
 import { DEV_TIER_SELECTION } from "@/lib/llm/tiers";
 import { z } from "zod";
@@ -424,7 +425,7 @@ export async function planScrape(title: string, categories: string[]): Promise<S
     ].join(" "),
     prompt: `Wiki: ${title}\n\nCategories (up to 500):\n${categories.join("\n")}`,
     effort: "low",
-    maxTokens: 4_000,
+    maxTokens: STRUCTURED_RICH,
   });
 }
 

@@ -427,6 +427,42 @@ describe("runPacer — the strength gate under climbing phases (§3 record)", ()
   });
 });
 
+describe("the driving-close note into the conte (M2R2)", () => {
+  it("buildSystem names the concrete-pressure duty and bars re-posing the standing fork", () => {
+    const system = buildSystem(true);
+    expect(system).toContain("NAME the concrete pressure");
+    expect(system).toContain("never re-pose the standing fork");
+  });
+
+  it("an armed pacing_note flows through to result.pacingNote", async () => {
+    arm({ pacing_note: "let the knock land" });
+    const res = await runPacer(
+      DEV_TIER_SELECTION,
+      makeInput({ arcState: makeArc({ phase: "setup", turnsInPhase: 1 }) }),
+    );
+    expect(res.pacingNote).toContain("let the knock land");
+  });
+});
+
+describe("the Drive line stays clean (M2R2 audit)", () => {
+  it("beat.pacing_note carries the RAW model note; strength bookkeeping stays in pacingNote", async () => {
+    arm({
+      strength: "suggestion",
+      beat_classification: "wander",
+      must_reference: [],
+      pacing_note: "end on the knock landing, not the silence after",
+    });
+    const res = await runPacer(
+      DEV_TIER_SELECTION,
+      makeInput({ arcState: makeArc({ phase: "setup", turnsInPhase: 7 }) }),
+    );
+    expect(res.beat?.pacing_note).toBe("end on the knock landing, not the silence after");
+    // The joined engine note keeps the gate bookkeeping — engine-side only.
+    expect(res.pacingNote).toContain("phase gate");
+    expect(res.beat?.pacing_note).not.toContain("phase gate");
+  });
+});
+
 describe("canonicality-aware pacing (v3 rule #10, M2R R2)", () => {
   it("the prompt carries the CANONICALITY line when the contract supplies it", () => {
     const prompt = buildPrompt(

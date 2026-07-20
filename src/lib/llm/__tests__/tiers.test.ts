@@ -49,11 +49,23 @@ describe("tier menus (§3 — player-facing, closed)", () => {
     expect(MODEL_CAPS["claude-haiku-4-5"]).toEqual({
       adaptiveThinking: false,
       effortControl: false,
+      maxOutput: 64_000,
     });
   });
 
   it("Fable omits the thinking param (always-on) but keeps effort control", () => {
-    expect(MODEL_CAPS[FABLE_MODEL]).toEqual({ adaptiveThinking: false, effortControl: true });
+    expect(MODEL_CAPS[FABLE_MODEL]).toEqual({
+      adaptiveThinking: false,
+      effortControl: true,
+      maxOutput: 128_000,
+    });
+  });
+
+  it("every menu model carries its verified max-output ceiling (M2R2 §6)", () => {
+    expect(MODEL_CAPS["claude-opus-4-8"]?.maxOutput).toBe(128_000);
+    expect(MODEL_CAPS["claude-sonnet-5"]?.maxOutput).toBe(128_000);
+    expect(MODEL_CAPS[FABLE_MODEL]?.maxOutput).toBe(128_000);
+    expect(MODEL_CAPS["claude-haiku-4-5"]?.maxOutput).toBe(64_000);
   });
 
   it("Fable fallback constants match §3", () => {

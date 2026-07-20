@@ -16,6 +16,7 @@ const selection: TierSelection = useFable
 const { stream, done } = streamNarration({
   name: "smoke_narration",
   selection,
+  // deliberate smoke-size: a dev connectivity spike, not a budget class.
   maxTokens: 700,
   system: [
     {
