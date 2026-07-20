@@ -23,17 +23,44 @@ export const SceneCastDelta = z.object({
 });
 export type SceneCastDelta = z.infer<typeof SceneCastDelta>;
 
+/**
+ * Field docs are `.describe()` calls, not comments: z.toJSONSchema carries
+ * them into the commit_scene tool schema — the KA's ONLY view of what each
+ * field means (audit 2026-07-19: a bare schema left suggested_moves emission
+ * to model whim, so the player's default_on chips almost never appeared).
+ */
 export const CommitScene = z.object({
-  scene_cast_delta: z.array(SceneCastDelta).default([]),
-  /** Genuine decision point — present and stop (§5.1); chips may render (§9.2). */
-  decision_point: z.boolean(),
-  /** 2–3 suggested moves, rendered as dismissible chips, never in prose (§9.2). */
-  suggested_moves: z.array(z.string()).min(2).max(3).optional(),
-  /** Declared seed mentions — path 1 of two-path detection (§7.6). */
-  intended_seed_mentions: z.array(z.string()).default([]),
-  sakuga_used: SakugaMode.optional(),
-  /** 1–3 Compositor hints (§5.7). */
-  notable_beats: z.array(z.string()).min(1).max(3),
+  scene_cast_delta: z
+    .array(SceneCastDelta)
+    .default([])
+    .describe(
+      "Catalog changes this scene made. Admission is deliberate — most scenes admit no one.",
+    ),
+  decision_point: z
+    .boolean()
+    .describe(
+      "True when the scene ends on a genuine fork presented to the player — presented and stopped, unresolved.",
+    ),
+  suggested_moves: z
+    .array(z.string())
+    .min(2)
+    .max(3)
+    .optional()
+    .describe(
+      "When decision_point is true: 2-3 short, premise-true next moves the player could take (imperative phrases). Rendered as dismissible chips, never in prose. Omit when decision_point is false.",
+    ),
+  intended_seed_mentions: z
+    .array(z.string())
+    .default([])
+    .describe("Seed ids you deliberately wove into this scene."),
+  sakuga_used: SakugaMode.optional().describe(
+    "The sakuga sub-mode this scene actually used, when one was granted.",
+  ),
+  notable_beats: z
+    .array(z.string())
+    .min(1)
+    .max(3)
+    .describe("1-3 beats worth remembering — hints for the record, not prose."),
 });
 
 export type CommitScene = z.infer<typeof CommitScene>;

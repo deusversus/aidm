@@ -1,6 +1,7 @@
 import { assembleForCampaign } from "@/lib/blocks/campaign";
 import type { Db } from "@/lib/db";
-import { campaigns, overrides, pencilMarks } from "@/lib/db/schema";
+import { appendPlayerTaste } from "@/lib/db/helpers";
+import { campaigns, overrides, pencilMarks, players } from "@/lib/db/schema";
 import { callJudgment, callProbe, streamNarration } from "@/lib/llm/calls";
 import { DEV_TIER_SELECTION, TierSelection } from "@/lib/llm/tiers";
 import {
@@ -49,6 +50,7 @@ const BOOTH_RESOLUTION_SYSTEM = `You are closing an out-of-fiction booth convers
 - marks: standing craft/voice/axis guidance the player wants carried forward (the writer's #4 signal). kind = "axis" for a premise-dial nudge, "voice_feature" for a prose-voice fingerprint, "craft_note" for general craft direction. Each carries a topic, a direction, and evidence (a short quote or paraphrase of what the player said).
 - overrides: standing RULES the player explicitly laid down in the booth (rare — most rules go through the override channel). Include only a rule the player clearly declared as binding.
 - summary: one line naming what, if anything, was decided.
+- player_taste_note (usually OMIT): one sentence about the PLAYER's durable taste — how they like their stories, not this character or campaign — only when the chat plainly revealed one ("I always want the quiet aftermath scene").
 Empty arrays are a valid resolution: a chat that calibrated nothing resolves to empty marks and overrides with a summary that says so.`;
 
 /** The persona rides as a MESSAGE, never a system mutation (§5.4: the cached prefix stays byte-identical across responders). */
@@ -221,6 +223,14 @@ export async function closeBoothIfOpen(
   if (state.exchanges.length === 0) return; // nothing open
 
   const selection = resolveSelection(campaign.tierModels);
+  // Already-known taste rides the extraction prompt (R4 audit): a blind
+  // extractor re-notes the same durable taste every booth, and near-dupes
+  // evict distinct notes from the slice(-3) windows Settei/recap read.
+  const [playerRow] = await db
+    .select({ profile: players.profile })
+    .from(players)
+    .where(eq(players.id, campaign.playerId));
+  const knownTaste = (playerRow?.profile as { taste?: string[] } | null)?.taste ?? [];
   let resolution: BoothResolution | null = null;
   try {
     resolution = await callJudgment(selection, {
@@ -231,7 +241,17 @@ export async function closeBoothIfOpen(
       effort: "medium",
       maxTokens: 6_000,
       system: BOOTH_RESOLUTION_SYSTEM,
-      prompt: `Booth transcript:\n${formatTranscript(state.exchanges)}`,
+      prompt: [
+        knownTaste.length > 0
+          ? `Already-known player taste (only set player_taste_note for something NEW):\n${knownTaste
+              .slice(-6)
+              .map((t) => `- ${t}`)
+              .join("\n")}\n`
+          : "",
+        `Booth transcript:\n${formatTranscript(state.exchanges)}`,
+      ]
+        .filter(Boolean)
+        .join("\n"),
     });
   } catch (err) {
     console.warn(
@@ -265,6 +285,13 @@ export async function closeBoothIfOpen(
           confidence: 1,
         })),
       );
+    }
+    // §6.9 layer-10 writer #2 (M2R R4): a booth-revealed PLAYER taste note
+    // appends to the cross-campaign profile (same append-only shape as SZ).
+    if (resolution.player_taste_note) {
+      // Atomic append (R4 audit): three writers share the player row; the
+      // helper also trims (a padded note landed verbatim before).
+      await appendPlayerTaste(db, campaign.playerId, [resolution.player_taste_note]);
     }
   }
 

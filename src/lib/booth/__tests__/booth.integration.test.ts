@@ -472,4 +472,29 @@ describe.skipIf(!url)("Meta booth + override channel (real Postgres, scripted mo
     expect(res.closed).toBe(false);
     expect(mockStream).toHaveBeenCalledTimes(1);
   });
+
+  it("a booth-revealed taste note appends to the cross-campaign profile (§6.9 writer, M2R R4)", async () => {
+    if (!db) throw new Error("unreachable");
+    const campaignId = await makeCampaign();
+    await setBoothState(campaignId, 1, [
+      { role: "player", text: "honestly I always want the quiet aftermath scene", at_turn: 1 },
+      { role: "studio", text: "noted", responder: "director", at_turn: 1 },
+    ]);
+    mockJudgment.mockResolvedValue({
+      marks: [],
+      overrides: [],
+      player_taste_note: "Wants the quiet aftermath scene after big beats.",
+      summary: "Taste noted.",
+    } as never);
+
+    await closeBoothIfOpen(db, campaignId, 2);
+
+    const [player] = await db
+      .select({ profile: schema.players.profile })
+      .from(schema.players)
+      .where(eq(schema.players.id, playerId));
+    expect((player?.profile as { taste?: string[] })?.taste).toContain(
+      "Wants the quiet aftermath scene after big beats.",
+    );
+  });
 });

@@ -96,6 +96,8 @@ export interface PacerInput {
   recentBeats: string[];
   /** Null until a Director has run — beat classification only, strength held at suggestion. */
   arcState: PacerArcState | null;
+  /** §7.2 "canonicality-aware" (v3 pacing rule #10, restored M2R R2). */
+  canonicality?: { timeline_mode: string; event_fidelity: string };
   campaignId?: string;
   turnNumber?: number;
 }
@@ -124,7 +126,7 @@ function normalizeStrength(value: unknown): Strength {
     : "suggestion";
 }
 
-function buildPrompt(input: PacerInput): string {
+export function buildPrompt(input: PacerInput): string {
   const lines: string[] = [];
   const arc = input.arcState;
   if (arc) {
@@ -145,13 +147,18 @@ function buildPrompt(input: PacerInput): string {
   } else {
     lines.push("PHASE: none yet (no Director has run) — classify the beat and tone only.");
   }
+  if (input.canonicality) {
+    lines.push(
+      `CANONICALITY: timeline ${input.canonicality.timeline_mode}, events ${input.canonicality.event_fidelity}`,
+    );
+  }
   if (input.recentBeats.length > 0) lines.push(`RECENT BEATS: ${input.recentBeats.join(" → ")}`);
   lines.push(`PLAYER INPUT: ${input.playerInput}`);
   lines.push(`INTENT: ${input.intent}`);
   return lines.join("\n");
 }
 
-function buildSystem(hasArcState: boolean): string {
+export function buildSystem(hasArcState: boolean): string {
   return [
     "You are the Pacer for an anime TTRPG narrative engine — the per-turn beat director (blueprint §7.2).",
     "Classify the beat this action opens and shape it for the writer. Rules, carried from v3's pacing discipline:",
@@ -163,6 +170,7 @@ function buildSystem(hasArcState: boolean): string {
     "- pacing_note: one actionable sentence.",
     "- Defer to active player momentum: if the player is driving the story somewhere, go with them — gates prevent STALLING, never player agency (§7.4: expressed player word > premise-truth > the engine's inferred impulse).",
     "- strength is a PROPOSAL (suggestion/strong/override). The engine enforces the stall table; propose override ONLY when the phase gate's override threshold is met. When in doubt, suggestion.",
+    "- CANONICALITY shapes pacing (v3 rule #10): canon_adjacent timeline + observable events → the external canon timeline provides structure; lean on upcoming canon events as natural escalation anchors. alternate timeline or influenceable events → the timeline is mutable; pacing is fully player-driven. inspired timeline or background events → no external timeline exists; pacing rests entirely on player action and Director planning.",
     "- phase_transition: name the target phase ONLY when a transition is genuinely due; otherwise omit.",
     hasArcState
       ? ""

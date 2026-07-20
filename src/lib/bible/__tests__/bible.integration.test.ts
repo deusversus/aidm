@@ -251,6 +251,7 @@ describe.skipIf(!url)("composeBible (real Postgres)", () => {
         death_physics: "death is real, sudden, and cheap",
         lethality_posture: "losses stay lost",
         hard_lines: ["no harm to children on screen", "no sexual violence"],
+        control_key: { circumstances: "when the bloodrage takes hold" },
       },
     });
     await completeTurn(campaignId);
@@ -260,5 +261,9 @@ describe.skipIf(!url)("composeBible (real Postgres)", () => {
       "no harm to children on screen",
       "no sexual violence",
     ]);
+    // M2R R4 (§9.1 review gate): the full intensity contract is visible.
+    expect(bible?.premise.deathPhysics).toBe("death is real, sudden, and cheap");
+    expect(bible?.premise.lethalityPosture).toBe("losses stay lost");
+    expect(bible?.premise.controlKey).toBe("when the bloodrage takes hold");
   });
 });

@@ -1,5 +1,6 @@
-import { budgetPriorFor, expectedTension, payoffDebt } from "@/lib/direction/arcs";
+import { budgetPriorFor, expectedTension, payoffDebt, seriesBudgetFor } from "@/lib/direction/arcs";
 import type { ArcRow } from "@/lib/direction/arcs";
+import { finitudeDirective } from "@/lib/direction/director";
 import { bebopContract } from "@/lib/renderer/__tests__/fixtures";
 import type { PremiseContract } from "@/lib/types/premise";
 import { describe, expect, it } from "vitest";
@@ -127,5 +128,25 @@ describe("budgetPriorFor bands (§7.3 genre priors)", () => {
 
   it("Bebop's canonical pacing (6) lands in the moderate band", () => {
     expect(budgetPriorFor(bebopContract())).toEqual({ unit: "episodes", target: 4, tolerance: 2 });
+  });
+});
+
+describe("seriesBudgetFor (§8 finitude, M2R R2)", () => {
+  it("finite and undecided plan a finale inside two cours ± one", () => {
+    expect(seriesBudgetFor("finite")).toEqual({ unit: "episodes", target: 24, tolerance: 12 });
+    expect(seriesBudgetFor("undecided")).toEqual({ unit: "episodes", target: 24, tolerance: 12 });
+  });
+
+  it("indefinite widens tolerance to the full horizon — RUSHED pressure is meaningless for an open cycle", () => {
+    expect(seriesBudgetFor("indefinite")).toEqual({ unit: "episodes", target: 24, tolerance: 24 });
+  });
+});
+
+describe("finitudeDirective (§8 — the Director finally reads the player's word)", () => {
+  it("each value carries its behavioral meaning, not just the label", () => {
+    expect(finitudeDirective("finite")).toContain("planned finale across seasons");
+    expect(finitudeDirective("indefinite")).toContain("Never force or drift toward an ending");
+    expect(finitudeDirective("undecided")).toContain("season boundaries");
+    expect(finitudeDirective("undecided")).toContain("never resolved unilaterally");
   });
 });

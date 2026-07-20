@@ -48,6 +48,14 @@ export default async function PlayPage({ params }: { params: Promise<{ id: strin
     .orderBy(desc(episodicRecords.turnNumber))
     .limit(12);
 
+  // §5.5 degraded markers rehydrate with the transcript (M2R R3 — the flag
+  // was a dead SSE wire; a reload hid which scenes rendered thin).
+  const degradedRows = await db
+    .select({ turnNumber: turns.turnNumber })
+    .from(turns)
+    .where(and(eq(turns.campaignId, id), eq(turns.degraded, true)));
+  const degradedSet = new Set(degradedRows.map((r) => r.turnNumber));
+
   // Channel turns live OUTSIDE the episodic layer by design (§5.4 — booth
   // text never enters the story window), so the transcript rehydrates them
   // from the turns table; their replay metadata rides the sidecar jsonb (C9).
@@ -83,7 +91,14 @@ export default async function PlayPage({ params }: { params: Promise<{ id: strin
       ...(meta.acknowledgement ? { acknowledgement: meta.acknowledgement } : {}),
     };
   });
-  const initialItems = [...recent.map((r) => ({ kind: "story" as const, ...r })), ...channelItems]
+  const initialItems = [
+    ...recent.map((r) => ({
+      kind: "story" as const,
+      ...r,
+      ...(degradedSet.has(r.turnNumber) ? { degraded: true } : {}),
+    })),
+    ...channelItems,
+  ]
     .sort((a, b) => a.turnNumber - b.turnNumber)
     .slice(-16);
 
@@ -101,6 +116,28 @@ export default async function PlayPage({ params }: { params: Promise<{ id: strin
     .limit(1);
 
   const contract = campaign.premiseContract as { suggestion_affordance?: string } | null;
+  const affordance = contract?.suggestion_affordance ?? "on_request_only";
+
+  // §9.2 chips rehydration (M2R R1): the durable record IS the UI state — a
+  // reload over a live decision point re-offers the KA's persisted moves.
+  // Only when no turn is open (an open turn means a new scene supersedes).
+  let initialChips: string[] | undefined;
+  if (!openTurn && affordance === "default_on") {
+    const [lastComplete] = await db
+      .select({ sidecar: turns.sidecar })
+      .from(turns)
+      .where(and(eq(turns.campaignId, id), eq(turns.status, "complete")))
+      .orderBy(desc(turns.turnNumber))
+      .limit(1);
+    const sidecar = lastComplete?.sidecar as {
+      decision_point?: boolean;
+      suggested_moves?: string[];
+    } | null;
+    // Same gate as the suggestions route (audit): 2-3 moves, never more.
+    if (sidecar?.decision_point && (sidecar.suggested_moves?.length ?? 0) >= 2) {
+      initialChips = sidecar.suggested_moves?.slice(0, 3);
+    }
+  }
 
   return (
     <PlayView
@@ -108,7 +145,8 @@ export default async function PlayPage({ params }: { params: Promise<{ id: strin
       title={campaign.title}
       initialExchanges={initialItems}
       openTurn={openTurn ?? null}
-      suggestionAffordance={contract?.suggestion_affordance ?? "on_request_only"}
+      suggestionAffordance={affordance}
+      {...(initialChips ? { initialChips } : {})}
       // §9.5 voice: present only when the key is configured — no key, no button.
       ttsAvailable={Boolean(process.env.ELEVENLABS_API_KEY)}
       ttsVoiceId={

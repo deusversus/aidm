@@ -4,7 +4,7 @@ import type { Db } from "@/lib/db";
 import { notTombstoned } from "@/lib/db/helpers";
 import { arcs } from "@/lib/db/schema";
 import {
-  type ArcBudget,
+  ArcBudget,
   COUR_EPISODES,
   type DirectorArcPlan,
   type PayoffContract,
@@ -129,6 +129,34 @@ export function budgetPriorFor(contract: PremiseContract): ArcBudget {
   return { unit: "episodes", target: prior.target, tolerance: prior.tolerance };
 }
 
+/**
+ * The Series stratum's budget by finitude (M2R R2): a finite story plans a
+ * finale inside two cours ± one; an indefinite cycle widens tolerance to the
+ * full width as an honest open horizon. The reader is the Director dossier's
+ * series-horizon line ({@link seriesBudget}) — DESCRIPTIVE judgment context.
+ * Never feed series rows into payoffDebt-style rushed math: at tolerance ==
+ * target the (remaining <= tolerance) rule fires from episode zero (audit).
+ * Season/series arithmetic is M3's; existing campaigns keep their old rows.
+ */
+export function seriesBudgetFor(finitude: PremiseContract["finitude"]): ArcBudget {
+  return {
+    unit: "episodes",
+    target: COUR_EPISODES * 2,
+    tolerance: finitude === "indefinite" ? COUR_EPISODES * 2 : COUR_EPISODES,
+  };
+}
+
+/** The series row's stored budget — the dossier's series-horizon read. */
+export async function seriesBudget(db: Db, campaignId: string): Promise<ArcBudget | null> {
+  const [row] = await db
+    .select({ budget: arcs.budget })
+    .from(arcs)
+    .where(and(eq(arcs.campaignId, campaignId), eq(arcs.stratum, "series"), notTombstoned(arcs)))
+    .limit(1);
+  const parsed = ArcBudget.safeParse(row?.budget);
+  return parsed.success ? parsed.data : null;
+}
+
 // --- Strata rows --------------------------------------------------------------
 
 const sameName = (a: string, b: string): boolean =>
@@ -174,8 +202,7 @@ export async function ensureSeriesScaffold(
           stratum: "series",
           dramaticQuestion: spark,
           shape,
-          // Open-ended honesty: a series is two cours wide with a full cour of slack.
-          budget: { unit: "episodes", target: COUR_EPISODES * 2, tolerance: COUR_EPISODES },
+          budget: seriesBudgetFor(contract.finitude),
           phase: "setup",
           status: "active",
           turnId: 0,

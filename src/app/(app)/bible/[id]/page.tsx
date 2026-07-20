@@ -86,6 +86,30 @@ export default async function BiblePage({ params }: { params: Promise<{ id: stri
               </dd>
             </div>
           )}
+          {premise.deathPhysics && (
+            <div className="space-y-0.5">
+              <dt className="text-xs uppercase tracking-wide text-muted-foreground">
+                Death physics
+              </dt>
+              <dd className="leading-6">{premise.deathPhysics}</dd>
+            </div>
+          )}
+          {premise.lethalityPosture && (
+            <div className="space-y-0.5">
+              <dt className="text-xs uppercase tracking-wide text-muted-foreground">
+                Lethality posture
+              </dt>
+              <dd className="leading-6">{premise.lethalityPosture}</dd>
+            </div>
+          )}
+          {premise.controlKey && (
+            <div className="space-y-0.5">
+              {/* No "player-cut" claim in the label: a known SZ-compiler defect
+                  can store a DECLINATION here (see the spawned fix task). */}
+              <dt className="text-xs uppercase tracking-wide text-muted-foreground">Control key</dt>
+              <dd className="leading-6">{premise.controlKey}</dd>
+            </div>
+          )}
         </dl>
         {premise.hardLines.length > 0 && (
           <div className="space-y-1">

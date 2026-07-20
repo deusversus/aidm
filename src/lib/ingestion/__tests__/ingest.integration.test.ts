@@ -7,7 +7,7 @@ import { and, eq, isNull } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { CANON_MATCH_DISTANCE, ingestAssertion } from "../ingest";
+import { CANON_MATCH_DISTANCE, ingestAssertion, renderDossier } from "../ingest";
 
 /**
  * Universal ingestion (§5.4, §6.5) against real Postgres with a scripted
@@ -1248,5 +1248,38 @@ describe.skipIf(!url)("Universal ingestion (real Postgres, scripted extractor)",
     const opts = call?.[1] as { campaignId?: string; turnNumber?: number };
     expect(opts.campaignId).toBe(campaignId);
     expect(opts.turnNumber).toBe(25);
+  });
+});
+
+describe("renderDossier protagonist grouping (M2R R4 — the C4 fix pattern)", () => {
+  it("a REAL-named PC with the state marker groups under THE PLAYER'S PROTAGONIST, never NPCS", () => {
+    const dossier = renderDossier(
+      [
+        {
+          name: "Kaelen",
+          entityType: "npc",
+          block: "The thread-reader himself.",
+          turnId: 0,
+          state: { is_player_protagonist: true },
+        },
+        { name: "Casimir Thoss", entityType: "npc", block: "Junk with a story.", turnId: 3 },
+      ],
+      undefined,
+      5,
+    );
+    const protIdx = dossier.indexOf("THE PLAYER'S PROTAGONIST");
+    const npcIdx = dossier.indexOf("NPCS:");
+    expect(protIdx).toBeGreaterThan(-1);
+    expect(dossier.slice(protIdx, npcIdx > -1 ? npcIdx : undefined)).toContain("Kaelen");
+    expect(dossier.slice(npcIdx)).not.toContain("Kaelen");
+  });
+
+  it("the placeholder-name path still works without a marker", () => {
+    const dossier = renderDossier(
+      [{ name: "The Protagonist", entityType: "npc", block: "placeholder PC", turnId: 0 }],
+      undefined,
+      2,
+    );
+    expect(dossier.indexOf("THE PLAYER'S PROTAGONIST")).toBeGreaterThan(-1);
   });
 });

@@ -32,6 +32,16 @@ describe("COMMIT_SCENE_TOOL", () => {
     );
     expect(schema.required).toEqual(expect.arrayContaining(["decision_point", "notable_beats"]));
   });
+
+  it("field descriptions survive into the tool schema — the KA's only view of field meaning (M2R R1)", () => {
+    const schema = COMMIT_SCENE_TOOL.input_schema as {
+      properties?: Record<string, { description?: string }>;
+    };
+    const moves = schema.properties?.suggested_moves?.description ?? "";
+    expect(moves).toContain("decision_point is true");
+    expect(moves).toContain("chips");
+    expect(schema.properties?.decision_point?.description).toContain("genuine fork");
+  });
 });
 
 describe("extractCommitScene (§5.7 trailer)", () => {

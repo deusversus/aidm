@@ -342,6 +342,8 @@ export interface DossierEntity {
   entityType: string;
   block: string;
   turnId: number;
+  /** Entity state jsonb — carries the C4 self-insert protagonist marker. */
+  state?: unknown;
 }
 
 function blockHead(block: string): string {
@@ -370,7 +372,11 @@ export function renderDossier(
   arcLine: string | undefined,
   turnNumber: number,
 ): string {
-  const isProt = (e: DossierEntity) => e.entityType === "npc" && isProtagonistName(e.name);
+  // The state marker first (M2R R4 audit — the C4 fix pattern): a REAL-named
+  // PC must group under THE PLAYER'S PROTAGONIST, not file under NPCS and
+  // fall off the recency budget (its row keeps turnId 0 forever).
+  const isProt = (e: DossierEntity) =>
+    e.entityType === "npc" && (marksPlayerProtagonistState(e.state) || isProtagonistName(e.name));
   const protagonist = entityRows.filter(isProt);
   const threads = entityRows.filter((e) => e.entityType === "thread");
   const others = entityRows

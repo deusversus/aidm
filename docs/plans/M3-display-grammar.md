@@ -41,3 +41,4 @@ The user's live table: a campaign whose premise grants `readout` and `memory` sh
 1. Does the five-directive starter set match your instinct, or trim/extend before it hardens?
 2. `memory` as a granted directive vs. always-available (every table has flashbacks; the SV4 law suggests the MARKING should be universal even when the chrome is premise-styled)?
 3. M3 proper, or pull forward as an M2.75 insertion after C10?
+4. The stinger (blueprint §8, part of the presentation vocabulary): `stinger_allowed` sits reserved in the contract with no mechanism anywhere — the M2R audit flagged it as the one vocabulary option with no staging plan. Does the post-credits seed-plant land here (a close-path directive beside the yokoku), or park post-M3?

@@ -15,6 +15,8 @@ interface Exchange {
   turnNumber: number;
   playerInput: string;
   narration: string;
+  /** §5.5 minimal-brief ladder fired — the scene rendered thin (M2R R3). */
+  degraded?: boolean;
 }
 
 /**
@@ -143,6 +145,7 @@ export function PlayView({
   initialExchanges,
   openTurn,
   suggestionAffordance,
+  initialChips,
   ttsAvailable = false,
   ttsVoiceId = "",
 }: {
@@ -152,6 +155,9 @@ export function PlayView({
   initialExchanges: TranscriptItem[];
   openTurn: OpenTurn | null;
   suggestionAffordance: string;
+  /** §9.2 rehydration: the latest turn's persisted moves at a live decision
+   *  point (server-gated to default_on) — a reload keeps the chips. */
+  initialChips?: string[];
   /** §9.5 voice: the listen button renders only when the key is configured. */
   ttsAvailable?: boolean;
   /** The campaign's chosen narrator voice (cache-busts listen URLs). */
@@ -163,7 +169,7 @@ export function PlayView({
   const [staging, setStaging] = useState<string | null>(null);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
-  const [chips, setChips] = useState<string[]>([]);
+  const [chips, setChips] = useState<string[]>(initialChips ?? []);
   const [error, setError] = useState<{ message: string; turnId: string } | null>(null);
   const [queued, setQueued] = useState<string | null>(null);
   const [pinNotice, setPinNotice] = useState<string | null>(null);
@@ -222,8 +228,12 @@ export function PlayView({
   // Live mirror so a mid-turn suggestion-affordance change gates THIS turn's
   // chips without a reload (the same closure-staleness guard as errorRef).
   const affordanceRef = useRef(suggestionAffordance);
+  // Closure-stable mirror (R3 audit): the queue drain and retry live inside
+  // long-lived closures where the sessionClosed state would be stale.
+  const sessionClosedRef = useRef(false);
   errorRef.current = error;
   affordanceRef.current = affordance;
+  sessionClosedRef.current = sessionClosed;
 
   // Input typed during a turn queues in memory; a 4-minute sakuga turn plus a
   // reload used to eat it. Mirror the queue to sessionStorage (per campaign)
@@ -245,12 +255,21 @@ export function PlayView({
     return () => clearInterval(tick);
   }, [busy]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: openTurn is the server snapshot, stable for this mount
   useEffect(() => {
     try {
       const saved = sessionStorage.getItem(queueStorageKey);
-      if (saved) {
+      if (!saved) return;
+      if (openTurn) {
         queuedRef.current = saved;
         setQueued(saved);
+      } else {
+        // No open turn to drain behind (M2R R3): the turn landed while the
+        // page was closed. Hand the message back to the input box — a queue
+        // with nothing in flight is a phantom indicator that later inverts
+        // send order.
+        sessionStorage.removeItem(queueStorageKey);
+        setInput((prev) => (prev ? prev : saved));
       }
     } catch {
       // sessionStorage can throw in locked-down contexts — the queue simply
@@ -309,6 +328,7 @@ export function PlayView({
               turnNumber?: number;
               decisionPoint?: boolean;
               suggestedMoves?: string[];
+              degraded?: boolean;
               retryable?: boolean;
               // §5.4 channel-turn terminal fields.
               intent?: ChannelIntent;
@@ -333,7 +353,12 @@ export function PlayView({
               terminal = true;
               setExchanges((x) => [
                 ...x,
-                { turnNumber: payload.turnNumber ?? 0, playerInput, narration: acc },
+                {
+                  turnNumber: payload.turnNumber ?? 0,
+                  playerInput,
+                  narration: acc,
+                  ...(payload.degraded ? { degraded: true } : {}),
+                },
               ]);
               setStreamText("");
               setPendingInput(null);
@@ -415,7 +440,9 @@ export function PlayView({
       // loop against the still-open failed turn). hadError is local, so it's
       // reliable where the `error` state closure would be stale.
       const q = queuedRef.current;
-      if (q && !hadError) {
+      // sessionClosedRef: a message queued before the closed state landed
+      // must not auto-submit into an explicitly-ended sitting (R3 audit).
+      if (q && !hadError && !sessionClosedRef.current) {
         queuedRef.current = null;
         setQueued(null);
         void submitRef.current(q);
@@ -426,6 +453,9 @@ export function PlayView({
 
   const submit = useCallback(
     async (message: string) => {
+      // The closed sitting is a wall for EVERY submit path, not just send()
+      // (R3 audit: the queue drain and callers ride this same function).
+      if (sessionClosedRef.current) return;
       busyRef.current = true;
       setBusy(true);
       setError(null);
@@ -492,13 +522,50 @@ export function PlayView({
           method: "POST",
         });
         if (!res.ok) return;
-        const body = (await res.json()) as { recap?: string };
+        const body = (await res.json()) as {
+          recap?: string;
+          closedRecently?: boolean;
+          yokoku?: string;
+        };
         if (body.recap) setRecap(body.recap);
+        // M2R R3: a just-ended sitting rehydrates as ended — tease intact,
+        // the next sitting begins deliberately (the reopen button). Chips
+        // clear with it: a dead sitting offers no moves (audit).
+        if (body.closedRecently) {
+          setSessionClosed(true);
+          setChips([]);
+          if (body.yokoku) setYokoku(body.yokoku);
+        }
       } catch (err) {
         console.warn("session open failed", err);
       }
     })();
   }, [campaignId]);
+
+  // M2R R3: the deliberate act that begins the next sitting after a recent
+  // explicit close — runs the full open sequence and clears the closed state.
+  const beginNextSitting = async () => {
+    if (closing) return;
+    setClosing(true);
+    try {
+      const res = await fetchWithAuthRetry(`/api/campaigns/${campaignId}/session/open`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ resume: true }),
+      });
+      if (res.ok) {
+        const body = (await res.json()) as { recap?: string };
+        setSessionClosed(false);
+        setYokoku(null);
+        if (body.recap) setRecap(body.recap);
+      } else {
+        setPinNotice("Couldn't open the next sitting — try again.");
+      }
+    } catch {
+      setPinNotice("Couldn't open the next sitting — try again.");
+    }
+    setClosing(false);
+  };
 
   const endSession = async () => {
     if (closing || sessionClosed) return;
@@ -543,6 +610,7 @@ export function PlayView({
   };
 
   const retry = async () => {
+    if (sessionClosedRef.current) return;
     if (!error?.turnId) return;
     const turnId = error.turnId;
     setError(null);
@@ -1334,6 +1402,11 @@ export function PlayView({
                 </div>
               </div>
               <NarrationProse text={e.narration} />
+              {e.degraded && (
+                <p className="text-[11px] italic text-muted-foreground/50">
+                  rendered thin — the studio was under time pressure this scene
+                </p>
+              )}
               {ttsAvailable && e.narration.trim() && (
                 <div className="flex justify-end">
                   <ListenButton
@@ -1446,9 +1519,17 @@ export function PlayView({
           </div>
         )}
         {sessionClosed && (
-          <p className="text-xs italic text-muted-foreground">
-            Session closed — reopen it from the shelf when you’re ready for the next sitting.
-          </p>
+          <div className="flex items-center gap-3">
+            <p className="text-xs italic text-muted-foreground">Session closed.</p>
+            <button
+              type="button"
+              onClick={() => void beginNextSitting()}
+              disabled={closing}
+              className="rounded-md border border-border px-3 py-1 text-xs hover:bg-muted disabled:opacity-50"
+            >
+              {closing ? "opening…" : "Begin the next sitting"}
+            </button>
+          </div>
         )}
         <div ref={bottomRef} />
       </div>

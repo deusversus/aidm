@@ -15,7 +15,7 @@ export const dynamic = "force-dynamic";
  * Runs the full open sequence (idle-close → Director → Settei rebuild →
  * pre-warm → recap) on a genuine open.
  */
-export async function POST(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
 
@@ -34,6 +34,9 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
   // catch-up-before-reader; same pattern as the rewind route).
   await settleG2IfPending(db, id);
 
-  const result = await openSession(db, id);
+  // M2R R3: {resume:true} is the deliberate "begin the next sitting" act —
+  // it bypasses the closed-recently guard; a bare mount never does.
+  const body = (await req.json().catch(() => ({}))) as { resume?: boolean };
+  const result = await openSession(db, id, { resume: body.resume === true });
   return NextResponse.json(result);
 }

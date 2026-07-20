@@ -39,6 +39,7 @@ import {
   expectedTension,
   getActiveArc,
   payoffDebt,
+  seriesBudget,
 } from "./arcs";
 import { overdueSeeds, overdueTensionBump, plantSeed, seedDossier, settleSeed } from "./seeds";
 
@@ -167,6 +168,22 @@ async function formatArcState(db: Db, campaignId: string, turnNumber: number): P
 const DIRECTOR_CHISEL =
   'Above the Outcome Judge\'s door, chiseled: "Failure must never be the engine defending its plot — and stories only end intentionally, never at the behest of a die-roll." Player-earned wins you did not plan are real; you replan around them. Even a total defeat is a narrative pivot, not a termination.';
 
+/**
+ * Finitude's behavioral consumer (§8 — "finite = the Director quietly builds
+ * toward a planned finale across seasons"; restored M2R R2 after the audit
+ * found finite and indefinite campaigns receiving identical direction).
+ */
+export function finitudeDirective(finitude: PremiseContract["finitude"]): string {
+  switch (finitude) {
+    case "finite":
+      return "FINITE — this story ENDS. Build quietly toward a planned finale across seasons: arc plans converge, seeds amortize toward payoff, nothing sprawls that cannot close. The finale is planned, never announced.";
+    case "indefinite":
+      return "INDEFINITE — an open cycle. Never force or drift toward an ending; arcs resolve and renew. Sprawl is licensed; closure debt is not a pressure here.";
+    case "undecided":
+      return "UNDECIDED — revisited at season boundaries, never resolved unilaterally. As a season boundary nears, add a director note that the finitude question is due back to the player.";
+  }
+}
+
 function directorPersona(contract: PremiseContract): string {
   const ipVoice = contract.active.voice.director_personality;
   return [
@@ -282,6 +299,11 @@ export async function runDirectorCycle(
     );
   const criticalCount = critRow?.n ?? 0;
 
+  // The series row's budget gets its reader here (M2R R2 audit — a stored
+  // horizon nothing reads is a defect): descriptive judgment context only;
+  // never rushed-math (see seriesBudgetFor's warning).
+  const horizon = await seriesBudget(db, campaignId);
+
   // The last session's carry-forward memo — Learned reader #2 (§7.1). Without
   // this read, the 400-word memo written at every close was a writer with no
   // reader in ongoing play (C7 audit, axiom 8): the startup path reads memos
@@ -311,6 +333,12 @@ export async function runDirectorCycle(
     "",
     "## The spark (the campaign's central question — read it first)",
     contract.spark,
+    "",
+    "## Series contract (finitude — the player's word; only they may change it)",
+    finitudeDirective(contract.finitude),
+    ...(horizon
+      ? [`Series horizon: ~${horizon.target} ${horizon.unit}, ± ${horizon.tolerance}.`]
+      : []),
     "",
     "## Framing (what this story frames itself as)",
     framingLine(contract),
@@ -565,6 +593,9 @@ export async function directorStartup(db: Db, campaignId: string): Promise<void>
     "",
     "## The spark (the campaign's central question — the dramatic_question descends from this)",
     contract.spark,
+    "",
+    "## Series contract (finitude — the player's word; only they may change it)",
+    finitudeDirective(contract.finitude),
     "",
     "## Framing",
     framingLine(contract),

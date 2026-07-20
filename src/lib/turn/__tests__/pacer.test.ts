@@ -12,6 +12,8 @@ import {
   type PacerInput,
   beatShapeAlternatives,
   beatShapeToken,
+  buildPrompt,
+  buildSystem,
   repeatedBeatShape,
   runPacer,
   stallDirective,
@@ -422,5 +424,27 @@ describe("runPacer — the strength gate under climbing phases (§3 record)", ()
     );
     expect(res.phaseTransition).toBe("escalation");
     expect(res.beat?.strength).toBe("strong");
+  });
+});
+
+describe("canonicality-aware pacing (v3 rule #10, M2R R2)", () => {
+  it("the prompt carries the CANONICALITY line when the contract supplies it", () => {
+    const prompt = buildPrompt(
+      makeInput({
+        canonicality: { timeline_mode: "canon_adjacent", event_fidelity: "observable" },
+      }),
+    );
+    expect(prompt).toContain("CANONICALITY: timeline canon_adjacent, events observable");
+  });
+
+  it("no canonicality, no line (pre-SV campaigns degrade quietly)", () => {
+    expect(buildPrompt(makeInput())).not.toContain("CANONICALITY");
+  });
+
+  it("the system rule restores v3's three branches verbatim in spirit", () => {
+    const system = buildSystem(true);
+    expect(system).toContain("canon events as natural escalation anchors");
+    expect(system).toContain("pacing is fully player-driven");
+    expect(system).toContain("no external timeline exists");
   });
 });

@@ -1,11 +1,11 @@
 import type { Db } from "@/lib/db";
+import { appendPlayerTaste } from "@/lib/db/helpers";
 import {
   campaigns,
   criticalFacts,
   entities,
   entityVersions,
   pencilMarks,
-  players,
   profiles,
 } from "@/lib/db/schema";
 import { identityKey, isProtagonistName, marksSelfInsert } from "@/lib/entity-identity";
@@ -929,16 +929,11 @@ export async function compileSessionZero(
         }
       }
 
-      // Player profile, thin (§6.9): taste observations accumulate.
+      // Player profile, thin (§6.9): taste observations accumulate — via the
+      // atomic append (M2R R4 audit: three writers, one player row; a
+      // read-modify-write replacement loses the losing writer's append).
       if (resolved.playerTaste.length > 0) {
-        const [player] = await tx.select().from(players).where(eq(players.id, campaign.playerId));
-        const existing = (player?.profile as { taste?: string[] } | null) ?? {};
-        await tx
-          .update(players)
-          .set({
-            profile: { ...existing, taste: [...(existing.taste ?? []), ...resolved.playerTaste] },
-          })
-          .where(eq(players.id, campaign.playerId));
+        await appendPlayerTaste(tx, campaign.playerId, resolved.playerTaste);
       }
     });
 

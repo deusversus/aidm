@@ -43,6 +43,14 @@ describe("KA contract camera faculty (SV4)", () => {
     expect(KA_CONTRACT).toContain("mark the variant");
   });
 
+  it("the trailer instruction asks for suggested_moves at decision points (M2R R1)", () => {
+    // Audit 2026-07-19: nothing ever asked the KA for moves — emission was
+    // model whim, so the player's default_on chips almost never appeared.
+    expect(KA_CONTRACT).toContain("suggested_moves");
+    expect(KA_CONTRACT).toContain("2-3 short premise-true next moves");
+    expect(KA_CONTRACT).toContain("omit them when it is false");
+  });
+
   it("the trailer discipline still closes the contract (recency preserved)", () => {
     // The camera section must not displace the measured trailer-drop close
     // from last position (C8: 50% drop rate at long scenes — recency is the fix).

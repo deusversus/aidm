@@ -1,12 +1,13 @@
 import { assembleForCampaign } from "@/lib/blocks/campaign";
 import type { Db } from "@/lib/db";
-import { notTombstoned } from "@/lib/db/helpers";
+import { appendPlayerTaste, notTombstoned } from "@/lib/db/helpers";
 import {
   campaigns,
   compactedBeats,
   entities,
   episodicRecords,
   pencilMarks,
+  players,
   sessionRecords,
   turns,
 } from "@/lib/db/schema";
@@ -31,7 +32,7 @@ import {
 import { PencilMark, activeMarks } from "@/lib/types/marks";
 import { PremiseContract } from "@/lib/types/premise";
 import type { TextBlockParam } from "@anthropic-ai/sdk/resources/messages/messages";
-import { and, asc, desc, eq, isNull } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, isNull } from "drizzle-orm";
 import { z } from "zod";
 
 /**
@@ -64,6 +65,12 @@ export interface OpenSessionResult {
   recap?: string;
   /** True when this open ran Director STARTUP (campaign's first session). */
   pilot: boolean;
+  /** M2R R3: the last sitting was explicit-closed moments ago — the mount
+   *  shows the closed state + tease instead of burning a new open sequence;
+   *  the player begins the next sitting deliberately (resume: true). */
+  closedRecently?: boolean;
+  /** The closed session's yokoku, re-surfaced with the closed state. */
+  yokoku?: string;
 }
 
 /**
@@ -74,7 +81,11 @@ export interface OpenSessionResult {
  * drain lives at the route so this module never imports compositor/g2
  * (which imports rollingCheckpoint from here — a cycle).
  */
-export async function openSession(db: Db, campaignId: string): Promise<OpenSessionResult> {
+export async function openSession(
+  db: Db,
+  campaignId: string,
+  opts?: { resume?: boolean },
+): Promise<OpenSessionResult> {
   const [campaign] = await db.select().from(campaigns).where(eq(campaigns.id, campaignId));
   if (!campaign) throw new Error(`openSession: campaign ${campaignId} not found`);
   if (campaign.status !== "active") {
@@ -93,6 +104,45 @@ export async function openSession(db: Db, campaignId: string): Promise<OpenSessi
   const currentMaxTurn = latest?.turnNumber ?? 0;
   const isPilot = latest === null;
 
+  // (0) A sitting the player JUST ended stays ended (M2R R3): reload after an
+  // explicit close used to silently burn a whole new open sequence (Director
+  // review, Settei rebuild, pre-warm, recap) and drop the yokoku. The mount
+  // now gets the closed state + tease back; the next sitting begins only on a
+  // deliberate resume, or once the close has aged past the idle window.
+  if (
+    !opts?.resume &&
+    latestSession?.closedAt &&
+    latestSession.closeTrigger === "explicit" &&
+    Date.now() - latestSession.closedAt.getTime() < SESSION_IDLE_TIMEOUT_MS &&
+    (latest?.completedAt?.getTime() ?? 0) <= latestSession.closedAt.getTime()
+  ) {
+    // A live turn means the sitting isn't really over (R3 audit): a failed
+    // turn awaiting retry — or one submitted from another tab — has
+    // completedAt null, which the check above reads as "no activity". The
+    // guard steps aside so the retried scene runs inside a real session.
+    const [liveTurn] = await db
+      .select({ id: turns.id })
+      .from(turns)
+      .where(
+        and(
+          eq(turns.campaignId, campaignId),
+          // OPEN_TURN_STATUSES (turn/rewind) inlined — importing it would
+          // cycle direction ⇄ turn through the compositor.
+          inArray(turns.status, ["queued", "phase_a_complete", "phase_b_complete", "failed"]),
+        ),
+      )
+      .limit(1);
+    if (!liveTurn) {
+      return {
+        sessionNumber: latestSession.sessionNumber,
+        opened: false,
+        pilot: false,
+        closedRecently: true,
+        ...(latestSession.yokoku ? { yokoku: latestSession.yokoku } : {}),
+      };
+    }
+  }
+
   // (1) Idempotent open: an already-open session that is still FRESH is a
   // no-op — the play view mounts and calls this on every load. Idle is
   // floored at the session's OWN openedAt (C7 audit): the previous sitting's
@@ -104,7 +154,16 @@ export async function openSession(db: Db, campaignId: string): Promise<OpenSessi
     const activity = Math.max(latestSession.openedAt.getTime(), turnActivity);
     const idleMs = Date.now() - activity;
     if (idleMs < SESSION_IDLE_TIMEOUT_MS) {
-      return { sessionNumber: latestSession.sessionNumber, opened: false, pilot: false };
+      // The persisted recap rides every no-op until the sitting's first turn
+      // (M2R R3): a reload during/just after the long open keeps "previously
+      // on" instead of eating the paid composition.
+      const sittingUntouched = turnActivity <= latestSession.openedAt.getTime();
+      return {
+        sessionNumber: latestSession.sessionNumber,
+        opened: false,
+        pilot: false,
+        ...(sittingUntouched && latestSession.recap ? { recap: latestSession.recap } : {}),
+      };
     }
     // Stale: auto-close (idle_timeout) before opening the next sitting so the
     // never-closed session still accrues its Learned-layer artifacts (§9.4).
@@ -131,7 +190,8 @@ export async function openSession(db: Db, campaignId: string): Promise<OpenSessi
     })
     .onConflictDoNothing()
     .returning({ id: sessionRecords.id });
-  if (claimed.length === 0) {
+  const claimedRow = claimed[0];
+  if (!claimedRow) {
     return { sessionNumber: newSessionNumber, opened: false, pilot: false };
   }
 
@@ -170,6 +230,14 @@ export async function openSession(db: Db, campaignId: string): Promise<OpenSessi
     if (!isPilot && blocks) {
       try {
         recap = await composeRecap(db, campaignId, tier, blocks.system);
+        // Persist the paid composition (M2R R3) — a reload re-serves it from
+        // the row instead of losing it; failure never fails the open.
+        if (recap) {
+          await db
+            .update(sessionRecords)
+            .set({ recap })
+            .where(eq(sessionRecords.id, claimedRow.id));
+        }
       } catch (err) {
         console.warn("[session] recap failed on open (non-fatal)", {
           campaignId,
@@ -190,7 +258,7 @@ export async function openSession(db: Db, campaignId: string): Promise<OpenSessi
     // STARTUP would never retry — turn 1 would render without its plan.
     await db
       .delete(sessionRecords)
-      .where(eq(sessionRecords.id, claimed[0]?.id ?? ""))
+      .where(eq(sessionRecords.id, claimedRow.id))
       .catch(() => {});
     throw err;
   }
@@ -214,10 +282,23 @@ export async function closeSession(
   let directorMemo: string | undefined;
   let voiceJournal: string | undefined;
   let yokoku: string | undefined;
+  let tasteNote: string | undefined;
   try {
-    directorMemo = await composeMemo(db, campaignId, tier, currentMaxTurn);
+    const composed = await composeMemo(db, campaignId, tier, currentMaxTurn);
+    directorMemo = composed.memo;
+    tasteNote = composed.tasteNote;
   } catch (err) {
     logComposerFailure("memo", campaignId, err);
+  }
+  // §6.9 layer-10 writer #3 (M2R R4): a close-revealed taste note appends to
+  // the cross-campaign profile; failure never blocks the close artifacts.
+  if (tasteNote && campaign) {
+    try {
+      // Atomic append (R4 audit): three writers share the player row.
+      await appendPlayerTaste(db, campaign.playerId, [tasteNote]);
+    } catch (err) {
+      logComposerFailure("taste_note", campaignId, err);
+    }
   }
   try {
     voiceJournal = await composeVoiceJournal(db, campaignId, tier);
@@ -283,7 +364,10 @@ export async function rollingCheckpoint(
   const tier = resolveTier(campaign?.tierModels);
   let directorMemo: string | undefined;
   try {
-    directorMemo = await composeMemo(db, campaignId, tier, turnNumber);
+    // Taste is deliberately ignored here: a rolling checkpoint fires every
+    // 12 turns and repeated appends would spam the profile (§6.9 writers
+    // are SZ, session close, booth — the checkpoint refreshes the memo only).
+    directorMemo = (await composeMemo(db, campaignId, tier, turnNumber)).memo;
   } catch (err) {
     logComposerFailure("memo", campaignId, err);
   }
@@ -311,10 +395,27 @@ export async function rebuildSettei(
 
   const marks = await loadActiveMarks(db, campaignId);
   const direction = await loadDirectionState(db, campaignId);
+  // §6.9 Renderer reader (M2R R4): the player's cross-campaign taste rides
+  // the rebuild as light priors; a read failure never blocks the Charter
+  // (the catch makes that promise true — audit).
+  let tasteNotes: string[] = [];
+  try {
+    const [playerRow] = await db
+      .select({ profile: players.profile })
+      .from(players)
+      .where(eq(players.id, campaign.playerId));
+    tasteNotes = (playerRow?.profile as { taste?: string[] } | null)?.taste ?? [];
+  } catch (err) {
+    console.warn("[session] taste read failed on Settei rebuild (non-fatal)", {
+      campaignId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
   const settei = renderSettei({
     contract: parsed.data,
     marks,
     arcRelevance: direction.arc_relevance as SetteiInput["arcRelevance"],
+    tasteNotes,
   });
 
   direction.settei = SetteiSnapshot.parse({
@@ -432,7 +533,7 @@ async function composeRecap(
   tier: TierSelection,
   system: TextBlockParam[],
 ): Promise<string | undefined> {
-  const [beats, fragments, arc, direction] = await Promise.all([
+  const [beats, fragments, arc, direction, [priorClosed], [playerRow]] = await Promise.all([
     db
       .select({ content: compactedBeats.content, position: compactedBeats.position })
       .from(compactedBeats)
@@ -450,6 +551,27 @@ async function composeRecap(
       .limit(5),
     getActiveArc(db, campaignId),
     loadDirectionState(db, campaignId),
+    // §9.4: "next session's cold open may honor the tease; the recap is its
+    // sibling" — the prior sitting's yokoku finally reaches its sibling
+    // (M2R R3; on the idle_timeout path this is the tease's ONLY surface).
+    db
+      .select({ yokoku: sessionRecords.yokoku })
+      .from(sessionRecords)
+      .where(
+        and(
+          eq(sessionRecords.campaignId, campaignId),
+          isNotNull(sessionRecords.closedAt),
+          notTombstoned(sessionRecords),
+        ),
+      )
+      .orderBy(desc(sessionRecords.sessionNumber))
+      .limit(1),
+    // §6.9 layer 10 reader (M2R R4): recap tone knows the player — lightly.
+    db
+      .select({ profile: players.profile })
+      .from(players)
+      .innerJoin(campaigns, eq(campaigns.playerId, players.id))
+      .where(eq(campaigns.id, campaignId)),
   ]);
 
   const orderedBeats = [...beats].reverse();
@@ -479,6 +601,21 @@ async function composeRecap(
   if (arc) {
     parts.push("## Active arc");
     parts.push(`${arc.name} — phase ${arc.phase}. Dramatic question: ${arc.dramaticQuestion}`);
+    parts.push("");
+  }
+  if (priorClosed?.yokoku) {
+    parts.push("## The tease made at last close (yokoku)");
+    parts.push(priorClosed.yokoku);
+    parts.push(
+      "Its vibe may be honored in how you frame this recap — never owed, never stated as promise.",
+    );
+    parts.push("");
+  }
+  // §6.9: taste notes as light priors — the premise always outranks them.
+  const taste = ((playerRow?.profile as { taste?: string[] } | null)?.taste ?? []).slice(-3);
+  if (taste.length > 0) {
+    parts.push("## The player, known (light priors — this premise always outranks them)");
+    for (const t of taste) parts.push(`- ${t}`);
     parts.push("");
   }
   parts.push("## Current tension");
@@ -530,7 +667,7 @@ async function composeYokoku(
 }
 
 const MEMO_SYSTEM =
-  "You are a narrative continuity director writing a concise session memo (max 400 words) for the next session's planning. Cover: arc position and momentum, seeds ready for payoff, NPCs who deserve a spotlight scene, creative decisions made this session, and open threads to carry forward. Use exactly these headers: Arc Status, Ready Payoffs, NPC Spotlight Debt, Carry Forward. This is internal planning prose — never player-facing.";
+  "You are a narrative continuity director writing a concise session memo (max 400 words) for the next session's planning. Cover: arc position and momentum, seeds ready for payoff, NPCs who deserve a spotlight scene, creative decisions made this session, and open threads to carry forward. Use exactly these headers: Arc Status, Ready Payoffs, NPC Spotlight Debt, Carry Forward. This is internal planning prose — never player-facing. Separately: if the player's own recent actions (quoted in the prompt) plainly reveal a durable PLAYER taste — how they like their stories told, what they reach for — set player_taste_note to one sentence grounded in those quoted actions and NOT already covered by the known-taste list; otherwise omit it (most sittings reveal none; never infer taste from director notes alone).";
 
 /** v3 director memo (judgment tier, Learned-layer bookkeeping). */
 async function composeMemo(
@@ -538,8 +675,8 @@ async function composeMemo(
   campaignId: string,
   tier: TierSelection,
   currentTurn: number,
-): Promise<string | undefined> {
-  const [arc, readySeeds, direction, npcRows] = await Promise.all([
+): Promise<{ memo?: string; tasteNote?: string }> {
+  const [arc, readySeeds, direction, npcRows, playerInputs, [playerRow]] = await Promise.all([
     getActiveArc(db, campaignId),
     callbackReadySeeds(db, campaignId, currentTurn),
     loadDirectionState(db, campaignId),
@@ -553,6 +690,20 @@ async function composeMemo(
           notTombstoned(entities),
         ),
       ),
+    // Grounding for player_taste_note (R4 audit, BLOCKING): the player's own
+    // recent actions — without them the taste ask invites pure hallucination.
+    db
+      .select({ playerInput: episodicRecords.playerInput })
+      .from(episodicRecords)
+      .where(and(eq(episodicRecords.campaignId, campaignId), notTombstoned(episodicRecords)))
+      .orderBy(desc(episodicRecords.turnNumber))
+      .limit(10),
+    // Already-known notes: the extractor sees the record so it only adds NEW.
+    db
+      .select({ profile: players.profile })
+      .from(players)
+      .innerJoin(campaigns, eq(campaigns.playerId, players.id))
+      .where(eq(campaigns.id, campaignId)),
   ]);
 
   const spotlight = npcRows
@@ -588,10 +739,33 @@ async function composeMemo(
           .join("\n")}`
       : "NPCs carrying spotlight debt: none tracked",
   );
+  const recentInputs = [...playerInputs].reverse();
+  if (recentInputs.length > 0) {
+    parts.push(
+      `The player's own recent actions (taste evidence — quote from THESE or omit the note):\n${recentInputs
+        .map((r) => `- ${r.playerInput.slice(0, 160)}`)
+        .join("\n")}`,
+    );
+  }
+  const knownTaste = (playerRow?.profile as { taste?: string[] } | null)?.taste ?? [];
+  if (knownTaste.length > 0) {
+    parts.push(
+      `Already-known player taste (do NOT re-note these):\n${knownTaste
+        .slice(-6)
+        .map((t) => `- ${t}`)
+        .join("\n")}`,
+    );
+  }
 
-  const { memo } = await callJudgment(tier, {
+  const { memo, player_taste_note } = await callJudgment(tier, {
     name: "session_memo",
-    schema: z.object({ memo: z.string() }),
+    schema: z.object({
+      memo: z.string(),
+      /** §6.9 layer-10 writer #3 (M2R R4): applied only at a REAL close —
+       *  the rolling checkpoint ignores it (repeated appends would spam).
+       *  Bounded: taste notes ride the Settei budget (audit). */
+      player_taste_note: z.string().max(240).optional(),
+    }),
     system: MEMO_SYSTEM,
     prompt: parts.join("\n\n"),
     effort: "medium",
@@ -599,7 +773,11 @@ async function composeMemo(
     campaignId,
   });
   const trimmed = memo.trim();
-  return trimmed.length > 0 ? trimmed : undefined;
+  const taste = player_taste_note?.trim();
+  return {
+    memo: trimmed.length > 0 ? trimmed : undefined,
+    ...(taste ? { tasteNote: taste } : {}),
+  };
 }
 
 const JOURNAL_SYSTEM =

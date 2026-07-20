@@ -215,14 +215,20 @@ export type IntensityContract = z.infer<typeof IntensityContract>;
  * supports one.
  */
 export const PresentationVocabulary = z.object({
-  /** Formatting grants, e.g. "diegetic System status windows (hooks into stat_mapping)". */
+  /** Formatting grants, e.g. "diegetic System status windows (hooks into stat_mapping)".
+   *  The one LIVE channel: compiler-populated, rides Block 1 to the KA, and
+   *  the recap/yokoku composers judge posture through it (§9.3 "no settings
+   *  toggle" — posture is premise-rendered, not a stored enum). */
   grants: z.array(z.string()).default([]),
-  /** Style/length/existence of the session-open recap — DBZ opens loud; Mushishi doesn't recap. */
+  /** RESERVED for M3 display grammar (M2R R4 audit: unpopulated, unread).
+   *  Recap posture today is delivered as premise judgment via grants. */
   recap_posture: z.string().optional(),
-  /** Next-episode preview posture — genre-licensed vagueness; Bebop's barely relate. */
+  /** RESERVED for M3 display grammar — yokoku posture rides grants today. */
   yokoku_posture: z.string().optional(),
+  /** RESERVED — the stinger (§8) has no mechanism yet; staging decision
+   *  lives in M3-display-grammar's open questions. */
   stinger_allowed: z.boolean().default(false),
-  /** Chips may be skinned diegetically — in Solo Leveling, the chips ARE a System window (§9.2). */
+  /** RESERVED for M3 display grammar — chip skinning deferred (M3-DG plan). */
   suggestion_chip_skin: z.string().optional(),
 });
 

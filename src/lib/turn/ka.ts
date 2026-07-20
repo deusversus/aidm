@@ -36,7 +36,7 @@ Non-negotiables:
 - PLAYER AGENCY: you write the world's half of the scene. Never decide, speak, or act FOR the player character beyond what their stated action implies. At a genuine decision point — a fork the player would want to weigh — present it and STOP mid-scene. Do not resolve it for them.
 - THE DIE ALREADY FELL: the storyboard carries the judged outcome and its arithmetic. Narrate THAT outcome — never soften a failure into a win, never tax a success the judgment didn't tax. Failure is part of the story now.
 - RESEARCH, THEN WRITE: you may have research tools this turn (budgeted). Use them BEFORE the prose when the scene touches canon or past detail you are not sure of; never mid-prose. If the budget is spent, write from what you have and keep uncertain specifics out of frame.
-- THE TRAILER: when the prose is complete, call commit_scene exactly once — cast changes (admission is deliberate; most scenes admit no one), decision_point, seed mentions, notable beats. Never mention the tool, the storyboard, or any machinery in the prose.
+- THE TRAILER: when the prose is complete, call commit_scene exactly once — cast changes (admission is deliberate; most scenes admit no one), decision_point, seed mentions, notable beats. When decision_point is true, ALSO include suggested_moves: 2-3 short premise-true next moves the player could take (they render as dismissible chips beside the scene, never in your prose); omit them when it is false. Never mention the tool, the storyboard, or any machinery in the prose.
 - Prose is the ONLY thing the player sees. No headers, no meta, no summaries of what you did.
 
 ## The camera
@@ -330,7 +330,7 @@ export async function runKeyAnimator(
       campaignId: args.campaignId,
       turnNumber: args.turnNumber,
       system:
-        "Reconstruct the scene sidecar from narration prose. Cast admission is DELIBERATE — most scenes admit no one to the catalog; only name a cast change when the scene clearly introduces a lasting character or dismisses one. decision_point only when the scene ends on a genuine fork presented to the player.",
+        "Reconstruct the scene sidecar from narration prose. Cast admission is DELIBERATE — most scenes admit no one to the catalog; only name a cast change when the scene clearly introduces a lasting character or dismisses one. decision_point only when the scene ends on a genuine fork presented to the player — and when it does, include suggested_moves: 2-3 short premise-true next moves grounded in the scene (omit them otherwise).",
       prompt: prose.slice(-6_000) || "(empty scene)",
       maxTokens: 2_000,
     });

@@ -27,7 +27,7 @@ import { and, desc, eq, gt, sql } from "drizzle-orm";
 import { type LadderStep, PHASE_A_BUDGET_MS, createDegradeClock } from "./degrade";
 import { judgeOutcome, syntheticOutcome, validateOutcome } from "./outcome";
 import { runPacer } from "./pacer";
-import { characterTierFor, powerContext } from "./power";
+import { characterTierFor, opModeActive, powerContext, powerDifferential } from "./power";
 import {
   decomposeQueries,
   fetchCallbacks,
@@ -209,7 +209,18 @@ export async function runLayout(
   // OP-mode machinery; baseline for tier-less contracts. A character sheet
   // owns live progression when one exists — this is the starting contract.
   const characterTier = characterTierFor(contract.pc_power_tier, worldBaseline);
-  const pContext = powerContext(characterTier, worldBaseline);
+  // M2R R2: an op_dominant composition mode fires OP framing even below the
+  // ≥3-tier mechanical threshold (the tier math, the hard core, is
+  // untouched) — but never for a character AT or BELOW baseline (audit: a
+  // profile-inherited op_dominant must not trivialize a deliberately
+  // ordinary protagonist, and must never contradict the underdog line).
+  const modeLine =
+    contract.active.framing.mode === "op_dominant" &&
+    !opModeActive(characterTier, worldBaseline) &&
+    powerDifferential(characterTier, worldBaseline) > 0
+      ? " OP MODE (composition mode op_dominant): treat the protagonist's routine power use as trivial even though the tier gap alone would not trigger it; stakes reframe onto meaning and relationships, never onto whether the power suffices."
+      : "";
+  const pContext = powerContext(characterTier, worldBaseline) + modeLine;
 
   const situation = lastEpisodic?.narration.slice(-300);
   const queries = decomposeQueries(intent, playerInput, situation);
@@ -336,6 +347,10 @@ export async function runLayout(
           playerInput,
           recentBeats,
           arcState,
+          canonicality: {
+            timeline_mode: contract.active.canonicality.timeline_mode,
+            event_fidelity: contract.active.canonicality.event_fidelity,
+          },
           campaignId,
           turnNumber,
         })

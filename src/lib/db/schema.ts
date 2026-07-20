@@ -544,6 +544,9 @@ export const sessionRecords = pgTable(
     directorMemo: text(),
     voiceJournal: text(),
     yokoku: text(),
+    /** §9.3 recap persisted at open (M2R R3) — a reload during or just after
+     *  the long open sequence must not eat the paid "previously on". */
+    recap: text(),
     ...provenanceColumns,
   },
   (t) => ({

@@ -111,6 +111,9 @@ export interface SetteiInput {
   marks: PencilMark[];
   /** Director-supplied secondary ranking; absent until C7 wires it (stubbed per plan). */
   arcRelevance?: Partial<Record<AxisName, number>>;
+  /** §6.9 layer-10 taste notes (M2R R4) — Renderer defaults, lightly:
+   *  priors the campaign premise always outranks. Most recent few only. */
+  tasteNotes?: string[];
 }
 
 export interface Settei {
@@ -288,16 +291,37 @@ export function renderSettei(input: SetteiInput): Settei {
           ...standing.map((m) => `- ${m.topic}: ${m.direction}`),
         ];
 
+  // §6.9's promised Renderer reader (M2R R4): cross-campaign taste as light
+  // priors — after the marks (campaign-specific outranks cross-campaign),
+  // capped at 3, explicitly subordinate to every pressure above it.
+  const tasteNotes = (input.tasteNotes ?? []).slice(-3);
+  const tasteBlock =
+    tasteNotes.length === 0
+      ? []
+      : [
+          "## The player, known (cross-campaign priors — everything above outranks these)",
+          ...tasteNotes.map((t) => `- ${t}`),
+        ];
+
   const assemble = (sections: string[][]) =>
     sections
       .filter((s) => s.length > 1 || (s.length === 1 && !s[0]?.startsWith("##")))
       .map((s) => s.join("\n\n"))
       .join("\n\n");
   const buildCharter = () =>
-    assemble([identity, craft, exemplarBlocks, groupLines, voiceBlock, marksBlock]);
+    assemble([identity, craft, exemplarBlocks, groupLines, voiceBlock, marksBlock, tasteBlock]);
 
   let charter = buildCharter();
-  // Budget, stage 1: trim exemplars last-in-first-out (floor: 2, per
+  // Budget, stage 0 (R4 audit): the taste block yields FIRST. Its own header
+  // says everything above outranks it — cross-campaign priors must never
+  // cost a premise-pressure exemplar or craft caveat their budget.
+  while (approxTokens(charter) > SETTEI_TOKEN_TARGET.max && tasteBlock.length > 1) {
+    const dropped = tasteBlock.pop();
+    if (tasteBlock.length === 1) tasteBlock.pop(); // header alone renders nothing anyway
+    trims.push(`taste note dropped for budget: ${(dropped ?? "").slice(0, 40)}`);
+    charter = buildCharter();
+  }
+  // Stage 1: trim exemplars last-in-first-out (floor: 2, per
   // §4.4a's "2–3") — craft instructions are the load-bearing pressure.
   while (approxTokens(charter) > SETTEI_TOKEN_TARGET.max && exemplarIds.length > 2) {
     const droppedId = exemplarIds.pop();

@@ -34,6 +34,9 @@ export interface BibleComposition {
     worldName?: string;
     powerSystem?: string;
     hardLines: string[];
+    deathPhysics?: string;
+    lethalityPosture?: string;
+    controlKey?: string;
   };
   cast: BibleEntry[];
   factions: BibleEntry[];
@@ -106,6 +109,11 @@ export async function composeBible(db: Db, campaignId: string): Promise<BibleCom
       worldName: worldLabel(contract.active.world),
       powerSystem: contract.active.world.power_system?.name,
       hardLines: contract.intensity.hard_lines,
+      // §9.1 review gate (M2R R4): the intensity contract the player set at
+      // SZ is theirs to see — it was collected, enforced, and shown nowhere.
+      deathPhysics: contract.intensity.death_physics,
+      lethalityPosture: contract.intensity.lethality_posture,
+      controlKey: contract.intensity.control_key?.circumstances,
     },
   };
 
@@ -153,7 +161,8 @@ export async function composeBible(db: Db, campaignId: string): Promise<BibleCom
         eq(criticalFacts.campaignId, campaignId),
         isNull(criticalFacts.demotedAt),
         notTombstoned(criticalFacts),
-        // "contract" rows (finitude/intensity) render under premise, not here.
+        // "contract" rows are excluded here because the premise section above
+        // carries them (finitude + the full intensity contract as of M2R R4).
         inArray(criticalFacts.category, ["sz_fact", "promoted"]),
       ),
     )

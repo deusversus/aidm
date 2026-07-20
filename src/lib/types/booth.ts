@@ -68,6 +68,10 @@ export const BoothResolution = z.object({
     .max(4),
   /** Standing rules the player laid down in the booth (rare — most go via the override channel). */
   overrides: z.array(z.string()).max(2),
+  /** §6.9 layer-10 writer (M2R R4): one durable note about the PLAYER's
+   *  taste — not the character, not this campaign — when the booth chat
+   *  revealed one. Usually absent. Bounded: rides the Settei budget. */
+  player_taste_note: z.string().max(240).optional(),
   summary: z.string().min(1),
 });
 export type BoothResolution = z.infer<typeof BoothResolution>;

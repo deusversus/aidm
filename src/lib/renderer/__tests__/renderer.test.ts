@@ -216,6 +216,75 @@ describe("renderSceneShape (§4.4c)", () => {
     expect(s.text).toContain("Terra Firma");
     expect(s.text).toContain("debt comes due");
   });
+
+  it("power_expression renders its craft line (M2R R2 — the SV3 choice finally has a reader)", () => {
+    const framing = { ...bebopContract().active.framing, power_expression: "hidden" as const };
+    const s = renderSceneShape(framing);
+    expect(s.text).toContain("Power on screen:");
+    expect(s.text).toContain("dramatic irony");
+    expect(s.tokens).toBeLessThanOrEqual(150);
+  });
+
+  it("balanced power_expression and not_applicable mode both render nothing", () => {
+    const balanced = { ...bebopContract().active.framing, power_expression: "balanced" as const };
+    expect(renderSceneShape(balanced).text).not.toContain("Power on screen:");
+    const na = {
+      ...bebopContract().active.framing,
+      power_expression: "overwhelming" as const,
+      mode: "not_applicable" as const,
+    };
+    expect(renderSceneShape(na).text).not.toContain("Power on screen:");
+  });
+});
+
+describe("the player, known (§6.9 Renderer reader, M2R R4)", () => {
+  // A low-pressure contract with budget headroom: all axes centered → few
+  // craft blocks → the taste block genuinely fits (Bebop sits at the max,
+  // where stage-0 correctly evicts taste — that's the OTHER test).
+  const roomy = () => {
+    const contract = bebopContract();
+    for (const axis of Object.keys(contract.active.treatment) as AxisName[]) {
+      contract.active.treatment[axis] = 5;
+    }
+    return contract;
+  };
+
+  it("taste notes render as subordinate cross-campaign priors, capped at 3, most recent kept", () => {
+    const settei = renderSettei({
+      contract: roomy(),
+      marks: [],
+      tasteNotes: [
+        "oldest — dropped",
+        "loves quiet aftermath scenes",
+        "reaches for found family",
+        "wants villains with a point",
+      ],
+    });
+    expect(settei.text).toContain("## The player, known");
+    expect(settei.text).toContain("everything above outranks these");
+    expect(settei.text).toContain("loves quiet aftermath scenes");
+    expect(settei.text).toContain("wants villains with a point");
+    expect(settei.text).not.toContain("oldest — dropped");
+  });
+
+  it("at the budget ceiling, taste yields FIRST — premise pressure never pays for priors (R4 audit)", () => {
+    // Bebop's charter sits at SETTEI_TOKEN_TARGET.max; a taste block must be
+    // the trim that gives, with premise exemplars intact.
+    const settei = renderSettei({
+      contract: bebopContract(),
+      marks: [],
+      tasteNotes: ["loves quiet aftermath scenes"],
+    });
+    expect(settei.text).not.toContain("## The player, known");
+    expect(settei.trims.some((t) => t.startsWith("taste note dropped"))).toBe(true);
+    expect(settei.exemplarIds.length).toBeGreaterThanOrEqual(2);
+    expect(settei.charterTokens).toBeLessThanOrEqual(SETTEI_TOKEN_TARGET.max);
+  });
+
+  it("no taste, no section", () => {
+    const settei = renderSettei({ contract: bebopContract(), marks: [] });
+    expect(settei.text).not.toContain("## The player, known");
+  });
 });
 
 describe("learned shading (§12, §6.6)", () => {

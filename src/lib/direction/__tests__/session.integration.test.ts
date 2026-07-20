@@ -498,4 +498,177 @@ describe.skipIf(!url)("Session lifecycle (real Postgres, scripted models)", () =
     await assembleForCampaign(db, inflight);
     expect(await readWatermark(inflight)).toBe(2);
   });
+
+  // ------------------------------------------------------------------------
+  // M2R R3: session artifacts survive (docs/plans/M2R-carry-repairs.md)
+
+  it("a just-ended sitting stays ended: closedRecently + the tease, no new open sequence", async () => {
+    if (!db) throw new Error("unreachable");
+    const campaignId = await makeCampaign();
+    await insertTurn(campaignId, 1);
+    await db
+      .update(schema.turns)
+      .set({ completedAt: new Date(Date.now() - 10 * 60 * 1000) })
+      .where(eq(schema.turns.campaignId, campaignId));
+    await insertSession(campaignId, 1, {
+      openedAt: new Date(Date.now() - 20 * 60 * 1000),
+      closedAt: new Date(Date.now() - 2 * 60 * 1000),
+      closeTrigger: "explicit",
+      yokoku: "Next time — smoke, and a door left open.",
+    });
+
+    const result = await openSession(db, campaignId);
+
+    expect(result.opened).toBe(false);
+    expect(result.closedRecently).toBe(true);
+    expect(result.yokoku).toBe("Next time — smoke, and a door left open.");
+    expect(mockReview).not.toHaveBeenCalled();
+    expect(mockStartup).not.toHaveBeenCalled();
+    expect(await sessionsFor(campaignId)).toHaveLength(1);
+  });
+
+  it("resume: true is the deliberate next sitting — the guard steps aside", async () => {
+    if (!db) throw new Error("unreachable");
+    const campaignId = await makeCampaign();
+    await insertTurn(campaignId, 1);
+    await db
+      .update(schema.turns)
+      .set({ completedAt: new Date(Date.now() - 10 * 60 * 1000) })
+      .where(eq(schema.turns.campaignId, campaignId));
+    await insertSession(campaignId, 1, {
+      openedAt: new Date(Date.now() - 20 * 60 * 1000),
+      closedAt: new Date(Date.now() - 2 * 60 * 1000),
+      closeTrigger: "explicit",
+    });
+
+    const result = await openSession(db, campaignId, { resume: true });
+
+    expect(result.opened).toBe(true);
+    expect(result.sessionNumber).toBe(2);
+    expect(result.closedRecently).toBeUndefined();
+    expect(mockReview).toHaveBeenCalledTimes(1);
+  });
+
+  it("a live turn (failed, awaiting retry) means the sitting isn't over — the guard steps aside", async () => {
+    if (!db) throw new Error("unreachable");
+    const campaignId = await makeCampaign();
+    // completedAt null: the exact shape the naive completedAt check misread.
+    await db.insert(schema.turns).values({
+      campaignId,
+      turnNumber: 1,
+      tier: "genga",
+      status: "failed",
+      playerInput: "doomed action",
+    });
+    await insertSession(campaignId, 1, {
+      openedAt: new Date(Date.now() - 20 * 60 * 1000),
+      closedAt: new Date(Date.now() - 2 * 60 * 1000),
+      closeTrigger: "explicit",
+    });
+
+    const result = await openSession(db, campaignId);
+
+    expect(result.closedRecently).toBeUndefined();
+    expect(result.opened).toBe(true);
+    expect(result.sessionNumber).toBe(2);
+  });
+
+  it("an aged explicit close opens normally — the guard covers only the fresh window", async () => {
+    if (!db) throw new Error("unreachable");
+    const campaignId = await makeCampaign();
+    await insertTurn(campaignId, 1);
+    await db
+      .update(schema.turns)
+      .set({ completedAt: new Date(Date.now() - 65 * 60 * 1000) })
+      .where(eq(schema.turns.campaignId, campaignId));
+    await insertSession(campaignId, 1, {
+      openedAt: new Date(Date.now() - 60 * 60 * 1000),
+      closedAt: new Date(Date.now() - 40 * 60 * 1000),
+      closeTrigger: "explicit",
+    });
+
+    const result = await openSession(db, campaignId);
+
+    expect(result.opened).toBe(true);
+    expect(result.closedRecently).toBeUndefined();
+    expect(result.sessionNumber).toBe(2);
+  });
+
+  it("the recap persists on the session row and re-serves on an untouched-sitting remount", async () => {
+    if (!db) throw new Error("unreachable");
+    const campaignId = await makeCampaign();
+    await insertTurn(campaignId, 1, "The bounty slipped away again.");
+    await db
+      .update(schema.turns)
+      .set({ completedAt: new Date(Date.now() - 10 * 60 * 1000) })
+      .where(eq(schema.turns.campaignId, campaignId));
+
+    const first = await openSession(db, campaignId);
+    expect(first.opened).toBe(true);
+    expect(first.recap).toBe("Previously, the crew chased a ghost across Mars.");
+
+    const rows = await sessionsFor(campaignId);
+    expect(rows[0]?.recap).toBe("Previously, the crew chased a ghost across Mars.");
+
+    // The remount that used to eat the paid composition.
+    const remount = await openSession(db, campaignId);
+    expect(remount.opened).toBe(false);
+    expect(remount.recap).toBe("Previously, the crew chased a ghost across Mars.");
+  });
+
+  it("the prior sitting's yokoku rides the recap prompt — the tease finally meets its sibling (§9.4)", async () => {
+    if (!db) throw new Error("unreachable");
+    const campaignId = await makeCampaign();
+    await insertTurn(campaignId, 1, "The bounty slipped away again.");
+    await db
+      .update(schema.turns)
+      .set({ completedAt: new Date(Date.now() - 65 * 60 * 1000) })
+      .where(eq(schema.turns.campaignId, campaignId));
+    await insertSession(campaignId, 1, {
+      openedAt: new Date(Date.now() - 60 * 60 * 1000),
+      closedAt: new Date(Date.now() - 40 * 60 * 1000),
+      closeTrigger: "idle_timeout",
+      yokoku: "Next time: the debt comes due.",
+    });
+
+    await openSession(db, campaignId);
+
+    const recapCall = mockStream.mock.calls.find(
+      (c) => (c[0] as { name?: string })?.name === "recap",
+    );
+    expect(recapCall).toBeDefined();
+    const prompt = String(
+      (recapCall?.[0] as { messages?: { content?: unknown }[] })?.messages?.[0]?.content ?? "",
+    );
+    expect(prompt).toContain("The tease made at last close");
+    expect(prompt).toContain("Next time: the debt comes due.");
+    expect(prompt).toContain("never owed");
+  });
+
+  it("a close-revealed taste note appends to the cross-campaign profile (§6.9 writer, M2R R4)", async () => {
+    if (!db) throw new Error("unreachable");
+    const campaignId = await makeCampaign();
+    await insertTurn(campaignId, 1);
+    await insertSession(campaignId, 1, { openedAt: new Date(Date.now() - 5 * 60 * 1000) });
+    // biome-ignore lint/suspicious/noExplicitAny: harness spans generic signatures
+    mockJudgment.mockImplementation((_s: any, opts: any) => {
+      if (opts.name === "session_memo")
+        return Promise.resolve({
+          memo: "Arc Status: steady.",
+          player_taste_note: "Lights up when NPCs remember small promises.",
+        }) as never;
+      if (opts.name === "voice_journal") return Promise.resolve({ journal: "Clipped." }) as never;
+      return Promise.reject(new Error(`unscripted judgment ${opts.name}`)) as never;
+    });
+
+    await closeSession(db, campaignId, "explicit");
+
+    const [player] = await db
+      .select({ profile: schema.players.profile })
+      .from(schema.players)
+      .where(eq(schema.players.id, playerId));
+    expect((player?.profile as { taste?: string[] })?.taste).toContain(
+      "Lights up when NPCs remember small promises.",
+    );
+  });
 });

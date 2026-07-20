@@ -34,6 +34,7 @@ vi.mock("@/lib/direction/arcs", () => ({
   payoffDebt: vi.fn(),
   budgetPriorFor: vi.fn(),
   expectedTension: vi.fn(),
+  seriesBudget: vi.fn(),
 }));
 vi.mock("@/lib/direction/seeds", () => ({
   plantSeed: vi.fn(),
@@ -242,6 +243,9 @@ describe.skipIf(!url)("Director (real Postgres, scripted model)", () => {
       .mockReset()
       .mockResolvedValue({ consumed: 4, target: 6, fraction: 0.66 });
     vi.mocked(arcs.expectedTension).mockReset().mockReturnValue(0.5);
+    vi.mocked(arcs.seriesBudget)
+      .mockReset()
+      .mockResolvedValue({ unit: "episodes", target: 24, tolerance: 12 });
     vi.mocked(arcs.payoffDebt)
       .mockReset()
       .mockReturnValue({ openItems: 1, remaining: 2, rushed: false });
@@ -344,6 +348,14 @@ describe.skipIf(!url)("Director (real Postgres, scripted model)", () => {
     expect(callOpts?.maxToolRounds).toBe(DIRECTOR_MAX_TOOL_ROUNDS);
     expect(callOpts?.effort).toBe("high");
     expect(callOpts?.maxTokens).toBe(16_000);
+
+    // M2R R2: the dossier carries the Series contract — finitude's behavioral
+    // consumer (§8) plus the series-horizon line (the budget's reader).
+    const dossierPrompt = String((callOpts as { prompt?: string })?.prompt ?? "");
+    expect(dossierPrompt).toContain("## Series contract");
+    expect(dossierPrompt).toContain("FINITE");
+    expect(dossierPrompt).toContain("planned finale across seasons");
+    expect(dossierPrompt).toContain("Series horizon: ~24 episodes, ± 12.");
 
     // arc plan applied, with the current turn stamped.
     expect(vi.mocked(arcs.applyArcPlan)).toHaveBeenCalledWith(
