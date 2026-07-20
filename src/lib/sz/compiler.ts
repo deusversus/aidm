@@ -204,9 +204,22 @@ export function resolveObservations(observations: Observation[]): ResolvedObserv
       case "hard_line":
         resolved.hardLines.push(obs.content);
         break;
-      case "control_key":
-        resolved.controlKey = obs.content;
+      case "control_key": {
+        // §7.5: NO key exists unless the player CUTS one. A recorded
+        // declination (anchored "declined", same discipline as finitude)
+        // compiles to no key — the raw decline stays in the observation
+        // record so nobody re-asks, but the contract never wears it as a
+        // cut key (live defect: a "Declined — ..." circumstance rendered
+        // the Settei's bounded-permission block around a refusal).
+        // Latest wins both ways: decline-then-cut keeps the cut;
+        // cut-then-decline melts it.
+        if (/^\s*["'“‘]?declined\b/i.test(obs.content)) {
+          resolved.controlKey = undefined;
+        } else {
+          resolved.controlKey = obs.content;
+        }
         break;
+      }
       case "calibration": {
         try {
           const parsed = z

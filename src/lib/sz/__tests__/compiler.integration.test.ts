@@ -182,6 +182,42 @@ describe("suggestion affordance resolution (anchored, never guessed from prose)"
   });
 });
 
+describe("control key declination (§7.5 — no key exists unless the player cuts one)", () => {
+  it("an anchored decline compiles to NO key — never a cut key wearing a refusal", () => {
+    const r = resolveObservations([
+      obs("control_key", "Declined — no loss-of-control mechanic; the power stays fully his own"),
+    ]);
+    expect(r.controlKey).toBeUndefined();
+  });
+
+  it("decline-then-cut: the later cut stands (latest wins)", () => {
+    const r = resolveObservations([
+      obs("control_key", "declined — wants no leash"),
+      obs("control_key", "when the bloodrage takes hold after a bondmate falls"),
+    ]);
+    expect(r.controlKey).toBe("when the bloodrage takes hold after a bondmate falls");
+  });
+
+  it("cut-then-decline: the later decline melts the key", () => {
+    const r = resolveObservations([
+      obs("control_key", "when the seal cracks under a full moon"),
+      obs("control_key", "Declined after reflection — no loss-of-control stakes after all"),
+    ]);
+    expect(r.controlKey).toBeUndefined();
+  });
+
+  it("a real key CONTAINING 'declined' mid-sentence stays a key (the anchor is the guard)", () => {
+    const cut = "when he has declined every warning and the beast takes him";
+    const r = resolveObservations([obs("control_key", cut)]);
+    expect(r.controlKey).toBe(cut);
+  });
+
+  it("a quoted decline still resolves as a decline", () => {
+    const r = resolveObservations([obs("control_key", '"declined" — keep the power leashless')]);
+    expect(r.controlKey).toBeUndefined();
+  });
+});
+
 describe("protagonist name resolution + gap (M2 C4, deterministic)", () => {
   it("gap verdict blocks an unnamed, un-deferred protagonist", () => {
     const gaps = gapVerdict(
