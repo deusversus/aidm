@@ -15,7 +15,14 @@ import { z } from "zod";
 
 const { createMock } = vi.hoisted(() => ({ createMock: vi.fn() }));
 vi.mock("@/lib/llm/anthropic", () => ({
-  getAnthropic: () => ({ messages: { create: createMock } }),
+  getAnthropic: () => ({
+    messages: {
+      create: createMock,
+      // Structured calls ride streaming transport (SDK 10-minute guard);
+      // the same fixture answers finalMessage().
+      stream: (params: unknown) => ({ finalMessage: () => createMock(params) }),
+    },
+  }),
 }));
 vi.mock("@/lib/observability/langfuse", () => ({ getLangfuse: () => null }));
 vi.mock("@/lib/observability/meter", () => ({ recordModelCall: vi.fn(async () => 0) }));

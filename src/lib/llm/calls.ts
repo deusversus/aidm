@@ -126,6 +126,18 @@ function usageStats(usage: Usage) {
   };
 }
 
+/**
+ * create() over STREAMING transport, same Message out. The SDK refuses a
+ * non-streaming call whose max_tokens implies a >10-minute worst case, and
+ * M2R2's padded ceilings crossed that line (live 2026-07-20: Phase A died
+ * on production with "Streaming is required for operations that may take
+ * longer than 10 minutes"). finalMessage() awaits the full accumulated
+ * Message; usage, stop_reason, and content are identical to create().
+ */
+async function createStreamed(params: MessageCreateParamsNonStreaming): Promise<Message> {
+  return getAnthropic().messages.stream(params).finalMessage();
+}
+
 async function callStructured<T>(
   tier: "judgment" | "probe",
   selection: TierSelection,
@@ -161,7 +173,7 @@ async function callStructured<T>(
       const invStarted = Date.now();
       let invMessage: Message;
       try {
-        invMessage = await getAnthropic().messages.create({
+        invMessage = await createStreamed({
           model,
           max_tokens: effectiveCap,
           ...(opts.system ? { system: opts.system } : {}),
@@ -265,7 +277,7 @@ async function callStructured<T>(
     const attemptStarted = Date.now();
     let message: Message;
     try {
-      message = await getAnthropic().messages.create({
+      message = await createStreamed({
         ...params,
         messages: attemptMessages,
         max_tokens: attemptCap,
