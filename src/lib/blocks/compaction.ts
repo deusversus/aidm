@@ -1,3 +1,4 @@
+import { stripDirectiveFences } from "@/lib/client/plain-prose";
 import type { Db } from "@/lib/db";
 import { notTombstoned } from "@/lib/db/helpers";
 import { compactedBeats, episodicRecords } from "@/lib/db/schema";
@@ -32,7 +33,7 @@ export type Compactor = (exchanges: ExchangeRow[]) => Promise<string[]>;
 
 /** M0 stub: one clipped beat per exchange. Superseded by `judgmentCompactor` at M1. */
 export const naiveCompactor: Compactor = async (exchanges) =>
-  exchanges.map((e) => `(t${e.turnNumber}) ${e.narration.slice(0, 200)}`);
+  exchanges.map((e) => `(t${e.turnNumber}) ${stripDirectiveFences(e.narration).slice(0, 200)}`);
 
 /**
  * The real M1 compactor (§6.2, subtext-first doctrine): ONE judgment-tier
@@ -52,7 +53,12 @@ export function judgmentCompactor(
 ): Compactor {
   return async (exchanges) => {
     const transcript = exchanges
-      .map((e) => `[Turn ${e.turnNumber}]\nPlayer: ${e.playerInput}\n\n${e.narration}`)
+      // M3-DG: the summarizer reads story, not chrome — same projection as
+      // the Sakkan and pins (the plan's §1 promise, audited true).
+      .map(
+        (e) =>
+          `[Turn ${e.turnNumber}]\nPlayer: ${e.playerInput}\n\n${stripDirectiveFences(e.narration)}`,
+      )
       .join("\n\n");
     const result = await callJudgment(selection, {
       name: "compact_beats",

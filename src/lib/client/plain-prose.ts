@@ -12,8 +12,23 @@
  * are rendered constructs and project out. A heuristic, not a parser: a
  * miss degrades to sourceTurn 0, so near-enough beats exact.
  */
+/**
+ * Strip M3-DG directive fence MARKERS (` ```name ` … ` ``` `), keeping the
+ * inner text as plain prose. The display grammar wraps devices in fenced
+ * blocks; three readers must see the inner text as story prose, never chrome:
+ * pins (a selection inside a device reaches the source turn), compaction, and
+ * — load-bearing — the Sakkan's scorer input. That last is the NEUTRALITY
+ * LAW: directive-fenced prose and its stripped projection must produce
+ * identical scorer input, so the Gauge reads story, not chrome (route the
+ * Sakkan's narration sample through this before scoring). Only whole fence
+ * LINES go; inline `code` is left to plainProse's own handling.
+ */
+export function stripDirectiveFences(md: string): string {
+  return md.replace(/^[ \t]*```[^\n]*\n?/gm, "");
+}
+
 export function plainProse(md: string): string {
-  return md
+  return stripDirectiveFences(md)
     .replace(/^[ \t]*>[ \t]?/gm, "")
     .replace(/^#{1,6}[ \t]+/gm, "")
     .replace(/^[-*_]{3,}[ \t]*$/gm, "")

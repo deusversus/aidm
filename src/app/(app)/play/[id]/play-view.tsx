@@ -2,6 +2,7 @@
 
 import { fetchWithAuthRetry } from "@/lib/client/fetch-with-auth";
 import { plainProse } from "@/lib/client/plain-prose";
+import type { DirectiveGrant } from "@/lib/types/premise";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ListenButton } from "./listen-button";
@@ -43,6 +44,17 @@ interface AssertionNotice {
   writes: string[];
   clarify?: string;
   flags: string[];
+}
+
+/**
+ * §4.5 M2R3 steering-honesty notice: a player-driven drift the Director answered
+ * with an evolution. One quiet dismissible line, server-hydrated on load; dismiss
+ * clears it via the DELETE route (once per override).
+ */
+interface SteeringNotice {
+  axis: string;
+  observed: number;
+  set: number;
 }
 
 interface Pin {
@@ -95,6 +107,16 @@ interface SettingsResponse {
   voice_id?: string;
 }
 
+/** snake_case axis → spaced label for a player-facing line ("moral_complexity" → "moral complexity"). */
+function humanAxis(axis: string): string {
+  return axis.replace(/_/g, " ");
+}
+
+/** A 0–10 score for prose: integers bare, fractions to one decimal. */
+function fmtScore(n: number): string {
+  return Number.isInteger(n) ? String(n) : n.toFixed(1);
+}
+
 /** claude-opus-4-8 → "Opus 4.8": strip the prefix, title-case the name, dot the version. */
 function friendlyModel(id: string): string {
   const [name, ...version] = id.replace(/^claude-/, "").split("-");
@@ -145,7 +167,9 @@ export function PlayView({
   initialExchanges,
   openTurn,
   suggestionAffordance,
+  displayDirectives = [],
   initialChips,
+  steeringNotice = null,
   ttsAvailable = false,
   ttsVoiceId = "",
 }: {
@@ -155,9 +179,14 @@ export function PlayView({
   initialExchanges: TranscriptItem[];
   openTurn: OpenTurn | null;
   suggestionAffordance: string;
+  /** M3-DG: the premise's granted display devices (chrome for fenced
+   *  directives) — every prose surface renders with the same wardrobe. */
+  displayDirectives?: DirectiveGrant[];
   /** §9.2 rehydration: the latest turn's persisted moves at a live decision
    *  point (server-gated to default_on) — a reload keeps the chips. */
   initialChips?: string[];
+  /** §4.5 M2R3: a pending steering-honesty notice, server-hydrated on load. */
+  steeringNotice?: SteeringNotice | null;
   /** §9.5 voice: the listen button renders only when the key is configured. */
   ttsAvailable?: boolean;
   /** The campaign's chosen narrator voice (cache-busts listen URLs). */
@@ -177,6 +206,8 @@ export function PlayView({
   const [rewindBusy, setRewindBusy] = useState(false);
   // §5.4 world-assertion feedback: informational, cleared on the next submission.
   const [assertion, setAssertion] = useState<AssertionNotice | null>(null);
+  // §4.5 M2R3 steering-honesty notice: server-hydrated, dismissible once.
+  const [steering, setSteering] = useState<SteeringNotice | null>(steeringNotice);
   // §9.2 on-demand summon: one probe → the existing chips rail.
   const [summoning, setSummoning] = useState(false);
   // §5.4/§7.5 studio-notes panel: pins + standing rules, fetched lazily, exit-sign quiet.
@@ -618,6 +649,16 @@ export function PlayView({
       method: "POST",
     });
     void attachStream(turnId, pendingInput ?? "(retried turn)");
+  };
+
+  // §4.5 M2R3: dismiss the steering-honesty notice. Optimistic — clear locally,
+  // then persist so a reload doesn't re-show it (silence is consent; once per
+  // override). Best-effort: a failed DELETE just leaves it for the next load.
+  const dismissSteering = () => {
+    setSteering(null);
+    void fetchWithAuthRetry(`/api/campaigns/${campaignId}/steering-notice`, {
+      method: "DELETE",
+    }).catch(() => {});
   };
 
   // §5.6 pre-warm: input focus after >4 min idle fires the cache warmer.
@@ -1315,6 +1356,7 @@ export function PlayView({
               previously
             </p>
             <NarrationProse
+              directives={displayDirectives}
               text={recap}
               className="text-sm italic leading-7 text-muted-foreground [&_em]:not-italic"
             />
@@ -1382,6 +1424,7 @@ export function PlayView({
                 <p className="text-sm text-muted-foreground">{e.playerInput}</p>
                 {e.narration && (
                   <NarrationProse
+                    directives={displayDirectives}
                     text={e.narration}
                     className="text-sm italic leading-7 text-foreground/90 [&_em]:not-italic"
                   />
@@ -1401,7 +1444,7 @@ export function PlayView({
                   {e.playerInput}
                 </div>
               </div>
-              <NarrationProse text={e.narration} />
+              <NarrationProse directives={displayDirectives} text={e.narration} />
               {e.degraded && (
                 <p className="text-[11px] italic text-muted-foreground/50">
                   rendered thin — the studio was under time pressure this scene
@@ -1427,7 +1470,9 @@ export function PlayView({
             </div>
           </div>
         )}
-        {streamText && <NarrationProse text={streamText} streaming />}
+        {streamText && (
+          <NarrationProse directives={displayDirectives} text={streamText} streaming />
+        )}
         {staging && (
           <p className="text-xs italic text-muted-foreground">
             {staging}…
@@ -1507,12 +1552,31 @@ export function PlayView({
           </p>
         )}
         {pinNotice && <p className="text-xs text-muted-foreground">{pinNotice}</p>}
+        {steering && (
+          <div className="flex items-start justify-between gap-3 rounded-md border border-border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+            <p className="leading-5">
+              The studio noticed the story has been running its {humanAxis(steering.axis)} nearer{" "}
+              {fmtScore(steering.observed)} than the {fmtScore(steering.set)} the premise set out
+              with — it’s leaning with you now. Type <span className="font-medium">/meta</span> to
+              talk it over.
+            </p>
+            <button
+              type="button"
+              onClick={dismissSteering}
+              className="shrink-0 text-muted-foreground/60 hover:text-foreground"
+              title="Dismiss — the studio keeps leaning with you"
+            >
+              dismiss
+            </button>
+          </div>
+        )}
         {yokoku && (
           <div className="border-l-2 border-border pl-4">
             <p className="mb-1 text-[10px] uppercase tracking-widest text-muted-foreground/60">
               next time
             </p>
             <NarrationProse
+              directives={displayDirectives}
               text={yokoku}
               className="text-sm italic leading-7 text-muted-foreground [&_em]:not-italic"
             />

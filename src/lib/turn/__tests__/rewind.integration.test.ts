@@ -76,6 +76,37 @@ const spendConte = (turnNumber: number, amount: number) => ({
 type MpState = { resources?: { MP?: { current?: number; max?: number } } } | undefined;
 
 describe("rewindDirectionState (pure, §6.7 + C8 re-audit)", () => {
+  it("M2R3: player-driven findings past the tip die; the notice drops only when raised past it", async () => {
+    const { DirectionState, rewindDirectionState } = await import("@/lib/types/direction");
+    const state = DirectionState.parse({
+      sakkan: {
+        last_sample_turn: 20,
+        readings: {},
+        active_notes: [],
+        player_driven: {
+          continuity: { axis: "continuity", observed: 8, wanted: 3, at_turn: 8, evidence: "e" },
+          optimism: { axis: "optimism", observed: 6, wanted: 3, at_turn: 16, evidence: "e" },
+        },
+      },
+      steering_notice: { axis: "continuity", observed: 8, set: 3, at_turn: 14 },
+    });
+
+    const rewound = rewindDirectionState(state, 10);
+    // The finding anchored at turn 8 survives; turn 16's references un-happened inputs.
+    expect(Object.keys(rewound.sakkan?.player_driven ?? {})).toEqual(["continuity"]);
+    // The notice was raised at 14 > 10 — its override reverted with the timeline.
+    expect(rewound.steering_notice).toBeUndefined();
+
+    // A notice raised BEFORE the tip survives the rewind.
+    const kept = rewindDirectionState(
+      DirectionState.parse({
+        steering_notice: { axis: "continuity", observed: 8, set: 3, at_turn: 9 },
+      }),
+      10,
+    );
+    expect(kept.steering_notice?.at_turn).toBe(9);
+  });
+
   it("clamps turn-anchored fields, drops dead-timeline evidence, keeps soft state", async () => {
     const { DirectionState, rewindDirectionState } = await import("@/lib/types/direction");
     const state = DirectionState.parse({

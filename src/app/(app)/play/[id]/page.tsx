@@ -3,9 +3,11 @@ import { getDb } from "@/lib/db";
 import { notTombstoned } from "@/lib/db/helpers";
 import { campaigns, episodicRecords, turns } from "@/lib/db/schema";
 import { env } from "@/lib/env";
+import { DirectiveGrant } from "@/lib/types/premise";
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { z } from "zod";
 import { PlayView } from "./play-view";
 
 export const runtime = "nodejs";
@@ -115,8 +117,27 @@ export default async function PlayPage({ params }: { params: Promise<{ id: strin
     .orderBy(asc(turns.turnNumber))
     .limit(1);
 
-  const contract = campaign.premiseContract as { suggestion_affordance?: string } | null;
+  const contract = campaign.premiseContract as {
+    suggestion_affordance?: string;
+    presentation_vocabulary?: { directives?: unknown };
+  } | null;
   const affordance = contract?.suggestion_affordance ?? "on_request_only";
+  // M3-DG: the premise's granted display devices ride to every prose surface
+  // (zod-parsed — a malformed grant degrades to no chrome, never a crash).
+  const parsedDirectives = z
+    .array(DirectiveGrant)
+    .safeParse(contract?.presentation_vocabulary?.directives ?? []);
+  const displayDirectives = parsedDirectives.success ? parsedDirectives.data : [];
+
+  // §4.5 M2R3 steering-honesty notice: a player-driven drift the Director
+  // answered with an evolution. Read the flag off direction_state; the play
+  // view shows one quiet dismissible line and clears it via the DELETE route.
+  const steeringNotice =
+    (
+      campaign.directionState as {
+        steering_notice?: { axis: string; observed: number; set: number };
+      } | null
+    )?.steering_notice ?? null;
 
   // §9.2 chips rehydration (M2R R1): the durable record IS the UI state — a
   // reload over a live decision point re-offers the KA's persisted moves.
@@ -147,6 +168,8 @@ export default async function PlayPage({ params }: { params: Promise<{ id: strin
       openTurn={openTurn ?? null}
       suggestionAffordance={affordance}
       {...(initialChips ? { initialChips } : {})}
+      {...(steeringNotice ? { steeringNotice } : {})}
+      displayDirectives={displayDirectives}
       // §9.5 voice: present only when the key is configured — no key, no button.
       ttsAvailable={Boolean(process.env.ELEVENLABS_API_KEY)}
       ttsVoiceId={

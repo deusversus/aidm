@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { plainProse } from "../plain-prose";
+import { plainProse, stripDirectiveFences } from "../plain-prose";
 
 /**
  * Pin-from-selection substrate: the selection comes from RENDERED prose,
@@ -59,5 +59,34 @@ describe("plainProse (pin-from-selection projection)", () => {
 
   it("strikethrough projects to its rendered text", () => {
     expect(plainProse("she ~~lied~~ said")).toBe("she lied said");
+  });
+
+  it("a selection inside a directive block matches the raw fenced markdown (M3-DG)", () => {
+    // The player selects rendered device text (chrome + fence markers gone);
+    // the stored narration is a fenced block. The projection must meet it.
+    const raw = "```readout\nLILITH: threat critical\n```";
+    expect(plainProse(raw)).toBe("LILITH: threat critical");
+    const withProse = "She froze.\n\n```window\nHP 12/100\n```\n\nThen she ran.";
+    expect(plainProse(withProse)).toBe("She froze. HP 12/100 Then she ran.");
+  });
+});
+
+describe("stripDirectiveFences (M3-DG chrome removal — the Sakkan-neutrality projection)", () => {
+  it("removes fence marker lines, keeping the inner text verbatim", () => {
+    const fenced = "The alarm blared.\n\n```readout\nTHREAT: CRITICAL\n```\n\nShe ran.";
+    // Identical to the same prose written WITHOUT the device (the neutrality
+    // guarantee at the scorer-input level: chrome never changes the story).
+    expect(stripDirectiveFences(fenced)).toBe("The alarm blared.\n\nTHREAT: CRITICAL\n\nShe ran.");
+  });
+
+  it("strips every device name (info string) and the bare closing fence", () => {
+    for (const name of ["window", "readout", "letter", "title", "memory", "comms"]) {
+      expect(stripDirectiveFences(`\`\`\`${name}\nX\n\`\`\``)).toBe("X\n");
+    }
+  });
+
+  it("leaves fence-free prose untouched (inline code survives — not a fence)", () => {
+    const prose = "She read the `mana_core` gauge and sighed.";
+    expect(stripDirectiveFences(prose)).toBe(prose);
   });
 });

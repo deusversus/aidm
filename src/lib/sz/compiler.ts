@@ -18,6 +18,7 @@ import { DNAScales } from "@/lib/types/dna";
 import { OpeningStatePackage } from "@/lib/types/opening";
 import {
   Canonicality,
+  DirectiveGrant,
   type PremiseComponents,
   PremiseContract,
   PresentationVocabulary,
@@ -84,6 +85,13 @@ export interface ResolvedObservations {
   /** SV3: OP-composition moves — active-layer Framing overrides, latest-wins per axis. */
   framingChoices: { axis: keyof Composition; value: string }[];
   presentationGrants: string[];
+  /**
+   * M3-DG: the structured display-device grants the conductor gathered at the
+   * presentation beat (kind "presentation_directive"). Resolved latest-wins
+   * per device name into the contract's `presentation_vocabulary.directives`;
+   * prose grants stay in `presentationGrants`.
+   */
+  directiveGrants: z.infer<typeof DirectiveGrant>[];
   suggestionAffordance?: z.infer<typeof SuggestionAffordance>;
   tierSelection?: TierSelection;
   /**
@@ -126,6 +134,7 @@ export function resolveObservations(observations: Observation[]): ResolvedObserv
     calibration: {},
     framingChoices: [],
     presentationGrants: [],
+    directiveGrants: [],
     blendChoices: [],
     worldFacts: [],
     castFacts: [],
@@ -306,6 +315,22 @@ export function resolveObservations(observations: Observation[]): ResolvedObserv
       case "presentation":
         resolved.presentationGrants.push(obs.content);
         break;
+      case "presentation_directive": {
+        // M3-DG: structured device grant, {"name": "readout", "skin": "..."}.
+        // Same idiom as framing_choice — the model proposes, the schema
+        // disposes; a bad name/JSON defers instead of poisoning the contract.
+        // Latest wins per device name (a re-skinned device replaces its prior).
+        try {
+          const parsed = DirectiveGrant.parse(JSON.parse(obs.content));
+          resolved.directiveGrants = [
+            ...resolved.directiveGrants.filter((d) => d.name !== parsed.name),
+            parsed,
+          ];
+        } catch {
+          resolved.deferred.push(`unparseable presentation directive: ${obs.content.slice(0, 80)}`);
+        }
+        break;
+      }
       case "suggestion_affordance": {
         // Same discipline as resolveFinitude — enum tokens appear inside prose
         // ("…never as a fourth-wall voice" compiled to "never", live
@@ -802,6 +827,7 @@ export async function compileSessionZero(
       spark: resolved.spark,
       presentation_vocabulary: PresentationVocabulary.parse({
         grants: resolved.presentationGrants,
+        directives: resolved.directiveGrants,
       }),
       finitude: resolved.finitude,
       intensity: {

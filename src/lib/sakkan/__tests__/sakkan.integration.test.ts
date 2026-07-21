@@ -20,12 +20,22 @@ vi.mock("@/lib/sakkan/score", async (importOriginal) => {
   return { ...actual, scoreAxes: vi.fn() };
 });
 
+// The gate-trip attribution probe (M2R3): its ONLY model surface. Mocked so the
+// routing (player_driven closes the retake; narrator_driven opens it) is tested
+// with NO live call — scripted like the scorer above (working agreement).
+vi.mock("@/lib/sakkan/attribution", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/sakkan/attribution")>();
+  return { ...actual, attributeDrift: vi.fn() };
+});
+
+import { attributeDrift } from "@/lib/sakkan/attribution";
 import {
   DRIFT_CONSECUTIVE,
   MARK_CONSECUTIVE,
   SAKKAN_PROVENANCE,
   activeSakkanNotes,
   gaugeTrend,
+  playerDrivenTrend,
   runSakkanSample,
   sakkanDue,
 } from "@/lib/sakkan/sakkan";
@@ -33,6 +43,7 @@ import { scoreAxes } from "@/lib/sakkan/score";
 import type { AxisScore } from "@/lib/sakkan/score";
 
 const mockScore = vi.mocked(scoreAxes);
+const mockAttribute = vi.mocked(attributeDrift);
 
 const url = process.env.DATABASE_URL;
 if (!url) console.warn("[sakkan] DATABASE_URL not set — skipping real-DB suite");
@@ -156,6 +167,31 @@ describe("Sakkan pure helpers", () => {
     expect(trend).toContain("RETAKE ACTIVE since turn 16");
     expect(trend.split("\n").length).toBeLessThanOrEqual(12);
   });
+
+  it("playerDrivenTrend renders observed-vs-set findings; empty → ''", () => {
+    expect(playerDrivenTrend(DirectionState.parse({}))).toBe("");
+    const state = DirectionState.parse({
+      sakkan: {
+        last_sample_turn: 16,
+        readings: {},
+        active_notes: [],
+        player_driven: {
+          continuity: {
+            axis: "continuity",
+            observed: 8,
+            wanted: 3,
+            evidence: "one long evening",
+            at_turn: 16,
+          },
+        },
+      },
+    });
+    const trend = playerDrivenTrend(state);
+    expect(trend).toContain("continuity");
+    expect(trend).toContain("playing ~8/10");
+    expect(trend).toContain("premise's 3/10");
+    expect(trend).toContain("one long evening");
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -253,6 +289,9 @@ describe.skipIf(!url)("Sakkan sample (real Postgres, scripted scorer)", () => {
 
   beforeEach(() => {
     mockScore.mockReset();
+    // Default: a gate trip attributes to the NARRATOR (today's retake behavior),
+    // so every pre-M2R3 test still opens its retake. Player-driven cases override.
+    mockAttribute.mockReset().mockResolvedValue({ driver: "narrator_driven", evidence: "default" });
   });
 
   // Bebop active darkness = 7; with no override, effective darkness = 7.
@@ -496,5 +535,127 @@ describe.skipIf(!url)("Sakkan sample (real Postgres, scripted scorer)", () => {
     // In band against the effective premise → no drift accrues, no retake fires.
     expect(st.sakkan?.readings.darkness?.consecutive_drift).toBe(0);
     expect(st.sakkan?.active_notes).toHaveLength(0);
+  });
+
+  // --- M2R3: the gate-trip attribution read (the retake gets an exit) --------
+
+  it("player_driven: the gate trip closes the retake and routes the finding to the Director", async () => {
+    if (!db) throw new Error("unreachable");
+    const campaignId = await makeCampaign({ directionState: { settei: settei(["darkness"]) } });
+    await seedProse(campaignId, cleanSix());
+
+    // Sample 1 — a single drift (spike): no gate trip, so no attribution probe.
+    mockScore.mockResolvedValueOnce([axisScore("darkness", 3, 0.9)]);
+    await runSakkanSample(db, campaignId, 8);
+    expect(mockAttribute).not.toHaveBeenCalled();
+
+    // Sample 2 — the gate trips (2 consecutive). The probe charges the PLAYER.
+    mockAttribute.mockResolvedValueOnce({
+      driver: "player_driven",
+      evidence: "the player kept the same thread all evening",
+    });
+    mockScore.mockResolvedValueOnce([axisScore("darkness", 3, 0.9)]);
+    await runSakkanSample(db, campaignId, 16);
+
+    // Fired exactly ONCE, over the PLAYER INPUTS (never the dials), drift lower.
+    expect(mockAttribute).toHaveBeenCalledTimes(1);
+    const attribArgs = mockAttribute.mock.calls[0]?.[1];
+    expect(attribArgs?.axis).toBe("darkness");
+    expect(attribArgs?.direction).toBe("lower"); // observed 3 < wanted 7
+    expect(attribArgs?.playerInputs.length).toBeGreaterThan(0);
+    expect(attribArgs?.playerInputs.join(" ")).toContain("input 6");
+
+    const st = await readState(campaignId);
+    // The retake CLOSED (never opened) — the engine stops straining (§0).
+    expect(st.sakkan?.active_notes).toHaveLength(0);
+    // The finding routed to the Director, carrying observed + the set value.
+    expect(st.sakkan?.player_driven.darkness).toMatchObject({
+      axis: "darkness",
+      observed: 3,
+      wanted: 7,
+      at_turn: 16,
+    });
+    expect(playerDrivenTrend(st)).toContain("darkness");
+    expect(playerDrivenTrend(st)).toContain("premise's 7");
+  });
+
+  it("player_driven: the probe fires ONCE per trip and the calibration mark is suppressed", async () => {
+    if (!db) throw new Error("unreachable");
+    const campaignId = await makeCampaign({ directionState: { settei: settei(["darkness"]) } });
+    await seedProse(campaignId, cleanSix());
+
+    mockAttribute.mockResolvedValue({ driver: "player_driven", evidence: "player-led" });
+    // Four consecutive drift reads — well past MARK_CONSECUTIVE.
+    for (const turn of [8, 16, 24, 32]) {
+      mockScore.mockResolvedValueOnce([axisScore("darkness", 3, 0.9)]);
+      await runSakkanSample(db, campaignId, turn);
+    }
+
+    // The probe fired exactly ONCE (the fresh trip at sample 2), never per sample.
+    expect(mockAttribute).toHaveBeenCalledTimes(1);
+    const st = await readState(campaignId);
+    expect(st.sakkan?.active_notes).toHaveLength(0);
+    expect(st.sakkan?.player_driven.darkness).toBeDefined();
+    // Writer #3 stays silent — no "pull it back" mark to fight the player.
+    expect(await sakkanMarks(campaignId, "darkness")).toHaveLength(0);
+  });
+
+  it("narrator_driven: the gate trip opens the retake unchanged, writes no finding", async () => {
+    if (!db) throw new Error("unreachable");
+    const campaignId = await makeCampaign({ directionState: { settei: settei(["darkness"]) } });
+    await seedProse(campaignId, cleanSix());
+
+    mockAttribute.mockResolvedValue({ driver: "narrator_driven", evidence: "the writer wandered" });
+    for (const turn of [8, 16]) {
+      mockScore.mockResolvedValueOnce([axisScore("darkness", 3, 0.9)]);
+      await runSakkanSample(db, campaignId, turn);
+    }
+
+    const st = await readState(campaignId);
+    expect(st.sakkan?.active_notes).toEqual([
+      { axis: "darkness", active: 7, observed: 3, since_turn: 16 },
+    ]);
+    expect(st.sakkan?.player_driven).toEqual({});
+    expect(playerDrivenTrend(st)).toBe("");
+  });
+
+  it("a probe failure defaults conservatively to the retake (never the eternal-retake regression)", async () => {
+    if (!db) throw new Error("unreachable");
+    const campaignId = await makeCampaign({ directionState: { settei: settei(["darkness"]) } });
+    await seedProse(campaignId, cleanSix());
+
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    mockAttribute.mockRejectedValue(new Error("scripted probe failure"));
+    for (const turn of [8, 16]) {
+      mockScore.mockResolvedValueOnce([axisScore("darkness", 3, 0.9)]);
+      await runSakkanSample(db, campaignId, turn);
+    }
+    warn.mockRestore();
+
+    const st = await readState(campaignId);
+    // The retake opened (today's behavior) — a missed exit, not a regression.
+    expect(st.sakkan?.active_notes).toHaveLength(1);
+    expect(st.sakkan?.player_driven).toEqual({});
+  });
+
+  it("an in-band read clears a player-driven finding (the drift resolved)", async () => {
+    if (!db) throw new Error("unreachable");
+    const campaignId = await makeCampaign({ directionState: { settei: settei(["darkness"]) } });
+    await seedProse(campaignId, cleanSix());
+
+    mockAttribute.mockResolvedValue({ driver: "player_driven", evidence: "player-led" });
+    for (const turn of [8, 16]) {
+      mockScore.mockResolvedValueOnce([axisScore("darkness", 3, 0.9)]);
+      await runSakkanSample(db, campaignId, turn);
+    }
+    let st = await readState(campaignId);
+    expect(st.sakkan?.player_driven.darkness).toBeDefined();
+
+    // Sample 3 reads in band (|7 − 7| = 0): the finding clears, counter resets.
+    mockScore.mockResolvedValueOnce([axisScore("darkness", 7, 0.9)]);
+    await runSakkanSample(db, campaignId, 24);
+    st = await readState(campaignId);
+    expect(st.sakkan?.player_driven).toEqual({});
+    expect(st.sakkan?.readings.darkness?.consecutive_drift).toBe(0);
   });
 });

@@ -130,7 +130,7 @@ export function bebopContract(overrides: Partial<PremiseContract> = {}): Premise
     canonical: structuredClone(components),
     active: structuredClone(components),
     spark: "The moment someone says 'Whatever happens, happens' and walks toward the thing anyway.",
-    presentation_vocabulary: { grants: ["bare prose"], stinger_allowed: false },
+    presentation_vocabulary: { grants: ["bare prose"], directives: [], stinger_allowed: false },
     finitude: "finite",
     intensity: {
       death_physics: "death is real, sudden, and cheap — nobody gets a speech",

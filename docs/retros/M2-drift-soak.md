@@ -60,6 +60,14 @@ Director-proposed premise evolution (§7.1), not retake forever. If the reading 
 the fix is a re-run with an episodic beat plan (scene breaks between bounties) to separate
 harness structure from narrator drift. Either way: the user's call, not the harness's.
 
+**ADJUDICATED (user, 2026-07-20): the reading is accepted — M2 passes its gate.** The KA
+following the player was correct under §0 authority ordering; the Sakkan's open retake was
+honest measurement without an exit. The residual finding is promoted to sanctioned work
+(docs/plans/M2R3-drift-attribution.md): the Sakkan stays blind to the DIALS (measurement
+integrity) but the drift band gains sight of the PLAYER — a gate-trip attribution read that
+closes the retake on player-driven drift and escalates to steering honesty + a §4.2
+active-layer evolution instead of retaking forever.
+
 ## Cost assertions — corrected per audit (the earlier draft overstated)
 
 The accurate statement: **every turn metered in-invocation passed the §10.8 absolute

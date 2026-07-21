@@ -121,5 +121,39 @@ describe("presentation grants channel contract (SV4, Settei-side)", () => {
 
   it("no grants, no contract — renders nothing", () => {
     expect(renderPresentationGrants([])).toBe("");
+    // M3-DG: empty on BOTH halves is still nothing (bare-prose premises).
+    expect(renderPresentationGrants([], [])).toBe("");
+  });
+
+  it("structured directives teach the granted device names + skins (M3-DG)", () => {
+    const text = renderPresentationGrants(
+      [],
+      [
+        { name: "readout", skin: "the tactical machine" },
+        { name: "memory", skin: "a sepia flashback" },
+      ],
+    );
+    expect(text).toContain("## Display devices");
+    expect(text).toContain("`readout` — the tactical machine");
+    expect(text).toContain("`memory` — a sepia flashback");
+    // Inner text is plain prose (pins/Gauge/compaction read story, not chrome).
+    expect(text).toContain("PLAIN story prose");
+  });
+
+  it("teaches the universal memory marking when memory was NOT granted (M3-DG)", () => {
+    const text = renderPresentationGrants([], [{ name: "window", skin: "blue-glass panels" }]);
+    expect(text).toContain("`window` — blue-glass panels");
+    // memory is universal — the KA is told it can always mark a not-now passage.
+    expect(text).toContain("`memory` — always available");
+  });
+
+  it("grants and directives render side by side", () => {
+    const text = renderPresentationGrants(
+      ["episode-title cards only"],
+      [{ name: "comms", skin: "phone screens" }],
+    );
+    expect(text).toContain("## Presentation vocabulary");
+    expect(text).toContain("## Display devices");
+    expect(text).toContain("`comms` — phone screens");
   });
 });

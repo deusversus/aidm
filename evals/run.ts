@@ -6,6 +6,7 @@ import { budgetAssertions } from "./suites/budget-assertions";
 import { goldenProfile } from "./suites/golden-profile";
 import { notAnotherAnime } from "./suites/not-another-anime";
 import { rendererEfficacy } from "./suites/renderer-efficacy";
+import { sakkanNeutrality } from "./suites/sakkan-neutrality";
 import { scaffolds } from "./suites/scaffolds";
 import type { Suite, SuiteResult } from "./types";
 
@@ -26,6 +27,7 @@ const allSuites: Suite[] = [
   goldenProfile,
   notAnotherAnime,
   rendererEfficacy,
+  sakkanNeutrality,
   authorshipDetection,
   ...scaffolds,
 ];

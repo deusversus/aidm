@@ -4,7 +4,7 @@ import { campaigns, criticalFacts, entities, pencilMarks, sessionRecords } from 
 import { LOOPED_LARGE } from "@/lib/llm/budgets";
 import { callJudgment } from "@/lib/llm/calls";
 import { DEV_TIER_SELECTION, TierSelection } from "@/lib/llm/tiers";
-import { gaugeTrend } from "@/lib/sakkan/sakkan";
+import { gaugeTrend, playerDrivenTrend } from "@/lib/sakkan/sakkan";
 import {
   GET_TURN_NARRATIVE_TOOL,
   RECALL_SCENE_TOOL,
@@ -328,6 +328,9 @@ export async function runDirectorCycle(
   // circular import (director ⇄ sakkan) is function-scope only on both sides
   // — bindings resolve at call time, never at module init.
   const trend = gaugeTrend(state);
+  // Dailies consumer #3 (M2R3): drifts the gate-trip attribution charged to the
+  // player. A first-class section — the exit from the eternal retake (§4.5/§8).
+  const playerDrift = playerDrivenTrend(state);
 
   const dossier = [
     `# Director cycle — turn ${turnNumber}${opts?.trigger ? ` (${opts.trigger})` : ""}`,
@@ -355,6 +358,14 @@ export async function runDirectorCycle(
     spotlightNote,
     "",
     ...(trend ? ["## Gauge trend (Sakkan, §4.5 — the dailies' drift read)", trend, ""] : []),
+    ...(playerDrift
+      ? [
+          "## Player-driven drift (§8 steering honesty + §4.2 — the story is being pulled by PLAY)",
+          "The drift band measured these axes running against the premise, and the gate-trip attribution charged the divergence to the PLAYER's own inputs — not narrator wander. The retake is already CLOSED; the engine will not strain against the player (§0 authority ordering). You MAY, if it serves the story, emit a SINGLE arc_override moving the axis to where play actually lives (a dna_shift to the observed value — active layer only, latest-wins, canonical untouched), its transition_signal naming the observation gently in the fiction's own language. This is an invitation, not an order: if the pull is a passing mood, let it stand and say nothing.",
+          playerDrift,
+          "",
+        ]
+      : []),
     "## Critical layer (§6.3 dailies review)",
     `${criticalCount} active critical fact(s). Demote only what has gone stale — restraint, not a purge.`,
     "",
@@ -419,6 +430,11 @@ export async function runDirectorCycle(
     await closeEpisode(db, campaignId, turnNumber, output.episode_close, arcId);
   }
 
+  // §4.5 M2R3 steering-honesty notice + finding clear, computed during the
+  // override apply and folded into the saved state below.
+  let steeringNotice: DirectionState["steering_notice"];
+  let clearedSakkan: DirectionState["sakkan"];
+
   // arc_override latest-wins onto the campaign; a new one supersedes any clear.
   // The model speaks in axis/value PAIRS (the strict-output grammar caps
   // optional params — C7 live probe); the stored ArcOverride carries the
@@ -447,6 +463,38 @@ export async function runDirectorCycle(
         : {}),
     };
     await db.update(campaigns).set({ arcOverride: override }).where(eq(campaigns.id, campaignId));
+
+    // §4.5 M2R3: if this override ANSWERS a player-driven drift (a shifted DNA
+    // axis matches a pending finding), raise the one-line player notice and
+    // clear the answered finding(s) — the drift is now being LED with, not
+    // measured against, so the next Sakkan sample reads it in band against the
+    // new effective premise and never re-raises it. Framing (composition)
+    // shifts carry no numeric gauge, so only dna_shifts can answer a finding.
+    const shifted = new Set(output.arc_override.dna_shifts.map((s) => s.axis));
+    const pd = state.sakkan?.player_driven ?? {};
+    const answered = Object.values(pd).find((f) => shifted.has(f.axis));
+    if (answered) {
+      steeringNotice = {
+        axis: answered.axis,
+        observed: answered.observed,
+        set: answered.wanted,
+        at_turn: turnNumber,
+      };
+      if (state.sakkan) {
+        clearedSakkan = {
+          ...state.sakkan,
+          // Clear ONLY the noticed finding (audit): an override answering
+          // several player-driven axes surfaces them SEQUENTIALLY - one
+          // notice per cycle - so no evolution on a player-authored axis
+          // lands silently. Un-noticed answered findings stay pending and
+          // raise their own notice on a later cycle (or auto-clear when
+          // the moved premise reads them back in band).
+          player_driven: Object.fromEntries(
+            Object.entries(pd).filter(([axis]) => axis !== answered.axis),
+          ),
+        };
+      }
+    }
   } else if (output.clear_override) {
     await db.update(campaigns).set({ arcOverride: null }).where(eq(campaigns.id, campaignId));
   }
@@ -495,6 +543,9 @@ export async function runDirectorCycle(
     // §7.1 spotlight output lands in state so Layout can surface it as conte
     // spotlight_hints — a Director writer with no reader is a defect (axiom 8).
     spotlight_directives: output.spotlight_directives,
+    // §4.5 M2R3: the answered player-driven finding cleared, the notice raised.
+    ...(clearedSakkan ? { sakkan: clearedSakkan } : {}),
+    ...(steeringNotice ? { steering_notice: steeringNotice } : {}),
     // Accumulators reset; the trigger begins re-arming from here.
     accumulated_epicness: 0,
     arc_events: [],

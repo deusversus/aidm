@@ -92,7 +92,10 @@ export async function assembleForCampaign(
     });
   }
 
-  const presentation = renderPresentationGrants(contract.presentation_vocabulary.grants);
+  const presentation = renderPresentationGrants(
+    contract.presentation_vocabulary.grants,
+    contract.presentation_vocabulary.directives,
+  );
 
   const block1 = `${setteiText}${presentation}\n\n${KA_CONTRACT}`;
 

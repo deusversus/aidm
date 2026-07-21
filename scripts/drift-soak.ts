@@ -45,8 +45,10 @@ import { OpeningStatePackage } from "@/lib/types/opening";
 import { and, desc, eq } from "drizzle-orm";
 import {
   BEBOP_OSP,
+  type DriftGate,
   type TurnRecord,
   attributeSpend,
+  classifyAxisVerdict,
   fmtUsd,
   guardNoFable,
   meterTurn,
@@ -246,6 +248,8 @@ interface SampleSnapshot {
     consecutiveDrift: number;
   }[];
   activeNotes: { axis: string; sinceTurn: number }[];
+  /** §4.5 M2R3 — axes the gate-trip attribution charged to the player (retake closed). */
+  playerDrivenAxes: string[];
 }
 
 /** The premise the Sakkan measures against: active ⊕ arc_override (§4.2) —
@@ -290,6 +294,7 @@ async function snapshotSakkan(
       axis: n.axis,
       sinceTurn: n.since_turn,
     })),
+    playerDrivenAxes: Object.keys(state.sakkan?.player_driven ?? {}),
   };
 }
 
@@ -298,7 +303,12 @@ async function injectForcedNote(db: Db, campaignId: string, atTurn: number): Pro
   const state = await loadDirectionState(db, campaignId);
   const effective = await effectiveTreatment(db, campaignId);
   const active = effective[FORCED_AXIS] ?? 7;
-  const sakkan = state.sakkan ?? { last_sample_turn: 0, readings: {}, active_notes: [] };
+  const sakkan = state.sakkan ?? {
+    last_sample_turn: 0,
+    readings: {},
+    active_notes: [],
+    player_driven: {},
+  };
   sakkan.active_notes = [
     ...sakkan.active_notes.filter((n) => n.axis !== FORCED_AXIS),
     { axis: FORCED_AXIS, active, observed: FORCED_OBSERVED, since_turn: atTurn },
@@ -378,6 +388,10 @@ interface Verdict {
   uncorrected: { axis: string; atTurn: number; delta: number }[];
   /** Axes that drifted out and were pulled back — the machinery WORKING. */
   corrected: { axis: string; outAt: number; backInAt: number }[];
+  /** §4.5 M2R3: axes that ended engaged but whose drift the gate-trip attribution
+   *  charged to the PLAYER (retake closed) — escalated to steering honesty, NOT
+   *  a fail. The box the M2 soak lacked. */
+  escalated: { axis: string; atTurn: number; delta: number }[];
   /** Final-read excursions BELOW the consecutive trigger — the correction
    *  machinery was never due; neither pass nor fail, reported forward. */
   unresolved: { axis: string; atTurn: number; delta: number; consecutive: number }[];
@@ -449,26 +463,39 @@ function computeVerdict(snapshots: SampleSnapshot[], injectedAt: number | null):
     }
   }
   const drifting = (x: Point) => x.delta >= DRIFT_THRESHOLD && x.confidence >= DRIFT_CONFIDENCE;
-  const engaged = (x: Point) => drifting(x) && x.consecutiveDrift >= DRIFT_CONSECUTIVE;
+  const gate: DriftGate = {
+    threshold: DRIFT_THRESHOLD,
+    confidence: DRIFT_CONFIDENCE,
+    consecutive: DRIFT_CONSECUTIVE,
+  };
+  // Which axes ended charged to the player (§4.5 M2R3): read the LAST snapshot
+  // that carried real readings — an axis engaged there but in the player-driven
+  // set is escalated, never a fail (the M2 continuity ambiguity's exit).
+  const finalPlayerDriven = new Set<string>(
+    [...snapshots].reverse().find((s) => s.readings.length > 0)?.playerDrivenAxes ?? [],
+  );
   const uncorrected: Verdict["uncorrected"] = [];
   const corrected: Verdict["corrected"] = [];
+  const escalated: Verdict["escalated"] = [];
   const unresolved: Verdict["unresolved"] = [];
   for (const [axis, seq] of byAxis) {
     seq.sort((a, b) => a.atTurn - b.atTurn);
-    const events = seq.filter(drifting);
-    if (events.length === 0) continue;
     const last = seq[seq.length - 1];
     if (!last) continue;
-    if (engaged(last)) {
+    const cls = classifyAxisVerdict(seq, gate, finalPlayerDriven.has(axis));
+    if (cls === "uncorrected") {
       uncorrected.push({ axis, atTurn: last.atTurn, delta: last.delta });
-    } else if (drifting(last)) {
+    } else if (cls === "player_driven") {
+      escalated.push({ axis, atTurn: last.atTurn, delta: last.delta });
+    } else if (cls === "unresolved") {
       unresolved.push({
         axis,
         atTurn: last.atTurn,
         delta: last.delta,
         consecutive: last.consecutiveDrift,
       });
-    } else {
+    } else if (cls === "corrected") {
+      const events = seq.filter(drifting);
       const firstOut = events[0];
       const backIn = seq.find((x) => x.atTurn > (firstOut?.atTurn ?? 0) && !drifting(x));
       corrected.push({
@@ -477,11 +504,13 @@ function computeVerdict(snapshots: SampleSnapshot[], injectedAt: number | null):
         backInAt: backIn?.atTurn ?? last.atTurn,
       });
     }
+    // "clean" → no entry.
   }
   return {
     bandHeld: uncorrected.length === 0,
     uncorrected,
     corrected,
+    escalated,
     unresolved,
     forced: {
       injectedAt,
@@ -531,6 +560,13 @@ function buildReport(
     out.push(
       `- Corrected drift (the machinery WORKING — out of band, then pulled back): ${verdict.corrected
         .map((c) => `${c.axis} (out at turn ${c.outAt}, back in by turn ${c.backInAt})`)
+        .join("; ")}`,
+    );
+  }
+  if (verdict.escalated.length > 0) {
+    out.push(
+      `- Player-driven — escalated (§4.5 M2R3: gate tripped, attribution charged the PLAYER, retake closed — NOT a fail; the M2 continuity ambiguity's exit): ${verdict.escalated
+        .map((e) => `${e.axis} (delta ${e.delta} at turn ${e.atTurn})`)
         .join("; ")}`,
     );
   }

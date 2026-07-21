@@ -424,6 +424,117 @@ describe.skipIf(!url)("Director (real Postgres, scripted model)", () => {
     expect(c?.arcOverride).toBeNull();
   });
 
+  // --- M2R3: the player-driven drift exit (steering honesty + evolution) -----
+
+  const playerDrivenState = () => ({
+    sakkan: {
+      last_sample_turn: 16,
+      readings: {},
+      active_notes: [],
+      player_driven: {
+        darkness: {
+          axis: "darkness",
+          observed: 8,
+          wanted: 3,
+          evidence: "the player kept the whole run one long grim evening",
+          at_turn: 16,
+        },
+      },
+    },
+  });
+
+  it("dossier carries the player-driven drift as a first-class steering-honesty section", async () => {
+    if (!db) throw new Error("unreachable");
+    const campaignId = await makeCampaign();
+    vi.mocked(arcs.getActiveArc).mockResolvedValue(fakeArc(campaignId));
+    await db
+      .update(schema.campaigns)
+      .set({ directionState: playerDrivenState() })
+      .where(eq(schema.campaigns.id, campaignId));
+
+    mockJudgment.mockResolvedValue(directorOutput() as never);
+    await runDirectorCycle(db, campaignId, 20);
+
+    const dossier = String((mockJudgment.mock.calls[0]?.[1] as { prompt?: string })?.prompt ?? "");
+    expect(dossier).toContain("## Player-driven drift");
+    expect(dossier).toContain("darkness");
+    // The section INSTRUCTS the Director it MAY evolve via an arc_override.
+    expect(dossier).toContain("arc_override");
+    // Blindness is scoped to the Sakkan's scorer, never the Director: the set
+    // value is present here so the showrunner can judge the gap.
+    expect(dossier).toContain("premise's 3/10");
+  });
+
+  it("an override answering a player-driven drift raises the notice and clears the finding", async () => {
+    if (!db) throw new Error("unreachable");
+    const campaignId = await makeCampaign();
+    vi.mocked(arcs.getActiveArc).mockResolvedValue(fakeArc(campaignId));
+    await db
+      .update(schema.campaigns)
+      .set({ directionState: playerDrivenState() })
+      .where(eq(schema.campaigns.id, campaignId));
+
+    mockJudgment.mockResolvedValue(
+      directorOutput({
+        arc_override: {
+          arc_name: "the long evening",
+          transition_signal: "dawn breaks over the docks and the case finally closes",
+          dna_shifts: [{ axis: "darkness", value: 8 }],
+          composition_shifts: [],
+        },
+      }) as never,
+    );
+
+    await runDirectorCycle(db, campaignId, 20);
+
+    const state = await loadDirectionState(db, campaignId);
+    // The notice is raised, naming where play RAN vs what the premise SET.
+    expect(state.steering_notice).toMatchObject({
+      axis: "darkness",
+      observed: 8,
+      set: 3,
+      at_turn: 20,
+    });
+    // The answered finding cleared — the drift is now led with, not measured
+    // against (the next Sakkan sample reads it in band vs the new effective).
+    expect(state.sakkan?.player_driven).toEqual({});
+    // The evolution rode the EXISTING §4.2 override machinery (reuse, not invent).
+    const [c] = await db
+      .select({ arcOverride: schema.campaigns.arcOverride })
+      .from(schema.campaigns)
+      .where(eq(schema.campaigns.id, campaignId));
+    expect(ArcOverride.parse(c?.arcOverride).dna).toEqual({ darkness: 8 });
+  });
+
+  it("an override on an UNRELATED axis leaves the finding and raises no notice", async () => {
+    if (!db) throw new Error("unreachable");
+    const campaignId = await makeCampaign();
+    vi.mocked(arcs.getActiveArc).mockResolvedValue(fakeArc(campaignId));
+    await db
+      .update(schema.campaigns)
+      .set({ directionState: playerDrivenState() })
+      .where(eq(schema.campaigns.id, campaignId));
+
+    mockJudgment.mockResolvedValue(
+      directorOutput({
+        arc_override: {
+          arc_name: "a tonal turn elsewhere",
+          transition_signal: "the shuttle clears the gate",
+          dna_shifts: [{ axis: "optimism", value: 2 }],
+          composition_shifts: [],
+        },
+      }) as never,
+    );
+
+    await runDirectorCycle(db, campaignId, 20);
+
+    const state = await loadDirectionState(db, campaignId);
+    expect(state.steering_notice).toBeUndefined();
+    // The unanswered finding survives to the next dossier (the Director judged
+    // not to evolve THIS axis — the invitation stands, it is never forced).
+    expect(state.sakkan?.player_driven.darkness).toBeDefined();
+  });
+
   it("startup ensures the scaffold, plans the first arc, and writes the PilotPlan verbatim", async () => {
     if (!db) throw new Error("unreachable");
     const campaignId = await makeCampaign({ openingPackage: ospFixture() });

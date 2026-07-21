@@ -394,6 +394,61 @@ export async function meterTurn(
 }
 
 // ---------------------------------------------------------------------------
+// Drift verdict classification (§4.5 M2R3 — the third class).
+// ---------------------------------------------------------------------------
+
+/** One blind reading of an axis at a sample, as the soak snapshots it. */
+export interface DriftPoint {
+  atTurn: number;
+  delta: number;
+  confidence: number;
+  consecutiveDrift: number;
+}
+
+/** The engine's triple gate (imported values passed in, never re-hardcoded). */
+export interface DriftGate {
+  threshold: number;
+  confidence: number;
+  consecutive: number;
+}
+
+/**
+ * How an axis's drift sequence resolves at run end (§4.5 gate parity):
+ *  - clean         never drifted
+ *  - corrected     drifted out, then pulled back in band (the machinery WORKING)
+ *  - unresolved    final read drifting but below the consecutive trigger (never due)
+ *  - player_driven gate tripped, the attribution charged the PLAYER, the retake
+ *                  closed — ESCALATED to steering honesty, NOT a fail (M2R3)
+ *  - uncorrected   gate tripped and STILL engaged at run end — the FAIL
+ *
+ * The `player_driven` class is what the M2 drift soak lacked: continuity ended
+ * the run engaged (delta 5.2, 13 consecutive) but the PLAYER drove it, and the
+ * harness had no box for "the player did it" — so it read FAIL. With the drift
+ * band's gate-trip attribution, such an axis is escalated, not failed.
+ */
+export type AxisVerdictClass =
+  | "clean"
+  | "corrected"
+  | "unresolved"
+  | "player_driven"
+  | "uncorrected";
+
+export function classifyAxisVerdict(
+  seq: DriftPoint[],
+  gate: DriftGate,
+  playerDriven: boolean,
+): AxisVerdictClass {
+  const drifting = (x: DriftPoint) => x.delta >= gate.threshold && x.confidence >= gate.confidence;
+  const engaged = (x: DriftPoint) => drifting(x) && x.consecutiveDrift >= gate.consecutive;
+  const ordered = seq.slice().sort((a, b) => a.atTurn - b.atTurn);
+  const last = ordered[ordered.length - 1];
+  if (!last || !ordered.some(drifting)) return "clean";
+  if (engaged(last)) return playerDriven ? "player_driven" : "uncorrected";
+  if (drifting(last)) return "unresolved";
+  return "corrected";
+}
+
+// ---------------------------------------------------------------------------
 // Spend attribution.
 // ---------------------------------------------------------------------------
 

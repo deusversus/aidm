@@ -173,14 +173,74 @@ export const SakkanActiveNote = z.object({
 });
 export type SakkanActiveNote = z.infer<typeof SakkanActiveNote>;
 
+/**
+ * The gate-trip attribution read (§4.5 M2R3 — the drift band gains sight of the
+ * PLAYER without gaining sight of the DIALS): once a retake trips, one blind
+ * judgment probe classifies who is driving the divergence. `player_driven` and
+ * `narrator_driven` are the poles; `entangled` is routed conservatively (like
+ * narrator). See sakkan/attribution.ts — the probe never sees a premise value.
+ */
+export const DRIVER_CLASSES = ["player_driven", "narrator_driven", "entangled"] as const;
+export const DriverClass = z.enum(DRIVER_CLASSES);
+export type DriverClass = z.infer<typeof DriverClass>;
+
+export const AttributionResult = z.object({
+  driver: DriverClass,
+  /** One sentence, from the player inputs, naming why. */
+  evidence: z.string(),
+});
+export type AttributionResult = z.infer<typeof AttributionResult>;
+
+/**
+ * A drift the gate-trip attribution charged to the PLAYER (§0 authority
+ * ordering: player word outranks premise-truth). The retake is CLOSED — the
+ * engine stops silently straining against the player — and this rides the
+ * Director's next dossier as a first-class steering-honesty item (§7.1/§8/§4.2).
+ * Keyed by axis in SakkanState.player_driven; cleared when the axis reads back
+ * in band (the drift resolved — by an accepted §4.2 evolution, or by play
+ * returning home on its own). `wanted` is the effective-premise value the story
+ * SET (active ⊕ override); the Director and the player notice read it — the
+ * Sakkan's blind SCORER never does (blindness is scoped to scoring, §4.5).
+ */
+export const PlayerDrivenDrift = z.object({
+  axis: z.string(),
+  observed: z.number().min(0).max(10),
+  wanted: z.number().min(0).max(10),
+  evidence: z.string().default(""),
+  at_turn: z.number().int().nonnegative(),
+});
+export type PlayerDrivenDrift = z.infer<typeof PlayerDrivenDrift>;
+
 export const SakkanState = z.object({
   last_sample_turn: z.number().int().nonnegative().default(0),
   /** Per-axis observed record — with canonical/active read from the contract,
    *  this IS the §12 canonical/active/observed record (data only at M1). */
   readings: z.record(z.string(), SakkanReading).default({}),
   active_notes: z.array(SakkanActiveNote).default([]),
+  /**
+   * §4.5 M2R3 — axes whose drift the gate-trip attribution charged to the
+   * player. Keyed by axis. The retake is closed (never opened); the finding
+   * rides the Director's next dossier. Cleared when the axis reads back in band.
+   */
+  player_driven: z.record(z.string(), PlayerDrivenDrift).default({}),
 });
 export type SakkanState = z.infer<typeof SakkanState>;
+
+/**
+ * §4.5 M2R3 steering-honesty notice: set when the Director applies a §4.2
+ * arc_override that ANSWERS a player-driven drift finding. The play surface
+ * reads it on next load and shows ONE quiet, dismissible line (the
+ * assertion-notice family, never a modal); dismissing clears it. `observed` is
+ * where play ran; `set` is the premise value it ran against — both surface in
+ * the line ("runs [observed] against the premise's [set]"). Once per override.
+ */
+export const SteeringNotice = z.object({
+  axis: z.string(),
+  observed: z.number().min(0).max(10),
+  set: z.number().min(0).max(10),
+  at_turn: z.number().int().nonnegative(),
+});
+export type SteeringNotice = z.infer<typeof SteeringNotice>;
 
 /**
  * A janitor-detected near-duplicate pair the machine won't auto-merge (§6.5,
@@ -230,6 +290,13 @@ export const DirectionState = z.object({
   settei: SetteiSnapshot.optional(),
   /** §4.5 drift band (C8): readings, counters, active retakes. */
   sakkan: SakkanState.optional(),
+  /**
+   * §4.5 M2R3 — a pending steering-honesty notice for the play surface, set by
+   * the Director when it applies an override answering a player-driven drift.
+   * The play view shows one quiet dismissible line on next load; dismiss clears
+   * it (the DELETE steering-notice route). Absent = nothing to show.
+   */
+  steering_notice: SteeringNotice.optional(),
 });
 export type DirectionState = z.infer<typeof DirectionState>;
 
@@ -277,8 +344,18 @@ export function rewindDirectionState(state: DirectionState, toTurn: number): Dir
               Object.entries(state.sakkan.readings).filter(([, r]) => r.at_turn <= toTurn),
             ),
             active_notes: state.sakkan.active_notes.filter((n) => n.since_turn <= toTurn),
+            // Player-driven findings anchored past the surviving tip die with
+            // the dead timeline — their evidence references un-happened inputs.
+            player_driven: Object.fromEntries(
+              Object.entries(state.sakkan.player_driven).filter(([, f]) => f.at_turn <= toTurn),
+            ),
           },
         }
+      : {}),
+    // A steering notice raised on a now-un-happened override drops (the
+    // override write itself reverts under the rewind sweep).
+    ...(state.steering_notice && state.steering_notice.at_turn > toTurn
+      ? { steering_notice: undefined }
       : {}),
   };
 }

@@ -3,7 +3,12 @@ import type { ArcOverride } from "../arc";
 import type { Composition } from "../composition";
 import { type DNAScales, dnaDelta } from "../dna";
 import { PencilMark, activeMarks } from "../marks";
-import { type PremiseComponents, PremiseContract, effectivePremise } from "../premise";
+import {
+  type PremiseComponents,
+  PremiseContract,
+  PresentationVocabulary,
+  effectivePremise,
+} from "../premise";
 import type { IPMechanics } from "../profile";
 
 function treatment(overrides: Partial<DNAScales> = {}): DNAScales {
@@ -146,6 +151,7 @@ describe("PremiseContract", () => {
       spark: "The moment Spike says 'Whatever happens, happens' and walks toward the thing anyway.",
       presentation_vocabulary: {
         grants: ["bare prose; episode-title cards only"],
+        directives: [{ name: "readout", skin: "the bounty terminal" }],
         recap_posture: "barely bothers — one wry line",
         stinger_allowed: false,
       },
@@ -162,6 +168,17 @@ describe("PremiseContract", () => {
     expect(parsed.anchors_used).toEqual([]);
     expect(parsed.intensity.control_key).toBeUndefined();
     expect(parsed.presentation_vocabulary.stinger_allowed).toBe(false);
+    // M3-DG: structured directives round-trip; the skin defaults to "" if unset.
+    expect(parsed.presentation_vocabulary.directives).toEqual([
+      { name: "readout", skin: "the bounty terminal" },
+    ]);
+  });
+
+  it("presentation_vocabulary.directives defaults to [] and skins default to '' (M3-DG)", () => {
+    const vocab = PresentationVocabulary.parse({ grants: [] });
+    expect(vocab.directives).toEqual([]);
+    const skinless = PresentationVocabulary.parse({ directives: [{ name: "memory" }] });
+    expect(skinless.directives).toEqual([{ name: "memory", skin: "" }]);
   });
 
   it("rejects a contract without a spark", () => {

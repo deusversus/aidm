@@ -1,3 +1,4 @@
+import type { DirectiveGrant } from "@/lib/types/premise";
 import type { TextBlockParam } from "@anthropic-ai/sdk/resources/messages/messages";
 import { approxTokens } from "./tokens";
 
@@ -34,12 +35,37 @@ export interface ExchangeRow {
 /**
  * §8 presentation grants, rendered for Block 1 — with the channel contract
  * (SV4): a granted device carries the tense/diegesis it was granted for,
- * the Settei-side half of the KA contract's camera law. Empty grants render
- * nothing (no channels granted, no contract needed).
+ * the Settei-side half of the KA contract's camera law. The M3-DG structured
+ * half (`directives`) teaches the granted display-device NAMES + skins the KA
+ * writes as fenced blocks. Empty grants AND empty directives render nothing
+ * (bare-prose premises get no chrome and no contract). Kept compact: this
+ * rides Block 1, which is cached across the session.
  */
-export function renderPresentationGrants(grants: string[]): string {
-  if (grants.length === 0) return "";
-  return `\n\n## Presentation vocabulary (granted — use at your judgment, never as obligation)\n${grants.map((g) => `- ${g}`).join("\n")}\nEach grant carries the tense and diegesis it was granted for. A channel the campaign has taught the player to read one way never silently carries another time or another speaker — when a granted device does double duty, mark the variant so the cut is visible (the camera law, below).`;
+export function renderPresentationGrants(
+  grants: string[],
+  directives: DirectiveGrant[] = [],
+): string {
+  if (grants.length === 0 && directives.length === 0) return "";
+  let out = "";
+  if (grants.length > 0) {
+    out += `\n\n## Presentation vocabulary (granted — use at your judgment, never as obligation)\n${grants
+      .map((g) => `- ${g}`)
+      .join(
+        "\n",
+      )}\nEach grant carries the tense and diegesis it was granted for. A channel the campaign has taught the player to read one way never silently carries another time or another speaker — when a granted device does double duty, mark the variant so the cut is visible (the camera law, below).`;
+  }
+  if (directives.length > 0) {
+    out += `\n\n## Display devices (granted — diegetic fenced blocks, used at your judgment)\nWrite a device as a fenced block whose info string is its name (\`\`\`readout … \`\`\`); the surface renders its chrome. The fenced inner text is PLAIN story prose — pins, the Gauge, and compaction read it as prose, so nothing load-bearing lives only inside a device.\n${directives
+      .map((d) => `- \`${d.name}\`${d.skin ? ` — ${d.skin}` : ""}`)
+      .join("\n")}`;
+    // The memory MARKING is universal (M3-DG): even where the premise set no
+    // skin, a not-now/not-real passage can be marked and will render legibly.
+    if (!directives.some((d) => d.name === "memory")) {
+      out +=
+        "\n- `memory` — always available: mark any not-now / not-real passage (a flashback should look like one), even unskinned.";
+    }
+  }
+  return out;
 }
 
 export interface BeatRow {

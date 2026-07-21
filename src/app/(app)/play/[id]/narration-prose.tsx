@@ -1,27 +1,84 @@
 "use client";
 
-import type { ReactNode } from "react";
+import type { DirectiveGrant } from "@/lib/types/premise";
+import { type ReactElement, type ReactNode, isValidElement } from "react";
 import Markdown from "react-markdown";
 import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
+import {
+  DIRECTIVE_CHROME,
+  EYEBROW_DEVICES,
+  directiveFenceName,
+  resolveDirective,
+} from "./directives";
 
 /**
  * The markdown floor (§8 walk-back 2026-07-03: "the product layer renders,
  * never imposes" — until now it imposed plaintext, showing the KA's italics
  * as literal asterisks). Restrained by design: paragraphs, emphasis,
- * blockquotes (the readout channel gets real visual offset), scene-break
- * rules, modest headers. The rich display grammar (diegetic System windows,
- * title cards — per-grant skins) is a planned successor, not this component.
+ * blockquotes, scene-break rules, modest headers. The M3-DG display grammar
+ * rides on top: a fenced block (` ```readout … ``` `) whose info string names a
+ * granted device renders in premise-styled chrome via the directive registry;
+ * unknown/ungranted fences degrade to the plain offset fallback, and the whole
+ * thing is streaming-safe by construction (react-markdown/CommonMark render an
+ * unclosed fence as a forming code block, never garbage).
  */
+
+/** The rendered directive block. Bypasses the inner <code> entirely: it takes
+ *  the fence's raw text and wraps it in the resolved chrome (styled / neutral /
+ *  fallback). The skin surfaces as `data-skin` + a select-none header eyebrow. */
+function DirectiveBlock({
+  name,
+  granted,
+  children,
+}: {
+  name: string;
+  granted: readonly DirectiveGrant[];
+  children: ReactNode;
+}) {
+  const res = resolveDirective(name, granted);
+  if (res.mode === "fallback") {
+    return (
+      <div className={DIRECTIVE_CHROME.fallback} data-device="fallback" data-fence={res.name}>
+        {children}
+      </div>
+    );
+  }
+  const skin = res.mode === "styled" ? res.skin : "";
+  const showEyebrow = EYEBROW_DEVICES.has(res.name) && skin.length > 0;
+  return (
+    <div
+      className={DIRECTIVE_CHROME[res.name]}
+      data-device={res.name}
+      data-skin={skin || undefined}
+    >
+      {showEyebrow && (
+        <div
+          aria-hidden
+          className="mb-1 select-none font-semibold text-[0.7em] text-muted-foreground uppercase tracking-[0.15em]"
+        >
+          {skin}
+        </div>
+      )}
+      {children}
+    </div>
+  );
+}
+
 export function NarrationProse({
   text,
   streaming = false,
   className = "text-[15px] leading-7",
+  directives = [],
 }: {
   text: string;
   streaming?: boolean;
   /** Replaces the default typography wholesale (recap/booth variants). */
   className?: string;
+  /** M3-DG granted display devices (`contract.presentation_vocabulary.directives`).
+   *  Absent → every device but the universal `memory` degrades to the plain
+   *  offset fallback; `memory` still renders its neutral marking. */
+  directives?: readonly DirectiveGrant[];
 }) {
   return (
     // While streaming, the last paragraph renders inline so the cursor
@@ -69,11 +126,34 @@ export function NarrationProse({
           code: ({ children }: { children?: ReactNode }) => (
             <code className="rounded bg-muted px-1 py-0.5 font-mono text-[0.88em]">{children}</code>
           ),
-          pre: ({ children }: { children?: ReactNode }) => (
-            <pre className="my-3 overflow-x-auto rounded bg-muted p-3 font-mono text-[13px] leading-6 [&_code]:bg-transparent [&_code]:p-0">
-              {children}
-            </pre>
-          ),
+          // Fenced code blocks are the M3-DG directive seam. react-markdown
+          // wraps a fence's <code> in this <pre>; a fence with an info string
+          // (` ```readout `) gives the <code> a `language-<name>` class. A named
+          // fence routes to the directive registry (styled / neutral / offset
+          // fallback); a bare ``` fence (no info string, incl. a mid-stream
+          // partial) stays the generic monospace block — never garbage.
+          pre: ({ children }: { children?: ReactNode }) => {
+            const codeEl = children as
+              | ReactElement<{ className?: string; children?: ReactNode }>
+              | undefined;
+            const name = isValidElement(codeEl) ? directiveFenceName(codeEl.props.className) : null;
+            if (name) {
+              const inner = codeEl?.props?.children;
+              // Trim the single trailing newline react-markdown keeps on fence
+              // content, so a pre-wrap device doesn't gain a blank last line.
+              const content = typeof inner === "string" ? inner.replace(/\n$/, "") : inner;
+              return (
+                <DirectiveBlock name={name} granted={directives}>
+                  {content}
+                </DirectiveBlock>
+              );
+            }
+            return (
+              <pre className="my-3 overflow-x-auto rounded bg-muted p-3 font-mono text-[13px] leading-6 [&_code]:bg-transparent [&_code]:p-0">
+                {children}
+              </pre>
+            );
+          },
           // Narration never reaches outward: links render as their text,
           // images as their alt text — an <img> would fire a live external
           // fetch (react-dom even preloads it), a surface prose must not have.

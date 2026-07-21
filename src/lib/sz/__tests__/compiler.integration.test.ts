@@ -115,6 +115,7 @@ const SCRIPTED_OBSERVATIONS: Observation[] = [
     '{"timeline_mode": "canon_adjacent", "canon_cast_mode": "full_cast", "event_fidelity": "influenceable"}',
   ),
   obs("presentation", "bare prose; episode-title cards only"),
+  obs("presentation_directive", '{"name": "readout", "skin": "the bounty terminal"}'),
   obs("suggestion_affordance", "on_request_only"),
   obs(
     "tier_selection",
@@ -404,6 +405,36 @@ describe("power tier + framing choices (SV3, deterministic)", () => {
     expect(r.framingChoices).toContainEqual({ axis: "mode", value: "op_dominant" });
     expect(r.framingChoices).toHaveLength(3);
     expect(r.deferred.filter((d) => d.includes("framing choice"))).toHaveLength(3);
+  });
+});
+
+describe("presentation directive resolution (M3-DG, deterministic)", () => {
+  it("resolves structured device grants latest-wins per name; malformed defers", () => {
+    const r = resolveObservations([
+      obs("presentation_directive", '{"name": "readout", "skin": "Lilith\'s machine"}'),
+      obs("presentation_directive", '{"name": "memory", "skin": "a sepia flashback"}'),
+      // Re-skin the same device — the newer grant wins, not a duplicate.
+      obs("presentation_directive", '{"name": "readout", "skin": "the tactical overlay"}'),
+      // A device with no skin is valid (the plain device).
+      obs("presentation_directive", '{"name": "title"}'),
+      // A bad name defers; junk JSON defers — neither poisons the contract.
+      obs("presentation_directive", '{"name": "hologram", "skin": "shiny"}'),
+      obs("presentation_directive", "just give it some flair"),
+    ]);
+    expect(r.directiveGrants).toContainEqual({ name: "readout", skin: "the tactical overlay" });
+    expect(r.directiveGrants).toContainEqual({ name: "memory", skin: "a sepia flashback" });
+    expect(r.directiveGrants).toContainEqual({ name: "title", skin: "" });
+    expect(r.directiveGrants).toHaveLength(3);
+    expect(r.deferred.filter((d) => d.includes("presentation directive"))).toHaveLength(2);
+  });
+
+  it("prose presentation grants stay prose — the structured half is separate", () => {
+    const r = resolveObservations([
+      obs("presentation", "bare prose; episode-title cards only"),
+      obs("presentation_directive", '{"name": "readout", "skin": "the machine"}'),
+    ]);
+    expect(r.presentationGrants).toEqual(["bare prose; episode-title cards only"]);
+    expect(r.directiveGrants).toEqual([{ name: "readout", skin: "the machine" }]);
   });
 });
 
@@ -913,6 +944,14 @@ describe.skipIf(!url)("SZ compiler (real Postgres)", () => {
     // layout falls back to the world baseline exactly as before.
     expect(result.contract.pc_power_tier).toBeUndefined();
     expect(result.contract.intensity.hard_lines).toContain("no harm to children on-screen");
+    // M3-DG: the structured device grant rides the contract, prose grant intact.
+    expect(result.contract.presentation_vocabulary.directives).toContainEqual({
+      name: "readout",
+      skin: "the bounty terminal",
+    });
+    expect(result.contract.presentation_vocabulary.grants).toContain(
+      "bare prose; episode-title cards only",
+    );
 
     const [campaign] = await db
       .select()

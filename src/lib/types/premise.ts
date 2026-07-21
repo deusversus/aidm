@@ -202,6 +202,41 @@ export const IntensityContract = z.object({
 export type IntensityContract = z.infer<typeof IntensityContract>;
 
 // ---------------------------------------------------------------------------
+// Display directives (§8, M3-DG) — the KA's diegetic display grammar
+// ---------------------------------------------------------------------------
+
+/**
+ * The six starter display devices (M3-DG, closed until the ledger opens it):
+ * fenced blocks whose info string names the device and whose inner text is
+ * plain story prose. GRANTED per premise at SZ; an ungranted device renders
+ * as the plain offset channel (the KA is corrected by the Sakkan/dailies,
+ * never a render error). `memory` is the one UNIVERSAL device — its MARKING
+ * renders on every campaign (the legibility law is universal); the other five
+ * render their premise-styled chrome only where granted.
+ */
+export const DirectiveName = z.enum([
+  "window", // the diegetic UI panel (a System; a cyberpunk HUD)
+  "readout", // the analytical/tactical channel (a machine's output, a countdown)
+  "letter", // written artifacts (letters, notes, inscriptions, signs)
+  "title", // the episode title card
+  "memory", // the marked not-now/not-real channel (flashback/dream/vision are its skins)
+  "comms", // the conversation-shaped channel (chat logs, radio, phone screens, threads)
+]);
+export type DirectiveName = z.infer<typeof DirectiveName>;
+
+/**
+ * A granted device and its premise-native chrome. `skin` colors the chrome
+ * (Solo Leveling's blue-glass System; a cyberpunk HUD; a flashback's sepia);
+ * empty = the device's neutral default chrome. The compiler resolves these
+ * from the conductor's structured presentation grants — latest-wins per name.
+ */
+export const DirectiveGrant = z.object({
+  name: DirectiveName,
+  skin: z.string().default(""),
+});
+export type DirectiveGrant = z.infer<typeof DirectiveGrant>;
+
+// ---------------------------------------------------------------------------
 // Presentation vocabulary (§8) — expressive formatting as authorial judgment
 // ---------------------------------------------------------------------------
 
@@ -220,6 +255,12 @@ export const PresentationVocabulary = z.object({
    *  the recap/yokoku composers judge posture through it (§9.3 "no settings
    *  toggle" — posture is premise-rendered, not a stored enum). */
   grants: z.array(z.string()).default([]),
+  /** M3-DG: the STRUCTURED half of the presentation vocabulary — the display
+   *  devices granted for THIS premise and their premise-native skins. The KA
+   *  writes a granted device as a fenced block; the surface renders its chrome
+   *  (`renderPresentationGrants` teaches the granted names; the play surface's
+   *  directive registry renders them). Prose `grants` above are unchanged. */
+  directives: z.array(DirectiveGrant).default([]),
   /** RESERVED for M3 display grammar (M2R R4 audit: unpopulated, unread).
    *  Recap posture today is delivered as premise judgment via grants. */
   recap_posture: z.string().optional(),

@@ -1,3 +1,4 @@
+import { stripDirectiveFences } from "@/lib/client/plain-prose";
 import type { Db } from "@/lib/db";
 import { campaigns, pencilMarks, turns } from "@/lib/db/schema";
 import { loadDirectionState, saveDirectionState } from "@/lib/direction/director";
@@ -6,6 +7,8 @@ import type { SakkanNote } from "@/lib/renderer/amendments";
 import { ArcOverride } from "@/lib/types/arc";
 import type {
   DirectionState,
+  DriverClass,
+  PlayerDrivenDrift,
   SakkanActiveNote,
   SakkanReading,
   SakkanState,
@@ -13,6 +16,7 @@ import type {
 import { type AxisName, COVERED_AXES } from "@/lib/types/grounding";
 import { PremiseContract, effectivePremise } from "@/lib/types/premise";
 import { and, desc, eq } from "drizzle-orm";
+import { attributeDrift } from "./attribution";
 import { MAX_SCORED_AXES, scoreAxes } from "./score";
 
 /**
@@ -27,6 +31,14 @@ import { MAX_SCORED_AXES, scoreAxes } from "./score";
  *   §16) into the Amendments — strong, expiring on one in-band read
  *   (|Δ| ≤ IN_BAND_DELTA). MARK_CONSECUTIVE consecutive same-axis drift →
  *   pencil-mark writer #3 (Learned layer).
+ *
+ * The retake gets an EXIT (§4.5 M2R3 — "the eternal retake" ledger row): the
+ * first time an axis trips the gate, one blind attribution probe (attribution.ts,
+ * player inputs only — never the dials) asks who drove the divergence. A
+ * `player_driven` verdict CLOSES the retake (the engine stops straining against
+ * the player, §0) and routes the finding to the Director's next dossier
+ * (state.sakkan.player_driven); `narrator_driven`/`entangled` keep today's
+ * retake behavior. A probe failure defaults conservatively to the retake.
  *
  * The band compares against the EFFECTIVE premise (active ⊕ arc_override,
  * §4.2), not raw active: during an override the page is SUPPOSED to read at
@@ -170,8 +182,15 @@ export async function runSakkanSample(
   // Prose sample (§4.5): the last SAKKAN_SAMPLE_TURNS complete, non-degraded
   // turns' narration, oldest→newest. KA prose only — turns.narration is KA-only
   // (player input is a separate column); degraded turns are excluded (§5.5).
+  // player_input rides along in the SAME window: the gate-trip attribution probe
+  // reads the PLAYER INPUTS (never the narration alone) to decide who drove a
+  // drift — the scorer above still sees KA prose only, blindness intact (§4.5).
   const rows = await db
-    .select({ turnNumber: turns.turnNumber, narration: turns.narration })
+    .select({
+      turnNumber: turns.turnNumber,
+      narration: turns.narration,
+      playerInput: turns.playerInput,
+    })
     .from(turns)
     .where(
       and(
@@ -182,11 +201,19 @@ export async function runSakkanSample(
     )
     .orderBy(desc(turns.turnNumber))
     .limit(SAKKAN_SAMPLE_TURNS);
-  const proses = rows
-    .reverse()
-    .map((r) => r.narration)
+  const window = rows.reverse();
+  const proses = window
+    // M3-DG neutrality: the Gauge reads story, never chrome — the fence
+    // strip is the single projection every scorer input rides through.
+    .map((r) => (r.narration ? stripDirectiveFences(r.narration) : null))
     .filter((n): n is string => typeof n === "string" && n.trim().length > 0);
   const sample = proses.join("\n\n--- scene break ---\n\n");
+  // The attribution window: the player's own inputs (oldest→newest) plus short
+  // narration tails for context. Assembled ONCE; used only if a gate trips.
+  const playerInputs = window
+    .map((r) => r.playerInput)
+    .filter((p): p is string => typeof p === "string" && p.trim().length > 0);
+  const narrationTails = proses;
 
   // A skipped sample is NOT evidence: zero scoreable axes or zero usable prose →
   // no-op WITHOUT advancing counters or last_sample_turn (§4.5).
@@ -214,6 +241,13 @@ export async function runSakkanSample(
   const readings: Record<string, SakkanReading> = { ...(state.sakkan?.readings ?? {}) };
   const notesByAxis = new Map<string, SakkanActiveNote>();
   for (const n of state.sakkan?.active_notes ?? []) notesByAxis.set(n.axis, n);
+  // Axes already charged to the player on an earlier gate trip (§4.5 M2R3):
+  // their retake is closed and their finding awaits the Director. A subsequent
+  // drifting sample refreshes them but never re-fires the probe.
+  const playerDriven = new Map<string, PlayerDrivenDrift>();
+  for (const [axis, f] of Object.entries(state.sakkan?.player_driven ?? {})) {
+    playerDriven.set(axis, f);
+  }
 
   const marksToWrite: Array<{
     axis: AxisName;
@@ -242,9 +276,12 @@ export async function runSakkanSample(
     if (drifting) {
       consecutive = prior + 1;
     } else if (inBand) {
-      // One in-band read lifts the retake and clears the counter (§4.5).
+      // One in-band read lifts the retake AND clears any player-driven finding
+      // and the counter (§4.5): the drift resolved — by an accepted evolution,
+      // or by play returning home on its own.
       consecutive = 0;
       notesByAxis.delete(axis);
+      playerDriven.delete(axis);
     }
     // The BETWEEN case — |Δ| ≥ 2 at low confidence, or 1 < |Δ| < 2 — is neither
     // evidence for nor against drift: the counter holds and any note stays.
@@ -258,22 +295,67 @@ export async function runSakkanSample(
     };
 
     if (drifting && consecutive >= DRIFT_CONSECUTIVE) {
-      // Upsert the retake. Refresh observed/active on every drifting sample while
-      // active; since_turn keeps the ORIGINAL fire turn across refreshes.
+      // The gate is open. Three cases — attribution fires ONCE per trip (§4.5
+      // M2R3), on the FRESH trip only; refreshes never re-probe.
+      const priorFinding = playerDriven.get(axis);
       const existing = notesByAxis.get(axis);
-      notesByAxis.set(axis, {
-        axis,
-        active: wanted,
-        observed,
-        since_turn: existing?.since_turn ?? turnNumber,
-      });
+      if (priorFinding) {
+        // Already charged to the player: retake stays closed, probe stays quiet.
+        // Refresh the finding's observed read so the Director's dossier is current.
+        playerDriven.set(axis, { ...priorFinding, observed, evidence: s.evidence_span });
+      } else if (existing) {
+        // An open narrator/entangled retake — refresh it (today's behavior).
+        // observed/active track every drifting sample; since_turn is the fire.
+        notesByAxis.set(axis, { axis, active: wanted, observed, since_turn: existing.since_turn });
+      } else {
+        // FRESH gate trip: ask the blind attribution probe ONCE who drove it.
+        // The probe reads player inputs, never the dials (attribution.ts). A
+        // probe failure defaults conservatively to the retake — never worse than
+        // today's behavior (the eternal retake is the failure we fix; a missed
+        // exit is not a regression).
+        let driver: DriverClass = "narrator_driven";
+        let attribEvidence = "";
+        try {
+          const attrib = await attributeDrift(selection, {
+            axis,
+            direction: observed > wanted ? "higher" : "lower",
+            playerInputs,
+            narrationTails,
+            campaignId,
+            turnNumber,
+          });
+          driver = attrib.driver;
+          attribEvidence = attrib.evidence;
+        } catch (err) {
+          console.warn(
+            `[sakkan] attribution probe failed (axis ${axis}, turn ${turnNumber}) — defaulting to retake:`,
+            err,
+          );
+        }
+        if (driver === "player_driven") {
+          // Close the retake (never open it) and route the finding to the
+          // Director's next dossier (§0 authority ordering + §8 steering honesty).
+          notesByAxis.delete(axis);
+          playerDriven.set(axis, {
+            axis,
+            observed,
+            wanted,
+            evidence: attribEvidence || s.evidence_span,
+            at_turn: turnNumber,
+          });
+        } else {
+          // narrator_driven / entangled → open the retake (today's behavior).
+          notesByAxis.set(axis, { axis, active: wanted, observed, since_turn: turnNumber });
+        }
+      }
     }
 
     // Writer #3 (§6.6): at EXACTLY MARK_CONSECUTIVE same-axis drift reports the
     // gap is calibration, not noise. The counter passes through this value once
     // (each drift read increments by 1), so the mark fires once, not every
-    // sample after.
-    if (drifting && consecutive === MARK_CONSECUTIVE) {
+    // sample after. NOT for a player-driven axis — a "pull it back" mark into
+    // the Learned layer would fight the player the Director may be leaning with.
+    if (drifting && consecutive === MARK_CONSECUTIVE && !playerDriven.has(axis)) {
       marksToWrite.push({ axis, observed, wanted, evidence: s.evidence_span });
     }
   }
@@ -304,6 +386,7 @@ export async function runSakkanSample(
     last_sample_turn: turnNumber,
     readings,
     active_notes: [...notesByAxis.values()],
+    player_driven: Object.fromEntries(playerDriven),
   };
   await saveDirectionState(db, campaignId, { ...state, sakkan });
 
@@ -384,4 +467,28 @@ export function gaugeTrend(state: DirectionState): string {
     }
   }
   return lines.join("\n");
+}
+
+/**
+ * The Director's steering-honesty read (§7.1 consumer + §8 + §4.2, M2R3): the
+ * per-axis lines for drifts the gate-trip attribution charged to the PLAYER —
+ * the retake already closed, the engine no longer strains against the player.
+ * Each line names where play RAN and what the premise SET, so the Director can
+ * judge whether to evolve the axis (an arc_override to where play lives) or let
+ * a passing mood stand. Empty string when there are no player-driven findings.
+ * The Director sees the dials here by design — blindness is scoped to the
+ * Sakkan's SCORER, never to the showrunner that acts on it (§4.5).
+ */
+export function playerDrivenTrend(state: DirectionState): string {
+  const findings = Object.values(state.sakkan?.player_driven ?? {});
+  if (findings.length === 0) return "";
+  return findings
+    .slice()
+    .sort((a, b) => b.at_turn - a.at_turn)
+    .map((f) => {
+      const dir = f.observed > f.wanted ? "above" : "below";
+      const ev = f.evidence ? ` — "${f.evidence}"` : "";
+      return `${f.axis}: playing ~${fmt(f.observed)}/10 (${dir} the premise's ${fmt(f.wanted)}/10), since turn ${f.at_turn}${ev}`;
+    })
+    .join("\n");
 }

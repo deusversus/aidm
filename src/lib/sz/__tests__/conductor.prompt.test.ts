@@ -61,6 +61,20 @@ describe("conductor system prompt spec (SV2 — the voice)", () => {
     expect(bar).toContain("CONCEPT");
   });
 
+  it("the presentation beat offers the six display devices premise-natively (M3-DG)", () => {
+    const beat = CONDUCTOR_SYSTEM.slice(CONDUCTOR_SYSTEM.indexOf("presentation vocabulary:"));
+    for (const device of ["window", "readout", "letter", "title", "memory", "comms"]) {
+      expect(beat).toContain(device);
+    }
+    // Records a STRUCTURED grant the compiler resolves; premise-native, never a
+    // menu (Berserk gets bare prose, Solo Leveling its System window).
+    expect(beat).toContain('"presentation_directive"');
+    expect(beat).toContain("Berserk is offered bare prose");
+    // The memory MARKING is universal — offered at every table.
+    expect(beat).toContain("memory MARKING is available at every table");
+    expect(ObservationKind.options).toContain("presentation_directive");
+  });
+
   it("THE POWER TIER beat exists, walks the four options, records both kinds (SV3)", () => {
     expect(CONDUCTOR_SYSTEM).toContain("THE POWER TIER");
     for (const walk of ["below baseline", "at baseline", "far above"]) {
