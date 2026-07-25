@@ -85,7 +85,7 @@ describe.skipIf(!url)("settings route (M2 C5, real Postgres)", () => {
 
   it("tier change round-trips: DB updated, log carries from/to, handoff note on narration", async () => {
     if (!db) throw new Error("unreachable");
-    const res = await PATCH(patchReq({ narration: "claude-opus-4-8" }), params(campaignId));
+    const res = await PATCH(patchReq({ narration: "claude-opus-5" }), params(campaignId));
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
       changes: { field: string; from: string; to: string }[];
@@ -95,7 +95,7 @@ describe.skipIf(!url)("settings route (M2 C5, real Postgres)", () => {
       expect.objectContaining({
         field: "tier.narration",
         from: "claude-sonnet-5",
-        to: "claude-opus-4-8",
+        to: "claude-opus-5",
       }),
     ]);
     expect(body.note).toMatch(/studio handoff/);
@@ -104,7 +104,7 @@ describe.skipIf(!url)("settings route (M2 C5, real Postgres)", () => {
       .select({ tierModels: schema.campaigns.tierModels, log: schema.campaigns.settingsLog })
       .from(schema.campaigns)
       .where(eq(schema.campaigns.id, campaignId));
-    expect((row?.tierModels as { narration: string }).narration).toBe("claude-opus-4-8");
+    expect((row?.tierModels as { narration: string }).narration).toBe("claude-opus-5");
     expect(row?.log).toHaveLength(1);
   });
 

@@ -4,6 +4,8 @@ import { estimateCostUsd, pricingFor } from "../pricing";
 describe("pricing table (2026-07 rates)", () => {
   it("carries the confirmed per-1M rates", () => {
     expect(pricingFor("claude-fable-5")).toMatchObject({ inputPer1M: 10, outputPer1M: 50 });
+    expect(pricingFor("claude-opus-5")).toMatchObject({ inputPer1M: 5, outputPer1M: 25 });
+    // Off-menu since 2026-07-25; kept for historical rows and fixtures.
     expect(pricingFor("claude-opus-4-8")).toMatchObject({ inputPer1M: 5, outputPer1M: 25 });
     expect(pricingFor("claude-sonnet-5")).toMatchObject({ inputPer1M: 3, outputPer1M: 15 });
     expect(pricingFor("claude-haiku-4-5")).toMatchObject({ inputPer1M: 1, outputPer1M: 5 });
@@ -15,6 +17,7 @@ describe("pricing table (2026-07 rates)", () => {
     // live think-time made the 5m rate (1.25×) a rate this engine never pays.
     for (const model of [
       "claude-fable-5",
+      "claude-opus-5",
       "claude-opus-4-8",
       "claude-sonnet-5",
       "claude-haiku-4-5",

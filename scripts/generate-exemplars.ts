@@ -28,7 +28,7 @@ const Draft = z.object({
 });
 
 // Opus for craft; this is content tooling, not player-facing narration.
-const selection = { ...DEV_TIER_SELECTION, judgment: "claude-opus-4-8" as const };
+const selection = { ...DEV_TIER_SELECTION, judgment: "claude-opus-5" as const };
 
 const result = await callJudgment(selection, {
   name: "generate_exemplars",

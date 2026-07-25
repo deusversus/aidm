@@ -2,7 +2,7 @@
  * C4 smoke: streaming free prose + mandatory commit_scene tool trailer +
  * cache accounting, traced + metered. Run:
  *   pnpm spike:narration            (Sonnet 5, ~a cent)
- *   pnpm spike:narration -- --fable (Fable 5 w/ server-side Opus 4.8 fallback config, ~a few cents)
+ *   pnpm spike:narration -- --fable (Fable 5 w/ server-side Opus 5 fallback config, ~a few cents)
  */
 import { streamNarration } from "@/lib/llm/calls";
 import { DEV_TIER_SELECTION, type TierSelection } from "@/lib/llm/tiers";

@@ -528,7 +528,7 @@ export function streamNarration(opts: NarrationOptions) {
 
   // `fallbacks` postdates SDK 0.90's types; the API accepts it under the
   // server-side-fallback beta header. Fable narration ALWAYS ships with the
-  // Opus 4.8 fallback configured (§3).
+  // Opus 5 fallback configured (§3; Opus 4.8 until 2026-07-25).
   const body = (
     isFable ? { ...params, fallbacks: [{ model: FABLE_FALLBACK_MODEL }] } : params
   ) as MessageStreamParams;

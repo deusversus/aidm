@@ -66,7 +66,7 @@ describe("computeEffectiveMaxTokens", () => {
   });
 
   it("scales the pad by effort on an adaptive-thinking model", () => {
-    const m = "claude-opus-4-8";
+    const m = "claude-opus-5";
     expect(computeEffectiveMaxTokens(1_000, m, "low")).toBe(1_000 + 8_000);
     expect(computeEffectiveMaxTokens(1_000, m, "medium")).toBe(1_000 + 12_000);
     // 24k (M2R2 audit): genga, the default narration tier, runs effort high —
@@ -89,7 +89,7 @@ describe("computeEffectiveMaxTokens", () => {
 
   it("clamps to the model's real max output", () => {
     // Opus/Fable/Sonnet cap at 128k; Haiku at 64k.
-    expect(computeEffectiveMaxTokens(120_000, "claude-opus-4-8", "max")).toBe(128_000);
+    expect(computeEffectiveMaxTokens(120_000, "claude-opus-5", "max")).toBe(128_000);
     expect(computeEffectiveMaxTokens(70_000, "claude-haiku-4-5")).toBe(64_000);
     expect(computeEffectiveMaxTokens(60_000, "claude-haiku-4-5")).toBe(60_000);
   });

@@ -10,8 +10,10 @@ import { z } from "zod";
  */
 
 export const TIER_MENUS = {
-  narration: ["claude-sonnet-5", "claude-opus-4-8", "claude-fable-5"],
-  judgment: ["claude-haiku-4-5", "claude-sonnet-5", "claude-opus-4-8"],
+  // Opus 5 replaced Opus 4.8 on every menu rung (user-directed 2026-07-25;
+  // same $5/$25 pricing, same 128k output, adaptive thinking + effort).
+  narration: ["claude-sonnet-5", "claude-opus-5", "claude-fable-5"],
+  judgment: ["claude-haiku-4-5", "claude-sonnet-5", "claude-opus-5"],
   probe: ["claude-haiku-4-5", "claude-sonnet-5"],
 } as const;
 
@@ -51,17 +53,21 @@ export interface ModelCaps {
 }
 export const MODEL_CAPS: Record<string, ModelCaps> = {
   "claude-fable-5": { adaptiveThinking: false, effortControl: true, maxOutput: 128_000 },
+  "claude-opus-5": { adaptiveThinking: true, effortControl: true, maxOutput: 128_000 },
+  // Off the menus since 2026-07-25 (Opus 5 supersedes) — kept so anything
+  // still carrying the old id (history, fixtures) clamps correctly.
   "claude-opus-4-8": { adaptiveThinking: true, effortControl: true, maxOutput: 128_000 },
   "claude-sonnet-5": { adaptiveThinking: true, effortControl: true, maxOutput: 128_000 },
   "claude-haiku-4-5": { adaptiveThinking: false, effortControl: false, maxOutput: 64_000 },
 };
 
 /**
- * Fable narration always configures server-side fallback to Opus 4.8 (§3):
- * a safety-classifier decline is transparently re-served by the fallback
- * inside the same call, repriced at the fallback's own rates. Any fallback
- * event lands in the trace as Sakkan-relevant (the voice shifted).
+ * Fable narration always configures server-side fallback to Opus 5 (§3;
+ * Opus 4.8 until 2026-07-25): a safety-classifier decline is transparently
+ * re-served by the fallback inside the same call, repriced at the fallback's
+ * own rates. Any fallback event lands in the trace as Sakkan-relevant (the
+ * voice shifted).
  */
 export const FABLE_MODEL = "claude-fable-5";
-export const FABLE_FALLBACK_MODEL = "claude-opus-4-8";
+export const FABLE_FALLBACK_MODEL = "claude-opus-5";
 export const SERVER_SIDE_FALLBACK_BETA = "server-side-fallback-2026-06-01";

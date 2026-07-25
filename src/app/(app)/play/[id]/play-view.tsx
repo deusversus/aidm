@@ -117,7 +117,7 @@ function fmtScore(n: number): string {
   return Number.isInteger(n) ? String(n) : n.toFixed(1);
 }
 
-/** claude-opus-4-8 → "Opus 4.8": strip the prefix, title-case the name, dot the version. */
+/** claude-opus-5 → "Opus 5": strip the prefix, title-case the name, dot the version. */
 function friendlyModel(id: string): string {
   const [name, ...version] = id.replace(/^claude-/, "").split("-");
   if (!name) return id;
@@ -129,13 +129,13 @@ function friendlyModel(id: string): string {
 const TIER_COST_FRAMING: Record<TierKey, Record<string, string>> = {
   narration: {
     "claude-sonnet-5": "excellent, standard cost",
-    "claude-opus-4-8": "deeper, ~2x",
+    "claude-opus-5": "deeper, ~2x",
     "claude-fable-5": "the frontier, ~3x, automatic fallback protection",
   },
   judgment: {
     "claude-haiku-4-5": "fast, lowest cost",
     "claude-sonnet-5": "sharper, standard cost",
-    "claude-opus-4-8": "deepest, ~2x",
+    "claude-opus-5": "deepest, ~2x",
   },
   probe: {
     "claude-haiku-4-5": "fast, lowest cost",

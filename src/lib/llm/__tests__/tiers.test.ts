@@ -10,9 +10,9 @@ import {
 } from "../tiers";
 
 describe("tier menus (§3 — player-facing, closed)", () => {
-  it("menus match the blueprint exactly", () => {
-    expect(TIER_MENUS.narration).toEqual(["claude-sonnet-5", "claude-opus-4-8", "claude-fable-5"]);
-    expect(TIER_MENUS.judgment).toEqual(["claude-haiku-4-5", "claude-sonnet-5", "claude-opus-4-8"]);
+  it("menus match the blueprint exactly (Opus 5 since 2026-07-25, user-directed)", () => {
+    expect(TIER_MENUS.narration).toEqual(["claude-sonnet-5", "claude-opus-5", "claude-fable-5"]);
+    expect(TIER_MENUS.judgment).toEqual(["claude-haiku-4-5", "claude-sonnet-5", "claude-opus-5"]);
     expect(TIER_MENUS.probe).toEqual(["claude-haiku-4-5", "claude-sonnet-5"]);
   });
 
@@ -62,14 +62,16 @@ describe("tier menus (§3 — player-facing, closed)", () => {
   });
 
   it("every menu model carries its verified max-output ceiling (M2R2 §6)", () => {
-    expect(MODEL_CAPS["claude-opus-4-8"]?.maxOutput).toBe(128_000);
+    expect(MODEL_CAPS["claude-opus-5"]?.maxOutput).toBe(128_000);
     expect(MODEL_CAPS["claude-sonnet-5"]?.maxOutput).toBe(128_000);
     expect(MODEL_CAPS[FABLE_MODEL]?.maxOutput).toBe(128_000);
     expect(MODEL_CAPS["claude-haiku-4-5"]?.maxOutput).toBe(64_000);
+    // Off-menu but still clamping correctly for anything carrying the old id.
+    expect(MODEL_CAPS["claude-opus-4-8"]?.maxOutput).toBe(128_000);
   });
 
   it("Fable fallback constants match §3", () => {
-    expect(FABLE_FALLBACK_MODEL).toBe("claude-opus-4-8");
+    expect(FABLE_FALLBACK_MODEL).toBe("claude-opus-5");
     expect(SERVER_SIDE_FALLBACK_BETA).toBe("server-side-fallback-2026-06-01");
   });
 });

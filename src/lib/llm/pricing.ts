@@ -31,6 +31,14 @@ const PRICING: Record<string, ModelPricing> = {
     cacheReadPer1M: 1,
     cacheCreationPer1M: 20,
   },
+  "claude-opus-5": {
+    inputPer1M: 5,
+    outputPer1M: 25,
+    cacheReadPer1M: 0.5,
+    cacheCreationPer1M: 10,
+  },
+  // Off the menus since 2026-07-25 (Opus 5 supersedes, same rates) — kept so
+  // historical rows and fixtures still meter instead of throwing.
   "claude-opus-4-8": {
     inputPer1M: 5,
     outputPer1M: 25,

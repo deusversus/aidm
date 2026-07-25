@@ -10,7 +10,7 @@ This file is loaded into context on every Claude session in this repo. It's the 
 
 **jcettison.** Sole player, sole developer, author of v3. This is a passion project first, product second. What the machinery buys is not an app — it is more of the moments v3 already gave him: stories that made him laugh out loud, nearly cry, and yearn in real life. Blueprint §0 carries this in full; internalize it before touching anything.
 
-**Model versions (user-confirmed 2026-07-06):** Claude Fable 5, Opus 4.8, Sonnet 5, Haiku 4.5. The player-facing tier menus live in blueprint §3. Do not guess newer models without explicit confirmation.
+**Model versions (user-confirmed 2026-07-25):** Claude Fable 5, Opus 5, Sonnet 5, Haiku 4.5 (Opus 4.8 retired from the menus 2026-07-25, user-directed). The player-facing tier menus live in blueprint §3. Do not guess newer models without explicit confirmation.
 
 ## Authority ordering
 
@@ -106,7 +106,7 @@ The soak proves the engine, never the experience (M1 retro). Any change a player
 | DB | Postgres 18 + pgvector 0.8 on Railway (`aidm_v5` database — **never the v4 one**; blueprint says 16, instance is actually 18.3) |
 | ORM | Drizzle + drizzle-kit (schema at `src/lib/db/schema.ts`, lands C3) |
 | Auth | Clerk v7 (`currentUser()` pattern — no `<SignedIn>/<SignedOut>` in v7) |
-| LLM | Anthropic-only for generation, via Claude Agent SDK spine + raw SDK. Player-facing tier menus (§3): narration Sonnet 5 / Opus 4.8 / Fable 5 · judgment Haiku 4.5 / Sonnet 5 / Opus 4.8 · probe Haiku 4.5 / Sonnet 5. Fable narration always configures server-side fallback to Opus 4.8 |
+| LLM | Anthropic-only for generation, via Claude Agent SDK spine + raw SDK. Player-facing tier menus (§3): narration Sonnet 5 / Opus 5 / Fable 5 · judgment Haiku 4.5 / Sonnet 5 / Opus 5 · probe Haiku 4.5 / Sonnet 5. Fable narration always configures server-side fallback to Opus 5 |
 | Embeddings | **Voyage `voyage-3.5` @ 1024 dims — the named exception, frozen at M0** |
 | Observability | Langfuse (every model call traced + cost-metered; `pnpm langfuse:latest` for trace questions) + PostHog |
 | Deploy | Railway (Dockerfile builder, GitHub push-to-deploy) |
