@@ -13,6 +13,12 @@ import { type PencilMark, activeMarks } from "@/lib/types/marks";
  * Corrective punch-through (§12, M2-C6): a retake that persists without the
  * gauge closing escalates — stronger phrasing, its extreme exemplar quoted
  * inline, positioned FIRST. Bounded: at most ONE escalated axis per render.
+ *
+ * The Director's ear (M2R4): the Sakkan's measured voice pressure and the
+ * Director's latest voice patterns render as a trailing second section — the
+ * fingerprint channel, and the lowest-priority content here (first to yield
+ * under the budget, since every line above it is a live turn-specific
+ * correction).
  */
 
 export const AMENDMENTS_TOKEN_MAX = 250;
@@ -25,6 +31,17 @@ export const AMENDMENTS_TOKEN_MAX = 250;
 export const AMENDMENTS_ESCALATED_TOKEN_MAX = 350;
 /** A retake persisting this many turns without the gauge closing escalates. */
 export const PUNCH_THROUGH_TURNS = 3;
+/**
+ * The Director's voice patterns carried per render (M2R4 deliverable 3). Three
+ * is the ear, not the essay — the fingerprint's standing statement lives in the
+ * Settei; this channel only carries what the LATEST cycle heard.
+ */
+export const VOICE_PATTERN_MAX = 3;
+// Self-scoped against the amendments envelope ("obey over the standing
+// charter"): voice is the charter's OWN fingerprint kept audible, not a fresh
+// correction that outranks it — the header says so where the envelope can't.
+const VOICE_HEADER =
+  "## The Director's ear (voice — the author's hand, kept; this restates the standing charter's fingerprint, it does not override it)";
 /**
  * "Still outside the drift band" for punch-through = |active − observed| ≥ this.
  * Mirrors sakkan.ts DRIFT_THRESHOLD (§4.5); duplicated locally so the
@@ -59,6 +76,19 @@ export interface AmendmentsInput {
    * (measured, not vibed; C6 audit #1). Absent → escalation never fires.
    */
   lastSampleTurn?: number;
+  /**
+   * The Director's latest voice notes (§7.1, M2R4 deliverable 3) — capped at
+   * VOICE_PATTERN_MAX. Until now these flowed only into the close-time voice
+   * journal, which only the Director's own next memo read: a writer with no
+   * reader (axiom 8). This is the reader.
+   */
+  voicePatterns?: string[];
+  /**
+   * The Sakkan's composed weak-voice line (§4.5 Voice checklist, M2R4) — the
+   * MEASURED half of this section, so it leads the Director's heard patterns.
+   * v1 corrects voice through pressure, never a retake.
+   */
+  voicePressure?: string;
 }
 
 export interface Amendments {
@@ -171,6 +201,22 @@ export function renderAmendments(input: AmendmentsInput): Amendments {
     (m) => `Fresh calibration — ${m.topic}: ${m.direction}`,
   );
 
+  // The Director's ear (M2R4): the measured pressure line first, then the
+  // patterns the last cycle actually heard. Its own section, because it is
+  // voice — the fingerprint — not an axis correction.
+  const voicePatternLines = (input.voicePatterns ?? [])
+    .map((p) => p.trim())
+    .filter(Boolean)
+    .slice(0, VOICE_PATTERN_MAX)
+    .map((p) => `- ${p}`);
+  const voicePressureLine = (input.voicePressure ?? "").trim();
+  let voiceCut = false;
+  const voiceBlock = () => {
+    if (voiceCut) return "";
+    const lines = [...(voicePressureLine ? [voicePressureLine] : []), ...voicePatternLines];
+    return lines.length === 0 ? "" : `${VOICE_HEADER}\n\n${lines.join("\n")}`;
+  };
+
   const build = (escalatedLine: string | null) => {
     // Escalation leads the block (§12); then override, retakes, fresh marks.
     const lines = [
@@ -179,16 +225,32 @@ export function renderAmendments(input: AmendmentsInput): Amendments {
       ...retakeLines,
       ...freshLines,
     ];
-    return lines.length === 0 ? "" : `## Amendments (this scene)\n\n${lines.join("\n")}`;
+    const amendmentsBlock =
+      lines.length === 0 ? "" : `## Amendments (this scene)\n\n${lines.join("\n")}`;
+    return [amendmentsBlock, voiceBlock()].filter(Boolean).join("\n\n");
   };
 
   const budget = escalated ? AMENDMENTS_ESCALATED_TOKEN_MAX : AMENDMENTS_TOKEN_MAX;
   let escalatedLine = escalated ? escalated.line : null;
   let text = build(escalatedLine);
 
-  // Trim fresh marks first (they migrate into the Settei at the next
-  // session-open rebuild), never the retakes (measured corrections outrank
-  // accumulating calibration).
+  // The voice section yields FIRST and yields entirely: it is standing craft
+  // guidance, while everything below it is a live, turn-specific correction the
+  // gauge or the player asked for. Patterns go one at a time (the ear degrades
+  // gracefully), then the whole section including its measured line.
+  while (approxTokens(text) > budget && voicePatternLines.length > 0) {
+    const dropped = voicePatternLines.pop();
+    trims.push(`voice pattern dropped for budget: ${dropped?.slice(0, 60)}`);
+    text = build(escalatedLine);
+  }
+  if (approxTokens(text) > budget && voiceBlock() !== "") {
+    voiceCut = true;
+    trims.push("voice section dropped for budget");
+    text = build(escalatedLine);
+  }
+  // Then fresh marks (they migrate into the Settei at the next session-open
+  // rebuild), never the retakes (measured corrections outrank accumulating
+  // calibration).
   while (approxTokens(text) > budget && freshLines.length > 0) {
     const dropped = freshLines.pop();
     trims.push(`dropped for budget: ${dropped?.slice(0, 60)}`);

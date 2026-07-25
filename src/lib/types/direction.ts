@@ -223,6 +223,17 @@ export const SakkanState = z.object({
    * rides the Director's next dossier. Cleared when the axis reads back in band.
    */
   player_driven: z.record(z.string(), PlayerDrivenDrift).default({}),
+  /** §4.5 Voice checklist (M2R4): per-dimension adherence from the latest
+   *  sample — the fingerprint measured, not vibed. Keyed by dimension name. */
+  voice_readings: z
+    .record(
+      z.string(),
+      z.object({ score: z.number(), evidence: z.string(), at_turn: z.number().int() }),
+    )
+    .default({}),
+  /** Composed pressure line when voice runs sustained-weak; the Amendments
+   *  render it so the correction reaches the pen (M2R4). */
+  voice_pressure: z.string().optional(),
 });
 export type SakkanState = z.infer<typeof SakkanState>;
 
@@ -349,6 +360,12 @@ export function rewindDirectionState(state: DirectionState, toTurn: number): Dir
             player_driven: Object.fromEntries(
               Object.entries(state.sakkan.player_driven).filter(([, f]) => f.at_turn <= toTurn),
             ),
+            // Voice readings likewise; the pressure line always recomputes at
+            // the next sample, so a rewind simply clears it (M2R4).
+            voice_readings: Object.fromEntries(
+              Object.entries(state.sakkan.voice_readings).filter(([, r]) => r.at_turn <= toTurn),
+            ),
+            voice_pressure: undefined,
           },
         }
       : {}),

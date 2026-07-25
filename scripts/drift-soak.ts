@@ -308,6 +308,7 @@ async function injectForcedNote(db: Db, campaignId: string, atTurn: number): Pro
     readings: {},
     active_notes: [],
     player_driven: {},
+    voice_readings: {},
   };
   sakkan.active_notes = [
     ...sakkan.active_notes.filter((n) => n.axis !== FORCED_AXIS),

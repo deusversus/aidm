@@ -492,6 +492,11 @@ export async function runLayout(
     // turns alone are not (C6 audit #1).
     currentTurn: turnNumber,
     ...(direction.sakkan ? { lastSampleTurn: direction.sakkan.last_sample_turn } : {}),
+    // The voice channel finally reaches the pen (M2R4): the Director's heard
+    // patterns had only the close-time journal for a reader (axiom 8), and the
+    // Sakkan's voice checklist composes the measured pressure line beside them.
+    voicePatterns: direction.voice_patterns,
+    ...(direction.sakkan?.voice_pressure ? { voicePressure: direction.sakkan.voice_pressure } : {}),
   });
   // Scene-Shape Directive (§4.4c): the Director is the producer (C7) — arc
   // line from the active arc, trajectory + notes from the last cycle. The

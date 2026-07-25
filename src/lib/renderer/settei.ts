@@ -16,8 +16,9 @@ import type { PremiseContract } from "@/lib/types/premise";
  * Composition, in order: hard-core preamble (world rules + canonicality —
  * axiom 3's commands) → identity paragraph → the spark (standing note, §8
  * reader #1) → ≤6 extreme axes as craft instruction → 2–3 exemplar
- * passages for the most extreme covered axes → one line per non-extreme
- * axis group → Voice fingerprint verbatim → standing pencil marks.
+ * passages, the author's OWN sample first (M2R4) and foreign register
+ * passages for the most extreme covered axes after → one line per
+ * non-extreme axis group → Voice fingerprint verbatim → standing pencil marks.
  *
  * Regeneration triggers are the caller's law (§4.4a): session open,
  * premise edit, batched session-boundary changes — nothing else.
@@ -269,21 +270,41 @@ export function renderSettei(input: SetteiInput): Settei {
 
   // Exemplars: the most extreme rendered axes that have covered passages at
   // the matching band (gap rule: uncovered axes render craft text only).
+  //
+  // M2R4 deliverable 1: when the premise carries the author's own sample, it
+  // LEADS this section and is declared senior to the foreign passages. The
+  // charter's loudest style signal must not be someone else's hand — DNA is the
+  // register, voice is the fingerprint, and the fingerprint outranks a
+  // register-matched stranger. The sample takes one of §4.4a's three slots, so
+  // foreign exemplars cap at 2 alongside it.
+  const authorSample = (voice.author_voice.example_voice ?? "").trim();
+  const foreignCap = SETTEI_MAX_EXEMPLARS - (authorSample ? 1 : 0);
   const { byId, anchors } = loadGrounding();
   const exemplarIds: string[] = [];
-  const exemplarBlocks: string[] = ["## Register exemplars (write like this feels)"];
+  const foreignBlocks: string[] = [];
   for (const axis of rendered) {
-    if (exemplarIds.length >= SETTEI_MAX_EXEMPLARS) break;
+    if (exemplarIds.length >= foreignCap) break;
     if (!COVERED_AXES.includes(axis)) continue;
     const band = treatment[axis] <= 3 ? "1" : "9";
     const ref = anchors.find((a) => a.axis === axis)?.bands[band]?.excerpt_ref;
     const exemplar = ref ? byId.get(ref) : undefined;
     if (!exemplar) continue;
     exemplarIds.push(exemplar.id);
-    exemplarBlocks.push(
+    foreignBlocks.push(
       `(${axis} at the ${band === "1" ? "low" : "high"} extreme)\n${exemplar.text}`,
     );
   }
+  const exemplarBlocks: string[] = ["## Register exemplars (write like this feels)"];
+  if (authorSample) {
+    // The seniority clause only makes sense when passages actually follow; a
+    // sample standing alone anchors the register without pointing at ghosts.
+    const framing =
+      foreignBlocks.length > 0
+        ? "(THIS AUTHOR'S OWN HAND, verbatim — when the passages below and this hand disagree, this hand wins)"
+        : "(THIS AUTHOR'S OWN HAND, verbatim — the register's anchor)";
+    exemplarBlocks.push(`${framing}\n${authorSample}`);
+  }
+  exemplarBlocks.push(...foreignBlocks);
 
   // §4.4a: one line per NON-EXTREME axis group. Unrendered extremes are
   // left unmentioned — telling the KA to keep a premise extreme "moderate"
@@ -297,13 +318,18 @@ export function renderSettei(input: SetteiInput): Settei {
     groupLines.push(`${group}: keep ${mid.join(", ")} moderate, unforced.`);
   }
 
+  // The sample renders ONCE (M2R4): leading the exemplars when it exists, here
+  // otherwise. A real example_voice is a full in-register paragraph — carrying
+  // it twice inside a ~900-token charter costs a foreign exemplar AND the craft
+  // caveats, and repetition adds no pressure the lead placement doesn't already
+  // carry ("this hand wins").
   const voiceBlock = [
     "## Voice fingerprint (verbatim)",
     `Sentence patterns: ${voice.author_voice.sentence_patterns.join("; ")}`,
     `Structural motifs: ${voice.author_voice.structural_motifs.join("; ")}`,
     `Dialogue quirks: ${voice.author_voice.dialogue_quirks.join("; ")}`,
     `Emotional rhythm: ${voice.author_voice.emotional_rhythm.join("; ")}`,
-    `In-register sample: ${voice.author_voice.example_voice}`,
+    ...(authorSample ? [] : [`In-register sample: ${voice.author_voice.example_voice}`]),
     `Cast depth: main cast ${voice.cast_depth_posture.main_cast}; supporting ${voice.cast_depth_posture.supporting}; bits ${voice.cast_depth_posture.recurring_bits}.`,
   ];
 
@@ -346,9 +372,14 @@ export function renderSettei(input: SetteiInput): Settei {
     trims.push(`taste note dropped for budget: ${(dropped ?? "").slice(0, 40)}`);
     charter = buildCharter();
   }
-  // Stage 1: trim exemplars last-in-first-out (floor: 2, per
-  // §4.4a's "2–3") — craft instructions are the load-bearing pressure.
-  while (approxTokens(charter) > SETTEI_TOKEN_TARGET.max && exemplarIds.length > 2) {
+  // Stage 1: trim FOREIGN exemplars last-in-first-out — craft instructions are
+  // the load-bearing pressure. Floor is 2 per §4.4a's "2–3", except when the
+  // author's own hand renders: the sample IS an exemplar and counts toward that
+  // expectation, so the floor drops to 1 foreign passage alongside it. The
+  // author sample itself is NEVER trimmed (M2R4) — it sits ahead of every
+  // foreign block, so this LIFO pop can only reach the strangers' passages.
+  const foreignFloor = authorSample ? 1 : 2;
+  while (approxTokens(charter) > SETTEI_TOKEN_TARGET.max && exemplarIds.length > foreignFloor) {
     const droppedId = exemplarIds.pop();
     exemplarBlocks.pop();
     trims.push(`exemplar ${droppedId} dropped for budget`);

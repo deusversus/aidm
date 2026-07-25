@@ -28,6 +28,16 @@ vi.mock("@/lib/sakkan/attribution", async (importOriginal) => {
   return { ...actual, attributeDrift: vi.fn() };
 });
 
+// The §4.5 voice checklist (M2R4): its ONLY model surface. Mocked so the voice
+// half's wiring (readings, the sustained-weak pressure line, failure isolation)
+// is tested with NO live call — scripted like the scorer and the probe above.
+// composeVoicePressure / voicePatterns stay REAL: the pressure line's exact
+// composition is what the Amendments will render, so it is pinned, not faked.
+vi.mock("@/lib/sakkan/voice", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/sakkan/voice")>();
+  return { ...actual, judgeVoice: vi.fn() };
+});
+
 import { attributeDrift } from "@/lib/sakkan/attribution";
 import {
   DRIFT_CONSECUTIVE,
@@ -41,9 +51,20 @@ import {
 } from "@/lib/sakkan/sakkan";
 import { scoreAxes } from "@/lib/sakkan/score";
 import type { AxisScore } from "@/lib/sakkan/score";
+import { VOICE_DIMENSIONS, type VoiceDimensionRead, judgeVoice } from "@/lib/sakkan/voice";
 
 const mockScore = vi.mocked(scoreAxes);
 const mockAttribute = vi.mocked(attributeDrift);
+const mockVoice = vi.mocked(judgeVoice);
+
+/** One checklist sheet: every dimension at `base`, with named overrides. */
+function voiceReads(base: number, overrides: Record<string, number> = {}): VoiceDimensionRead[] {
+  return VOICE_DIMENSIONS.map((name) => ({
+    name,
+    score: overrides[name] ?? base,
+    evidence: `${name} evidence`,
+  }));
+}
 
 const url = process.env.DATABASE_URL;
 if (!url) console.warn("[sakkan] DATABASE_URL not set — skipping real-DB suite");
@@ -166,6 +187,50 @@ describe("Sakkan pure helpers", () => {
     expect(trend).toContain("wanted 7");
     expect(trend).toContain("RETAKE ACTIVE since turn 16");
     expect(trend.split("\n").length).toBeLessThanOrEqual(12);
+  });
+
+  it("gaugeTrend gains the voice line the Director reads (M2R4, zero director.ts changes)", () => {
+    const state = DirectionState.parse({
+      sakkan: {
+        last_sample_turn: 16,
+        readings: {
+          darkness: {
+            observed: 7,
+            confidence: 0.9,
+            at_turn: 16,
+            consecutive_drift: 0,
+            evidence: "the neon guttered",
+          },
+        },
+        active_notes: [],
+        voice_readings: {
+          sentence_patterns: { score: 7, evidence: "a", at_turn: 16 },
+          structural_motifs: { score: 5, evidence: "b", at_turn: 16 },
+          dialogue_quirks: { score: 3, evidence: "c", at_turn: 16 },
+          emotional_rhythm: { score: 6, evidence: "d", at_turn: 16 },
+        },
+        voice_pressure:
+          'Voice pressure (measured): "dialogue_quirks" reads weak two samples running',
+      },
+    });
+    const trend = gaugeTrend(state);
+    const voiceLine = trend.split("\n").find((l) => l.startsWith("voice:"));
+    expect(voiceLine).toBe("voice: sentences 7 · motifs 5 · quirks 3 (weak ×2) · emotion 6");
+    // The axis lines are untouched, and the voice line rides last.
+    expect(trend).toContain("darkness: observed 7");
+    expect(trend.trimEnd().endsWith(voiceLine ?? "")).toBe(true);
+
+    // A weak dimension with no standing pressure is flagged once, not twice.
+    const firstWeak = DirectionState.parse({
+      sakkan: {
+        last_sample_turn: 16,
+        readings: {},
+        active_notes: [],
+        voice_readings: { dialogue_quirks: { score: 4, evidence: "c", at_turn: 16 } },
+      },
+    });
+    // Voice readings alone still produce a trend — the axis half may be silent.
+    expect(gaugeTrend(firstWeak)).toBe("voice: quirks 4 (weak)");
   });
 
   it("playerDrivenTrend renders observed-vs-set findings; empty → ''", () => {
@@ -292,6 +357,9 @@ describe.skipIf(!url)("Sakkan sample (real Postgres, scripted scorer)", () => {
     // Default: a gate trip attributes to the NARRATOR (today's retake behavior),
     // so every pre-M2R3 test still opens its retake. Player-driven cases override.
     mockAttribute.mockReset().mockResolvedValue({ driver: "narrator_driven", evidence: "default" });
+    // Default: the voice half returns nothing — a no-op second half, so the
+    // axis-band tests read exactly as they did before M2R4. Voice cases override.
+    mockVoice.mockReset().mockResolvedValue([]);
   });
 
   // Bebop active darkness = 7; with no override, effective darkness = 7.
@@ -657,5 +725,207 @@ describe.skipIf(!url)("Sakkan sample (real Postgres, scripted scorer)", () => {
     st = await readState(campaignId);
     expect(st.sakkan?.player_driven).toEqual({});
     expect(st.sakkan?.readings.darkness?.consecutive_drift).toBe(0);
+  });
+
+  // --- M2R4: the §4.5 voice checklist (the author's hand, measured) ---------
+
+  it("the voice half reads the SAME window and writes voice_readings at the sample turn", async () => {
+    if (!db) throw new Error("unreachable");
+    const campaignId = await makeCampaign({ directionState: { settei: settei(["darkness"]) } });
+    await seedProse(campaignId, cleanSix());
+
+    mockScore.mockResolvedValueOnce([axisScore("darkness", 7, 0.9)]);
+    mockVoice.mockResolvedValueOnce(voiceReads(7, { dialogue_quirks: 5 }));
+    await runSakkanSample(db, campaignId, 8);
+
+    // One voice call, on the same stripped sample string the axis scorer read —
+    // one window, two halves (§4.5).
+    expect(mockVoice).toHaveBeenCalledTimes(1);
+    const voiceArgs = mockVoice.mock.calls[0]?.[1];
+    expect(voiceArgs?.sample).toBe(mockScore.mock.calls[0]?.[1]?.sample);
+    expect(voiceArgs?.campaignId).toBe(campaignId);
+    expect(voiceArgs?.turnNumber).toBe(8);
+    // The fingerprint reaches it (it IS the checklist); no dial channel exists.
+    expect(voiceArgs?.patterns.dialogue_quirks).toEqual(["deflection as intimacy"]);
+
+    const st = await readState(campaignId);
+    // (Sorted: jsonb does not preserve key insertion order.)
+    expect(Object.keys(st.sakkan?.voice_readings ?? {}).sort()).toEqual(
+      [...VOICE_DIMENSIONS].sort(),
+    );
+    expect(st.sakkan?.voice_readings.dialogue_quirks).toEqual({
+      score: 5,
+      evidence: "dialogue_quirks evidence",
+      at_turn: 8,
+    });
+    // No dimension is weak → no pressure, and the axis half is untouched.
+    expect(st.sakkan?.voice_pressure).toBeUndefined();
+    expect(st.sakkan?.readings.darkness?.observed).toBe(7);
+  });
+
+  it("weak twice running composes the pressure line; recovery clears it", async () => {
+    if (!db) throw new Error("unreachable");
+    const campaignId = await makeCampaign({ directionState: { settei: settei(["darkness"]) } });
+    await seedProse(campaignId, cleanSix());
+
+    // Sample 1 — dialogue_quirks reads weak ONCE: a scene, not a trend.
+    mockScore.mockResolvedValueOnce([axisScore("darkness", 7, 0.9)]);
+    mockVoice.mockResolvedValueOnce(voiceReads(7, { dialogue_quirks: 4 }));
+    await runSakkanSample(db, campaignId, 8);
+    let st = await readState(campaignId);
+    expect(st.sakkan?.voice_pressure).toBeUndefined();
+
+    // Sample 2 — weak again on the SAME dimension: the pressure fires, naming
+    // the weakest dimension, quoting one of its patterns, anchored on the
+    // author's own first sentence (the fixture's example_voice).
+    mockScore.mockResolvedValueOnce([axisScore("darkness", 7, 0.9)]);
+    mockVoice.mockResolvedValueOnce(voiceReads(7, { dialogue_quirks: 2, emotional_rhythm: 3 }));
+    await runSakkanSample(db, campaignId, 16);
+    st = await readState(campaignId);
+    const pressure = st.sakkan?.voice_pressure ?? "";
+    // emotional_rhythm is weak too but only for the FIRST time — the sustained
+    // dimension owns the line.
+    expect(pressure).toContain('"dialogue_quirks"');
+    expect(pressure).not.toContain("emotional_rhythm");
+    expect(pressure).toContain('"deflection as intimacy"');
+    expect(pressure).toContain('The author\'s hand: "Whatever happens, happens."');
+    // The Director's dossier reads it without touching director.ts.
+    expect(gaugeTrend(st)).toContain("quirks 2 (weak ×2)");
+
+    // Sample 3 — every dimension back above the weak line: pressure cleared.
+    mockScore.mockResolvedValueOnce([axisScore("darkness", 7, 0.9)]);
+    mockVoice.mockResolvedValueOnce(voiceReads(8));
+    await runSakkanSample(db, campaignId, 24);
+    st = await readState(campaignId);
+    expect(st.sakkan?.voice_pressure).toBeUndefined();
+    expect(st.sakkan?.voice_readings.dialogue_quirks?.score).toBe(8);
+  });
+
+  it("the pressure lives and dies by the dimension it NAMES — a mixed sheet still clears it", async () => {
+    if (!db) throw new Error("unreachable");
+    const campaignId = await makeCampaign({ directionState: { settei: settei(["darkness"]) } });
+    await seedProse(campaignId, cleanSix());
+
+    // Samples 1–2: dialogue_quirks weak twice → the pressure names it.
+    for (const [turn, score] of [
+      [8, 4],
+      [16, 2],
+    ] as const) {
+      mockScore.mockResolvedValueOnce([axisScore("darkness", 7, 0.9)]);
+      mockVoice.mockResolvedValueOnce(voiceReads(7, { dialogue_quirks: score }));
+      await runSakkanSample(db, campaignId, turn);
+    }
+    let st = await readState(campaignId);
+    expect(st.sakkan?.voice_pressure).toContain('"dialogue_quirks"');
+
+    // Sample 3 — quirks RECOVERS while emotional_rhythm goes weak for the
+    // first time. The sheet isn't clean, but the line's MEASURED claim is
+    // about quirks and quirks alone: it clears, and the trend never prints
+    // ×2 on the healthy score.
+    mockScore.mockResolvedValueOnce([axisScore("darkness", 7, 0.9)]);
+    mockVoice.mockResolvedValueOnce(voiceReads(7, { dialogue_quirks: 8, emotional_rhythm: 3 }));
+    await runSakkanSample(db, campaignId, 24);
+    st = await readState(campaignId);
+    expect(st.sakkan?.voice_pressure).toBeUndefined();
+    const trend = gaugeTrend(st);
+    expect(trend).toContain("quirks 8");
+    expect(trend).not.toContain("×2");
+    expect(trend).toContain("emotion 3 (weak)");
+
+    // Sample 4 — emotional_rhythm weak AGAIN: a FRESH line composes for the
+    // new sustained dimension (never a ride on the retired one).
+    mockScore.mockResolvedValueOnce([axisScore("darkness", 7, 0.9)]);
+    mockVoice.mockResolvedValueOnce(voiceReads(7, { emotional_rhythm: 3 }));
+    await runSakkanSample(db, campaignId, 32);
+    st = await readState(campaignId);
+    expect(st.sakkan?.voice_pressure).toContain('"emotional_rhythm"');
+    expect(st.sakkan?.voice_pressure).not.toContain("dialogue_quirks");
+  });
+
+  it("a voice-judge failure skips the voice half — the axis sample still lands", async () => {
+    if (!db) throw new Error("unreachable");
+    const campaignId = await makeCampaign({ directionState: { settei: settei(["darkness"]) } });
+    await seedProse(campaignId, cleanSix());
+
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    mockScore.mockResolvedValueOnce([axisScore("darkness", 3, 0.9)]);
+    mockVoice.mockRejectedValueOnce(new Error("scripted voice failure"));
+    expect(await runSakkanSample(db, campaignId, 8)).toEqual({ scored: 1, notesActive: 0 });
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining("[sakkan] voice checklist failed"),
+      expect.anything(),
+    );
+    warn.mockRestore();
+
+    const st = await readState(campaignId);
+    // The axis half landed in full; the voice half simply has nothing to say.
+    expect(st.sakkan?.last_sample_turn).toBe(8);
+    expect(st.sakkan?.readings.darkness?.consecutive_drift).toBe(1);
+    expect(st.sakkan?.voice_readings).toEqual({});
+    expect(st.sakkan?.voice_pressure).toBeUndefined();
+  });
+
+  it("an empty fingerprint skips the voice half entirely (never a wasted call)", async () => {
+    if (!db) throw new Error("unreachable");
+    const blank = bebopContract();
+    for (const layer of [blank.canonical, blank.active]) {
+      layer.voice.author_voice = {
+        sentence_patterns: [],
+        structural_motifs: [],
+        dialogue_quirks: [],
+        emotional_rhythm: [],
+        example_voice: "",
+      };
+    }
+    const campaignId = await makeCampaign({
+      premiseContract: blank,
+      directionState: { settei: settei(["darkness"]) },
+    });
+    await seedProse(campaignId, cleanSix());
+
+    mockScore.mockResolvedValueOnce([axisScore("darkness", 7, 0.9)]);
+    await runSakkanSample(db, campaignId, 8);
+
+    expect(mockVoice).not.toHaveBeenCalled();
+    const st = await readState(campaignId);
+    expect(st.sakkan?.voice_readings).toEqual({});
+    expect(st.sakkan?.readings.darkness?.observed).toBe(7);
+  });
+
+  it("an emptied fingerprint drops a standing pressure — never an unfalsifiable line", async () => {
+    if (!db) throw new Error("unreachable");
+    const blank = bebopContract();
+    for (const layer of [blank.canonical, blank.active]) {
+      layer.voice.author_voice = {
+        sentence_patterns: [],
+        structural_motifs: [],
+        dialogue_quirks: [],
+        emotional_rhythm: [],
+        example_voice: "",
+      };
+    }
+    // The pressure predates a contract edit that emptied the fingerprint: no
+    // future read could ever clear it through the judge path, so the sampler
+    // drops it OUTSIDE that path. The readings stay — they are history.
+    const campaignId = await makeCampaign({
+      premiseContract: blank,
+      directionState: {
+        settei: settei(["darkness"]),
+        sakkan: {
+          voice_pressure:
+            'Voice pressure (measured): "dialogue_quirks" reads weak two samples running.',
+          voice_readings: { dialogue_quirks: { score: 2, evidence: "stale", at_turn: 4 } },
+        },
+      },
+    });
+    await seedProse(campaignId, cleanSix());
+
+    mockScore.mockResolvedValueOnce([axisScore("darkness", 7, 0.9)]);
+    await runSakkanSample(db, campaignId, 8);
+
+    expect(mockVoice).not.toHaveBeenCalled();
+    const st = await readState(campaignId);
+    expect(st.sakkan?.voice_pressure).toBeUndefined();
+    expect(st.sakkan?.voice_readings.dialogue_quirks?.score).toBe(2);
   });
 });

@@ -72,16 +72,31 @@ describe("renderSettei (§4.4a)", () => {
   });
 
   it("picks exemplars for the most extreme covered axes at the matching band", () => {
+    // Bebop's fixture carries an example_voice, so the author's hand takes one
+    // of §4.4a's three slots and foreign passages cap at 2 (M2R4).
     expect(settei.exemplarIds[0]).toBe("moral_complexity_b9_vinland");
-    expect(settei.exemplarIds[1]).toBe("empathy_b9_fruitsbasket");
-    // Third exemplar rides only if the budget holds it (§4.4a: 2–3).
-    expect(settei.exemplarIds.length).toBeGreaterThanOrEqual(2);
-    if (settei.exemplarIds.length === 3) {
-      expect(settei.exemplarIds[2]).toBe("continuity_b1_kino");
-      expect(settei.trims).toHaveLength(0);
+    expect(settei.exemplarIds.length).toBeLessThanOrEqual(2);
+    // A second foreign passage rides only if the budget holds it; Bebop's
+    // charter is dense enough that it does not.
+    if (settei.exemplarIds.length === 2) {
+      expect(settei.exemplarIds[1]).toBe("empathy_b9_fruitsbasket");
     } else {
-      expect(settei.trims.length).toBeGreaterThan(0);
+      expect(settei.trims.some((t) => t.startsWith("exemplar "))).toBe(true);
     }
+  });
+
+  it("picks up to three foreign passages when the premise carries no author sample", () => {
+    const contract = bebopContract();
+    contract.active.voice.author_voice.example_voice = "";
+    const s = renderSettei({ contract, marks: [] });
+    expect(s.text).not.toContain("THIS AUTHOR'S OWN HAND");
+    expect(s.exemplarIds[0]).toBe("moral_complexity_b9_vinland");
+    expect(s.exemplarIds[1]).toBe("empathy_b9_fruitsbasket");
+    // Legacy behavior: the third slot is a foreign passage, and the trim floor
+    // is 2 — never 1.
+    expect(s.exemplarIds.length).toBeGreaterThanOrEqual(2);
+    if (s.exemplarIds.length === 3) expect(s.exemplarIds[2]).toBe("continuity_b1_kino");
+    expect(s.charterTokens).toBeLessThanOrEqual(SETTEI_TOKEN_TARGET.max);
   });
 
   it("carries the hard core, the spark, and the voice fingerprint verbatim", () => {
@@ -122,6 +137,116 @@ describe("renderSettei (§4.4a)", () => {
     expect(withMarks.text).not.toContain("stale note");
     // Shading never mutates the premise: treatment values unchanged.
     expect(BEBOP_DNA.emotional_register).toBe(6);
+  });
+});
+
+describe("the author's hand leads the exemplars (§4.4a, M2R4)", () => {
+  const HAND =
+    "(THIS AUTHOR'S OWN HAND, verbatim — when the passages below and this hand disagree, this hand wins)";
+  // A Re:ZERO-shaped example_voice: a full in-register paragraph, not a tagline
+  // — the case the deliverable exists for, and the one that maxes the charter.
+  const LONG_SAMPLE = [
+    "The cold came first, the way it always did, crawling up from the cobblestones into the",
+    "soles of his shoes, and Subaru understood — before the pain, before the sound of his own",
+    "name in someone else's mouth — that he had already lost this one. Again. The market was",
+    "loud. The market was always loud. Somewhere behind him a woman was laughing at a joke he",
+    "would never hear the end of, and he thought, with the awful clarity of a man who has done",
+    "this too many times: I know how she dies. I know the hour. I know I will not be enough,",
+    "and I am going to try anyway, because the alternative is to stand here in the cold and let",
+    "the clock run out on someone who still believes I am the kind of person who saves people.",
+  ].join(" ");
+
+  it("renders the sample first in the exemplar section, framed as senior to the strangers", () => {
+    const s = renderSettei({ contract: bebopContract(), marks: [] });
+    const handAt = s.text.indexOf(HAND);
+    expect(handAt).toBeGreaterThan(-1);
+    // Inside the exemplar section, and ahead of every foreign passage.
+    expect(handAt).toBeGreaterThan(s.text.indexOf("## Register exemplars"));
+    expect(handAt).toBeLessThan(s.text.indexOf("(moral_complexity at the"));
+    // The sample follows its framing line immediately.
+    expect(s.text.slice(handAt)).toContain(`${HAND}\nWhatever happens, happens.`);
+  });
+
+  it("renders the sample ONCE — the fingerprint block no longer repeats it", () => {
+    const s = renderSettei({ contract: bebopContract(), marks: [] });
+    expect(s.text).not.toContain("In-register sample:");
+    expect(s.text).toContain("## Voice fingerprint (verbatim)");
+    expect(s.text).toContain("deflection as intimacy");
+  });
+
+  it("is NEVER trimmed on a maxed charter — the foreign passages pay instead", () => {
+    const contract = bebopContract();
+    contract.active.voice.author_voice.example_voice = LONG_SAMPLE;
+    const s = renderSettei({
+      contract,
+      marks: [],
+      // Taste notes ride too, so every rung of the ladder is live.
+      tasteNotes: ["loves quiet aftermath scenes"],
+    });
+    // The charter is genuinely at the ceiling here (the ladder fires in full).
+    expect(s.charterTokens).toBeLessThanOrEqual(SETTEI_TOKEN_TARGET.max);
+    expect(s.charterTokens).toBeGreaterThan(SETTEI_TOKEN_TARGET.max - 60);
+    expect(s.trims.length).toBeGreaterThan(0);
+    // Everything else gave: taste, a foreign exemplar, craft caveats.
+    expect(s.trims.some((t) => t.startsWith("taste note dropped"))).toBe(true);
+    expect(s.trims.some((t) => t.startsWith("exemplar "))).toBe(true);
+    // The author's hand survives, whole and in place.
+    expect(s.text).toContain(HAND);
+    expect(s.text).toContain(LONG_SAMPLE);
+    expect(s.trims.some((t) => t.includes("author"))).toBe(false);
+    // Floor drops to ONE foreign passage when the sample renders: sample +
+    // one stranger still meets §4.4a's "2–3 exemplars".
+    expect(s.exemplarIds).toHaveLength(1);
+  });
+
+  it("caps foreign exemplars at 2 alongside the sample — the cap binds, not the budget", () => {
+    // A deliberately light charter with THREE covered extremes and room to
+    // spare: whatever limits the foreign passages here is the cap, not a trim.
+    const lean = (sample: string) => {
+      const c = bebopContract();
+      for (const axis of Object.keys(c.active.treatment) as AxisName[]) {
+        c.active.treatment[axis] = 5;
+      }
+      c.active.treatment.darkness = 9;
+      c.active.treatment.comedy = 9;
+      c.active.treatment.intimacy = 9;
+      c.active.voice.director_personality = "Terse.";
+      c.active.voice.cast_depth_posture = {
+        main_cast: "deep",
+        supporting: "sharp",
+        recurring_bits: "brief",
+      };
+      c.active.voice.author_voice.example_voice = sample;
+      c.spark = "one moment";
+      return c;
+    };
+
+    const withSample = renderSettei({ contract: lean("Whatever happens, happens."), marks: [] });
+    expect(withSample.text).toContain(HAND);
+    expect(withSample.exemplarIds).toEqual(["darkness_b9_berserk", "comedy_b9_konosuba"]);
+    // The third candidate was never picked, and nothing was trimmed to get here.
+    expect(withSample.trims).toHaveLength(0);
+    expect(withSample.text).not.toContain("(intimacy at the");
+    expect(withSample.charterTokens).toBeLessThanOrEqual(SETTEI_TOKEN_TARGET.max);
+
+    // Same charter without the author sample: the third slot goes to a foreign
+    // passage — it is picked, and only then does the budget rule on it.
+    const noSample = renderSettei({ contract: lean(""), marks: [] });
+    expect(noSample.trims).toContain("exemplar intimacy_b9_march dropped for budget");
+  });
+
+  it("drops the seniority clause when no foreign passage follows (no pointing at ghosts)", () => {
+    // All-mid treatment: no covered extremes, so zero foreign exemplars — the
+    // sample still leads the section, framed as the anchor, not as senior to
+    // passages that aren't there.
+    const c = bebopContract();
+    for (const axis of Object.keys(c.active.treatment) as AxisName[]) {
+      c.active.treatment[axis] = 5;
+    }
+    const s = renderSettei({ contract: c, marks: [] });
+    expect(s.exemplarIds).toHaveLength(0);
+    expect(s.text).toContain("(THIS AUTHOR'S OWN HAND, verbatim — the register's anchor)");
+    expect(s.text).not.toContain("this hand wins");
   });
 });
 
@@ -224,6 +349,97 @@ describe("renderAmendments (§4.4b)", () => {
   });
 });
 
+describe("the Director's ear in the Amendments (voice, M2R4)", () => {
+  const VOICE_HEADER =
+    "## The Director's ear (voice — the author's hand, kept; this restates the standing charter's fingerprint, it does not override it)";
+
+  it("renders the measured pressure line first, then the Director's patterns", () => {
+    const a = renderAmendments({
+      sakkanNotes: [],
+      freshMarks: [],
+      voicePressure:
+        "Voice is thinning: dialogue quirks read 4/10 — the deflection-as-intimacy beat has gone missing.",
+      voicePatterns: ["cold opens on an object, not a face", "the joke lands a beat late"],
+    });
+    expect(a.text).toContain(VOICE_HEADER);
+    expect(a.text.indexOf("Voice is thinning")).toBeGreaterThan(a.text.indexOf(VOICE_HEADER));
+    expect(a.text.indexOf("Voice is thinning")).toBeLessThan(a.text.indexOf("- cold opens"));
+    expect(a.text).toContain("- the joke lands a beat late");
+    expect(a.tokens).toBeLessThanOrEqual(AMENDMENTS_TOKEN_MAX);
+  });
+
+  it("caps the patterns at three and renders either half alone", () => {
+    const capped = renderAmendments({
+      sakkanNotes: [],
+      freshMarks: [],
+      voicePatterns: ["one", "two", "three", "four"],
+    });
+    expect(capped.text).toContain("- three");
+    expect(capped.text).not.toContain("- four");
+
+    const pressureOnly = renderAmendments({
+      sakkanNotes: [],
+      freshMarks: [],
+      voicePressure: "emotional rhythm is running flat",
+    });
+    expect(pressureOnly.text).toContain(VOICE_HEADER);
+    expect(pressureOnly.text).toContain("emotional rhythm is running flat");
+  });
+
+  it("renders no section when neither the Sakkan nor the Director has anything", () => {
+    const a = renderAmendments({ sakkanNotes: [], freshMarks: [], voicePatterns: [] });
+    expect(a.text).toBe("");
+    const b = renderAmendments({
+      sakkanNotes: [{ axis: "darkness", active: 9, observed: 6, since_turn: 4 }],
+      freshMarks: [],
+    });
+    expect(b.text).not.toContain("Director's ear");
+  });
+
+  it("sits beside the Amendments block without displacing it", () => {
+    const a = renderAmendments({
+      sakkanNotes: [{ axis: "darkness", active: 9, observed: 6, since_turn: 4 }],
+      freshMarks: [mark("register", "keep it plainer")],
+      voicePatterns: ["cold opens on an object, not a face"],
+    });
+    expect(a.text.indexOf("## Amendments (this scene)")).toBe(0);
+    expect(a.text.indexOf(VOICE_HEADER)).toBeGreaterThan(a.text.indexOf("keep it plainer"));
+  });
+
+  it("yields FIRST under budget pressure — patterns one at a time, then the section", () => {
+    const longPattern = (n: number) =>
+      `pattern ${n}: the narration keeps reaching for a simile where the author would have used a hard noun and stopped`;
+    const freshMarks = Array.from({ length: 7 }, (_, i) =>
+      mark(`topic_${i}`, `a calibration direction about restraint number ${i}`),
+    );
+    const notes = [
+      { axis: "darkness" as const, active: 9, observed: 3, since_turn: 4 },
+      { axis: "comedy" as const, active: 1, observed: 6, since_turn: 5 },
+    ];
+
+    // Enough voice content that the section alone would blow the budget.
+    const squeezed = renderAmendments({
+      sakkanNotes: notes,
+      freshMarks,
+      voicePressure:
+        "Voice is thinning: dialogue quirks read 3/10 across the last sample — the deflection-as-intimacy beat is gone and the lines are saying what they mean.",
+      voicePatterns: [longPattern(1), longPattern(2), longPattern(3)],
+    });
+    expect(squeezed.tokens).toBeLessThanOrEqual(AMENDMENTS_TOKEN_MAX);
+    expect(squeezed.trims.some((t) => t.startsWith("voice pattern dropped"))).toBe(true);
+    // Everything the voice section outranked is still on the page: the whole
+    // voice section goes before a single fresh mark does.
+    expect(squeezed.text).toContain("RETAKE (strong): darkness");
+    expect(squeezed.text).toContain("RETAKE (strong): comedy");
+    expect(squeezed.text).toContain("restraint number 6");
+    expect(squeezed.trims.some((t) => t.startsWith("dropped for budget"))).toBe(false);
+    // Under this much pressure the section itself is gone, measured line included.
+    expect(squeezed.trims).toContain("voice section dropped for budget");
+    expect(squeezed.text).not.toContain("Director's ear");
+    expect(squeezed.text).not.toContain("Voice is thinning");
+  });
+});
+
 describe("renderSceneShape (§4.4c)", () => {
   it("renders Framing + arc state inside the 150-token budget", () => {
     const s = renderSceneShape(bebopContract().active.framing, {
@@ -297,7 +513,10 @@ describe("the player, known (§6.9 Renderer reader, M2R R4)", () => {
     });
     expect(settei.text).not.toContain("## The player, known");
     expect(settei.trims.some((t) => t.startsWith("taste note dropped"))).toBe(true);
-    expect(settei.exemplarIds.length).toBeGreaterThanOrEqual(2);
+    // Premise pressure intact: the author's hand plus a foreign passage — the
+    // exemplar floor with a sample rendering (M2R4).
+    expect(settei.text).toContain("THIS AUTHOR'S OWN HAND");
+    expect(settei.exemplarIds.length).toBeGreaterThanOrEqual(1);
     expect(settei.charterTokens).toBeLessThanOrEqual(SETTEI_TOKEN_TARGET.max);
   });
 

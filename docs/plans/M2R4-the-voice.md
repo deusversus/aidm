@@ -1,0 +1,22 @@
+# M2R4 — The voice: the author's hand, measured
+
+**Trigger (2026-07-21, user report from live play):** "the tone is correct for the DNA values Re:ZERO would have, but maybe not true to Re:ZERO itself." Diagnosis confirmed against the live row and the code: the author_voice DATA is rich and genuinely in-register (Return by Design's fingerprint is textbook Nagatsuki), but the SYSTEM around it half-survived the v3→v5 port. DNA is the register; voice is the fingerprint — v5 measures and corrects the register while merely whispering the fingerprint.
+
+**The four findings:**
+1. The charter's loudest style signals are 2–3 verbatim register exemplars by OTHER authors (the global grounding library, selected per-axis), while the actual author gets four compressed list-lines and one sample paragraph further down. The KA is shown someone else's hand as its strongest "write like this."
+2. §4.5 promises the Gauge a **Voice checklist** beside axis scoring. Never built — voice fidelity is unmeasured, so drift is invisible and uncorrectable ("measured, not vibed" violated precisely where the player feels it).
+3. The Director's `voice_patterns` flow only into the close-time voice journal, which only the Director's own next memo reads. The writer never sees them — a writer-with-no-reader chain (axiom 8).
+4. Campaign-local: Return by Design's `director_personality` is canon-faithful cruelty aimed at Subaru specifically, fighting the player's hard lines (competence never undermined, leads functionally safe, cathartic-flex register). User ruling: re-aim the cruelty at the world; denied purchase on the protected leads.
+
+**Ledger status:** items 1–3 are §4.5/§4.4a promised mechanisms or axiom-8 defect repairs — no new ledger surface. Item 4 is a player-ruled active-layer data fix plus one generic persona guard line.
+
+## Deliverables (one commit)
+
+1. **The author's hand leads the exemplars** (renderer/settei.ts). When `author_voice.example_voice` exists, it renders FIRST in the register-exemplar section, labeled as this author's own hand and explicitly senior to the foreign passages ("when they disagree, this hand wins"). Foreign exemplars cap at 2 alongside it (the author sample takes the third §4.4a slot); the trim ladder NEVER trims the author sample (order stays: taste → foreign exemplars → craft clipping).
+2. **§4.5 Voice checklist** (sakkan). At each Sakkan sample, a second judgment call audits the stripped window against the contract's four fingerprint dimensions (sentence_patterns, structural_motifs, dialogue_quirks, emotional_rhythm): per-dimension adherence + one evidence line. Blindness discipline: the voice check necessarily SEES the fingerprint (it is the checklist) but NEVER the DNA dials — the axis scorer's blindness is untouched. Results persist in SakkanState (`voice_readings`); the gauge trend the Director reads gains a voice line; sustained weak dimensions surface as an Amendments voice note quoting the weakest dimension + the author sample line — v1 corrects through pressure, not retakes (the retake machinery stays axis-shaped; a voice retake is a later conversation if pressure proves insufficient).
+3. **voice_patterns reach the pen** (renderer/amendments.ts): the latest Director cycle's voice notes (cap 3) render in the Amendments as the Director's ear — the KA finally reads them. The voice-journal path is unchanged (it remains the close-time archive).
+4. **The persona guard + the Return by Design re-aim.** One generic line in the Director persona: the contract's hard lines and framing outrank the personality — where instinct and contract conflict, the contract wins and the cruelty finds other targets. Plus the user-ruled data fix to RbD's active-layer `director_personality` (applied to the row with his sign-off already given; canonical layer untouched; Settei rebuilt).
+
+**Out of scope, noted as follow-up:** the cast `voice_cards` starvation (research scrape returned "no direct quotations" for Subaru/Emilia/Rem and misattributed a Beatrice signature phrase) — a research-pipeline quote-mining improvement, its own plan item; per-campaign tier-menu changes (Opus 5's existence is recorded but §3 menus change only on the user's explicit instruction).
+
+**Cost:** +1 judgment call per Sakkan sample (samples fire at session close + noted intervals — rare); one Block-1 cache bust (charter change). Tests scripted throughout; no live calls.

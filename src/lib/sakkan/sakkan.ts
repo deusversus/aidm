@@ -18,6 +18,15 @@ import { PremiseContract, effectivePremise } from "@/lib/types/premise";
 import { and, desc, eq } from "drizzle-orm";
 import { attributeDrift } from "./attribution";
 import { MAX_SCORED_AXES, scoreAxes } from "./score";
+import {
+  VOICE_DIMENSIONS,
+  VOICE_WEAK_SCORE,
+  composeVoicePressure,
+  judgeVoice,
+  measurableDimensions,
+  pressuredDimension,
+  voicePatterns,
+} from "./voice";
 
 /**
  * The Sakkan (blueprint §4.5, §16 — the sakuga kantoku): drift is MEASURED,
@@ -360,6 +369,76 @@ export async function runSakkanSample(
     }
   }
 
+  // --- The §4.5 voice half (M2R4): the author's HAND, on the same window ----
+  // Failure-isolated exactly like the axis scorer above: a voice-judge failure
+  // skips the voice half with a warn and never costs the sample its axis
+  // measurement (the register read is the older, load-bearing half).
+  const priorVoice = state.sakkan?.voice_readings ?? {};
+  let voiceReadings = priorVoice;
+  let voicePressure = state.sakkan?.voice_pressure;
+  const patterns = voicePatterns(effective.voice.author_voice);
+  const measurable = measurableDimensions(patterns);
+  if (measurable.length === 0) {
+    // A contract edit emptied the fingerprint: nothing left to measure, and a
+    // standing pressure line would be unfalsifiable — no future read could
+    // ever clear it. It drops here, outside the judge path.
+    voicePressure = undefined;
+  } else {
+    try {
+      const reads = await judgeVoice(selection, {
+        // The SAME stripped window the axis scorer read — one sample, two halves.
+        patterns,
+        sample,
+        campaignId,
+        turnNumber,
+      });
+      if (reads.length > 0) {
+        const next: SakkanState["voice_readings"] = { ...priorVoice };
+        for (const r of reads)
+          next[r.name] = { score: r.score, evidence: r.evidence, at_turn: turnNumber };
+        voiceReadings = next;
+
+        // Sustained weakness = weak NOW and weak on the immediately prior read
+        // of the same dimension (the pre-sample record). One weak read is a
+        // scene, not a trend — the axis band's two-consecutive contract, in the
+        // voice half's shape.
+        const sustained = reads.filter(
+          (r) =>
+            r.score <= VOICE_WEAK_SCORE && (priorVoice[r.name]?.score ?? 10) <= VOICE_WEAK_SCORE,
+        );
+        if (sustained.length > 0) {
+          // A fresh line for the weakest sustained dimension REPLACES any
+          // standing one — the pressure always claims what this sample proved.
+          const weakest = sustained.reduce((a, b) => (b.score < a.score ? b : a));
+          voicePressure = composeVoicePressure(
+            weakest.name,
+            patterns,
+            effective.voice.author_voice.example_voice,
+          );
+        } else if (voicePressure) {
+          // The line says MEASURED, so it lives and dies by the dimension it
+          // NAMES — never by the rest of the sheet. It clears when that
+          // dimension reads healthy now (or fell out of the fingerprint); it
+          // holds only while the named dimension went unmeasured this sample.
+          const named = pressuredDimension(voicePressure);
+          const namedRead = named ? reads.find((r) => r.name === named) : undefined;
+          if (
+            !named ||
+            !measurable.includes(named) ||
+            (namedRead && namedRead.score > VOICE_WEAK_SCORE)
+          ) {
+            voicePressure = undefined;
+          }
+        }
+      }
+    } catch (err) {
+      console.warn(
+        `[sakkan] voice checklist failed (turn ${turnNumber}) — voice half skipped:`,
+        err,
+      );
+    }
+  }
+
   // Marks first, then the state save (single writer at sample time, §4.5;
   // same-turn re-entry is guarded at the top of this function). Writing the
   // mark ahead of the counter save favours never losing a calibration over an
@@ -387,6 +466,10 @@ export async function runSakkanSample(
     readings,
     active_notes: [...notesByAxis.values()],
     player_driven: Object.fromEntries(playerDriven),
+    // The §4.5 voice half (M2R4) — written above, or carried through unchanged
+    // when the fingerprint is empty or the checklist call failed.
+    voice_readings: voiceReadings,
+    ...(voicePressure ? { voice_pressure: voicePressure } : {}),
   };
   await saveDirectionState(db, campaignId, { ...state, sakkan });
 
@@ -421,13 +504,55 @@ function fmt(n: number): string {
 }
 
 /**
+ * Short dossier labels for the four voice dimensions — the trend line is a
+ * glance, not a schema dump.
+ */
+const VOICE_TREND_LABELS: Record<string, string> = {
+  sentence_patterns: "sentences",
+  structural_motifs: "motifs",
+  dialogue_quirks: "quirks",
+  emotional_rhythm: "emotion",
+};
+
+/**
+ * The voice half's dossier line (§4.5 M2R4): the fingerprint's per-dimension
+ * adherence, compact, so the Director reads it with ZERO director.ts changes —
+ * it rides the gauge trend it already consumes. A dimension at or below
+ * VOICE_WEAK_SCORE is flagged; the dimension the standing pressure line names
+ * is flagged "weak ×2" (the pressure line IS the sustained-weak record — the
+ * state seam carries one reading per dimension, not a counter, and
+ * composeVoicePressure quotes the dimension name so the match is exact).
+ * Empty string when no voice readings exist.
+ */
+function voiceTrendLine(state: DirectionState): string {
+  const readings = state.sakkan?.voice_readings ?? {};
+  const pressured = pressuredDimension(state.sakkan?.voice_pressure);
+  const parts: string[] = [];
+  for (const dim of VOICE_DIMENSIONS) {
+    const r = readings[dim];
+    if (!r) continue;
+    const flag = pressured === dim ? " (weak ×2)" : r.score <= VOICE_WEAK_SCORE ? " (weak)" : "";
+    parts.push(`${VOICE_TREND_LABELS[dim] ?? dim} ${fmt(r.score)}${flag}`);
+  }
+  // Any dimension name the seam carries that isn't one of the four (a renamed
+  // fingerprint, a hand-edited state) still reports rather than vanishing.
+  for (const [dim, r] of Object.entries(readings)) {
+    if ((VOICE_DIMENSIONS as readonly string[]).includes(dim)) continue;
+    parts.push(`${dim} ${fmt(r.score)}${r.score <= VOICE_WEAK_SCORE ? " (weak)" : ""}`);
+  }
+  return parts.length > 0 ? `voice: ${parts.join(" · ")}` : "";
+}
+
+/**
  * The Director's dailies trend (§7.1 consumer #2): a compact plaintext block
  * for the cycle dossier — per-axis observed vs effective with drift arrows,
- * active retakes, and axes trending home. Empty string when no readings.
+ * active retakes, axes trending home, and (M2R4) the voice half's per-dimension
+ * adherence. Empty string when there is nothing measured at all.
  */
 export function gaugeTrend(state: DirectionState): string {
+  const voiceLine = voiceTrendLine(state);
   const readings = Object.entries(state.sakkan?.readings ?? {});
-  if (readings.length === 0) return "";
+  if (readings.length === 0) return voiceLine;
 
   const notesByAxis = new Map<string, SakkanActiveNote>();
   for (const n of state.sakkan?.active_notes ?? []) notesByAxis.set(n.axis, n);
@@ -466,6 +591,7 @@ export function gaugeTrend(state: DirectionState): string {
       );
     }
   }
+  if (voiceLine) lines.push(voiceLine);
   return lines.join("\n");
 }
 
