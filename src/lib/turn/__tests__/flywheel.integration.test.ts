@@ -1,3 +1,4 @@
+import { block3Text } from "@/lib/blocks/assemble";
 import { assembleForCampaign } from "@/lib/blocks/campaign";
 import { loadBeats, maybeCompact } from "@/lib/blocks/compaction";
 import { settleG2IfPending } from "@/lib/compositor/g2";
@@ -290,7 +291,9 @@ describe.skipIf(!url)(
         await collectTurn(db, campaignId, "I ask Jet what the bounty board says.");
         const blocks = await assembleForCampaign(db, campaignId);
         if (!blocks) throw new Error("assembly returned null");
-        const block3 = blocks.system[2]?.text ?? "";
+        // M2R5 C3: B3 is a LIST of blocks (pin head · header · one per
+        // exchange), so the layer-1 read is over their concatenation.
+        const block3 = block3Text(blocks.system);
 
         expect(block3).toContain("I ask Jet what the bounty board says.");
         expect(block3).toContain("Jet wipes down the galley");

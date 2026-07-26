@@ -10,11 +10,22 @@ import { approxTokens } from "./tokens";
  *       edits (§4.4a). Cached; its tail is breakpoint 1.
  *   [2] Compacted history — changes only at compaction events (§6.2).
  *       Cached; its tail is breakpoint 2.
- *   [3] Working memory: pins at the head, then the verbatim exchange tail —
- *       APPEND-ONLY between compaction events. Cached; its tail is
- *       breakpoint 3, refreshed each turn.
+ *   [3] Working memory: the pin head, then the verbatim exchange tail —
+ *       APPEND-ONLY between compaction events. Rendered as DISCRETE blocks:
+ *       pin head (breakpoint 3) · window header · one block per exchange,
+ *       with breakpoint 4 riding the LAST exchange block and MOVING each
+ *       turn (§5.6, amended 2026-07-26).
  *   [4] The conte — dynamic, uncached, rendered into the user message by
  *       the turn engine (not this module).
+ *
+ * Why the window breathes in exchanges (M2R5 C3, measured 2026-07-26): as
+ * one growing text block, B3 re-wrote its whole window at the 2× 1h-write
+ * rate every turn — a 12k-token median creation per first-narration-call
+ * that nothing read back, because 60 of 82 turns made exactly one narration
+ * call and the next turn's growth busted the entry again. With a moving tail
+ * breakpoint the prior window reads at 0.1× and only the new exchange
+ * writes. The prompt the model reads is byte-identical either way — only the
+ * cache boundaries moved, and `assemble.test.ts` pins that equality.
  *
  * Append-only by construction: this module exposes no mutation surface at
  * all — it renders whatever rows it is given, and the row sources are
@@ -22,8 +33,7 @@ import { approxTokens } from "./tokens";
  * single sanctioned truncation, implemented in compaction.ts as
  * beats-written + watermark-advanced, never row edits). The prefix-
  * stability tests assert the cache invariant directly: appending an
- * exchange must leave the previously rendered prompt as a strict string
- * prefix of the new one.
+ * exchange leaves every prior block byte-identical and adds exactly one.
  */
 
 export interface ExchangeRow {
@@ -97,8 +107,41 @@ export interface BlockInputs {
 export const PIN_MAX_COUNT = 5;
 export const PIN_MAX_TOKENS = 2_000;
 
+/** The API's hard ceiling on `cache_control` markers in one request. */
+export const MAX_CACHE_BREAKPOINTS = 4;
+
+/**
+ * A cache read walks back at most this many blocks from a breakpoint looking
+ * for a match. Everything between the pin/Block-2 breakpoint and the moving
+ * tail is the window, so the window's block count is the number that has to
+ * stay under the ceiling. Compaction (trigger 16, keep-tail 10) should hold
+ * it at ≤16 exchanges + header, but the assembly checks rather than trusting
+ * that cadence forever.
+ */
+export const CACHE_WALKBACK_BLOCKS = 20;
+
+/** Blocks 1 and 2 come first; everything after them is Block 3. */
+export const B3_FIRST_BLOCK_INDEX = 2;
+
+const WINDOW_HEADER = "## Recent play (verbatim)\n\n";
+
+/**
+ * What the model actually reads as Block 3 — the window blocks concatenated.
+ * The split into blocks is a CACHE fact, not a prompt fact: this string is
+ * byte-identical to the single block the assembler emitted before M2R5 C3.
+ */
+export function block3Text(system: TextBlockParam[]): string {
+  return system
+    .slice(B3_FIRST_BLOCK_INDEX)
+    .map((b) => b.text)
+    .join("");
+}
+
 export interface AssembledBlocks {
-  /** Blocks 1–3 as system blocks, each tail carrying a cache breakpoint. */
+  /**
+   * Blocks 1–3 as system blocks. Breakpoints: Block 1 tail · Block 2 tail ·
+   * pin head (when pins exist) · last exchange block (moving).
+   */
   system: TextBlockParam[];
   budgets: {
     b1Tokens: number;
@@ -173,11 +216,14 @@ export function assembleBlocks(inputs: BlockInputs): AssembledBlocks {
     kept.length === 0
       ? ""
       : `## Pinned passages (player-held, verbatim)\n\n${kept.map((p) => p.content).join("\n\n")}\n\n`;
-  const windowText = [...inputs.exchanges]
+
+  // The `\n\n` that joins two exchanges rides the HEAD of the later block,
+  // never the tail of the earlier one: a trailing separator would rewrite the
+  // previous block on every append, which is the exact rewrite this structure
+  // exists to stop.
+  const windowTexts = [...inputs.exchanges]
     .sort((a, b) => a.turnNumber - b.turnNumber)
-    .map(renderExchange)
-    .join("\n\n");
-  const b3 = `${pinText}## Recent play (verbatim)\n\n${windowText}`;
+    .map((e, i) => (i === 0 ? renderExchange(e) : `\n\n${renderExchange(e)}`));
 
   // C9 (§5.6, measured 2026-07-18): live inter-turn think-time runs 19-65
   // minutes within a sitting (p50 ~36m) — ZERO gaps fell under 5 minutes,
@@ -188,8 +234,46 @@ export function assembleBlocks(inputs: BlockInputs): AssembledBlocks {
   const system: TextBlockParam[] = [
     { type: "text", text: b1, ...breakpoint },
     { type: "text", text: b2, ...breakpoint },
-    { type: "text", text: b3, ...breakpoint },
   ];
+  if (pinText.length > 0) {
+    // Pins get their own breakpoint so a rare pin add busts pins + window and
+    // never Blocks 1–2.
+    system.push({ type: "text", text: pinText, ...breakpoint });
+  }
+  // An empty window (turn 1) renders NO header — the one byte C3 deliberately
+  // stopped writing: the pre-C3 block promised "recent play" with nothing
+  // under it. Every non-empty window is byte-for-byte what it always was.
+  if (windowTexts.length > 0) {
+    system.push({ type: "text", text: WINDOW_HEADER });
+    for (const [i, text] of windowTexts.entries()) {
+      const isTail = i === windowTexts.length - 1;
+      system.push({ type: "text", text, ...(isTail ? breakpoint : {}) });
+    }
+  }
+
+  const b3 = block3Text(system);
+
+  const breakpointCount = system.filter((b) => b.cache_control).length;
+  if (breakpointCount > MAX_CACHE_BREAKPOINTS) {
+    throw new Error(
+      `assembleBlocks emitted ${breakpointCount} cache breakpoints; the API allows ${MAX_CACHE_BREAKPOINTS}`,
+    );
+  }
+
+  // Degraded caching is not a failed turn — this warns, never throws. If it
+  // ever fires, compaction's cadence has drifted past the walk-back margin
+  // and the window's reads are silently missing.
+  const windowBlockCount = system.length - B3_FIRST_BLOCK_INDEX - (pinText.length > 0 ? 1 : 0);
+  if (windowBlockCount >= CACHE_WALKBACK_BLOCKS - 1) {
+    console.warn(
+      "[blocks] Block-3 window is at the cache walk-back margin — compaction is overdue and reads will start missing",
+      {
+        windowBlockCount,
+        walkBackLimit: CACHE_WALKBACK_BLOCKS,
+        exchanges: inputs.exchanges.length,
+      },
+    );
+  }
 
   const budgets = {
     b1Tokens: approxTokens(b1),

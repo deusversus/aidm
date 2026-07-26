@@ -276,6 +276,16 @@ function primaryNarration(rows: CallRow[]): CallRow | null {
   return narr.reduce((best, r) => (readable(r) > readable(best) ? r : best));
 }
 
+/** The turn's chronologically FIRST narration call — the only one that can
+ *  prove the TURN-TO-TURN prefix read. On a multi-round turn the largest
+ *  prompt is the LAST round, whose read is the guaranteed within-turn hit;
+ *  gating on it would hide a broken inter-turn prefix (C3 audit). */
+function firstNarration(rows: CallRow[]): CallRow | null {
+  const narr = rows.filter((r) => r.tier === "narration");
+  if (narr.length === 0) return null;
+  return narr.reduce((first, r) => (r.createdAt.getTime() < first.createdAt.getTime() ? r : first));
+}
+
 export async function meterTurn(
   db: Db,
   campaignId: string,
@@ -312,8 +322,9 @@ export async function meterTurn(
   const tier = turnRow?.tier ?? "genga";
   const status = turnRow?.status ?? "unknown";
   const servedModel = primary?.model ?? "(none)";
+  const first = firstNarration(rows);
   const cacheReadFrac =
-    primary && readable(primary) > 0 ? primary.cacheReadInputTokens / readable(primary) : null;
+    first && readable(first) > 0 ? first.cacheReadInputTokens / readable(first) : null;
 
   const flags: string[] = [];
   const failures: string[] = [];
@@ -357,9 +368,18 @@ export async function meterTurn(
         flags.push(
           `cold turn — turn-to-turn cache-read frac ${cacheReadFrac.toFixed(2)} (prefix creation expected)`,
         );
+      } else if (cacheReadFrac === 0) {
+        // M2R5 C3 retired the "B3 re-creates by design" excuse: the window now
+        // renders one block per exchange with a MOVING tail breakpoint, so on
+        // a warm turn every block but the newest exchange is byte-identical to
+        // what the prior turn wrote. A zero-read first narration call is a
+        // broken prefix, not the architecture doing its job.
+        failures.push(
+          `turn ${run.turnNumber} (${tier}): first narration call read ZERO cached tokens on a warm turn (§5.6 moving tail should have read the prior window)`,
+        );
       } else if (cacheReadFrac < BUDGET_ASSUMPTIONS.assumedCacheHitRate) {
         flags.push(
-          `turn-to-turn cache-read frac ${cacheReadFrac.toFixed(2)} vs the ${BUDGET_ASSUMPTIONS.assumedCacheHitRate} assumption (reported, §5.6 — B3 re-creates by design)`,
+          `turn-to-turn cache-read frac ${cacheReadFrac.toFixed(2)} under the ${BUDGET_ASSUMPTIONS.assumedCacheHitRate} assumption (pnpm cache:gauge is the running measure)`,
         );
       }
     }

@@ -26,6 +26,7 @@
 
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { compactionWatermark } from "@/lib/blocks/compaction";
 import { settleG2IfPending } from "@/lib/compositor/g2";
 import { type Db, getDb } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
@@ -575,6 +576,7 @@ async function liveRun(db: Db, campaignId: string): Promise<void> {
   const records: TurnRecord[] = [];
   const artifacts: RunArtifacts = { session2Opened: false };
   const coldTurns = new Set<number>([1]); // pilot is cold; session-2 first turn added below
+  let lastWatermark = 0;
 
   // Open the pilot sitting: Director startup + Settei rebuild + pre-warm.
   const opened = await openSession(db, campaignId);
@@ -635,6 +637,16 @@ async function liveRun(db: Db, campaignId: string): Promise<void> {
       // Flush this turn's G2 so its distill/director/sakkan/compaction spend is
       // metered before we read the ledger (catch-up-before-reader, §5.8).
       await settleG2IfPending(db, campaignId);
+
+      // A compaction event wholesale-resets B2 + the window (sanctioned, §6.2)
+      // — the NEXT turn's first read is legitimately cold, same as a session
+      // open (C3 audit symmetry; without this it survives only via B1's
+      // frozen-Settei partial read).
+      const wm = await compactionWatermark(db, campaignId);
+      if (wm > lastWatermark) {
+        coldTurns.add(turnNumber + 1);
+        lastWatermark = wm;
+      }
 
       const record = await meterTurn(db, campaignId, run, step, label, since, coldTurns);
       records.push(record);

@@ -1,4 +1,4 @@
-import { assembleBlocks } from "@/lib/blocks/assemble";
+import { assembleBlocks, block3Text } from "@/lib/blocks/assemble";
 import {
   compactionWatermark,
   loadBeats,
@@ -949,7 +949,10 @@ describe.skipIf(!url)("Compositor (real Postgres, scripted models)", () => {
         watermark,
       });
       expect(after.system[1]?.text).toBe(before.system[1]?.text);
-      expect(after.system[2]?.text.startsWith(before.system[2]?.text ?? "!")).toBe(true);
+      // Post-C3 B3 is a block LIST; the prefix property lives on its
+      // concatenation (system[2] alone is the constant window header —
+      // asserting on it proved nothing).
+      expect(block3Text(after.system).startsWith(block3Text(before.system))).toBe(true);
     },
   );
 });

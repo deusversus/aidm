@@ -18,7 +18,18 @@ export const BUDGET_ASSUMPTIONS = {
   /** Opportunistic turn-to-turn hit rate assumed until M2 telemetry (§5.6).
    *  M1 soak MEASURED 0.24 mean on a young campaign (B3 dominates while
    *  B1+B2 are thin; improves as compaction fills cached B2) — the 0.7
-   *  assumption stands as the mature-campaign target, telemetry at M2. */
+   *  assumption stands as the mature-campaign target, telemetry at M2.
+   *  M2R5 C3 moved B3 to per-exchange blocks with a moving tail breakpoint,
+   *  which should lift the real rate sharply (the prior window now READS
+   *  instead of re-creating). Wire-measured at C3's landing (2026-07-26):
+   *  a WARM mid-session turn reads 99.1% of its prefix — turn N+1 read
+   *  exactly turn N's read + write (5,215 = 4,916 + 299) and wrote 47
+   *  tokens for the new exchange. 0.7 stays as the ENGINE-WIDE mix
+   *  assumption because cold turns, session-open Settei rebuilds,
+   *  compaction resets, and the §3 effort-flap busts (douga low / genga
+   *  high key separately — measured 2026-07-26, ruling pending) all still
+   *  dilute it; `pnpm cache:gauge` is the running measure, and this number
+   *  tightens when real-session data says so, never from a two-call spike. */
   assumedCacheHitRate: 0.7,
   /** Uncached per-turn tail: the conte + player input (Block 4). */
   dynamicTokensPerTurn: 3_000,

@@ -4,7 +4,7 @@ import { and, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { assembleBlocks } from "../assemble";
+import { assembleBlocks, block3Text } from "../assemble";
 import { compactionWatermark, loadBeats, runCompaction, workingWindow } from "../compaction";
 
 /** Real-DB proof of the §5.6 discipline: the window only shrinks through a compaction event. */
@@ -114,8 +114,14 @@ describe.skipIf(!url)("compaction event (real Postgres)", () => {
       watermark,
     });
 
-    expect(after.system[2]?.text.startsWith(before.system[2]?.text ?? "!")).toBe(true);
+    expect(block3Text(after.system).startsWith(block3Text(before.system))).toBe(true);
     expect(after.system[1]?.text).toBe(before.system[1]?.text);
+    // Block-list form (M2R5 C3): the append adds exactly one block and leaves
+    // every prior one byte-identical — the moving tail's whole premise.
+    expect(after.system).toHaveLength(before.system.length + 1);
+    for (const [i, block] of before.system.entries()) {
+      expect(after.system[i]?.text).toBe(block.text);
+    }
   });
 
   it("beat writes carry the provenance envelope", async () => {

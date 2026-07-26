@@ -26,6 +26,7 @@
 
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { compactionWatermark } from "@/lib/blocks/compaction";
 import { settleG2IfPending } from "@/lib/compositor/g2";
 import { type Db, getDb } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
@@ -651,6 +652,7 @@ async function liveRun(db: Db, campaignId: string, resumedFrom: number): Promise
   const records: TurnRecord[] = [];
   const snapshots: SampleSnapshot[] = [];
   const coldTurns = new Set<number>([1]);
+  let lastWatermark = 0;
   let injectedAt: number | null = null;
   let abort: string | null = null;
 
@@ -709,6 +711,13 @@ async function liveRun(db: Db, campaignId: string, resumedFrom: number): Promise
         break;
       }
       await settleG2IfPending(db, campaignId);
+      // Compaction resets B2 + the window wholesale — the NEXT turn's first
+      // read is legitimately cold (C3 audit symmetry with the session open).
+      const wm = await compactionWatermark(db, campaignId);
+      if (wm > lastWatermark) {
+        coldTurns.add(run.turnNumber + 1);
+        lastWatermark = wm;
+      }
       const record = await meterTurn(db, campaignId, run, intended, beat.label, since, coldTurns);
       records.push(record);
       snapshots.push(await snapshotSakkan(db, campaignId, run.turnNumber));
