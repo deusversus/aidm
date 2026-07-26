@@ -1,6 +1,6 @@
 import { getDb } from "@/lib/db";
 import { modelCalls } from "@/lib/db/schema";
-import { estimateCostUsd } from "@/lib/llm/pricing";
+import { type UsageStats, estimateCostUsd } from "@/lib/llm/pricing";
 
 /**
  * The cost meter (blueprint §3): every model call — Anthropic, Voyage,
@@ -17,12 +17,13 @@ export interface ModelCallRecord {
   provider: "anthropic" | "voyage";
   model: string;
   tier: "narration" | "judgment" | "probe" | "embedding";
-  usage: {
-    input_tokens: number;
-    output_tokens: number;
-    cache_read_input_tokens?: number;
-    cache_creation_input_tokens?: number;
-  };
+  /**
+   * UsageStats, not a local shape: the optional per-TTL `cache_creation`
+   * split has to survive the hop to estimateCostUsd or a 5m write meters at
+   * the 2× rate. The ROW stays flat (two token columns, no split) — the
+   * split changes the price, not the schema.
+   */
+  usage: UsageStats;
   latencyMs: number;
   campaignId?: string;
   turnNumber?: number;

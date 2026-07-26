@@ -8,9 +8,10 @@
  * silently corrupt the ledger.
  *
  * Rates as of 2026-07 (user-confirmed model set). Cache math per Anthropic:
- * read = 0.1× input; write = 2× input at the 1-HOUR TTL every breakpoint
- * now uses (C9, measured 2026-07-18: no live inter-turn gap fits 5 minutes;
- * the 1.25× 5m rate no longer occurs in this engine).
+ * read = 0.1× input; write = 1.25× input at the 5-minute TTL, 2× at the
+ * 1-hour TTL. Inter-turn breakpoints all write at 1h (C9, measured
+ * 2026-07-18: no live inter-turn gap fits 5 minutes); the 5m rate returned
+ * with M2R5 C2's in-process loops, whose rounds are seconds apart.
  */
 
 export interface ModelPricing {
@@ -20,7 +21,9 @@ export interface ModelPricing {
   outputPer1M: number;
   /** USD per 1M cache-read input tokens. */
   cacheReadPer1M: number;
-  /** USD per 1M cache-creation input tokens (1h TTL — the engine's only write). */
+  /** USD per 1M cache-creation input tokens at the 5-minute TTL (1.25×). */
+  cacheCreation5mPer1M: number;
+  /** USD per 1M cache-creation input tokens at the 1-hour TTL (2×). */
   cacheCreationPer1M: number;
 }
 
@@ -29,12 +32,14 @@ const PRICING: Record<string, ModelPricing> = {
     inputPer1M: 10,
     outputPer1M: 50,
     cacheReadPer1M: 1,
+    cacheCreation5mPer1M: 12.5,
     cacheCreationPer1M: 20,
   },
   "claude-opus-5": {
     inputPer1M: 5,
     outputPer1M: 25,
     cacheReadPer1M: 0.5,
+    cacheCreation5mPer1M: 6.25,
     cacheCreationPer1M: 10,
   },
   // Off the menus since 2026-07-25 (Opus 5 supersedes, same rates) — kept so
@@ -43,6 +48,7 @@ const PRICING: Record<string, ModelPricing> = {
     inputPer1M: 5,
     outputPer1M: 25,
     cacheReadPer1M: 0.5,
+    cacheCreation5mPer1M: 6.25,
     cacheCreationPer1M: 10,
   },
   // List price; an intro rate ($2/$10) runs through 2026-08-31 — we meter
@@ -51,12 +57,14 @@ const PRICING: Record<string, ModelPricing> = {
     inputPer1M: 3,
     outputPer1M: 15,
     cacheReadPer1M: 0.3,
+    cacheCreation5mPer1M: 3.75,
     cacheCreationPer1M: 6,
   },
   "claude-haiku-4-5": {
     inputPer1M: 1,
     outputPer1M: 5,
     cacheReadPer1M: 0.1,
+    cacheCreation5mPer1M: 1.25,
     cacheCreationPer1M: 2,
   },
   // Voyage bills input tokens only (embeddings have no output tokens).
@@ -64,6 +72,7 @@ const PRICING: Record<string, ModelPricing> = {
     inputPer1M: 0.06,
     outputPer1M: 0,
     cacheReadPer1M: 0,
+    cacheCreation5mPer1M: 0,
     cacheCreationPer1M: 0,
   },
 };
@@ -76,11 +85,23 @@ export function pricingFor(model: string): ModelPricing {
   return p;
 }
 
+/** The API's per-TTL creation split (`usage.cache_creation`). */
+export interface CacheCreationSplit {
+  ephemeral_5m_input_tokens: number;
+  ephemeral_1h_input_tokens: number;
+}
+
 export interface UsageStats {
   input_tokens: number;
   output_tokens: number;
   cache_read_input_tokens?: number;
   cache_creation_input_tokens?: number;
+  /**
+   * Per-TTL creation breakdown, when the response carried one. Absent means
+   * "unknown", not "zero" — historical rows and fixtures predate M2R5 C2 and
+   * price flat at the 1h rate below.
+   */
+  cache_creation?: CacheCreationSplit;
 }
 
 /** Compute total USD cost for a given model + usage breakdown. */
@@ -89,7 +110,24 @@ export function estimateCostUsd(model: string, usage: UsageStats): number {
   const inputCost = (usage.input_tokens / 1_000_000) * p.inputPer1M;
   const outputCost = (usage.output_tokens / 1_000_000) * p.outputPer1M;
   const cacheReadCost = ((usage.cache_read_input_tokens ?? 0) / 1_000_000) * p.cacheReadPer1M;
+  // A 5m write costs 1.25×, a 1h write 2× — pricing every write at 2× turned
+  // M2R5 C2's short-loop writes into phantom overcharges on the ledger. The
+  // split is trusted ONLY when it is finite and sums to the flat total beside
+  // it: on the streamed path the SDK updates the flat counter from
+  // message_delta but never the nested split, so a drifted or partial split
+  // must lose to the flat 1h rate — a NaN here doesn't misprice a row, it
+  // THROWS at the numeric insert and the row is lost (C2 audit).
+  const flat = usage.cache_creation_input_tokens ?? 0;
+  const split = usage.cache_creation;
+  const splitSane =
+    split !== undefined &&
+    Number.isFinite(split.ephemeral_5m_input_tokens) &&
+    Number.isFinite(split.ephemeral_1h_input_tokens) &&
+    split.ephemeral_5m_input_tokens + split.ephemeral_1h_input_tokens === flat;
   const cacheCreationCost =
-    ((usage.cache_creation_input_tokens ?? 0) / 1_000_000) * p.cacheCreationPer1M;
+    split !== undefined && splitSane
+      ? (split.ephemeral_5m_input_tokens / 1_000_000) * p.cacheCreation5mPer1M +
+        (split.ephemeral_1h_input_tokens / 1_000_000) * p.cacheCreationPer1M
+      : (flat / 1_000_000) * p.cacheCreationPer1M;
   return inputCost + outputCost + cacheReadCost + cacheCreationCost;
 }

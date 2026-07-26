@@ -194,8 +194,17 @@ describe.skipIf(!url)("SZ conductor draft-resume (real Postgres, scripted model)
 
     const sent = mockStream.mock.calls[0]?.[0];
     expect(sent?.messages).toHaveLength(5); // turn 1's four + the new player message
-    expect(sent?.messages[0]?.content).toBe(SZ_KICKOFF);
-    expect(sent?.messages[4]?.content).toBe("let's play cowboy bebop");
+    // Every transcript string rides as a one-block array — one byte shape for
+    // a message's whole life (C2 audit) — unmarked behind the tail.
+    expect(sent?.messages[0]?.content).toEqual([{ type: "text", text: SZ_KICKOFF }]);
+    // The newest message wears the moving cache breakpoint (M2R5 C2).
+    expect(sent?.messages[4]?.content).toEqual([
+      {
+        type: "text",
+        text: "let's play cowboy bebop",
+        cache_control: { type: "ephemeral", ttl: "1h" },
+      },
+    ]);
     // Tool round-trips survive rehydration in order (API replay requirement).
     const blocks = sent?.messages[1]?.content as { type: string }[];
     expect(blocks.some((b) => b.type === "tool_use")).toBe(true);

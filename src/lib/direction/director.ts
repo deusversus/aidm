@@ -423,6 +423,11 @@ export async function runDirectorCycle(
     tools: DIRECTOR_TOOLS,
     executeTool,
     maxToolRounds: DIRECTOR_MAX_TOOL_ROUNDS,
+    // M2R5 C2: persona + dossier are a 1.2–3.5k head this cycle re-sends on
+    // every investigation round. 5m, not 1h — the rounds are seconds apart
+    // and cycles are turns apart, so the cheaper write amortizes across up to
+    // six reads at 0.1× and nothing is left paying 2× for a dead entry.
+    cacheHead: "5m",
   });
 
   // --- APPLY (§7.1) ---------------------------------------------------------

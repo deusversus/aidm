@@ -5,9 +5,9 @@
  * number the 2026-07-26 audit turned on — net USD saved (or lost) against the
  * counterfactual where the same tokens had never been cached at all.
  *
- * The cache is a bet: a write costs 2× the base input rate (1h TTL, the only
- * TTL this engine uses) and a read costs 0.1×. Write once, read twice and you
- * are ahead; write and never read and you paid double for nothing. This script
+ * The cache is a bet: a write costs 2× the base input rate at the 1h TTL
+ * (1.25× at 5m) and a read costs 0.1×. Write once, read twice and you are
+ * ahead; write and never read and you paid double for nothing. This script
  * settles the bet.
  *
  *   pnpm cache:gauge [days]     (days = window, default 14)
@@ -77,7 +77,7 @@ interface Row {
 }
 
 interface Priced extends Row {
-  /** creation × cacheCreationPer1M (the 2× write premium). */
+  /** creation × cacheCreationPer1M (the 2× 1h write premium). */
   writeUsd: number;
   /** read × cacheReadPer1M (the 0.1× discount). */
   readUsd: number;
@@ -142,6 +142,10 @@ function printReport(days: number, since: Date, rows: Row[]): void {
       const p = pricingFor(r.model);
       priced.push({
         ...r,
+        // Flat 2×: model_calls stores one creation total, not the per-TTL
+        // split the meter now prices from (the rows predate it and the schema
+        // stays put) — so a 5m write shows here at 2× and the NET line below
+        // is, if anything, conservative.
         writeUsd: (r.creation / 1_000_000) * p.cacheCreationPer1M,
         readUsd: (r.read / 1_000_000) * p.cacheReadPer1M,
         counterfactualUsd: ((r.creation + r.read) / 1_000_000) * p.inputPer1M,
@@ -161,7 +165,7 @@ function printReport(days: number, since: Date, rows: Row[]): void {
 
   console.log("");
   console.log("Cache-token accounting (creation + read; plain input tokens cancel out):");
-  console.log(`  written    ${int(creation).padStart(12)} tokens @ 2×    = ${usd(writeUsd)}`);
+  console.log(`  written    ${int(creation).padStart(12)} tokens @ 2× 1h = ${usd(writeUsd)}`);
   console.log(`  read       ${int(read).padStart(12)} tokens @ 0.1×  = ${usd(readUsd)}`);
   console.log(`  actual paid                              = ${usd(actual)}`);
   console.log(`  uncached counterfactual @ 1×             = ${usd(counterfactual)}`);

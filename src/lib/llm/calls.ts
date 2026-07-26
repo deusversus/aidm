@@ -116,14 +116,31 @@ interface StructuredCallOptions<T> extends CallContext {
   executeTool?: (name: string, input: unknown) => Promise<string>;
   /** Investigation rounds before the final structured emit. 0 (default) = single-shot. */
   maxToolRounds?: number;
+  /**
+   * Opt-in prefix caching (M2R5 C2), OFF by default: converts `system` into a
+   * text block carrying the breakpoint and marks the tail of the opening user
+   * turn, so a call whose HEAD repeats within the TTL reads it at 0.1×
+   * instead of re-billing it at list price. Only worth it for an in-process
+   * loop — the Director's investigation re-sends a 1.2–3.5k head up to six
+   * rounds seconds apart ("5m"). Judgment and probe stay bare: their systems
+   * run under the per-model cache minimums and their payloads are unique per
+   * firing, so a breakpoint would buy a 1.25–2× write nothing ever reads.
+   */
+  cacheHead?: "5m" | "1h";
 }
 
+// Return type inferred deliberately: the two cache counters are always filled
+// here (prewarmPrefix reads them as numbers), while `cache_creation` stays
+// optional — UsageStats' own contract, minus the optionality this never emits.
 function usageStats(usage: Usage) {
   return {
     input_tokens: usage.input_tokens,
     output_tokens: usage.output_tokens,
     cache_read_input_tokens: usage.cache_read_input_tokens ?? 0,
     cache_creation_input_tokens: usage.cache_creation_input_tokens ?? 0,
+    // The per-TTL split (M2R5 C2): without it the meter prices every write at
+    // the 2× 1h rate and overcharges the loops that write at 1.25×.
+    ...(usage.cache_creation ? { cache_creation: usage.cache_creation } : {}),
   };
 }
 
@@ -155,11 +172,29 @@ async function callStructured<T>(
     metadata: { campaignId: opts.campaignId, turnNumber: opts.turnNumber },
   });
 
+  // The opt-in head breakpoint (M2R5 C2). Absent — the default — both fields
+  // stay bare strings and the request is byte-identical to the uncached form.
+  const headCache = opts.cacheHead
+    ? ({ type: "ephemeral", ttl: opts.cacheHead } as const)
+    : undefined;
+  const system: MessageCreateParamsNonStreaming["system"] | undefined = opts.system
+    ? headCache
+      ? [{ type: "text", text: opts.system, cache_control: headCache }]
+      : opts.system
+    : undefined;
+
   // The transcript. Single-shot callers leave it at one user turn; an
   // investigation loop (§7.1) grows it in place with tool round-trips before
   // the final structured emit. When no tools run, `messages` is identical to
   // the prior inline literal — the single-shot path stays untouched.
-  const messages: MessageParam[] = [{ role: "user", content: opts.prompt }];
+  const messages: MessageParam[] = [
+    {
+      role: "user",
+      content: headCache
+        ? [{ type: "text", text: opts.prompt, cache_control: headCache }]
+        : opts.prompt,
+    },
+  ];
   const maxToolRounds = opts.maxToolRounds ?? 0;
   if (opts.tools && opts.tools.length > 0 && opts.executeTool && maxToolRounds > 0) {
     const execute = opts.executeTool;
@@ -177,7 +212,7 @@ async function callStructured<T>(
         invMessage = await createStreamed({
           model,
           max_tokens: effectiveCap,
-          ...(opts.system ? { system: opts.system } : {}),
+          ...(system ? { system } : {}),
           messages,
           tools: opts.tools,
           ...(caps?.adaptiveThinking ? { thinking: { type: "adaptive" } } : {}),
@@ -253,7 +288,7 @@ async function callStructured<T>(
   const params: MessageCreateParamsNonStreaming = {
     model,
     max_tokens: effectiveCap,
-    ...(opts.system ? { system: opts.system } : {}),
+    ...(system ? { system } : {}),
     messages,
     output_config: {
       format: zodOutputFormat(opts.schema),

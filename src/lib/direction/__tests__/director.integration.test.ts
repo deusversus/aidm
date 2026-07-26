@@ -349,6 +349,9 @@ describe.skipIf(!url)("Director (real Postgres, scripted model)", () => {
     expect(callOpts?.maxToolRounds).toBe(DIRECTOR_MAX_TOOL_ROUNDS);
     expect(callOpts?.effort).toBe("high");
     expect(callOpts?.maxTokens).toBe(LOOPED_LARGE);
+    // M2R5 C2: the loop re-sends persona + dossier every round, seconds apart —
+    // 5m, so the 1.25× write amortizes across up to six reads at 0.1×.
+    expect(callOpts?.cacheHead).toBe("5m");
 
     // M2R R2: the dossier carries the Series contract — finitude's behavioral
     // consumer (§8) plus the series-horizon line (the budget's reader).
@@ -568,6 +571,8 @@ describe.skipIf(!url)("Director (real Postgres, scripted model)", () => {
     // No tools on the startup call (planning from the OSP, not investigating).
     const startupOpts = mockJudgment.mock.calls[0]?.[1];
     expect(startupOpts?.tools).toBeUndefined();
+    // And no breakpoint: a single-shot head is written once and never re-read.
+    expect(startupOpts?.cacheHead).toBeUndefined();
 
     const state = await loadDirectionState(db, campaignId);
     expect(state.tension_level).toBe(0.2);

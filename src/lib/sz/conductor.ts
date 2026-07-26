@@ -4,7 +4,11 @@ import { PROSE_COMPOSER } from "@/lib/llm/budgets";
 import { streamNarration } from "@/lib/llm/calls";
 import { DEV_TIER_SELECTION, TierSelection } from "@/lib/llm/tiers";
 import { researchTitle } from "@/lib/research/research";
-import type { Tool } from "@anthropic-ai/sdk/resources/messages/messages";
+import type {
+  ContentBlockParam,
+  MessageParam,
+  Tool,
+} from "@anthropic-ai/sdk/resources/messages/messages";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 
@@ -201,6 +205,45 @@ export function draftMessages(
   return out;
 }
 
+/** C9, measured 2026-07-18: SZ think-time is the same human as play think-time. */
+const SZ_CACHE_CONTROL = { type: "ephemeral", ttl: "1h" } as const;
+
+/**
+ * The transcript as the API sees it, with a MOVING breakpoint on its last
+ * message (M2R5 C2). The conversation is append-only, so every round of the
+ * loop — and every later turn — re-sends everything said so far; with the
+ * mark riding the tail, the next request reads that whole head at 0.1×
+ * instead of re-billing it at list price. Only the tail is rewritten (a
+ * string content becomes a one-block array so it can carry the mark) and the
+ * durable draft is never touched, so the prefix stays byte-stable behind it.
+ */
+function transcriptMessages(transcript: TranscriptMessage[]): MessageParam[] {
+  // EVERY string content renders as a one-block array, marked or not: a
+  // message must keep one byte shape for its whole life in the transcript.
+  // Rendering the tail as an array and the same message as a bare string one
+  // round later would bet the prefix match on the server normalizing the two
+  // — the wire says it does (measured 2026-07-26), but nothing documents it,
+  // and uniformity costs nothing (C2 audit).
+  const messages = transcript.map(
+    (m) =>
+      ({
+        role: m.role,
+        content: typeof m.content === "string" ? [{ type: "text", text: m.content }] : m.content,
+      }) as MessageParam,
+  );
+  const last = messages[messages.length - 1];
+  if (!last || typeof last.content === "string") return messages;
+  const blocks: ContentBlockParam[] = [...last.content];
+  const tail = blocks[blocks.length - 1];
+  // A thinking block rejects cache_control outright (400). The tail is always
+  // a user turn in practice — the player's line, or the round's tool_results —
+  // so this is a guard against a shape change, not a live path.
+  if (!tail || tail.type === "thinking" || tail.type === "redacted_thinking") return messages;
+  blocks[blocks.length - 1] = { ...tail, cache_control: SZ_CACHE_CONTROL };
+  messages[messages.length - 1] = { role: last.role, content: blocks };
+  return messages;
+}
+
 async function executeTool(
   db: Db,
   draft: ConductorDraft,
@@ -310,8 +353,7 @@ export async function runConductorTurn(
   const [player] = await db.select().from(players).where(eq(players.id, campaign.playerId));
   const taste = (player?.profile as { taste?: string[] } | null)?.taste ?? [];
   const system: Parameters<typeof streamNarration>[0]["system"] = [
-    // C9: 1h TTL — SZ think-time is the same human as play think-time.
-    { type: "text", text: CONDUCTOR_SYSTEM, cache_control: { type: "ephemeral", ttl: "1h" } },
+    { type: "text", text: CONDUCTOR_SYSTEM },
   ];
   if (taste.length > 0) {
     system.push({
@@ -319,6 +361,11 @@ export async function runConductorTurn(
       text: `RETURNING PLAYER. Taste notes from past campaigns — greet them like a regular, and hold these LIGHTLY: they are who this player has been at other tables, not who they are being today. Recognition, never presumption — do not frame the new campaign through a past one's preferences, and never make the player push back against an assumption to claim a departure. These are material for questions ("same appetite as last time, or something different?"), never defaults; what the player says THIS time outranks every line below. Never recite the list back:\n${taste.map((t) => `- ${t}`).join("\n")}`,
     });
   }
+  // M2R5 C2: the breakpoint marks the LAST system block, not the first — it
+  // used to sit on the persona alone, leaving a returning player's taste block
+  // outside the cached prefix to re-bill at list price every single round.
+  const lastSystem = system[system.length - 1];
+  if (lastSystem) lastSystem.cache_control = SZ_CACHE_CONTROL;
 
   draft.transcript.push({ role: "user", content: playerMessage.trim() || SZ_KICKOFF });
 
@@ -332,10 +379,7 @@ export async function runConductorTurn(
       // recorded as an observation and applied at compile).
       selection: selection.success ? selection.data : DEV_TIER_SELECTION,
       system,
-      messages: draft.transcript.map((m) => ({
-        role: m.role,
-        content: m.content as never,
-      })),
+      messages: transcriptMessages(draft.transcript),
       // A player-facing prose composer; thinking headroom is added structurally
       // (computeEffectiveMaxTokens). A ceiling, not a target — only produced
       // tokens bill (the C1 NAA lesson: a flat 2k once truncated a reply live).
