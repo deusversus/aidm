@@ -1,19 +1,14 @@
 import type { Db } from "@/lib/db";
 import { SAKUGA_FRAGMENTS } from "@/lib/ka/fragments";
 import { STRUCTURED_SMALL } from "@/lib/llm/budgets";
-import { COMMIT_SCENE_TOOL, callProbe, extractCommitScene, streamNarration } from "@/lib/llm/calls";
+import { callProbe, extractCommitScene, streamNarration } from "@/lib/llm/calls";
 import type { TierSelection } from "@/lib/llm/tiers";
 import type { Conte } from "@/lib/types/conte";
 import { CommitScene } from "@/lib/types/sidecar";
 import type { TurnEffort } from "@/lib/types/turn";
 import type { MessageParam, TextBlockParam } from "@anthropic-ai/sdk/resources/messages/messages";
 import type { LadderStep } from "./degrade";
-import {
-  KA_RESEARCH_TOOLS,
-  executeGetTurnNarrative,
-  executeRecallScene,
-  executeSearchLore,
-} from "./tools";
+import { KA_TOOLS, executeGetTurnNarrative, executeRecallScene, executeSearchLore } from "./tools";
 
 /**
  * Phase B — the KeyAnimator (blueprint §5.1, §5.7): ONE narration-tier
@@ -57,13 +52,27 @@ How a scene ends is a choice you are always making, and the house habit is the w
 
 The scene is not finished when the prose ends. It is finished when commit_scene is called. A long scene makes the trailer easy to forget — end the prose, then IMMEDIATELY call commit_scene, every scene, without exception. (Measured 2026-07-11: half of long-form scenes dropped it; the fallback reconstruction is lossier than your own record.)`;
 
-/** Deterministic Block-4 rendering: the conte as the KA's storyboard. */
-export function renderConte(conte: Conte, playerInput: string): string {
+/**
+ * Deterministic Block-4 rendering: the conte as the KA's storyboard.
+ *
+ * `researchBudget` rides here, in the volatile block, because the tool array
+ * can no longer carry it (M2R5 C1 — the array is constant so the cached prefix
+ * survives a douga beat). Stating the allowance is what keeps a zero-budget
+ * turn from spending a whole round discovering the refusal.
+ */
+export function renderConte(conte: Conte, playerInput: string, researchBudget?: number): string {
   const lines: string[] = ["# Storyboard (this scene only)"];
   lines.push(`Player action: ${playerInput}`);
   lines.push(
     `Turn ${conte.turn_id} · tier ${conte.tier}${conte.degraded ? " · DEGRADED (minimal brief)" : ""}`,
   );
+  if (researchBudget !== undefined) {
+    lines.push(
+      researchBudget > 0
+        ? `Research allowance this scene: ${researchBudget} tool call(s), before the prose.`
+        : "Research allowance this scene: NONE. Write from what you hold — a research call this turn will be refused.",
+    );
+  }
 
   if (conte.outcome) {
     const o = conte.outcome;
@@ -176,6 +185,13 @@ function researchBudget(base: number, ladderSteps: LadderStep[]): number {
 }
 
 /**
+ * What an over-budget research call gets back (M2R5 C1). The allowance is
+ * stated in the conte; the tool array can no longer carry it without busting
+ * the prefix, so the refusal carries it instead.
+ */
+export const RESEARCH_REFUSAL = "research budget exhausted — write the scene from what you hold.";
+
+/**
  * Run Phase B: stream prose, execute budgeted research round-trips, end on
  * the commit_scene trailer (or reconstruct it via probe). The prior
  * exchanges live in Block 3 — the message list here is just this turn.
@@ -198,10 +214,9 @@ export async function runKeyAnimator(
   },
 ): Promise<KAResult> {
   const budget = researchBudget(args.kaResearchCalls, args.ladderSteps);
-  const tools = budget > 0 ? [COMMIT_SCENE_TOOL, ...KA_RESEARCH_TOOLS] : [COMMIT_SCENE_TOOL];
 
   const messages: MessageParam[] = [
-    { role: "user", content: renderConte(args.conte, args.playerInput) },
+    { role: "user", content: renderConte(args.conte, args.playerInput, budget) },
   ];
 
   let prose = "";
@@ -209,7 +224,10 @@ export async function runKeyAnimator(
   let costUsd = 0;
   let fallbackUsed = false;
 
-  // Research loop: each round streams; commit_scene (or plain end) exits.
+  // Research loop: each round streams; commit_scene (or plain end) exits. The
+  // round cap still scales with the budget, so a zero-budget turn gets one
+  // refused research round and one round to write — a stubborn model cannot
+  // spin past the cap by asking again.
   for (let round = 0; round < budget + 2; round++) {
     const { stream, done } = streamNarration({
       name: "ka_narration",
@@ -224,7 +242,7 @@ export async function runKeyAnimator(
       // which is why the pad, not this budget, absorbs the reasoning spend.
       maxTokens: args.maxTokens,
       effort: args.effort === "xhigh" ? "xhigh" : args.effort === "low" ? "low" : "high",
-      tools,
+      tools: KA_TOOLS,
       campaignId: args.campaignId,
       turnNumber: args.turnNumber,
     });
@@ -295,7 +313,9 @@ export async function runKeyAnimator(
       }
       let output: string;
       if (researchCalls >= budget) {
-        output = "Research budget exhausted — write the scene from what you have.";
+        // Refused, not executed: no DB work, no counter bump. The round it
+        // consumed is the only cost, and the loop cap bounds those.
+        output = RESEARCH_REFUSAL;
       } else {
         researchCalls += 1;
         args.emit({ type: "staging", text: "checking the records" });

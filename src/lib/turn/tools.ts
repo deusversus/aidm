@@ -1,6 +1,7 @@
 import type { Db } from "@/lib/db";
 import { notTombstoned } from "@/lib/db/helpers";
 import { canonChunks, episodicRecords } from "@/lib/db/schema";
+import { COMMIT_SCENE_TOOL } from "@/lib/llm/calls";
 import { embedTexts } from "@/lib/llm/voyage";
 import type { Tool } from "@anthropic-ai/sdk/resources/messages/messages";
 import { and, eq, gte, inArray, lte, sql } from "drizzle-orm";
@@ -62,6 +63,17 @@ export const KA_RESEARCH_TOOLS: Tool[] = [
   RECALL_SCENE_TOOL,
   GET_TURN_NARRATIVE_TOOL,
 ];
+
+/**
+ * The KA's tool array — CONSTANT for every narration call, every tier, every
+ * ladder step (M2R5 C1). Tools render ahead of `system` in the cache key, so
+ * an array that flaps with the research budget busts all three block
+ * breakpoints twice around any douga beat or `cap_research_0` degrade. The
+ * budget is enforced inside the loop instead (ka.ts): an over-budget research
+ * call gets a refusal tool_result, never execution. The pre-warm sends this
+ * same array so its write lands in the entry the KA actually reads.
+ */
+export const KA_TOOLS: Tool[] = [COMMIT_SCENE_TOOL, ...KA_RESEARCH_TOOLS];
 
 export async function executeSearchLore(
   db: Db,

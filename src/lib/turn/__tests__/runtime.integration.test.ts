@@ -8,6 +8,7 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { attachToTurn, executeTurn, submitTurn } from "../runtime";
+import { KA_TOOLS } from "../tools";
 
 /**
  * The durable turn (§5.7) against real Postgres with scripted models:
@@ -447,7 +448,7 @@ describe.skipIf(!url)("Turn Runtime (real Postgres, scripted models)", () => {
     expect((turn?.sidecar as typeof SIDECAR).notable_beats).toBeDefined();
   });
 
-  it("research budget: calls past the cap get the exhausted notice; ladder cap_research_0 strips tools", async () => {
+  it("research budget: calls past the cap get the exhausted notice; cap_research_0 keeps the constant tools and refuses in-loop", async () => {
     if (!db) throw new Error("unreachable");
     const { runKeyAnimator } = await import("../ka");
     const bebop = bebopContract();
@@ -513,10 +514,12 @@ describe.skipIf(!url)("Turn Runtime (real Postgres, scripted models)", () => {
     expect(result.researchCalls).toBe(2); // third call got the exhausted notice
     expect(result.sidecar).not.toBeNull();
 
-    // Ladder cap_research_0: the research tools never reach the model.
+    // Ladder cap_research_0: the tool array is UNCHANGED (M2R5 C1 — the array
+    // is law; a degraded turn that stripped tools busted the cache prefix).
+    // The budget is refused in the loop, not withheld from the request.
     mockStream.mockClear();
     mockStream.mockImplementation((opts: Parameters<typeof streamNarration>[0]) => {
-      expect((opts.tools ?? []).map((t) => t.name)).toEqual(["commit_scene"]);
+      expect(opts.tools).toEqual(KA_TOOLS);
       return kaRound(
         [
           { type: "text", text: "No research. " },

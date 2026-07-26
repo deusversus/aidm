@@ -25,6 +25,7 @@ import { callJudgment, prewarmPrefix, streamNarration } from "@/lib/llm/calls";
 import { DEV_TIER_SELECTION, TierSelection } from "@/lib/llm/tiers";
 import { type SetteiInput, renderSettei } from "@/lib/renderer/settei";
 import { runSakkanSample } from "@/lib/sakkan/sakkan";
+import { KA_TOOLS } from "@/lib/turn/tools";
 import {
   ROLLING_CHECKPOINT_TURNS,
   SESSION_IDLE_TIMEOUT_MS,
@@ -215,7 +216,7 @@ export async function openSession(
     // Pre-warm must never fail the open — the sitting starts regardless.
     if (blocks) {
       try {
-        await prewarmPrefix(tier, blocks.system, { campaignId });
+        await prewarmPrefix(tier, blocks.system, KA_TOOLS, { campaignId });
       } catch (err) {
         console.warn("[session] prewarm failed on open (non-fatal)", {
           campaignId,

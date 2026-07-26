@@ -7,6 +7,7 @@ import { assembleBlocks } from "@/lib/blocks/assemble";
 import { prewarmPrefix } from "@/lib/llm/calls";
 import { DEV_TIER_SELECTION } from "@/lib/llm/tiers";
 import { flushLangfuse } from "@/lib/observability/langfuse";
+import { KA_TOOLS } from "@/lib/turn/tools";
 
 // Synthetic but realistically-sized blocks — the prefix must clear the
 // model's minimum cacheable length (1024 tokens on Sonnet).
@@ -44,11 +45,11 @@ const blocks = assembleBlocks({
 
 console.log("budgets:", JSON.stringify(blocks.budgets));
 
-const first = await prewarmPrefix(DEV_TIER_SELECTION, blocks.system);
+const first = await prewarmPrefix(DEV_TIER_SELECTION, blocks.system, KA_TOOLS);
 console.log(
   `first call:  cacheCreation=${first.cacheCreation} cacheRead=${first.cacheRead} cost=$${first.costUsd.toFixed(6)}`,
 );
-const second = await prewarmPrefix(DEV_TIER_SELECTION, blocks.system);
+const second = await prewarmPrefix(DEV_TIER_SELECTION, blocks.system, KA_TOOLS);
 console.log(
   `second call: cacheCreation=${second.cacheCreation} cacheRead=${second.cacheRead} cost=$${second.costUsd.toFixed(6)}`,
 );

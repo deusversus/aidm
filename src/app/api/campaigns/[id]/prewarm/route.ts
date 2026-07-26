@@ -4,6 +4,7 @@ import { getDb } from "@/lib/db";
 import { campaigns } from "@/lib/db/schema";
 import { prewarmPrefix } from "@/lib/llm/calls";
 import { TierSelection } from "@/lib/llm/tiers";
+import { KA_TOOLS } from "@/lib/turn/tools";
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
@@ -34,6 +35,8 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     return NextResponse.json({ error: "campaign has no premise contract yet" }, { status: 409 });
   }
 
-  const result = await prewarmPrefix(selection.data, blocks.system, { campaignId: id });
+  const result = await prewarmPrefix(selection.data, blocks.system, KA_TOOLS, {
+    campaignId: id,
+  });
   return NextResponse.json({ ...result, budgets: blocks.budgets });
 }

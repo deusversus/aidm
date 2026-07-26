@@ -10,6 +10,7 @@ import type {
   MessageStreamParams,
   TextBlockParam,
   Tool,
+  ToolUnion,
   Usage,
 } from "@anthropic-ai/sdk/resources/messages/messages";
 import type { ZodType } from "zod";
@@ -378,13 +379,24 @@ export function callProbe<T>(selection: TierSelection, opts: StructuredCallOptio
 }
 
 /**
- * Cache pre-warm (§5.6): a max_tokens=1 request against the exact blocks
- * 1–3 prefix so the player's real call reads warm. Fired by the play view
- * when the input regains focus after >4min idle (client hook lands M1).
+ * Cache pre-warm (§5.6): a max_tokens=0 request against the EXACT prefix the
+ * real call will send — same tools, same blocks 1–3 — so the player's turn
+ * reads warm. Fired by the play view when the input regains focus after
+ * >4min idle, and on session open.
+ *
+ * `tools` is required, not optional (M2R5 C1): tools render AHEAD of `system`
+ * in the cache key, so a tool-less pre-warm wrote an entry the KA
+ * structurally could not hit — every firing was a pure 2×-rate loss that
+ * delivered none of the latency it exists for.
+ *
+ * max_tokens=0 is the documented pre-warm form: prefill runs, the cache
+ * writes, zero output tokens bill (the old max_tokens=1 paid for a token
+ * nobody read).
  */
 export async function prewarmPrefix(
   selection: TierSelection,
   system: TextBlockParam[],
+  tools: ToolUnion[],
   ctx: CallContext = {},
 ): Promise<{ cacheCreation: number; cacheRead: number; costUsd: number }> {
   const model = selection.narration;
@@ -399,9 +411,16 @@ export async function prewarmPrefix(
   try {
     message = await getAnthropic().messages.create({
       model,
-      max_tokens: 1,
+      max_tokens: 0,
+      // No tool_choice: {type:"tool"|"any"} — those are rejected alongside
+      // max_tokens=0, and tool_choice does not enter the tools/system cache
+      // key anyway, so the KA's `auto` costs the prefix nothing.
+      ...(tools.length > 0 ? { tools } : {}),
       system,
-      messages: [{ role: "user", content: "." }],
+      // The documented pre-warm form keeps a placeholder user turn — an empty
+      // `messages` array is a 400. It sits AFTER the last breakpoint (the
+      // Block-3 tail), so it never enters the cached prefix.
+      messages: [{ role: "user", content: "warmup" }],
     });
   } catch (err) {
     const statusMessage = err instanceof Error ? err.message : String(err);
