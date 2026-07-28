@@ -138,6 +138,7 @@ export function bebopContract(overrides: Partial<PremiseContract> = {}): Premise
       hard_lines: [],
     },
     suggestion_affordance: "on_request_only",
+    premise_laws: [],
     anchors_used: [],
     ...overrides,
   };

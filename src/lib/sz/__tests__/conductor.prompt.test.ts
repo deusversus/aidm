@@ -1,3 +1,9 @@
+import {
+  CompositionMode,
+  NarrativeFocus,
+  PowerExpression,
+  TensionSource,
+} from "@/lib/types/composition";
 import { describe, expect, it } from "vitest";
 import { CONDUCTOR_SYSTEM, ObservationKind } from "../conductor";
 
@@ -73,6 +79,49 @@ describe("conductor system prompt spec (SV2 — the voice)", () => {
     // The memory MARKING is universal — offered at every table.
     expect(beat).toContain("memory MARKING is available at every table");
     expect(ObservationKind.options).toContain("presentation_directive");
+  });
+
+  it("THE LAW CHANNEL routes an off-instrument resolution to premise_law (M2R6)", () => {
+    expect(CONDUCTOR_SYSTEM).toContain("THE LAW CHANNEL");
+    expect(CONDUCTOR_SYSTEM).toContain('"premise_law"');
+    expect(ObservationKind.options).toContain("premise_law");
+    // The three rules that were bent at the China Shop, and the case that
+    // named the commit: absence is the one thing the pen cannot infer.
+    expect(CONDUCTOR_SYSTEM).toContain("never decorate an enum token with a gloss");
+    expect(CONDUCTOR_SYSTEM).toContain("never coin a value");
+    expect(CONDUCTOR_SYSTEM).toContain("NEGATIVE SPACE");
+    // A deferral and a law are opposites, and must never be filed as each other.
+    expect(CONDUCTOR_SYSTEM).toContain("Never file one as the other");
+  });
+
+  it("the framing beat carries the CLOSED vocabularies and the law fallthrough (M2R6)", () => {
+    // "Not on the enum" is unknowable unless the enum is in the prompt — the
+    // routing rule is stated where framing_choice is taught, with its tokens.
+    const beat = CONDUCTOR_SYSTEM.slice(
+      CONDUCTOR_SYSTEM.indexOf("THE POWER TIER"),
+      CONDUCTOR_SYSTEM.indexOf("WHAT YOU GATHER"),
+    );
+    // Derived from the SOURCE enums, not hand-copied samples — a
+    // composition.ts edit must fail here, never drift the prompt silently
+    // (C2 audit).
+    for (const token of [
+      ...TensionSource.options,
+      ...PowerExpression.options,
+      ...NarrativeFocus.options,
+      ...CompositionMode.options,
+    ]) {
+      expect(beat).toContain(token);
+    }
+    expect(beat).toContain("premise_law");
+    expect(beat).toContain("CLOSED SETS");
+  });
+
+  it("the recap beat reads the carved laws back before anything is signed (M2R6)", () => {
+    const bar = CONDUCTOR_SYSTEM.slice(CONDUCTOR_SYSTEM.indexOf("WHEN THE TABLE IS SET"));
+    expect(bar).toContain("OPEN ITEMS");
+    expect(bar).toContain("CARVED LAWS");
+    expect(bar).toContain("READ THEM BACK");
+    expect(bar).toContain("UNREAD RECORDS");
   });
 
   it("THE POWER TIER beat exists, walks the four options, records both kinds (SV3)", () => {

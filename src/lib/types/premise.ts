@@ -308,6 +308,22 @@ export const PremiseContract = z.object({
    * sheet owns LIVE progression — this is the starting contract.
    */
   pc_power_tier: PowerTier.optional(),
+  /**
+   * The law channel (M2R6, §2 player authority): resolutions the player
+   * reached at the table that NO closed axis holds, verbatim, one clause
+   * each. The engine has two organs — the GAUGE (DNA axes, Framing enums:
+   * closed, anchored, blind-measurable) and the LAW (hard lines, critical
+   * facts: open, verbatim, absolute). A premise that outgrows the instrument
+   * grows here, never by minting an axis value.
+   *
+   * Negative space is the canonical resident ("there is NO cost to my
+   * power"): the register is a positive-pressure system that fills every
+   * unfenced hollow with genre, so an absence must be fenced as hard as a
+   * line. Readers: Block 1's world-rules freight (the control-key
+   * precedent — obeyed text, never scored text) and layer 9's critical
+   * facts, which ride every conte's hard_constraints.
+   */
+  premise_laws: z.array(z.string()).default([]),
   /** Anchor shows used during SZ calibration (§4.6). */
   anchors_used: z.array(z.string()).default([]),
 });

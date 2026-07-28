@@ -103,7 +103,39 @@ export interface ResolvedObservations {
   worldFacts: Observation[];
   castFacts: Observation[];
   playerTaste: string[];
-  deferred: string[];
+  /**
+   * M2R6, the law channel: resolutions the closed instrument cannot hold,
+   * VERBATIM — recorded `premise_law` clauses plus any framing_choice value
+   * that could not be normalized onto its axis. This is the must-place
+   * invariant's landing: a player resolution either PLACES on the gauge or
+   * becomes LAW; the schema-dropped third class no longer exists (the China
+   * Shop, 2026-07-27 — "there is no cost to my power" fell into `deferred`,
+   * rode `ready: true`, and the register filled the hollow it left).
+   */
+  premiseLaws: string[];
+  /**
+   * What the PLAYER left open — their own deferrals, the deferral notes, and
+   * engine notes about what stays open for the story. The conductor's "open
+   * for the story to discover" list, and nothing else.
+   */
+  playerDeferred: string[];
+  /**
+   * Records the engine could not READ: malformed JSON (or an ambiguous
+   * anchored value) of a STRUCTURED kind, where there is no player clause to
+   * carve — a power tier is a rung on a closed ladder, not a sentence. A
+   * repair signal for the conductor, surfaced at the gate as its own list; it
+   * never wears the costume of an open story item.
+   */
+  parseFailures: string[];
+  /**
+   * Framing values that compiled to a bare token while carrying MORE words
+   * than the token. The gloss may be color or may be the design — no parser
+   * can rule which, so the TABLE does: these ride the gate for read-back
+   * beside the carved laws, and a load-bearing gloss re-records as
+   * premise_law (C2 audit — "consequence, but collateral" must never lose
+   * its second half silently).
+   */
+  compiledWithGloss: string[];
 }
 
 type Finitude = "finite" | "indefinite" | "undecided";
@@ -126,6 +158,48 @@ export function resolveFinitude(content: string): Finitude | undefined {
   return hits.size === 1 ? [...hits][0] : undefined;
 }
 
+/**
+ * A framing value's HEAD token, normalized for enum matching: everything up
+ * to the first gloss separator, unquoted, lowercased, whitespace and hyphens
+ * folded to underscores. "overwhelming — force is rarely in doubt" →
+ * `overwhelming`; "Reverse Ensemble" → `reverse_ensemble`.
+ *
+ * The head must EQUAL a token, never merely contain one: "collateral
+ * consequence" normalizes to `collateral_consequence`, matches nothing, and
+ * goes to law. A contains-match would silently compile it to `consequence` —
+ * the player's actual design overwritten by the nearest gauge reading, which
+ * is the same authority violation as dropping it (M2R6).
+ */
+export function normalizeFramingValue(
+  options: readonly string[],
+  raw: string,
+): { token: string; glossed: boolean } | undefined {
+  const head = raw.trim().split(/[—–…:;,()/|\n]|\s-\s|\.(?:\s|$)/)[0] ?? "";
+  const clean = (s: string) =>
+    s
+      .replace(/^["'“”‘’\s]+|["'“”‘’.\s]+$/g, "")
+      .toLowerCase()
+      .replace(/[\s-]+/g, "_");
+  const token = clean(head);
+  const hits = options.filter((o) => o === token);
+  if (hits.length !== 1 || !hits[0]) return undefined;
+  // Glossed = the whole value normalizes to MORE than the bare token. The
+  // gloss may be pure color ("overwhelming — force is rarely in doubt") or a
+  // modifier that IS the design ("consequence — but collateral, the world
+  // pays") — no machine can tell them apart, so the TABLE decides: a glossed
+  // compile is read back beside the carved laws (C2 audit F1/F3).
+  return { token: hits[0], glossed: clean(raw) !== token };
+}
+
+function parseJsonWith<T extends z.ZodTypeAny>(content: string, schema: T): z.infer<T> | undefined {
+  try {
+    const parsed = schema.safeParse(JSON.parse(content));
+    return parsed.success ? parsed.data : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export function resolveObservations(observations: Observation[]): ResolvedObservations {
   const resolved: ResolvedObservations = {
     pcNameDeferred: false,
@@ -139,8 +213,29 @@ export function resolveObservations(observations: Observation[]): ResolvedObserv
     worldFacts: [],
     castFacts: [],
     playerTaste: [],
-    deferred: [],
+    premiseLaws: [],
+    playerDeferred: [],
+    parseFailures: [],
+    compiledWithGloss: [],
   };
+  /** Law is append-and-dedupe: a re-recorded clause is the same law. */
+  const carveLaw = (clause: string) => {
+    const text = clause.trim();
+    if (text && !resolved.premiseLaws.includes(text)) resolved.premiseLaws.push(text);
+  };
+  // Parse failures carry their kind AND their position so a LATER readable
+  // record of the same kind clears the note (SV2's discipline: the recap must
+  // never send the conductor re-asking a settled question) — while a garbage
+  // record that arrived AFTER the good one still surfaces, because it may
+  // have been an attempted change (C2 audit: order-aware, every kind).
+  // Blocking on failures instead would deadlock the table — resolution
+  // replays every observation ever recorded, so a malformed early record
+  // never disappears.
+  const parseFailures: { kind: Observation["kind"]; note: string; seq: number }[] = [];
+  let seq = 0;
+  const cannotRead = (kind: Observation["kind"], note: string) =>
+    parseFailures.push({ kind, note, seq });
+  const readAt = new Map<Observation["kind"], number>();
   // Deferral notes surface as open items only if still deferred AFTER
   // latest-wins resolution — a player who defers, then decides, must never
   // see a stale "left open" line in the conductor's summary (SV2; the C4
@@ -148,6 +243,11 @@ export function resolveObservations(observations: Observation[]): ResolvedObserv
   let nameDeferralNote: string | undefined;
   let conceptDeferralNote: string | undefined;
   for (const obs of observations) {
+    seq += 1;
+    // An observation either produces a parseFailure or was READ — placed on
+    // the instrument, carved as law, or held as a deferral. Reads stamp
+    // readAt so an earlier same-kind failure clears (order-aware; below).
+    const failuresBefore = parseFailures.length;
     switch (obs.kind) {
       case "spark":
         resolved.spark = obs.content; // verbatim, latest wins
@@ -155,7 +255,7 @@ export function resolveObservations(observations: Observation[]): ResolvedObserv
       case "finitude": {
         const value = resolveFinitude(obs.content);
         if (value) resolved.finitude = value;
-        else resolved.deferred.push(`ambiguous finitude: ${obs.content.slice(0, 80)}`);
+        else cannotRead("finitude", `ambiguous finitude: ${obs.content.slice(0, 80)}`);
         break;
       }
       case "pc_name": {
@@ -238,7 +338,7 @@ export function resolveObservations(observations: Observation[]): ResolvedObserv
             resolved.calibration[parsed.axis as keyof DNAScales] = parsed.value;
           }
         } catch {
-          resolved.deferred.push(`unparseable calibration: ${obs.content.slice(0, 80)}`);
+          cannotRead("calibration", `unparseable calibration: ${obs.content.slice(0, 80)}`);
         }
         break;
       }
@@ -250,32 +350,67 @@ export function resolveObservations(observations: Observation[]): ResolvedObserv
           resolved.pcPowerTier = parsed.tier;
           resolved.pcPowerBaseline = parsed.baseline;
         } catch {
-          resolved.deferred.push(`unparseable power tier: ${obs.content.slice(0, 80)}`);
+          // A tier is a rung on a closed ladder (T1-T10) that layout reads as
+          // a NUMBER — prose like "T3-ish" has no law form; carving it would
+          // put an unusable clause in Block 1 and still leave layout guessing.
+          cannotRead("pc_power_tier", `unparseable power tier: ${obs.content.slice(0, 80)}`);
         }
         break;
       }
       case "framing_choice": {
         // Calibration's idiom for the Framing component: any of the 13 axes,
-        // the value validated against THAT axis's enum — the model proposes,
-        // the schema disposes. Latest wins per axis.
-        try {
-          const parsed = z
-            .object({ axis: z.string(), value: z.string() })
-            .parse(JSON.parse(obs.content));
-          const axisSchema =
-            parsed.axis in Composition.shape
-              ? Composition.shape[parsed.axis as keyof Composition]
-              : undefined;
-          if (axisSchema?.safeParse(parsed.value).success) {
-            resolved.framingChoices = [
-              ...resolved.framingChoices.filter((f) => f.axis !== parsed.axis),
-              { axis: parsed.axis as keyof Composition, value: parsed.value },
-            ];
+        // the value normalized against THAT axis's enum. Latest wins per axis.
+        //
+        // M2R6 — the schema no longer DISPOSES of what it cannot hold. Two
+        // failures were stacked here (the China Shop): a correct token wearing
+        // a gloss failed safeParse on a technicality, and a genuine
+        // instrument-outgrowth ("collateral consequence") had nowhere to go.
+        // Now the head normalizes onto the axis, and anything still unplaceable
+        // is carved as LAW — including a value on an axis that doesn't exist,
+        // and a record that isn't even JSON. The gauge stays closed; the
+        // player's resolution never lands on the floor.
+        const parsed = parseJsonWith(
+          obs.content,
+          z.object({ axis: z.string(), value: z.string() }),
+        );
+        if (!parsed) {
+          // Free prose IS the player's clause — carve it. A record SHAPED like
+          // a structured one that won't parse is a broken record, not their
+          // words: reading a truncated JSON blob back as law would be theater.
+          if (obs.content.trim().startsWith("{")) {
+            cannotRead("framing_choice", `unparseable framing choice: ${obs.content.slice(0, 80)}`);
           } else {
-            resolved.deferred.push(`unrecognized framing choice: ${obs.content.slice(0, 80)}`);
+            carveLaw(obs.content);
           }
-        } catch {
-          resolved.deferred.push(`unparseable framing choice: ${obs.content.slice(0, 80)}`);
+          break;
+        }
+        const axisSchema =
+          parsed.axis in Composition.shape
+            ? Composition.shape[parsed.axis as keyof Composition]
+            : undefined;
+        const options: readonly string[] | undefined = axisSchema?.options;
+        const norm = options ? normalizeFramingValue(options, parsed.value) : undefined;
+        if (norm) {
+          resolved.framingChoices = [
+            ...resolved.framingChoices.filter((f) => f.axis !== parsed.axis),
+            { axis: parsed.axis as keyof Composition, value: norm.token },
+          ];
+          if (norm.glossed) {
+            // The gloss compiled to nothing — but whether it WAS nothing is
+            // the player's ruling, not the parser's. It rides the gate for
+            // read-back beside the carved laws (C2 audit).
+            resolved.compiledWithGloss.push(
+              `${parsed.axis} compiled to "${norm.token}" — the rest of the player's words rode as color: "${parsed.value}". If the gloss was load-bearing, record it as premise_law.`,
+            );
+          }
+        } else if (parsed.value.trim()) {
+          // The axis name rides the law because it is the clause's subject —
+          // "collateral consequence…" is only legible as an answer to
+          // "where does this story's tension come from?".
+          carveLaw(`${parsed.axis}: ${parsed.value}`);
+        } else {
+          // An empty value holds nothing of the player's to carve.
+          cannotRead("framing_choice", `empty framing choice: ${obs.content.slice(0, 80)}`);
         }
         break;
       }
@@ -308,7 +443,10 @@ export function resolveObservations(observations: Observation[]): ResolvedObserv
             parsed,
           ];
         } catch {
-          resolved.deferred.push(`unparseable blend choice: ${obs.content.slice(0, 80)}`);
+          // A blend pick names WHICH SOURCE supplies a component — it resolves
+          // against the loaded profiles, not against prose, and the hybrid
+          // recipe (not Block 1) is its reader. Nothing to carve.
+          cannotRead("blend", `unparseable blend choice: ${obs.content.slice(0, 80)}`);
         }
         break;
       }
@@ -327,7 +465,14 @@ export function resolveObservations(observations: Observation[]): ResolvedObserv
             parsed,
           ];
         } catch {
-          resolved.deferred.push(`unparseable presentation directive: ${obs.content.slice(0, 80)}`);
+          // The six devices are a closed set with a RENDERER behind each name;
+          // an ungranted device already degrades to the plain offset channel,
+          // and the prose `presentation` kind is where an unlisted want
+          // belongs. A repair signal, not a law.
+          cannotRead(
+            "presentation_directive",
+            `unparseable presentation directive: ${obs.content.slice(0, 80)}`,
+          );
         }
         break;
       }
@@ -351,7 +496,10 @@ export function resolveObservations(observations: Observation[]): ResolvedObserv
           resolved.suggestionAffordance = value;
         } else {
           resolved.suggestionAffordance = "on_request_only";
-          resolved.deferred.push(`ambiguous suggestion affordance: ${obs.content.slice(0, 80)}`);
+          cannotRead(
+            "suggestion_affordance",
+            `ambiguous suggestion affordance (safe default applied): ${obs.content.slice(0, 80)}`,
+          );
         }
         break;
       }
@@ -359,9 +507,10 @@ export function resolveObservations(observations: Observation[]): ResolvedObserv
         try {
           const parsed = TierSelection.safeParse(JSON.parse(obs.content));
           if (parsed.success) resolved.tierSelection = parsed.data;
-          else resolved.deferred.push(`unparseable tier selection: ${obs.content.slice(0, 80)}`);
+          else
+            cannotRead("tier_selection", `unparseable tier selection: ${obs.content.slice(0, 80)}`);
         } catch {
-          resolved.deferred.push(`unparseable tier selection: ${obs.content.slice(0, 80)}`);
+          cannotRead("tier_selection", `unparseable tier selection: ${obs.content.slice(0, 80)}`);
         }
         break;
       }
@@ -374,14 +523,30 @@ export function resolveObservations(observations: Observation[]): ResolvedObserv
       case "player_taste":
         resolved.playerTaste.push(obs.content);
         break;
+      case "premise_law":
+        // VERBATIM, always — the law channel's whole value is that nothing
+        // interprets it. Accumulates like hard lines; latest-wins would let a
+        // second law silently retract the first. A whitespace-only record is
+        // the channel's last silent-drop path — it surfaces instead (C2 audit).
+        if (obs.content.trim()) carveLaw(obs.content);
+        else cannotRead("premise_law", "empty premise law — nothing to carve");
+        break;
       case "deferred":
-        resolved.deferred.push(obs.content);
+        resolved.playerDeferred.push(obs.content);
         break;
     }
+    if (parseFailures.length === failuresBefore) readAt.set(obs.kind, seq);
   }
-  if (resolved.pcNameDeferred && nameDeferralNote) resolved.deferred.push(nameDeferralNote);
+  if (resolved.pcNameDeferred && nameDeferralNote) resolved.playerDeferred.push(nameDeferralNote);
   if (resolved.pcConceptDeferred && conceptDeferralNote)
-    resolved.deferred.push(conceptDeferralNote);
+    resolved.playerDeferred.push(conceptDeferralNote);
+  // Order-aware clearing, every kind (C2 audit — supersedes the old
+  // three-kind settled map): a failure is stale only when a LATER record of
+  // the same kind was read. A garbage record that arrived after the good one
+  // still surfaces — it may have been an attempted change.
+  resolved.parseFailures = parseFailures
+    .filter((f) => (readAt.get(f.kind) ?? -1) < f.seq)
+    .map((f) => f.note);
   return resolved;
 }
 
@@ -513,10 +678,17 @@ export const defaultOspSynthesizer: OspSynthesizer = async ({
       `Lethality: ${resolved.lethalityPosture}`,
       `Hard lines: ${resolved.hardLines.join("; ") || "(none)"}`,
       `Control key: ${resolved.controlKey ?? "(not on the table)"}`,
+      // M2R6: laws are premise truth the instrument could not hold. The
+      // opening must be written INSIDE them — an absence the OSP treats as
+      // unfenced comes back as a forbidden move nobody declared.
+      `PREMISE LAWS (the player's own words — absolute; write inside them, never around them, and never introduce a substitute for something a law removes): ${resolved.premiseLaws.join(" | ") || "(none)"}`,
       `Blend decisions: ${resolved.blendChoices.map((b) => `${b.component} ← ${b.choice}`).join("; ") || "(single source)"}`,
       `World facts: ${resolved.worldFacts.map((o) => o.content).join("; ") || "(none)"}`,
       `Cast facts: ${resolved.castFacts.map((o) => o.content).join("; ") || "(none)"}`,
-      `Deferred (Director's territory — likely uncertainties): ${resolved.deferred.join("; ") || "(none)"}`,
+      `Deferred (Director's territory — likely uncertainties): ${resolved.playerDeferred.join("; ") || "(none)"}`,
+      // Surfaced, not swallowed: a record the engine could not read is an OPEN
+      // question, and the OSP's uncertainty channel is where open questions go.
+      `Records the engine could not read (treat as OPEN, never as resolved): ${resolved.parseFailures.join("; ") || "(none)"}`,
     ].join("\n"),
     effort: "high",
     // OSP synthesis emits a large contract; thinking headroom is added
@@ -700,7 +872,7 @@ export async function compileSessionZero(
   }
   const profile = Profile.parse(profileRow?.profile);
   if (isHybrid) {
-    resolved.deferred.push(
+    resolved.playerDeferred.push(
       `hybrid premise compiled single-source (base: ${profileId}) — per-component assembly lands at M4; honor the recorded blend in prose meanwhile`,
     );
   }
@@ -756,8 +928,8 @@ export async function compileSessionZero(
           provenance: "sz_compiler",
         });
         if (ingested.clarify)
-          resolved.deferred.push(`unresolved at the table: ${ingested.clarify}`);
-        resolved.deferred.push(...ingested.flags);
+          resolved.playerDeferred.push(`unresolved at the table: ${ingested.clarify}`);
+        resolved.playerDeferred.push(...ingested.flags);
       } catch (err) {
         // Ingestion enriches; it never gates the handoff. The critical-facts
         // path below still carries every assertion.
@@ -838,6 +1010,10 @@ export async function compileSessionZero(
       },
       suggestion_affordance: resolved.suggestionAffordance ?? "on_request_only",
       ...(resolved.pcPowerTier ? { pc_power_tier: resolved.pcPowerTier } : {}),
+      // M2R6: the law channel rides the contract so the Renderer can put it in
+      // Block 1's world-rules freight beside the control key — the pen reads
+      // the laws EVERY turn, not only through per-turn hard_constraints.
+      premise_laws: resolved.premiseLaws,
       anchors_used: draft.profileIds,
     });
 
@@ -893,6 +1069,24 @@ export async function compileSessionZero(
           confidence: 1,
         })),
       );
+
+      // The law channel's second reader (M2R6): every carved law is a layer-9
+      // critical fact, so it rides EVERY conte's hard_constraints — including
+      // a douga turn's, where retrieval is none and the critical block is all
+      // the pen gets. Content is the player's clause verbatim; the label lives
+      // in `provenance`, not inside their words.
+      if (contract.premise_laws.length > 0) {
+        await tx.insert(criticalFacts).values(
+          contract.premise_laws.map((content) => ({
+            campaignId,
+            content,
+            category: "sz_fact",
+            turnId: 0,
+            provenance: "sz_resolution",
+            confidence: 1,
+          })),
+        );
+      }
 
       // Player-asserted facts persist DETERMINISTICALLY (player words are
       // world-building, never dropped) — the OSP call may also weave them into

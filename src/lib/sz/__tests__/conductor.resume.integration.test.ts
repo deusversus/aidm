@@ -426,4 +426,109 @@ describe.skipIf(!url)("SZ conductor draft-resume (real Postgres, scripted model)
       await db.delete(schema.campaigns).where(eq(schema.campaigns.id, c.id));
     }
   });
+
+  it("record_observation accepts kind premise_law and keeps the clause verbatim (M2R6 C1)", async () => {
+    if (!db) throw new Error("unreachable");
+    mockStream.mockReset();
+    const clause = "There is no cost to my power and no loss of control.";
+    const [c] = await db
+      .insert(schema.campaigns)
+      .values({ playerId, title: "law recording", status: "draft" })
+      .returning();
+    if (!c) throw new Error("insert failed");
+    try {
+      mockStream
+        .mockReturnValueOnce(
+          scriptedRound(
+            [
+              {
+                type: "tool_use",
+                id: "law_1",
+                name: "record_observation",
+                input: { kind: "premise_law", content: clause },
+              },
+            ],
+            "tool_use",
+          ),
+        )
+        .mockReturnValueOnce(
+          scriptedRound([{ type: "text", text: "Good — that's a hard line, then." }], "end_turn"),
+        );
+      const result = await runConductorTurn(db, c.id, "there is no cost to my power", () => {});
+      expect(toolResultFor(result, "law_1")).toBe("recorded");
+      const law = result.observations.find((o) => o.kind === "premise_law");
+      expect(law?.content).toBe(clause);
+      // Persisted, not just in memory — the compile reads szExtraction.
+      const [row] = await db.select().from(schema.campaigns).where(eq(schema.campaigns.id, c.id));
+      expect(row?.szExtraction).toContainEqual(
+        expect.objectContaining({ kind: "premise_law", content: clause }),
+      );
+    } finally {
+      await db.delete(schema.campaigns).where(eq(schema.campaigns.id, c.id));
+    }
+  });
+
+  it("the recap round carries the carve-back: carved laws, open items, and unread records are THREE lists (M2R6)", async () => {
+    if (!db) throw new Error("unreachable");
+    mockStream.mockReset();
+    const clause = "There is no cost to my power and no loss of control.";
+    const draft: ConductorDraft = {
+      transcript: [],
+      observations: [
+        ...TABLE_MINUS_NAME,
+        obs("pc_name", "Kami — he chose it himself"),
+        obs("deferred", "who the recurring antagonist is — director's territory"),
+        obs("premise_law", clause),
+        // The China Shop payload: off every tension_source enum, so the
+        // compiler carves it rather than dropping it.
+        obs(
+          "framing_choice",
+          '{"axis": "tension_source", "value": "collateral consequence — who pays the cost"}',
+        ),
+        // A record the engine cannot read must wear neither costume.
+        obs("blend", "mostly bebop I guess"),
+      ],
+      profileIds: ["seeded-profile"],
+      readyToCompile: false,
+    };
+    const [c] = await db
+      .insert(schema.campaigns)
+      .values({ playerId, title: "gate carve-back", status: "draft", szTranscript: draft })
+      .returning();
+    if (!c) throw new Error("insert failed");
+    try {
+      mockStream
+        .mockReturnValueOnce(
+          scriptedRound(
+            [
+              {
+                type: "tool_use",
+                id: "pc_1",
+                name: "propose_contract",
+                input: { campaign_title: "The China Shop" },
+              },
+            ],
+            "tool_use",
+          ),
+        )
+        .mockReturnValueOnce(
+          scriptedRound([{ type: "text", text: "I'm carving these as law: …" }], "end_turn"),
+        );
+      const result = await runConductorTurn(db, c.id, "that's everything", () => {});
+      expect(result.readyToCompile).toBe(true);
+      const parsed = JSON.parse(toolResultFor(result, "pc_1"));
+      expect(parsed.ready).toBe(true);
+      // The law the player must HEAR before signing.
+      expect(parsed.carved_laws).toEqual([
+        clause,
+        "tension_source: collateral consequence — who pays the cost",
+      ]);
+      // …and it is NOT filed as something left open for the story.
+      expect(parsed.open_items).toEqual(["who the recurring antagonist is — director's territory"]);
+      expect(parsed.unread_records.some((u: string) => u.includes("unparseable blend"))).toBe(true);
+      expect(parsed.guidance).toContain("READ THE CARVED LAWS BACK");
+    } finally {
+      await db.delete(schema.campaigns).where(eq(schema.campaigns.id, c.id));
+    }
+  });
 });

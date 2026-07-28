@@ -1,11 +1,18 @@
 import * as schema from "@/lib/db/schema";
 import { bebopContract } from "@/lib/renderer/__tests__/fixtures";
 import { renderSettei } from "@/lib/renderer/settei";
+import { NarrativeFocus, TensionSource } from "@/lib/types/composition";
 import { and, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { compileSessionZero, dedupeAdmissions, gapVerdict, resolveObservations } from "../compiler";
+import {
+  compileSessionZero,
+  dedupeAdmissions,
+  gapVerdict,
+  normalizeFramingValue,
+  resolveObservations,
+} from "../compiler";
 import type { ConductorDraft, Observation } from "../conductor";
 
 /** Real-DB compile: scripted draft → contract + OSP → persisted handoff. */
@@ -167,7 +174,7 @@ describe("suggestion affordance resolution (anchored, never guessed from prose)"
       ),
     ]);
     expect(r.suggestionAffordance).toBe("on_request_only");
-    expect(r.deferred.some((d) => d.includes("ambiguous suggestion affordance"))).toBe(true);
+    expect(r.parseFailures.some((d) => d.includes("ambiguous suggestion affordance"))).toBe(true);
   });
 
   it("anchored 'never' resolves", () => {
@@ -269,7 +276,7 @@ describe("protagonist name resolution + gap (M2 C4, deterministic)", () => {
     ]);
     expect(r.pcName).toBeUndefined();
     expect(r.pcNameDeferred).toBe(true);
-    expect(r.deferred.some((d) => d.includes("protagonist name deferred"))).toBe(true);
+    expect(r.playerDeferred.some((d) => d.includes("protagonist name deferred"))).toBe(true);
   });
 
   it("latest wins on a rename, and a later real name clears an earlier deferral", () => {
@@ -288,7 +295,9 @@ describe("protagonist name resolution + gap (M2 C4, deterministic)", () => {
     expect(undeferred.pcNameDeferred).toBe(false);
     // SV2: the resolved deferral leaves no stale open item behind — the
     // summary must never claim the name is being left open when it isn't.
-    expect(undeferred.deferred.some((d) => d.includes("protagonist name deferred"))).toBe(false);
+    expect(undeferred.playerDeferred.some((d) => d.includes("protagonist name deferred"))).toBe(
+      false,
+    );
   });
 });
 
@@ -329,7 +338,7 @@ describe("character concept resolution + gap (SV2, deterministic)", () => {
     ]);
     expect(r.pcConcept).toBeUndefined();
     expect(r.pcConceptDeferred).toBe(true);
-    expect(r.deferred.some((d) => d.includes("character concept deferred"))).toBe(true);
+    expect(r.playerDeferred.some((d) => d.includes("character concept deferred"))).toBe(true);
     expect(gapVerdict(r, true).some((g) => g.includes("concept"))).toBe(false);
   });
 
@@ -340,7 +349,7 @@ describe("character concept resolution + gap (SV2, deterministic)", () => {
     ]);
     expect(r.pcConcept).toContain("underdog");
     expect(r.pcConceptDeferred).toBe(false);
-    expect(r.deferred.some((d) => d.includes("character concept deferred"))).toBe(false);
+    expect(r.playerDeferred.some((d) => d.includes("character concept deferred"))).toBe(false);
   });
 
   it("mid-string 'deferred' in verbatim prose is NOT a deferral (the sentinel is anchored)", () => {
@@ -381,22 +390,31 @@ describe("power tier + framing choices (SV3, deterministic)", () => {
 
     const prose = resolveObservations([obs("pc_power_tier", "far above baseline, T3-ish")]);
     expect(prose.pcPowerTier).toBeUndefined();
-    expect(prose.deferred.some((d) => d.includes("unparseable power tier"))).toBe(true);
+    expect(prose.parseFailures.some((d) => d.includes("unparseable power tier"))).toBe(true);
     // Off the T1-T10 ladder never lands a garbage tier on the contract.
     const off = resolveObservations([obs("pc_power_tier", '{"tier": "T11", "baseline": "T8"}')]);
     expect(off.pcPowerTier).toBeUndefined();
-    expect(off.deferred.some((d) => d.includes("unparseable power tier"))).toBe(true);
+    expect(off.parseFailures.some((d) => d.includes("unparseable power tier"))).toBe(true);
+    // A later valid record clears the stale note — the recap must not send the
+    // conductor re-asking a question the table already settled (M2R6).
+    const repaired = resolveObservations([
+      obs("pc_power_tier", "far above baseline, T3-ish"),
+      obs("pc_power_tier", '{"tier": "T3", "baseline": "T8"}'),
+    ]);
+    expect(repaired.pcPowerTier).toBe("T3");
+    expect(repaired.parseFailures).toHaveLength(0);
   });
 
-  it("framing choices validate per-axis and win latest; junk defers, never overwrites", () => {
+  it("framing choices validate per-axis and win latest; nothing unplaceable is dropped", () => {
     const r = resolveObservations([
       obs("framing_choice", '{"axis": "tension_source", "value": "burden"}'),
       obs("framing_choice", '{"axis": "tension_source", "value": "existential"}'),
       obs("framing_choice", '{"axis": "narrative_focus", "value": "mundane"}'),
       obs("framing_choice", '{"axis": "mode", "value": "op_dominant"}'),
-      // A junk VALUE on a real axis defers and must not clobber the settled pick.
+      // An off-enum VALUE on a real axis becomes LAW and must not clobber the
+      // settled pick (M2R6 — it used to become a dead letter in `deferred`).
       obs("framing_choice", '{"axis": "tension_source", "value": "vibes"}'),
-      // A junk AXIS defers; non-JSON defers.
+      // A coined AXIS is law too; so is a record that isn't even JSON.
       obs("framing_choice", '{"axis": "power_level", "value": "high"}'),
       obs("framing_choice", "make it feel like a legend"),
     ]);
@@ -404,7 +422,157 @@ describe("power tier + framing choices (SV3, deterministic)", () => {
     expect(r.framingChoices).toContainEqual({ axis: "narrative_focus", value: "mundane" });
     expect(r.framingChoices).toContainEqual({ axis: "mode", value: "op_dominant" });
     expect(r.framingChoices).toHaveLength(3);
-    expect(r.deferred.filter((d) => d.includes("framing choice"))).toHaveLength(3);
+    expect(r.premiseLaws).toEqual([
+      "tension_source: vibes",
+      "power_level: high",
+      "make it feel like a legend",
+    ]);
+    // The dead-letter class is gone: a framing_choice never lands here.
+    expect(r.parseFailures).toHaveLength(0);
+    expect(r.playerDeferred).toHaveLength(0);
+  });
+});
+
+describe("the law channel (M2R6 — the China Shop, 35a4823d)", () => {
+  // The two payloads the conductor actually recorded on 2026-07-27, verbatim.
+  const GLOSSED_TOKEN =
+    '{"axis": "power_expression", "value": "overwhelming — force is rarely in doubt; the question is what it costs everyone else"}';
+  const OFF_ENUM =
+    '{"axis": "tension_source", "value": "collateral consequence — who pays the cost when he wins"}';
+
+  it("a glossed enum token compiles to the BARE token (the model proposed right)", () => {
+    const r = resolveObservations([obs("framing_choice", GLOSSED_TOKEN)]);
+    expect(r.framingChoices).toEqual([{ axis: "power_expression", value: "overwhelming" }]);
+    // The gloss is not load-bearing: it never becomes a second law.
+    expect(r.premiseLaws).toHaveLength(0);
+    expect(r.parseFailures).toHaveLength(0);
+  });
+
+  it("an off-enum resolution is CARVED AS LAW, never dropped and never rounded to a token", () => {
+    const r = resolveObservations([obs("framing_choice", OFF_ENUM)]);
+    // The nearest gauge reading (`consequence`) is NOT what the player said —
+    // a contains-match here would overwrite the design with an approximation.
+    expect(r.framingChoices).toHaveLength(0);
+    expect(r.premiseLaws).toEqual([
+      "tension_source: collateral consequence — who pays the cost when he wins",
+    ]);
+  });
+
+  it("a premise_law clause lands VERBATIM; a re-recorded clause is the same law", () => {
+    const clause = "There is no cost to my power and no loss of control.";
+    const r = resolveObservations([
+      obs("premise_law", clause),
+      obs("premise_law", `  ${clause}  `),
+      obs("premise_law", "The cost is collateral: the world around him pays it."),
+    ]);
+    expect(r.premiseLaws).toEqual([
+      clause,
+      "The cost is collateral: the world around him pays it.",
+    ]);
+  });
+
+  it("token normalization takes the HEAD only — never a contained token, never a phrase", () => {
+    const focus = NarrativeFocus.options;
+    expect(normalizeFramingValue(focus, "reverse ensemble")).toEqual({
+      token: "reverse_ensemble",
+      glossed: false,
+    });
+    expect(normalizeFramingValue(focus, "Ensemble.")).toEqual({
+      token: "ensemble",
+      glossed: false,
+    });
+    expect(normalizeFramingValue(focus, '"mundane" — ordinary is the goal')).toEqual({
+      token: "mundane",
+      glossed: true,
+    });
+    expect(normalizeFramingValue(focus, "an ensemble of misfits")).toBeUndefined();
+    const tension = TensionSource.options;
+    expect(normalizeFramingValue(tension, "burden (power exacts a toll)")).toEqual({
+      token: "burden",
+      glossed: true,
+    });
+    expect(normalizeFramingValue(tension, "collateral consequence")).toBeUndefined();
+    expect(normalizeFramingValue(tension, "")).toBeUndefined();
+  });
+
+  it("a glossed compile is read back at the gate — the TABLE rules whether the gloss was design", () => {
+    // The C2 audit's constructed inversion: a legal head smuggling the China
+    // Shop's own semantic. The token compiles; the gloss must NOT vanish.
+    const r = resolveObservations([
+      obs(
+        "framing_choice",
+        '{"axis": "tension_source", "value": "consequence — but collateral, the world pays"}',
+      ),
+      obs("framing_choice", '{"axis": "power_expression", "value": "overwhelming"}'),
+    ]);
+    expect(r.framingChoices).toContainEqual({ axis: "tension_source", value: "consequence" });
+    expect(r.compiledWithGloss).toHaveLength(1);
+    expect(r.compiledWithGloss[0]).toContain("consequence");
+    expect(r.compiledWithGloss[0]).toContain("but collateral, the world pays");
+    // A bare token carries no gloss note — no read-back noise on clean picks.
+    expect(r.compiledWithGloss[0]).not.toContain("power_expression");
+  });
+
+  it("a whitespace-only premise_law surfaces as unread — the channel's last silent drop closes", () => {
+    const r = resolveObservations([obs("premise_law", "   ")]);
+    expect(r.premiseLaws).toHaveLength(0);
+    expect(r.parseFailures).toHaveLength(1);
+    expect(r.parseFailures[0]).toContain("empty premise law");
+  });
+
+  it("stale-note clearing is order-aware for EVERY kind — later read clears, later garbage surfaces", () => {
+    // A broken suggestion_affordance followed by a valid one: the note clears
+    // (the old settled map covered only finitude/power-tier/tier-selection).
+    const healed = resolveObservations([
+      obs("suggestion_affordance", "hmm whatever you think"),
+      obs("suggestion_affordance", "never — full immersion"),
+    ]);
+    expect(healed.suggestionAffordance).toBe("never");
+    expect(healed.parseFailures).toHaveLength(0);
+    // The reverse order: the garbage arrived AFTER the good record — it may
+    // have been an attempted change, so it still surfaces for repair.
+    const suspect = resolveObservations([
+      obs("finitude", "finite — it ends"),
+      obs("finitude", "actually make it sort of both?"),
+    ]);
+    expect(suspect.finitude).toBe("finite");
+    expect(suspect.parseFailures).toHaveLength(1);
+  });
+
+  it("a BROKEN structured record is a repair signal, never a law read back as prose", () => {
+    const r = resolveObservations([
+      // Truncated JSON: shaped like a record, holds no readable clause.
+      obs("framing_choice", '{"axis": "tension_source", "value":'),
+      // A real axis with an empty value holds nothing of the player's either.
+      obs("framing_choice", '{"axis": "mode", "value": "   "}'),
+    ]);
+    expect(r.premiseLaws).toHaveLength(0);
+    expect(r.parseFailures).toHaveLength(2);
+  });
+
+  it("a plain valid enum value still compiles byte-identically (regression pin)", () => {
+    const r = resolveObservations([
+      obs("framing_choice", '{"axis": "tension_source", "value": "burden"}'),
+      obs("framing_choice", '{"axis": "power_expression", "value": "overwhelming"}'),
+    ]);
+    expect(r.framingChoices).toEqual([
+      { axis: "tension_source", value: "burden" },
+      { axis: "power_expression", value: "overwhelming" },
+    ]);
+    expect(r.premiseLaws).toHaveLength(0);
+    expect(r.parseFailures).toHaveLength(0);
+    expect(r.playerDeferred).toHaveLength(0);
+  });
+
+  it("the three lists stay distinct: law is not a deferral, a deferral is not a parse failure", () => {
+    const r = resolveObservations([
+      obs("premise_law", "Nobody in this world ages."),
+      obs("deferred", "who the recurring antagonist is — director's territory"),
+      obs("blend", "mostly bebop I guess"),
+    ]);
+    expect(r.premiseLaws).toEqual(["Nobody in this world ages."]);
+    expect(r.playerDeferred).toEqual(["who the recurring antagonist is — director's territory"]);
+    expect(r.parseFailures.some((f) => f.includes("unparseable blend"))).toBe(true);
   });
 });
 
@@ -425,7 +593,7 @@ describe("presentation directive resolution (M3-DG, deterministic)", () => {
     expect(r.directiveGrants).toContainEqual({ name: "memory", skin: "a sepia flashback" });
     expect(r.directiveGrants).toContainEqual({ name: "title", skin: "" });
     expect(r.directiveGrants).toHaveLength(3);
-    expect(r.deferred.filter((d) => d.includes("presentation directive"))).toHaveLength(2);
+    expect(r.parseFailures.filter((d) => d.includes("presentation directive"))).toHaveLength(2);
   });
 
   it("prose presentation grants stay prose — the structured half is separate", () => {
@@ -551,13 +719,13 @@ describe.skipIf(!url)("SZ compiler (real Postgres)", () => {
       obs("finitude", "torn between a finite run and letting it go on indefinitely"),
     ]);
     expect(ambiguous.finitude).toBeUndefined();
-    expect(ambiguous.deferred.some((d) => d.includes("ambiguous finitude"))).toBe(true);
+    expect(ambiguous.parseFailures.some((d) => d.includes("ambiguous finitude"))).toBe(true);
   });
 
   it("a malformed tier_selection defers instead of throwing", () => {
     const resolved = resolveObservations([obs("tier_selection", "sonnet for everything please")]);
     expect(resolved.tierSelection).toBeUndefined();
-    expect(resolved.deferred.some((d) => d.includes("tier selection"))).toBe(true);
+    expect(resolved.parseFailures.some((d) => d.includes("tier selection"))).toBe(true);
   });
 
   it("blend choices resolve latest-wins per component; malformed ones defer", () => {
@@ -569,7 +737,7 @@ describe.skipIf(!url)("SZ compiler (real Postgres)", () => {
     ]);
     expect(resolved.blendChoices).toContainEqual({ component: "world", choice: "Cowboy Bebop" });
     expect(resolved.blendChoices).toHaveLength(2);
-    expect(resolved.deferred.some((d) => d.includes("unparseable blend"))).toBe(true);
+    expect(resolved.parseFailures.some((d) => d.includes("unparseable blend"))).toBe(true);
   });
 
   it("a hybrid draft compiles single-source from the player's WORLD pick, recipe carried (M1, user-ratified)", async () => {
@@ -799,7 +967,7 @@ describe.skipIf(!url)("SZ compiler (real Postgres)", () => {
     try {
       const result = await compileSessionZero(db, campaign.id, {
         ospSynthesizer: async (input) => {
-          seenDeferred = [...input.resolved.deferred];
+          seenDeferred = [...input.resolved.playerDeferred];
           return DEFERRED_STUB;
         },
         ingestor: async () => ({ writes: [], flags: [] }),
@@ -859,6 +1027,77 @@ describe.skipIf(!url)("SZ compiler (real Postgres)", () => {
       expect(result.contract.canonical.framing.mode).toBe("standard");
       // The OSP hears about the elevation (no struggle-scene cold opens).
       expect(seenTier).toBe("T5");
+    } finally {
+      await db.delete(schema.campaigns).where(eq(schema.campaigns.id, campaign.id));
+    }
+  });
+
+  it("the China Shop table compiles WHOLE: gloss placed, law carved into layer 9 AND Block 1", async () => {
+    if (!db) throw new Error("unreachable");
+    const LAW_CLAUSE = "There is no cost to Kami's power and no loss of control.";
+    const lawDraft: ConductorDraft = {
+      transcript: [],
+      observations: [
+        ...SCRIPTED_OBSERVATIONS,
+        obs(
+          "framing_choice",
+          '{"axis": "power_expression", "value": "overwhelming — force is rarely in doubt"}',
+        ),
+        obs(
+          "framing_choice",
+          '{"axis": "tension_source", "value": "collateral consequence — who pays the cost when he wins"}',
+        ),
+        obs("premise_law", LAW_CLAUSE),
+      ],
+      profileIds: ["test_sz_profile"],
+      readyToCompile: true,
+    };
+    const [campaign] = await db
+      .insert(schema.campaigns)
+      .values({ playerId, title: "law channel fixture", status: "draft", szTranscript: lawDraft })
+      .returning();
+    if (!campaign) throw new Error("insert failed");
+    let seenLaws: string[] = [];
+    try {
+      const result = await compileSessionZero(db, campaign.id, {
+        ospSynthesizer: async (input) => {
+          seenLaws = [...input.resolved.premiseLaws];
+          return STUB_OSP;
+        },
+        ingestor: async () => ({ writes: [], flags: [] }),
+      });
+      expect(result.gaps).toEqual([]);
+      // The gloss was never the defect: the correct token places on the axis.
+      expect(result.contract.active.framing.power_expression).toBe("overwhelming");
+      // …and the resolution the instrument cannot hold is on the contract.
+      const carved = "tension_source: collateral consequence — who pays the cost when he wins";
+      expect(result.contract.premise_laws).toEqual([carved, LAW_CLAUSE]);
+      expect(seenLaws).toEqual([carved, LAW_CLAUSE]);
+
+      // Reader 1 — layer 9: every conte's hard_constraints, verbatim.
+      const facts = await db
+        .select()
+        .from(schema.criticalFacts)
+        .where(eq(schema.criticalFacts.campaignId, campaign.id));
+      const lawRow = facts.find((f) => f.content === LAW_CLAUSE);
+      expect(lawRow?.provenance).toBe("sz_resolution");
+      expect(lawRow?.category).toBe("sz_fact");
+      expect(lawRow?.confidence).toBe(1);
+      expect(facts.some((f) => f.content === carved)).toBe(true);
+
+      // Reader 2 — Block 1's world-rules freight, on the control key's
+      // precedent: obeyed text the pen reads every turn, and NOT charter
+      // budget (the §4.4a 600-900 window is untouched by a law).
+      const settei = renderSettei({ contract: result.contract, marks: [] });
+      expect(settei.text).toContain("Premise law (the player's word");
+      expect(settei.text).toContain(LAW_CLAUSE);
+      expect(settei.text).toContain("collateral consequence");
+      const lawless = renderSettei({
+        contract: { ...result.contract, premise_laws: [] },
+        marks: [],
+      });
+      expect(settei.charterTokens).toBe(lawless.charterTokens);
+      expect(settei.tokens).toBeGreaterThan(lawless.tokens);
     } finally {
       await db.delete(schema.campaigns).where(eq(schema.campaigns.id, campaign.id));
     }
@@ -926,7 +1165,7 @@ describe.skipIf(!url)("SZ compiler (real Postgres)", () => {
         };
       },
       ospSynthesizer: async (input) => {
-        ospDeferred = [...input.resolved.deferred];
+        ospDeferred = [...input.resolved.playerDeferred];
         return STUB_OSP;
       },
     });

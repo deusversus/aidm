@@ -240,6 +240,21 @@ export function renderSettei(input: SetteiInput): Settei {
       `Control key (player-cut, §7.5): in the declared circumstance — ${controlKey.circumstances}${controlKey.notes ? ` (${controlKey.notes})` : ""} — the player character may briefly slip the player's control; narrate that loss of agency, kept short and bounded to exactly this circumstance. Outside it the player's agency is absolute and inviolable; /meta re-opens the dialectic and /override melts the key instantly.`,
     );
   }
+  // The law channel (M2R6): premise resolutions no closed axis holds, in the
+  // player's own words, on the control key's precedent — Block-1 command
+  // freight outside the charter budget. Obeyed text, never scored text: a law
+  // has no anchor and no band, so the Sakkan never measures it. The absence
+  // clause is spelled out because the register fills unfenced hollows with
+  // genre, and that fill is what a "there is NO…" law exists to forbid.
+  if (contract.premise_laws.length > 0) {
+    hardCore.push(
+      [
+        "Premise law (the player's word — absolute, never traded against, never quietly balanced):",
+        ...contract.premise_laws.map((l) => `- ${l}`),
+        'Where a law names an ABSENCE ("there is no…"), do not fill the space and do not substitute an equivalent cost, price, or leash elsewhere; the hollow is deliberate.',
+      ].join("\n"),
+    );
+  }
 
   const framing = contract.active.framing;
   const identity = [

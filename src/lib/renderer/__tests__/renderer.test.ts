@@ -310,6 +310,40 @@ describe("the control key in the Settei (§7.5, M2-C8)", () => {
   });
 });
 
+describe("the law channel in the Settei (M2R6 — obeyed text, never scored text)", () => {
+  const lawed = () =>
+    bebopContract({
+      premise_laws: [
+        "There is no cost to my power and no loss of control.",
+        "tension_source: collateral consequence — who pays the cost when he wins",
+      ],
+    });
+
+  it("renders the player's clauses verbatim in the world-rules command block", () => {
+    const s = renderSettei({ contract: lawed(), marks: [] });
+    expect(s.text).toContain("Premise law (the player's word");
+    expect(s.text).toContain("There is no cost to my power and no loss of control.");
+    expect(s.text).toContain("collateral consequence");
+    // The absence clause is fenced explicitly: the register fills unfenced
+    // hollows with genre, and a substitute price is the fill this forbids.
+    expect(s.text).toContain("do not fill the space");
+    // Hard core, ahead of the charter's advisory pressure (axiom 3).
+    expect(s.text.indexOf("Premise law")).toBeLessThan(s.text.indexOf("## What this story is"));
+  });
+
+  it("renders NOTHING when no law was carved", () => {
+    const s = renderSettei({ contract: bebopContract(), marks: [] });
+    expect(s.text).not.toContain("Premise law");
+  });
+
+  it("is Block-1 freight, never charter budget (the control-key precedent)", () => {
+    const lawless = renderSettei({ contract: bebopContract(), marks: [] });
+    const withLaw = renderSettei({ contract: lawed(), marks: [] });
+    expect(withLaw.charterTokens).toBe(lawless.charterTokens);
+    expect(withLaw.tokens).toBeGreaterThan(lawless.tokens);
+  });
+});
+
 describe("renderAmendments (§4.4b)", () => {
   it("renders override pressure, retake direction, and fresh marks inside budget", () => {
     const a = renderAmendments({
