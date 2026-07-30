@@ -4,9 +4,19 @@ import { fetchWithAuthRetry } from "@/lib/client/fetch-with-auth";
 import { plainProse } from "@/lib/client/plain-prose";
 import type { DirectiveGrant } from "@/lib/types/premise";
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { ListenButton } from "./listen-button";
 import { NarrationProse } from "./narration-prose";
+import {
+  beyondRetakeHorizon,
+  firstUnwoundInput,
+  openingRetakeAvailable,
+  retakeDraftKey,
+  retakeSeamKey,
+  retakeTargets,
+  unwoundBoothCount,
+  unwoundCount,
+} from "./retake";
 
 type ChannelIntent = "META_FEEDBACK" | "OVERRIDE_COMMAND" | "OP_COMMAND";
 
@@ -156,6 +166,77 @@ const AFFORDANCE_OPTIONS: { value: string; label: string; note: string }[] = [
 ];
 
 /**
+ * The retake slate (M2R7 §3): the confirm lives in the transcript, under the
+ * chosen reply — no modal. It names the cost plainly in both directions: the
+ * record keeps the un-happened turns (tombstones, §6.7), the model spend does not
+ * come back.
+ */
+function RetakeSlate({
+  unwound,
+  unwoundBooth,
+  opening,
+  busy,
+  onConfirm,
+  onCancel,
+}: {
+  unwound: number;
+  unwoundBooth: number;
+  opening: boolean;
+  busy: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <div
+      data-retake="slate"
+      className="space-y-2 rounded-md border border-red-900/40 bg-red-950/20 px-3 py-2"
+    >
+      <p className="text-xs leading-5 text-muted-foreground">
+        <span className="font-medium uppercase tracking-widest text-foreground/90">Retake</span>{" "}
+        {opening
+          ? "from the opening — every turn un-happens."
+          : `from here — ${unwound === 1 ? "1 turn un-happens" : `${unwound} turns un-happen`}.`}{" "}
+        {unwoundBooth > 0
+          ? `${unwoundBooth === 1 ? "1 booth exchange un-happens" : `${unwoundBooth} booth exchanges un-happen`} too — rules minted there revert. `
+          : ""}
+        The record keeps them; the spend is spent.
+      </p>
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={onConfirm}
+          disabled={busy}
+          className="rounded-md border border-border px-3 py-1 text-xs hover:bg-muted disabled:opacity-50"
+        >
+          {busy ? "retaking…" : "Retake"}
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          disabled={busy}
+          className="text-xs text-muted-foreground/70 hover:text-muted-foreground disabled:opacity-50"
+        >
+          cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** The seam (M2R7 §5): a hairline at the cut, this sitting only — never a scar. */
+function RetakeSeam() {
+  return (
+    <div data-retake="seam" className="flex items-center gap-2">
+      <span className="h-px flex-1 bg-border" />
+      <span className="text-[10px] uppercase tracking-widest text-muted-foreground/50">
+        — retake —
+      </span>
+      <span className="h-px flex-1 bg-border" />
+    </div>
+  );
+}
+
+/**
  * The play view client: submits turns, streams SSE progress, renders
  * decision-point chips (dismissible, never in prose), typed errors with
  * retry, queued input, pin-from-selection, and the §5.6 pre-warm on input
@@ -202,8 +283,13 @@ export function PlayView({
   const [error, setError] = useState<{ message: string; turnId: string } | null>(null);
   const [queued, setQueued] = useState<string | null>(null);
   const [pinNotice, setPinNotice] = useState<string | null>(null);
-  const [rewindOpen, setRewindOpen] = useState(false);
-  const [rewindBusy, setRewindBusy] = useState(false);
+  // The retake (M2R7): a MODE over the transcript, not a panel of chips. The
+  // preview is the hovered/focused target; the target is the committed one.
+  const [retakeMode, setRetakeMode] = useState(false);
+  const [retakeBusy, setRetakeBusy] = useState(false);
+  const [retakeTarget, setRetakeTarget] = useState<number | null>(null);
+  const [retakePreview, setRetakePreview] = useState<number | null>(null);
+  const [seamTurn, setSeamTurn] = useState<number | null>(null);
   // §5.4 world-assertion feedback: informational, cleared on the next submission.
   const [assertion, setAssertion] = useState<AssertionNotice | null>(null);
   // §4.5 M2R3 steering-honesty notice: server-hydrated, dismissible once.
@@ -255,6 +341,7 @@ export function PlayView({
   const submitRef = useRef<(m: string) => void>(() => {});
   const lastActivityRef = useRef(Date.now());
   const bottomRef = useRef<HTMLDivElement>(null);
+  const composerRef = useRef<HTMLTextAreaElement>(null);
   const resumedRef = useRef(false);
   // Live mirror so a mid-turn suggestion-affordance change gates THIS turn's
   // chips without a reload (the same closure-staleness guard as errorRef).
@@ -316,6 +403,66 @@ export function PlayView({
       // Same as hydration: non-fatal, persistence is best-effort.
     }
   }, [queued, queueStorageKey]);
+
+  // M2R7 §4/§5: the two things a retake carries across its reload — the first
+  // unwound input, back in the composer as an editable draft, and the seam at
+  // the cut. Read-once (deleted as read) so a later reload reads the durable
+  // record clean: a seam, never a scar.
+  useEffect(() => {
+    try {
+      const draft = sessionStorage.getItem(retakeDraftKey(campaignId));
+      const seam = sessionStorage.getItem(retakeSeamKey(campaignId));
+      sessionStorage.removeItem(retakeDraftKey(campaignId));
+      sessionStorage.removeItem(retakeSeamKey(campaignId));
+      if (seam !== null) {
+        const n = Number.parseInt(seam, 10);
+        if (Number.isInteger(n)) setSeamTurn(n);
+      }
+      if (draft) {
+        // The retake draft OUTRANKS a surviving queue mirror: a queued line
+        // belongs to the branch that just un-happened (M2R7 audit).
+        sessionStorage.removeItem(queueStorageKey);
+        setInput(draft);
+        // After the state flush: focus with the cursor at the end, so the
+        // player edits their own words rather than retyping them.
+        setTimeout(() => {
+          const el = composerRef.current;
+          if (!el) return;
+          el.focus();
+          el.setSelectionRange(el.value.length, el.value.length);
+        }, 0);
+      }
+    } catch {
+      // sessionStorage can throw in locked-down contexts — the retake itself
+      // landed; only the draft/seam courtesy is lost.
+    }
+  }, [campaignId, queueStorageKey]);
+
+  // A turn in flight or a closed sitting is a wall for the mode, not just for
+  // entering it: an open turn can resume under a mode already entered.
+  useEffect(() => {
+    if (busy || sessionClosed || error !== null) {
+      setRetakeMode(false);
+      setRetakeTarget(null);
+      setRetakePreview(null);
+    }
+  }, [busy, sessionClosed, error]);
+
+  // Escape steps back one level: deselect, then leave the mode.
+  useEffect(() => {
+    if (!retakeMode) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if (retakeTarget !== null) {
+        setRetakeTarget(null);
+        return;
+      }
+      setRetakeMode(false);
+      setRetakePreview(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [retakeMode, retakeTarget]);
 
   const attachStream = useCallback(
     async (turnId: string, playerInput: string, retries = 0) => {
@@ -692,34 +839,51 @@ export function PlayView({
     setTimeout(() => setPinNotice(null), 4_000);
   };
 
-  // Rewind (§6.7): "before turn N" un-happens turn N onward — keep everything
-  // up to N-1. The durable record IS the UI state, so a reload rehydrates the
-  // rewound transcript from the (now-tombstoned-excluded) episodic layer.
-  // Story turns only: a booth exchange is out-of-fiction (§5.4) — "before a
-  // booth line" is not a place in the story (C9 audit).
-  const rewindTargets = exchanges
-    .filter((e) => e.kind !== "channel")
-    .map((e) => e.turnNumber)
-    .slice(-10);
-  const rewindTo = async (beforeTurn: number) => {
-    setRewindBusy(true);
+  // The retake (§6.7, M2R7): the player picks the reply that becomes the new
+  // present — `toTurn: N` keeps N and un-happens everything after it. The
+  // durable record IS the UI state, so the reload rehydrates the surviving
+  // transcript from the (tombstone-excluding) episodic layer.
+  const retakeTargetSet = retakeTargets(exchanges);
+  const openingIsTarget = openingRetakeAvailable(exchanges);
+  const hasRetakeTargets = retakeTargetSet.size > 0 || openingIsTarget;
+  // The selected target wins over a hover preview: once chosen, the dim holds
+  // still while the player reads the slate.
+  const unwindFrom = retakeTarget ?? retakePreview;
+
+  const exitRetake = () => {
+    setRetakeMode(false);
+    setRetakeTarget(null);
+    setRetakePreview(null);
+  };
+
+  const confirmRetake = async (toTurn: number) => {
+    if (retakeBusy) return;
+    setRetakeBusy(true);
+    // Read the draft BEFORE the reload takes the transcript away.
+    const draft = firstUnwoundInput(exchanges, toTurn);
     try {
       const res = await fetchWithAuthRetry(`/api/campaigns/${campaignId}/rewind`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ toTurn: beforeTurn - 1 }),
+        body: JSON.stringify({ toTurn }),
       });
       if (res.ok) {
+        try {
+          if (draft) sessionStorage.setItem(retakeDraftKey(campaignId), draft);
+          sessionStorage.setItem(retakeSeamKey(campaignId), String(toTurn));
+        } catch {
+          // Best-effort: a retake without its draft is still a retake.
+        }
         window.location.reload();
         return;
       }
       const body = (await res.json().catch(() => ({}))) as { error?: string };
-      setPinNotice(body.error ?? "Rewind failed.");
+      setPinNotice(body.error ?? "The retake didn't take — try again.");
     } catch {
-      setPinNotice("Rewind failed.");
+      setPinNotice("The retake didn't take — try again.");
     }
-    setRewindBusy(false);
-    setRewindOpen(false);
+    setRetakeBusy(false);
+    exitRetake();
   };
 
   // §9.2 on-demand summon: one probe-tier call → the existing chips rail. A
@@ -965,12 +1129,23 @@ export function PlayView({
           </button>
           <button
             type="button"
-            onClick={() => setRewindOpen((o) => !o)}
-            disabled={busy}
-            className="rounded-md border border-border px-3 py-1 text-xs hover:bg-muted disabled:opacity-50"
-            title="Rewind the story to before an earlier turn — un-happens everything after it"
+            data-retake="enter"
+            onClick={() => {
+              if (retakeMode) {
+                exitRetake();
+                return;
+              }
+              setRetakeMode(true);
+            }}
+            disabled={busy || sessionClosed || error !== null}
+            className={`rounded-md border px-3 py-1 text-xs disabled:opacity-50 ${
+              retakeMode
+                ? "border-foreground bg-muted text-foreground"
+                : "border-border hover:bg-muted"
+            }`}
+            title="Choose an earlier moment to return to — everything after it un-happens"
           >
-            Rewind
+            Retake
           </button>
           <button
             type="button"
@@ -1311,44 +1486,6 @@ export function PlayView({
         </div>
       )}
 
-      {rewindOpen && (
-        <div className="mt-3 space-y-2 rounded-md border border-border bg-muted/30 px-3 py-3 text-sm">
-          <p className="text-muted-foreground">
-            Rewind un-happens everything after the turn you pick — the story continues from there as
-            if the rest never played.
-          </p>
-          {rewindTargets.length > 0 ? (
-            <div className="flex flex-wrap gap-2">
-              {rewindTargets.map((n) => (
-                <button
-                  key={n}
-                  type="button"
-                  onClick={() => rewindTo(n)}
-                  disabled={rewindBusy}
-                  className="rounded-md border border-border px-3 py-1 text-xs hover:bg-muted disabled:opacity-50"
-                  title={`Rewind to before turn ${n} — un-happens everything after`}
-                >
-                  before turn {n}
-                </button>
-              ))}
-            </div>
-          ) : (
-            <p className="text-xs text-muted-foreground">Nothing to rewind yet.</p>
-          )}
-          <p className="text-xs italic text-muted-foreground">
-            One thing can’t be taken back: the model time already spent. Everything inside the story
-            itself reverts.
-          </p>
-          <button
-            type="button"
-            onClick={() => setRewindOpen(false)}
-            className="text-xs text-muted-foreground/70 hover:text-muted-foreground"
-          >
-            cancel
-          </button>
-        </div>
-      )}
-
       <div className="flex-1 space-y-5 overflow-y-auto py-4">
         {recap && (
           <div className="border-l-2 border-border pl-4">
@@ -1389,7 +1526,56 @@ export function PlayView({
               </button>
             </div>
           )}
+        {/* M2R7 §6: the top edge gets its name — the old degenerate "before
+            turn 1" chip, said as a place. Offered only inside the horizon. */}
+        {retakeMode && openingIsTarget && (
+          <div className="space-y-2">
+            <button
+              type="button"
+              data-retake="opening"
+              onMouseEnter={() => setRetakePreview(0)}
+              onMouseLeave={() => setRetakePreview(null)}
+              onFocus={() => setRetakePreview(0)}
+              onBlur={() => setRetakePreview(null)}
+              onClick={() => setRetakeTarget(0)}
+              className="rounded-md border border-border px-2 py-1 text-[11px] text-muted-foreground hover:bg-muted"
+            >
+              ↺ Return to the opening — replay from the first scene
+            </button>
+            {retakeTarget === 0 && (
+              <RetakeSlate
+                unwound={unwoundCount(exchanges, 0)}
+                unwoundBooth={unwoundBoothCount(exchanges, 0)}
+                opening
+                busy={retakeBusy}
+                onConfirm={() => void confirmRetake(0)}
+                onCancel={() => setRetakeTarget(null)}
+              />
+            )}
+          </div>
+        )}
+        {seamTurn === 0 && <RetakeSeam />}
         {exchanges.map((e, i) => {
+          // Retake mode tones the transcript: what un-happens carries a quiet
+          // red haze; what can never be returned to (booth lines, turns past
+          // the horizon) simply recedes.
+          const unwinding = retakeMode && unwindFrom !== null && e.turnNumber > unwindFrom;
+          const isTarget = retakeMode && e.kind !== "channel" && retakeTargetSet.has(e.turnNumber);
+          const beyond = retakeMode && beyondRetakeHorizon(exchanges, e.turnNumber);
+          const tone = unwinding
+            ? "-mx-3 rounded-md bg-red-950/10 px-3 py-2 opacity-50 ring-1 ring-red-900/30 transition-opacity"
+            : retakeMode && !isTarget
+              ? "opacity-40 transition-opacity"
+              : "";
+          const nonTargetTitle = beyond
+            ? "beyond the retake horizon"
+            : e.kind === "channel"
+              ? "the booth is not a moment in the story"
+              : retakeMode && !isTarget
+                ? "the newest moment — nothing after it to un-happen"
+                : undefined;
+
+          let block: ReactNode;
           if (e.kind === "channel") {
             const label =
               e.responder === "director"
@@ -1399,10 +1585,11 @@ export function PlayView({
                   : "THE STUDIO";
             // Override/op commands are a one-line confirmation, not a room.
             if (e.intent === "OVERRIDE_COMMAND" || e.intent === "OP_COMMAND") {
-              return (
+              block = (
                 <div
-                  key={`channel-${e.turnNumber}-${i}`}
-                  className="rounded-md border border-border bg-muted/20 px-4 py-2 text-sm"
+                  data-turn={e.turnNumber}
+                  {...(nonTargetTitle ? { title: nonTargetTitle } : {})}
+                  className={`rounded-md border border-border bg-muted/20 px-4 py-2 text-sm ${tone}`}
                 >
                   <p className="mb-1 text-[10px] uppercase tracking-widest text-muted-foreground/60">
                     standing rule set
@@ -1411,56 +1598,95 @@ export function PlayView({
                   <p className="mt-1 text-muted-foreground">{e.acknowledgement ?? e.narration}</p>
                 </div>
               );
-            }
-            // The booth: a bracketed studio room, clearly out of the fiction.
-            return (
-              <div
-                key={`channel-${e.turnNumber}-${i}`}
-                className="space-y-2 rounded-md border border-dashed border-border bg-muted/20 px-4 py-3"
-              >
-                <p className="text-[10px] uppercase tracking-widest text-muted-foreground/60">
-                  {label} · booth
-                </p>
-                <p className="text-sm text-muted-foreground">{e.playerInput}</p>
-                {e.narration && (
-                  <NarrationProse
-                    directives={displayDirectives}
-                    text={e.narration}
-                    className="text-sm italic leading-7 text-foreground/90 [&_em]:not-italic"
-                  />
-                )}
-                {e.closed && (
-                  <p className="text-[11px] italic text-muted-foreground/60">
-                    booth resolved — calibrations recorded
+            } else {
+              // The booth: a bracketed studio room, clearly out of the fiction.
+              block = (
+                <div
+                  data-turn={e.turnNumber}
+                  {...(nonTargetTitle ? { title: nonTargetTitle } : {})}
+                  className={`space-y-2 rounded-md border border-dashed border-border bg-muted/20 px-4 py-3 ${tone}`}
+                >
+                  <p className="text-[10px] uppercase tracking-widest text-muted-foreground/60">
+                    {label} · booth
                   </p>
+                  <p className="text-sm text-muted-foreground">{e.playerInput}</p>
+                  {e.narration && (
+                    <NarrationProse
+                      directives={displayDirectives}
+                      text={e.narration}
+                      className="text-sm italic leading-7 text-foreground/90 [&_em]:not-italic"
+                    />
+                  )}
+                  {e.closed && (
+                    <p className="text-[11px] italic text-muted-foreground/60">
+                      booth resolved — calibrations recorded
+                    </p>
+                  )}
+                </div>
+              );
+            }
+          } else {
+            block = (
+              <div
+                data-turn={e.turnNumber}
+                {...(!isTarget && nonTargetTitle ? { title: nonTargetTitle } : {})}
+                className={`space-y-3 ${tone}`}
+              >
+                <div className="flex justify-end">
+                  <div className="max-w-[80%] whitespace-pre-wrap rounded-lg bg-foreground px-3 py-2 text-sm text-background">
+                    {e.playerInput}
+                  </div>
+                </div>
+                <NarrationProse directives={displayDirectives} text={e.narration} />
+                {e.degraded && (
+                  <p className="text-[11px] italic text-muted-foreground/50">
+                    rendered thin — the studio was under time pressure this scene
+                  </p>
+                )}
+                {ttsAvailable && e.narration.trim() && (
+                  <div className="flex justify-end">
+                    <ListenButton
+                      campaignId={campaignId}
+                      turnNumber={e.turnNumber}
+                      narration={e.narration}
+                      voiceId={voiceId}
+                    />
+                  </div>
+                )}
+                {isTarget && (
+                  <button
+                    type="button"
+                    data-retake="target"
+                    onMouseEnter={() => setRetakePreview(e.turnNumber)}
+                    onMouseLeave={() => setRetakePreview(null)}
+                    onFocus={() => setRetakePreview(e.turnNumber)}
+                    onBlur={() => setRetakePreview(null)}
+                    onClick={() => setRetakeTarget(e.turnNumber)}
+                    className="rounded-md border border-border px-2 py-1 text-[11px] text-muted-foreground hover:bg-muted"
+                    title="Return here — the story goes on from this moment"
+                  >
+                    ↺ Return here
+                  </button>
+                )}
+                {retakeTarget === e.turnNumber && isTarget && (
+                  <RetakeSlate
+                    unwound={unwoundCount(exchanges, e.turnNumber)}
+                    unwoundBooth={unwoundBoothCount(exchanges, e.turnNumber)}
+                    opening={false}
+                    busy={retakeBusy}
+                    onConfirm={() => void confirmRetake(e.turnNumber)}
+                    onCancel={() => setRetakeTarget(null)}
+                  />
                 )}
               </div>
             );
           }
+
           return (
-            <div key={`story-${e.turnNumber}-${i}`} className="space-y-3">
-              <div className="flex justify-end">
-                <div className="max-w-[80%] whitespace-pre-wrap rounded-lg bg-foreground px-3 py-2 text-sm text-background">
-                  {e.playerInput}
-                </div>
-              </div>
-              <NarrationProse directives={displayDirectives} text={e.narration} />
-              {e.degraded && (
-                <p className="text-[11px] italic text-muted-foreground/50">
-                  rendered thin — the studio was under time pressure this scene
-                </p>
-              )}
-              {ttsAvailable && e.narration.trim() && (
-                <div className="flex justify-end">
-                  <ListenButton
-                    campaignId={campaignId}
-                    turnNumber={e.turnNumber}
-                    narration={e.narration}
-                    voiceId={voiceId}
-                  />
-                </div>
-              )}
-            </div>
+            <Fragment key={`${e.kind === "channel" ? "channel" : "story"}-${e.turnNumber}-${i}`}>
+              {block}
+              {seamTurn === e.turnNumber && <RetakeSeam />}
+            </Fragment>
           );
         })}
         {pendingInput && (
@@ -1599,61 +1825,87 @@ export function PlayView({
       </div>
 
       <footer className="border-t border-border pt-3">
-        <div className="flex gap-2">
-          <textarea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onFocus={onFocus}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                send();
-              }
-            }}
-            placeholder={
-              sessionClosed
-                ? "the sitting is over"
-                : busy
-                  ? "type away — it sends when the scene lands"
-                  : "What do you do?"
-            }
-            rows={2}
-            disabled={sessionClosed}
-            className="flex-1 resize-none rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-foreground disabled:opacity-50"
-          />
-          <button
-            type="button"
-            onClick={send}
-            disabled={!input.trim() || sessionClosed}
-            className="rounded-md border border-border px-4 text-sm font-medium hover:bg-muted disabled:opacity-50"
+        {/* M2R7 §1: in retake mode the composer stands down — the transcript is
+            the picker, and the only thing to say is which moment to return to. */}
+        {retakeMode ? (
+          <div
+            data-retake="bar"
+            className="flex items-center justify-between gap-3 rounded-md border border-border bg-muted/30 px-3 py-2"
           >
-            {busy ? "Queue" : "Act"}
-          </button>
-        </div>
-        <div className="mt-2 flex items-center justify-between">
-          <div>
-            {affordance !== "never" && (
+            <p className="text-xs text-muted-foreground">
+              {hasRetakeTargets
+                ? "Choose the moment to return to — everything after it un-happens"
+                : "Nothing to return to yet — the story needs a turn behind it."}
+            </p>
+            <button
+              type="button"
+              onClick={exitRetake}
+              disabled={retakeBusy}
+              className="shrink-0 text-xs text-muted-foreground/70 hover:text-muted-foreground disabled:opacity-50"
+            >
+              cancel
+            </button>
+          </div>
+        ) : (
+          <>
+            <div className="flex gap-2">
+              <textarea
+                ref={composerRef}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onFocus={onFocus}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    send();
+                  }
+                }}
+                placeholder={
+                  sessionClosed
+                    ? "the sitting is over"
+                    : busy
+                      ? "type away — it sends when the scene lands"
+                      : "What do you do?"
+                }
+                rows={2}
+                disabled={sessionClosed}
+                className="flex-1 resize-none rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-foreground disabled:opacity-50"
+              />
               <button
                 type="button"
-                onClick={() => void summonSuggestions()}
-                disabled={busy || sessionClosed || summoning}
-                title="Ask the studio for a few premise-true next moves"
+                onClick={send}
+                disabled={!input.trim() || sessionClosed}
+                className="rounded-md border border-border px-4 text-sm font-medium hover:bg-muted disabled:opacity-50"
+              >
+                {busy ? "Queue" : "Act"}
+              </button>
+            </div>
+            <div className="mt-2 flex items-center justify-between">
+              <div>
+                {affordance !== "never" && (
+                  <button
+                    type="button"
+                    onClick={() => void summonSuggestions()}
+                    disabled={busy || sessionClosed || summoning}
+                    title="Ask the studio for a few premise-true next moves"
+                    className="text-xs text-muted-foreground/70 hover:text-muted-foreground disabled:opacity-50"
+                  >
+                    {summoning ? "thinking…" : "Suggest moves"}
+                  </button>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={endSession}
+                disabled={closing || sessionClosed || busy}
+                title="End this sitting — writes the session's notes and shows next time's tease"
                 className="text-xs text-muted-foreground/70 hover:text-muted-foreground disabled:opacity-50"
               >
-                {summoning ? "thinking…" : "Suggest moves"}
+                {closing ? "closing…" : "End session"}
               </button>
-            )}
-          </div>
-          <button
-            type="button"
-            onClick={endSession}
-            disabled={closing || sessionClosed || busy}
-            title="End this sitting — writes the session's notes and shows next time's tease"
-            className="text-xs text-muted-foreground/70 hover:text-muted-foreground disabled:opacity-50"
-          >
-            {closing ? "closing…" : "End session"}
-          </button>
-        </div>
+            </div>
+          </>
+        )}
       </footer>
     </main>
   );
