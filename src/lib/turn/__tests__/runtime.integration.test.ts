@@ -560,7 +560,7 @@ describe.skipIf(!url)("Turn Runtime (real Postgres, scripted models)", () => {
         judgment: "claude-sonnet-5",
         probe: "claude-haiku-4-5",
       },
-      effort: "xhigh",
+      effort: "high",
       maxTokens: 1_000,
       kaResearchCalls: 4,
       ladderSteps: ["skip_validation_retry", "timebox_pacer", "cap_research_2", "cap_research_0"],

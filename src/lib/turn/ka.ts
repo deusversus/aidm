@@ -241,7 +241,7 @@ export async function runKeyAnimator(
       // bill (§5.5); a ceiling that fails a turn trims depth (§0 inversion),
       // which is why the pad, not this budget, absorbs the reasoning spend.
       maxTokens: args.maxTokens,
-      effort: args.effort === "xhigh" ? "xhigh" : args.effort === "low" ? "low" : "high",
+      effort: args.effort, // flat "high" from TURN_CONTRACTS since the §3 amendment (2026-08-01)
       tools: KA_TOOLS,
       campaignId: args.campaignId,
       turnNumber: args.turnNumber,

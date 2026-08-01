@@ -26,8 +26,7 @@ export const BUDGET_ASSUMPTIONS = {
    *  exactly turn N's read + write (5,215 = 4,916 + 299) and wrote 47
    *  tokens for the new exchange. 0.7 stays as the ENGINE-WIDE mix
    *  assumption because cold turns, session-open Settei rebuilds,
-   *  compaction resets, and the §3 effort-flap busts (douga low / genga
-   *  high key separately — measured 2026-07-26, ruling pending) all still
+   *  compaction resets, and cold session-open overhead all still
    *  dilute it; `pnpm cache:gauge` is the running measure, and this number
    *  tightens when real-session data says so, never from a two-call spike. */
   assumedCacheHitRate: 0.7,
@@ -42,9 +41,15 @@ export const BUDGET_ASSUMPTIONS = {
  * model, not in a widened margin). Measured allowances, M1 soak run #3.
  */
 export const THINKING_ALLOWANCE_TOKENS: Record<TurnTier, number> = {
-  douga: 1_000,
+  // 1k was measured while douga ran effort "low"; the §3 flatten (2026-08-01)
+  // moved douga to "high", where adaptive thinking self-regulates on trivial
+  // beats but has never been measured. Interim: genga's allowance (same
+  // effort, deeper scenes — a conservative over-model beats a known-wrong
+  // under-model). RE-BASELINES from the first flat-high soak (M3 C5).
+  douga: 6_000,
   // Recalibrated from live telemetry 2026-07-11 (C8): genga p95 5296 / max
   // 7548; sakuga p95 14695 / max 15488 — allowances cover p95 with margin.
+  // (Sakuga's 16k was measured at xhigh; at flat high it is conservative.)
   genga: 6_000,
   sakuga: 16_000,
 };
@@ -65,7 +70,12 @@ export const COLD_TURN_CEILING_USD: Record<TurnTier, number> = {
   // at Fable. Ceilings sit ~10% over — regression margin, never headroom.
   // The EXPECTED per-turn cost falls despite this: 1h caching converts
   // most real turns from full-prefix rewrites into 0.1x reads.
-  douga: 0.72,
+  //
+  // Douga re-set with the §3 flatten (2026-08-01): its interim 6k thinking
+  // allowance raises the modeled Fable cold to ~$0.90; ceiling ~10% over.
+  // Like the allowance, this RE-BASELINES from the first flat-high soak
+  // (M3 C5) — an interim over-model, never a quality budget.
+  douga: 0.99,
   genga: 1.05,
   sakuga: 1.95,
 };

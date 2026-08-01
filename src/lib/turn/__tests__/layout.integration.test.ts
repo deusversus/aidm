@@ -351,7 +351,9 @@ describe.skipIf(!url)("Layout (real Postgres, scripted models)", () => {
     expect(result.conte.entity_cards).toHaveLength(0);
     expect(result.conte.active_consequences).toHaveLength(0);
     expect(result.conte.hard_constraints.some((c) => c.includes("corgi"))).toBe(true);
-    expect(result.effort).toBe("low");
+    // Flat "high" across tiers (§3 amendment 2026-08-01): one cache key, every
+    // turn opens warm — the douga "low" rung retired with the effort-flap fix.
+    expect(result.effort).toBe("high");
     expect(result.ladderSteps).toHaveLength(0);
   });
 

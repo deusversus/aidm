@@ -132,6 +132,15 @@ export interface TurnContract {
  * Pacer's beat classification promotes effort on build-up scenes (escalation
  * beats run ≥ "high") so sakuga's masterstroke build-ups are never starved.
  * That promotion lives in the Pacer (M1), not this table.
+ *
+ * Effort is FLAT at "high" across all three tiers (§3 amendment, user-ruled
+ * 2026-08-01). Effort participates in the prompt-cache key (wire-measured
+ * 2026-07-26): the old ladder (douga low / sakuga xhigh) bought a full cold
+ * ~25k-token prefix re-write at every tier boundary, and the playtest measured
+ * genga-at-high running warm at $0.38/turn while sakuga-at-xhigh opened cold
+ * every time. "high" is the API default and still thinks deeply; xhigh's
+ * quality delta was designed-in, never measured. It earns its seat back only
+ * through a blind A/B (two sakuga scenes, both efforts, read cold).
  */
 export const TURN_CONTRACTS: Record<TurnTier, TurnContract> = {
   douga: {
@@ -146,7 +155,7 @@ export const TURN_CONTRACTS: Record<TurnTier, TurnContract> = {
     ttftTargetMs: 3_000,
     totalTargetMs: 10_000,
     validationRetry: false,
-    effort: "low",
+    effort: "high",
   },
   genga: {
     tier: "genga",
@@ -174,7 +183,7 @@ export const TURN_CONTRACTS: Record<TurnTier, TurnContract> = {
     ttftTargetMs: 15_000,
     totalTargetMs: 60_000,
     validationRetry: true,
-    effort: "xhigh",
+    effort: "high",
   },
 };
 

@@ -184,7 +184,7 @@ export function buildSystem(hasArcState: boolean): string {
 /**
  * The full Pacer (§7.2). One timeboxed probe; the model proposes, the code
  * enforces. Returns a conte-ready {@link PacerBeat} with a clamped strength,
- * plus the (never-applied) phase-transition suggestion and effort promotion.
+ * plus the (never-applied) phase-transition suggestion (effort promotion retired — C9, then §3 flat-high).
  */
 export async function runPacer(
   selection: TierSelection,

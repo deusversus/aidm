@@ -21,10 +21,12 @@ describe("TURN_CONTRACTS (§5.1 table)", () => {
     expect(douga.canonFanOut).toBe(false);
   });
 
-  it("effort mapping: douga→low, genga→high, sakuga→xhigh", () => {
-    expect(TURN_CONTRACTS.douga.effort).toBe("low");
+  it("effort is FLAT at high across all tiers (§3 amendment, user-ruled 2026-08-01)", () => {
+    // Effort is part of the prompt-cache key (wire-measured): the old ladder
+    // cold-opened every tier boundary. One value, one key, every turn warm.
+    expect(TURN_CONTRACTS.douga.effort).toBe("high");
     expect(TURN_CONTRACTS.genga.effort).toBe("high");
-    expect(TURN_CONTRACTS.sakuga.effort).toBe("xhigh");
+    expect(TURN_CONTRACTS.sakuga.effort).toBe("high");
   });
 
   it("only sakuga carries the validation retry and canon fan-out", () => {

@@ -72,8 +72,9 @@ async function main(): Promise<void> {
     `prewarm:   cacheCreation=${warm.cacheCreation} cacheRead=${warm.cacheRead} cost=$${warm.costUsd.toFixed(6)}`,
   );
 
-  // Two reads at DIFFERENT efforts, exactly as the KA varies them per tier
-  // (douga low / genga high). MEASURED 2026-07-26 on this spike: effort
+  // Two reads at DIFFERENT efforts. (The KA no longer varies effort per tier
+  // — flat high since the §3 amendment 2026-08-01 — but the spike keeps both
+  // legs as the standing cache-key probe.) MEASURED 2026-07-26 here: effort
   // PARTICIPATES in the cache key — "high" reads a no-effort entry (high is
   // the API default, same normalized key) while "low" misses the identical
   // prefix and re-writes it at 2×. The high leg is therefore the pass/fail
