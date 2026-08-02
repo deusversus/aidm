@@ -84,6 +84,8 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     prompt: `${tail}\n\noffer 2-3 concrete, premise-true next moves the player could take — short imperative phrases, no numbering`,
     campaignId: id,
     turnNumber: lastScene?.turnNumber,
+    // Summoned beside a finished turn, not inside one (M3 C1).
+    phase: "suggestion",
     maxTokens: STRUCTURED_SMALL,
   });
   return NextResponse.json({ moves });

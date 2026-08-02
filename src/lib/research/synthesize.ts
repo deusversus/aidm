@@ -82,6 +82,7 @@ export async function interpretTonal(media: AniListMedia): Promise<TonalInterpre
   const [treatmentPart, framingPart, worldPart] = await Promise.all([
     callJudgment(SELECTION, {
       name: "research_interpret_treatment",
+      phase: "research",
       schema: z.object({ treatment: DNAScales }),
       system: `${INTERPRET_SYSTEM} Calibrate the 0-10 treatment axes against these witness anchors (same scales the engine measures with):\n${witnessAnchorBlock()}`,
       prompt: block,
@@ -90,6 +91,7 @@ export async function interpretTonal(media: AniListMedia): Promise<TonalInterpre
     }),
     callJudgment(SELECTION, {
       name: "research_interpret_framing",
+      phase: "research",
       schema: z.object({
         framing: Composition,
         combat_style: CombatStyle,
@@ -115,6 +117,7 @@ export async function interpretTonal(media: AniListMedia): Promise<TonalInterpre
     }),
     callJudgment(SELECTION, {
       name: "research_interpret_world",
+      phase: "research",
       schema: z.object({
         storytelling_tropes: StorytellingTropes,
         visual_style: VisualStyle,
@@ -146,6 +149,7 @@ export async function synthesizePowerSystem(
     .join("\n\n");
   return callJudgment(SELECTION, {
     name: "research_power_system",
+    phase: "research",
     schema: PowerSystem,
     system:
       "Synthesize the source's power system from its technique pages. `limitations` is the field the engine enforces as HARD RULES — be precise about costs, triggers, and what the system cannot do.",
@@ -157,7 +161,14 @@ export async function synthesizePowerSystem(
 
 // --- 3. Voice cards ----------------------------------------------------------
 
-const VoiceCards = z.object({ cards: z.array(VoiceCard).max(8) });
+/**
+ * ≤8 cards, enforced in the prompt + below rather than by a schema bound: the
+ * structured-output grammar strips maxItems (2026-08-01), so a `.max(8)` here
+ * could not hold the model to eight — only fail the parse and take the whole
+ * profile research run down with it (this call is awaited unguarded).
+ */
+const VOICE_CARDS_MAX = 8;
+const VoiceCards = z.object({ cards: z.array(VoiceCard) });
 
 export async function synthesizeVoiceCards(
   quotesByCharacter: Record<string, string[]>,
@@ -169,14 +180,20 @@ export async function synthesizeVoiceCards(
     .join("\n\n");
   const result = await callJudgment(SELECTION, {
     name: "research_voice_cards",
+    phase: "research",
     schema: VoiceCards,
-    system:
-      "Build voice cards for the main cast from wiki-sourced quotes. Where a main-cast member has no quotes, derive the card from what the quotes of OTHERS reveal plus the character's role — mark speech_patterns conservatively rather than inventing tics.",
+    system: `Build voice cards for the main cast from wiki-sourced quotes. Where a main-cast member has no quotes, derive the card from what the quotes of OTHERS reveal plus the character's role — mark speech_patterns conservatively rather than inventing tics. Emit at most ${VOICE_CARDS_MAX} cards, most central first — any beyond the eighth are discarded unread.`,
     prompt: `Quotes:\n${quoteBlock}\n\nMain cast needing gap-fill: ${gapFillMainCast.join(", ") || "(none)"}`,
     effort: "high",
     maxTokens: STRUCTURED_RICH,
   });
-  return result.cards;
+  if (result.cards.length > VOICE_CARDS_MAX) {
+    console.warn(
+      `[research] voice cards over the ${VOICE_CARDS_MAX}-card ceiling — clamped, research kept`,
+      { emitted: result.cards.length },
+    );
+  }
+  return result.cards.slice(0, VOICE_CARDS_MAX);
 }
 
 // --- 4. Narrative synthesis (LAST) + NAA gate --------------------------------
@@ -205,6 +222,7 @@ export async function naaGate(title: string, voiceText: string): Promise<boolean
   const judge = () =>
     callJudgment(SELECTION, {
       name: "research_naa_gate",
+      phase: "research",
       schema: NaaVerdict,
       system:
         "Judge directing-voice text for a story engine. It passes only if every sentence is something that could NOT apply to a different anime — named-show specificity of craft, not generic 'balance humor and heart' advice.",
@@ -244,6 +262,7 @@ export async function synthesizeNarrative(
     : "";
   const result = await callJudgment(SELECTION, {
     name: "research_narrative",
+    phase: "research",
     schema: NarrativeSynthesis,
     system: [
       "You distill an IP's method-of-telling for a story engine's writer,",
@@ -303,6 +322,7 @@ export async function synthesizeStatMapping(
     .join("\n\n");
   const result = await callJudgment(SELECTION, {
     name: "research_stat_mapping",
+    phase: "research",
     schema: StatMapping,
     system:
       "Does this source have a CANONICAL on-screen stat system (status windows, hunter ranks with numbers, explicit levels)? If yes, map its stats onto D&D-style internals. If no, say has_canonical_stats=false with confidence 0 — most works have none, and inventing one is a defect.",

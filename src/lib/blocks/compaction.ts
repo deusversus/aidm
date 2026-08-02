@@ -43,8 +43,18 @@ export const naiveCompactor: Compactor = async (exchanges) =>
  * become the compacted history the KA reads (Block 2) in place of the
  * verbatim turns, so the pressure is on meaning, not recital.
  */
+export const COMPACT_BEATS_MAX = 4;
+
+/**
+ * NO LENGTH BOUNDS (M3, after the 2026-08-01 live diagnosis): the structured-
+ * output grammar strips `minItems`/`maxItems`/`minLength`, so a bound here
+ * could not hold the compactor to four beats — only fail the parse on a fifth
+ * and throw the compaction event itself, which at 100-turn scale is the window
+ * that never truncates. The count is stated in the prompt (twice) and applied
+ * in `judgmentCompactor`; blanks are filtered there too.
+ */
 const CompactBeats = z.object({
-  beats: z.array(z.string().min(1)).min(1).max(4),
+  beats: z.array(z.string()),
 });
 
 export function judgmentCompactor(
@@ -75,10 +85,19 @@ export function judgmentCompactor(
         "play-by-play of who did what. Each beat is at most 120 words, past",
         "tense, in the story's own register. These beats replace the verbatim",
         "turns in the writer's memory: preserve meaning, discard choreography.",
+        `Emit at most ${COMPACT_BEATS_MAX} beats — any beyond the fourth are`,
+        "discarded unread, so put the meaning in the ones you write.",
       ].join(" "),
       prompt: `Compact this stretch into 2–4 subtext-first beats:\n\n${transcript}`,
     });
-    return result.beats;
+    const beats = result.beats.map((b) => b.trim()).filter((b) => b.length > 0);
+    if (beats.length > COMPACT_BEATS_MAX) {
+      console.warn(
+        `[compaction] compactor emitted ${beats.length} beats over its ${COMPACT_BEATS_MAX} ceiling — clamped, event kept`,
+        { campaignId: ctx.campaignId, turnNumber: ctx.turnNumber },
+      );
+    }
+    return beats.slice(0, COMPACT_BEATS_MAX);
   };
 }
 
@@ -176,6 +195,26 @@ export async function runCompaction(
   }
 
   const beatTexts = await compactor(toCompact);
+  if (beatTexts.length === 0) {
+    // A compactor that produced nothing must not advance the watermark: the
+    // window is DERIVED from the beats, so writing zero rows and reporting
+    // success would silently drop the stretch out of the writer's memory. The
+    // window stays over-long for one more turn and the next event retries.
+    console.warn("[compaction] compactor produced no beats — window kept, event deferred", {
+      campaignId,
+      exchanges: toCompact.length,
+    });
+    const beats = await loadBeats(db, campaignId);
+    const b2TokensAfter = beats.reduce((s, b) => s + approxTokens(b.content), 0);
+    return {
+      compacted: false,
+      exchangesCompacted: 0,
+      beatsWritten: 0,
+      b3TokensTruncated: 0,
+      b2TokensAfter,
+      epochMergeDue: b2TokensAfter > BLOCK2_CEILING_TOKENS,
+    };
+  }
   const existing = await loadBeats(db, campaignId);
   let position = (existing.at(-1)?.position ?? -1) + 1;
   const first = toCompact[0];

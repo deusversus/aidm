@@ -394,6 +394,82 @@ describe.skipIf(!url)("Compositor (real Postgres, scripted models)", () => {
     },
   );
 
+  it(
+    "a reconstructed sidecar's admission enters the catalog demoted (M3 C1)",
+    { timeout: 30_000 },
+    async () => {
+      if (!db) throw new Error("unreachable");
+      // Live 2026-08-01: a probe read a scene back from prose alone and filed
+      // Shikō — present, alive, speaking — as "Kami's sister, deceased", and
+      // the catalog carried that at 0.9 confidence into every later conte.
+      // The row still gets written (real admissions ride the same path); it
+      // just no longer claims to be the writer's own word.
+      const campaignId = await makeCampaign();
+      const conte = Conte.parse({ turn_id: 1, tier: "genga" });
+      const admit = (name: string) =>
+        CommitScene.parse({
+          decision_point: false,
+          notable_beats: ["x"],
+          scene_cast_delta: [{ name, action: "admit_to_catalog", note: "a note" }],
+        });
+
+      await settleG1(db, {
+        campaignId,
+        turnId: "unused",
+        turnNumber: 1,
+        conte,
+        sidecar: admit("Shiko"),
+        trailerSource: "probe",
+        profileIds: [],
+      });
+      await settleG1(db, {
+        campaignId,
+        turnId: "unused",
+        turnNumber: 2,
+        conte,
+        sidecar: admit("Kami"),
+        trailerSource: "native",
+        profileIds: [],
+      });
+      await settleG1(db, {
+        campaignId,
+        turnId: "unused",
+        turnNumber: 3,
+        conte,
+        sidecar: admit("Miwa"),
+        trailerSource: "continuation",
+        profileIds: [],
+      });
+
+      const rows = await db
+        .select()
+        .from(schema.entities)
+        .where(eq(schema.entities.campaignId, campaignId));
+      const reconstructed = rows.find((r) => r.name === "Shiko");
+      const written = rows.find((r) => r.name === "Kami");
+      const asked = rows.find((r) => r.name === "Miwa");
+
+      expect(reconstructed?.provenance).toBe("sidecar_fallback");
+      expect(Number(reconstructed?.confidence)).toBeCloseTo(0.6);
+      // Native is untouched — the demotion is a distinction, not a blanket.
+      expect(written?.provenance).toBe("chronicler_g1");
+      expect(Number(written?.confidence)).toBeCloseTo(0.9);
+      // The CONTINUATION is the writer answering for its own scene — the
+      // writer's testimony whether volunteered or asked for. Only the probe's
+      // read-back demotes (M3 C1 ruling, 2026-08-01).
+      expect(asked?.provenance).toBe("chronicler_g1");
+      expect(Number(asked?.confidence)).toBeCloseTo(0.9);
+
+      // The version row carries the same envelope as its entity.
+      const versions = await db
+        .select()
+        .from(schema.entityVersions)
+        .where(eq(schema.entityVersions.entityId, reconstructed?.id ?? ""));
+      expect(versions[0]?.provenance).toBe("sidecar_fallback");
+      expect(Number(versions[0]?.confidence)).toBeCloseTo(0.6);
+    },
+  );
+
   // -------------------------------------------------------------------------
   // (2) G2 end-to-end with a scripted distiller
   // -------------------------------------------------------------------------
@@ -615,6 +691,78 @@ describe.skipIf(!url)("Compositor (real Postgres, scripted models)", () => {
       const [after] = await db.select().from(schema.turns).where(eq(schema.turns.id, turnRow.id));
       expect((after?.checkpoints as { g2?: { media?: boolean } }).g2?.media).toBe(true);
       expect(distillCallCount("g2_distill")).toBe(1);
+    },
+  );
+
+  it(
+    "an over-count distill CLAMPS and settles — G2 is never lost to a ninth fact (2026-08-01)",
+    { timeout: 30_000 },
+    async () => {
+      if (!db) throw new Error("unreachable");
+      // The grammar strips maxItems, so `.max(8)` on facts could never hold the
+      // distiller to eight — only fail the parse and throw away the whole G2
+      // artifact: fragment, semantic layer, promotions, seeds, marks.
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const campaignId = await makeCampaign();
+      const turnNumber = 6;
+      const [turnRow] = await db
+        .insert(schema.turns)
+        .values({
+          campaignId,
+          turnNumber,
+          tier: "genga",
+          status: "complete",
+          playerInput: "I read the whole file",
+          narration: "The file was longer than anyone wanted it to be.",
+          sidecar: CommitScene.parse({ decision_point: false, notable_beats: ["a long read"] }),
+          checkpoints: { phase_a: true, phase_b: true, g1: true },
+        })
+        .returning({ id: schema.turns.id });
+      if (!turnRow) throw new Error("turn insert failed");
+      await db.insert(schema.episodicRecords).values({
+        campaignId,
+        turnNumber,
+        playerInput: "I read the whole file",
+        narration: "The file was longer than anyone wanted it to be.",
+        turnId: turnNumber,
+        provenance: "chronicler_g1",
+        confidence: 1,
+      });
+
+      mockEmbed.mockImplementation((texts: string[]) => Promise.resolve(texts.map(() => VEC())));
+      // biome-ignore lint/suspicious/noExplicitAny: harness spans generic signatures
+      mockJudgment.mockImplementation((_s: any, opts: any) => {
+        if (opts.name === "g2_distill")
+          return Promise.resolve({
+            narrated_fragment: "Everything in the file pointed one way.",
+            facts: Array.from({ length: 12 }, (_, i) => ({
+              content: `fact ${i}`,
+              category: "event",
+              is_plot_critical: false,
+            })),
+            entity_updates: Array.from({ length: 6 }, (_, i) => ({
+              name: `ghost ${i}`,
+              note: "not in the catalog",
+            })),
+            confirmed_seed_descriptions: [],
+            meta_comments: [],
+          }) as never;
+        return Promise.reject(new Error(`unscripted judgment ${opts.name}`)) as never;
+      });
+
+      await settleG2(db, turnRow.id);
+
+      const [done] = await db.select().from(schema.turns).where(eq(schema.turns.id, turnRow.id));
+      expect((done?.checkpoints as { g2?: { media?: boolean } }).g2?.media).toBe(true);
+      const sem = await db
+        .select()
+        .from(schema.semanticMemories)
+        .where(eq(schema.semanticMemories.campaignId, campaignId));
+      expect(sem).toHaveLength(8);
+      // The clamp lands BEFORE the stash, so crash-replay reads the same shape.
+      const payload = (done?.checkpoints as { g2_payload?: { facts?: unknown[] } }).g2_payload;
+      expect(payload?.facts).toHaveLength(8);
+      warn.mockRestore();
     },
   );
 

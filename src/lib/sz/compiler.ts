@@ -624,6 +624,7 @@ export const defaultOspSynthesizer: OspSynthesizer = async ({
   return callJudgment(resolved.tierSelection ?? DEV_TIER_SELECTION, {
     name: "sz_compile_osp",
     campaignId,
+    phase: "sz",
     schema: OspDraft,
     system: [
       "You compile Session Zero's Opening State Package for a story engine.",

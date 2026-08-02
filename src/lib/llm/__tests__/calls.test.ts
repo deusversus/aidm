@@ -1,5 +1,5 @@
 import type { Message } from "@anthropic-ai/sdk/resources/messages/messages";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { COMMIT_SCENE_TOOL, extractCommitScene } from "../calls";
 
 function fixtureMessage(content: Message["content"]): Message {
@@ -82,5 +82,48 @@ describe("extractCommitScene (§5.7 trailer)", () => {
       },
     ]);
     expect(extractCommitScene(message)).toBeNull();
+  });
+
+  it("CLAMPS an off-count trailer instead of dropping the scene (2026-08-01)", () => {
+    // The grammar strips minItems/maxItems, so the KA can satisfy the tool
+    // schema and still emit four moves. That must cost the surplus entry, not
+    // the whole trailer — a null here burns the continuation round and files
+    // the scene with a smaller model's reconstruction.
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const message = fixtureMessage([
+      {
+        type: "tool_use",
+        id: "toolu_3",
+        name: "commit_scene",
+        caller: { type: "direct" },
+        input: {
+          decision_point: true,
+          suggested_moves: ["Take the beer", "Ask what he wants", "Walk out", "Draw on him"],
+          notable_beats: ["one", "two", "three", "four"],
+        },
+      },
+    ]);
+    const sidecar = extractCommitScene(message);
+    expect(sidecar).not.toBeNull();
+    expect(sidecar?.suggested_moves).toEqual(["Take the beer", "Ask what he wants", "Walk out"]);
+    expect(sidecar?.notable_beats).toEqual(["one", "two", "three"]);
+    warn.mockRestore();
+  });
+
+  it("keeps a single-move trailer rather than rejecting it", () => {
+    const message = fixtureMessage([
+      {
+        type: "tool_use",
+        id: "toolu_4",
+        name: "commit_scene",
+        caller: { type: "direct" },
+        input: {
+          decision_point: true,
+          suggested_moves: ["Follow the money"],
+          notable_beats: ["the fork was named"],
+        },
+      },
+    ]);
+    expect(extractCommitScene(message)?.suggested_moves).toEqual(["Follow the money"]);
   });
 });

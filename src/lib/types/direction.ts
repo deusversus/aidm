@@ -142,6 +142,12 @@ export type SceneShapeBase = z.infer<typeof SceneShapeBase>;
 export const SetteiSnapshot = z.object({
   text: z.string(),
   charter_tokens: z.number().int().nonnegative(),
+  /**
+   * The charter shipped over §4.4a's ceiling even after every trim (M3 C1).
+   * Recorded so the overrun is visible to the Director and the dailies
+   * instead of dying in the renderer's local trim list.
+   */
+  charter_over_target: z.boolean().default(false),
   rendered_axes: z.array(z.string()).default([]),
   uncovered_extremes: z.array(z.string()).default([]),
   /** Marks with turnId > this ride Amendments; ≤ this are baked in. */
@@ -414,11 +420,24 @@ export type DirectorSeedOp = z.infer<typeof DirectorSeedOp>;
  * put the count at 43 and 400'd every cycle). Premise shifts are expressed as
  * axis/value PAIRS; the engine converts to the stored ArcOverride partials.
  * Always-emitted arrays are REQUIRED (the model writes [] explicitly).
+ *
+ * NO LENGTH OR RANGE BOUNDS HERE (M3, after the 2026-08-01 live diagnosis).
+ * The same grammar that enforces types and enums STRIPS `minItems`/`maxItems`/
+ * `minimum`/`maximum` — they are validated client-side only. A `.max(5)` on
+ * director_notes could therefore never stop the model from writing six; it
+ * could only fail the parse, burn callStructured's one corrective retry, and
+ * throw away the ENTIRE cycle — arc plan, seed ops, demotions and all — over a
+ * surplus advisory note. The ceilings are real and they stay: they are stated
+ * in the dossier's task list (the model's actual constraint) and applied by
+ * `clampDirectorOutput` in direction/director.ts before anything is written.
+ * Enums (`ArcShape`, `PacerPhase`, op kinds) and `.int()` ARE grammar-native —
+ * never strip those.
  */
 export const DirectorOutput = z.object({
   /** Investigation digest — internal, never player-facing (axiom 2). */
   analysis: z.string(),
-  tension_level: z.number().min(0).max(1),
+  /** 0..1; clamped engine-side (the range is not grammar-enforced). */
+  tension_level: z.number(),
   // No top-level phase field: arc_plan.phase is the single phase authority —
   // a second unconstrained copy let the Pacer and the arc row diverge (C7 audit).
   arc_plan: DirectorArcPlan,
@@ -430,26 +449,48 @@ export const DirectorOutput = z.object({
     .object({
       arc_name: z.string().min(1),
       transition_signal: z.string().min(1),
-      /** DNA axis shifts, e.g. {axis:"darkness", value:8}. Invalid axes drop engine-side. */
-      dna_shifts: z.array(z.object({ axis: z.string(), value: z.number().min(0).max(10) })).max(6),
-      /** Framing enum shifts, e.g. {axis:"arc_shape", value:"falling"}. */
-      composition_shifts: z.array(z.object({ axis: z.string(), value: z.string() })).max(4),
+      /** ≤6 DNA axis shifts, e.g. {axis:"darkness", value:8} (0-10). Invalid axes drop engine-side. */
+      dna_shifts: z.array(z.object({ axis: z.string(), value: z.number() })),
+      /** ≤4 framing enum shifts, e.g. {axis:"arc_shape", value:"falling"}. */
+      composition_shifts: z.array(z.object({ axis: z.string(), value: z.string() })),
     })
     .optional(),
   clear_override: z.boolean(),
   scene_shape_trajectory: z.string().optional(),
-  scene_shape_notes: z.array(z.string()).max(3),
-  arc_relevance: z
-    .array(z.object({ axis: z.string(), relevance: z.number().min(1).max(9) }))
-    .max(6),
-  seed_ops: z.array(DirectorSeedOp).max(6),
-  spotlight_directives: z.array(z.object({ name: z.string(), note: z.string() })).max(3),
-  /** Dailies (§6.3 size review): critical facts to demote, matched on content. */
-  demote_criticals: z.array(z.string()).max(5),
-  director_notes: z.array(z.string()).max(5),
-  voice_patterns: z.array(z.string()).max(5),
+  /** ≤3. */
+  scene_shape_notes: z.array(z.string()),
+  /** ≤6 axes, relevance 1-9. */
+  arc_relevance: z.array(z.object({ axis: z.string(), relevance: z.number() })),
+  /** ≤6. */
+  seed_ops: z.array(DirectorSeedOp),
+  /** ≤3. */
+  spotlight_directives: z.array(z.object({ name: z.string(), note: z.string() })),
+  /** Dailies (§6.3 size review): ≤5 critical facts to demote, matched on content. */
+  demote_criticals: z.array(z.string()),
+  /** ≤5. */
+  director_notes: z.array(z.string()),
+  /** ≤5. */
+  voice_patterns: z.array(z.string()),
 });
 export type DirectorOutput = z.infer<typeof DirectorOutput>;
+
+/**
+ * The DirectorOutput emission ceilings, in one place — the schema can no
+ * longer carry them (see the contract note above), so the dossier states them
+ * and `clampDirectorOutput` applies them.
+ */
+export const DIRECTOR_CAPS = {
+  scene_shape_notes: 3,
+  arc_relevance: 6,
+  seed_ops: 6,
+  spotlight_directives: 3,
+  demote_criticals: 5,
+  director_notes: 5,
+  voice_patterns: 5,
+  dna_shifts: 6,
+  composition_shifts: 4,
+  cold_open_constraints: 5,
+} as const;
 
 export interface DirectorTrigger {
   fire: boolean;

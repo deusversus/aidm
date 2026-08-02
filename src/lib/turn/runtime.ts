@@ -10,7 +10,7 @@ import type { CommitScene } from "@/lib/types/sidecar";
 import { TURN_CONTRACTS, type TurnTier } from "@/lib/types/turn";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import type { LadderStep } from "./degrade";
-import { runKeyAnimator } from "./ka";
+import { type TrailerSource, runKeyAnimator } from "./ka";
 import { runLayout } from "./layout";
 
 /**
@@ -235,6 +235,7 @@ async function runPhases(
     g1?: boolean;
     ladder?: LadderStep[];
     trailer_fallback?: boolean;
+    trailer_source?: TrailerSource;
     error?: string;
     channel_intent?: string;
   };
@@ -333,6 +334,15 @@ async function runPhases(
 
   // --- Phase B (one auto-retry on the SAME conte) -----------------------------
   let sidecar: CommitScene | null = null;
+  // Which §5.7 path produced the sidecar — G1 needs it to stamp a non-native
+  // cast admission with a demoted envelope (M3 C1), so unlike the old
+  // write-only checkpoint flag it must survive a crash-resume too.
+  // Pre-M3 checkpoints have no trailer_source but DO carry trailer_fallback —
+  // deriving "native" for a probe-reconstructed sidecar would re-catalog its
+  // cast at full trust on crash-resume, the exact failure castEnvelope stops
+  // (C1 audit).
+  let trailerSource: TrailerSource =
+    checkpoints.trailer_source ?? (checkpoints.trailer_fallback ? "probe" : "native");
   let narration = turn.narration ?? "";
   if (!checkpoints.phase_b) {
     emit({ type: "staging", text: "writing" });
@@ -374,6 +384,7 @@ async function runPhases(
         if (!result.prose.trim()) throw new Error("empty narration");
         narration = result.prose;
         sidecar = result.sidecar;
+        trailerSource = result.trailerSource;
         await db
           .update(turns)
           .set({
@@ -383,6 +394,7 @@ async function runPhases(
             checkpoints: sql`${turns.checkpoints} || ${JSON.stringify({
               phase_b: true,
               trailer_fallback: result.trailerFallback,
+              trailer_source: result.trailerSource,
             })}::jsonb`,
           })
           .where(eq(turns.id, turnId));
@@ -443,6 +455,7 @@ async function runPhases(
       turnNumber: turn.turnNumber,
       conte,
       sidecar,
+      trailerSource,
       profileIds: (campaign.premiseContract as { anchors_used?: string[] })?.anchors_used ?? [],
     });
     await db

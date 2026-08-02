@@ -431,8 +431,9 @@ describe.skipIf(!url)("Turn Runtime (real Postgres, scripted models)", () => {
     expect(extraProbe).toBe(false);
   });
 
-  it("trailer fallback: no commit_scene → probe reconstructs; checkpoint records it", async () => {
+  it("trailer fallback: continuation then probe; the checkpoint records WHICH path ran", async () => {
     if (!db) throw new Error("unreachable");
+    // Every round refuses the trailer, so the ladder runs to its last net.
     mockStream.mockImplementation(() =>
       kaRound([{ type: "text", text: "Prose without a trailer." }], "end_turn"),
     );
@@ -444,7 +445,53 @@ describe.skipIf(!url)("Turn Runtime (real Postgres, scripted models)", () => {
     });
     const [turn] = await db.select().from(schema.turns).where(eq(schema.turns.id, turnId));
     expect(turn?.status).toBe("complete");
-    expect((turn?.checkpoints as { trailer_fallback?: boolean }).trailer_fallback).toBe(true);
+    const checkpoints = turn?.checkpoints as {
+      trailer_fallback?: boolean;
+      trailer_source?: string;
+    };
+    expect(checkpoints.trailer_fallback).toBe(true);
+    // M3 C1: the flag says the native trailer was missing; the source says who
+    // actually wrote the record — G1 stamps the cast envelope from it.
+    expect(checkpoints.trailer_source).toBe("probe");
+    expect((turn?.sidecar as typeof SIDECAR).notable_beats).toBeDefined();
+  });
+
+  it("the continuation round recovers the trailer without the probe (M3 C1)", async () => {
+    if (!db) throw new Error("unreachable");
+    let round = 0;
+    mockStream.mockImplementation(() => {
+      round += 1;
+      return round === 1
+        ? kaRound([{ type: "text", text: "Prose without a trailer." }], "end_turn")
+        : kaRound(
+            [{ type: "tool_use", id: "t1", name: "commit_scene", input: SIDECAR }],
+            "tool_use",
+          );
+    });
+    const probeCallsBefore = mockProbe.mock.calls.filter(
+      (c) => (c[1] as { name?: string })?.name === "sidecar_fallback",
+    ).length;
+
+    const { turnId } = await submitTurn(db, campaignId, "I check the departure board");
+    await new Promise<void>((resolve) => {
+      attachToTurn(turnId, (e) => {
+        if (e.type === "done" || e.type === "error") resolve();
+      });
+    });
+
+    const [turn] = await db.select().from(schema.turns).where(eq(schema.turns.id, turnId));
+    expect(turn?.status).toBe("complete");
+    const checkpoints = turn?.checkpoints as {
+      trailer_fallback?: boolean;
+      trailer_source?: string;
+    };
+    expect(checkpoints.trailer_source).toBe("continuation");
+    expect(checkpoints.trailer_fallback).toBe(true);
+    // The reconstruction never ran — the writer answered for itself.
+    const probeCallsAfter = mockProbe.mock.calls.filter(
+      (c) => (c[1] as { name?: string })?.name === "sidecar_fallback",
+    ).length;
+    expect(probeCallsAfter).toBe(probeCallsBefore);
     expect((turn?.sidecar as typeof SIDECAR).notable_beats).toBeDefined();
   });
 

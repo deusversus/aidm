@@ -3,6 +3,25 @@ import { z } from "zod";
 /**
  * Turn vocabulary: the salvaged v4 probe/judgment output schemas plus the
  * v5 turn-contract table (blueprint §5.1).
+ *
+ * THE BOUNDS BELOW ARE PROTECTIVE, AND THEY STAY (M3, 2026-08-01). The
+ * structured-output grammar strips `.min()`/`.max()` on strings, arrays and
+ * numbers — they validate client-side only — so elsewhere in the codebase such
+ * a bound is a DESTROY-CLASS defect: it cannot constrain the model, and its
+ * only effect is to fail the parse and take a single-shot artifact down with
+ * it (the sidecar trailer, a Director cycle, a G2 distill, a booth
+ * resolution). Those were removed and replaced with prompt text + a consumer
+ * clamp.
+ *
+ * IntentOutput and OutcomeOutput are the deliberate exception, on two counts.
+ * (1) The failure has somewhere to land: both run under callStructured's
+ * corrective retry and then a caller degrade ladder (triage falls back to
+ * genga; the outcome judgment retries then degrades), so a rejected parse
+ * costs a retry, never the turn. (2) Rejection is the POINT — the
+ * difficulty_class band exists so a hallucinated `difficulty_class: 999` is
+ * refused rather than clamped into a plausible-looking 30 and written into the
+ * permanent turn record. A silently pinned die roll is worse than a re-rolled
+ * one. Do not "sweep" these into clamps.
  */
 
 export const IntentType = z.enum([

@@ -69,6 +69,30 @@ describe("renderSettei (§4.4a)", () => {
     // Whole Block 1 = charter + the world-rules command block.
     expect(settei.tokens).toBeGreaterThan(settei.charterTokens);
     expect(approxTokens(settei.text)).toBe(settei.tokens);
+    expect(settei.charterOverTarget).toBe(false);
+  });
+
+  it("the overrun flag reports the measurement, never a guess (M3 C1)", () => {
+    // Live campaigns run ~2× the §4.4a ceiling and the overrun was recorded
+    // only as a trim string nobody reads. The flag must track the number it
+    // claims to describe, on every contract the renderer can be handed.
+    for (const s of [
+      renderSettei({ contract: bebopContract(), marks: [] }),
+      // A contract carrying extra Block-1 freight — laws, a control key, and
+      // standing calibration — is where the ladder actually runs out of rope.
+      renderSettei({
+        contract: bebopContract({
+          premise_laws: Array.from({ length: 6 }, (_, i) => `Law ${i}: ${"x".repeat(200)}`),
+        }),
+        marks: [],
+      }),
+    ]) {
+      expect(s.charterOverTarget).toBe(s.charterTokens > SETTEI_TOKEN_TARGET.max);
+      // An over-budget charter always says so in its trims as well.
+      if (s.charterOverTarget) {
+        expect(s.trims.some((t) => t.includes("still over budget"))).toBe(true);
+      }
+    }
   });
 
   it("picks exemplars for the most extreme covered axes at the matching band", () => {

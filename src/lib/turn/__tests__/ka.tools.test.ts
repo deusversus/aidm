@@ -206,8 +206,14 @@ describe("the research budget is enforced in the loop, not in the tool array", (
 
     const result = await runKeyAnimator(noDb, kaArgs({ kaResearchCalls: 0 }));
 
-    // budget 0 → cap of two rounds, then the §5.7 probe fallback closes it.
-    expect(mockStream).toHaveBeenCalledTimes(2);
+    // budget 0 → cap of two SCENE rounds. The third call is the §5.7 trailer
+    // continuation (M3 C1), which is bounded at exactly one and cannot ask for
+    // research — tool_choice forces commit_scene — so the cap still holds.
+    expect(mockStream).toHaveBeenCalledTimes(3);
+    expect(mockStream.mock.calls[2]?.[0].toolChoice).toEqual({
+      type: "tool",
+      name: "commit_scene",
+    });
     expect(result.researchCalls).toBe(0);
     expect(result.trailerFallback).toBe(true);
     expect(vi.mocked(executeRecallScene)).not.toHaveBeenCalled();

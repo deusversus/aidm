@@ -54,24 +54,35 @@ export type BoothRoute = z.infer<typeof BoothRoute>;
  * booth closes: the conversation's durable outcomes become pencil marks
  * (writer #4) and/or overrides. Empty arrays are a valid resolution (a chat
  * that calibrated nothing).
+ *
+ * NO LENGTH BOUNDS (M3, after the 2026-08-01 live diagnosis — this schema
+ * carried the exact twin of the field that caused it). The structured-output
+ * grammar strips `.max()` on strings and arrays, so a bound here could not
+ * stop a fifth mark from being written; it could only fail the parse and lose
+ * the WHOLE resolution — every calibration the player just settled — over a
+ * surplus note. The prompt states the limits; booth.ts clamps them.
  */
 export const BoothResolution = z.object({
-  marks: z
-    .array(
-      z.object({
-        kind: z.enum(["axis", "voice_feature", "craft_note"]),
-        topic: z.string().min(1),
-        direction: z.string().min(1),
-        evidence: z.string().min(1),
-      }),
-    )
-    .max(4),
-  /** Standing rules the player laid down in the booth (rare — most go via the override channel). */
-  overrides: z.array(z.string()).max(2),
+  /** ≤4; clamped engine-side. */
+  marks: z.array(
+    z.object({
+      kind: z.enum(["axis", "voice_feature", "craft_note"]),
+      topic: z.string().min(1),
+      direction: z.string().min(1),
+      evidence: z.string().min(1),
+    }),
+  ),
+  /** ≤2 standing rules the player laid down in the booth (rare — most go via the override channel). */
+  overrides: z.array(z.string()),
   /** §6.9 layer-10 writer (M2R R4): one durable note about the PLAYER's
    *  taste — not the character, not this campaign — when the booth chat
-   *  revealed one. Usually absent. Bounded: rides the Settei budget. */
-  player_taste_note: z.string().max(240).optional(),
+   *  revealed one. Usually absent. Bounded by TASTE_NOTE_MAX (db/helpers.ts):
+   *  notes ride the Settei budget, enforced at the consumer. */
+  player_taste_note: z.string().optional(),
   summary: z.string().min(1),
 });
 export type BoothResolution = z.infer<typeof BoothResolution>;
+
+/** Emission ceilings the schema can no longer carry (see above). */
+export const BOOTH_MARKS_MAX = 4;
+export const BOOTH_OVERRIDES_MAX = 2;

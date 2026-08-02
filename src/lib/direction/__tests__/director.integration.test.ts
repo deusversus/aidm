@@ -410,6 +410,79 @@ describe.skipIf(!url)("Director (real Postgres, scripted model)", () => {
     expect(state.phase_state).toEqual({ arc_id: "arc-xyz", phase: "rising", entered_at_turn: 8 });
   });
 
+  it("an over-count cycle lands CLAMPED — the plan is never lost to a surplus note (2026-08-01)", async () => {
+    if (!db) throw new Error("unreachable");
+    // The structured-output grammar strips minItems/maxItems, so `.max(5)` on
+    // director_notes could never hold the model to five — it could only fail
+    // the parse and throw away the whole cycle: arc plan, seed ops, demotions.
+    // Surplus entries drop; everything else must still land.
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const campaignId = await makeCampaign();
+    vi.mocked(arcs.getActiveArc).mockResolvedValue(fakeArc(campaignId));
+    const many = (n: number, tag: string) => Array.from({ length: n }, (_, i) => `${tag} ${i + 1}`);
+
+    mockJudgment.mockResolvedValue(
+      directorOutput({
+        // Out of band on both ends, and out of count on every list.
+        tension_level: 1.4,
+        scene_shape_notes: many(6, "note"),
+        arc_relevance: Array.from({ length: 8 }, (_, i) => ({
+          axis: `axis_${i}`,
+          relevance: i === 0 ? 42 : 5,
+        })),
+        seed_ops: Array.from({ length: 9 }, (_, i) => ({
+          op: "plant" as const,
+          description: `seed ${i}`,
+          dependencies: [],
+        })),
+        spotlight_directives: many(5, "npc").map((name) => ({ name, note: "give them a scene" })),
+        demote_criticals: many(7, "stale"),
+        director_notes: many(8, "note"),
+        voice_patterns: many(9, "pattern"),
+        arc_override: {
+          arc_name: "the overlong shift",
+          transition_signal: "the shift ends",
+          dna_shifts: Array.from({ length: 9 }, (_, i) => ({
+            axis: i === 0 ? "darkness" : `axis_${i}`,
+            value: i === 0 ? 99 : 5,
+          })),
+          composition_shifts: many(6, "framing").map((axis) => ({ axis, value: "falling" })),
+        },
+      }) as never,
+    );
+
+    const output = await runDirectorCycle(db, campaignId, 8);
+
+    // The cycle survived and every ceiling held.
+    expect(output.tension_level).toBe(1);
+    expect(output.scene_shape_notes).toHaveLength(3);
+    expect(output.arc_relevance).toHaveLength(6);
+    expect(output.seed_ops).toHaveLength(6);
+    expect(output.spotlight_directives).toHaveLength(3);
+    expect(output.demote_criticals).toHaveLength(5);
+    expect(output.director_notes).toHaveLength(5);
+    expect(output.voice_patterns).toHaveLength(5);
+    expect(output.arc_override?.dna_shifts).toHaveLength(6);
+    expect(output.arc_override?.composition_shifts).toHaveLength(4);
+    // Out-of-band NUMBERS pin rather than drop: a 99 passed through would fail
+    // PartialDNAScales and take every other shift in the override with it.
+    expect(output.arc_override?.dna_shifts[0]).toEqual({ axis: "darkness", value: 10 });
+    expect(output.arc_relevance[0]?.relevance).toBe(9);
+
+    // …and the APPLY ran on the clamped plan, not on nothing.
+    expect(vi.mocked(seeds.plantSeed)).toHaveBeenCalledTimes(6);
+    const state = await loadDirectionState(db, campaignId);
+    expect(state.last_director_turn).toBe(8);
+    expect(state.tension_level).toBe(1);
+    expect(state.director_notes).toHaveLength(5);
+    const [c] = await db
+      .select({ arcOverride: schema.campaigns.arcOverride })
+      .from(schema.campaigns)
+      .where(eq(schema.campaigns.id, campaignId));
+    expect(ArcOverride.parse(c?.arcOverride).dna).toEqual({ darkness: 10 });
+    warn.mockRestore();
+  });
+
   it("clears an active arc_override on clear_override", async () => {
     if (!db) throw new Error("unreachable");
     const campaignId = await makeCampaign({

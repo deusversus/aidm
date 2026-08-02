@@ -157,6 +157,13 @@ export interface Settei {
    * freight outside the charter budget.
    */
   charterTokens: number;
+  /**
+   * The charter is still over §4.4a's ceiling after every trim (M3 C1). Live
+   * campaigns run roughly 2× the budget and the overrun used to be recorded
+   * only as a trim string nobody reads — the snapshot now carries the fact
+   * itself, so the Director and the dailies can see a charter that never fit.
+   */
+  charterOverTarget: boolean;
   /** Trims applied to hold the §4.4a budget — surfaced, never silent. */
   trims: string[];
 }
@@ -413,8 +420,23 @@ export function renderSettei(input: SetteiInput): Settei {
     charter = buildCharter();
   }
 
-  if (approxTokens(charter) > SETTEI_TOKEN_TARGET.max) {
-    trims.push(`charter still over budget after all trims: ${approxTokens(charter)} tokens`);
+  const charterTokens = approxTokens(charter);
+  const charterOverTarget = charterTokens > SETTEI_TOKEN_TARGET.max;
+  if (charterOverTarget) {
+    trims.push(`charter still over budget after all trims: ${charterTokens} tokens`);
+    // LOUD, not filed (M3 C1): the trim ladder ran out of things to drop and
+    // the charter went to the KA over budget anyway. Measured ~2× the §4.4a
+    // ceiling on live campaigns — a standing overrun that was only ever
+    // written into a string array no reader consumes.
+    console.warn("[settei] charter OVER the §4.4a budget after every trim", {
+      charterTokens,
+      target: SETTEI_TOKEN_TARGET,
+      overBy: charterTokens - SETTEI_TOKEN_TARGET.max,
+      ratio: Number((charterTokens / SETTEI_TOKEN_TARGET.max).toFixed(2)),
+      renderedAxes: rendered.length,
+      exemplars: exemplarIds.length,
+      trims: trims.length,
+    });
   }
 
   const text = `${assemble([hardCore])}\n\n${charter}`;
@@ -424,7 +446,8 @@ export function renderSettei(input: SetteiInput): Settei {
     uncoveredExtremes,
     exemplarIds,
     tokens: approxTokens(text),
-    charterTokens: approxTokens(charter),
+    charterTokens,
+    charterOverTarget,
     trims,
   };
 }

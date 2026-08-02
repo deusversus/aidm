@@ -674,6 +674,7 @@ export async function ingestAssertion(
     const verdict = await pairLikelySame(db, selection, {
       campaignId,
       turnNumber,
+      phase: "turn",
       a: {
         id: best.ref.id,
         name: best.ref.name,

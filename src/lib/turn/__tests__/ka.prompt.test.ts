@@ -61,8 +61,11 @@ describe("KA contract camera faculty (SV4)", () => {
     expect(close).toBeGreaterThan(camera);
     // LAST position, not merely after-the-camera: the contract must END on
     // the trailer close — any future section appended below it re-breaks
-    // the measured 50% drop rate.
-    expect(KA_CONTRACT.trimEnd().endsWith("lossier than your own record.)")).toBe(true);
+    // the measured drop rate. Pinned structurally so a copy edit to the
+    // measurement itself (M3 C1 re-dated it to 0-of-15) doesn't read as a
+    // regression, while a new section below it still does.
+    expect(KA_CONTRACT.indexOf("##", close)).toBe(-1);
+    expect(KA_CONTRACT.trimEnd().endsWith(")")).toBe(true);
   });
 });
 
@@ -91,7 +94,9 @@ describe("the exit (M2R2)", () => {
   it("the trailer close still ENDS the contract (recency pin holds under the exit section)", () => {
     // The exit section sits BEFORE the trailer close (which the C8 recency fix
     // keeps last); a new faculty must never displace it from final position.
-    expect(KA_CONTRACT.trimEnd().endsWith("lossier than your own record.)")).toBe(true);
+    const close = KA_CONTRACT.indexOf("The scene is not finished when the prose ends");
+    expect(close).toBeGreaterThan(KA_CONTRACT.indexOf("## The exit"));
+    expect(KA_CONTRACT.indexOf("##", close)).toBe(-1);
   });
 
   it("renderConte surfaces the pacing_note as the Drive line", () => {

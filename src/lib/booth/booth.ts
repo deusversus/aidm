@@ -1,12 +1,14 @@
 import { assembleForCampaign } from "@/lib/blocks/campaign";
 import type { Db } from "@/lib/db";
-import { appendPlayerTaste } from "@/lib/db/helpers";
+import { TASTE_NOTE_MAX, appendPlayerTaste } from "@/lib/db/helpers";
 import { campaigns, overrides, pencilMarks, players } from "@/lib/db/schema";
 import { CLASSIFY, PROSE_COMPOSER, STRUCTURED_RICH } from "@/lib/llm/budgets";
 import { callJudgment, callProbe, streamNarration } from "@/lib/llm/calls";
 import { DEV_TIER_SELECTION, TierSelection } from "@/lib/llm/tiers";
 import {
   BOOTH_EXCHANGE_CAP,
+  BOOTH_MARKS_MAX,
+  BOOTH_OVERRIDES_MAX,
   type BoothExchange,
   BoothResolution,
   type BoothResponder,
@@ -32,6 +34,16 @@ function resolveSelection(tierModels: unknown): TierSelection {
   return parsed.success ? parsed.data : DEV_TIER_SELECTION;
 }
 
+/** Drop surplus entries past an emission ceiling, loudly (types/booth.ts). */
+function capBooth<T>(list: T[], max: number, field: string, campaignId: string): T[] {
+  if (list.length <= max) return list;
+  console.warn(`[booth] ${field} over its ${max}-item ceiling — clamped, resolution kept`, {
+    campaignId,
+    emitted: list.length,
+  });
+  return list.slice(0, max);
+}
+
 /** Compact, one-line-per-turn booth transcript for prompts: PLAYER / STUDIO(persona). */
 function formatTranscript(exchanges: BoothExchange[]): string {
   return exchanges
@@ -48,11 +60,11 @@ An EXPLICIT summon in the player's own words WINS outright over topic classifica
 Return the single responder and a one-line reason.`;
 
 const BOOTH_RESOLUTION_SYSTEM = `You are closing an out-of-fiction booth conversation between a player and the studio. Extract ONLY the durable calibrations the player actually SETTLED — not everything discussed, not studio suggestions the player did not take up.
-- marks: standing craft/voice/axis guidance the player wants carried forward (the writer's #4 signal). kind = "axis" for a premise-dial nudge, "voice_feature" for a prose-voice fingerprint, "craft_note" for general craft direction. Each carries a topic, a direction, and evidence (a short quote or paraphrase of what the player said).
-- overrides: standing RULES the player explicitly laid down in the booth (rare — most rules go through the override channel). Include only a rule the player clearly declared as binding.
+- marks (at most ${BOOTH_MARKS_MAX}): standing craft/voice/axis guidance the player wants carried forward (the writer's #4 signal). kind = "axis" for a premise-dial nudge, "voice_feature" for a prose-voice fingerprint, "craft_note" for general craft direction. Each carries a topic, a direction, and evidence (a short quote or paraphrase of what the player said).
+- overrides (at most ${BOOTH_OVERRIDES_MAX}): standing RULES the player explicitly laid down in the booth (rare — most rules go through the override channel). Include only a rule the player clearly declared as binding.
 - summary: one line naming what, if anything, was decided.
-- player_taste_note (usually OMIT): one sentence about the PLAYER's durable taste — how they like their stories, not this character or campaign — only when the chat plainly revealed one ("I always want the quiet aftermath scene").
-Empty arrays are a valid resolution: a chat that calibrated nothing resolves to empty marks and overrides with a summary that says so.`;
+- player_taste_note (usually OMIT): ONE sentence, at most ${TASTE_NOTE_MAX} characters, about the PLAYER's durable taste — how they like their stories, not this character or campaign — only when the chat plainly revealed one ("I always want the quiet aftermath scene").
+Empty arrays are a valid resolution: a chat that calibrated nothing resolves to empty marks and overrides with a summary that says so. Entries beyond a stated limit are discarded unread — keep the best ones.`;
 
 /** The persona rides as a MESSAGE, never a system mutation (§5.4: the cached prefix stays byte-identical across responders). */
 function personaFraming(responder: BoothResponder, contract: PremiseContract): string {
@@ -117,6 +129,7 @@ export async function runBoothExchange(
   const routerPrompt = `${routerContext}New player message:\n${playerInput}`;
   const route = await callProbe(selection, {
     name: "booth_router",
+    phase: "booth",
     schema: BoothRoute,
     campaignId,
     turnNumber,
@@ -160,6 +173,7 @@ export async function runBoothExchange(
 
   const { stream, done } = streamNarration({
     name: "booth_responder",
+    phase: "booth",
     selection,
     system: blocks?.system ?? [],
     messages: [{ role: "user", content: userMessage }],
@@ -245,6 +259,7 @@ export async function closeBoothIfOpen(
   try {
     resolution = await callJudgment(selection, {
       name: "booth_resolution",
+      phase: "booth",
       schema: BoothResolution,
       campaignId,
       turnNumber,
@@ -270,9 +285,19 @@ export async function closeBoothIfOpen(
   }
 
   if (resolution) {
-    if (resolution.marks.length > 0) {
+    // The ceilings the schema can no longer carry (types/booth.ts): surplus
+    // entries drop with a warn, the resolution itself always lands.
+    const marks = capBooth(resolution.marks, BOOTH_MARKS_MAX, "marks", campaignId);
+    const overrideRules = capBooth(
+      resolution.overrides,
+      BOOTH_OVERRIDES_MAX,
+      "overrides",
+      campaignId,
+    );
+    const tasteNote = resolution.player_taste_note?.trim();
+    if (marks.length > 0) {
       await db.insert(pencilMarks).values(
-        resolution.marks.map((m) => ({
+        marks.map((m) => ({
           campaignId,
           kind: m.kind,
           topic: m.topic,
@@ -284,9 +309,9 @@ export async function closeBoothIfOpen(
         })),
       );
     }
-    if (resolution.overrides.length > 0) {
+    if (overrideRules.length > 0) {
       await db.insert(overrides).values(
-        resolution.overrides.map((content) => ({
+        overrideRules.map((content) => ({
           campaignId,
           content,
           active: true,
@@ -298,10 +323,18 @@ export async function closeBoothIfOpen(
     }
     // §6.9 layer-10 writer #2 (M2R R4): a booth-revealed PLAYER taste note
     // appends to the cross-campaign profile (same append-only shape as SZ).
-    if (resolution.player_taste_note) {
+    // Over-budget → dropped with a warn, exactly as at session close: an
+    // optional decoration never costs the resolution it rides on.
+    if (tasteNote && tasteNote.length > TASTE_NOTE_MAX) {
+      console.warn("[booth] taste note over budget — dropped, resolution kept", {
+        campaignId,
+        length: tasteNote.length,
+        limit: TASTE_NOTE_MAX,
+      });
+    } else if (tasteNote) {
       // Atomic append (R4 audit): three writers share the player row; the
       // helper also trims (a padded note landed verbatim before).
-      await appendPlayerTaste(db, campaign.playerId, [resolution.player_taste_note]);
+      await appendPlayerTaste(db, campaign.playerId, [tasteNote]);
     }
   }
 

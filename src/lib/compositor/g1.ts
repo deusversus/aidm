@@ -1,6 +1,7 @@
 import type { Db } from "@/lib/db";
 import { notTombstoned } from "@/lib/db/helpers";
 import { consequences, entities, entityVersions } from "@/lib/db/schema";
+import type { TrailerSource } from "@/lib/turn/ka";
 import { writeSnapshotIfDue } from "@/lib/turn/rewind";
 import type { Conte } from "@/lib/types/conte";
 import type { CommitScene } from "@/lib/types/sidecar";
@@ -23,6 +24,37 @@ import { and, eq, max, sql } from "drizzle-orm";
 
 const G1_PROVENANCE = "chronicler_g1";
 
+/**
+ * The demoted envelope for a cast admission the KA did not write itself
+ * (M3 C1). Live 2026-08-01: a probe reconstruction read a scene back from
+ * prose alone and filed Shikō — present, alive, speaking — as "Kami's sister,
+ * deceased", and the catalog carried that as 0.9-confidence engine truth into
+ * every later conte. A reconstruction is evidence, not testimony: it still
+ * gets written (dropping it would lose real admissions), but it enters at the
+ * confidence it actually has, so the janitor, the Bible and any future
+ * contradiction check can see which rows were never the writer's own word.
+ */
+const FALLBACK_PROVENANCE = "sidecar_fallback";
+const FALLBACK_CONFIDENCE = 0.6;
+
+/**
+ * Only the KA's own trailer, emitted in the same breath as the prose, writes
+ * at full confidence — and so does the CONTINUATION: it is the same model, in
+ * the same conversation, with the scene still in view, answering for its own
+ * work. The writer's testimony is the writer's testimony whether volunteered
+ * or asked for. Only the PROBE demotes — a different, smaller model reading
+ * prose back is a reconstruction, and a reconstruction is what cataloged
+ * Shikō as the dead sister (M3 C1 ruling, 2026-08-01).
+ */
+function castEnvelope(source: TrailerSource | undefined): {
+  provenance: string;
+  confidence: number;
+} {
+  return source === "probe"
+    ? { provenance: FALLBACK_PROVENANCE, confidence: FALLBACK_CONFIDENCE }
+    : { provenance: G1_PROVENANCE, confidence: 0.9 };
+}
+
 interface ResourceState {
   current: number;
   max: number;
@@ -43,6 +75,8 @@ export async function settleG1(
     turnNumber: number;
     conte: Conte;
     sidecar: CommitScene | null;
+    /** Which §5.7 path wrote the sidecar (M3 C1) — sets the cast envelope. */
+    trailerSource?: TrailerSource;
     /** Kept for future G1 seams (booth/pin deltas); unused at M1. */
     profileIds?: string[];
   },
@@ -51,7 +85,7 @@ export async function settleG1(
 
   await applyMechanicalState(db, campaignId, turnNumber, conte);
   await applyConsequence(db, campaignId, turnNumber, conte);
-  await applyCastCatalog(db, campaignId, turnNumber, sidecar);
+  await applyCastCatalog(db, campaignId, turnNumber, sidecar, args.trailerSource);
 
   // World-assertion ingestion happens in LAYOUT (Phase A), not here: the
   // §5.4 pipeline runs once per assertion so the conte can carry integration
@@ -171,8 +205,18 @@ async function applyCastCatalog(
   campaignId: string,
   turnNumber: number,
   sidecar: CommitScene | null,
+  trailerSource?: TrailerSource,
 ): Promise<void> {
   const deltas = sidecar?.scene_cast_delta ?? [];
+  const envelope = castEnvelope(trailerSource);
+  if (deltas.length > 0 && envelope.provenance === FALLBACK_PROVENANCE) {
+    console.warn("[g1] cataloguing cast from a reconstructed sidecar — demoted envelope", {
+      campaignId,
+      turnNumber,
+      trailerSource,
+      names: deltas.map((d) => d.name),
+    });
+  }
   for (const delta of deltas) {
     if (delta.action === "spawn_transient") continue;
 
@@ -230,8 +274,7 @@ async function applyCastCatalog(
               version: (row?.v ?? 0) + 1,
               block,
               turnId: turnNumber,
-              provenance: G1_PROVENANCE,
-              confidence: 0.9,
+              ...envelope,
             });
           }
         });
@@ -247,8 +290,7 @@ async function applyCastCatalog(
         entityType: "npc",
         block: note,
         turnId: turnNumber,
-        provenance: G1_PROVENANCE,
-        confidence: 0.9,
+        ...envelope,
       })
       // The partial unique index (campaign, type, name) WHERE not tombstoned
       // makes a concurrent/replayed admit a no-op.
@@ -264,8 +306,7 @@ async function applyCastCatalog(
           version: 1,
           block: note,
           turnId: turnNumber,
-          provenance: G1_PROVENANCE,
-          confidence: 0.9,
+          ...envelope,
         })
         .onConflictDoNothing();
     }

@@ -27,7 +27,7 @@ const mockJudgment = vi.mocked(callJudgment);
 type AssertExact<T, U> = [T] extends [U] ? ([U] extends [T] ? true : never) : never;
 const scoreOptionsCarryNoIntent: AssertExact<
   keyof ScoreOptions,
-  "sample" | "axes" | "name" | "campaignId" | "turnNumber"
+  "sample" | "axes" | "name" | "campaignId" | "turnNumber" | "phase"
 > = true;
 
 // The vocabulary that would leak what the story is REACHING for, past the

@@ -1,6 +1,6 @@
 import { getLangfuse } from "@/lib/observability/langfuse";
-import { recordModelCall } from "@/lib/observability/meter";
-import { CommitScene } from "@/lib/types/sidecar";
+import { type ModelCallPhase, recordModelCall } from "@/lib/observability/meter";
+import { CommitScene, clampCommitScene } from "@/lib/types/sidecar";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import type {
   ContentBlockParam,
@@ -10,6 +10,7 @@ import type {
   MessageStreamParams,
   TextBlockParam,
   Tool,
+  ToolChoice,
   ToolUnion,
   Usage,
 } from "@anthropic-ai/sdk/resources/messages/messages";
@@ -93,6 +94,21 @@ export function computeEffectiveMaxTokens(
 interface CallContext {
   campaignId?: string;
   turnNumber?: number;
+  /**
+   * Which lifecycle this spend belongs to (M3 C1). Callers that know their
+   * phase state it; turn-scoped work is recognised by its turn number.
+   */
+  phase?: ModelCallPhase;
+}
+
+/**
+ * The ledger's phase, resolved at the choke point. A turn number IS the
+ * turn-scope evidence, so per-turn callers need no plumbing; a call with
+ * neither stays NULL and reports as "(unattributed)" — a named gap rather
+ * than spend silently attributed to play (the audit's 47% blind spot).
+ */
+function resolvePhase(ctx: CallContext): ModelCallPhase | undefined {
+  return ctx.phase ?? (ctx.turnNumber !== undefined ? "turn" : undefined);
 }
 
 interface StructuredCallOptions<T> extends CallContext {
@@ -235,6 +251,7 @@ async function callStructured<T>(
         latencyMs: invLatency,
         campaignId: opts.campaignId,
         turnNumber: opts.turnNumber,
+        phase: resolvePhase(opts),
         traceId: trace?.id,
       });
       invGeneration?.end({
@@ -337,6 +354,7 @@ async function callStructured<T>(
       latencyMs,
       campaignId: opts.campaignId,
       turnNumber: opts.turnNumber,
+      phase: resolvePhase(opts),
       traceId: trace?.id,
     });
 
@@ -472,6 +490,9 @@ export async function prewarmPrefix(
     latencyMs,
     campaignId: ctx.campaignId,
     turnNumber: ctx.turnNumber,
+    // The function IS the phase: a pre-warm carries the play view's turn
+    // number, so the turn-number default would file it as play.
+    phase: ctx.phase ?? "prewarm",
     traceId: trace?.id,
   });
   trace?.update({ output: { latencyMs, ...usage } });
@@ -508,6 +529,17 @@ export interface NarrationOptions extends CallContext {
    * callers (the SZ conductor, Director investigation) supply their own.
    */
   tools?: Tool[];
+  /**
+   * Tool-use posture. Absent = `auto` — byte-identical to the pre-M3 request,
+   * which is the point: every existing caller keeps its exact wire shape.
+   * Two callers need more (M3 C1): `{type:"none"}` lets a prose composer send
+   * the KA's tool ARRAY (so its prefix matches the KA's cache entry, §5.6)
+   * while staying structurally unable to call one; `{type:"tool"}` forces the
+   * §5.7 trailer on the continuation round, where no prose is wanted.
+   * tool_choice is not part of the tools/system cache key, so neither costs
+   * the prefix anything.
+   */
+  toolChoice?: ToolChoice;
 }
 
 export interface NarrationResult {
@@ -542,7 +574,9 @@ export function extractCommitScene(message: Message): CommitScene | null {
     });
     return null;
   }
-  return parsed.data;
+  // The counts are enforced here, not by the schema (types/sidecar.ts): the
+  // grammar strips length bounds, so an off-count list must clamp, never fail.
+  return clampCommitScene(parsed.data, { source: "native" });
 }
 
 /**
@@ -566,16 +600,20 @@ export function streamNarration(opts: NarrationOptions) {
   const generation = trace?.generation({ name, model });
   const started = Date.now();
 
-  // tools: [] means a deliberately tool-less narration call (recap/yokoku,
-  // §9.3/§9.4) — tool_choice with an empty tools array is an API 400, so
-  // both fields drop together (C7 session agent's catch).
+  // tools: [] means a deliberately tool-less narration call — tool_choice with
+  // an empty tools array is an API 400, so both fields drop together (C7
+  // session agent's catch). The recap/yokoku composers no longer take that
+  // road: they send the KA's array under tool_choice `none` (M3 C1) so their
+  // prefix can share the KA's cache entry instead of writing a cold one.
   const tools = opts.tools ?? [COMMIT_SCENE_TOOL];
   const params: MessageStreamParams = {
     model,
     max_tokens: effectiveCap,
     system: opts.system,
     messages: opts.messages,
-    ...(tools.length > 0 ? { tools, tool_choice: { type: "auto" as const } } : {}),
+    ...(tools.length > 0
+      ? { tools, tool_choice: opts.toolChoice ?? { type: "auto" as const } }
+      : {}),
     ...(caps?.adaptiveThinking ? { thinking: { type: "adaptive" } } : {}),
     ...(opts.effort && caps?.effortControl ? { output_config: { effort: opts.effort } } : {}),
   };
@@ -642,6 +680,7 @@ export function streamNarration(opts: NarrationOptions) {
           latencyMs,
           campaignId: opts.campaignId,
           turnNumber: opts.turnNumber,
+          phase: resolvePhase(opts),
           fallbackUsed: true,
           traceId: trace?.id,
         });
@@ -656,6 +695,7 @@ export function streamNarration(opts: NarrationOptions) {
         latencyMs,
         campaignId: opts.campaignId,
         turnNumber: opts.turnNumber,
+        phase: resolvePhase(opts),
         fallbackUsed,
         traceId: trace?.id,
       });

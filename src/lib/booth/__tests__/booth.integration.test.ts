@@ -497,4 +497,42 @@ describe.skipIf(!url)("Meta booth + override channel (real Postgres, scripted mo
       "Wants the quiet aftermath scene after big beats.",
     );
   });
+
+  it("an over-count resolution with an over-budget taste note still lands (2026-08-01)", async () => {
+    if (!db) throw new Error("unreachable");
+    // The grammar strips maxItems and maxLength, so `.max(4)` on marks and
+    // `.max(240)` on the taste note could only ever fail the parse — losing
+    // EVERY calibration the player just settled to one surplus entry. Surplus
+    // marks/overrides clamp; an over-budget note drops alone.
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const campaignId = await makeCampaign();
+    await setBoothState(campaignId, 2, [
+      { role: "player", text: "a long calibration chat", at_turn: 2 },
+      { role: "studio", text: "noted", responder: "director", at_turn: 2 },
+    ]);
+    mockJudgment.mockResolvedValue({
+      marks: Array.from({ length: 7 }, (_, i) => ({
+        kind: "craft_note",
+        topic: `topic ${i}`,
+        direction: `direction ${i}`,
+        evidence: `evidence ${i}`,
+      })),
+      overrides: ["rule one", "rule two", "rule three", "rule four"],
+      player_taste_note: "x".repeat(400),
+      summary: "Settled several things at once.",
+    } as never);
+
+    await closeBoothIfOpen(db, campaignId, 9);
+
+    expect(await marksFor(campaignId)).toHaveLength(4);
+    expect(await overridesFor(campaignId)).toHaveLength(2);
+    expect(await readBoothState(campaignId)).toBeNull();
+    // The over-budget decoration dropped WITHOUT taking the marks with it.
+    const [player] = await db
+      .select({ profile: schema.players.profile })
+      .from(schema.players)
+      .where(eq(schema.players.id, playerId));
+    expect((player?.profile as { taste?: string[] })?.taste ?? []).not.toContain("x".repeat(400));
+    warn.mockRestore();
+  });
 });

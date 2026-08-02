@@ -84,18 +84,46 @@ const DistillEntityUpdate = z.object({
   faction_ripple: z.string().optional(),
 });
 
+/**
+ * NO LENGTH BOUNDS (M3, after the 2026-08-01 live diagnosis): the structured-
+ * output grammar strips `minItems`/`maxItems`, so a `.max(8)` here could not
+ * stop a ninth fact — only fail the parse and lose the whole G2 artifact
+ * (fragment, semantic layer, promotions, seeds, marks) over one surplus row.
+ * The prompt states the ceilings (DISTILL_SYSTEM) and `clampDistill` applies
+ * them before the payload is stashed, so crash-replay sees the same shape.
+ */
+const DISTILL_FACTS_MAX = 8;
+const DISTILL_ENTITY_UPDATES_MAX = 4;
+
 const DistillOutput = z.object({
   /** One subtext-first sentence: what the scene MEANT, not what happened. */
   narrated_fragment: z.string(),
-  facts: z.array(DistillFact).max(8).default([]),
-  /** Only for entities already in the catalog — background never creates (§6.5). */
-  entity_updates: z.array(DistillEntityUpdate).max(4).default([]),
+  /** ≤8; clamped engine-side. */
+  facts: z.array(DistillFact).default([]),
+  /** ≤4, and only for entities already in the catalog — background never creates (§6.5). */
+  entity_updates: z.array(DistillEntityUpdate).default([]),
   /** Which sidecar-mentioned seeds the scene actually paid attention to. */
   confirmed_seed_descriptions: z.array(z.string()).default([]),
   /** Out-of-fiction player craft feedback ("less flowery please") — usually empty. */
   meta_comments: z.array(z.string()).default([]),
 });
 type DistillOutput = z.infer<typeof DistillOutput>;
+
+function clampDistill(payload: DistillOutput, ctx: { campaignId: string; turnNumber: number }) {
+  const cap = <T>(list: T[], max: number, field: string): T[] => {
+    if (list.length <= max) return list;
+    console.warn(`[g2] ${field} over its ${max}-item ceiling — clamped, distill kept`, {
+      ...ctx,
+      emitted: list.length,
+    });
+    return list.slice(0, max);
+  };
+  return {
+    ...payload,
+    facts: cap(payload.facts, DISTILL_FACTS_MAX, "facts"),
+    entity_updates: cap(payload.entity_updates, DISTILL_ENTITY_UPDATES_MAX, "entity_updates"),
+  };
+}
 
 const DISTILL_SYSTEM = [
   "You are the Chronicler's distiller. Read the player's input and the scene",
@@ -104,7 +132,8 @@ const DISTILL_SYSTEM = [
   "(the motive, shift, or cost underneath), not a recap of events. facts — up",
   "to 8 durable facts, each in ONE of the given categories; mark is_plot_critical",
   "true only when losing the fact breaks continuity (a death, an alliance, a",
-  "revealed secret) and give a critical_reason. entity_updates — up to 4, ONLY",
+  "revealed secret) and give a critical_reason — facts past the eighth are",
+  "discarded unread, so rank them. entity_updates — up to 4 (likewise), ONLY",
   "for characters/factions already established in the scene, with a note and any",
   "relationship_shift / faction_ripple. confirmed_seed_descriptions — the seeds",
   "the scene genuinely engaged. meta_comments — out-of-fiction craft feedback",
@@ -186,7 +215,7 @@ async function settleG2Inner(db: Db, turnId: string): Promise<void> {
   // 1. distill — the ONE bundled judgment call; result stashed for replay.
   let payload: DistillOutput;
   if (!g2.distill) {
-    payload = await callJudgment(selection, {
+    const emitted = await callJudgment(selection, {
       name: "g2_distill",
       schema: DistillOutput,
       campaignId,
@@ -196,6 +225,9 @@ async function settleG2Inner(db: Db, turnId: string): Promise<void> {
       system: DISTILL_SYSTEM,
       prompt: `PLAYER INPUT:\n${turn.playerInput}\n\nNARRATION:\n${narration}`,
     });
+    // Clamp BEFORE the stash so crash-replay reads the same shape (the ceilings
+    // are no longer schema-enforceable — see the contract note above).
+    payload = clampDistill(emitted, { campaignId, turnNumber });
     g2.distill = true;
     await markDb({ g2_payload: payload });
   } else {

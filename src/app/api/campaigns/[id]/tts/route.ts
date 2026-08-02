@@ -86,6 +86,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
           provider: "elevenlabs",
           model: process.env.ELEVENLABS_MODEL_ID ?? "eleven_multilingual_v2",
           tier: "tts",
+          phase: "tts",
           inputTokens: PREVIEW_LINE.length,
           costUsd: "0",
         })
@@ -174,6 +175,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       provider: "elevenlabs",
       model: process.env.ELEVENLABS_MODEL_ID ?? "eleven_multilingual_v2",
       tier: "tts",
+      phase: "tts",
       inputTokens: text.length,
       costUsd: "0",
     })

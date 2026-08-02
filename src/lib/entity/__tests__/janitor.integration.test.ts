@@ -188,4 +188,48 @@ describe.skipIf(!url)("Janitor catalog review (real Postgres, scripted probe)", 
       ?.merge_suggestions;
     expect(suggestions).toHaveLength(1);
   });
+
+  it("an out-of-band confidence PINS instead of throwing the review (2026-08-01)", async () => {
+    if (!db) throw new Error("unreachable");
+    // The grammar strips minimum/maximum alongside the length bounds, so
+    // `.min(0).max(1)` could only ever fail the parse and take the whole
+    // close-time review (or the mint-time resolver guard) with it. The verdict
+    // is read only through the merge thresholds, so pinning is lossless.
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    // biome-ignore lint/suspicious/noExplicitAny: harness spans the generic probe signature
+    mockProbe.mockImplementation((_s: any, _o: any) =>
+      Promise.resolve({ same: true, confidence: 1.4, reason: "certain beyond certainty" } as never),
+    );
+    const [older] = await db
+      .insert(schema.entities)
+      .values({
+        campaignId,
+        name: "The Ashen Vault",
+        entityType: "location",
+        block: "A vault under the ash flats.",
+        turnId: 1,
+        ...ENV,
+      })
+      .returning();
+    const [newer] = await db
+      .insert(schema.entities)
+      .values({
+        campaignId,
+        name: "Vault beneath the ash flats",
+        entityType: "location",
+        block: "The same vault, named twice.",
+        turnId: 2,
+        ...ENV,
+      })
+      .returning();
+    if (!older || !newer) throw new Error("seed failed");
+
+    const report = await reviewCatalog(db, campaignId, 7, DEV_TIER_SELECTION);
+
+    // Pinned to 1.0 → still above MERGE_AUTO, so the review completed normally.
+    expect(report.merged).toHaveLength(1);
+    expect(report.merged[0]?.survivorId).toBe(older.id);
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
+  });
 });

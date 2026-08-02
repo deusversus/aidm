@@ -17,6 +17,16 @@ export function notTombstoned(table: { tombstonedAt: PgColumn }): SQL {
 }
 
 /**
+ * The §6.9 taste-note ceiling. A real budget (notes ride the Settei), and a
+ * CODE one: the structured-output grammar strips `z.string().max()`, so a
+ * schema bound could only ever fail the parse and destroy the artifact the
+ * note rides on (diagnosed live 2026-08-01, session memo). Every writer states
+ * the limit in its prompt and enforces it here — an over-budget note drops
+ * with a warn; the memo, the resolution, and the close all survive.
+ */
+export const TASTE_NOTE_MAX = 240;
+
+/**
  * The only sanctioned WRITE path for §6.9 taste notes (M2R R4 audit): an
  * ATOMIC jsonb append. The player profile is player-scoped — the SZ
  * compiler, session close, and booth close all write it, potentially for

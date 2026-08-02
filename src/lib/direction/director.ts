@@ -16,6 +16,7 @@ import {
 import type { ArcOverride } from "@/lib/types/arc";
 import { PartialComposition } from "@/lib/types/composition";
 import {
+  DIRECTOR_CAPS,
   DIRECTOR_EPICNESS_THRESHOLD,
   DIRECTOR_MAX_INTERVAL,
   DIRECTOR_MAX_TOOL_ROUNDS,
@@ -122,6 +123,73 @@ export function accumulate(
 function resolveSelection(tierModels: unknown): TierSelection {
   const parsed = TierSelection.safeParse(tierModels);
   return parsed.success ? parsed.data : DEV_TIER_SELECTION;
+}
+
+// --- Emission ceilings (types/direction.ts carries the why) ------------------
+
+function capList<T>(list: T[], max: number, field: string, campaignId: string): T[] {
+  if (list.length <= max) return list;
+  console.warn(`[director] ${field} over its ${max}-item ceiling — clamped, cycle kept`, {
+    campaignId,
+    emitted: list.length,
+  });
+  return list.slice(0, max);
+}
+
+const clampTo = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n));
+
+/**
+ * Apply the ceilings the schema can no longer enforce (the grammar strips
+ * length and range bounds — types/direction.ts). Surplus entries are dropped
+ * with a warn and out-of-range numbers are pinned to their band; the cycle
+ * itself always survives. Axis VALUES clamp rather than drop: an out-of-band
+ * value passed through would fail PartialDNAScales below and take every other
+ * shift in the override down with it.
+ */
+function clampDirectorOutput(output: DirectorOutput, campaignId: string): DirectorOutput {
+  const cap = <T>(list: T[], max: number, field: string) => capList(list, max, field, campaignId);
+  return {
+    ...output,
+    tension_level: clampTo(output.tension_level, 0, 1),
+    scene_shape_notes: cap(
+      output.scene_shape_notes,
+      DIRECTOR_CAPS.scene_shape_notes,
+      "scene_shape_notes",
+    ),
+    arc_relevance: cap(output.arc_relevance, DIRECTOR_CAPS.arc_relevance, "arc_relevance").map(
+      (r) => ({ ...r, relevance: clampTo(r.relevance, 1, 9) }),
+    ),
+    seed_ops: cap(output.seed_ops, DIRECTOR_CAPS.seed_ops, "seed_ops"),
+    spotlight_directives: cap(
+      output.spotlight_directives,
+      DIRECTOR_CAPS.spotlight_directives,
+      "spotlight_directives",
+    ),
+    demote_criticals: cap(
+      output.demote_criticals,
+      DIRECTOR_CAPS.demote_criticals,
+      "demote_criticals",
+    ),
+    director_notes: cap(output.director_notes, DIRECTOR_CAPS.director_notes, "director_notes"),
+    voice_patterns: cap(output.voice_patterns, DIRECTOR_CAPS.voice_patterns, "voice_patterns"),
+    ...(output.arc_override
+      ? {
+          arc_override: {
+            ...output.arc_override,
+            dna_shifts: cap(
+              output.arc_override.dna_shifts,
+              DIRECTOR_CAPS.dna_shifts,
+              "dna_shifts",
+            ).map((s) => ({ ...s, value: clampTo(s.value, 0, 10) })),
+            composition_shifts: cap(
+              output.arc_override.composition_shifts,
+              DIRECTOR_CAPS.composition_shifts,
+              "composition_shifts",
+            ),
+          },
+        }
+      : {}),
+  };
 }
 
 // --- Investigation toolkit (§7.1) -------------------------------------------
@@ -330,6 +398,12 @@ export async function runDirectorCycle(
   // circular import (director ⇄ sakkan) is function-scope only on both sides
   // — bindings resolve at call time, never at module init.
   const trend = gaugeTrend(state);
+  // The C1 flag gets its reader here (a writer with no reader is a defect,
+  // axiom 8): a charter running past its §4.4a budget is a Director-visible
+  // condition, not a discarded console line.
+  const charterFlag = state.settei?.charter_over_target
+    ? `The Style Charter is over its §4.4a budget (${state.settei.charter_tokens} tokens) — trims are exhausting; expect coarser premise pressure until the next rebuild.`
+    : "";
   // Dailies consumer #3 (M2R3): drifts the gate-trip attribution charged to the
   // player. A first-class section — the exit from the eternal retake (§4.5/§8).
   const playerDrift = playerDrivenTrend(state);
@@ -360,6 +434,7 @@ export async function runDirectorCycle(
     spotlightNote,
     "",
     ...(trend ? ["## Gauge trend (Sakkan, §4.5 — the dailies' drift read)", trend, ""] : []),
+    ...(charterFlag ? ["## The charter's budget", charterFlag, ""] : []),
     ...(playerDrift
       ? [
           "## Player-driven drift (§8 steering honesty + §4.2 — the story is being pulled by PLAY)",
@@ -381,7 +456,11 @@ export async function runDirectorCycle(
       : "None yet.",
     "",
     "## Your task",
-    `Investigate with your tools (up to ${DIRECTOR_MAX_TOOL_ROUNDS} rounds — seeds, arc, canon, past scenes), then emit ONE typed plan: the arc plan (name/phase/shape/budget/payoff), tension level, any single arc_override (latest wins, with its transition signal; express premise shifts as axis/value pairs) OR clear_override, seeds to plant/resolve/abandon, criticals to demote, the Scene-Shape base, an arc_relevance ranking of secondary axes, director notes (advisory), and voice patterns.`,
+    `Investigate with your tools (up to ${DIRECTOR_MAX_TOOL_ROUNDS} rounds — seeds, arc, canon, past scenes), then emit ONE typed plan: the arc plan (name/phase/shape/budget/payoff), tension_level, any single arc_override (latest wins, with its transition signal; express premise shifts as axis/value pairs) OR clear_override, seeds to plant/resolve/abandon, criticals to demote, the Scene-Shape base, an arc_relevance ranking of secondary axes, director notes (advisory), and voice patterns.`,
+    // The ceilings the schema cannot carry (types/direction.ts): stated here
+    // because this text IS the constraint the model writes against. Anything
+    // beyond a ceiling is silently dropped engine-side — say the best ones.
+    `Hard limits — emit at most: ${DIRECTOR_CAPS.scene_shape_notes} scene_shape_notes, ${DIRECTOR_CAPS.arc_relevance} arc_relevance entries, ${DIRECTOR_CAPS.seed_ops} seed_ops, ${DIRECTOR_CAPS.spotlight_directives} spotlight_directives, ${DIRECTOR_CAPS.demote_criticals} demote_criticals, ${DIRECTOR_CAPS.director_notes} director_notes, ${DIRECTOR_CAPS.voice_patterns} voice_patterns, and inside arc_override at most ${DIRECTOR_CAPS.dna_shifts} dna_shifts and ${DIRECTOR_CAPS.composition_shifts} composition_shifts. tension_level is 0-1, arc_relevance.relevance is 1-9, and every dna_shifts value is 0-10. Surplus entries are discarded, not read — rank them yourself and emit only what earns its place.`,
   ].join("\n");
 
   // --- One creative judgment call with the investigation loop ---------------
@@ -409,11 +488,14 @@ export async function runDirectorCycle(
     }
   };
 
-  const output = await callJudgment(selection, {
+  const emitted = await callJudgment(selection, {
     name: `director_${opts?.trigger ?? "cycle"}`,
     schema: DirectorOutput,
     campaignId,
     turnNumber,
+    // A Director cycle rides a turn number but is not the player's turn —
+    // without this the ledger files the whole cycle as play (M3 C1).
+    phase: "director_cycle",
     // A tool-loop call emitting a large contract; thinking headroom is added
     // structurally on top (computeEffectiveMaxTokens), not folded in here.
     maxTokens: LOOPED_LARGE,
@@ -429,6 +511,7 @@ export async function runDirectorCycle(
     // six reads at 0.1× and nothing is left paying 2× for a dead entry.
     cacheHead: "5m",
   });
+  const output = clampDirectorOutput(emitted, campaignId);
 
   // --- APPLY (§7.1) ---------------------------------------------------------
   const { arcId, phaseChanged } = await applyArcPlan(db, campaignId, turnNumber, output.arc_plan);
@@ -579,10 +662,12 @@ export async function runDirectorCycle(
 
 // --- Startup (§7.1 session boundaries, first open) ---------------------------
 
+/** Unbounded for the same reason DirectorOutput is (types/direction.ts): a
+ *  sixth cold-open constraint must not cost the campaign its pilot plan. */
 const StartupPlan = z.object({
   arc: DirectorArcPlan,
-  cold_open_constraints: z.array(z.string()).max(5).default([]),
-  scene_shape_notes: z.array(z.string()).max(3).default([]),
+  cold_open_constraints: z.array(z.string()).default([]),
+  scene_shape_notes: z.array(z.string()).default([]),
 });
 
 /**
@@ -673,7 +758,7 @@ export async function directorStartup(db: Db, campaignId: string): Promise<void>
     ...learnedSection,
     "",
     "## Your task",
-    "Plan the OPENING ARC. Name it (IP-appropriate, evocative), set phase to Setup, give it a dramatic_question descending from the spark, its shape and a budget within tolerance of the prior. Then: ≤5 cold_open_constraints and ≤3 scene_shape_notes for the writer's first scene. Do NOT restate the forbidden opening moves — those pass through as hard constraints, verbatim.",
+    `Plan the OPENING ARC. Name it (IP-appropriate, evocative), set phase to Setup, give it a dramatic_question descending from the spark, its shape and a budget within tolerance of the prior. Then: at most ${DIRECTOR_CAPS.cold_open_constraints} cold_open_constraints and at most ${DIRECTOR_CAPS.scene_shape_notes} scene_shape_notes for the writer's first scene — surplus entries are discarded, not read. Do NOT restate the forbidden opening moves — those pass through as hard constraints, verbatim.`,
   ].join("\n");
 
   const plan = await callJudgment(selection, {
@@ -681,6 +766,7 @@ export async function directorStartup(db: Db, campaignId: string): Promise<void>
     schema: StartupPlan,
     campaignId,
     turnNumber: 0,
+    phase: "director_cycle",
     maxTokens: LOOPED_LARGE,
     effort: "high",
     system: directorPersona(contract),
@@ -693,9 +779,21 @@ export async function directorStartup(db: Db, campaignId: string): Promise<void>
     ...state,
     tension_level: 0.2,
     phase_state: { arc_id: arcId, phase: plan.arc.phase, entered_at_turn: 0 },
-    scene_shape: { notes: plan.scene_shape_notes },
+    scene_shape: {
+      notes: capList(
+        plan.scene_shape_notes,
+        DIRECTOR_CAPS.scene_shape_notes,
+        "scene_shape_notes",
+        campaignId,
+      ),
+    },
     pilot_plan: {
-      cold_open_constraints: plan.cold_open_constraints,
+      cold_open_constraints: capList(
+        plan.cold_open_constraints,
+        DIRECTOR_CAPS.cold_open_constraints,
+        "cold_open_constraints",
+        campaignId,
+      ),
       // Hard constraints — passed through verbatim, never model-rewritten (§8).
       forbidden_opening_moves: osp.animation_inputs.forbidden_opening_moves,
       opening_pov: osp.animation_inputs.opening_pov,

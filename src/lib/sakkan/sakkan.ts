@@ -134,6 +134,9 @@ export async function runSakkanSample(
   turnNumber: number,
   opts?: { trigger?: "interval" | "sakuga" | "session_close" },
 ): Promise<{ scored: number; notesActive: number } | null> {
+  // Spend attribution (M3 C1): the sample carries a turn number in every
+  // trigger, but what BOUGHT it differs — a close-path sample is close spend.
+  const phase = opts?.trigger === "session_close" ? ("session_close" as const) : ("turn" as const);
   const [campaign] = await db.select().from(campaigns).where(eq(campaigns.id, campaignId));
   if (!campaign) throw new Error(`runSakkanSample: campaign ${campaignId} not found`);
 
@@ -391,6 +394,7 @@ export async function runSakkanSample(
         sample,
         campaignId,
         turnNumber,
+        phase,
       });
       if (reads.length > 0) {
         const next: SakkanState["voice_readings"] = { ...priorVoice };

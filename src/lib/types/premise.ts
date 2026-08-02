@@ -261,15 +261,33 @@ export const PresentationVocabulary = z.object({
    *  (`renderPresentationGrants` teaches the granted names; the play surface's
    *  directive registry renders them). Prose `grants` above are unchanged. */
   directives: z.array(DirectiveGrant).default([]),
-  /** RESERVED for M3 display grammar (M2R R4 audit: unpopulated, unread).
-   *  Recap posture today is delivered as premise judgment via grants. */
+  // The four fields below were RESERVED for the display grammar (M2R
+  // carry-repairs: "the four unpopulated subfields stay — removing contract
+  // fields churns live jsonb rows for nothing"). M3-DG has now landed, so
+  // their status is settled here rather than left open (M3 C1 close-out).
+  // All four keep zero writers and zero readers by DECISION, not by drift.
+  //
+  /** SUPERSEDED by `grants`, not pending. §9.3 makes recap posture — style,
+   *  length, even whether to recap at all — the composer's judgment under the
+   *  premise's own vocabulary ("no settings toggle; posture is premise-
+   *  rendered, not a stored enum"). A stored posture string would be exactly
+   *  the toggle §9.3 refuses. Kept only because deleting it rewrites every
+   *  live contract's jsonb; write nothing here, read nothing from it. */
   recap_posture: z.string().optional(),
-  /** RESERVED for M3 display grammar — yokoku posture rides grants today. */
+  /** SUPERSEDED by `grants`, same reasoning as recap_posture (§9.4). */
   yokoku_posture: z.string().optional(),
-  /** RESERVED — the stinger (§8) has no mechanism yet; staging decision
-   *  lives in M3-display-grammar's open questions. */
+  /** PENDING the stinger commit. §8 lists the post-credits stinger in the
+   *  presentation vocabulary; M3-display-grammar sized the mechanism as "its
+   *  own small commit AFTER this plan lands — a close-path artifact beside
+   *  the yokoku, using the wardrobe this plan builds" (resolved 2026-07-20,
+   *  item 4). That is still the plan of record; the wardrobe it waited on now
+   *  exists. Until that commit gives it BOTH a writer (an SZ presentation
+   *  beat that can grant it) and a reader (a composeStinger on the close
+   *  path), this stays inert and false on every contract. */
   stinger_allowed: z.boolean().default(false),
-  /** RESERVED for M3 display grammar — chip skinning deferred (M3-DG plan). */
+  /** PENDING its own commit, deliberately: M3-display-grammar deferred chip
+   *  skinning "once chips have usage data" — the data is the gate, not the
+   *  code. Inert until then. */
   suggestion_chip_skin: z.string().optional(),
 });
 

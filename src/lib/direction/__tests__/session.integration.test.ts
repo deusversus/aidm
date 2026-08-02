@@ -9,6 +9,7 @@ import {
 import { callJudgment, callProbe, prewarmPrefix, streamNarration } from "@/lib/llm/calls";
 import type { TierSelection } from "@/lib/llm/tiers";
 import { bebopContract } from "@/lib/renderer/__tests__/fixtures";
+import { KA_TOOLS } from "@/lib/turn/tools";
 import type { DirectionState } from "@/lib/types/direction";
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
@@ -643,6 +644,31 @@ describe.skipIf(!url)("Session lifecycle (real Postgres, scripted models)", () =
     expect(prompt).toContain("The tease made at last close");
     expect(prompt).toContain("Next time: the debt comes due.");
     expect(prompt).toContain("never owed");
+  });
+
+  it("the recap sends the KA's tool array under tool_choice none (M3 C1 — the cold write)", async () => {
+    if (!db) throw new Error("unreachable");
+    // Session-open composers used to send `tools: []`. Tools render AHEAD of
+    // `system` in the cache key, so their prefix could never share the KA's
+    // entry however identical Blocks 1–3 were — every open paid two full cold
+    // Opus writes. The array now rides along with the door bolted shut.
+    const campaignId = await makeCampaign();
+    await insertTurn(campaignId, 1, "The bounty slipped away again.");
+    await db
+      .update(schema.turns)
+      .set({ completedAt: new Date(Date.now() - 65 * 60 * 1000) })
+      .where(eq(schema.turns.campaignId, campaignId));
+
+    await openSession(db, campaignId);
+
+    const recapCall = mockStream.mock.calls.find(
+      (c) => (c[0] as { name?: string })?.name === "recap",
+    )?.[0] as Parameters<typeof streamNarration>[0] | undefined;
+    expect(recapCall).toBeDefined();
+    expect(JSON.stringify(recapCall?.tools)).toBe(JSON.stringify(KA_TOOLS));
+    expect(recapCall?.toolChoice).toEqual({ type: "none" });
+    // …and the spend is attributed to the open, not to play (M3 C1).
+    expect(recapCall?.phase).toBe("session_open");
   });
 
   it("a close-revealed taste note appends to the cross-campaign profile (§6.9 writer, M2R R4)", async () => {

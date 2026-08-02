@@ -1,6 +1,7 @@
 import { STRUCTURED_RICH } from "@/lib/llm/budgets";
 import { callJudgment } from "@/lib/llm/calls";
 import type { TierSelection } from "@/lib/llm/tiers";
+import type { ModelCallPhase } from "@/lib/observability/meter";
 import { loadGrounding } from "@/lib/rules/grounding";
 import { type AnchorFile, type AxisName, COVERED_AXES, type Exemplar } from "@/lib/types/grounding";
 import { z } from "zod";
@@ -43,6 +44,7 @@ export interface ScoreOptions {
   name?: string;
   campaignId?: string;
   turnNumber?: number;
+  phase?: ModelCallPhase;
 }
 
 /**
@@ -119,6 +121,7 @@ export async function scoreAxes(
 
   const result = await callJudgment(selection, {
     name: opts.name ?? "sakkan_score",
+    phase: opts.phase,
     schema: ScoreSheet,
     system: [
       "You are the Sakkan (animation director) for a prose story engine: you score",

@@ -1,6 +1,6 @@
 import { env } from "@/lib/env";
 import { getLangfuse } from "@/lib/observability/langfuse";
-import { recordModelCall } from "@/lib/observability/meter";
+import { type ModelCallPhase, recordModelCall } from "@/lib/observability/meter";
 import { VoyageAIClient } from "voyageai";
 import { EMBEDDING_DIMENSIONS, EMBEDDING_MODEL } from "./embedding-config";
 
@@ -26,6 +26,8 @@ export interface EmbedOptions {
   patience?: "interactive" | "research";
   campaignId?: string;
   turnNumber?: number;
+  /** Spend attribution (M3 C1) — see ModelCallPhase. */
+  phase?: ModelCallPhase;
 }
 
 /**
@@ -90,6 +92,9 @@ export async function embedTexts(texts: string[], opts: EmbedOptions = {}): Prom
     latencyMs,
     campaignId: opts.campaignId,
     turnNumber: opts.turnNumber,
+    // Same law as the Anthropic trio (M3 C1): a turn number is turn-scope
+    // evidence; an embed with neither stays honestly unattributed.
+    phase: opts.phase ?? (opts.turnNumber !== undefined ? "turn" : undefined),
     traceId: trace?.id,
   });
 

@@ -156,6 +156,7 @@ async function freezeSettei(
       settei: SetteiSnapshot.parse({
         text: rendered.text,
         charter_tokens: rendered.charterTokens,
+        charter_over_target: rendered.charterOverTarget,
         rendered_axes: rendered.renderedAxes,
         uncovered_extremes: rendered.uncoveredExtremes,
         rebuilt_at_turn: g2Settled ? n : Math.max(0, n - 1),

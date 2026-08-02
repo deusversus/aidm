@@ -1,6 +1,7 @@
 import { CLASSIFY } from "@/lib/llm/budgets";
 import { callJudgment } from "@/lib/llm/calls";
 import type { TierSelection } from "@/lib/llm/tiers";
+import type { ModelCallPhase } from "@/lib/observability/meter";
 import { AttributionResult } from "@/lib/types/direction";
 
 /**
@@ -93,7 +94,7 @@ export function buildAttributionPrompt(input: AttributionInput): string {
 /** Run the blind gate-trip attribution read through the traced trio (judgment tier). */
 export async function attributeDrift(
   selection: TierSelection,
-  input: AttributionInput & { campaignId?: string; turnNumber?: number },
+  input: AttributionInput & { campaignId?: string; turnNumber?: number; phase?: ModelCallPhase },
 ): Promise<AttributionResult> {
   return callJudgment(selection, {
     name: "sakkan_attribution",
@@ -104,5 +105,6 @@ export async function attributeDrift(
     maxTokens: CLASSIFY,
     campaignId: input.campaignId,
     turnNumber: input.turnNumber,
+    phase: input.phase,
   });
 }

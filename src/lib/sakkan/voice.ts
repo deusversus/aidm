@@ -1,6 +1,7 @@
 import { STRUCTURED_SMALL } from "@/lib/llm/budgets";
 import { callJudgment } from "@/lib/llm/calls";
 import type { TierSelection } from "@/lib/llm/tiers";
+import type { ModelCallPhase } from "@/lib/observability/meter";
 import type { AuthorVoice } from "@/lib/types/profile";
 import { z } from "zod";
 
@@ -150,6 +151,7 @@ export async function judgeVoice(
     sample: string;
     campaignId?: string;
     turnNumber?: number;
+    phase?: ModelCallPhase;
   },
 ): Promise<VoiceDimensionRead[]> {
   const wanted = measurableDimensions(opts.patterns);
@@ -164,6 +166,7 @@ export async function judgeVoice(
     maxTokens: STRUCTURED_SMALL,
     campaignId: opts.campaignId,
     turnNumber: opts.turnNumber,
+    phase: opts.phase,
   });
 
   const asked = new Set<string>(wanted);

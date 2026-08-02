@@ -1,11 +1,64 @@
 import { notTombstoned } from "@/lib/db/helpers";
 import * as schema from "@/lib/db/schema";
+import { callJudgment } from "@/lib/llm/calls";
 import { and, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { assembleBlocks, block3Text } from "../assemble";
-import { compactionWatermark, loadBeats, runCompaction, workingWindow } from "../compaction";
+import {
+  COMPACT_BEATS_MAX,
+  compactionWatermark,
+  judgmentCompactor,
+  loadBeats,
+  runCompaction,
+  workingWindow,
+} from "../compaction";
+
+vi.mock("@/lib/llm/calls", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/llm/calls")>();
+  return { ...actual, callJudgment: vi.fn() };
+});
+const mockJudgment = vi.mocked(callJudgment);
+
+const SELECTION = {
+  narration: "claude-sonnet-5",
+  judgment: "claude-haiku-4-5",
+  probe: "claude-haiku-4-5",
+} as const;
+
+const EXCHANGES = [
+  { turnNumber: 1, playerInput: "in", narration: "out" },
+  { turnNumber: 2, playerInput: "in", narration: "out" },
+];
+
+describe("judgmentCompactor emission ceiling (§6.2)", () => {
+  it("clamps an over-count compactor instead of throwing the event (2026-08-01)", async () => {
+    // The grammar strips maxItems, so `.max(4)` could never hold the compactor
+    // to four beats — only fail the parse and throw the compaction event. At
+    // 100-turn scale that is the window that never truncates.
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    mockJudgment.mockResolvedValue({
+      beats: ["a", "b", "  ", "c", "d", "e", "f"],
+    } as never);
+
+    const beats = await judgmentCompactor(SELECTION, { campaignId: "c1", turnNumber: 20 })(
+      EXCHANGES,
+    );
+
+    expect(beats).toHaveLength(COMPACT_BEATS_MAX);
+    expect(beats).toEqual(["a", "b", "c", "d"]); // blanks dropped, then sliced
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it("states the ceiling in the prompt — the only place it can now be enforced", async () => {
+    mockJudgment.mockResolvedValue({ beats: ["one"] } as never);
+    await judgmentCompactor(SELECTION, { campaignId: "c1", turnNumber: 20 })(EXCHANGES);
+    const system = String((mockJudgment.mock.calls.at(-1)?.[1] as { system?: string })?.system);
+    expect(system).toContain(`at most ${COMPACT_BEATS_MAX} beats`);
+  });
+});
 
 /** Real-DB proof of the §5.6 discipline: the window only shrinks through a compaction event. */
 
@@ -122,6 +175,28 @@ describe.skipIf(!url)("compaction event (real Postgres)", () => {
     for (const [i, block] of before.system.entries()) {
       expect(after.system[i]?.text).toBe(block.text);
     }
+  });
+
+  it("a compactor that produced nothing leaves the window intact (no watermark drift)", async () => {
+    if (!db) throw new Error("unreachable");
+    // With the schema's min(1) gone, an empty beat list is representable. It
+    // must NOT advance the watermark: the window derives from the beats, so a
+    // zero-row "success" would drop the stretch out of the writer's memory.
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const watermarkBefore = await compactionWatermark(db, campaignId);
+    const windowBefore = await workingWindow(db, campaignId);
+
+    const report = await runCompaction(db, campaignId, 20, {
+      compactor: async () => [],
+      keepTail: 1,
+    });
+
+    expect(report.compacted).toBe(false);
+    expect(report.beatsWritten).toBe(0);
+    expect(await compactionWatermark(db, campaignId)).toBe(watermarkBefore);
+    expect(await workingWindow(db, campaignId)).toHaveLength(windowBefore.length);
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
   });
 
   it("beat writes carry the provenance envelope", async () => {

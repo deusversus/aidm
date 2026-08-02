@@ -76,6 +76,19 @@ interface Row {
   costUsd: number;
 }
 
+/** One lifecycle's slice of the ledger (M3 C1) — the whole bill, not just play. */
+interface PhaseRow {
+  phase: string;
+  calls: number;
+  input: number;
+  read: number;
+  creation: number;
+  costUsd: number;
+}
+
+/** NULL phase = written before the column existed. Named, never counted as play. */
+const UNATTRIBUTED = "(unattributed)";
+
 interface Priced extends Row {
   /** creation × cacheCreationPer1M (the 2× 1h write premium). */
   writeUsd: number;
@@ -111,7 +124,40 @@ function pct(x: number): string {
 // Output
 // ---------------------------------------------------------------------------
 
-function printReport(days: number, since: Date, rows: Row[]): void {
+/**
+ * The spend ledger by lifecycle (M3 C1). The 2026-08-01 audit found 47% of
+ * real spend invisible to per-turn telemetry — session opens, recaps,
+ * pre-warms and Director cycles — which made the cost model understate a
+ * sitting by roughly 2×. Per tier × model says what ran; this says what it
+ * was FOR, and the share column is the number that was missing.
+ */
+function printPhases(phases: PhaseRow[]): void {
+  if (phases.length === 0) return;
+  const total = phases.reduce((s, p) => s + p.costUsd, 0);
+  console.log("");
+  console.log("Spend by phase (the whole ledger, not just the turn):");
+  console.log(
+    `${"phase".padEnd(16)} ${"calls".padStart(6)} ${"input".padStart(11)} ${"read".padStart(12)} ${"creation".padStart(11)} ${"cost".padStart(11)} ${"share".padStart(7)}`,
+  );
+  console.log("-".repeat(80));
+  for (const p of [...phases].sort((a, b) => b.costUsd - a.costUsd)) {
+    const share = total === 0 ? 0 : p.costUsd / total;
+    console.log(
+      `${p.phase.padEnd(16)} ${String(p.calls).padStart(6)} ${int(p.input).padStart(11)} ${int(p.read).padStart(12)} ${int(p.creation).padStart(11)} ${usd(p.costUsd).padStart(11)} ${pct(share).padStart(7)}`,
+    );
+  }
+  const turn = phases.find((p) => p.phase === "turn")?.costUsd ?? 0;
+  const offTurn = total - turn;
+  console.log("-".repeat(80));
+  console.log(
+    `${"TOTAL".padEnd(16)} ${String(phases.reduce((s, p) => s + p.calls, 0)).padStart(6)} ${"".padStart(11)} ${"".padStart(12)} ${"".padStart(11)} ${usd(total).padStart(11)}`,
+  );
+  console.log(
+    `  off-turn spend: ${usd(offTurn)} (${pct(total === 0 ? 0 : offTurn / total)}) — the share a per-turn cost model cannot see.`,
+  );
+}
+
+function printReport(days: number, since: Date, rows: Row[], phases: PhaseRow[]): void {
   console.log("");
   console.log(`=== Cache gauge — last ${days} day(s) ===`);
   console.log(`window since ${since.toISOString()} · ${rows.length} tier×model pair(s)`);
@@ -121,6 +167,9 @@ function printReport(days: number, since: Date, rows: Row[]): void {
     console.log("No model_calls rows in the window.");
     return;
   }
+
+  printPhases(phases);
+  console.log("");
 
   console.log(
     `${"tier".padEnd(10)} ${"model".padEnd(24)} ${"calls".padStart(6)} ${"input".padStart(11)} ${"read".padStart(12)} ${"creation".padStart(11)} ${"cost".padStart(11)} ${"hit".padStart(7)}`,
@@ -221,7 +270,49 @@ async function main(): Promise<void> {
     costUsd: num(r.costUsd),
   }));
 
-  printReport(days, since, rows);
+  // The phase column is additive and lands with its own migration; until the
+  // operator applies it the gauge still has a job to do, so a missing column
+  // costs the phase table and nothing else.
+  const rawPhases = await selectPhases(db, since);
+
+  const phases: PhaseRow[] = rawPhases.map((p) => ({
+    phase: p.phase,
+    calls: num(p.calls),
+    input: num(p.input),
+    read: num(p.read),
+    creation: num(p.creation),
+    costUsd: num(p.costUsd),
+  }));
+
+  printReport(days, since, rows, phases);
+}
+
+async function selectPhases(
+  db: ReturnType<typeof getDb>,
+  since: Date,
+): Promise<
+  { phase: string; calls: string; input: string; read: string; creation: string; costUsd: string }[]
+> {
+  try {
+    return await db
+      .select({
+        phase: sql<string>`coalesce(${schema.modelCalls.phase}, ${UNATTRIBUTED})`,
+        calls: sql<string>`count(*)`,
+        input: sql<string>`coalesce(sum(${schema.modelCalls.inputTokens}), 0)`,
+        read: sql<string>`coalesce(sum(${schema.modelCalls.cacheReadInputTokens}), 0)`,
+        creation: sql<string>`coalesce(sum(${schema.modelCalls.cacheCreationInputTokens}), 0)`,
+        costUsd: sql<string>`coalesce(sum(${schema.modelCalls.costUsd}), 0)`,
+      })
+      .from(schema.modelCalls)
+      .where(gte(schema.modelCalls.createdAt, since))
+      .groupBy(sql`coalesce(${schema.modelCalls.phase}, ${UNATTRIBUTED})`);
+  } catch (err) {
+    console.warn(
+      `\n[cache-gauge] phase table skipped — ${err instanceof Error ? err.message : String(err)}`,
+    );
+    console.warn("[cache-gauge] run the pending migration to see spend by phase.\n");
+    return [];
+  }
 }
 
 try {

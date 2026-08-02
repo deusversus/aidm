@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { Conte } from "../conte";
-import { CommitScene } from "../sidecar";
+import { CommitScene, clampCommitScene } from "../sidecar";
 
 const memory = (n: number) => ({
   content: `memory ${n}`,
@@ -63,17 +63,62 @@ describe("CommitScene sidecar (§5.7)", () => {
     expect(parsed.scene_cast_delta[0]?.action).toBe("admit_to_catalog");
   });
 
-  it("suggested_moves must be 2–3 when present, and may be absent", () => {
-    const base = { decision_point: false, notable_beats: ["quiet beat"] };
-    expect(CommitScene.parse(base).suggested_moves).toBeUndefined();
-    expect(() => CommitScene.parse({ ...base, suggested_moves: ["only one"] })).toThrow();
-    expect(() => CommitScene.parse({ ...base, suggested_moves: ["a", "b", "c", "d"] })).toThrow();
+  it("an off-count trailer PARSES — the counts are not schema bounds (2026-08-01)", () => {
+    // The API grammar strips minItems/maxItems, so a bound here could only
+    // ever fail the parse and destroy the scene's own record. Both directions
+    // must survive the schema; the clamp below is what enforces the ceiling.
+    const base = { decision_point: true, notable_beats: ["a", "b", "c", "d"] };
+    expect(() => CommitScene.parse(base)).not.toThrow();
+    expect(() => CommitScene.parse({ ...base, suggested_moves: ["only one"] })).not.toThrow();
+    expect(() =>
+      CommitScene.parse({ ...base, suggested_moves: ["a", "b", "c", "d"] }),
+    ).not.toThrow();
+    expect(() => CommitScene.parse({ decision_point: false, notable_beats: [] })).not.toThrow();
   });
 
-  it("notable_beats requires 1–3 entries", () => {
-    expect(() => CommitScene.parse({ decision_point: false, notable_beats: [] })).toThrow();
-    expect(() =>
-      CommitScene.parse({ decision_point: false, notable_beats: ["a", "b", "c", "d"] }),
-    ).toThrow();
+  it("clampCommitScene slices to the ceilings and keeps the scene", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const clamped = clampCommitScene(
+      CommitScene.parse({
+        decision_point: true,
+        suggested_moves: ["a", "b", "c", "d", "e"],
+        notable_beats: ["w", "x", "y", "z"],
+      }),
+    );
+    expect(clamped.suggested_moves).toEqual(["a", "b", "c"]);
+    expect(clamped.notable_beats).toEqual(["w", "x", "y"]);
+    expect(clamped.decision_point).toBe(true);
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it("clampCommitScene passes SHORT lists through — a move cannot be sliced into existence", () => {
+    // The chips are optional decoration; the play view and the suggestions
+    // route both gate on length >= 2 and render nothing below it.
+    const one = clampCommitScene(
+      CommitScene.parse({
+        decision_point: true,
+        suggested_moves: ["only one"],
+        notable_beats: ["a beat"],
+      }),
+    );
+    expect(one.suggested_moves).toEqual(["only one"]);
+
+    const none = clampCommitScene(CommitScene.parse({ decision_point: false, notable_beats: [] }));
+    expect(none.notable_beats).toEqual([]);
+    expect(none.suggested_moves).toBeUndefined();
+  });
+
+  it("clampCommitScene drops blanks, and an all-blank move list becomes absent", () => {
+    const clamped = clampCommitScene(
+      CommitScene.parse({
+        decision_point: true,
+        suggested_moves: ["  ", ""],
+        notable_beats: ["  kept  ", "   "],
+      }),
+    );
+    expect(clamped.notable_beats).toEqual(["kept"]);
+    expect(clamped.suggested_moves).toBeUndefined();
+    expect("suggested_moves" in clamped).toBe(false);
   });
 });

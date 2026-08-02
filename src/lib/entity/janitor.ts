@@ -6,6 +6,7 @@ import { CLASSIFY } from "@/lib/llm/budgets";
 import { callProbe } from "@/lib/llm/calls";
 import type { TierSelection } from "@/lib/llm/tiers";
 import { cosineSimilarity, embedTexts } from "@/lib/llm/voyage";
+import type { ModelCallPhase } from "@/lib/observability/meter";
 import { DirectionState, type MergeSuggestion } from "@/lib/types/direction";
 import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
@@ -41,9 +42,18 @@ export interface JanitorReport {
   suggested: MergeSuggestion[];
 }
 
+/**
+ * NO RANGE BOUND on confidence (M3, after the 2026-08-01 live diagnosis): the
+ * structured-output grammar strips `minimum`/`maximum` alongside the string
+ * and array bounds, so `.min(0).max(1)` could not hold the probe to the band —
+ * only fail the parse on a 1.2 and throw, taking the session-close review (or,
+ * via pairLikelySame, the mint-time resolver guard) with it. The band is
+ * stated in the prompt and pinned below; the verdict is read only through the
+ * MERGE_AUTO/MERGE_SUGGEST thresholds, so pinning is lossless.
+ */
 const PairVerdict = z.object({
   same: z.boolean(),
-  confidence: z.number().min(0).max(1),
+  confidence: z.number(),
   reason: z.string(),
 });
 
@@ -75,6 +85,7 @@ export async function pairLikelySame(
   args: {
     campaignId: string;
     turnNumber: number;
+    phase: ModelCallPhase;
     a: { id: string; name: string; entityType: string; block: string };
     b: { name: string; block: string };
   },
@@ -93,15 +104,25 @@ export async function pairLikelySame(
     "Are ENTRY A and ENTRY B the same in-fiction entity described twice, or genuinely distinct?",
   ].join("\n");
 
-  return callProbe(selection, {
+  const verdict = await callProbe(selection, {
     name: "entity_merge_pair",
     schema: PairVerdict,
     campaignId: args.campaignId,
     turnNumber: args.turnNumber,
+    phase: args.phase,
     system: PAIR_SYSTEM,
     prompt,
     maxTokens: CLASSIFY,
   });
+  const confidence = Math.min(1, Math.max(0, verdict.confidence));
+  if (confidence !== verdict.confidence) {
+    console.warn("[janitor] pair confidence outside 0..1 — pinned to the band, verdict kept", {
+      campaignId: args.campaignId,
+      emitted: verdict.confidence,
+      pinned: confidence,
+    });
+  }
+  return { ...verdict, confidence };
 }
 
 interface CatalogRow {
@@ -145,6 +166,7 @@ export async function reviewCatalog(
   campaignId: string,
   turnNumber: number,
   selection: TierSelection,
+  phase: ModelCallPhase = "turn",
 ): Promise<JanitorReport> {
   const rows: CatalogRow[] = await db
     .select({
@@ -208,6 +230,7 @@ export async function reviewCatalog(
     const verdict = await pairLikelySame(db, selection, {
       campaignId,
       turnNumber,
+      phase,
       a: { id: cand.a.id, name: cand.a.name, entityType: cand.a.entityType, block: cand.a.block },
       b: { name: cand.b.name, block: cand.b.block },
     });

@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { callJudgment } from "@/lib/llm/calls";
+import { describe, expect, it, vi } from "vitest";
 import {
   type AniListMedia,
   continuityBase,
@@ -8,7 +9,14 @@ import {
 } from "../anilist";
 import { chunkPage } from "../corpus";
 import { classifyScope, profileSlug } from "../research";
+import { synthesizeVoiceCards } from "../synthesize";
 import { cleanWikiHtml, extractQuotes, stripNoiseSections } from "../wiki";
+
+vi.mock("@/lib/llm/calls", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/llm/calls")>();
+  return { ...actual, callJudgment: vi.fn() };
+});
+const mockJudgment = vi.mocked(callJudgment);
 
 const media = (overrides: Partial<AniListMedia>): AniListMedia => ({
   id: 1,
@@ -195,5 +203,33 @@ describe("chunkPage (corpus chunking)", () => {
     for (const c of chunksBig) {
       expect(c.content.length / 4).toBeLessThan(1_600);
     }
+  });
+});
+
+describe("synthesizeVoiceCards emission ceiling", () => {
+  it("clamps an over-count card set instead of failing the research run (2026-08-01)", async () => {
+    // The grammar strips maxItems, so `.max(8)` could only ever fail the parse
+    // — and this call is awaited unguarded, so that took the whole profile
+    // research run with it.
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const card = (i: number) => ({
+      character: `char ${i}`,
+      speech_patterns: [],
+      verbal_tics: [],
+      formality: "neutral",
+      sample_lines: [],
+    });
+    mockJudgment.mockResolvedValue({
+      cards: Array.from({ length: 11 }, (_, i) => card(i)),
+    } as never);
+
+    const cards = await synthesizeVoiceCards({ Spike: ["Whatever happens, happens."] }, []);
+
+    expect(cards).toHaveLength(8);
+    expect(warn).toHaveBeenCalled();
+    // The ceiling is stated where it can now be enforced: the prompt.
+    const system = String((mockJudgment.mock.calls.at(-1)?.[1] as { system?: string })?.system);
+    expect(system).toContain("at most 8 cards");
+    warn.mockRestore();
   });
 });

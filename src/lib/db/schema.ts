@@ -176,6 +176,13 @@ export const modelCalls = pgTable(
     model: text().notNull(),
     /** narration | judgment | probe | embedding (media tiers join at M5). */
     tier: text().notNull(),
+    /**
+     * Which lifecycle the spend belongs to (M3 C1): turn | session_open |
+     * session_close | prewarm | director_cycle | sz | suggestion | tts.
+     * Nullable by design — rows written before the column report as
+     * "(unattributed)" in the gauge rather than being counted as play.
+     */
+    phase: text(),
     inputTokens: integer().notNull().default(0),
     outputTokens: integer().notNull().default(0),
     cacheReadInputTokens: integer().notNull().default(0),

@@ -13,10 +13,31 @@ import { type UsageStats, estimateCostUsd } from "@/lib/llm/pricing";
  * errors ever recur in traces, that's a defect to fix, not noise.
  */
 
+/**
+ * Which lifecycle a call was spent on (M3 C1). The 2026-08-01 audit measured
+ * 47% of real spend invisible to per-turn telemetry — session opens, recaps,
+ * pre-warms and Director cycles all landed as turn-less rows the cost model
+ * silently read as free play. The tier says WHAT ran; the phase says WHY.
+ * Rows written before this column exists stay NULL and report as
+ * "(unattributed)" — an honest gap, never a zero.
+ */
+export type ModelCallPhase =
+  | "turn"
+  | "session_open"
+  | "session_close"
+  | "prewarm"
+  | "director_cycle"
+  | "sz"
+  | "booth"
+  | "research"
+  | "suggestion"
+  | "tts";
+
 export interface ModelCallRecord {
   provider: "anthropic" | "voyage";
   model: string;
   tier: "narration" | "judgment" | "probe" | "embedding";
+  phase?: ModelCallPhase;
   /**
    * UsageStats, not a local shape: the optional per-TTL `cache_creation`
    * split has to survive the hop to estimateCostUsd or a 5m write meters at
@@ -54,6 +75,7 @@ export async function recordModelCall(record: ModelCallRecord): Promise<number> 
         provider: record.provider,
         model: record.model,
         tier: record.tier,
+        phase: record.phase,
         inputTokens: record.usage.input_tokens,
         outputTokens: record.usage.output_tokens,
         cacheReadInputTokens: record.usage.cache_read_input_tokens ?? 0,

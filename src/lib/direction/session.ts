@@ -1,6 +1,6 @@
 import { assembleForCampaign } from "@/lib/blocks/campaign";
 import type { Db } from "@/lib/db";
-import { appendPlayerTaste, notTombstoned } from "@/lib/db/helpers";
+import { TASTE_NOTE_MAX, appendPlayerTaste, notTombstoned } from "@/lib/db/helpers";
 import {
   campaigns,
   compactedBeats,
@@ -23,6 +23,7 @@ import { reviewCatalog } from "@/lib/entity/janitor";
 import { PROSE_COMPOSER, STRUCTURED_RICH } from "@/lib/llm/budgets";
 import { callJudgment, prewarmPrefix, streamNarration } from "@/lib/llm/calls";
 import { DEV_TIER_SELECTION, TierSelection } from "@/lib/llm/tiers";
+import type { ModelCallPhase } from "@/lib/observability/meter";
 import { type SetteiInput, renderSettei } from "@/lib/renderer/settei";
 import { runSakkanSample } from "@/lib/sakkan/sakkan";
 import { KA_TOOLS } from "@/lib/turn/tools";
@@ -286,7 +287,7 @@ export async function closeSession(
   let yokoku: string | undefined;
   let tasteNote: string | undefined;
   try {
-    const composed = await composeMemo(db, campaignId, tier, currentMaxTurn);
+    const composed = await composeMemo(db, campaignId, tier, currentMaxTurn, "session_close");
     directorMemo = composed.memo;
     tasteNote = composed.tasteNote;
   } catch (err) {
@@ -327,7 +328,7 @@ export async function closeSession(
   // composers and the Sakkan sample — a hygiene failure never blocks the close.
   if (currentMaxTurn > 0) {
     try {
-      await reviewCatalog(db, campaignId, currentMaxTurn, tier);
+      await reviewCatalog(db, campaignId, currentMaxTurn, tier, "session_close");
     } catch (err) {
       logComposerFailure("janitor", campaignId, err);
     }
@@ -369,7 +370,9 @@ export async function rollingCheckpoint(
     // Taste is deliberately ignored here: a rolling checkpoint fires every
     // 12 turns and repeated appends would spam the profile (§6.9 writers
     // are SZ, session close, booth — the checkpoint refreshes the memo only).
-    directorMemo = (await composeMemo(db, campaignId, tier, turnNumber)).memo;
+    // G2-driven, mid-session (every 12 turns): turn-scoped spend, not a close
+    // (C1 audit — a mislabel hides cost worse than a NULL).
+    directorMemo = (await composeMemo(db, campaignId, tier, turnNumber, "turn")).memo;
   } catch (err) {
     logComposerFailure("memo", campaignId, err);
   }
@@ -423,6 +426,7 @@ export async function rebuildSettei(
   direction.settei = SetteiSnapshot.parse({
     text: settei.text,
     charter_tokens: settei.charterTokens,
+    charter_over_target: settei.charterOverTarget,
     rendered_axes: settei.renderedAxes,
     uncovered_extremes: settei.uncoveredExtremes,
     rebuilt_at_turn: currentTurn,
@@ -511,16 +515,31 @@ async function collectNarration(
   system: TextBlockParam[],
   prompt: string,
   campaignId: string,
+  phase: ModelCallPhase,
 ): Promise<string | undefined> {
   const { done } = streamNarration({
     name,
     selection,
     system,
     messages: [{ role: "user", content: prompt }],
-    // NO tools: recap/yokoku are player-facing prose, never a commit_scene.
-    tools: [],
+    // The KA's array under tool_choice `none` (M3 C1). These composers must
+    // never call a tool — but `tools: []` made that true by removing the
+    // array, and tools render AHEAD of `system` in the cache key, so their
+    // prefix could not share the KA's entry however identical Blocks 1–3
+    // were: every session open paid two full cold Opus writes. `auto` and
+    // `none` inject the same tool-use preamble, so sending the array with the
+    // door bolted shut makes the prefix bytes match the KA's while leaving
+    // the composer structurally unable to open it.
+    tools: KA_TOOLS,
+    toolChoice: { type: "none" },
+    // Explicit, not inherited: "high" is the API default and the wire showed
+    // absent ≡ high in the cache key (2026-07-26) — but the KA sends flat
+    // "high" (§3), and prefix compatibility should read as intent, never as
+    // reliance on a normalization fact (M3 C1 ruling).
+    effort: "high",
     maxTokens: PROSE_COMPOSER,
     campaignId,
+    phase,
   });
   const result = await done();
   // A clipped composer is still returned (recap/yokoku are skippable, never
@@ -630,7 +649,7 @@ async function composeRecap(
   parts.push("## Current tension");
   parts.push(`${direction.tension_level.toFixed(2)} on a 0 (calm) … 1 (breaking point) scale.`);
 
-  return collectNarration("recap", tier, system, parts.join("\n"), campaignId);
+  return collectNarration("recap", tier, system, parts.join("\n"), campaignId, "session_open");
 }
 
 /** §9.4 yokoku — narration tier, in-voice tease; vibe-promise, never events. */
@@ -672,11 +691,18 @@ async function composeYokoku(
   }
   parts.push("Now write the yokoku.");
 
-  return collectNarration("yokoku", tier, blocks.system, parts.join("\n"), campaignId);
+  return collectNarration(
+    "yokoku",
+    tier,
+    blocks.system,
+    parts.join("\n"),
+    campaignId,
+    "session_close",
+  );
 }
 
 const MEMO_SYSTEM =
-  "You are a narrative continuity director writing a concise session memo (max 400 words) for the next session's planning. Cover: arc position and momentum, seeds ready for payoff, NPCs who deserve a spotlight scene, creative decisions made this session, and open threads to carry forward. Use exactly these headers: Arc Status, Ready Payoffs, NPC Spotlight Debt, Carry Forward. This is internal planning prose — never player-facing. Separately: if the player's own recent actions (quoted in the prompt) plainly reveal a durable PLAYER taste — how they like their stories told, what they reach for — set player_taste_note to one sentence grounded in those quoted actions and NOT already covered by the known-taste list; otherwise omit it (most sittings reveal none; never infer taste from director notes alone).";
+  "You are a narrative continuity director writing a concise session memo (max 400 words) for the next session's planning. Cover: arc position and momentum, seeds ready for payoff, NPCs who deserve a spotlight scene, creative decisions made this session, and open threads to carry forward. Use exactly these headers: Arc Status, Ready Payoffs, NPC Spotlight Debt, Carry Forward. This is internal planning prose — never player-facing. Separately: if the player's own recent actions (quoted in the prompt) plainly reveal a durable PLAYER taste — how they like their stories told, what they reach for — set player_taste_note to ONE sentence of at most 240 characters, grounded in those quoted actions and NOT already covered by the known-taste list; otherwise omit it (most sittings reveal none; never infer taste from director notes alone).";
 
 /** v3 director memo (judgment tier, Learned-layer bookkeeping). */
 async function composeMemo(
@@ -684,6 +710,7 @@ async function composeMemo(
   campaignId: string,
   tier: TierSelection,
   currentTurn: number,
+  phase: ModelCallPhase,
 ): Promise<{ memo?: string; tasteNote?: string }> {
   const [arc, readySeeds, direction, npcRows, playerInputs, [playerRow]] = await Promise.all([
     getActiveArc(db, campaignId),
@@ -772,17 +799,35 @@ async function composeMemo(
       memo: z.string(),
       /** §6.9 layer-10 writer #3 (M2R R4): applied only at a REAL close —
        *  the rolling checkpoint ignores it (repeated appends would spam).
-       *  Bounded: taste notes ride the Settei budget (audit). */
-      player_taste_note: z.string().max(240).optional(),
+       *  Bounded: taste notes ride the Settei budget (audit) — but the bound
+       *  is enforced BELOW, not in the schema. Diagnosed 2026-08-01: this
+       *  field carried z.string().max(240), and the API strips string-length
+       *  constraints from a structured-output schema (they are validated
+       *  client-side only). A 250-character note therefore failed zod, burned
+       *  the one corrective retry, threw — and took the whole memo down with
+       *  it. Five of the last thirty-three closes lost their memo that way,
+       *  every one of them beside a voice journal and a yokoku that landed
+       *  fine. An optional decoration must never be able to destroy the
+       *  required artifact it rides on. */
+      player_taste_note: z.string().optional(),
     }),
     system: MEMO_SYSTEM,
     prompt: parts.join("\n\n"),
     effort: "medium",
     maxTokens: STRUCTURED_RICH,
     campaignId,
+    phase,
   });
   const trimmed = memo.trim();
-  const taste = player_taste_note?.trim();
+  let taste = player_taste_note?.trim();
+  if (taste && taste.length > TASTE_NOTE_MAX) {
+    console.warn("[session] taste note over budget — dropped, memo kept", {
+      campaignId,
+      length: taste.length,
+      limit: TASTE_NOTE_MAX,
+    });
+    taste = undefined;
+  }
   return {
     memo: trimmed.length > 0 ? trimmed : undefined,
     ...(taste ? { tasteNote: taste } : {}),
@@ -839,6 +884,7 @@ async function composeVoiceJournal(
     effort: "medium",
     maxTokens: STRUCTURED_RICH,
     campaignId,
+    phase: "session_close",
   });
   const trimmed = journal.trim();
   return trimmed.length > 0 ? trimmed : undefined;

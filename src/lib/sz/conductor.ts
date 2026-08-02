@@ -411,6 +411,7 @@ export async function runConductorTurn(
       maxTokens: PROSE_COMPOSER,
       tools: CONDUCTOR_TOOLS,
       campaignId,
+      phase: "sz",
     });
     stream.on("text", (t) => {
       // Rounds are separate paragraphs in the player's single bubble.
