@@ -371,6 +371,38 @@ describe.skipIf(!url)("Layout (real Postgres, scripted models)", () => {
     expect(result.ladderSteps).toHaveLength(0);
   });
 
+  it("§6.3 demotion is honored where it costs tokens: a demoted critical leaves hard_constraints", async () => {
+    if (!db) throw new Error("unreachable");
+    const [demotedRow] = await db
+      .insert(schema.criticalFacts)
+      .values({
+        campaignId,
+        content: "The docking codes from the pilot episode still work.",
+        category: "promoted",
+        demotedAt: new Date(),
+        turnId: 1,
+        provenance: "chronicler_promotion",
+        confidence: 0.9,
+      })
+      .returning({ id: schema.criticalFacts.id });
+    try {
+      armHarness({
+        intent_triage: { ...GENGA_INTENT, intent: "DEFAULT", epicness: 0.05 },
+      });
+      const result = await runLayout(db, campaignId, 8, "I pour another coffee", () => {});
+      expect(result.kind).toBe("conte");
+      if (result.kind !== "conte") return;
+      // The live critical still rides every tier; the demoted one is out of
+      // the guaranteed injection — its home is semantic-with-floor now (§6.3).
+      expect(result.conte.hard_constraints.some((c) => c.includes("Finitude"))).toBe(true);
+      expect(result.conte.hard_constraints.some((c) => c.includes("docking codes"))).toBe(false);
+    } finally {
+      if (demotedRow) {
+        await db.delete(schema.criticalFacts).where(eq(schema.criticalFacts.id, demotedRow.id));
+      }
+    }
+  });
+
   it("SV3: the contract's pc_power_tier reaches the outcome judge — OP context renders at gap ≥3", async () => {
     if (!db) throw new Error("unreachable");
     // Bebop's world baseline is T9; a T5 contract is 4 tiers above — the

@@ -1,6 +1,13 @@
 import type { Db } from "@/lib/db";
 import { notTombstoned } from "@/lib/db/helpers";
-import { campaigns, criticalFacts, entities, pencilMarks, sessionRecords } from "@/lib/db/schema";
+import {
+  campaigns,
+  criticalFacts,
+  entities,
+  pencilMarks,
+  semanticMemories,
+  sessionRecords,
+} from "@/lib/db/schema";
 import { LOOPED_LARGE } from "@/lib/llm/budgets";
 import { callJudgment } from "@/lib/llm/calls";
 import { DEV_TIER_SELECTION, TierSelection } from "@/lib/llm/tiers";
@@ -25,7 +32,6 @@ import {
   DirectorArcPlan,
   DirectorOutput,
   type DirectorTrigger,
-  EVOLUTION_CATEGORY,
 } from "@/lib/types/direction";
 import { PartialDNAScales } from "@/lib/types/dna";
 import { OpeningStatePackage } from "@/lib/types/opening";
@@ -62,6 +68,14 @@ import { overdueSeeds, overdueTensionBump, plantSeed, seedDossier, settleSeed } 
  */
 
 const DIRECTOR_PROVENANCE = "director";
+
+/**
+ * §6.3 "semantic-with-floor": a demoted critical's source memory decays again
+ * but never below this — v3's plot-critical relationship floor (g2.ts), the
+ * one "critical keeps a floor" value the codebase already carries. Below the
+ * hot-baseline bar (60) on purpose: demotion must free the slot.
+ */
+const DEMOTED_HEAT_FLOOR = 40;
 
 export function initialDirectionState(): DirectionState {
   return DirectionState.parse({});
@@ -267,7 +281,7 @@ function directorPersona(contract: PremiseContract): string {
     "",
     "Your personality is an instinct, never a license: the premise contract's hard lines and framing OUTRANK it. Where your instincts and the contract conflict, the contract wins - and your cruelty finds other targets.",
     "",
-    "Dailies duties: judge Framing adherence qualitatively (the enums carry no numeric gauge — read the drift, don't measure it). Review the Critical layer's size with demotion restraint — demote only stale facts whose loss no longer breaks continuity (§6.3); criticality is earned and revocable, never a ratchet, and you demote, never delete.",
+    "Dailies duties: judge Framing adherence qualitatively (the enums carry no numeric gauge — read the drift, don't measure it). Review the Critical layer's size with demotion restraint — demote only stale PROMOTED facts whose loss no longer breaks continuity (§6.3); the player's Session Zero facts and the contract are never yours to demote; criticality is earned and revocable, never a ratchet, and you demote, never delete.",
     "",
     "You are never an anxious check-in. An author who keeps asking permission has no voice. Decide, in the fiction's own language.",
   ].join("\n");
@@ -374,7 +388,10 @@ export async function runDirectorCycle(
       : "No spotlight debts ≥ 2.";
 
   const [critRow] = await db
-    .select({ n: sql<number>`count(*)::int` })
+    .select({
+      n: sql<number>`count(*)::int`,
+      promoted: sql<number>`(count(*) FILTER (WHERE ${criticalFacts.category} = 'promoted'))::int`,
+    })
     .from(criticalFacts)
     .where(
       and(
@@ -384,6 +401,7 @@ export async function runDirectorCycle(
       ),
     );
   const criticalCount = critRow?.n ?? 0;
+  const promotedCount = critRow?.promoted ?? 0;
 
   // The series row's budget gets its reader here (M2R R2 audit — a stored
   // horizon nothing reads is a defect): descriptive judgment context only;
@@ -465,7 +483,7 @@ export async function runDirectorCycle(
       : []),
     ...(gate ? [renderEvolutionReview(gate), ""] : []),
     "## Critical layer (§6.3 dailies review)",
-    `${criticalCount} active critical fact(s). Demote only what has gone stale — restraint, not a purge.`,
+    `${criticalCount} active critical fact(s), of which ${promotedCount} promoted mid-campaign. Only PROMOTED facts are demotable — Session Zero facts and the contract are the player's, and a demote naming one is silently ignored. Demote only what has gone stale — restraint, not a purge.`,
     "",
     ...memoSection,
     "## Pending flags routed to you",
@@ -622,28 +640,53 @@ export async function runDirectorCycle(
     }
   }
 
-  // §6.3: demotion, not erasure — set demotedAt, never delete.
+  // §6.3: demotion, not erasure — set demotedAt, never delete. Only PROMOTED
+  // facts are demotable: they alone came FROM the semantic layer, so "back to
+  // semantic-with-floor" has somewhere to land. sz_fact and contract rows are
+  // player authority (premise laws, hard lines, assertions) with no semantic
+  // copy — a demotion there would drop the player's own words from every
+  // reader, and the ILIKE containment match makes accidental hits real. The
+  // §7.1 player_ratified retoolings are fenced by the same guard (C4 audit:
+  // one model-chosen phrase must never drop them out of the bible).
   for (const match of output.demote_criticals) {
     if (!match.trim()) continue;
     // Literal containment, not pattern matching: %/_ in the model's string
     // ("50% morale") are live ILIKE wildcards unless escaped — unescaped they
     // over-demote facts the Director never named (C7 audit).
     const literal = match.replace(/([\\%_])/g, "\\$1");
-    await db
-      .update(criticalFacts)
-      .set({ demotedAt: new Date() })
-      .where(
-        and(
-          eq(criticalFacts.campaignId, campaignId),
-          isNull(criticalFacts.demotedAt),
-          notTombstoned(criticalFacts),
-          // The player's ratified retoolings are NOT the Director's to demote
-          // (C4 audit): one model-chosen phrase must never drop a
-          // player_ratified record out of the bible.
-          sql`${criticalFacts.category} != ${EVOLUTION_CATEGORY}`,
-          sql`${criticalFacts.content} ILIKE ${`%${literal}%`}`,
-        ),
-      );
+    // One transaction per match: a demote that lands without its re-home has
+    // no retry path (isNull(demotedAt) never matches again), so the source's
+    // no-decay pin would ratchet on forever.
+    await db.transaction(async (tx) => {
+      const demoted = await tx
+        .update(criticalFacts)
+        .set({ demotedAt: new Date() })
+        .where(
+          and(
+            eq(criticalFacts.campaignId, campaignId),
+            eq(criticalFacts.category, "promoted"),
+            isNull(criticalFacts.demotedAt),
+            notTombstoned(criticalFacts),
+            sql`${criticalFacts.content} ILIKE ${`%${literal}%`}`,
+          ),
+        )
+        .returning({ sourceMemoryId: criticalFacts.sourceMemoryId });
+      // Re-home: release the source memory's no-decay pin (curve 1.0 + the
+      // +0.3 retrieval bonus + a permanent hot-baseline slot would ratchet on)
+      // and leave it a floor — "semantic-with-floor" made literal.
+      const sourceIds = demoted
+        .map((d) => d.sourceMemoryId)
+        .filter((id): id is string => id !== null);
+      if (sourceIds.length > 0) {
+        await tx
+          .update(semanticMemories)
+          .set({
+            plotCritical: false,
+            heatFloor: sql`GREATEST(${semanticMemories.heatFloor}, ${DEMOTED_HEAT_FLOOR})`,
+          })
+          .where(and(inArray(semanticMemories.id, sourceIds), notTombstoned(semanticMemories)));
+      }
+    });
   }
 
   // §7.1 (M3 C4): the season-boundary proposal AMENDS NOTHING here. It lands on

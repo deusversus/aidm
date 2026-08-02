@@ -15,7 +15,7 @@ import { embedTexts } from "@/lib/llm/voyage";
 import type { CanonChunk, ConteMemory } from "@/lib/types/conte";
 import { EVOLUTION_CATEGORY } from "@/lib/types/direction";
 import type { IntentOutput } from "@/lib/types/turn";
-import { and, desc, eq, inArray, ne, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, ne, sql } from "drizzle-orm";
 import { z } from "zod";
 
 /**
@@ -474,9 +474,12 @@ export async function fetchCallbacks(
 /**
  * Critical facts — guaranteed include, every tier including douga (§5.4).
  * Layout files these under the conte's `hard_constraints`, which the KA reads
- * as "inviolable" — so the §7.1 retooling record is EXCLUDED (M3 C4). A dated
- * paragraph arguing that the season became something better is a record, not a
- * rule; its pressure reaches the pen the right way, through the amended active
+ * as "inviolable" — so two populations fall out HERE, the only reader that
+ * costs tokens every turn. Demoted facts (§6.3): demotion returns a promoted
+ * fact to semantic-with-floor, so its context home is the heat economy above,
+ * not this injection. The §7.1 retooling record (M3 C4): a dated paragraph
+ * arguing that the season became something better is a record, not a rule;
+ * its pressure reaches the pen the right way, through the amended active
  * premise and the Charter rebuilt from it (§4.4: numbers measure, prose
  * presses). Its reader is the Series Bible (§9.1).
  */
@@ -487,6 +490,7 @@ export async function fetchCritical(db: Db, campaignId: string): Promise<string[
     .where(
       and(
         eq(criticalFacts.campaignId, campaignId),
+        isNull(criticalFacts.demotedAt),
         notTombstoned(criticalFacts),
         ne(criticalFacts.category, EVOLUTION_CATEGORY),
       ),

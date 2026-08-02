@@ -1,6 +1,7 @@
 import * as schema from "@/lib/db/schema";
 import { LOOPED_LARGE } from "@/lib/llm/budgets";
 import { callJudgment } from "@/lib/llm/calls";
+import { EMBEDDING_DIMENSIONS } from "@/lib/llm/embedding-config";
 import { bebopContract } from "@/lib/renderer/__tests__/fixtures";
 import { ArcOverride } from "@/lib/types/arc";
 import {
@@ -298,15 +299,47 @@ describe.skipIf(!url)("Director (real Postgres, scripted model)", () => {
     const campaignId = await makeCampaign();
     vi.mocked(arcs.getActiveArc).mockResolvedValue(fakeArc(campaignId));
 
-    // Seed a real critical fact the Director will demote (never delete).
-    await db.insert(schema.criticalFacts).values({
-      campaignId,
-      content: "The safe combination is 4021.",
-      category: "sz_fact",
-      turnId: 1,
-      provenance: "sz_handoff",
-      confidence: 1,
-    });
+    // Seed the demotion cast (§6.3): a PROMOTED critical with its semantic
+    // source (the Director may demote it — back to semantic-with-floor), and
+    // an sz_fact matching the same demote string (player authority — the
+    // category guard must leave it standing).
+    const embedding = Array.from({ length: EMBEDDING_DIMENSIONS }, (_, i) => (i === 0 ? 1 : 0));
+    const [sourceMemory] = await db
+      .insert(schema.semanticMemories)
+      .values({
+        campaignId,
+        content: "The safe combination is 4021.",
+        embedding,
+        category: "fact",
+        baseHeat: 100,
+        heatFloor: 1,
+        lastBoostedTurn: 1,
+        plotCritical: true,
+        turnId: 1,
+        provenance: "chronicler_g2",
+        confidence: 0.8,
+      })
+      .returning({ id: schema.semanticMemories.id });
+    if (!sourceMemory) throw new Error("semantic seed failed");
+    await db.insert(schema.criticalFacts).values([
+      {
+        campaignId,
+        content: "The safe combination is 4021.",
+        category: "promoted",
+        sourceMemoryId: sourceMemory.id,
+        turnId: 1,
+        provenance: "chronicler_promotion",
+        confidence: 0.9,
+      },
+      {
+        campaignId,
+        content: "HARD LINE (absolute): the safe combination was Julia's dying gift.",
+        category: "sz_fact",
+        turnId: 0,
+        provenance: "sz_resolution",
+        confidence: 1,
+      },
+    ]);
     // Prime the accumulators so the reset is observable.
     await db
       .update(schema.campaigns)
@@ -371,6 +404,10 @@ describe.skipIf(!url)("Director (real Postgres, scripted model)", () => {
     expect(dossierPrompt).toContain("planned finale across seasons");
     expect(dossierPrompt).toContain("Series horizon: ~24 episodes, ± 12.");
 
+    // §6.3 dailies line: the Director sees the demotable population, not just
+    // the layer size (2 seeded criticals, 1 of them promoted).
+    expect(dossierPrompt).toContain("2 active critical fact(s), of which 1 promoted");
+
     // arc plan applied, with the current turn stamped.
     expect(vi.mocked(arcs.applyArcPlan)).toHaveBeenCalledWith(
       expect.anything(),
@@ -394,13 +431,28 @@ describe.skipIf(!url)("Director (real Postgres, scripted model)", () => {
     // (the model-facing schema stays lean — strict-output grammar cap).
     expect(parsedOverride.dna).toEqual({ darkness: 8 });
 
-    // The critical fact was demoted, not deleted.
-    const [crit] = await db
+    // The PROMOTED fact was demoted, not deleted; the sz_fact matching the
+    // same string survived the category guard (player authority, §6.3).
+    const crits = await db
       .select()
       .from(schema.criticalFacts)
       .where(eq(schema.criticalFacts.campaignId, campaignId));
-    expect(crit).toBeDefined();
-    expect(crit?.demotedAt).not.toBeNull();
+    const promoted = crits.find((c) => c.category === "promoted");
+    const szFact = crits.find((c) => c.category === "sz_fact");
+    expect(promoted?.demotedAt).not.toBeNull();
+    expect(szFact).toBeDefined();
+    expect(szFact?.demotedAt).toBeNull();
+
+    // Re-homed to semantic-with-floor: the no-decay pin released, floor 40.
+    const [source] = await db
+      .select({
+        plotCritical: schema.semanticMemories.plotCritical,
+        heatFloor: schema.semanticMemories.heatFloor,
+      })
+      .from(schema.semanticMemories)
+      .where(eq(schema.semanticMemories.id, sourceMemory.id));
+    expect(source?.plotCritical).toBe(false);
+    expect(source?.heatFloor).toBe(40);
 
     // seed ops forwarded.
     expect(vi.mocked(seeds.plantSeed)).toHaveBeenCalledTimes(1);
