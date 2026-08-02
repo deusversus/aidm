@@ -7,13 +7,16 @@
  * assertions, and spend attribution with per-tier projections.
  */
 
+import { COMPACTION_KEEP_TAIL, COMPACTION_TRIGGER_EXCHANGES } from "@/lib/blocks/compaction";
 import type { Db } from "@/lib/db";
+import { notTombstoned } from "@/lib/db/helpers";
 import * as schema from "@/lib/db/schema";
 import { type UsageStats, estimateCostUsd } from "@/lib/llm/pricing";
-import { TIER_MENUS } from "@/lib/llm/tiers";
+import { TIER_MENUS, type TierSelection } from "@/lib/llm/tiers";
+import { MAX_PLAY_VIEW_REWIND } from "@/lib/turn/rewind";
 import { type TurnEvent, attachToTurn, executeTurn, submitTurn } from "@/lib/turn/runtime";
 import { TURN_CONTRACTS, type TurnTier } from "@/lib/types/turn";
-import { and, eq, gte } from "drizzle-orm";
+import { and, eq, gte, isNull, sql } from "drizzle-orm";
 import {
   BUDGET_ASSUMPTIONS,
   assertTurnCost,
@@ -22,6 +25,9 @@ import {
 
 export const TURN_TIMEOUT_MS = 180_000;
 export const CACHE_READ_FLOOR = 0.5;
+/** A narration row written as the connection dropped can land after the turn
+ *  settles; the metering re-reads once before calling a row LOST (M2 turn 24). */
+export const LEDGER_SETTLE_MS = 2_000;
 
 export function fmtUsd(v: number): string {
   return `$${v.toFixed(4)}`;
@@ -134,14 +140,65 @@ function awaitTerminal(turnId: string, submitTime: number): Promise<AttachResult
   });
 }
 
+/**
+ * The DATABASE's clock, read over the same pool the ledger writes through.
+ *
+ * Everything this harness bounds — attempt boundaries, the `since` filter on
+ * model_calls — is compared against `created_at`, which Postgres stamps from
+ * its OWN clock (`defaultNow()`). Bounding with the harness's `Date.now()`
+ * compares two clocks. Measured on the dev machine against the Railway
+ * instance on 2026-08-01: the local clock ran 1.7 SECONDS ahead. A boundary
+ * that far in the future files an attempt's opening ledger rows into the
+ * PREVIOUS attempt's bucket — which is the false cost breach per-attempt
+ * metering exists to end — and a `since` that far ahead drops the turn's first
+ * rows entirely, reporting a live row as lost. One round-trip per boundary
+ * (two on a retried turn, one otherwise) buys a single clock.
+ *
+ * Read as epoch MILLISECONDS on purpose. `select now()` comes back over
+ * node-postgres as the string "2026-08-02 02:18:26.932005+00" — not ISO-8601,
+ * so parsing it means leaning on implementation-defined `Date` parsing.
+ * Epoch-milliseconds has no format and no timezone to get wrong.
+ */
+export async function dbNow(db: Db): Promise<Date> {
+  const result = await db.execute<{ ms: string | number }>(
+    sql`select extract(epoch from now()) * 1000 as ms`,
+  );
+  const ms = Number(result.rows[0]?.ms);
+  if (Number.isFinite(ms)) return new Date(ms);
+  // Never a NaN date: a poisoned boundary would silently mis-bucket everything
+  // downstream. Degrade to the local clock and SAY so.
+  console.warn("[soak] could not read the database clock — falling back to the local clock");
+  return new Date();
+}
+
 export interface TurnRun {
   turnId: string;
   turnNumber: number;
   terminal: Terminal;
   ttftMs: number | null;
-  totalMs: number;
+  /** Wall-clock for the observed attempt; null when the turn was metered from
+   *  the durable record and no latency was observed at all (never 0 — a zero
+   *  reads as an impossibly fast turn, and the report prints "—" instead). */
+  totalMs: number | null;
   prose: string;
   retried: boolean;
+  /**
+   * When each ATTEMPT at this turn began, IN DATABASE TIME (`dbNow`) — the §5.7
+   * retry route re-anchors the same turn row, so a retried turn's ledger rows
+   * sum two or three whole narration writes. The M2 soak asserted that SUM
+   * against a single-attempt ceiling and read a retry artifact as a cost breach
+   * (turns 9 and 12; the retro's "meter per-attempt, assert per-attempt" ledger
+   * item). These boundaries are what make the per-attempt assertion possible.
+   */
+  attemptStarts: Date[];
+  /**
+   * False when the boundaries cannot separate the attempts that actually ran —
+   * a turn rebuilt from the durable record carries ONE boundary (its row's
+   * createdAt) while having been retried, so every attempt's rows land in one
+   * bucket. Asserting a single-attempt ceiling against that sum is the false
+   * breach again; `meterTurn` flags and SKIPS instead.
+   */
+  attemptBoundsResolved: boolean;
 }
 
 /** A turn is only "past" when its ROW is terminal (soak crash #1). A poll
@@ -174,7 +231,11 @@ export async function waitForRowTerminal(
 }
 
 export async function runOneTurn(db: Db, campaignId: string, input: string): Promise<TurnRun> {
+  // Latency is measured on the LOCAL clock (an interval, so skew cancels);
+  // attempt boundaries come from the DB's, because that is the clock the ledger
+  // rows are stamped by.
   const submitTime = Date.now();
+  const attemptStarts: Date[] = [await dbNow(db)];
   const { turnId, turnNumber } = await submitTurn(db, campaignId, input);
   let res = await awaitTerminal(turnId, submitTime);
   let retried = false;
@@ -204,6 +265,7 @@ export async function runOneTurn(db: Db, campaignId: string, input: string): Pro
     // awaitTerminal attaches, or the attach replays the stale terminal.
     retried = true;
     await db.update(schema.turns).set({ status: "queued" }).where(eq(schema.turns.id, turnId));
+    attemptStarts.push(await dbNow(db));
     const retryTime = Date.now();
     void executeTurn(db, turnId).catch((err) =>
       console.error("[soak] retry execution crashed", { turnId, err }),
@@ -225,6 +287,8 @@ export async function runOneTurn(db: Db, campaignId: string, input: string): Pro
     totalMs: res.totalMs,
     prose: res.prose,
     retried,
+    attemptStarts,
+    attemptBoundsResolved: true,
   };
 }
 
@@ -233,6 +297,14 @@ export async function runOneTurn(db: Db, campaignId: string, input: string): Pro
 // ---------------------------------------------------------------------------
 
 export type CallRow = typeof schema.modelCalls.$inferSelect;
+
+/** One attempt at a turn, metered on its own (§10.8 per-attempt assertion). */
+export interface AttemptRecord {
+  /** 1-based; attempt 2+ only exists when the §5.7 retry route fired. */
+  index: number;
+  usd: number;
+  calls: number;
+}
 
 export interface TurnRecord {
   step: number;
@@ -245,10 +317,21 @@ export interface TurnRecord {
   turnUsd: number;
   cacheReadFrac: number | null;
   ttftMs: number | null;
-  totalMs: number;
+  /** Null when nothing observed the turn run (metered from the durable record):
+   *  absent, not zero — the report prints "—", the same as an absent TTFT. */
+  totalMs: number | null;
   fallbackUsed: boolean;
   retried: boolean;
   narrationUsage: UsageStats | null;
+  /** Per-attempt narration spend — what the ceilings are asserted against. */
+  attempts: AttemptRecord[];
+  /**
+   * A COMPLETE story turn with no narration row in the ledger: the spend is
+   * under-counted and the §10.8 assertion could not run at all. M2's turn 24
+   * lost its row to a connection drop mid-write and the harness read the hole
+   * as a $0.0000 turn that passed every ceiling (M1's turn 13, likewise).
+   */
+  ledgerNarrationMissing: boolean;
   flags: string[];
   failures: string[];
 }
@@ -286,6 +369,35 @@ function firstNarration(rows: CallRow[]): CallRow | null {
   return narr.reduce((first, r) => (r.createdAt.getTime() < first.createdAt.getTime() ? r : first));
 }
 
+/**
+ * Split a turn's narration rows into ATTEMPTS at the retry boundaries
+ * (M2 harness ledger: "meter per-attempt, assert per-attempt").
+ *
+ * Within one attempt a turn legitimately makes several narration calls — the
+ * KA's research rounds — and those belong to the attempt's cost. What does NOT
+ * belong together is attempt 1 and attempt 2 of the same turn: the §5.7 retry
+ * re-anchors and re-writes, so their SUM cannot be compared against a
+ * single-attempt ceiling without reading the retry as a cost regression (M2
+ * turn 9: three attempts summing $1.10 against a $0.53 ceiling; turn 12: two).
+ */
+export function partitionAttempts(narrRows: CallRow[], attemptStarts: Date[]): CallRow[][] {
+  const ordered = narrRows.slice().sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+  const bounds = attemptStarts.map((d) => d.getTime()).sort((a, b) => a - b);
+  if (bounds.length <= 1) return [ordered];
+  const buckets: CallRow[][] = bounds.map(() => []);
+  for (const row of ordered) {
+    let idx = 0;
+    for (let i = 0; i < bounds.length; i++) {
+      const bound = bounds[i];
+      if (bound !== undefined && row.createdAt.getTime() >= bound) idx = i;
+    }
+    buckets[idx]?.push(row);
+  }
+  // An attempt that produced no ledger row at all (the executor died before
+  // the write) drops out — an empty bucket is not an attempt worth asserting.
+  return buckets.filter((b) => b.length > 0);
+}
+
 export async function meterTurn(
   db: Db,
   campaignId: string,
@@ -302,16 +414,29 @@ export async function meterTurn(
       and(eq(schema.turns.campaignId, campaignId), eq(schema.turns.turnNumber, run.turnNumber)),
     );
 
-  const rows = await db
-    .select()
-    .from(schema.modelCalls)
-    .where(
-      and(
-        eq(schema.modelCalls.campaignId, campaignId),
-        eq(schema.modelCalls.turnNumber, run.turnNumber),
-        gte(schema.modelCalls.createdAt, since),
-      ),
-    );
+  const readCalls = (): Promise<CallRow[]> =>
+    db
+      .select()
+      .from(schema.modelCalls)
+      .where(
+        and(
+          eq(schema.modelCalls.campaignId, campaignId),
+          eq(schema.modelCalls.turnNumber, run.turnNumber),
+          gte(schema.modelCalls.createdAt, since),
+        ),
+      );
+
+  let rows = await readCalls();
+  const storyComplete =
+    (turnRow?.status ?? "unknown") === "complete" &&
+    (turnRow?.tier === "douga" || turnRow?.tier === "genga" || turnRow?.tier === "sakuga");
+  // A ledger write racing the turn's own settle can land a beat late; re-read
+  // once before declaring the row LOST, so a slow write is never reported as
+  // an under-count (and a genuinely lost row still is — M2 turn 24).
+  if (storyComplete && rows.every((r) => r.tier !== "narration")) {
+    await new Promise((r) => setTimeout(r, LEDGER_SETTLE_MS));
+    rows = await readCalls();
+  }
 
   const turnUsd = rows.reduce((sum, r) => sum + Number(r.costUsd), 0);
   const narrRows = rows.filter((r) => r.tier === "narration");
@@ -328,6 +453,22 @@ export async function meterTurn(
 
   const flags: string[] = [];
   const failures: string[] = [];
+  const attemptBuckets = partitionAttempts(narrRows, run.attemptStarts);
+  const attempts: AttemptRecord[] = attemptBuckets.map((bucket, i) => ({
+    index: i + 1,
+    usd: bucket.reduce((sum, r) => sum + Number(r.costUsd), 0),
+    calls: bucket.length,
+  }));
+
+  // The lost-row hole (M2 turn 24, M1 turn 13): a complete story turn whose
+  // narration never reached the ledger metered as $0.0000 and passed every
+  // ceiling silently. It is a COVERAGE failure, not a cheap turn.
+  const ledgerNarrationMissing = storyComplete && narrRows.length === 0;
+  if (ledgerNarrationMissing) {
+    failures.push(
+      `turn ${run.turnNumber} (${turnRow?.tier ?? "?"}): COMPLETE with no narration row in the ledger — spend under-counted and the §10.8 assertion could not run (ledger row lost mid-write)`,
+    );
+  }
 
   if (fallbackUsed) {
     failures.push(
@@ -338,29 +479,53 @@ export async function meterTurn(
   if (run.terminal === "timeout")
     failures.push(`turn ${run.turnNumber}: hit the ${TURN_TIMEOUT_MS}ms timeout`);
 
-  const isStory =
-    status === "complete" && (tier === "douga" || tier === "genga" || tier === "sakuga");
-  if (primary && isStory) {
+  if (primary && storyComplete) {
     const turnTier = asTier(tier);
     const ceiling = turnCostModel(turnTier, servedModel).coldUsd;
-    if (narrationUsd > ceiling) {
-      failures.push(
-        `turn ${run.turnNumber} (${tier}/${servedModel}): narration $${narrationUsd.toFixed(4)} > cold ceiling $${ceiling.toFixed(4)}`,
+    if (!run.attemptBoundsResolved) {
+      // The boundaries cannot tell attempt 1 from attempt 2, so every
+      // per-attempt assertion below would be asserting a SUM against a
+      // single-attempt model — the M2 false breach, rebuilt. Say so and skip,
+      // rather than emit a ceiling failure the evidence cannot support. The
+      // spend is still reported; it is the ASSERTION that is unavailable.
+      flags.push(
+        `retry attempts unresolvable — per-attempt assertion skipped (metered from the durable record: one boundary, ≥2 attempts' ledger rows; narration total $${narrationUsd.toFixed(4)} vs a $${ceiling.toFixed(4)} single-attempt ceiling is not comparable)`,
       );
-    }
-    const absolute = assertTurnCost(turnTier, narrationUsd);
-    if (absolute) failures.push(`turn ${run.turnNumber}: ${absolute}`);
-
-    const followUps = narrRows
-      .slice()
-      .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
-      .slice(1);
-    for (const call of followUps) {
-      const frac = readable(call) > 0 ? call.cacheReadInputTokens / readable(call) : null;
-      if (frac !== null && frac < CACHE_READ_FLOOR) {
-        failures.push(
-          `turn ${run.turnNumber} (${tier}): WITHIN-turn research read frac ${frac.toFixed(2)} < ${CACHE_READ_FLOOR} floor (§5.6 guaranteed read missed)`,
+    } else {
+      // PER-ATTEMPT (the M2 harness ledger item). The turn's total still gets
+      // reported as spend — it is what the run actually bought — but the cost
+      // MODEL describes one attempt, so it is asserted against one attempt.
+      for (const attempt of attempts) {
+        const where =
+          attempts.length > 1 ? `attempt ${attempt.index}/${attempts.length}` : "narration";
+        if (attempt.usd > ceiling) {
+          failures.push(
+            `turn ${run.turnNumber} (${tier}/${servedModel}): ${where} $${attempt.usd.toFixed(4)} > cold ceiling $${ceiling.toFixed(4)}`,
+          );
+        }
+        const absolute = assertTurnCost(turnTier, attempt.usd);
+        if (absolute) failures.push(`turn ${run.turnNumber} (${where}): ${absolute}`);
+      }
+      if (attempts.length > 1) {
+        flags.push(
+          `turn total $${narrationUsd.toFixed(4)} sums ${attempts.length} attempts (retry inflation) — ceilings asserted per attempt`,
         );
+      }
+
+      // Research rounds are the calls after the FIRST one WITHIN an attempt. A
+      // retry's opening call is not a follow-up read — it re-anchors the turn,
+      // and holding it to the within-turn floor charged the retry twice. With
+      // unresolved boundaries every retry's opening call looks like a research
+      // round, so this rides the same gate.
+      for (const bucket of attemptBuckets) {
+        for (const call of bucket.slice(1)) {
+          const frac = readable(call) > 0 ? call.cacheReadInputTokens / readable(call) : null;
+          if (frac !== null && frac < CACHE_READ_FLOOR) {
+            failures.push(
+              `turn ${run.turnNumber} (${tier}): WITHIN-turn research read frac ${frac.toFixed(2)} < ${CACHE_READ_FLOOR} floor (§5.6 guaranteed read missed)`,
+            );
+          }
+        }
       }
     }
     if (cacheReadFrac !== null) {
@@ -389,7 +554,7 @@ export async function meterTurn(
   if (run.ttftMs !== null && run.ttftMs > contract.ttftTargetMs) {
     flags.push(`TTFT ${run.ttftMs}ms > target ${contract.ttftTargetMs}ms`);
   }
-  if (run.totalMs > contract.totalTargetMs) {
+  if (run.totalMs !== null && run.totalMs > contract.totalTargetMs) {
     flags.push(`total ${run.totalMs}ms > target ${contract.totalTargetMs}ms`);
   }
 
@@ -408,8 +573,403 @@ export async function meterTurn(
     fallbackUsed,
     retried: run.retried,
     narrationUsage: primary ? usageOf(primary) : null,
+    attempts,
+    ledgerNarrationMissing,
     flags,
     failures,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Coverage: every settled turn metered, every played turn inside a sitting.
+// Both holes are M2 drift-soak ledger items (docs/retros/M2-drift-soak.md).
+// ---------------------------------------------------------------------------
+
+/**
+ * Meter a turn the driving loop never saw settle (M2's turn 9): crash debris
+ * re-anchored through the stale-turn retry route consumed its scripted beat
+ * and left NO record — so it was never asserted at all, and the run reported
+ * full metering coverage it did not have. The record is rebuilt from the
+ * durable row; latency is honestly absent rather than invented.
+ */
+export async function meterSettledTurn(
+  db: Db,
+  campaignId: string,
+  turnNumber: number,
+  step: number,
+  label: string,
+  coldTurns: Set<number>,
+  /** True when the harness itself drove the §5.7 retry route on this turn
+   *  (drift-soak's stale route does; a turn that settled on another
+   *  executor's watch did not, and must not wear the flag). */
+  retried = false,
+): Promise<TurnRecord | null> {
+  const [row] = await db
+    .select({
+      id: schema.turns.id,
+      status: schema.turns.status,
+      createdAt: schema.turns.createdAt,
+    })
+    .from(schema.turns)
+    .where(and(eq(schema.turns.campaignId, campaignId), eq(schema.turns.turnNumber, turnNumber)));
+  if (!row) return null;
+  const terminal: Terminal =
+    row.status === "channel" ? "channel" : row.status === "complete" ? "done" : "error";
+  const run: TurnRun = {
+    turnId: row.id,
+    turnNumber,
+    terminal,
+    ttftMs: null,
+    // Wall-clock across a crash would measure the OUTAGE, not the turn — and 0
+    // would read as an impossibly fast turn that passed the latency contract.
+    // Absent is the truth; the report prints "—", like an absent TTFT.
+    totalMs: null,
+    prose: "",
+    retried,
+    // The row's createdAt is a DATABASE stamp, the same clock the ledger rows
+    // carry — but it is ONE boundary. When this turn was retried, its attempts
+    // cannot be separated from it, and meterTurn skips the per-attempt
+    // assertion rather than asserting their sum.
+    attemptStarts: [row.createdAt],
+    attemptBoundsResolved: !retried,
+  };
+  const record = await meterTurn(db, campaignId, run, step, label, row.createdAt, coldTurns);
+  record.flags.push(
+    `re-anchored: metered from the durable record (the driving loop never saw it settle; latency unobserved${retried ? ", attempt boundaries unresolvable" : ""})`,
+  );
+  return record;
+}
+
+export interface MeteringCoverage {
+  /** Turns in range with no TurnRecord at all — never asserted. */
+  missing: number[];
+  /** Metered turns whose narration row was lost — asserted against nothing. */
+  unasserted: number[];
+  certified: boolean;
+  lines: string[];
+}
+
+/**
+ * The run-end coverage assertion. M2 reported "every turn metered in-invocation
+ * passed" while three of twenty-four were never asserted — the harness had no
+ * way to say so, because absence of a record looked exactly like absence of a
+ * problem. It says so now.
+ */
+export function meteringCoverage(
+  records: TurnRecord[],
+  reachedTurn: number,
+  fromTurn = 1,
+): MeteringCoverage {
+  const seen = new Set(records.map((r) => r.turnNumber));
+  const missing: number[] = [];
+  for (let n = fromTurn; n <= reachedTurn; n++) if (!seen.has(n)) missing.push(n);
+  const unasserted = records.filter((r) => r.ledgerNarrationMissing).map((r) => r.turnNumber);
+  const certified = missing.length === 0 && unasserted.length === 0;
+  const lines = [
+    `turns ${fromTurn}..${reachedTurn}: ${reachedTurn - fromTurn + 1 - missing.length} metered, ${missing.length} unmetered`,
+    missing.length > 0 ? `UNMETERED (never asserted): ${missing.join(", ")}` : "",
+    unasserted.length > 0
+      ? `METERED BUT UNASSERTED (narration ledger row lost): ${unasserted.join(", ")}`
+      : "",
+    certified
+      ? "metering coverage CERTIFIED — every played turn carries an assertion"
+      : "metering coverage NOT certified — the cost verdict covers less than the run",
+  ].filter((l) => l.length > 0);
+  return { missing, unasserted, certified, lines };
+}
+
+export interface SittingWindow {
+  sessionNumber: number;
+  openedAt: Date;
+  closedAt: Date | null;
+  closeTrigger: string | null;
+}
+
+export interface SessionCoverage {
+  sittings: SittingWindow[];
+  /** The open sitting's number, or null when play has no sitting at all. */
+  openNow: number | null;
+  /** Completed turns that fell outside every sitting window. */
+  turnsOutside: number[];
+  certified: boolean;
+  lines: string[];
+}
+
+/** The open sitting (§9.4), or null — a pure read, so the harness can GUARD
+ *  before a turn instead of discovering the hole in the retro. */
+export async function openSittingNumber(db: Db, campaignId: string): Promise<number | null> {
+  const [row] = await db
+    .select({ n: schema.sessionRecords.sessionNumber })
+    .from(schema.sessionRecords)
+    .where(
+      and(
+        eq(schema.sessionRecords.campaignId, campaignId),
+        notTombstoned(schema.sessionRecords),
+        isNull(schema.sessionRecords.closedAt),
+      ),
+    )
+    .orderBy(schema.sessionRecords.sessionNumber);
+  return row?.n ?? null;
+}
+
+/**
+ * Session-lifecycle coverage (M2's fourth hole). The M2 run's only close was a
+ * crash-abort's, mid-turn-9; turns 10–24 then played with NO open sitting and
+ * the run's session-lifecycle coverage was, in the retro's words, "weaker than
+ * designed and NOT certified" — discovered afterwards, by hand. This measures
+ * it from the record, and the report states it either way.
+ */
+export async function sessionCoverage(db: Db, campaignId: string): Promise<SessionCoverage> {
+  const sittings = await db
+    .select({
+      sessionNumber: schema.sessionRecords.sessionNumber,
+      openedAt: schema.sessionRecords.openedAt,
+      closedAt: schema.sessionRecords.closedAt,
+      closeTrigger: schema.sessionRecords.closeTrigger,
+    })
+    .from(schema.sessionRecords)
+    .where(
+      and(eq(schema.sessionRecords.campaignId, campaignId), notTombstoned(schema.sessionRecords)),
+    )
+    .orderBy(schema.sessionRecords.sessionNumber);
+
+  const turnRows = await db
+    .select({ turnNumber: schema.turns.turnNumber, completedAt: schema.turns.completedAt })
+    .from(schema.turns)
+    .where(and(eq(schema.turns.campaignId, campaignId), eq(schema.turns.status, "complete")));
+
+  const now = Date.now();
+  const turnsOutside: number[] = [];
+  for (const t of turnRows) {
+    const at = t.completedAt?.getTime();
+    if (at === undefined) continue;
+    const inside = sittings.some(
+      (s) => at >= s.openedAt.getTime() && at <= (s.closedAt?.getTime() ?? now),
+    );
+    if (!inside) turnsOutside.push(t.turnNumber);
+  }
+  turnsOutside.sort((a, b) => a - b);
+
+  const openNow = sittings.find((s) => s.closedAt === null)?.sessionNumber ?? null;
+  const certified = sittings.length > 0 && turnsOutside.length === 0;
+  const lines = [
+    `${sittings.length} sitting(s); ${sittings.filter((s) => s.closedAt).length} closed (${
+      sittings
+        .filter((s) => s.closedAt)
+        .map((s) => `#${s.sessionNumber}:${s.closeTrigger ?? "?"}`)
+        .join(", ") || "none"
+    }); open now: ${openNow === null ? "NONE" : `#${openNow}`}`,
+    turnsOutside.length > 0
+      ? `turns played OUTSIDE any sitting: ${turnsOutside.join(", ")} — session-lifecycle coverage NOT certified by this run`
+      : "every completed turn played inside a sitting — session-lifecycle coverage CERTIFIED",
+  ];
+  return { sittings, openNow, turnsOutside, certified, lines };
+}
+
+// ---------------------------------------------------------------------------
+// The run plan + its price (the M3 gate runs 100 turns; §10.3 asks 50–100).
+// ---------------------------------------------------------------------------
+
+export interface SoakPlan {
+  turns: number;
+  /** Ops keyed to turn numbers. Specials keep their scripted turns; the
+   *  structural ops scale with the run so a 100-turn plan is not a 30-turn
+   *  plan with seventy filler beats bolted on the end. */
+  pinAfter: number;
+  midpointAfter: number;
+  rewindAfter: number;
+  rewindDepth: number;
+  maxSteps: number;
+}
+
+/** Pure: the same N always yields the same plan (the dry-run prints it). */
+export function buildSoakPlan(turns: number, pinAfter: number, rewindDepth: number): SoakPlan {
+  if (!Number.isInteger(turns) || turns < 1) {
+    throw new Error(`[soak] --turns must be a positive integer (got ${turns})`);
+  }
+  if (rewindDepth > MAX_PLAY_VIEW_REWIND) {
+    // §6.7: the play view's retake horizon. A soak that rewinds deeper than a
+    // player can would be exercising the studio-view path while claiming to
+    // exercise play.
+    throw new Error(
+      `[soak] rewind depth ${rewindDepth} exceeds the ${MAX_PLAY_VIEW_REWIND}-turn retake horizon (§6.7)`,
+    );
+  }
+  const midpointAfter = Math.floor(turns / 2);
+  // Two thirds in — 20/30 at the default, the M1 plan's own position — and far
+  // enough past the midpoint that the REWIND ITSELF clears it: the op un-happens
+  // `rewindDepth` turns, so `rewindAfter > midpointAfter` is not enough. At
+  // N=10 that older guard put the rewind after turn 6 with depth 2, landing the
+  // re-climb at turn 4 — before the midpoint close at 5 that the run had
+  // already crossed, re-playing turns across a session boundary. The landing
+  // turn is what must clear it.
+  const rewindAfter = Math.max(midpointAfter + rewindDepth, Math.floor((turns * 2) / 3));
+  return {
+    turns,
+    pinAfter,
+    midpointAfter,
+    rewindAfter,
+    rewindDepth,
+    maxSteps: turns + rewindDepth + 6,
+  };
+}
+
+/**
+ * Ops this N cannot fire — a short run genuinely drops them, and the plan says
+ * so out loud rather than letting the event-mix checklist report the absence as
+ * a coverage miss the reader has to diagnose.
+ */
+export function droppedOps(plan: SoakPlan): string[] {
+  const dropped: string[] = [];
+  if (plan.pinAfter < 1 || plan.pinAfter > plan.turns) {
+    dropped.push(
+      `pin (scheduled after turn ${plan.pinAfter}, which N=${plan.turns} never reaches)`,
+    );
+  }
+  if (plan.midpointAfter < 1) {
+    dropped.push(`session close/reopen (N=${plan.turns} has no midpoint turn to fire after)`);
+  }
+  if (plan.rewindAfter > plan.turns) {
+    dropped.push(
+      `rewind of ${plan.rewindDepth} (scheduled after turn ${plan.rewindAfter}, which N=${plan.turns} never reaches)`,
+    );
+  }
+  return dropped;
+}
+
+/**
+ * Measured tier mix, pooled over the two recorded soaks (M1's 30 turns: 27
+ * genga / 3 sakuga; M2's 24: 10 genga / 12 sakuga / 2 douga) = 54 turns. Both
+ * predate the §3 flat-high ruling and C9's douga calibration, so this is an
+ * interim prior for PRICING only — the first 100-turn run re-baselines it, the
+ * same way the thinking allowances re-baseline (budget-assertions.ts).
+ */
+export const MEASURED_TIER_MIX: Record<TurnTier, number> = {
+  douga: 0.04,
+  genga: 0.68,
+  sakuga: 0.28,
+};
+
+/** Judgment + probe + G2 spend per turn: the M2 record's mean of (turn $ −
+ *  narration $) over its 24 metered turns at DEV tiers ($0.0492). */
+export const MEASURED_NON_NARRATION_USD = 0.049;
+
+/** Session-open/close composers: recap, yokoku, director memo, voice journal. */
+const SESSION_COMPOSER_CALLS = 4;
+
+/**
+ * Turns whose prefix is legitimately cold: each sitting's first turn, plus
+ * every compaction event (§6.2's sanctioned blocks-2/3 invalidation).
+ *
+ * The cadence, from `shouldCompact` + `maybeCompact` rather than from the
+ * constants' difference: the event fires when the window is STRICTLY over the
+ * trigger (`length > 16`, so first at 17 exchanges) and keeps a tail of 10, so
+ * each event moves the watermark forward by 17 − 10 = 7 and the next event is
+ * 7 turns later. First reset at turn 17, then 24, 31 … — at N=100 that is 12
+ * resets, not the 15 the old `(16 − 10)`-step arithmetic reported.
+ *
+ * The TOKEN trigger (WINDOW_MAX_TOKENS) stays deliberately unmodeled: it
+ * depends on measured prose length, which this estimator does not have. It can
+ * only fire an event EARLIER, so the count here is a FLOOR on compaction
+ * resets — and the all-cold ceiling `estimateRunPrice` prints is what bounds
+ * the run either way.
+ */
+export function coldOpensFor(
+  turns: number,
+  sessions: number,
+): { total: number; compactions: number } {
+  const firstAt = COMPACTION_TRIGGER_EXCHANGES + 1;
+  const step = Math.max(1, firstAt - COMPACTION_KEEP_TAIL);
+  const compactions = turns >= firstAt ? Math.floor((turns - firstAt) / step) + 1 : 0;
+  return { total: sessions + compactions, compactions };
+}
+
+export interface RunPriceEstimate {
+  turns: number;
+  narrationModel: string;
+  coldTurns: number;
+  warmTurns: number;
+  warmFloorUsd: number;
+  expectedUsd: number;
+  coldCeilingUsd: number;
+  sessionOverheadUsd: number;
+  lines: string[];
+}
+
+/**
+ * What N turns cost at DEV tiers, from the §10.8 cost model — printed BEFORE
+ * anything runs, because the standing rule is that the user prices a run and
+ * then authorizes it, never the other way round.
+ *
+ * The model is deliberately conservative: `turnCostModel` carries p95 thinking
+ * allowances, so this reads as an upper-leaning number, not a forecast.
+ */
+export function estimateRunPrice(
+  turns: number,
+  selection: TierSelection,
+  sessions: number,
+): RunPriceEstimate {
+  const model = selection.narration;
+  let warmPerTurn = MEASURED_NON_NARRATION_USD;
+  let coldPerTurn = MEASURED_NON_NARRATION_USD;
+  const mixLines: string[] = [];
+  for (const tier of ["douga", "genga", "sakuga"] as const) {
+    const share = MEASURED_TIER_MIX[tier];
+    const m = turnCostModel(tier, model);
+    warmPerTurn += m.warmUsd * share;
+    coldPerTurn += m.coldUsd * share;
+    mixLines.push(
+      `${tier} ${(share * 100).toFixed(0)}% (warm ${fmtUsd(m.warmUsd)} / cold ${fmtUsd(m.coldUsd)})`,
+    );
+  }
+  const cold = coldOpensFor(turns, sessions);
+  const coldTurns = Math.min(turns, cold.total);
+  const warmTurns = turns - coldTurns;
+
+  const prefix = Math.max(
+    0,
+    TURN_CONTRACTS.genga.promptBudgetTokens - BUDGET_ASSUMPTIONS.dynamicTokensPerTurn,
+  );
+  // Post-M3-C1 the session composers carry the tool law's constant array, so
+  // they READ the KA's prefix instead of writing a second one (plan C1 item 4).
+  const perComposer = estimateCostUsd(model, {
+    input_tokens: 1_000,
+    output_tokens: 400,
+    cache_read_input_tokens: prefix,
+  });
+  const sessionOverheadUsd = perComposer * SESSION_COMPOSER_CALLS * sessions;
+
+  const warmFloorUsd = turns * warmPerTurn + sessionOverheadUsd;
+  const expectedUsd = warmTurns * warmPerTurn + coldTurns * coldPerTurn + sessionOverheadUsd;
+  const coldCeilingUsd = turns * coldPerTurn + sessionOverheadUsd;
+
+  const lines = [
+    `=== PRICE ESTIMATE — ${turns} turns at DEV tiers ===`,
+    `narration ${model} · judgment ${selection.judgment} · probe ${selection.probe}`,
+    `tier mix (measured, 54 pooled soak turns): ${mixLines.join(" · ")}`,
+    `non-narration per turn (measured, M2): ${fmtUsd(MEASURED_NON_NARRATION_USD)}`,
+    `cache: ${warmTurns} warm turn(s) · ${coldTurns} cold (${sessions} sitting open(s) + ${cold.compactions} compaction reset(s))`,
+    `  all-warm floor      ${fmtUsd(warmFloorUsd)}`,
+    `  EXPECTED            ${fmtUsd(expectedUsd)}`,
+    `  all-cold ceiling    ${fmtUsd(coldCeilingUsd)}`,
+    `  (of which session composers: ${fmtUsd(sessionOverheadUsd)} over ${sessions} sitting(s))`,
+    "the model carries §10.8's p95 thinking allowances — a deliberate OVER-model",
+    "(budget-assertions.ts); the M2 record's measured mean was $0.33/turn at a",
+    "sakuga-heavy mix on pre-M2R5 caching. Treat floor..EXPECTED as the band.",
+    "",
+    "SPEND IS GATED BY THE USER: this run is not authorized until the user approves",
+    "this number. `--dry-run` is the only unattended execution (zero model calls).",
+  ];
+  return {
+    turns,
+    narrationModel: model,
+    coldTurns,
+    warmTurns,
+    warmFloorUsd,
+    expectedUsd,
+    coldCeilingUsd,
+    sessionOverheadUsd,
+    lines,
   };
 }
 

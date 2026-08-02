@@ -50,10 +50,16 @@ import {
   type TurnRecord,
   attributeSpend,
   classifyAxisVerdict,
+  dbNow,
+  estimateRunPrice,
   fmtUsd,
   guardNoFable,
+  meterSettledTurn,
   meterTurn,
+  meteringCoverage,
+  openSittingNumber,
   runOneTurn,
+  sessionCoverage,
   waitForRowTerminal,
 } from "./soak-lib";
 
@@ -371,6 +377,33 @@ async function seedOrResume(db: Db): Promise<{ campaignId: string; resumedFrom: 
 // Report
 // ---------------------------------------------------------------------------
 
+/** Beats this invocation will actually buy. The drift soak has no scaled
+ *  structural ops — its beat list IS its plan — and a `--resume` only pays for
+ *  what is left, so the price is quoted over that, never over the whole list. */
+function beatsRemaining(resumedFrom: number): number {
+  return Object.keys(BEATS)
+    .map(Number)
+    .filter((n) => n > resumedFrom && n <= TARGET_TURNS).length;
+}
+
+/**
+ * The pre-run price banner, the same standing gate soak.ts prints (§0.9): the
+ * user prices a run and THEN authorizes it, never the other way round. Reuses
+ * `estimateRunPrice` so the two harnesses can never quote different arithmetic;
+ * only the turn count differs, and it comes from this script's own beat list.
+ */
+function printPriceBanner(resumedFrom: number): void {
+  const turns = beatsRemaining(resumedFrom);
+  const estimate = estimateRunPrice(turns, DEV_TIER_SELECTION, SESSIONS);
+  for (const line of estimate.lines) console.log(line);
+  if (resumedFrom > 0) {
+    console.log(
+      `(resume: ${turns} of ${TARGET_TURNS} temptation beats remain — turns 1..${resumedFrom} are already bought)`,
+    );
+  }
+  console.log("");
+}
+
 function describePlan(): string {
   const lines = [
     `M2 drift soak — ${TARGET_TURNS} temptation beats (DEV tiers: narration=claude-sonnet-5) · forced retake after turn ${FORCE_AFTER_TURN} on '${FORCED_AXIS}'`,
@@ -533,6 +566,8 @@ function buildReport(
   snapshots: SampleSnapshot[],
   verdict: Verdict,
   spend: Awaited<ReturnType<typeof attributeSpend>>,
+  coverage: Awaited<ReturnType<typeof meteringCoverage>>,
+  sessions: Awaited<ReturnType<typeof sessionCoverage>>,
   resumedFrom: number,
   abort: string | null,
 ): string {
@@ -611,14 +646,23 @@ function buildReport(
 
   out.push("## Per-turn table");
   out.push("");
-  out.push("| turn | class | tier | narration $ | turn $ | flags |");
-  out.push("| ---: | --- | --- | ---: | ---: | --- |");
+  out.push("| turn | class | tier | attempts | narration $ | turn $ | flags |");
+  out.push("| ---: | --- | --- | ---: | ---: | ---: | --- |");
   for (const r of records) {
     const flags = [...r.failures.map((x) => `FAIL:${x}`), ...r.flags].join("; ") || "—";
+    const attempts =
+      r.attempts.length === 0 ? "—" : r.attempts.map((a) => fmtUsd(a.usd)).join(" + ");
     out.push(
-      `| ${r.turnNumber} | ${r.label} | ${r.tier} | ${fmtUsd(r.narrationUsd)} | ${fmtUsd(r.turnUsd)} | ${flags} |`,
+      `| ${r.turnNumber} | ${r.label} | ${r.tier} | ${attempts} | ${fmtUsd(r.narrationUsd)} | ${fmtUsd(r.turnUsd)} | ${flags} |`,
     );
   }
+  out.push("");
+
+  // The two coverage statements M2 had to reconstruct by hand afterwards.
+  out.push("## Assertion coverage (§10.8) + session lifecycle (§9.4)");
+  out.push("");
+  for (const line of coverage.lines) out.push(`- ${line}`);
+  for (const line of sessions.lines) out.push(`- ${line}`);
   out.push("");
 
   out.push("## Spend attribution");
@@ -659,6 +703,15 @@ async function liveRun(db: Db, campaignId: string, resumedFrom: number): Promise
   if (resumedFrom === 0) {
     const opened = await openSession(db, campaignId);
     console.log(`[drift-soak] session opened (pilot=${opened.pilot})`);
+  } else if ((await openSittingNumber(db, campaignId)) === null) {
+    // The M2 hole: run #1's crash-abort closed the sitting mid-turn-9, the
+    // resume opened none, and turns 10–24 played with NO sitting open —
+    // discovered only in the retro, where the run's session-lifecycle coverage
+    // had to be declared uncertified. A resume now re-opens what it inherits.
+    const reopened = await openSession(db, campaignId, { resume: true });
+    console.warn(
+      `[drift-soak] resume inherited a CLOSED sitting — opened session ${reopened.sessionNumber} (coverage guard)`,
+    );
   }
 
   try {
@@ -666,7 +719,9 @@ async function liveRun(db: Db, campaignId: string, resumedFrom: number): Promise
     while (intended <= TARGET_TURNS) {
       const beat = BEATS[intended];
       if (!beat) throw new Error(`no beat scripted for turn ${intended}`);
-      const since = new Date();
+      // DATABASE time (see soak-lib's dbNow): this bound filters model_calls by
+      // their Postgres-stamped created_at, so it must come from that clock.
+      const since = await dbNow(db);
       let run: Awaited<ReturnType<typeof runOneTurn>>;
       try {
         run = await runOneTurn(db, campaignId, beat.input);
@@ -699,6 +754,32 @@ async function liveRun(db: Db, campaignId: string, resumedFrom: number): Promise
             )
             .orderBy(desc(schema.turns.turnNumber))
             .limit(1);
+          // The settled turn consumed its beat and spent real money. M2's turn
+          // 9 went exactly this way and was NEVER metered or asserted, while
+          // the run reported that every turn passed (retro: "Turn 9 was never
+          // asserted at all — it settled through the stale-turn retry route,
+          // which re-anchors without metering"). Meter it from the record.
+          if (lastRow && lastRow.turnNumber >= intended) {
+            for (let n = intended; n <= lastRow.turnNumber; n++) {
+              const settledBeat = BEATS[n];
+              const rec = await meterSettledTurn(
+                db,
+                campaignId,
+                n,
+                n,
+                `${settledBeat?.label ?? "unscripted"} (re-anchored)`,
+                coldTurns,
+                true, // this route drove the §5.7 retry itself
+              );
+              if (rec) {
+                records.push(rec);
+                snapshots.push(await snapshotSakkan(db, campaignId, n));
+                console.warn(
+                  `[drift-soak] re-anchored turn ${n} metered from the record (${fmtUsd(rec.narrationUsd)})`,
+                );
+              }
+            }
+          }
           intended = (lastRow?.turnNumber ?? intended - 1) + 1;
           continue;
         }
@@ -757,19 +838,40 @@ async function liveRun(db: Db, campaignId: string, resumedFrom: number): Promise
 
   const verdict = computeVerdict(snapshots, injectedAt);
   const spend = await attributeSpend(db, campaignId, records, SESSIONS);
-  const report = buildReport(campaignId, records, snapshots, verdict, spend, resumedFrom, abort);
+  // Coverage spans the WHOLE campaign, not this invocation: a resumed run
+  // inherits the earlier invocations' turns and must not report their
+  // assertions as its own (§0.9 resume discipline).
+  const reachedTurn = records.reduce((max, r) => Math.max(max, r.turnNumber), resumedFrom);
+  const coverage = meteringCoverage(records, reachedTurn, resumedFrom + 1);
+  const sessions = await sessionCoverage(db, campaignId);
+  const report = buildReport(
+    campaignId,
+    records,
+    snapshots,
+    verdict,
+    spend,
+    coverage,
+    sessions,
+    resumedFrom,
+    abort,
+  );
   const reportPath = join(process.cwd(), "docs", "retros", "M2-drift-soak.md");
   writeFileSync(reportPath, report);
   console.log(`\n[drift-soak] report → ${reportPath}`);
   console.log("\n=== DRIFT SOAK SUMMARY ===");
   console.log(`band held: ${verdict.bandHeld} · forced arm: ${JSON.stringify(verdict.forced)}`);
   console.log(`total spend: ${fmtUsd(spend.totalUsd)}`);
+  for (const line of coverage.lines) console.log(`  coverage: ${line}`);
+  for (const line of sessions.lines) console.log(`  sittings: ${line}`);
 }
 
 async function main(): Promise<void> {
   guardNoFable(DEV_TIER_SELECTION);
 
   if (DRY_RUN) {
+    // The dry run is where the number gets read before the live run is
+    // authorized, so it prints the same banner (it buys nothing itself).
+    printPriceBanner(0);
     console.log(describePlan());
     if (!process.env.DATABASE_URL) {
       console.warn("[dry-run] DATABASE_URL not set — plan only.");
@@ -799,6 +901,9 @@ async function main(): Promise<void> {
 
   const db = getDb();
   const { campaignId, resumedFrom } = await seedOrResume(db);
+  // The price BEFORE the first turn is submitted — seedOrResume writes rows but
+  // buys no model calls, so the gate still stands in front of all spend.
+  printPriceBanner(resumedFrom);
   console.log(`[drift-soak] LIVE · campaign ${campaignId}`);
   try {
     await liveRun(db, campaignId, resumedFrom);

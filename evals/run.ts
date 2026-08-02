@@ -39,13 +39,22 @@ if (requested.length > 0 && suites.length !== requested.length) {
 }
 
 const results: SuiteResult[] = [];
+/**
+ * Suites the CI gate never runs BY DESIGN (they buy model calls). They report
+ * `skipped` like everything else, but they are a different fact from a gate
+ * suite that RAN and found no evidence — and conflating the two is what made
+ * the roll-up print "11 of 13 measured nothing" on a healthy run, which trains
+ * exactly the ignoring the roll-up exists to prevent.
+ */
+const ciExcluded = new Set<string>();
 for (const suite of suites) {
   if (ci && suite.requiresLlm) {
+    ciExcluded.add(suite.name);
     results.push({
       name: suite.name,
       gate: suite.gate,
       status: "skipped",
-      details: ["skipped under --ci (LLM suite)"],
+      details: ["excluded under --ci (requiresLlm — the deterministic gate buys no model calls)"],
       failures: [],
     });
     continue;
@@ -67,9 +76,36 @@ for (const r of results) {
   const mark = r.status === "pass" ? "✓" : r.status === "fail" ? "✗" : "⊘";
   console.log(`${mark} ${r.name} [${r.status}] — gate: ${r.gate}`);
   for (const f of r.failures) console.log(`    FAIL: ${f}`);
+  // A skipped suite ALWAYS prints its reason. A silent ⊘ is indistinguishable
+  // from a pass at a glance, and a gate suite that quietly measures nothing is
+  // how a milestone gets called green on evidence nobody produced.
+  if (r.status === "skipped") {
+    const why = ciExcluded.has(r.name) ? "EXCLUDED" : "SKIPPED";
+    for (const d of r.details) console.log(`    ${why}: ${d}`);
+  }
   if (r.status === "pass" && r.details.length > 0 && r.details.length <= 6) {
     for (const d of r.details) console.log(`    ${d}`);
   }
+}
+
+const excluded = results.filter((r) => ciExcluded.has(r.name));
+if (excluded.length > 0) {
+  console.log(
+    `\n${excluded.length} suite(s) EXCLUDED under --ci (requiresLlm — not a measurement gap): ${excluded
+      .map((r) => r.name)
+      .join(", ")}`,
+  );
+}
+// The roll-up that matters: a GATE suite that ran and produced no evidence.
+// Only these — an --ci exclusion is a policy, not a hole, and mixing them in
+// buried the real signal under ten lines of noise.
+const measuredNothing = results.filter((r) => r.status === "skipped" && !ciExcluded.has(r.name));
+if (measuredNothing.length > 0) {
+  console.log(
+    `\n${measuredNothing.length} gate suite(s) MEASURED NOTHING (ran, no evidence — NOT a pass): ${measuredNothing
+      .map((r) => `${r.name} [gate ${r.gate}]`)
+      .join(", ")}`,
+  );
 }
 
 const outPath = join(process.cwd(), "evals", "latest.json");

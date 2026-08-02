@@ -1,6 +1,7 @@
 import type { Suite, SuiteResult } from "../types";
 import { controlKey } from "./control-key";
 import { fingerprintReliability } from "./fingerprint-reliability";
+import { MIN_SOAK_TURNS, flywheelProspective } from "./flywheel-prospective";
 
 /**
  * §10 suites that gate later milestones — scaffolded now (axiom 8: the
@@ -36,15 +37,15 @@ export const scaffolds: Suite[] = [
     "M1",
     "§6.8 the M1 gate is IMPLEMENTED as a vitest integration suite, not an eval-harness suite: src/lib/turn/__tests__/flywheel.integration.test.ts drives the real turn loop (real Postgres, scripted trio) with one named test per layer — nine layers + the §6.9 player profile — each proving writer→reader by surfacing planted content through the layer's reader. This scaffold stays skipped and points there",
   ),
-  scaffold(
-    "flywheel-prospective",
-    "M3",
-    "§6.8 N+40 prospective surfacing via Director/seed machinery (M3)",
-  ),
+  // §6.8 — LIVE at M3 C5: prospective surfacing, adjudicated over a soaked
+  // campaign's rows. It skips (never fails) with its own reason until one
+  // exists — the suite states the depth it needs rather than grading a run
+  // that cannot carry the claim.
+  flywheelProspective,
   scaffold(
     "seed-integrity",
     "M3",
-    "§10.5 payoff windows + organic-detection recall need the seed engine in anger (M3)",
+    `§10.5 payoff windows + organic-detection recall need the seed engine in anger. NEEDS a soaked campaign of ≥ ${MIN_SOAK_TURNS} turns (§10.3's letter; the M2 gate ran 24 — docs/retros/M2-drift-soak.md): run \`pnpm soak -- --turns=${MIN_SOAK_TURNS}\` or deeper, then re-run with FLYWHEEL_CAMPAIGN_ID=<campaign uuid>. Until then nothing is measured — this is NOT a pass`,
   ),
   scaffold(
     "golden-regression",

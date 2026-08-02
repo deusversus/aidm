@@ -1,18 +1,20 @@
 /**
- * M1-C10 — the 30-turn soak harness (blueprint §12 M1 exit; plan
- * docs/plans/M1-loop.md C10). A scripted Bebop run driven through the REAL
- * turn loop (submitTurn → attachToTurn), player side voiced by a probe-tier
- * persona, metered against the §5.1 budget table and the §5.5 latency
- * doctrine (budgets FLAG waste, they never hard-fail — breaches surface for
- * review, the run continues).
+ * The soak harness (blueprint §12 M1 exit, plan docs/plans/M1-loop.md C10;
+ * extended to the §10.3 long run at M3 C5). A scripted Bebop run driven
+ * through the REAL turn loop (submitTurn → attachToTurn), player side voiced
+ * by a probe-tier persona, metered against the §5.1 budget table and the §5.5
+ * latency doctrine (budgets FLAG waste, they never hard-fail — breaches
+ * surface for review, the run continues).
  *
  * SPEND IS GATED BY THE USER. The default (flag-less) invocation is a LIVE
- * run and MUST NOT be executed without explicit approval. The only execution
- * this script is meant to perform unattended is `--dry-run`, which prints the
- * beat plan and proves the seed/teardown wiring boots WITHOUT submitting a
- * single turn (zero model calls).
+ * run and MUST NOT be executed without explicit approval; every invocation
+ * prints its PRICE ESTIMATE first. The only execution this script is meant to
+ * perform unattended is `--dry-run`, which prints the beat plan and proves the
+ * seed/teardown wiring boots WITHOUT submitting a single turn (zero model
+ * calls) — at any N.
  *
- *   pnpm soak                     LIVE 30-turn run (user-gated spend) → docs/retros/M1-soak.md
+ *   pnpm soak                     LIVE 30-turn run (user-gated) → docs/retros/soak-30turn.md
+ *   pnpm soak -- --turns=100      the §10.3 long run — the M3 gate depth
  *   pnpm soak -- --dry-run        prints the plan, seeds + tears down, ZERO model calls
  *   pnpm soak -- --capture-golden LIVE run, then writes §10.7 golden-turn seeds
  *   pnpm soak -- --cleanup        LIVE run, then deletes the soak campaign
@@ -46,14 +48,25 @@ import { z } from "zod";
 import { BUDGET_ASSUMPTIONS } from "../evals/suites/budget-assertions";
 import {
   BEBOP_OSP,
+  type MeteringCoverage,
+  type SessionCoverage,
+  type SoakPlan,
   type SpendAttribution,
   type TurnRecord,
   type TurnRun,
   attributeSpend,
+  buildSoakPlan,
+  dbNow,
+  droppedOps,
+  estimateRunPrice,
   fmtUsd,
   guardNoFable,
+  meterSettledTurn,
   meterTurn,
+  meteringCoverage,
+  openSittingNumber,
   runOneTurn,
+  sessionCoverage,
   waitForRowTerminal,
 } from "./soak-lib";
 
@@ -64,6 +77,21 @@ import {
 const DRY_RUN = process.argv.includes("--dry-run");
 const CAPTURE_GOLDEN = process.argv.includes("--capture-golden");
 const CLEANUP = process.argv.includes("--cleanup");
+
+/** `--turns=N` (default 30, the M1 shape). The M3 gate runs 100 (§10.3 asks
+ *  50–100; the M2 gate ran 24 against that letter — a recorded discrepancy). */
+function parseTurns(argv: string[]): number {
+  const flag = argv.find((a) => a.startsWith("--turns="));
+  if (!flag) return 30;
+  const n = Number(flag.slice("--turns=".length));
+  if (!Number.isInteger(n) || n < 1 || n > 500) {
+    console.error(`[soak] FATAL: --turns must be an integer in 1..500 (got '${flag}')`);
+    process.exit(1);
+  }
+  return n;
+}
+
+const TARGET_TURNS = parseTurns(process.argv);
 
 /** How many turns a nominal play sitting is, for the spend projection. */
 const SESSIONS = 2;
@@ -118,20 +146,24 @@ const SCRIPTED: Record<number, ScriptedBeat> = {
   },
 };
 
-/** Ops fire AFTER the intended turn lands, once each. */
+/** Ops fire AFTER the intended turn lands, once each. The pin rides the combat
+ *  special, so it keeps that special's turn; the midpoint and the rewind are
+ *  structural and scale with N (buildSoakPlan). */
 const PIN_AFTER_TURN = 8;
-const MIDPOINT_AFTER_TURN = 15;
-const REWIND_AFTER_TURN = 20;
 const REWIND_DEPTH = 2;
-const TARGET_TURNS = 30;
+const PLAN: SoakPlan = buildSoakPlan(TARGET_TURNS, PIN_AFTER_TURN, REWIND_DEPTH);
 
-const OPS_AFTER: Record<number, string[]> = {
-  [PIN_AFTER_TURN]: ["pin the combat passage (studio note)"],
-  [MIDPOINT_AFTER_TURN]: ["session close (yokoku + Sakkan) → reopen (recap)"],
-  [REWIND_AFTER_TURN]: [
-    `rewind ${REWIND_DEPTH} turns (${REWIND_AFTER_TURN}→${REWIND_AFTER_TURN - REWIND_DEPTH}), then re-climb`,
-  ],
-};
+function opsAfter(turn: number): string[] {
+  const ops: string[] = [];
+  if (turn === PLAN.pinAfter) ops.push("pin the combat passage (studio note)");
+  if (turn === PLAN.midpointAfter) ops.push("session close (yokoku + Sakkan) → reopen (recap)");
+  if (turn === PLAN.rewindAfter) {
+    ops.push(
+      `rewind ${PLAN.rewindDepth} turns (${PLAN.rewindAfter}→${PLAN.rewindAfter - PLAN.rewindDepth}), then re-climb — inside the ${PLAN.rewindDepth}-of-10 retake horizon (§6.7)`,
+    );
+  }
+  return ops;
+}
 
 // ---------------------------------------------------------------------------
 // The persona (the player). One probe-tier call per unscripted turn.
@@ -237,12 +269,14 @@ async function rewindTwo(
   // The rewind-route contract: drain lagging G2 before the tombstone sweep so
   // a detached settle can't write ghost rows for an un-happened turn.
   await settleG2IfPending(db, campaignId);
-  const toTurn = Math.max(0, currentMax - REWIND_DEPTH);
+  // Depth is measured from wherever the op fires, so a longer run rewinds the
+  // same PLAYER-REACHABLE distance (§6.7's retake horizon), never a deeper one.
+  const toTurn = Math.max(0, currentMax - PLAN.rewindDepth);
   const result = await rewindCampaign(
     db,
     campaignId,
     toTurn,
-    "soak: rewind-of-2 regression exercise",
+    `soak: rewind-of-${PLAN.rewindDepth} regression exercise`,
   );
   return { toTurn, tombstoned: result.tombstonedCount };
 }
@@ -459,19 +493,37 @@ async function captureGolden(db: Db, campaignId: string): Promise<string[]> {
 function describePlan(): string {
   const lines: string[] = [];
   lines.push(
-    "M1 30-turn soak — scripted beat plan (DEV tiers: narration=claude-sonnet-5, judgment=claude-haiku-4-5, probe=claude-haiku-4-5)",
+    `soak — ${PLAN.turns}-turn scripted beat plan (DEV tiers: narration=${DEV_TIER_SELECTION.narration}, judgment=${DEV_TIER_SELECTION.judgment}, probe=${DEV_TIER_SELECTION.probe})`,
   );
   lines.push(
-    `target ${TARGET_TURNS} turns · specials scripted, gaps persona-driven (one probe/turn) · rewind of ${REWIND_DEPTH} at turn ${REWIND_AFTER_TURN}`,
+    `target ${PLAN.turns} turns · specials scripted at their own turns, gaps persona-driven (one probe/turn) · pin after ${PLAN.pinAfter} · session close/reopen after ${PLAN.midpointAfter} · rewind of ${PLAN.rewindDepth} after ${PLAN.rewindAfter}`,
   );
+  const unreachable = Object.keys(SCRIPTED)
+    .map(Number)
+    .filter((n) => n > PLAN.turns);
+  if (unreachable.length > 0) {
+    lines.push(
+      `NOTE: specials at turn(s) ${unreachable.join(", ")} never fire at N=${PLAN.turns} — the event mix will be short by design`,
+    );
+  }
+  // The structural ops scale with N and a small N genuinely drops some of them.
+  // Said here, so the event-mix checklist's later "[ ] pin held" reads as a
+  // planned absence rather than a failure the reader has to go diagnose.
+  const dropped = droppedOps(PLAN);
+  if (dropped.length > 0) {
+    lines.push(
+      `NOTE: op(s) DROPPED at N=${PLAN.turns} — ${dropped.join("; ")}; the event-mix checklist will show them unmet by design`,
+    );
+  }
   lines.push("");
-  for (let n = 1; n <= TARGET_TURNS; n++) {
+  const width = String(PLAN.turns).length;
+  for (let n = 1; n <= PLAN.turns; n++) {
     const s = SCRIPTED[n];
     const desc = s
       ? `${s.label} — ${s.input}`
       : "persona — probe-driven laconic bounty-hunter move";
-    lines.push(`  turn ${String(n).padStart(2, " ")}  ${desc}`);
-    for (const op of OPS_AFTER[n] ?? []) lines.push(`          ↳ op: ${op}`);
+    lines.push(`  turn ${String(n).padStart(width, " ")}  ${desc}`);
+    for (const op of opsAfter(n)) lines.push(`          ↳ op: ${op}`);
   }
   return lines.join("\n");
 }
@@ -485,9 +537,11 @@ function buildReport(
   records: TurnRecord[],
   checklist: ChecklistItem[],
   spend: SpendAttribution,
+  coverage: MeteringCoverage,
+  sessions: SessionCoverage,
 ): string {
   const out: string[] = [];
-  out.push("# M1 Soak Report — playable to turn 30");
+  out.push(`# Soak Report — ${PLAN.turns}-turn run`);
   out.push("");
   out.push(`Generated: ${new Date().toISOString()}`);
   out.push("");
@@ -496,24 +550,44 @@ function buildReport(
   );
   out.push("");
   out.push(
-    "Tier selection (DEV): narration=`claude-sonnet-5`, judgment=`claude-haiku-4-5`, probe=`claude-haiku-4-5`. Fable guard: **PASS** (no Fable in any tier).",
+    `Tier selection (DEV): narration=\`${DEV_TIER_SELECTION.narration}\`, judgment=\`${DEV_TIER_SELECTION.judgment}\`, probe=\`${DEV_TIER_SELECTION.probe}\`. Fable guard: **PASS** (no Fable in any tier).`,
   );
   out.push("");
 
   out.push("## Per-turn table");
   out.push("");
   out.push(
-    "| step | turn | tier | served model | narration $ | turn $ | cacheRead frac | TTFT ms | total ms | flags |",
+    "| step | turn | tier | served model | attempts | narration $ | turn $ | cacheRead frac | TTFT ms | total ms | flags |",
   );
-  out.push("| ---: | ---: | --- | --- | ---: | ---: | ---: | ---: | ---: | --- |");
+  out.push("| ---: | ---: | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |");
   for (const r of records) {
     const frac = r.cacheReadFrac === null ? "—" : r.cacheReadFrac.toFixed(2);
     const ttft = r.ttftMs === null ? "—" : String(r.ttftMs);
+    // Absent, not zero: a re-anchored turn's latency was never observed, and a
+    // "0" in this column reads as an impossibly fast turn.
+    const total = r.totalMs === null ? "—" : String(r.totalMs);
     const flags = [...r.failures.map((f) => `FAIL:${f}`), ...r.flags].join("; ") || "—";
+    // Per-attempt spend, since the ceilings are asserted per attempt: a
+    // multi-attempt turn's total is spend, not a cost-model reading.
+    const attempts =
+      r.attempts.length === 0
+        ? "—"
+        : r.attempts.map((a) => fmtUsd(a.usd)).join(" + ") +
+          (r.attempts.length > 1 ? ` (${r.attempts.length})` : "");
     out.push(
-      `| ${r.step} | ${r.turnNumber} | ${r.tier} | ${r.servedModel} | ${fmtUsd(r.narrationUsd)} | ${fmtUsd(r.turnUsd)} | ${frac} | ${ttft} | ${r.totalMs} | ${flags} |`,
+      `| ${r.step} | ${r.turnNumber} | ${r.tier} | ${r.servedModel} | ${attempts} | ${fmtUsd(r.narrationUsd)} | ${fmtUsd(r.turnUsd)} | ${frac} | ${ttft} | ${total} | ${flags} |`,
     );
   }
+  out.push("");
+
+  // The two coverage statements the M2 retro had to reconstruct by hand.
+  out.push("## Assertion coverage (§10.8)");
+  out.push("");
+  for (const line of coverage.lines) out.push(`- ${line}`);
+  out.push("");
+  out.push("## Session-lifecycle coverage (§9.4)");
+  out.push("");
+  for (const line of sessions.lines) out.push(`- ${line}`);
   out.push("");
 
   out.push("## Event-mix checklist");
@@ -523,6 +597,10 @@ function buildReport(
 
   out.push("## Totals + spend attribution");
   out.push("");
+  const estimate = estimateRunPrice(PLAN.turns, DEV_TIER_SELECTION, SESSIONS);
+  out.push(
+    `- Pre-run estimate (the number the run was authorized against): ${fmtUsd(estimate.warmFloorUsd)} floor · ${fmtUsd(estimate.expectedUsd)} expected · ${fmtUsd(estimate.coldCeilingUsd)} all-cold ceiling`,
+  );
   out.push(`- Soak engine spend (all model calls, this campaign): **${fmtUsd(spend.totalUsd)}**`);
   out.push(`- Attributed to turns 1..N: ${fmtUsd(spend.attributedUsd)}`);
   out.push(
@@ -597,19 +675,34 @@ async function liveRun(db: Db, campaignId: string): Promise<void> {
   let didMidpoint = false;
   let didRewind = false;
   let combatPassage = "";
-  const MAX_STEPS = TARGET_TURNS + REWIND_DEPTH + 6; // re-climb headroom + safety
+  const MAX_STEPS = PLAN.maxSteps; // re-climb headroom + safety
 
   // The report writes NO MATTER HOW the loop ends (soak crash #1 lost run
   // data to an unhandled throw): abort reasons land in the report instead.
   let abort: string | null = null;
   try {
-    while (turnNumber < TARGET_TURNS && step < MAX_STEPS) {
+    while (turnNumber < PLAN.turns && step < MAX_STEPS) {
       const intended = turnNumber + 1;
       const scripted = SCRIPTED[intended];
+
+      // No turn plays outside a sitting (M2 hole #4: turns 10–24 played with
+      // the sitting closed, and the run's session-lifecycle coverage was only
+      // discovered to be uncertified in the retro). The guard is cheap — one
+      // indexed read — and only ever opens when there is genuinely nothing open.
+      if ((await openSittingNumber(db, campaignId)) === null) {
+        console.warn("[soak] no open sitting before this turn — opening one");
+        const reopened = await openSession(db, campaignId, { resume: true });
+        coldTurns.add(intended);
+        console.warn(`[soak] sitting ${reopened.sessionNumber} opened mid-run (coverage guard)`);
+      }
+
       const input = scripted ? scripted.input : await personaMove(campaignId, tail);
       const label = scripted ? scripted.label : "persona";
 
-      const since = new Date();
+      // DATABASE time, not the harness's: this bound filters `model_calls` by
+      // their Postgres-stamped `created_at`, and a laptop clock running ahead
+      // would drop the turn's own ledger rows and report a lost row.
+      const since = await dbNow(db);
       let run: TurnRun;
       try {
         run = await runOneTurn(db, campaignId, input);
@@ -623,6 +716,33 @@ async function liveRun(db: Db, campaignId: string): Promise<void> {
           if (settled === "failed" || settled === "stuck") {
             abort = `turn ${err.pendingTurnId} wedged (${settled}) — campaign held open by design`;
             break;
+          }
+          // That turn settled on its OWN — it consumed this beat and its spend
+          // is real. M2's turn 9 took exactly this route and was never metered
+          // or asserted, while the run reported full coverage. Meter it from
+          // the durable record, re-anchor, and let the loop re-derive the beat.
+          step += 1;
+          const [settledRow] = await db
+            .select({ turnNumber: schema.turns.turnNumber })
+            .from(schema.turns)
+            .where(eq(schema.turns.id, err.pendingTurnId));
+          if (settledRow) {
+            const rec = await meterSettledTurn(
+              db,
+              campaignId,
+              settledRow.turnNumber,
+              step,
+              `${label} (re-anchored)`,
+              coldTurns,
+            );
+            if (rec) {
+              records.push(rec);
+              turnNumber = Math.max(turnNumber, settledRow.turnNumber);
+              console.warn(
+                `[soak] re-anchored on turn ${settledRow.turnNumber} — metered from the record (${fmtUsd(rec.narrationUsd)})`,
+              );
+              continue;
+            }
           }
           run = await runOneTurn(db, campaignId, input);
         } else {
@@ -675,12 +795,12 @@ async function liveRun(db: Db, campaignId: string): Promise<void> {
       );
 
       // --- Ops, keyed to the intended turn number (before any rewind re-climb) ---
-      if (intended === PIN_AFTER_TURN && !didPin) {
+      if (intended === PLAN.pinAfter && !didPin) {
         await pinPassage(db, campaignId, turnNumber, combatPassage || run.prose);
         didPin = true;
         console.log(`[soak] pinned a passage from turn ${turnNumber}`);
       }
-      if (intended === MIDPOINT_AFTER_TURN && !didMidpoint) {
+      if (intended === PLAN.midpointAfter && !didMidpoint) {
         const closed = await closeSession(db, campaignId, "explicit");
         artifacts.yokoku = closed.yokoku;
         await settleG2IfPending(db, campaignId);
@@ -693,7 +813,7 @@ async function liveRun(db: Db, campaignId: string): Promise<void> {
           `[soak] midpoint: session closed (yokoku ${closed.yokoku ? "yes" : "no"}) → reopened (recap ${reopened.recap ? "yes" : "no"})`,
         );
       }
-      if (intended === REWIND_AFTER_TURN && !didRewind) {
+      if (intended === PLAN.rewindAfter && !didRewind) {
         artifacts.rewound = await rewindTwo(db, campaignId, turnNumber);
         turnNumber = artifacts.rewound.toTurn; // re-climb from here
         didRewind = true;
@@ -712,13 +832,17 @@ async function liveRun(db: Db, campaignId: string): Promise<void> {
 
   const checklist = await buildChecklist(db, campaignId, records, artifacts);
   const spend = await attributeSpend(db, campaignId, records, SESSIONS);
-  let report = buildReport(campaignId, records, checklist, spend);
+  const coverage = meteringCoverage(records, turnNumber);
+  const sessions = await sessionCoverage(db, campaignId);
+  let report = buildReport(campaignId, records, checklist, spend, coverage, sessions);
   if (abort) {
     report += `\n## ABORTED\n\n${abort}\n`;
     console.error(`[soak] ABORTED: ${abort}`);
   }
 
-  const reportPath = join(process.cwd(), "docs", "retros", "M1-soak.md");
+  // Named by N: a 100-turn M3 gate run must never overwrite the M1 retro that
+  // records a different run at a different depth.
+  const reportPath = join(process.cwd(), "docs", "retros", `soak-${PLAN.turns}turn.md`);
   writeFileSync(reportPath, report);
   console.log(`\n[soak] report → ${reportPath}`);
 
@@ -733,6 +857,8 @@ async function liveRun(db: Db, campaignId: string): Promise<void> {
     `event mix: ${checklist.length - misses.length}/${checklist.length} landed${misses.length ? ` (missing: ${misses.map((m) => m.label).join(", ")})` : ""}`,
   );
   console.log(`assertion failures: ${failures.length}`);
+  for (const line of coverage.lines) console.log(`  coverage: ${line}`);
+  for (const line of sessions.lines) console.log(`  sittings: ${line}`);
   for (const p of spend.projections)
     console.log(`  projected/session @ ${p.model}: ${fmtUsd(p.perSessionUsd)}`);
 
@@ -748,6 +874,12 @@ async function liveRun(db: Db, campaignId: string): Promise<void> {
 
 async function main(): Promise<void> {
   guardNoFable(DEV_TIER_SELECTION);
+
+  // The price BEFORE anything else, dry-run included: the user prices a run and
+  // then authorizes it, never the other way round (§0.9 / the standing gate).
+  const estimate = estimateRunPrice(PLAN.turns, DEV_TIER_SELECTION, SESSIONS);
+  for (const line of estimate.lines) console.log(line);
+  console.log("");
 
   if (DRY_RUN) {
     console.log(describePlan());
