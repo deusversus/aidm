@@ -20,7 +20,12 @@ import {
   runDirectorCycle,
   saveDirectionState,
 } from "@/lib/direction/director";
-import { overdueSeeds, overdueTensionBump } from "@/lib/direction/seeds";
+import {
+  overdueSeeds,
+  overdueTensionBump,
+  recordSeedMention,
+  sweepSeedCandidates,
+} from "@/lib/direction/seeds";
 import { rollingCheckpoint } from "@/lib/direction/session";
 import { CLASSIFY, STRUCTURED_RICH } from "@/lib/llm/budgets";
 import { callJudgment, callProbe } from "@/lib/llm/calls";
@@ -31,7 +36,7 @@ import { CATEGORY_DECAY } from "@/lib/turn/retrieval";
 import { ArcOverride } from "@/lib/types/arc";
 import { DIRECTOR_MAX_INTERVAL } from "@/lib/types/direction";
 import { CommitScene } from "@/lib/types/sidecar";
-import { and, asc, eq, lte, max, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, lte, max, sql } from "drizzle-orm";
 import { z } from "zod";
 
 /**
@@ -102,7 +107,9 @@ const DistillOutput = z.object({
   facts: z.array(DistillFact).default([]),
   /** ≤4, and only for entities already in the catalog — background never creates (§6.5). */
   entity_updates: z.array(DistillEntityUpdate).default([]),
-  /** Which sidecar-mentioned seeds the scene actually paid attention to. */
+  /** Seeds the distiller read the scene as engaging. A DECLARED-path source
+   *  (like the sidecar's intended mentions), never a confirmation: the
+   *  distiller is never shown the ledger, so §7.6's probe is what confirms. */
   confirmed_seed_descriptions: z.array(z.string()).default([]),
   /** Out-of-fiction player craft feedback ("less flowery please") — usually empty. */
   meta_comments: z.array(z.string()).default([]),
@@ -144,6 +151,14 @@ const ArcTransitionCheck = z.object({
   transitioned: z.boolean(),
   evidence: z.string().optional(),
 });
+
+/**
+ * The §7.6 declared-detection probe. Indexes, not descriptions: an index is
+ * unambiguous and cheap, and the grammar strips bounds anyway — an
+ * out-of-range number is filtered at the call site rather than failing the
+ * parse and costing every real confirmation in the same emit.
+ */
+const SeedMentionCheck = z.object({ surfaced: z.array(z.number().int()).default([]) });
 
 // --- Checkpoint plumbing ----------------------------------------------------
 
@@ -401,53 +416,116 @@ async function settleG2Inner(db: Db, turnId: string): Promise<void> {
     });
   }
 
-  // 6. seeds — declared (sidecar) + confirmed (distiller) mentions bump the
-  //    ledger; confirmation flips status. Code only, no model call (§7.6).
+  // 6. seeds, DECLARED path (§7.6): the writer's own claim about this scene —
+  //    the sidecar's intended mentions plus any the distiller named — put to
+  //    ONE cheap bounded probe that reads the page and says which of them
+  //    actually surfaced. Confirmed mentions bump the counter and the urgency;
+  //    an intention the prose never kept changes nothing. Before M3 C2 every
+  //    declared mention bumped the ledger unread, and the distiller was asked
+  //    to "confirm" seeds it was never shown.
+  //    Read by the organic sweep below (6b) as its exclusion list.
+  // Crash-replay honesty (stack audit NIT 6): a crash between step 6 and 6b
+  // replays with g2.seeds already true — the exclusion list must come back
+  // from the checkpoint, or the just-confirmed seed gains a same-turn
+  // candidate the next batch counts twice.
+  let declaredMentionIds: string[] = Array.isArray(checkpoints.seed_declared)
+    ? (checkpoints.seed_declared as string[])
+    : [];
   if (!g2.seeds) {
-    const mentions = [
+    const declared = [
       ...new Set(
         [...(sidecar?.intended_seed_mentions ?? []), ...payload.confirmed_seed_descriptions]
           .map((s) => s.trim())
           .filter(Boolean),
       ),
     ];
-    const confirmedSet = new Set(
-      payload.confirmed_seed_descriptions.map((s) => s.trim().toLowerCase()),
-    );
+    const named = new Map<string, { id: string; description: string }>();
+    for (const m of declared) {
+      // Literal containment: %/_ inside the model's string are live ILIKE
+      // wildcards unless escaped — unescaped, one stray "50%" matches seeds
+      // nobody named (the same hazard the C7 audit found in demote_criticals).
+      const literal = m.replace(/([\\%_])/g, "\\$1");
+      const matched = await db
+        .select({ id: seeds.id, description: seeds.description })
+        .from(seeds)
+        .where(
+          and(
+            eq(seeds.campaignId, campaignId),
+            inArray(seeds.status, ["planted", "confirmed"]),
+            notTombstoned(seeds),
+            sql`(${seeds.id}::text = ${m} OR ${seeds.description} ILIKE ${`%${literal}%`})`,
+          ),
+        );
+      for (const s of matched) named.set(s.id, s);
+    }
+
+    // Cost discipline (§7.6): nothing declared, or nothing declared that maps
+    // onto a live seed → no probe at all.
+    const roster = [...named.values()];
+    let surfaced: { id: string }[] = [];
+    if (roster.length > 0) {
+      const check = await callProbe(selection, {
+        name: "seed_mention_check",
+        schema: SeedMentionCheck,
+        campaignId,
+        turnNumber,
+        system: [
+          "A SEED is a planted narrative promise a story owes an answer to. The writer",
+          "claimed this scene would touch the seeds below. Read the scene and say which",
+          "of them ACTUALLY SURFACED ON THE PAGE — named, alluded to, or acted upon so a",
+          "reader would feel the thread. Sharing a setting, a character, or a mood with a",
+          "seed is not surfacing it. Return only the numbers that surfaced; return none",
+          "if the scene kept no promise.",
+        ].join(" "),
+        prompt: [
+          "SEEDS:",
+          ...roster.map((s, i) => `${i}. ${s.description}`),
+          "",
+          "SCENE:",
+          narration,
+        ].join("\n"),
+        maxTokens: CLASSIFY,
+      });
+      // The grammar strips bounds, so an out-of-range index is a live outcome:
+      // filter, never fail (a bad number must not cost the real confirmations).
+      surfaced = [...new Set(check.surfaced)]
+        .map((i) => roster[i])
+        .filter((s): s is { id: string; description: string } => Boolean(s));
+    }
+
+    declaredMentionIds = surfaced.map((s) => s.id);
     await db.transaction(async (tx) => {
-      const toUpdate = new Map<string, boolean>(); // seedId -> confirm
-      for (const m of mentions) {
-        const matched = await tx
-          .select({ id: seeds.id })
-          .from(seeds)
-          .where(
-            and(
-              eq(seeds.campaignId, campaignId),
-              eq(seeds.status, "planted"),
-              notTombstoned(seeds),
-              sql`(${seeds.id}::text = ${m} OR ${seeds.description} ILIKE ${`%${m}%`})`,
-            ),
-          );
-        for (const s of matched) {
-          toUpdate.set(s.id, (toUpdate.get(s.id) ?? false) || confirmedSet.has(m.toLowerCase()));
-        }
-      }
-      for (const [id, confirm] of toUpdate) {
-        await tx
-          .update(seeds)
-          .set({
-            mentionCount: sql`${seeds.mentionCount} + 1`,
-            urgency: sql`LEAST(1, ${seeds.urgency} + 0.1)`,
-            ...(confirm ? { status: "confirmed" } : {}),
-          })
-          .where(eq(seeds.id, id));
-      }
+      for (const s of surfaced) await recordSeedMention(tx, s.id);
       g2.seeds = true;
       await tx
         .update(turns)
-        .set({ checkpoints: checkpointSql(g2) })
+        .set({ checkpoints: checkpointSql(g2, { seed_declared: declaredMentionIds }) })
         .where(eq(turns.id, turnId));
     });
+  }
+
+  // 6b. seeds, ORGANIC path (§7.6): the sweep the prose never declared. Pure
+  //     code — one embedding of this scene cosined against every open seed's
+  //     description. Hits accumulate as CANDIDATES on the seed row; only the
+  //     batched adjudication on Director cadence may call one a mention.
+  //     Seeds the declared probe just confirmed sit this turn out so the two
+  //     paths cannot bill the same scene twice. (A crash landing exactly
+  //     BETWEEN step 6 and this one replays with an empty exclusion list — the
+  //     cost is one extra candidate on a seed the page genuinely surfaced,
+  //     which the adjudicator still judges on the evidence.)
+  if (!g2.seed_sweep) {
+    try {
+      await sweepSeedCandidates(db, campaignId, turnNumber, narration, {
+        alreadyMentioned: declaredMentionIds,
+      });
+    } catch (err) {
+      console.warn(
+        `[g2] organic seed sweep failed (turn ${turnNumber}) — candidates skipped:`,
+        err,
+      );
+    }
+    g2.seed_sweep = true;
+    await markDb();
   }
 
   // 7. arc_watcher (§4.2) — if an override is active, one probe asks whether

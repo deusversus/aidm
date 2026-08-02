@@ -21,7 +21,7 @@ import {
   stateSnapshots,
   turns,
 } from "@/lib/db/schema";
-import { DirectionState, rewindDirectionState } from "@/lib/types/direction";
+import { DirectionState, parseCandidates, rewindDirectionState } from "@/lib/types/direction";
 import { and, asc, desc, eq, gt, inArray, isNull, lte } from "drizzle-orm";
 
 /**
@@ -121,6 +121,30 @@ export async function rewindCampaign(
   return db.transaction(async (tx) => {
     const now = new Date();
 
+    // Era boundary (M3 C3, stack audit 2026-08-01): an epoch's turnId is its
+    // OLDEST constituent's, so a rewind landing MID-era keeps the whole epoch
+    // — including narrative from turns this rewind un-happens. Unreachable
+    // through the 10-turn retake horizon today; if a deeper rewind ever
+    // crosses an era, it must not do so silently.
+    const [crossedEpoch] = await tx
+      .select({ id: compactedBeats.id, toTurn: compactedBeats.toTurn })
+      .from(compactedBeats)
+      .where(
+        and(
+          eq(compactedBeats.campaignId, campaignId),
+          eq(compactedBeats.isEpoch, true),
+          notTombstoned(compactedBeats),
+          gt(compactedBeats.toTurn, toTurn),
+        ),
+      )
+      .limit(1);
+    if (crossedEpoch) {
+      console.warn(
+        "[rewind] target crosses a merged era — the epoch summary survives whole and may narrate un-happened turns; dissolving it needs constituent linkage (deferred until deep rewind ships)",
+        { campaignId, toTurn, epochToTurn: crossedEpoch.toTurn },
+      );
+    }
+
     // 1. Tombstone every campaign-scoped layer write past N (§6.7). The row
     //    remains for provenance; notTombstoned() hides it from every reader.
     let tombstonedCount = 0;
@@ -197,6 +221,35 @@ export async function rewindCampaign(
           .where(eq(campaigns.id, campaignId));
       }
     }
+
+    // 1c. Organic seed candidates (§7.6, M3 C2) are turn-anchored evidence
+    //     stored INSIDE a surviving row, so the tombstone pass cannot reach
+    //     them: a seed planted at turn 3 keeps its hits from turns the rewind
+    //     just un-happened, and the next batched adjudication would judge a
+    //     payoff against scenes that no longer exist. Drop them here.
+    const survivingSeeds = await tx
+      .select({ id: seeds.id, candidates: seeds.candidates })
+      .from(seeds)
+      .where(and(eq(seeds.campaignId, campaignId), notTombstoned(seeds)));
+    for (const s of survivingSeeds) {
+      const kept = parseCandidates(s.candidates).filter((c) => c.t <= toTurn);
+      if (kept.length !== parseCandidates(s.candidates).length) {
+        await tx.update(seeds).set({ candidates: kept }).where(eq(seeds.id, s.id));
+      }
+    }
+
+    // 1d. Settlements are in-place UPDATEs anchored by resolvedTurn, not
+    //     turnId (turnId is the PLANT turn), so the tombstone pass keeps a
+    //     seed the adjudicator resolved during turns that just un-happened —
+    //     a paid-off thread the story never actually paid (stack audit,
+    //     2026-08-01). Restore the state machine; mention counters stay
+    //     approximate (advisory numbers, no per-turn log to replay).
+    await tx
+      .update(seeds)
+      .set({ status: "planted", resolvedTurn: null, resolvedBy: null })
+      .where(
+        and(eq(seeds.campaignId, campaignId), notTombstoned(seeds), gt(seeds.resolvedTurn, toTurn)),
+      );
 
     // 2. heat_boosts has no tombstone columns — it is an unapplied batch (the
     //    C4 write-only seam). Dead-timeline boosts are simply deleted.

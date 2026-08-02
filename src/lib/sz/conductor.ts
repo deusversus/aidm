@@ -109,10 +109,19 @@ export const ObservationKind = z.enum([
   "deferred",
 ]);
 
+/**
+ * NO RANGE BOUND on `confidence` (M3 C2 bounds sweep). The tool's own input
+ * schema below never carried one, so the bound was never a constraint on the
+ * model — only a reason to REJECT the whole observation. That is the wrong
+ * trade by a wide margin: the content is the spark VERBATIM, the finitude
+ * answer, a hard line — and confidence is a decoration with a default. It
+ * clamps at the ingress in `executeTool`; `content` keeps its `.min(1)`,
+ * because an observation with no content is nothing at all.
+ */
 export const Observation = z.object({
   kind: ObservationKind,
   content: z.string().min(1),
-  confidence: z.number().min(0).max(1).default(0.9),
+  confidence: z.number().default(0.9),
 });
 export type Observation = z.infer<typeof Observation>;
 
@@ -269,7 +278,10 @@ async function executeTool(
   if (name === "record_observation") {
     const obs = Observation.safeParse(input);
     if (!obs.success) return `invalid observation: ${obs.error.issues[0]?.message}`;
-    draft.observations.push(obs.data);
+    draft.observations.push({
+      ...obs.data,
+      confidence: Math.min(1, Math.max(0, obs.data.confidence)),
+    });
     return "recorded";
   }
   if (name === "propose_contract") {

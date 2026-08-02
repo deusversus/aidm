@@ -388,12 +388,20 @@ export async function categoryMembers(
 // Scrape plan (v3 WikiScout, single-shot v5 form)
 // ---------------------------------------------------------------------------
 
+/**
+ * NO RANGE BOUND on `priority` (M3 C2 bounds sweep). The grammar strips
+ * `minimum`/`maximum`, so `.min(1).max(3)` could only ever throw away a whole
+ * scrape plan — the mapping of every category in a 500-category wiki — over a
+ * priority of 4 on ONE row. Priority is a sort key and nothing else
+ * (research.ts sorts ascending), so the band is stated in the description and
+ * clamped in `planScrape`.
+ */
 const ScrapePlan = z.object({
   categories: z.array(
     z.object({
       wiki_category: z.string(),
       canonical_type: z.enum(CANONICAL_PAGE_TYPES),
-      priority: z.number().int().min(1).max(3).describe("1 = scrape first"),
+      priority: z.number().int().describe("1-3; 1 = scrape first"),
     }),
   ),
   ip_notes: z.string().describe("one or two lines of wiki-specific quirks worth remembering"),
@@ -401,7 +409,7 @@ const ScrapePlan = z.object({
 export type ScrapePlan = z.infer<typeof ScrapePlan>;
 
 export async function planScrape(title: string, categories: string[]): Promise<ScrapePlan> {
-  return callJudgment(DEV_TIER_SELECTION, {
+  const plan = await callJudgment(DEV_TIER_SELECTION, {
     name: "wiki_scrape_plan",
     schema: ScrapePlan,
     system: [
@@ -427,6 +435,13 @@ export async function planScrape(title: string, categories: string[]): Promise<S
     effort: "low",
     maxTokens: STRUCTURED_RICH,
   });
+  return {
+    ...plan,
+    categories: plan.categories.map((c) => ({
+      ...c,
+      priority: Math.min(3, Math.max(1, c.priority)),
+    })),
+  };
 }
 
 /**

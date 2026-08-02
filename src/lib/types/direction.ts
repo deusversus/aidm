@@ -96,6 +96,102 @@ export const SEED_MAX_TURNS_TO_PAYOFF = 50;
 export const SEED_DEFAULT_URGENCY = 0.5;
 export const SEED_MENTION_URGENCY_BUMP = 0.1;
 
+// --- §7.6 two-path detection (M3 C2) -----------------------------------------
+
+/**
+ * Organic detection (§7.6): cosine between a turn's narration and an active
+ * seed's description at or above this is a CANDIDATE — not a mention. The
+ * blueprint sets the number; the sweep that applies it is pure code.
+ */
+export const ORGANIC_CANDIDATE_THRESHOLD = 0.55;
+
+/** Two seeds this mutually similar are a CONVERGENCE candidate (§7.6, pure code). */
+export const SEED_CONVERGENCE_SIMILARITY = 0.7;
+
+/** Convergence pairs rendered in the dossier — the Director reads the strongest few. */
+export const SEED_CONVERGENCE_MAX_PAIRS = 5;
+
+/**
+ * Candidate entries kept per seed row. The sweep appends one per matching
+ * turn; the ledger must not grow a per-turn tail over a 100-turn season, so
+ * the oldest fall off. Adjudicated entries stay (convergence reads the whole
+ * window); only un-adjudicated ones cost a judged call.
+ */
+export const SEED_MAX_CANDIDATES = 12;
+
+/**
+ * Below this the batched adjudicator's state-changing verdicts (payoff,
+ * conflict, extend) are recorded as evidence-free and dropped: an auto-resolve
+ * or an auto-abandon on a hedge is the engine deciding the story on a coin
+ * flip, and §7.5's chisel forbids exactly that. Mentions are cheap and
+ * reversible, so they ride the same floor for simplicity, not for safety.
+ */
+export const SEED_ADJUDICATION_MIN_CONFIDENCE = 0.6;
+
+/**
+ * The §7.6 cost law made structural: the batched call renders ONLY seeds under
+ * review — pending candidates, callback-ready seeds carrying an expected
+ * payoff, and overdue conflict-suspects — never the ledger. These are the
+ * per-bucket ceilings; the ledger may hold a hundred seeds and the call still
+ * costs the same.
+ */
+export const SEED_ADJUDICATION_CAPS = {
+  candidates: 12,
+  callback_ready: 8,
+  conflict_suspects: 6,
+  /** Narrated fragments rendered as the shared evidence window. */
+  evidence_turns: 12,
+} as const;
+
+/**
+ * One organic-sweep hit, stored compactly on the seed row (see schema.ts for
+ * why the row and not DirectionState). `t` is the turn whose narration
+ * matched, `s` the cosine at the sweep, `adj` set once a batched adjudication
+ * has already read it — the cost law depends on never re-judging a candidate.
+ */
+export const SeedCandidate = z.object({
+  t: z.number().int().nonnegative(),
+  s: z.number(),
+  adj: z.boolean().optional(),
+});
+export type SeedCandidate = z.infer<typeof SeedCandidate>;
+
+/** Tolerant read of the seeds.candidates jsonb — a malformed entry drops, never throws. */
+export function parseCandidates(raw: unknown): SeedCandidate[] {
+  if (!Array.isArray(raw)) return [];
+  const out: SeedCandidate[] = [];
+  for (const entry of raw) {
+    const parsed = SeedCandidate.safeParse(entry);
+    if (parsed.success) out.push(parsed.data);
+  }
+  return out;
+}
+
+export const SEED_VERDICTS = ["mention", "payoff", "conflict", "extend", "none"] as const;
+
+/**
+ * One verdict from the batched adjudication (§7.6). NO RANGE BOUNDS — same
+ * grammar law as DirectorOutput: `minimum`/`maximum` are stripped by the
+ * strict-output compiler, so a bound here could only fail the parse and throw
+ * away every OTHER verdict in the batch. The limits are stated in the prompt
+ * and applied by `clampAdjudication`.
+ */
+export const SeedVerdict = z.object({
+  /** Index into the rendered under-review list; out-of-range refs drop engine-side. */
+  seed_ref: z.number().int(),
+  verdict: z.enum(SEED_VERDICTS),
+  /** 0-1; clamped engine-side. */
+  confidence: z.number(),
+  /** One sentence from the evidence naming why. */
+  evidence: z.string(),
+  /** verdict="extend" only: the new payoff-window `to` turn. */
+  new_window_to: z.number().int().optional(),
+});
+export type SeedVerdict = z.infer<typeof SeedVerdict>;
+
+export const SeedAdjudication = z.object({ verdicts: z.array(SeedVerdict) });
+export type SeedAdjudication = z.infer<typeof SeedAdjudication>;
+
 // --- Arc model (§7.3) ---------------------------------------------------------
 
 /** Register-derived season default: one cour. Two-cour plans a mid-season climax. */
@@ -398,8 +494,22 @@ export const DirectorArcPlan = z.object({
 });
 export type DirectorArcPlan = z.infer<typeof DirectorArcPlan>;
 
+/**
+ * The seed lifecycle vocabulary (§7.6). `adjust_window` was planned in C1 and
+ * slipped: without it the Director's only way to give a seed more room was to
+ * plant a near-duplicate, so the original never left the ledger and the audit
+ * found 12 live seeds with zero payoffs. The push-out is a window UPDATE now.
+ * `auto_resolve` is the judged-payoff settle — the same lifecycle end as
+ * `resolve`, recorded under its own provenance so a payoff the batched
+ * adjudicator found is never mistaken for a payoff the Director chose.
+ */
+// auto_resolve is NOT here by design: it is the adjudicator's verdict, applied
+// by id through autoResolveSeed — a model-emitted op must never wear the
+// adjudicator's provenance (stack audit, 2026-08-01).
+export const SEED_OPS = ["plant", "resolve", "abandon", "adjust_window"] as const;
+
 export const DirectorSeedOp = z.object({
-  op: z.enum(["plant", "resolve", "abandon"]),
+  op: z.enum(SEED_OPS),
   /** plant: the new seed's description. */
   description: z.string().optional(),
   expected_payoff: z.string().optional(),
@@ -407,7 +517,7 @@ export const DirectorSeedOp = z.object({
   payoff_window_to: z.number().int().optional(),
   /** plant: descriptions of seeds gating this one (matched to ids engine-side). */
   dependencies: z.array(z.string()).default([]),
-  /** resolve/abandon: match against the existing seed's description. */
+  /** resolve/abandon/adjust_window/auto_resolve: match against the existing seed's description. */
   seed_description: z.string().optional(),
   reason: z.string().optional(),
 });

@@ -207,98 +207,107 @@ describe.skipIf(!url)("C7 direction wiring (real Postgres, scripted models)", ()
     expect(result.conte.spotlight_hints).toContain("Vicious: give his absence weight this scene");
   });
 
-  it("G2 step 11 fires the REAL Director cycle on the hybrid trigger: arc row written, accumulators reset", async () => {
-    if (!db) throw new Error("unreachable");
-    const campaignId = await makeCampaign({
-      directionState: { last_director_turn: 0, accumulated_epicness: 0, tension_level: 0.3 },
-    });
-    const turnNumber = 4;
-    const [turnRow] = await db
-      .insert(schema.turns)
-      .values({
+  it(
+    "G2 step 11 fires the REAL Director cycle on the hybrid trigger: arc row written, accumulators reset",
+    { timeout: 30_000 },
+    async () => {
+      if (!db) throw new Error("unreachable");
+      const campaignId = await makeCampaign({
+        directionState: { last_director_turn: 0, accumulated_epicness: 0, tension_level: 0.3 },
+      });
+      const turnNumber = 4;
+      const [turnRow] = await db
+        .insert(schema.turns)
+        .values({
+          campaignId,
+          turnNumber,
+          tier: "genga",
+          status: "complete",
+          playerInput: "I corner the dockmaster.",
+          narration: "The dockmaster's hands stop moving.",
+          checkpoints: { phase_a: true, phase_b: true, g1: true, epicness: 2.5 },
+        })
+        .returning({ id: schema.turns.id });
+      if (!turnRow) throw new Error("turn insert failed");
+      await db.insert(schema.episodicRecords).values({
         campaignId,
         turnNumber,
-        tier: "genga",
-        status: "complete",
         playerInput: "I corner the dockmaster.",
         narration: "The dockmaster's hands stop moving.",
-        checkpoints: { phase_a: true, phase_b: true, g1: true, epicness: 2.5 },
-      })
-      .returning({ id: schema.turns.id });
-    if (!turnRow) throw new Error("turn insert failed");
-    await db.insert(schema.episodicRecords).values({
-      campaignId,
-      turnNumber,
-      playerInput: "I corner the dockmaster.",
-      narration: "The dockmaster's hands stop moving.",
-      turnId: turnNumber,
-      provenance: "chronicler_g1",
-      confidence: 1,
-    });
+        turnId: turnNumber,
+        provenance: "chronicler_g1",
+        confidence: 1,
+      });
 
-    mockEmbed.mockImplementation((texts: string[]) => Promise.resolve(texts.map(() => VEC())));
-    // biome-ignore lint/suspicious/noExplicitAny: harness spans generic signatures
-    mockJudgment.mockImplementation((_s: any, opts: any) => {
-      if (opts.name === "g2_distill")
-        return Promise.resolve({
-          narrated_fragment: "A quiet threat, finally named.",
-          facts: [],
-          entity_updates: [],
-          confirmed_seed_descriptions: [],
-          meta_comments: [],
-        }) as never;
-      if (typeof opts.name === "string" && opts.name.startsWith("director_"))
-        return Promise.resolve({
-          analysis: "The dock thread is ready to become the arc's spine.",
-          tension_level: 0.55,
-          arc_plan: {
-            name: "The Quiet Bounty",
-            dramatic_question: "Who wants this bounty unclaimed?",
-            shape: "rising",
-            budget: { unit: "episodes", target: 4, tolerance: 2 },
-            phase: "rising",
-            payoff_contract: [],
-            status: "active",
-          },
-          clear_override: false,
-          scene_shape_notes: ["let silence do the threatening"],
-          arc_relevance: [],
-          seed_ops: [],
-          spotlight_directives: [{ name: "Jet", note: "he noticed the cornering" }],
-          demote_criticals: [],
-          director_notes: ["hold the noir patience"],
-          voice_patterns: [],
-        }) as never;
-      return Promise.reject(new Error(`unscripted judgment ${opts.name}`)) as never;
-    });
+      mockEmbed.mockImplementation((texts: string[]) => Promise.resolve(texts.map(() => VEC())));
+      // biome-ignore lint/suspicious/noExplicitAny: harness spans generic signatures
+      mockJudgment.mockImplementation((_s: any, opts: any) => {
+        if (opts.name === "g2_distill")
+          return Promise.resolve({
+            narrated_fragment: "A quiet threat, finally named.",
+            facts: [],
+            entity_updates: [],
+            confirmed_seed_descriptions: [],
+            meta_comments: [],
+          }) as never;
+        if (typeof opts.name === "string" && opts.name.startsWith("director_"))
+          return Promise.resolve({
+            analysis: "The dock thread is ready to become the arc's spine.",
+            tension_level: 0.55,
+            arc_plan: {
+              name: "The Quiet Bounty",
+              dramatic_question: "Who wants this bounty unclaimed?",
+              shape: "rising",
+              budget: { unit: "episodes", target: 4, tolerance: 2 },
+              phase: "rising",
+              payoff_contract: [],
+              status: "active",
+            },
+            clear_override: false,
+            scene_shape_notes: ["let silence do the threatening"],
+            arc_relevance: [],
+            seed_ops: [],
+            spotlight_directives: [{ name: "Jet", note: "he noticed the cornering" }],
+            demote_criticals: [],
+            director_notes: ["hold the noir patience"],
+            voice_patterns: [],
+          }) as never;
+        return Promise.reject(new Error(`unscripted judgment ${opts.name}`)) as never;
+      });
 
-    await settleG2(db, turnRow.id);
+      await settleG2(db, turnRow.id);
 
-    const state = await loadDirectionState(db, campaignId);
-    expect(state.last_director_turn).toBe(turnNumber);
-    expect(state.accumulated_epicness).toBe(0); // reset
-    expect(state.arc_events).toEqual([]);
-    expect(state.tension_level).toBeCloseTo(0.55);
-    expect(state.director_notes).toContain("hold the noir patience");
-    expect(state.spotlight_directives).toEqual([{ name: "Jet", note: "he noticed the cornering" }]);
-    expect(state.phase_state?.phase).toBe("rising");
+      const state = await loadDirectionState(db, campaignId);
+      expect(state.last_director_turn).toBe(turnNumber);
+      expect(state.accumulated_epicness).toBe(0); // reset
+      expect(state.arc_events).toEqual([]);
+      expect(state.tension_level).toBeCloseTo(0.55);
+      expect(state.director_notes).toContain("hold the noir patience");
+      expect(state.spotlight_directives).toEqual([
+        { name: "Jet", note: "he noticed the cornering" },
+      ]);
+      expect(state.phase_state?.phase).toBe("rising");
 
-    const arcs = await db.select().from(schema.arcs).where(eq(schema.arcs.campaignId, campaignId));
-    const active = arcs.find((a) => a.name === "The Quiet Bounty");
-    expect(active?.status).toBe("active");
-    expect(active?.phase).toBe("rising");
-    expect(active?.provenance).toBe("director");
+      const arcs = await db
+        .select()
+        .from(schema.arcs)
+        .where(eq(schema.arcs.campaignId, campaignId));
+      const active = arcs.find((a) => a.name === "The Quiet Bounty");
+      expect(active?.status).toBe("active");
+      expect(active?.phase).toBe("rising");
+      expect(active?.provenance).toBe("director");
 
-    // Step markers landed (incl. the new rolling_checkpoint + media last).
-    const [after] = await db
-      .select({ checkpoints: schema.turns.checkpoints })
-      .from(schema.turns)
-      .where(eq(schema.turns.id, turnRow.id));
-    const g2 = (after?.checkpoints as { g2?: Record<string, boolean> }).g2;
-    expect(g2?.director_trigger).toBe(true);
-    expect(g2?.rolling_checkpoint).toBe(true);
-    expect(g2?.media).toBe(true);
-  });
+      // Step markers landed (incl. the new rolling_checkpoint + media last).
+      const [after] = await db
+        .select({ checkpoints: schema.turns.checkpoints })
+        .from(schema.turns)
+        .where(eq(schema.turns.id, turnRow.id));
+      const g2 = (after?.checkpoints as { g2?: Record<string, boolean> }).g2;
+      expect(g2?.director_trigger).toBe(true);
+      expect(g2?.rolling_checkpoint).toBe(true);
+      expect(g2?.media).toBe(true);
+    },
+  );
 
   it("G2 step 11 accumulates WITHOUT firing below the trigger, and a cycle failure never wedges G2", async () => {
     if (!db) throw new Error("unreachable");

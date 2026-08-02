@@ -38,7 +38,8 @@ const ScaleJudgment = z.object({
     .array(
       z.object({
         kind: z.string(),
-        multiplier: z.number().min(0.1).max(1),
+        /** 0.1-1.0; clamped below — the grammar strips the range (M3 C2). */
+        multiplier: z.number(),
         reason: z.string(),
       }),
     )
@@ -46,7 +47,13 @@ const ScaleJudgment = z.object({
   /** The scale this beat should play at (compatibility-checked in code). */
   primary_scale: z.enum(NARRATIVE_SCALES),
   secondary_scale: z.enum(NARRATIVE_SCALES).optional(),
-  threat_tier: z.number().int().min(0).max(11),
+  /**
+   * T0-T11; clamped below. The bound left the same hole the `kind` enum did
+   * (M1 soak: a hard-core combat call died on parse) — and an unclamped tier
+   * is worse than a failed one here, because tierPowerNum saturates at 0:
+   * a threat_tier of 50 reads as "vs the powerless" and inverts the imbalance.
+   */
+  threat_tier: z.number().int(),
   rationale: z.string(),
 });
 
@@ -87,8 +94,8 @@ export async function judgeScale(
       "self_limiter (vows, seals, restraint), mentor (teaching, not winning),",
       "political (a win here costs standing), genre (the story's register",
       "caps the flex). Only report modifiers the situation actually shows.",
-      "Estimate the threat's power tier (T10 ordinary human … T1 boundless;",
-      "lower = stronger). Scales: tactical (every move matters), ensemble,",
+      "Estimate the threat's power tier, T0-T11 (T10 ordinary human … T1",
+      "boundless; lower = stronger). Scales: tactical (every move matters), ensemble,",
       "spectacle, existential, underdog, slice_of_life, horror, mystery,",
       "comedy.",
     ].join(" "),
@@ -117,7 +124,13 @@ export async function judgeScale(
     .map((m) => ({ ...m, multiplier: Math.min(1, Math.max(0.1, m.multiplier)) }));
 
   const contextProduct = modifiers.reduce((p, m) => p * m.multiplier, 1);
-  const effectiveRatio = rawPowerRatio(args.characterTier, judged.threat_tier) * contextProduct;
+  const threatTier = Math.min(11, Math.max(0, judged.threat_tier));
+  if (threatTier !== judged.threat_tier) {
+    console.warn(
+      `[scale] threat_tier ${judged.threat_tier} out of T0-T11 — clamped to T${threatTier}`,
+    );
+  }
+  const effectiveRatio = rawPowerRatio(args.characterTier, threatTier) * contextProduct;
   const band = imbalanceBand(effectiveRatio);
   const flags = imbalanceFlags(effectiveRatio);
 

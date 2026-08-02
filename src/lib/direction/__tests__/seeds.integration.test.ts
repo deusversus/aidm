@@ -1,4 +1,37 @@
 import * as schema from "@/lib/db/schema";
+import { EMBEDDING_DIMENSIONS } from "@/lib/llm/embedding-config";
+import { bebopContract } from "@/lib/renderer/__tests__/fixtures";
+import {
+  DirectorArcPlan,
+  DirectorSeedOp,
+  ORGANIC_CANDIDATE_THRESHOLD,
+  SEED_ADJUDICATION_MIN_CONFIDENCE,
+  type SeedAdjudication,
+  parseCandidates,
+} from "@/lib/types/direction";
+import { eq } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/node-postgres";
+import { Pool } from "pg";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+
+/**
+ * The Arc Model + Seed Ledger (§7.3, §7.6) against real Postgres — the
+ * DB-denominated half of C7's direction slice, and M3 C2's two-path detection.
+ * NO LIVE MODELS: Voyage is mocked (deterministic vectors, so the 0.55 and 0.7
+ * thresholds are exercised exactly) and the batched adjudication's judgment
+ * call is scripted. Skipped (loudly) when no DATABASE_URL is configured; the
+ * DB-less curve/band math lives in arcs.test.ts and seeds.test.ts.
+ */
+
+vi.mock("@/lib/llm/voyage", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/llm/voyage")>();
+  return { ...actual, embedTexts: vi.fn() };
+});
+vi.mock("@/lib/llm/calls", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/llm/calls")>();
+  return { ...actual, callJudgment: vi.fn() };
+});
+
 import {
   applyArcPlan,
   arcPosition,
@@ -6,27 +39,56 @@ import {
   ensureSeriesScaffold,
   getActiveArc,
 } from "@/lib/direction/arcs";
+import { callJudgment } from "@/lib/llm/calls";
+import { embedTexts } from "@/lib/llm/voyage";
+import { adjudicateSeeds } from "../adjudication";
 import {
+  autoResolveSeed,
   callbackReadySeeds,
   overdueSeeds,
   overdueTensionBump,
   plantSeed,
   seedDossier,
+  seedsUnderReview,
   settleSeed,
-} from "@/lib/direction/seeds";
-import { bebopContract } from "@/lib/renderer/__tests__/fixtures";
-import { DirectorArcPlan, DirectorSeedOp } from "@/lib/types/direction";
-import { eq } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/node-postgres";
-import { Pool } from "pg";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+  sweepSeedCandidates,
+} from "../seeds";
+
+const mockEmbed = vi.mocked(embedTexts);
+const mockJudgment = vi.mocked(callJudgment);
 
 /**
- * The Arc Model + Seed Ledger (§7.3, §7.6) against real Postgres — the
- * DB-denominated half of C7's direction slice. No models: everything here is
- * pure code + SQL. Skipped (loudly) when no DATABASE_URL is configured; the
- * DB-less curve/band math lives in arcs.test.ts.
+ * A unit vector at `angle` radians in the (0,1) plane of the frozen 1024-dim
+ * space. cos(a, b) = cos(angleA − angleB), so a fixture's similarity to any
+ * other is exact arithmetic, not a hope about a real embedder.
  */
+function unitAt(angle: number): number[] {
+  return Array.from({ length: EMBEDDING_DIMENSIONS }, (_, i) =>
+    i === 0 ? Math.cos(angle) : i === 1 ? Math.sin(angle) : 0,
+  );
+}
+
+/**
+ * The default vector: a one-hot at a hash of the text, in the dimensions the
+ * angle fixtures never touch. Distinct texts are exactly orthogonal, so a
+ * suite that does not care about the sweep can never accumulate a candidate by
+ * accident — and the same text always embeds the same way (backfill checks).
+ */
+function unitFromText(text: string): number[] {
+  let h = 0;
+  for (let i = 0; i < text.length; i++) h = (h * 31 + text.charCodeAt(i)) >>> 0;
+  const idx = 2 + (h % (EMBEDDING_DIMENSIONS - 2));
+  return Array.from({ length: EMBEDDING_DIMENSIONS }, (_, i) => (i === idx ? 1 : 0));
+}
+
+/** Route each embed request through a text→angle table; unknown texts fall back to the one-hot. */
+function embedByAngle(angles: Record<string, number>): void {
+  mockEmbed.mockImplementation((texts: string[]) =>
+    Promise.resolve(
+      texts.map((t) => (t in angles ? unitAt(angles[t] as number) : unitFromText(t))),
+    ),
+  );
+}
 
 const url = process.env.DATABASE_URL;
 if (!url) console.warn("[direction] DATABASE_URL not set — skipping real-DB suite");
@@ -75,6 +137,14 @@ describe.skipIf(!url)("Direction: arcs + seeds (real Postgres)", () => {
   beforeAll(async () => {
     if (!db) throw new Error("unreachable");
     await db.insert(schema.players).values({ id: playerId, email: "direction@example.com" });
+  });
+
+  beforeEach(() => {
+    mockEmbed.mockReset();
+    mockJudgment.mockReset();
+    mockEmbed.mockImplementation((texts: string[]) =>
+      Promise.resolve(texts.map((t) => unitFromText(t))),
+    );
   });
 
   afterAll(async () => {
@@ -478,6 +548,483 @@ describe.skipIf(!url)("Direction: arcs + seeds (real Postgres)", () => {
       expect(dossier).toContain("1 resolved");
       expect(dossier).not.toContain("the woman in the photograph"); // resolved → not an open line
       expect(dossier.split("\n").length).toBeLessThanOrEqual(31);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // §7.6 two-path detection (M3 C2)
+  // -------------------------------------------------------------------------
+
+  describe("organic detection (code only — no model call)", () => {
+    it("plantSeed embeds the description once, at plant time", async () => {
+      if (!db) throw new Error("unreachable");
+      const campaignId = await makeCampaign();
+      embedByAngle({ "a coffin waiting on Ganymede": 0 });
+
+      const { seedId } = await plantSeed(
+        db,
+        campaignId,
+        1,
+        seedOp({ description: "a coffin waiting on Ganymede" }),
+        "director",
+      );
+      expect(mockEmbed).toHaveBeenCalledTimes(1);
+      expect(mockEmbed.mock.calls[0]?.[1]).toMatchObject({ inputType: "document" });
+
+      const [row] = await db.select().from(schema.seeds).where(eq(schema.seeds.id, seedId));
+      expect(row?.embedding).toHaveLength(1024);
+      expect(row?.embedding?.[0]).toBeCloseTo(1, 4);
+      expect(row?.candidates).toEqual([]);
+    });
+
+    it("a failed embed costs the embedding, never the plant", async () => {
+      if (!db) throw new Error("unreachable");
+      const campaignId = await makeCampaign();
+      mockEmbed.mockRejectedValueOnce(new Error("voyage down"));
+
+      const { seedId, notes } = await plantSeed(
+        db,
+        campaignId,
+        1,
+        seedOp({ description: "an unpaid favour" }),
+        "director",
+      );
+      expect(notes.join(" ")).toContain("could not be embedded");
+      const [row] = await db.select().from(schema.seeds).where(eq(schema.seeds.id, seedId));
+      expect(row?.description).toBe("an unpaid favour");
+      expect(row?.embedding).toBeNull();
+    });
+
+    it("the sweep accumulates hits ≥ 0.55 and ignores everything below", async () => {
+      if (!db) throw new Error("unreachable");
+      const campaignId = await makeCampaign();
+      const narration = "The coffin came up out of the ice, and nobody spoke.";
+      // near ≈ cos(0.2) ≈ 0.98 (a hit); far ≈ cos(1.4) ≈ 0.17 (not a hit).
+      embedByAngle({
+        "the buried coffin": 0.2,
+        "a debt to the Red Dragon": 1.4,
+        [narration]: 0,
+      });
+      const near = await plantSeed(
+        db,
+        campaignId,
+        1,
+        seedOp({ description: "the buried coffin" }),
+        "director",
+      );
+      const far = await plantSeed(
+        db,
+        campaignId,
+        1,
+        seedOp({ description: "a debt to the Red Dragon" }),
+        "director",
+      );
+
+      const swept = await sweepSeedCandidates(db, campaignId, 6, narration);
+      expect(swept).toMatchObject({ swept: 2, candidates: 1, backfilled: 0 });
+
+      const [nearRow] = await db
+        .select()
+        .from(schema.seeds)
+        .where(eq(schema.seeds.id, near.seedId));
+      const [farRow] = await db.select().from(schema.seeds).where(eq(schema.seeds.id, far.seedId));
+      const hits = parseCandidates(nearRow?.candidates);
+      expect(hits).toHaveLength(1);
+      expect(hits[0]?.t).toBe(6);
+      expect(hits[0]?.s).toBeGreaterThanOrEqual(ORGANIC_CANDIDATE_THRESHOLD);
+      expect(hits[0]?.adj).toBeUndefined();
+      expect(parseCandidates(farRow?.candidates)).toEqual([]);
+
+      // A candidate is NOT a mention: the counters and status are untouched.
+      expect(nearRow?.mentionCount).toBe(0);
+      expect(nearRow?.status).toBe("planted");
+
+      // Replay (G2 catch-up) must not double-count the same turn.
+      await sweepSeedCandidates(db, campaignId, 6, narration);
+      const [again] = await db.select().from(schema.seeds).where(eq(schema.seeds.id, near.seedId));
+      expect(parseCandidates(again?.candidates)).toHaveLength(1);
+    });
+
+    it("backfills a seed that predates the column, lazily, on its first sweep", async () => {
+      if (!db) throw new Error("unreachable");
+      const campaignId = await makeCampaign();
+      const narration = "She said his name like it still cost her something.";
+      embedByAngle({ "the name she never says": 0.1, [narration]: 0 });
+
+      // An M0-era row: no embedding, exactly as the migration leaves it.
+      const [legacy] = await db
+        .insert(schema.seeds)
+        .values({
+          campaignId,
+          description: "the name she never says",
+          status: "planted",
+          plantedTurn: 1,
+          urgency: 0.5,
+          turnId: 1,
+          provenance: "director",
+          confidence: 0.8,
+        })
+        .returning({ id: schema.seeds.id });
+      if (!legacy) throw new Error("legacy seed insert failed");
+
+      const swept = await sweepSeedCandidates(db, campaignId, 4, narration);
+      expect(swept.backfilled).toBe(1);
+      expect(swept.candidates).toBe(1);
+
+      const [row] = await db.select().from(schema.seeds).where(eq(schema.seeds.id, legacy.id));
+      expect(row?.embedding).toHaveLength(1024);
+      expect(parseCandidates(row?.candidates)).toHaveLength(1);
+    });
+
+    it("a seed the declared probe just confirmed sits the sweep out — no double billing", async () => {
+      if (!db) throw new Error("unreachable");
+      const campaignId = await makeCampaign();
+      const narration = "He said the name, and the room got smaller.";
+      embedByAngle({ "the name he owes": 0.1, [narration]: 0 });
+      const declared = await plantSeed(
+        db,
+        campaignId,
+        1,
+        seedOp({ description: "the name he owes" }),
+        "director",
+      );
+
+      const swept = await sweepSeedCandidates(db, campaignId, 7, narration, {
+        alreadyMentioned: [declared.seedId],
+      });
+      expect(swept).toMatchObject({ candidates: 0 });
+      const [row] = await db
+        .select()
+        .from(schema.seeds)
+        .where(eq(schema.seeds.id, declared.seedId));
+      // Without the exclusion the batched adjudication would later count this
+      // same scene as a SECOND mention of the seed the probe already confirmed.
+      expect(parseCandidates(row?.candidates)).toEqual([]);
+    });
+
+    it("no open seeds and empty narration are both zero-cost no-ops", async () => {
+      if (!db) throw new Error("unreachable");
+      const campaignId = await makeCampaign();
+      expect(await sweepSeedCandidates(db, campaignId, 3, "some prose")).toMatchObject({
+        candidates: 0,
+      });
+      await plantSeed(db, campaignId, 1, seedOp({ description: "a seed" }), "director");
+      mockEmbed.mockClear();
+      expect(await sweepSeedCandidates(db, campaignId, 3, "   ")).toMatchObject({ candidates: 0 });
+      expect(mockEmbed).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("lifecycle ops (adjust_window, auto_resolve)", () => {
+    it("adjust_window UPDATES the window in place — never a duplicate row", async () => {
+      if (!db) throw new Error("unreachable");
+      const campaignId = await makeCampaign();
+      const { seedId } = await plantSeed(
+        db,
+        campaignId,
+        2,
+        seedOp({ description: "the promise to visit the grave" }),
+        "director",
+      );
+
+      const settled = await settleSeed(db, campaignId, 20, {
+        op: "adjust_window",
+        seed_description: "promise to visit the grave",
+        payoff_window_to: 60,
+        dependencies: [],
+      });
+      expect(settled.seedId).toBe(seedId);
+
+      const rows = await db
+        .select()
+        .from(schema.seeds)
+        .where(eq(schema.seeds.campaignId, campaignId));
+      // The C1 slip made concrete: ONE row, a moved window, still open.
+      expect(rows).toHaveLength(1);
+      expect(rows[0]?.id).toBe(seedId);
+      expect(rows[0]?.payoffWindow).toEqual({ from: 7, to: 60 });
+      expect(rows[0]?.status).toBe("planted");
+      expect(rows[0]?.plantedTurn).toBe(2);
+    });
+
+    it("auto_resolve ends the seed under its own provenance, distinct from a Director resolve", async () => {
+      if (!db) throw new Error("unreachable");
+      const campaignId = await makeCampaign();
+      const auto = await plantSeed(
+        db,
+        campaignId,
+        1,
+        seedOp({ description: "the bounty on Vicious" }),
+        "director",
+      );
+      const chosen = await plantSeed(
+        db,
+        campaignId,
+        1,
+        seedOp({ description: "the derelict on Europa" }),
+        "director",
+      );
+
+      // The adjudicator's end is id-targeted (autoResolveSeed) — auto_resolve
+      // is deliberately NOT a settleSeed op: a model-emitted Director op must
+      // never wear the adjudicator's provenance (stack audit, 2026-08-01).
+      await autoResolveSeed(db, auto.seedId as string, 9);
+      await settleSeed(db, campaignId, 9, {
+        op: "resolve",
+        seed_description: "derelict on Europa",
+        dependencies: [],
+      });
+
+      const [autoRow] = await db
+        .select()
+        .from(schema.seeds)
+        .where(eq(schema.seeds.id, auto.seedId));
+      const [chosenRow] = await db
+        .select()
+        .from(schema.seeds)
+        .where(eq(schema.seeds.id, chosen.seedId));
+      expect(autoRow?.status).toBe("resolved");
+      expect(autoRow?.resolvedTurn).toBe(9);
+      expect(autoRow?.resolvedBy).toBe("adjudicator_payoff");
+      expect(chosenRow?.resolvedBy).toBe("director");
+      // The PLANT's envelope is untouched — resolvedBy is a separate channel.
+      expect(autoRow?.provenance).toBe("director");
+      expect(autoRow?.turnId).toBe(1);
+    });
+  });
+
+  describe("batched adjudication (one judged call per Director cycle)", () => {
+    /** Four seeds: one candidate, one callback-ready, one overdue, one untouched. */
+    async function ledger(campaignId: string) {
+      if (!db) throw new Error("unreachable");
+      const narration = "He set the bounty poster down and said the name out loud.";
+      embedByAngle({ "the bounty poster": 0.1, [narration]: 0 });
+
+      const candidate = await plantSeed(
+        db,
+        campaignId,
+        1,
+        seedOp({ description: "the bounty poster" }),
+        "director",
+      );
+      const ready = await plantSeed(
+        db,
+        campaignId,
+        1,
+        seedOp({
+          description: "the ledger the syndicate keeps",
+          expected_payoff: "the ledger is opened and a name is found in it",
+        }),
+        "director",
+      );
+      const overdue = await plantSeed(
+        db,
+        campaignId,
+        1,
+        seedOp({
+          description: "the storm that never came",
+          payoff_window_from: 2,
+          payoff_window_to: 4,
+        }),
+        "director",
+      );
+      const untouched = await plantSeed(
+        db,
+        campaignId,
+        1,
+        seedOp({
+          description: "a letter posted to a dead address",
+          payoff_window_from: 90,
+          payoff_window_to: 200,
+        }),
+        "director",
+      );
+      await db.insert(schema.episodicRecords).values({
+        campaignId,
+        turnNumber: 10,
+        playerInput: "I read the poster",
+        narration,
+        narratedFragment: "He finally let himself say the name.",
+        turnId: 10,
+        provenance: "chronicler_g1",
+        confidence: 1,
+      });
+      await sweepSeedCandidates(db, campaignId, 10, narration);
+      return { candidate, ready, overdue, untouched };
+    }
+
+    function scriptVerdicts(verdicts: SeedAdjudication["verdicts"]): void {
+      // biome-ignore lint/suspicious/noExplicitAny: harness spans generic signatures
+      mockJudgment.mockImplementation((_s: any, opts: any) =>
+        opts.name === "seed_adjudication"
+          ? (Promise.resolve({ verdicts }) as never)
+          : (Promise.reject(new Error(`unscripted judgment ${opts.name}`)) as never),
+      );
+    }
+
+    it("renders only seeds under review — cost scales with candidates, not ledger size", async () => {
+      if (!db) throw new Error("unreachable");
+      const campaignId = await makeCampaign();
+      const { untouched } = await ledger(campaignId);
+
+      const review = await seedsUnderReview(db, campaignId, 11);
+      expect(review.map((r) => r.seed.description).sort()).toEqual([
+        "the bounty poster",
+        "the ledger the syndicate keeps",
+        "the storm that never came",
+      ]);
+      expect(review.find((r) => r.seed.id === untouched.seedId)).toBeUndefined();
+
+      scriptVerdicts([]);
+      await adjudicateSeeds(db, campaignId, 11);
+      const prompt = String(mockJudgment.mock.calls[0]?.[1]?.prompt);
+      expect(prompt).toContain("the bounty poster");
+      expect(prompt).toContain("the ledger the syndicate keeps");
+      expect(prompt).not.toContain("a letter posted to a dead address");
+      // Judgment tier, filed to the cycle, one call.
+      expect(mockJudgment.mock.calls[0]?.[1]?.phase).toBe("director_cycle");
+      expect(mockJudgment).toHaveBeenCalledTimes(1);
+    });
+
+    it("applies mention / payoff / conflict / extend and spends the candidates", async () => {
+      if (!db) throw new Error("unreachable");
+      const campaignId = await makeCampaign();
+      const { candidate, ready, overdue } = await ledger(campaignId);
+      const review = await seedsUnderReview(db, campaignId, 11);
+      const refOf = (id: string) => review.findIndex((r) => r.seed.id === id);
+
+      scriptVerdicts([
+        { seed_ref: refOf(candidate.seedId), verdict: "mention", confidence: 0.9, evidence: "e" },
+        { seed_ref: refOf(ready.seedId), verdict: "payoff", confidence: 0.85, evidence: "e" },
+        { seed_ref: refOf(overdue.seedId), verdict: "conflict", confidence: 0.8, evidence: "e" },
+      ]);
+      const result = await adjudicateSeeds(db, campaignId, 11);
+      expect(result).toMatchObject({ reviewed: 3, mentions: 1, payoffs: 1, conflicts: 1 });
+
+      const [mentioned] = await db
+        .select()
+        .from(schema.seeds)
+        .where(eq(schema.seeds.id, candidate.seedId));
+      expect(mentioned?.mentionCount).toBe(1);
+      expect(mentioned?.urgency).toBeCloseTo(0.6, 3);
+      expect(mentioned?.status).toBe("confirmed");
+      // The candidate is SPENT — the next cycle must not pay to re-judge it.
+      expect(parseCandidates(mentioned?.candidates).every((c) => c.adj)).toBe(true);
+      expect(await seedsUnderReview(db, campaignId, 11)).toHaveLength(0);
+
+      const [paid] = await db.select().from(schema.seeds).where(eq(schema.seeds.id, ready.seedId));
+      expect(paid?.status).toBe("resolved");
+      expect(paid?.resolvedTurn).toBe(11);
+      expect(paid?.resolvedBy).toBe("adjudicator_payoff");
+
+      const [dropped] = await db
+        .select()
+        .from(schema.seeds)
+        .where(eq(schema.seeds.id, overdue.seedId));
+      expect(dropped?.status).toBe("abandoned");
+      expect(dropped?.resolvedBy).toBe("adjudicator_conflict");
+    });
+
+    it("extend moves the window in place; a hedged verdict is recorded and NOT acted on", async () => {
+      if (!db) throw new Error("unreachable");
+      const campaignId = await makeCampaign();
+      const { candidate, overdue } = await ledger(campaignId);
+      const review = await seedsUnderReview(db, campaignId, 11);
+      const refOf = (id: string) => review.findIndex((r) => r.seed.id === id);
+
+      scriptVerdicts([
+        {
+          seed_ref: refOf(overdue.seedId),
+          verdict: "extend",
+          confidence: 0.9,
+          evidence: "e",
+          new_window_to: 40,
+        },
+        {
+          seed_ref: refOf(candidate.seedId),
+          verdict: "payoff",
+          confidence: SEED_ADJUDICATION_MIN_CONFIDENCE - 0.1,
+          evidence: "maybe",
+        },
+      ]);
+      const result = await adjudicateSeeds(db, campaignId, 11);
+      expect(result).toMatchObject({ windowAdjustments: 1, payoffs: 0, lowConfidence: 1 });
+
+      const rows = await db
+        .select()
+        .from(schema.seeds)
+        .where(eq(schema.seeds.campaignId, campaignId));
+      expect(rows).toHaveLength(4); // no duplicate plant for the push-out
+      const pushed = rows.find((r) => r.id === overdue.seedId);
+      expect(pushed?.payoffWindow).toEqual({ from: 2, to: 40 });
+      expect(pushed?.status).toBe("planted");
+      // The hedged payoff never ended a thread.
+      const hedged = rows.find((r) => r.id === candidate.seedId);
+      expect(hedged?.status).toBe("planted");
+      expect(hedged?.resolvedBy).toBeNull();
+    });
+
+    it("an empty under-review set costs nothing — no judged call at all", async () => {
+      if (!db) throw new Error("unreachable");
+      const campaignId = await makeCampaign();
+      await plantSeed(
+        db,
+        campaignId,
+        1,
+        seedOp({
+          description: "a seed nobody has touched",
+          payoff_window_from: 90,
+          payoff_window_to: 200,
+        }),
+        "director",
+      );
+      const result = await adjudicateSeeds(db, campaignId, 5);
+      expect(result.reviewed).toBe(0);
+      expect(mockJudgment).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("the dossier surfaces overdue→tension and convergence", () => {
+    it("marks overdue lines, states the tension pressure, and names converging pairs", async () => {
+      if (!db) throw new Error("unreachable");
+      const campaignId = await makeCampaign();
+      const narration = "Two threads pulled at once and neither of them let go.";
+      embedByAngle({
+        "the coffin in the hold": 0.1,
+        "the coffin's second key": 0.15,
+        [narration]: 0,
+      });
+
+      await plantSeed(
+        db,
+        campaignId,
+        1,
+        seedOp({
+          description: "the coffin in the hold",
+          payoff_window_from: 2,
+          payoff_window_to: 5,
+        }),
+        "director",
+      );
+      await plantSeed(
+        db,
+        campaignId,
+        1,
+        seedOp({ description: "the coffin's second key" }),
+        "director",
+      );
+      await sweepSeedCandidates(db, campaignId, 9, narration);
+
+      const dossier = await seedDossier(db, campaignId, 30);
+      expect(dossier).toContain("OVERDUE");
+      expect(dossier).toContain("overdue → tension +0.05");
+      expect(dossier).toContain("adjust_window");
+      expect(dossier).toContain("CONVERGENCE");
+      expect(dossier).toContain("shared scenes 9");
+      expect(dossier).toContain("the coffin's second key");
+
+      const overdue = await overdueSeeds(db, campaignId, 30);
+      expect(overdue).toHaveLength(1);
     });
   });
 });

@@ -77,11 +77,19 @@ export function pressuredDimension(pressure: string | undefined): VoiceDimension
   return VOICE_DIMENSIONS.find((d) => pressure.includes(`"${d}"`));
 }
 
+/**
+ * NO RANGE BOUNDS on `score` (M3 C2 bounds sweep). The graceful drop below
+ * covers unknown and duplicated NAMES, not out-of-band numbers: the whole
+ * sheet is parsed by callJudgment before `judgeVoice` ever filters, so a
+ * single 0 or 10 killed all four dimension reads at once. `.int()` stays —
+ * integrality IS grammar-native. The 1-9 band is stated in the prompt and
+ * clamped below.
+ */
 export const VoiceDimensionRead = z.object({
   /** One of VOICE_DIMENSIONS — echoed back so the reads key cleanly. */
   name: z.string(),
-  /** 1 = the patterns are absent · 5 = intermittent/weakened · 9 = unmistakably this hand. */
-  score: z.number().int().min(1).max(9),
+  /** 1 = the patterns are absent · 5 = intermittent/weakened · 9 = unmistakably this hand. Clamped engine-side. */
+  score: z.number().int(),
   /** One short span: what carried the read, or where the pattern was expected and missing. */
   evidence: z.string(),
 });
@@ -175,7 +183,13 @@ export async function judgeVoice(
   for (const r of result.dimensions) {
     if (!asked.has(r.name) || seen.has(r.name)) continue;
     seen.add(r.name);
-    reads.push(r);
+    const score = Math.min(9, Math.max(1, r.score));
+    if (score !== r.score) {
+      console.warn(`[sakkan] out-of-band voice read on ${r.name} — clamped, sheet kept`, {
+        score: r.score,
+      });
+    }
+    reads.push({ ...r, score });
   }
   return reads;
 }

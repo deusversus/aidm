@@ -330,6 +330,12 @@ export function resolveObservations(observations: Observation[]): ResolvedObserv
         break;
       }
       case "calibration": {
+        // The 0-10 bound STAYS (M3 C2 bounds sweep, protective-class): this is
+        // not a model-facing output schema the grammar could strip — it reads
+        // a stored observation, and its failure path is a visible gap note,
+        // not a thrown compile. A clamped 14 would enter the DNA scales as a
+        // silent 10 the player never chose; §8's rule is that the compiler
+        // never ships a silent guess, so the axis stays unread and asked-about.
         try {
           const parsed = z
             .object({ axis: z.string(), value: z.number().min(0).max(10) })

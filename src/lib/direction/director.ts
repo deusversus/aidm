@@ -32,6 +32,7 @@ import { PremiseContract } from "@/lib/types/premise";
 import type { Tool } from "@anthropic-ai/sdk/resources/messages/messages";
 import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
+import { adjudicateSeeds } from "./adjudication";
 import {
   applyArcPlan,
   arcPosition,
@@ -309,6 +310,18 @@ export async function runDirectorCycle(
   const state = DirectionState.parse(campaign.directionState ?? {});
   const profileIds = contract.anchors_used;
 
+  // --- The batched seed adjudication (§7.6) FIRST ---------------------------
+  // Before the dossier is compiled, so the Director plans against a settled
+  // ledger: organic candidates promoted or dropped, judged payoffs resolved,
+  // contradicted seeds let go. Advisory, like the Sakkan: a failed
+  // adjudication is a skipped batch (the next cycle re-renders the same
+  // pending candidates), never a lost Director cycle.
+  try {
+    await adjudicateSeeds(db, campaignId, turnNumber);
+  } catch (err) {
+    console.warn(`[director] seed adjudication failed (turn ${turnNumber}) — batch skipped:`, err);
+  }
+
   // --- Compile the dossier in code (§7.1) -----------------------------------
   const arc = await getActiveArc(db, campaignId);
   const arcSection: string[] = [];
@@ -456,7 +469,11 @@ export async function runDirectorCycle(
       : "None yet.",
     "",
     "## Your task",
-    `Investigate with your tools (up to ${DIRECTOR_MAX_TOOL_ROUNDS} rounds — seeds, arc, canon, past scenes), then emit ONE typed plan: the arc plan (name/phase/shape/budget/payoff), tension_level, any single arc_override (latest wins, with its transition signal; express premise shifts as axis/value pairs) OR clear_override, seeds to plant/resolve/abandon, criticals to demote, the Scene-Shape base, an arc_relevance ranking of secondary axes, director notes (advisory), and voice patterns.`,
+    `Investigate with your tools (up to ${DIRECTOR_MAX_TOOL_ROUNDS} rounds — seeds, arc, canon, past scenes), then emit ONE typed plan: the arc plan (name/phase/shape/budget/payoff), tension_level, any single arc_override (latest wins, with its transition signal; express premise shifts as axis/value pairs) OR clear_override, seed ops, criticals to demote, the Scene-Shape base, an arc_relevance ranking of secondary axes, director notes (advisory), and voice patterns.`,
+    // The push-out has an op now (§7.6, M3 C2). Without saying so here, the
+    // Director's only way to give a seed more room was a near-duplicate plant
+    // — which is why the audit found seeds that could never leave the ledger.
+    'Seed ops: "plant" (description, expected_payoff, optional window and dependencies), "resolve" and "abandon" (seed_description), and "adjust_window" — give a seed still worth keeping a LATER payoff_window_to instead of planting it again under a new description. Never re-plant a seed that already exists; push its window out or let it go on purpose. Payoffs the story lands on its own are resolved for you between cycles — plan the ones it has not.',
     // The ceilings the schema cannot carry (types/direction.ts): stated here
     // because this text IS the constraint the model writes against. Anything
     // beyond a ceiling is silently dropped engine-side — say the best ones.

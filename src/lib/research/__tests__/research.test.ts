@@ -10,7 +10,7 @@ import {
 import { chunkPage } from "../corpus";
 import { classifyScope, profileSlug } from "../research";
 import { synthesizeVoiceCards } from "../synthesize";
-import { cleanWikiHtml, extractQuotes, stripNoiseSections } from "../wiki";
+import { cleanWikiHtml, extractQuotes, planScrape, stripNoiseSections } from "../wiki";
 
 vi.mock("@/lib/llm/calls", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/llm/calls")>();
@@ -231,5 +231,37 @@ describe("synthesizeVoiceCards emission ceiling", () => {
     const system = String((mockJudgment.mock.calls.at(-1)?.[1] as { system?: string })?.system);
     expect(system).toContain("at most 8 cards");
     warn.mockRestore();
+  });
+});
+
+describe("planScrape priority bounds (M3 C2 sweep — destroy-class, clamped)", () => {
+  it("an out-of-range priority CLAMPS; the whole scrape plan survives", async () => {
+    mockJudgment.mockReset();
+    mockJudgment.mockResolvedValue({
+      categories: [
+        { wiki_category: "Characters", canonical_type: "characters", priority: 9 },
+        { wiki_category: "Locations", canonical_type: "locations", priority: 0 },
+        { wiki_category: "Factions", canonical_type: "factions", priority: 2 },
+      ],
+      ip_notes: "british spelling",
+    } as never);
+
+    const plan = await planScrape("Cowboy Bebop Wiki", ["Characters", "Locations", "Factions"]);
+    // A 500-category mapping must never die over one out-of-range sort key.
+    expect(plan.categories.map((c) => c.priority)).toEqual([3, 1, 2]);
+    expect(plan.ip_notes).toBe("british spelling");
+  });
+
+  it("the schema no longer rejects an out-of-range priority (the grammar strips it anyway)", async () => {
+    mockJudgment.mockReset();
+    mockJudgment.mockResolvedValue({ categories: [], ip_notes: "" } as never);
+    await planScrape("Wiki", []);
+    const schema = mockJudgment.mock.calls.at(-1)?.[1]?.schema;
+    expect(
+      schema?.safeParse({
+        categories: [{ wiki_category: "C", canonical_type: "characters", priority: 42 }],
+        ip_notes: "",
+      }).success,
+    ).toBe(true);
   });
 });

@@ -466,8 +466,7 @@ export const arcs = pgTable(
 
 /**
  * The seed ledger (§7.6): lifecycle, payoff windows, urgency-on-mention,
- * dependency gates. Causal edges live in `dependencies` at M0; the graph
- * machinery hardens at M3.
+ * dependency gates, and the two-path detection the ledger grew at M3 C2.
  */
 export const seeds = pgTable(
   "seeds",
@@ -487,6 +486,34 @@ export const seeds = pgTable(
     dependencies: jsonb().notNull().default([]),
     mentionCount: integer().notNull().default(0),
     resolvedTurn: integer(),
+    /**
+     * The description embedded at plant time (§7.6 organic sweep). NULLABLE by
+     * design: an embedding failure must never cost the plant, and every seed
+     * that predates M3 C2 backfills lazily on its first sweep. No vector index
+     * — the sweep compares one narration against a campaign's OPEN seeds
+     * (dozens at most) in memory, so an HNSW index would cost writes to
+     * accelerate a scan that is already trivial.
+     */
+    embedding: vector({ dimensions: EMBEDDING_DIMENSIONS }),
+    /**
+     * Accumulated organic-sweep hits — `SeedCandidate[]` (types/direction.ts).
+     * On the SEED ROW, not DirectionState, for three reasons: candidates are
+     * per-seed facts, so they die with the seed under cascade delete and go
+     * invisible with it under a tombstone; DirectionState is read AND written
+     * on the campaigns row every single turn, and an unbounded per-turn
+     * accumulator there would fatten the hottest row in the schema; and
+     * convergence detection needs each seed's candidate turns beside its
+     * embedding, which is one SELECT here and a join-by-hand there.
+     */
+    candidates: jsonb().notNull().default([]),
+    /**
+     * Who settled this seed — "director" for a Director-chosen resolve/abandon,
+     * "adjudicator_payoff" for a judged payoff, "adjudicator_conflict" for an
+     * auto-abandonment the story contradicted. A separate column rather than
+     * overwriting `provenance`, which stays the PLANT's envelope (the rewind
+     * substrate reads turn_id/provenance as the write that created the row).
+     */
+    resolvedBy: text(),
     ...provenanceColumns,
   },
   (t) => ({

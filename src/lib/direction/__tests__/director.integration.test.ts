@@ -45,7 +45,12 @@ vi.mock("@/lib/direction/seeds", () => ({
   overdueTensionBump: vi.fn(),
   seedDossier: vi.fn(),
 }));
+// §7.6's batched adjudication runs at the TOP of the cycle (its own suite owns
+// its behaviour); here we only pin that the cycle calls it, once, before the
+// dossier it settles the ledger for.
+vi.mock("@/lib/direction/adjudication", () => ({ adjudicateSeeds: vi.fn() }));
 
+import * as adjudication from "@/lib/direction/adjudication";
 import * as arcs from "@/lib/direction/arcs";
 import {
   accumulate,
@@ -395,6 +400,17 @@ describe.skipIf(!url)("Director (real Postgres, scripted model)", () => {
     // seed ops forwarded.
     expect(vi.mocked(seeds.plantSeed)).toHaveBeenCalledTimes(1);
     expect(vi.mocked(seeds.settleSeed)).toHaveBeenCalledTimes(1);
+
+    // §7.6: the ledger settles BEFORE the Director reads it — one batched
+    // adjudication per cycle, and the dossier it plans against is current.
+    expect(vi.mocked(adjudication.adjudicateSeeds)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(adjudication.adjudicateSeeds)).toHaveBeenCalledWith(db, campaignId, 8);
+    const adjudicatedAt = vi.mocked(adjudication.adjudicateSeeds).mock.invocationCallOrder[0] ?? 0;
+    expect(adjudicatedAt).toBeLessThan(mockJudgment.mock.invocationCallOrder[0] ?? 0);
+
+    // The push-out op is stated where the model can act on it (the C1 slip).
+    const dossier = String(mockJudgment.mock.calls[0]?.[1]?.prompt);
+    expect(dossier).toContain("adjust_window");
 
     // State updated + accumulators reset + phase_state stamped (phaseChanged).
     const state = await loadDirectionState(db, campaignId);

@@ -20,10 +20,22 @@ import { z } from "zod";
  * a whole-charter score would multiply prompt cost past the budget.
  */
 
+/**
+ * NO RANGE BOUNDS (M3 C2 bounds sweep). The strict-output grammar strips
+ * `minimum`/`maximum`, so `.min(0).max(10)` here never constrained the model —
+ * it only meant that ONE axis read as 10.5 threw away the WHOLE sample: every
+ * other axis's score, the drift counters that sample would have advanced, the
+ * evidence spans. Worse, an out-of-band value that DID parse would be written
+ * into SakkanState.readings, whose schema does enforce 0-10 — poisoning
+ * `loadDirectionState` for every later turn. The band is stated in the prompt
+ * and clamped in `scoreAxes` before anything downstream sees it.
+ */
 export const AxisScore = z.object({
   axis: z.string(),
-  score: z.number().min(0).max(10),
-  confidence: z.number().min(0).max(1),
+  /** 0-10; clamped engine-side. */
+  score: z.number(),
+  /** 0-1; clamped engine-side. */
+  confidence: z.number(),
   /** Short quoted phrase from the sample that carried the read. */
   evidence_span: z.string(),
 });
@@ -140,5 +152,21 @@ export async function scoreAxes(
     turnNumber: opts.turnNumber,
   });
   const wanted = new Set<string>(opts.axes);
-  return result.scores.filter((s) => wanted.has(s.axis));
+  // Clamp, never drop: an axis read as 10.5 read HIGH, and pinning it to 10
+  // keeps that evidence. Dropping it would silently freeze the axis's drift
+  // counter, which reads identically to "no drift" (§4.5: a skipped sample is
+  // not evidence — but a clamped one is).
+  return result.scores
+    .filter((s) => wanted.has(s.axis))
+    .map((s) => {
+      const score = Math.min(10, Math.max(0, s.score));
+      const confidence = Math.min(1, Math.max(0, s.confidence));
+      if (score !== s.score || confidence !== s.confidence) {
+        console.warn(`[sakkan] out-of-band read on ${s.axis} — clamped, sample kept`, {
+          score: s.score,
+          confidence: s.confidence,
+        });
+      }
+      return { ...s, score, confidence };
+    });
 }

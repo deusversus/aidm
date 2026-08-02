@@ -585,6 +585,13 @@ describe.skipIf(!url)("Compositor (real Postgres, scripted models)", () => {
           }) as never;
         return Promise.reject(new Error(`unscripted judgment ${opts.name}`)) as never;
       });
+      // §7.6 declared detection: the sidecar/distiller NAME seeds; this probe
+      // reads the page and confirms which of them actually surfaced.
+      // biome-ignore lint/suspicious/noExplicitAny: harness spans generic signatures
+      mockProbe.mockImplementation((_s: any, opts: any) => {
+        if (opts.name === "seed_mention_check") return Promise.resolve({ surfaced: [0] }) as never;
+        return Promise.reject(new Error(`unscripted probe ${opts.name}`)) as never;
+      });
 
       await settleG2(db, turnRow.id);
 
@@ -665,7 +672,7 @@ describe.skipIf(!url)("Compositor (real Postgres, scripted models)", () => {
         .where(and(eq(schema.entities.campaignId, campaignId), eq(schema.entities.name, "Ryū")));
       expect((ryu?.state as { spotlightDebt: number }).spotlightDebt).toBe(0);
 
-      // Seed confirmation.
+      // Seed confirmation — via the §7.6 probe, not the distiller's word.
       const [seed] = await db
         .select()
         .from(schema.seeds)
@@ -673,6 +680,20 @@ describe.skipIf(!url)("Compositor (real Postgres, scripted models)", () => {
       expect(seed?.status).toBe("confirmed");
       expect(seed?.mentionCount).toBe(1);
       expect(seed?.urgency).toBeCloseTo(0.1);
+      expect(
+        mockProbe.mock.calls.filter(
+          (c) => (c[1] as { name?: string })?.name === "seed_mention_check",
+        ),
+      ).toHaveLength(1);
+      // The declared path won the turn OUTRIGHT (§7.6 double-billing
+      // exclusion, ruled 2026-08-01): a probe-confirmed seed is skipped by
+      // the sweep entirely — no candidate, and its lazy backfill defers to
+      // the first turn it is NOT declared (it needs no embedding while the
+      // stronger evidence keeps winning). Known cost, accepted: declared
+      // co-occurrence is invisible to candidate-turn overlap; the embedding
+      // leg of convergence still covers those pairs.
+      expect(seed?.embedding).toBeNull();
+      expect(seed?.candidates as unknown[]).toEqual([]);
 
       // Meta comment → pencil mark.
       const marks = await db

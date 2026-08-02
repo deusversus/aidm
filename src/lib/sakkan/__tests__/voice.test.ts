@@ -5,6 +5,7 @@ import {
   VOICE_CHECKLIST_SYSTEM,
   VOICE_DIMENSIONS,
   type VoiceDimension,
+  VoiceDimensionRead,
   type VoicePatterns,
   buildVoiceChecklistPrompt,
   composeVoicePressure,
@@ -144,11 +145,18 @@ describe("judgeVoice (judgment tier, STRUCTURED_SMALL budget)", () => {
     expect(opts?.campaignId).toBe("c1");
     expect(opts?.turnNumber).toBe(16);
     // The schema is a flat array of dimension reads (strict output prefers flat
-    // arrays over tuples); 1–9 integers are enforced by it.
-    const parsed = opts?.schema.safeParse({
-      dimensions: [{ name: "sentence_patterns", score: 10, evidence: "x" }],
-    });
-    expect(parsed?.success).toBe(false);
+    // arrays over tuples). INTEGRALITY is schema-enforced; the 1–9 band is NOT
+    // (M3 C2: the grammar strips ranges, so the band clamps in judgeVoice).
+    expect(
+      opts?.schema.safeParse({
+        dimensions: [{ name: "sentence_patterns", score: 10, evidence: "x" }],
+      })?.success,
+    ).toBe(true);
+    expect(
+      opts?.schema.safeParse({
+        dimensions: [{ name: "sentence_patterns", score: 4.5, evidence: "x" }],
+      })?.success,
+    ).toBe(false);
 
     const surface = `${opts?.system ?? ""}\n${opts?.prompt ?? ""}`.toLowerCase();
     for (const token of DIAL_LEAK_TOKENS) expect(surface).not.toMatch(token);
@@ -208,5 +216,43 @@ describe("composeVoicePressure (pure)", () => {
     const unknown = composeVoicePressure("not_a_dimension", FINGERPRINT, "A line.");
     expect(unknown).toContain('"not_a_dimension"');
     expect(unknown).toContain('The author\'s hand: "A line."');
+  });
+});
+
+/**
+ * The M3 C2 bounds sweep. `judgeVoice`'s graceful drop covers unknown and
+ * duplicated dimension NAMES — the whole sheet is parsed by callJudgment
+ * before that filter ever runs, so a single out-of-band score used to kill all
+ * four reads at once. `.int()` stays (grammar-native); the 1-9 band clamps.
+ */
+describe("judgeVoice numeric bounds (destroy-class: clamp, never reject)", () => {
+  it("an out-of-band score clamps into 1-9 and the other dimensions survive", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    mockJudgment.mockReset();
+    mockJudgment.mockResolvedValueOnce({
+      dimensions: VOICE_DIMENSIONS.map((name, i) => ({
+        name,
+        score: i === 0 ? 12 : i === 1 ? 0 : 6,
+        evidence: `evidence for ${name}`,
+      })),
+    });
+    const reads = await judgeVoice(DEV_TIER_SELECTION, { patterns: FINGERPRINT, sample: SAMPLE });
+    expect(reads).toHaveLength(4);
+    expect(reads[0]?.score).toBe(9);
+    expect(reads[1]?.score).toBe(1);
+    expect(reads[2]?.score).toBe(6);
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it("an out-of-band read PARSES — the band is not a schema bound (M3 C2)", () => {
+    expect(
+      VoiceDimensionRead.safeParse({ name: "sentence_patterns", score: 40, evidence: "x" }).success,
+    ).toBe(true);
+    // Integrality IS grammar-native, so it stays enforced.
+    expect(
+      VoiceDimensionRead.safeParse({ name: "sentence_patterns", score: 4.5, evidence: "x" })
+        .success,
+    ).toBe(false);
   });
 });

@@ -233,10 +233,17 @@ export async function fetchCandidates(
 export const RANK_FLOOR = 0.4;
 export const FILTER_CAP = 5;
 
+/**
+ * NO RANGE BOUNDS (M3 C2 bounds sweep). The grammar strips them, so
+ * `.min(0).max(1)` could only fail the parse — burning the corrective retry
+ * and then falling into the catch, which passes candidates through UNRANKED.
+ * The bounds also protect nothing: an out-of-range index simply matches no
+ * candidate in the lookup, and a score outside [0,1] compares against
+ * RANK_FLOOR exactly as a clamped one would. Stated in the prompt, clamped in
+ * code — the ranker is the whole point of the call.
+ */
 const RankOutput = z.object({
-  scores: z
-    .array(z.object({ index: z.number().int().min(0), score: z.number().min(0).max(1) }))
-    .default([]),
+  scores: z.array(z.object({ index: z.number().int(), score: z.number() })).default([]),
 });
 
 /**
@@ -287,7 +294,9 @@ export async function relevanceFilter(
         .join("\n"),
       maxTokens: STRUCTURED_SMALL,
     });
-    const scoreByIndex = new Map(ranked.scores.map((s) => [s.index, s.score]));
+    const scoreByIndex = new Map(
+      ranked.scores.map((s) => [s.index, Math.min(1, Math.max(0, s.score))]),
+    );
     return candidates
       .map((c, i) => ({ c, score: scoreByIndex.get(i) ?? 0 }))
       .filter((x) => x.score > RANK_FLOOR)

@@ -1,6 +1,6 @@
 import { DEV_TIER_SELECTION } from "@/lib/llm/tiers";
 import { describe, expect, it, vi } from "vitest";
-import { MAX_SCORED_AXES, type ScoreOptions, scoreAxes } from "../score";
+import { AxisScore, MAX_SCORED_AXES, type ScoreOptions, scoreAxes } from "../score";
 
 // M2-C6 closed real coverage at all 24 axes, so the gap-rule refusal can no
 // longer be provoked with a real axis — the guard still protects any FUTURE
@@ -113,5 +113,41 @@ describe("scoreAxes blind protocol (structural, on the constructed call)", () =>
     expect(prompt).toContain("The lake at dawn was the color of milk tea");
     // The clip lands at a word boundary with an ellipsis, not mid-word.
     expect(prompt).toContain("…");
+  });
+});
+
+/**
+ * The M3 C2 bounds sweep: `AxisScore` carries no range bounds any more,
+ * because the strict-output grammar strips them — a bound could only ever fail
+ * the parse and throw away the whole sample. The band is enforced here.
+ */
+describe("scoreAxes numeric bounds (destroy-class: clamp, never reject)", () => {
+  it("an out-of-band score CLAMPS and the sample survives — every other axis kept", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    mockJudgment.mockReset();
+    mockJudgment.mockResolvedValueOnce({
+      scores: [
+        { axis: "darkness", score: 10.5, confidence: 1.2, evidence_span: "the neon guttered" },
+        { axis: "pacing", score: -3, confidence: -0.1, evidence_span: "the cut was late" },
+      ],
+    });
+    const scores = await scoreAxes(DEV_TIER_SELECTION, {
+      sample: "The neon hummed over wet asphalt.",
+      axes: ["darkness", "pacing"],
+    });
+    expect(scores).toHaveLength(2);
+    expect(scores[0]).toMatchObject({ axis: "darkness", score: 10, confidence: 1 });
+    expect(scores[1]).toMatchObject({ axis: "pacing", score: 0, confidence: 0 });
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it("an out-of-band read PARSES — the band is not a schema bound (M3 C2)", () => {
+    // Losing the sample here would freeze the drift counters, which reads
+    // exactly like "no drift" (§4.5) — the silent failure the sweep removed.
+    expect(
+      AxisScore.safeParse({ axis: "darkness", score: 47, confidence: 9, evidence_span: "x" })
+        .success,
+    ).toBe(true);
   });
 });
