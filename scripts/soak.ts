@@ -26,7 +26,7 @@
 
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { compactionWatermark } from "@/lib/blocks/compaction";
+import { compactionWatermark, epochEventCount } from "@/lib/blocks/compaction";
 import { settleG2IfPending } from "@/lib/compositor/g2";
 import { type Db, getDb } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
@@ -306,6 +306,7 @@ async function buildChecklist(
     .select({ id: schema.compactedBeats.id })
     .from(schema.compactedBeats)
     .where(eq(schema.compactedBeats.campaignId, campaignId));
+  const epochMerges = await epochEventCount(db, campaignId);
 
   const sessionRows = await db
     .select({
@@ -377,7 +378,11 @@ async function buildChecklist(
     {
       label: "compaction event",
       ok: compactionRows.length > 0,
-      detail: `${compactionRows.length} compacted beat(s)`,
+      // Epoch merges ride this row rather than getting a pass/fail of their
+      // own: a 100-turn run is not expected to overflow Block 2's 8k ceiling,
+      // so a required "epoch merged" gate would fail the soak for behaving.
+      // Reported because when it DOES fire, the run's cache profile changes.
+      detail: `${compactionRows.length} compacted beat(s), ${epochMerges} epoch merge(s)`,
     },
     {
       label: "Director cycle",
@@ -577,6 +582,7 @@ async function liveRun(db: Db, campaignId: string): Promise<void> {
   const artifacts: RunArtifacts = { session2Opened: false };
   const coldTurns = new Set<number>([1]); // pilot is cold; session-2 first turn added below
   let lastWatermark = 0;
+  let lastEpochEvents = 0;
 
   // Open the pilot sitting: Director startup + Settei rebuild + pre-warm.
   const opened = await openSession(db, campaignId);
@@ -646,6 +652,17 @@ async function liveRun(db: Db, campaignId: string): Promise<void> {
       if (wm > lastWatermark) {
         coldTurns.add(turnNumber + 1);
         lastWatermark = wm;
+      }
+      // An EPOCH MERGE is the same sanctioned invalidation from the other end
+      // (M3 C3): it rewrites Block 2 wholesale but leaves the watermark exactly
+      // where it was — the epoch inherits its span's `toTurn` — so the check
+      // above cannot see it. Without this the next turn reads as a warm turn
+      // that mysteriously lost its B2 prefix, i.e. a soak failure for doing
+      // precisely what §6.2 asks.
+      const epochs = await epochEventCount(db, campaignId);
+      if (epochs > lastEpochEvents) {
+        coldTurns.add(turnNumber + 1);
+        lastEpochEvents = epochs;
       }
 
       const record = await meterTurn(db, campaignId, run, step, label, since, coldTurns);

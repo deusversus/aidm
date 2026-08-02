@@ -8,8 +8,11 @@ import { approxTokens } from "./tokens";
  * Block order and lifetimes:
  *   [1] Settei + world rules — changes only at session boundaries / premise
  *       edits (§4.4a). Cached; its tail is breakpoint 1.
- *   [2] Compacted history — changes only at compaction events (§6.2).
- *       Cached; its tail is breakpoint 2.
+ *   [2] Compacted history — changes only at compaction events and epoch
+ *       merges (§6.2), both sanctioned wholesale rewrites. Beats and epoch
+ *       summaries render identically and in position order: an epoch takes
+ *       its era's position, so folding one changes Block 2's bytes but never
+ *       its shape. Cached; its tail is breakpoint 2.
  *   [3] Working memory: the pin head, then the verbatim exchange tail —
  *       APPEND-ONLY between compaction events. Rendered as DISCRETE blocks:
  *       pin head (breakpoint 3) · window header · one block per exchange,
@@ -149,6 +152,12 @@ export interface AssembledBlocks {
     b3Tokens: number;
     pinTokens: number;
     totalTokens: number;
+    /**
+     * How many of Block 2's rows are epoch summaries (§6.2). Free to compute
+     * and it is the one number that tells a §10.8 budget reading whether a
+     * small b2Tokens means "young campaign" or "century of play, folded".
+     */
+    epochCount: number;
   };
   /** Pins dropped by the ≤5/≤2k bound or window dedup — surfaced, never silent. */
   droppedPins: PinRow[];
@@ -281,6 +290,7 @@ export function assembleBlocks(inputs: BlockInputs): AssembledBlocks {
     b3Tokens: approxTokens(b3),
     pinTokens: approxTokens(pinText),
     totalTokens: approxTokens(b1) + approxTokens(b2) + approxTokens(b3),
+    epochCount: inputs.beats.filter((b) => b.isEpoch).length,
   };
   return { system, budgets, droppedPins: dropped };
 }
