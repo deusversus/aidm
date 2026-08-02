@@ -291,6 +291,51 @@ export async function rewindCampaign(
         and(eq(seeds.campaignId, campaignId), notTombstoned(seeds), gt(seeds.resolvedTurn, toTurn)),
       );
 
+    // 1e. §6.3 demotions are in-place UPDATEs anchored by demotedAtTurn, not
+    //     turnId (turnId is the PROMOTION turn), so the tombstone pass keeps a
+    //     demotion the Director issued during turns that just un-happened —
+    //     the fact stayed out of injection and its source memory kept the
+    //     released pin (merge audit, 2026-08-02). Survivors only: the sweep
+    //     above already tombstoned facts whose promotion un-happened, and a
+    //     promoted fact shares its source memory's turnId (G2 promotes in the
+    //     creating turn), so the pair survives or falls together. Read the
+    //     undo BEFORE clearing it — UPDATE..RETURNING yields post-update rows.
+    const staleDemotions = await tx
+      .select({
+        id: criticalFacts.id,
+        sourceMemoryId: criticalFacts.sourceMemoryId,
+        demotionUndo: criticalFacts.demotionUndo,
+      })
+      .from(criticalFacts)
+      .where(
+        and(
+          eq(criticalFacts.campaignId, campaignId),
+          notTombstoned(criticalFacts),
+          gt(criticalFacts.demotedAtTurn, toTurn),
+        ),
+      );
+    if (staleDemotions.length > 0) {
+      await tx
+        .update(criticalFacts)
+        .set({ demotedAt: null, demotedAtTurn: null, demotionUndo: null })
+        .where(
+          inArray(
+            criticalFacts.id,
+            staleDemotions.map((d) => d.id),
+          ),
+        );
+      for (const row of staleDemotions) {
+        if (!row.sourceMemoryId || !row.demotionUndo) continue;
+        await tx
+          .update(semanticMemories)
+          .set({
+            plotCritical: row.demotionUndo.plot_critical,
+            heatFloor: row.demotionUndo.heat_floor,
+          })
+          .where(and(eq(semanticMemories.id, row.sourceMemoryId), notTombstoned(semanticMemories)));
+      }
+    }
+
     // 2. heat_boosts has no tombstone columns — it is an unapplied batch (the
     //    C4 write-only seam). Dead-timeline boosts are simply deleted.
     await tx

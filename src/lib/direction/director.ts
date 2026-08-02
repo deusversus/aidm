@@ -483,7 +483,7 @@ export async function runDirectorCycle(
       : []),
     ...(gate ? [renderEvolutionReview(gate), ""] : []),
     "## Critical layer (§6.3 dailies review)",
-    `${criticalCount} active critical fact(s), of which ${promotedCount} promoted mid-campaign. Only PROMOTED facts are demotable — Session Zero facts and the contract are the player's, and a demote naming one is silently ignored. Demote only what has gone stale — restraint, not a purge.`,
+    `${criticalCount} active critical fact(s), of which ${promotedCount} promoted mid-campaign. Only PROMOTED facts are demotable — Session Zero facts, the contract, and ratified retoolings are the player's, and a demote naming one is silently ignored. Demote only what has gone stale — restraint, not a purge.`,
     "",
     ...memoSection,
     "## Pending flags routed to you",
@@ -660,7 +660,7 @@ export async function runDirectorCycle(
     await db.transaction(async (tx) => {
       const demoted = await tx
         .update(criticalFacts)
-        .set({ demotedAt: new Date() })
+        .set({ demotedAt: new Date(), demotedAtTurn: turnNumber })
         .where(
           and(
             eq(criticalFacts.campaignId, campaignId),
@@ -670,7 +670,7 @@ export async function runDirectorCycle(
             sql`${criticalFacts.content} ILIKE ${`%${literal}%`}`,
           ),
         )
-        .returning({ sourceMemoryId: criticalFacts.sourceMemoryId });
+        .returning({ id: criticalFacts.id, sourceMemoryId: criticalFacts.sourceMemoryId });
       // Re-home: release the source memory's no-decay pin (curve 1.0 + the
       // +0.3 retrieval bonus + a permanent hot-baseline slot would ratchet on)
       // and leave it a floor — "semantic-with-floor" made literal.
@@ -678,6 +678,29 @@ export async function runDirectorCycle(
         .map((d) => d.sourceMemoryId)
         .filter((id): id is string => id !== null);
       if (sourceIds.length > 0) {
+        // Snapshot the pre-demotion pin BEFORE the re-home overwrites it: a
+        // rewind past this demotion restores from the undo (§6.7), and
+        // GREATEST() below is lossy.
+        const preValues = await tx
+          .select({
+            id: semanticMemories.id,
+            plotCritical: semanticMemories.plotCritical,
+            heatFloor: semanticMemories.heatFloor,
+          })
+          .from(semanticMemories)
+          .where(and(inArray(semanticMemories.id, sourceIds), notTombstoned(semanticMemories)));
+        const preById = new Map(preValues.map((p) => [p.id, p]));
+        for (const row of demoted) {
+          const pre = row.sourceMemoryId ? preById.get(row.sourceMemoryId) : undefined;
+          if (pre) {
+            await tx
+              .update(criticalFacts)
+              .set({
+                demotionUndo: { plot_critical: pre.plotCritical, heat_floor: pre.heatFloor },
+              })
+              .where(eq(criticalFacts.id, row.id));
+          }
+        }
         await tx
           .update(semanticMemories)
           .set({

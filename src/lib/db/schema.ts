@@ -609,6 +609,14 @@ export const criticalFacts = pgTable(
     sourceMemoryId: uuid(),
     /** Dailies can demote stale criticals back to semantic-with-floor (§6.3) — earned and revocable, not a ratchet. */
     demotedAt: timestamp({ withTimezone: true }),
+    /** The Director-cycle turn that demoted it — the rewind anchor (§6.7).
+     *  demotedAt alone has no place on the timeline, so a rewind could never
+     *  tell an un-happened demotion from a surviving one. */
+    demotedAtTurn: integer(),
+    /** The source memory's pre-demotion pin, captured at demote time: the
+     *  re-home's GREATEST() is lossy, so a rewind restores from this snapshot,
+     *  never from arithmetic. */
+    demotionUndo: jsonb().$type<{ plot_critical: boolean; heat_floor: number }>(),
     ...provenanceColumns,
   },
   (t) => ({

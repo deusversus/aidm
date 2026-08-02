@@ -234,6 +234,7 @@ describe.skipIf(!url)("rewindCampaign (real Postgres)", () => {
     await db
       .delete(schema.semanticMemories)
       .where(eq(schema.semanticMemories.campaignId, campaignId));
+    await db.delete(schema.criticalFacts).where(eq(schema.criticalFacts.campaignId, campaignId));
     await db
       .delete(schema.episodicRecords)
       .where(eq(schema.episodicRecords.campaignId, campaignId));
@@ -471,6 +472,113 @@ describe.skipIf(!url)("rewindCampaign (real Postgres)", () => {
       .from(schema.heatBoosts)
       .where(eq(schema.heatBoosts.campaignId, campaignId));
     expect(boosts.map((b) => b.n).sort((a, b) => a - b)).toEqual([1, 2, 3, 4, 5]);
+  }, 20_000);
+
+  it("§6.3 demotion undo: a demotion past N restores on survivors; earlier demotions and unwound promotions stay put", async () => {
+    if (!db) throw new Error("unreachable");
+    // Three promoted facts with their source memories (same turnId per pair —
+    // G2 promotes in the creating turn):
+    //   A: promoted t2, demoted t6 — rewind to 5 crosses the DEMOTION only → restore.
+    //   B: promoted t2, demoted t3 — nothing un-happened → stays demoted.
+    //   C: promoted t9, demoted t10 — the PROMOTION un-happens → both rows
+    //      tombstone, and the undo must NOT re-pin a tombstoned memory.
+    const mems = await db
+      .insert(schema.semanticMemories)
+      .values(
+        [
+          { t: 2, tag: "A" },
+          { t: 2, tag: "B" },
+          { t: 9, tag: "C" },
+        ].map(({ t, tag }) => ({
+          campaignId,
+          content: `demoted source ${tag}`,
+          embedding: vec(t),
+          category: "fact",
+          plotCritical: false,
+          heatFloor: 40,
+          ...envelope(t),
+        })),
+      )
+      .returning({ id: schema.semanticMemories.id });
+    const [memA, memB, memC] = mems;
+    if (!memA || !memB || !memC) throw new Error("memory seed failed");
+
+    const undo = { plot_critical: true, heat_floor: 1 };
+    const fact = (
+      tag: string,
+      sourceMemoryId: string,
+      promotedTurn: number,
+      demotedAtTurn: number,
+    ) => ({
+      campaignId,
+      content: `fact ${tag}`,
+      category: "promoted",
+      sourceMemoryId,
+      demotedAt: new Date(),
+      demotedAtTurn,
+      demotionUndo: undo,
+      ...envelope(promotedTurn),
+    });
+    await db
+      .insert(schema.criticalFacts)
+      .values([fact("A", memA.id, 2, 6), fact("B", memB.id, 2, 3), fact("C", memC.id, 9, 10)]);
+    // D: a crossing demotion with NO undo (source memory was tombstoned at
+    // demote time, so the sweep captured nothing) — the fact itself must
+    // still restore, and the missing snapshot must not throw (audit NIT).
+    await db.insert(schema.criticalFacts).values({
+      campaignId,
+      content: "fact D",
+      category: "promoted",
+      sourceMemoryId: null,
+      demotedAt: new Date(),
+      demotedAtTurn: 6,
+      demotionUndo: null,
+      ...envelope(2),
+    });
+
+    await rewindCampaign(db, campaignId, 5, "test: §6.3 undo");
+
+    const crits = await db
+      .select()
+      .from(schema.criticalFacts)
+      .where(eq(schema.criticalFacts.campaignId, campaignId));
+    const byContent = Object.fromEntries(crits.map((c) => [c.content, c]));
+
+    // A: the demotion un-happened — columns cleared, the fact back in force.
+    expect(byContent["fact A"]?.demotedAt).toBeNull();
+    expect(byContent["fact A"]?.demotedAtTurn).toBeNull();
+    expect(byContent["fact A"]?.demotionUndo).toBeNull();
+    expect(byContent["fact A"]?.tombstonedAt).toBeNull();
+    // B: demoted before the target — untouched by the undo.
+    expect(byContent["fact B"]?.demotedAt).not.toBeNull();
+    expect(byContent["fact B"]?.demotedAtTurn).toBe(3);
+    // C: the promotion itself un-happened — tombstoned; demotion columns stay
+    // as provenance on an invisible row (this pins the survivor filter: were
+    // notTombstoned missing from the restore's WHERE, these would be cleared).
+    expect(byContent["fact C"]?.tombstonedAt).not.toBeNull();
+    expect(byContent["fact C"]?.demotedAt).not.toBeNull();
+    expect(byContent["fact C"]?.demotedAtTurn).toBe(10);
+    expect(byContent["fact C"]?.demotionUndo).not.toBeNull();
+    // D: restored despite the missing undo — the null guard skips only the
+    // memory re-pin, never the fact itself, and never throws.
+    expect(byContent["fact D"]?.demotedAt).toBeNull();
+    expect(byContent["fact D"]?.demotedAtTurn).toBeNull();
+    expect(byContent["fact D"]?.tombstonedAt).toBeNull();
+
+    const memRows = await db
+      .select()
+      .from(schema.semanticMemories)
+      .where(eq(schema.semanticMemories.campaignId, campaignId));
+    const memById = new Map(memRows.map((m) => [m.id, m]));
+    // A's source: the exact pre-demotion pin back — snapshot, not arithmetic.
+    expect(memById.get(memA.id)?.plotCritical).toBe(true);
+    expect(memById.get(memA.id)?.heatFloor).toBe(1);
+    // B's source: still re-homed at the floor.
+    expect(memById.get(memB.id)?.plotCritical).toBe(false);
+    expect(memById.get(memB.id)?.heatFloor).toBe(40);
+    // C's source: fell with its promotion, and was NOT re-pinned.
+    expect(memById.get(memC.id)?.tombstonedAt).not.toBeNull();
+    expect(memById.get(memC.id)?.plotCritical).toBe(false);
   }, 20_000);
 
   it("writeSnapshotIfDue snapshots catalog state every 5th turn (idempotently); rewind reads it back", async () => {

@@ -3,6 +3,8 @@ import { LOOPED_LARGE } from "@/lib/llm/budgets";
 import { callJudgment } from "@/lib/llm/calls";
 import { EMBEDDING_DIMENSIONS } from "@/lib/llm/embedding-config";
 import { bebopContract } from "@/lib/renderer/__tests__/fixtures";
+import { fetchCritical } from "@/lib/turn/retrieval";
+import { rewindCampaign } from "@/lib/turn/rewind";
 import { ArcOverride } from "@/lib/types/arc";
 import {
   DIRECTOR_MAX_TOOL_ROUNDS,
@@ -10,7 +12,7 @@ import {
   type DirectorOutput,
 } from "@/lib/types/direction";
 import type { OpeningStatePackage } from "@/lib/types/opening";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -481,6 +483,41 @@ describe.skipIf(!url)("Director (real Postgres, scripted model)", () => {
     expect(state.arc_relevance).toEqual({ darkness: 7, intimacy: 5 });
     expect(state.scene_shape?.notes).toEqual(["end on a smash cut"]);
     expect(state.phase_state).toEqual({ arc_id: "arc-xyz", phase: "rising", entered_at_turn: 8 });
+
+    // §6.7: the demotion is REVOCABLE. The cycle stamped the rewind anchor and
+    // snapshotted the pre-demotion pin; a rewind past turn 8 restores both
+    // sides — the fact re-enters the guaranteed injection and the source
+    // memory gets its exact pre-demotion pin back (snapshot, not arithmetic).
+    expect(promoted?.demotedAtTurn).toBe(8);
+    expect(promoted?.demotionUndo).toEqual({ plot_critical: true, heat_floor: 1 });
+    await rewindCampaign(db, campaignId, 7, "test: unwind the demotion");
+    const [restoredFact] = await db
+      .select()
+      .from(schema.criticalFacts)
+      .where(
+        and(
+          eq(schema.criticalFacts.campaignId, campaignId),
+          eq(schema.criticalFacts.category, "promoted"),
+        ),
+      );
+    expect(restoredFact?.demotedAt).toBeNull();
+    expect(restoredFact?.demotedAtTurn).toBeNull();
+    expect(restoredFact?.demotionUndo).toBeNull();
+    const [restoredSource] = await db
+      .select({
+        plotCritical: schema.semanticMemories.plotCritical,
+        heatFloor: schema.semanticMemories.heatFloor,
+      })
+      .from(schema.semanticMemories)
+      .where(eq(schema.semanticMemories.id, sourceMemory.id));
+    expect(restoredSource?.plotCritical).toBe(true);
+    expect(restoredSource?.heatFloor).toBe(1);
+    expect(await fetchCritical(db, campaignId)).toEqual(
+      expect.arrayContaining([
+        "The safe combination is 4021.",
+        "HARD LINE (absolute): the safe combination was Julia's dying gift.",
+      ]),
+    );
   });
 
   it("an over-count cycle lands CLAMPED — the plan is never lost to a surplus note (2026-08-01)", async () => {
