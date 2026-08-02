@@ -146,6 +146,21 @@ export default async function BiblePage({ params }: { params: Promise<{ id: stri
         </section>
       )}
 
+      {bible.evolutions.length > 0 && (
+        <section className="space-y-3">
+          <p className="text-[10px] uppercase tracking-widest text-muted-foreground/60">
+            retoolings
+          </p>
+          <ul className="space-y-3 text-sm leading-6">
+            {bible.evolutions.map((e) => (
+              <li key={e.content} className="border-l-2 border-border pl-4">
+                {e.content}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       <Link href={`/play/${id}`} className="text-sm underline underline-offset-4">
         ← Back to the story
       </Link>

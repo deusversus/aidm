@@ -244,6 +244,34 @@ describe.skipIf(!url)("composeBible (real Postgres)", () => {
     expect(spikeFact?.playerMinted).toBe(false);
   });
 
+  it("§7.1 retoolings split out of world facts into their own dated record (M3 C4)", async () => {
+    if (!db) throw new Error("unreachable");
+    const campaignId = await makeCampaign();
+    await completeTurn(campaignId);
+    await db.insert(schema.criticalFacts).values([
+      {
+        campaignId,
+        content: "Spike left the Syndicate.",
+        category: "sz_fact",
+        ...envelope(0, "sz_handoff"),
+      },
+      {
+        campaignId,
+        content:
+          "Season 1 — retooling ratified by the player at turn 46: we set out to make a caper and we have been making a wake.",
+        category: "evolution",
+        ...envelope(46, "player_ratified"),
+      },
+    ]);
+
+    const bible = await composeBible(db, campaignId);
+    // A retooling is the premise's own history, never a fact about the world.
+    expect(bible?.worldFacts.map((f) => f.content)).toEqual(["Spike left the Syndicate."]);
+    expect(bible?.evolutions).toHaveLength(1);
+    expect(bible?.evolutions[0]?.turnId).toBe(46);
+    expect(bible?.evolutions[0]?.content).toContain("making a wake");
+  });
+
   it("surfaces hard lines from the intensity contract", async () => {
     if (!db) throw new Error("unreachable");
     const campaignId = await makeCampaign({

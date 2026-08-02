@@ -133,13 +133,25 @@ describe.skipIf(!url)("Layout (real Postgres, scripted models)", () => {
         .returning({ id: schema.semanticMemories.id });
       if (m) memoryIds.push(m.id);
     }
-    await db.insert(schema.criticalFacts).values({
-      campaignId,
-      content: "Finitude: finite — only the player may change this.",
-      category: "contract",
-      ...env,
-      confidence: 1,
-    });
+    await db.insert(schema.criticalFacts).values([
+      {
+        campaignId,
+        content: "Finitude: finite — only the player may change this.",
+        category: "contract",
+        ...env,
+        confidence: 1,
+      },
+      {
+        // §7.1 retooling record (M3 C4): rides the layer-9 TABLE for the
+        // envelope, never the conte's inviolable constraints — a paragraph
+        // arguing a case is a record, not a rule.
+        campaignId,
+        content: "Season 1 — retooling ratified by the player at turn 46: I think it's better.",
+        category: "evolution",
+        ...env,
+        confidence: 1,
+      },
+    ]);
     await db
       .insert(schema.overrides)
       .values({ campaignId, content: "Never harm the corgi.", ...env });
@@ -261,6 +273,8 @@ describe.skipIf(!url)("Layout (real Postgres, scripted models)", () => {
     // Hard core present: critical + override, every tier.
     expect(conte.hard_constraints.some((c) => c.includes("Finitude"))).toBe(true);
     expect(conte.hard_constraints.some((c) => c.includes("corgi"))).toBe(true);
+    // …and the §7.1 retooling record is NOT hard core (M3 C4).
+    expect(conte.hard_constraints.some((c) => c.includes("retooling"))).toBe(false);
 
     // SV3 no-regression half: a tier-less contract plays AT baseline — power
     // context reaches the judge, but no OP framing renders.

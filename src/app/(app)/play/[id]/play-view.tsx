@@ -5,6 +5,12 @@ import { plainProse } from "@/lib/client/plain-prose";
 import type { DirectiveGrant } from "@/lib/types/premise";
 import Link from "next/link";
 import { Fragment, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
+import {
+  type EvolutionProposalView,
+  evolutionEyebrow,
+  shiftLine,
+  showableProposal,
+} from "./evolution";
 import { ListenButton } from "./listen-button";
 import { NarrationProse } from "./narration-prose";
 import {
@@ -251,6 +257,7 @@ export function PlayView({
   displayDirectives = [],
   initialChips,
   steeringNotice = null,
+  evolutionProposal = null,
   ttsAvailable = false,
   ttsVoiceId = "",
 }: {
@@ -268,6 +275,9 @@ export function PlayView({
   initialChips?: string[];
   /** §4.5 M2R3: a pending steering-honesty notice, server-hydrated on load. */
   steeringNotice?: SteeringNotice | null;
+  /** §7.1 M3 C4: a pending season-boundary evolution proposal — a question,
+   *  server-hydrated on every mount until the player answers it. */
+  evolutionProposal?: EvolutionProposalView | null;
   /** §9.5 voice: the listen button renders only when the key is configured. */
   ttsAvailable?: boolean;
   /** The campaign's chosen narrator voice (cache-busts listen URLs). */
@@ -294,6 +304,9 @@ export function PlayView({
   const [assertion, setAssertion] = useState<AssertionNotice | null>(null);
   // §4.5 M2R3 steering-honesty notice: server-hydrated, dismissible once.
   const [steering, setSteering] = useState<SteeringNotice | null>(steeringNotice);
+  // §7.1 M3 C4 ratification card: server-hydrated, cleared ONLY by an answer.
+  const [evolution, setEvolution] = useState<EvolutionProposalView | null>(evolutionProposal);
+  const [evolutionBusy, setEvolutionBusy] = useState(false);
   // §9.2 on-demand summon: one probe → the existing chips rail.
   const [summoning, setSummoning] = useState(false);
   // §5.4/§7.5 studio-notes panel: pins + standing rules, fetched lazily, exit-sign quiet.
@@ -806,6 +819,29 @@ export function PlayView({
     void fetchWithAuthRetry(`/api/campaigns/${campaignId}/steering-notice`, {
       method: "DELETE",
     }).catch(() => {});
+  };
+
+  // §7.1 M3 C4: answer the ratification card. NOT optimistic, unlike the
+  // dismiss above — this one amends the premise (or plants retakes), so the
+  // card stands until the server has actually taken the word. A failed answer
+  // leaves the question exactly where it was.
+  const answerEvolution = async (action: "ratify" | "pull_home") => {
+    if (evolutionBusy) return;
+    setEvolutionBusy(true);
+    try {
+      const res = await fetchWithAuthRetry(`/api/campaigns/${campaignId}/evolution`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action }),
+      });
+      // 409 = answered in another tab — the card is spent there too; leaving
+      // it up gives dead buttons until reload (C4 audit NIT).
+      if (res.ok || res.status === 409) setEvolution(null);
+    } catch {
+      // Left standing on purpose — the season's turn can wait for a live tab.
+    } finally {
+      setEvolutionBusy(false);
+    }
   };
 
   // §5.6 pre-warm: input focus after >4 min idle fires the cache warmer.
@@ -1794,6 +1830,45 @@ export function PlayView({
             >
               dismiss
             </button>
+          </div>
+        )}
+        {evolution && showableProposal(evolution) && (
+          <div
+            data-evolution="card"
+            className="space-y-3 rounded-md border border-border bg-muted/20 px-4 py-3"
+          >
+            <p className="text-[10px] uppercase tracking-widest text-muted-foreground/60">
+              {evolutionEyebrow(evolution)}
+            </p>
+            {/* The Director's own prose, verbatim — the studio's chrome never
+                paraphrases the case it is asking the player to answer. */}
+            <p className="whitespace-pre-wrap text-sm leading-7">{evolution.director_case}</p>
+            <p className="text-xs text-muted-foreground">
+              {evolution.axes.map((a) => shiftLine(a)).join(" · ")}
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                data-evolution="ratify"
+                disabled={evolutionBusy}
+                onClick={() => void answerEvolution("ratify")}
+                className="rounded-md border border-border px-3 py-1 text-xs hover:bg-muted disabled:opacity-50"
+              >
+                Make it canon
+              </button>
+              <button
+                type="button"
+                data-evolution="pullhome"
+                disabled={evolutionBusy}
+                onClick={() => void answerEvolution("pull_home")}
+                className="rounded-md border border-border px-3 py-1 text-xs hover:bg-muted disabled:opacity-50"
+              >
+                Pull it home
+              </button>
+              <span className="text-xs italic text-muted-foreground/60">
+                nothing changes until you say
+              </span>
+            </div>
           </div>
         )}
         {yokoku && (

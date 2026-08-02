@@ -602,7 +602,8 @@ export const criticalFacts = pgTable(
       .notNull()
       .references(() => campaigns.id, { onDelete: "cascade" }),
     content: text().notNull(),
-    /** sz_fact | promoted | contract (finitude/intensity live here as records too). */
+    /** sz_fact | promoted | contract (finitude/intensity live here as records
+     *  too) | evolution (a player-ratified season retooling, §7.1). */
     category: text().notNull(),
     /** For promoted facts: the semantic memory that earned promotion. */
     sourceMemoryId: uuid(),

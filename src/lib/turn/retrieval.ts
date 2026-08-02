@@ -13,8 +13,9 @@ import { callJudgment } from "@/lib/llm/calls";
 import type { TierSelection } from "@/lib/llm/tiers";
 import { embedTexts } from "@/lib/llm/voyage";
 import type { CanonChunk, ConteMemory } from "@/lib/types/conte";
+import { EVOLUTION_CATEGORY } from "@/lib/types/direction";
 import type { IntentOutput } from "@/lib/types/turn";
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, ne, sql } from "drizzle-orm";
 import { z } from "zod";
 
 /**
@@ -470,12 +471,26 @@ export async function fetchCallbacks(
     );
 }
 
-/** Critical facts — guaranteed include, every tier including douga (§5.4). */
+/**
+ * Critical facts — guaranteed include, every tier including douga (§5.4).
+ * Layout files these under the conte's `hard_constraints`, which the KA reads
+ * as "inviolable" — so the §7.1 retooling record is EXCLUDED (M3 C4). A dated
+ * paragraph arguing that the season became something better is a record, not a
+ * rule; its pressure reaches the pen the right way, through the amended active
+ * premise and the Charter rebuilt from it (§4.4: numbers measure, prose
+ * presses). Its reader is the Series Bible (§9.1).
+ */
 export async function fetchCritical(db: Db, campaignId: string): Promise<string[]> {
   const rows = await db
     .select({ content: criticalFacts.content })
     .from(criticalFacts)
-    .where(and(eq(criticalFacts.campaignId, campaignId), notTombstoned(criticalFacts)));
+    .where(
+      and(
+        eq(criticalFacts.campaignId, campaignId),
+        notTombstoned(criticalFacts),
+        ne(criticalFacts.category, EVOLUTION_CATEGORY),
+      ),
+    );
   return rows.map((r) => r.content);
 }
 

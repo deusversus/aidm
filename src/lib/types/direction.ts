@@ -355,6 +355,72 @@ export const SteeringNotice = z.object({
 });
 export type SteeringNotice = z.infer<typeof SteeringNotice>;
 
+// --- §7.1 evolution ratification (M3 C4) --------------------------------------
+
+/**
+ * "Sustained" for the season-boundary EVOLUTION REVIEW: this many consecutive
+ * drifting samples on the axis. The drift band already calls TWO consecutive
+ * samples drifting and opens a retake (§4.5 DRIFT_CONSECUTIVE); ratification
+ * asks the player to change the premise PERMANENTLY, so it costs one sample
+ * more than a correction does — the same bar the Learned layer pays before it
+ * writes a pencil mark (MARK_CONSECUTIVE): this is calibration, not a streak.
+ */
+export const EVOLUTION_SUSTAINED_SAMPLES = 3;
+
+/**
+ * The depth branch: |observed − wanted| ≥ this on a single axis is material by
+ * itself. Mirrors §4.5's DRIFT_THRESHOLD — under two points the two readings
+ * are the same story told twice, and no story is "becoming something better
+ * than its premise" one point at a time.
+ */
+export const EVOLUTION_AXIS_DELTA = 2;
+
+/**
+ * The breadth branch: this many axes drifting player-ward at once is material
+ * whatever each one's depth. A story pulled sideways on two axes is not the
+ * same story — that reading is exactly what §7.1's review exists for.
+ */
+export const EVOLUTION_MIN_AXES = 2;
+
+/**
+ * A §7.1 evolution proposal, raised at a SEASON boundary only and awaiting the
+ * player's word. It amends NOTHING on its own: it sits on direction_state
+ * until the play surface's card is answered — "Make it canon" amends the
+ * ACTIVE premise layer permanently (§4.2) and dates a note into the bible;
+ * "Pull it home" plants retakes on the same axes. Silence persists the card;
+ * ratification is EXPLICIT, and an unanswered proposal never expires into a
+ * yes. Distinct from M2R3's steering_notice, which stays the IN-SEASON channel
+ * (any cycle, arc_override only, dismissible, silence is consent).
+ */
+/**
+ * The critical-facts category a ratified retooling files under. Its writer is
+ * direction/evolution.ts's ratify answer; its readers are the Series Bible's
+ * own retooling section (bible.ts) and — like every critical fact — the layer-9
+ * guaranteed injection, because a season the player re-authored is standing
+ * truth the writer keeps.
+ */
+export const EVOLUTION_CATEGORY = "evolution";
+
+export const EvolutionAxisShift = z.object({
+  axis: z.string(),
+  /** The ACTIVE layer's value today — what ratification overwrites. */
+  from: z.number().min(0).max(10),
+  /** Where the season actually played, per the Director's proposal. */
+  to: z.number().min(0).max(10),
+});
+export type EvolutionAxisShift = z.infer<typeof EvolutionAxisShift>;
+
+export const EvolutionProposal = z.object({
+  /** The season stratum row whose boundary raised this. */
+  season_id: z.string(),
+  season_name: z.string().default(""),
+  proposed_at_turn: z.number().int().nonnegative(),
+  /** The Director's own paragraph, in the fiction's language — shown VERBATIM. */
+  director_case: z.string(),
+  axes: z.array(EvolutionAxisShift),
+});
+export type EvolutionProposal = z.infer<typeof EvolutionProposal>;
+
 /**
  * A janitor-detected near-duplicate pair the machine won't auto-merge (§6.5,
  * M2 C1). Confidence sits between the suggest and auto thresholds; resolution
@@ -410,6 +476,30 @@ export const DirectionState = z.object({
    * it (the DELETE steering-notice route). Absent = nothing to show.
    */
   steering_notice: SteeringNotice.optional(),
+  /**
+   * §7.1 (M3 C4) — a season-boundary evolution proposal awaiting the player's
+   * word. Raised by the Director cycle only when the evidence gate is open;
+   * cleared ONLY by the two answers (ratify / pull home). Absent = nothing to
+   * ask, which is the overwhelmingly common case: an author who keeps asking
+   * permission has no voice.
+   */
+  evolution_proposal: EvolutionProposal.optional(),
+  /** One review per season, whatever the answer (C4 audit MUST-FIX: a spent
+   *  season reads "boundary" forever, and without this stamp a DECLINED
+   *  proposal re-asks every cycle — the anxious check-in §7.1 forbids). */
+  last_evolution_review: z.object({ season_id: z.string(), turn: z.number().int() }).optional(),
+  /** Ratified shifts with their FROM values — the rewind substrate's undo
+   *  record (C4 audit: the bible note tombstones on rewind but the amended
+   *  contract survived; this ledger makes the amendment revocable, §6.7). */
+  evolution_history: z
+    .array(
+      z.object({
+        season_id: z.string(),
+        turn: z.number().int(),
+        axes: z.array(z.object({ axis: z.string(), from: z.number(), to: z.number() })),
+      }),
+    )
+    .default([]),
 });
 export type DirectionState = z.infer<typeof DirectionState>;
 
@@ -475,6 +565,15 @@ export function rewindDirectionState(state: DirectionState, toTurn: number): Dir
     // override write itself reverts under the rewind sweep).
     ...(state.steering_notice && state.steering_notice.at_turn > toTurn
       ? { steering_notice: undefined }
+      : {}),
+    // Likewise a proposal raised on a season boundary that no longer happened:
+    // its whole case argues from turns the rewind just un-wrote.
+    ...(state.last_evolution_review && state.last_evolution_review.turn > toTurn
+      ? { last_evolution_review: undefined }
+      : {}),
+    evolution_history: (state.evolution_history ?? []).filter((e) => e.turn <= toTurn),
+    ...(state.evolution_proposal && state.evolution_proposal.proposed_at_turn > toTurn
+      ? { evolution_proposal: undefined }
       : {}),
   };
 }
@@ -566,6 +665,20 @@ export const DirectorOutput = z.object({
     })
     .optional(),
   clear_override: z.boolean(),
+  /**
+   * §7.1 season-boundary ratification (M3 C4). Emitted ONLY when the dossier
+   * carried an EVOLUTION REVIEW section; a proposal raised without that gate is
+   * dropped engine-side with a warn (the gate is code, not the model's mood —
+   * §7.1's "never an anxious check-in"). The model supplies the destination
+   * value only; `from` is read off the active contract, never taken on trust.
+   */
+  evolution_proposal: z
+    .object({
+      /** One paragraph, the fiction's own language — shown to the player VERBATIM. */
+      director_case: z.string(),
+      axes: z.array(z.object({ axis: z.string(), to: z.number() })),
+    })
+    .optional(),
   scene_shape_trajectory: z.string().optional(),
   /** ≤3. */
   scene_shape_notes: z.array(z.string()),
@@ -600,6 +713,8 @@ export const DIRECTOR_CAPS = {
   dna_shifts: 6,
   composition_shifts: 4,
   cold_open_constraints: 5,
+  /** A retooling the player can read in one breath — not a re-run of Session Zero. */
+  evolution_axes: 4,
 } as const;
 
 export interface DirectorTrigger {

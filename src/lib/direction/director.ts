@@ -25,6 +25,7 @@ import {
   DirectorArcPlan,
   DirectorOutput,
   type DirectorTrigger,
+  EVOLUTION_CATEGORY,
 } from "@/lib/types/direction";
 import { PartialDNAScales } from "@/lib/types/dna";
 import { OpeningStatePackage } from "@/lib/types/opening";
@@ -44,6 +45,7 @@ import {
   payoffDebt,
   seriesBudget,
 } from "./arcs";
+import { buildEvolutionProposal, evolutionGate, renderEvolutionReview } from "./evolution";
 import { overdueSeeds, overdueTensionBump, plantSeed, seedDossier, settleSeed } from "./seeds";
 
 /**
@@ -420,6 +422,11 @@ export async function runDirectorCycle(
   // Dailies consumer #3 (M2R3): drifts the gate-trip attribution charged to the
   // player. A first-class section — the exit from the eternal retake (§4.5/§8).
   const playerDrift = playerDrivenTrend(state);
+  // Dailies consumer #4 (§7.1, M3 C4): the season-boundary evolution gate. Null
+  // — the overwhelmingly common case — means the dossier carries no EVOLUTION
+  // REVIEW at all, and any proposal the model emits anyway is discarded below.
+  // Rare, evidence-gated, confident: the rarity is enforced HERE, in code.
+  const gate = await evolutionGate(db, campaignId, state, contract, turnNumber);
 
   const dossier = [
     `# Director cycle — turn ${turnNumber}${opts?.trigger ? ` (${opts.trigger})` : ""}`,
@@ -456,6 +463,7 @@ export async function runDirectorCycle(
           "",
         ]
       : []),
+    ...(gate ? [renderEvolutionReview(gate), ""] : []),
     "## Critical layer (§6.3 dailies review)",
     `${criticalCount} active critical fact(s). Demote only what has gone stale — restraint, not a purge.`,
     "",
@@ -629,9 +637,30 @@ export async function runDirectorCycle(
           eq(criticalFacts.campaignId, campaignId),
           isNull(criticalFacts.demotedAt),
           notTombstoned(criticalFacts),
+          // The player's ratified retoolings are NOT the Director's to demote
+          // (C4 audit): one model-chosen phrase must never drop a
+          // player_ratified record out of the bible.
+          sql`${criticalFacts.category} != ${EVOLUTION_CATEGORY}`,
           sql`${criticalFacts.content} ILIKE ${`%${literal}%`}`,
         ),
       );
+  }
+
+  // §7.1 (M3 C4): the season-boundary proposal AMENDS NOTHING here. It lands on
+  // the state and waits for the player's word on the play surface — ratification
+  // is explicit, and an unanswered proposal never expires into a yes. A proposal
+  // emitted without an open gate is the anxious check-in §7.1 forbids: dropped.
+  let evolutionProposal: DirectionState["evolution_proposal"];
+  if (output.evolution_proposal) {
+    if (gate) {
+      evolutionProposal =
+        buildEvolutionProposal(output.evolution_proposal, gate, turnNumber) ?? undefined;
+    } else {
+      console.warn("[director] evolution_proposal emitted with no open season gate — dropped", {
+        campaignId,
+        turnNumber,
+      });
+    }
   }
 
   const relevanceRecord: Record<string, number> = {};
@@ -653,6 +682,9 @@ export async function runDirectorCycle(
     // §4.5 M2R3: the answered player-driven finding cleared, the notice raised.
     ...(clearedSakkan ? { sakkan: clearedSakkan } : {}),
     ...(steeringNotice ? { steering_notice: steeringNotice } : {}),
+    // A pending proposal rides through `...state` untouched: silence persists
+    // the card across cycles until the player answers it (§7.1).
+    ...(evolutionProposal ? { evolution_proposal: evolutionProposal } : {}),
     // Accumulators reset; the trigger begins re-arming from here.
     accumulated_epicness: 0,
     arc_events: [],

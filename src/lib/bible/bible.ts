@@ -1,6 +1,7 @@
 import type { Db } from "@/lib/db";
 import { notTombstoned } from "@/lib/db/helpers";
 import { campaigns, criticalFacts, entities, turns } from "@/lib/db/schema";
+import { EVOLUTION_CATEGORY } from "@/lib/types/direction";
 import { PremiseContract, type WorldComponent } from "@/lib/types/premise";
 import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 
@@ -44,6 +45,12 @@ export interface BibleComposition {
   threads: BibleEntry[];
   /** Critical-layer world facts (categories sz_fact + promoted; contract rows excluded — they render under premise). */
   worldFacts: Array<{ content: string; provenance: string; playerMinted: boolean }>;
+  /**
+   * §7.1 retoolings: player-ratified season evolutions, dated, oldest first —
+   * the record of the premise changing on the player's own word. Its writer is
+   * direction/evolution.ts's ratify answer (category "evolution").
+   */
+  evolutions: Array<{ content: string; turnId: number }>;
 }
 
 /**
@@ -118,7 +125,15 @@ export async function composeBible(db: Db, campaignId: string): Promise<BibleCom
   };
 
   if (!revealed) {
-    return { ...scalar, cast: [], factions: [], locations: [], threads: [], worldFacts: [] };
+    return {
+      ...scalar,
+      cast: [],
+      factions: [],
+      locations: [],
+      threads: [],
+      worldFacts: [],
+      evolutions: [],
+    };
   }
 
   const rows = await db
@@ -152,6 +167,7 @@ export async function composeBible(db: Db, campaignId: string): Promise<BibleCom
   const facts = await db
     .select({
       content: criticalFacts.content,
+      category: criticalFacts.category,
       provenance: criticalFacts.provenance,
       turnId: criticalFacts.turnId,
     })
@@ -163,7 +179,9 @@ export async function composeBible(db: Db, campaignId: string): Promise<BibleCom
         notTombstoned(criticalFacts),
         // "contract" rows are excluded here because the premise section above
         // carries them (finitude + the full intensity contract as of M2R R4).
-        inArray(criticalFacts.category, ["sz_fact", "promoted"]),
+        // "evolution" rows ride along but split out below: a retooling is the
+        // premise's own history, not a fact about the world (§7.1, M3 C4).
+        inArray(criticalFacts.category, ["sz_fact", "promoted", EVOLUTION_CATEGORY]),
       ),
     )
     .orderBy(asc(criticalFacts.turnId));
@@ -174,10 +192,15 @@ export async function composeBible(db: Db, campaignId: string): Promise<BibleCom
     factions: rows.filter((r) => r.entityType === "faction").map(toEntry),
     locations: rows.filter((r) => r.entityType === "location").map(toEntry),
     threads: rows.filter((r) => r.entityType === "thread").map(toEntry),
-    worldFacts: facts.map((f) => ({
-      content: f.content,
-      provenance: f.provenance,
-      playerMinted: f.provenance === PLAYER_MINTED,
-    })),
+    worldFacts: facts
+      .filter((f) => f.category !== EVOLUTION_CATEGORY)
+      .map((f) => ({
+        content: f.content,
+        provenance: f.provenance,
+        playerMinted: f.provenance === PLAYER_MINTED,
+      })),
+    evolutions: facts
+      .filter((f) => f.category === EVOLUTION_CATEGORY)
+      .map((f) => ({ content: f.content, turnId: f.turnId })),
   };
 }

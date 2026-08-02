@@ -396,6 +396,122 @@ export async function arcPosition(
   return { consumed, target, fraction: clamp01(consumed / target) };
 }
 
+/**
+ * The Season stratum's consumed budget (§7.3). Episodes hang off ARC rows and
+ * arcs hang off the season, so a season's episode count is a GRANDCHILD count:
+ * {@link arcPosition}'s direct-child query reads zero for a season row and
+ * would report every season as untouched forever. scenes-denominated seasons
+ * fall back to turns since the row was minted, exactly like arcPosition.
+ */
+export async function seasonPosition(
+  db: Db,
+  campaignId: string,
+  season: ArcRow,
+  currentTurn: number,
+): Promise<{ consumed: number; target: number; fraction: number }> {
+  const budget = season.budget as ArcBudget;
+  const target = budget.target > 0 ? budget.target : 1;
+
+  if (budget.unit !== "episodes") {
+    const consumed = Math.max(0, currentTurn - season.turnId);
+    return { consumed, target, fraction: clamp01(consumed / target) };
+  }
+
+  const childArcs = await db
+    .select({ id: arcs.id })
+    .from(arcs)
+    .where(
+      and(
+        eq(arcs.campaignId, campaignId),
+        eq(arcs.stratum, "arc"),
+        eq(arcs.parentId, season.id),
+        notTombstoned(arcs),
+      ),
+    );
+  if (childArcs.length === 0) return { consumed: 0, target, fraction: 0 };
+
+  const episodes = await db
+    .select({ id: arcs.id })
+    .from(arcs)
+    .where(
+      and(
+        eq(arcs.campaignId, campaignId),
+        eq(arcs.stratum, "episode"),
+        inArray(
+          arcs.parentId,
+          childArcs.map((a) => a.id),
+        ),
+        eq(arcs.status, "closed"),
+        notTombstoned(arcs),
+      ),
+    );
+  return {
+    consumed: episodes.length,
+    target,
+    fraction: clamp01(episodes.length / target),
+  };
+}
+
+/** The season stratum standing at its boundary — §7.1's only ratification window. */
+export interface SeasonBoundary {
+  seasonId: string;
+  name: string;
+  consumed: number;
+  target: number;
+  /** Which signal opened the window (both are the same boundary to the Director). */
+  reason: "budget_reached" | "closing";
+}
+
+/**
+ * The season boundary signal (§7.1 — "at season boundaries only"). There is no
+ * explicit season-close EVENT in the engine: applyArcPlan only ever closes ARC
+ * rows, and the season scaffold is minted once and left standing. So the
+ * boundary is DETECTED, two ways:
+ *
+ *   1. the season row itself reads closing/closed (a future retooling path, or
+ *      a hand-set row) — the boundary is declared;
+ *   2. the season has consumed its whole budget ({@link seasonPosition} ≥
+ *      target) — a cour is spent and the next episode begins the next one.
+ *
+ * Deliberately NOT `remaining <= tolerance`: that is the RUSH signal's shape
+ * (payoffDebt), which fires a third of the way from the end. A retooling
+ * conversation belongs at the turn, not in the run-up to the finale.
+ */
+export async function seasonBoundary(
+  db: Db,
+  campaignId: string,
+  currentTurn: number,
+): Promise<SeasonBoundary | null> {
+  const [season] = await db
+    .select()
+    .from(arcs)
+    .where(and(eq(arcs.campaignId, campaignId), eq(arcs.stratum, "season"), notTombstoned(arcs)))
+    .orderBy(desc(arcs.turnId))
+    .limit(1);
+  if (!season) return null;
+
+  const position = await seasonPosition(db, campaignId, season, currentTurn);
+  if (season.status === "closing" || season.status === "closed") {
+    return {
+      seasonId: season.id,
+      name: season.name,
+      consumed: position.consumed,
+      target: position.target,
+      reason: "closing",
+    };
+  }
+  if (position.consumed >= position.target) {
+    return {
+      seasonId: season.id,
+      name: season.name,
+      consumed: position.consumed,
+      target: position.target,
+      reason: "budget_reached",
+    };
+  }
+  return null;
+}
+
 /** Payoff debt: open contract items vs remaining budget (§7.3 rush signal). */
 export function payoffDebt(
   arc: ArcRow,

@@ -139,6 +139,21 @@ export default async function PlayPage({ params }: { params: Promise<{ id: strin
       } | null
     )?.steering_notice ?? null;
 
+  // §7.1 season-boundary ratification (M3 C4): a pending proposal the Director
+  // raised at the season's turn. Unlike the notice above it is a QUESTION — no
+  // dismiss, and it rehydrates on every mount until the player answers it.
+  const evolutionProposal =
+    (
+      campaign.directionState as {
+        evolution_proposal?: {
+          season_name?: string;
+          proposed_at_turn?: number;
+          director_case: string;
+          axes: Array<{ axis: string; from: number; to: number }>;
+        };
+      } | null
+    )?.evolution_proposal ?? null;
+
   // §9.2 chips rehydration (M2R R1): the durable record IS the UI state — a
   // reload over a live decision point re-offers the KA's persisted moves.
   // Only when no turn is open (an open turn means a new scene supersedes).
@@ -169,6 +184,7 @@ export default async function PlayPage({ params }: { params: Promise<{ id: strin
       suggestionAffordance={affordance}
       {...(initialChips ? { initialChips } : {})}
       {...(steeringNotice ? { steeringNotice } : {})}
+      {...(evolutionProposal ? { evolutionProposal } : {})}
       displayDirectives={displayDirectives}
       // §9.5 voice: present only when the key is configured — no key, no button.
       ttsAvailable={Boolean(process.env.ELEVENLABS_API_KEY)}

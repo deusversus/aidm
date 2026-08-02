@@ -107,6 +107,30 @@ describe("rewindDirectionState (pure, §6.7 + C8 re-audit)", () => {
     expect(kept.steering_notice?.at_turn).toBe(9);
   });
 
+  it("M3 C4: an evolution proposal raised past the tip drops; one raised before it survives", async () => {
+    const { DirectionState, rewindDirectionState } = await import("@/lib/types/direction");
+    const proposal = (at: number) => ({
+      season_id: "season-1",
+      season_name: "Season 1",
+      proposed_at_turn: at,
+      director_case: "the season became something quieter",
+      axes: [{ axis: "darkness", from: 7, to: 10 }],
+    });
+
+    // Its whole case argues from turns the rewind just un-wrote.
+    const dropped = rewindDirectionState(
+      DirectionState.parse({ evolution_proposal: proposal(14) }),
+      10,
+    );
+    expect(dropped.evolution_proposal).toBeUndefined();
+
+    const kept = rewindDirectionState(
+      DirectionState.parse({ evolution_proposal: proposal(9) }),
+      10,
+    );
+    expect(kept.evolution_proposal?.proposed_at_turn).toBe(9);
+  });
+
   it("clamps turn-anchored fields, drops dead-timeline evidence, keeps soft state", async () => {
     const { DirectionState, rewindDirectionState } = await import("@/lib/types/direction");
     const state = DirectionState.parse({

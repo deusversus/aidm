@@ -36,6 +36,8 @@ vi.mock("@/lib/direction/arcs", () => ({
   budgetPriorFor: vi.fn(),
   expectedTension: vi.fn(),
   seriesBudget: vi.fn(),
+  seasonPosition: vi.fn(),
+  seasonBoundary: vi.fn(),
 }));
 vi.mock("@/lib/direction/seeds", () => ({
   plantSeed: vi.fn(),
@@ -265,6 +267,9 @@ describe.skipIf(!url)("Director (real Postgres, scripted model)", () => {
     vi.mocked(arcs.budgetPriorFor)
       .mockReset()
       .mockReturnValue({ unit: "episodes", target: 3, tolerance: 1 });
+    // §7.1 M3 C4: mid-season by default — the evolution gate is CLOSED unless a
+    // test opens it, which is the shape of ordinary play.
+    vi.mocked(arcs.seasonBoundary).mockReset().mockResolvedValue(null);
     vi.mocked(seeds.seedDossier).mockReset().mockResolvedValue("Seed ledger: (empty)");
     vi.mocked(seeds.overdueSeeds).mockReset().mockResolvedValue([]);
     vi.mocked(seeds.overdueTensionBump).mockReset().mockReturnValue(0);
@@ -625,6 +630,176 @@ describe.skipIf(!url)("Director (real Postgres, scripted model)", () => {
     // The unanswered finding survives to the next dossier (the Director judged
     // not to evolve THIS axis — the invitation stands, it is never forced).
     expect(state.sakkan?.player_driven.darkness).toBeDefined();
+  });
+
+  // --- M3 C4: §7.1 season-boundary evolution ratification --------------------
+
+  /** A season's worth of sustained, player-charged drift on darkness (active 7). */
+  const evolutionEvidence = () => ({
+    sakkan: {
+      last_sample_turn: 44,
+      readings: {
+        darkness: {
+          observed: 10,
+          confidence: 0.85,
+          at_turn: 44,
+          consecutive_drift: 5,
+          evidence: "the whole cour ran at night",
+        },
+      },
+      active_notes: [],
+      player_driven: {
+        darkness: {
+          axis: "darkness",
+          observed: 10,
+          wanted: 7,
+          evidence: "the player kept choosing the crueler read",
+          at_turn: 30,
+        },
+      },
+    },
+  });
+
+  const EVOLUTION_SEASON = {
+    seasonId: "season-1",
+    name: "Season 1",
+    consumed: 12,
+    target: 12,
+    reason: "budget_reached" as const,
+  };
+
+  const proposalOutput = () =>
+    directorOutput({
+      evolution_proposal: {
+        director_case:
+          "We set out to make a caper and we have been making a wake. I think the wake is the better show — should that become what we are making?",
+        axes: [{ axis: "darkness", to: 10 }],
+      },
+    }) as never;
+
+  it("mid-season: no EVOLUTION REVIEW section, and a proposal emitted anyway is DROPPED", async () => {
+    if (!db) throw new Error("unreachable");
+    const campaignId = await makeCampaign();
+    vi.mocked(arcs.getActiveArc).mockResolvedValue(fakeArc(campaignId));
+    // Evidence is overwhelming — but the season is mid-run, so the gate is shut.
+    await db
+      .update(schema.campaigns)
+      .set({ directionState: evolutionEvidence() })
+      .where(eq(schema.campaigns.id, campaignId));
+    vi.mocked(arcs.seasonBoundary).mockResolvedValue(null);
+
+    mockJudgment.mockResolvedValue(proposalOutput());
+    await runDirectorCycle(db, campaignId, 46);
+
+    const dossier = String((mockJudgment.mock.calls[0]?.[1] as { prompt?: string })?.prompt ?? "");
+    expect(dossier).not.toContain("EVOLUTION REVIEW");
+    // The pinned negative: no gate, no card — never an anxious check-in (§7.1).
+    const state = await loadDirectionState(db, campaignId);
+    expect(state.evolution_proposal).toBeUndefined();
+  });
+
+  it("a season boundary with thin evidence still produces no section (the pinned negative)", async () => {
+    if (!db) throw new Error("unreachable");
+    const campaignId = await makeCampaign();
+    vi.mocked(arcs.getActiveArc).mockResolvedValue(fakeArc(campaignId));
+    vi.mocked(arcs.seasonBoundary).mockResolvedValue(EVOLUTION_SEASON);
+    // One axis, charged to the player, but only two drifting samples — the
+    // drift band's own bar, one sample short of a retooling's.
+    await db
+      .update(schema.campaigns)
+      .set({
+        directionState: {
+          sakkan: {
+            last_sample_turn: 44,
+            readings: {
+              darkness: {
+                observed: 10,
+                confidence: 0.85,
+                at_turn: 44,
+                consecutive_drift: 2,
+                evidence: "e",
+              },
+            },
+            active_notes: [],
+            player_driven: {
+              darkness: { axis: "darkness", observed: 10, wanted: 7, evidence: "e", at_turn: 40 },
+            },
+          },
+        },
+      })
+      .where(eq(schema.campaigns.id, campaignId));
+
+    mockJudgment.mockResolvedValue(directorOutput() as never);
+    await runDirectorCycle(db, campaignId, 46);
+
+    const dossier = String((mockJudgment.mock.calls[0]?.[1] as { prompt?: string })?.prompt ?? "");
+    expect(dossier).not.toContain("EVOLUTION REVIEW");
+  });
+
+  it("at the boundary with material evidence: the section renders and the proposal LANDS, amending nothing", async () => {
+    if (!db) throw new Error("unreachable");
+    const campaignId = await makeCampaign();
+    vi.mocked(arcs.getActiveArc).mockResolvedValue(fakeArc(campaignId));
+    vi.mocked(arcs.seasonBoundary).mockResolvedValue(EVOLUTION_SEASON);
+    await db
+      .update(schema.campaigns)
+      .set({ directionState: evolutionEvidence() })
+      .where(eq(schema.campaigns.id, campaignId));
+
+    mockJudgment.mockResolvedValue(proposalOutput());
+    await runDirectorCycle(db, campaignId, 46);
+
+    const dossier = String((mockJudgment.mock.calls[0]?.[1] as { prompt?: string })?.prompt ?? "");
+    expect(dossier).toContain("EVOLUTION REVIEW");
+    expect(dossier).toContain("Season 1");
+
+    const state = await loadDirectionState(db, campaignId);
+    expect(state.evolution_proposal).toMatchObject({
+      season_id: "season-1",
+      proposed_at_turn: 46,
+      axes: [{ axis: "darkness", from: 7, to: 10 }],
+    });
+    expect(state.evolution_proposal?.director_case).toContain("the better show");
+
+    // It AMENDS NOTHING here: the active premise is untouched until the player
+    // answers, and no arc_override was minted on its behalf.
+    const [c] = await db
+      .select({
+        premiseContract: schema.campaigns.premiseContract,
+        arcOverride: schema.campaigns.arcOverride,
+      })
+      .from(schema.campaigns)
+      .where(eq(schema.campaigns.id, campaignId));
+    const contract = c?.premiseContract as { active: { treatment: { darkness: number } } };
+    expect(contract.active.treatment.darkness).toBe(7);
+    expect(c?.arcOverride).toBeNull();
+  });
+
+  it("a pending proposal suppresses the ask and survives the cycle untouched (silence persists)", async () => {
+    if (!db) throw new Error("unreachable");
+    const campaignId = await makeCampaign();
+    vi.mocked(arcs.getActiveArc).mockResolvedValue(fakeArc(campaignId));
+    vi.mocked(arcs.seasonBoundary).mockResolvedValue(EVOLUTION_SEASON);
+    const pending = {
+      season_id: "season-1",
+      season_name: "Season 1",
+      proposed_at_turn: 44,
+      director_case: "the case already put to the player",
+      axes: [{ axis: "darkness", from: 7, to: 10 }],
+    };
+    await db
+      .update(schema.campaigns)
+      .set({ directionState: { ...evolutionEvidence(), evolution_proposal: pending } })
+      .where(eq(schema.campaigns.id, campaignId));
+
+    mockJudgment.mockResolvedValue(proposalOutput());
+    await runDirectorCycle(db, campaignId, 48);
+
+    const dossier = String((mockJudgment.mock.calls[0]?.[1] as { prompt?: string })?.prompt ?? "");
+    // Asking twice while the card is up IS the anxious check-in.
+    expect(dossier).not.toContain("EVOLUTION REVIEW");
+    const state = await loadDirectionState(db, campaignId);
+    expect(state.evolution_proposal).toMatchObject(pending);
   });
 
   it("startup ensures the scaffold, plans the first arc, and writes the PilotPlan verbatim", async () => {

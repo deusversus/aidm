@@ -22,6 +22,7 @@ import {
   turns,
 } from "@/lib/db/schema";
 import { DirectionState, parseCandidates, rewindDirectionState } from "@/lib/types/direction";
+import { PremiseContract } from "@/lib/types/premise";
 import { and, asc, desc, eq, gt, inArray, isNull, lte } from "drizzle-orm";
 
 /**
@@ -215,9 +216,48 @@ export async function rewindCampaign(
     if (campaignRow?.directionState) {
       const parsed = DirectionState.safeParse(campaignRow.directionState);
       if (parsed.success) {
+        // §7.1 undo (C4 audit): a ratified evolution amends the ACTIVE
+        // premise, which no tombstone sweep can reach — the note dies with
+        // the sweep while the amendment survives, record-gone-effect-kept.
+        // The evolution_history ledger carries the FROM values for exactly
+        // this: restore any shift ratified past the target, and clear the
+        // frozen Settei snapshot so the next assembly re-renders from the
+        // restored contract (the rewound charter must not narrate the
+        // un-happened retooling).
+        const undone = (parsed.data.evolution_history ?? []).filter((e) => e.turn > toTurn);
+        if (undone.length > 0) {
+          const [contractRow] = await tx
+            .select({ premiseContract: campaigns.premiseContract })
+            .from(campaigns)
+            .where(eq(campaigns.id, campaignId));
+          const contract = PremiseContract.safeParse(contractRow?.premiseContract);
+          if (contract.success) {
+            const treatment = { ...contract.data.active.treatment };
+            // Newest-first so overlapping shifts unwind in reverse order.
+            for (const entry of [...undone].sort((a, b) => b.turn - a.turn)) {
+              for (const shift of entry.axes) {
+                if (shift.axis in treatment) {
+                  treatment[shift.axis as keyof typeof treatment] = shift.from;
+                }
+              }
+            }
+            await tx
+              .update(campaigns)
+              .set({
+                premiseContract: {
+                  ...contract.data,
+                  active: { ...contract.data.active, treatment },
+                },
+              })
+              .where(eq(campaigns.id, campaignId));
+          }
+        }
+        const rewound = rewindDirectionState(parsed.data, toTurn);
         await tx
           .update(campaigns)
-          .set({ directionState: rewindDirectionState(parsed.data, toTurn) })
+          .set({
+            directionState: undone.length > 0 ? { ...rewound, settei: undefined } : rewound,
+          })
           .where(eq(campaigns.id, campaignId));
       }
     }
