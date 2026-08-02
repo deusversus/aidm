@@ -893,6 +893,7 @@ export async function ingestAssertion(
     // single correction can hit BOTH an entity block and a critical fact.
     // ONE correction retires ONE critical fact (audit #2: a generic needle must
     // not sweep unrelated rows) — first un-retired match, deterministic order.
+    let promotedReplacementId: string | null = null;
     if (fact.corrects_existing) {
       const needle = fact.supersedes?.trim() || fact.content;
       const cf = criticalRows.find(
@@ -909,6 +910,7 @@ export async function ingestAssertion(
           .values({ campaignId, content: fact.content, category: cf.category, ...envelope })
           .returning({ id: criticalFacts.id });
         if (replacement) {
+          if (cf.category === "promoted") promotedReplacementId = replacement.id;
           writes.push({
             kind: "critical_fact_replaced",
             id: replacement.id,
@@ -934,6 +936,15 @@ export async function ingestAssertion(
       .returning({ id: semanticMemories.id });
     if (!mem) throw new Error("ingestAssertion: semantic insert failed");
     writes.push({ kind: "semantic_fact", id: mem.id, summary: fact.content.slice(0, 120) });
+    // A corrected PROMOTED fact keeps its semantic home (§6.3): without this
+    // link, a later Director demotion would set demotedAt but find no source
+    // to re-home — the fact would fall to floor 1 instead of with-floor.
+    if (promotedReplacementId) {
+      await db
+        .update(criticalFacts)
+        .set({ sourceMemoryId: mem.id })
+        .where(eq(criticalFacts.id, promotedReplacementId));
+    }
 
     // FLAG writes normally AND surfaces the craft note (§5.4).
     if (fact.posture === "flag") {

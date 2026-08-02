@@ -14,7 +14,7 @@ import type { TierSelection } from "@/lib/llm/tiers";
 import { embedTexts } from "@/lib/llm/voyage";
 import type { CanonChunk, ConteMemory } from "@/lib/types/conte";
 import type { IntentOutput } from "@/lib/types/turn";
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 
 /**
@@ -470,12 +470,23 @@ export async function fetchCallbacks(
     );
 }
 
-/** Critical facts — guaranteed include, every tier including douga (§5.4). */
+/**
+ * Critical facts — guaranteed include, every tier including douga (§5.4).
+ * Demoted facts fall out HERE, the only reader that costs tokens every turn:
+ * §6.3's demotion returns a promoted fact to semantic-with-floor, so its
+ * context home is the heat economy above, not this injection.
+ */
 export async function fetchCritical(db: Db, campaignId: string): Promise<string[]> {
   const rows = await db
     .select({ content: criticalFacts.content })
     .from(criticalFacts)
-    .where(and(eq(criticalFacts.campaignId, campaignId), notTombstoned(criticalFacts)));
+    .where(
+      and(
+        eq(criticalFacts.campaignId, campaignId),
+        isNull(criticalFacts.demotedAt),
+        notTombstoned(criticalFacts),
+      ),
+    );
   return rows.map((r) => r.content);
 }
 
