@@ -10,7 +10,8 @@ import {
 import { callProbe } from "@/lib/llm/calls";
 import { DEV_TIER_SELECTION } from "@/lib/llm/tiers";
 import { bebopContract } from "@/lib/renderer/__tests__/fixtures";
-import { INTENT_SYSTEM } from "@/lib/turn/layout";
+import { INTENT_SYSTEM, buildIntentPrompt, intentWorldFrame } from "@/lib/turn/layout";
+import { PremiseContract } from "@/lib/types/premise";
 import { IntentOutput } from "@/lib/types/turn";
 import { eq, sql } from "drizzle-orm";
 import type { Suite, SuiteResult } from "../types";
@@ -99,6 +100,10 @@ export const authorshipDetection: Suite = {
     if (!campaignId) throw new Error("authorship eval: campaign insert failed");
 
     try {
+      // The production prompt shape (2026-08-03): every intent probe carries
+      // the contract's world frame — this suite assembles through the real
+      // builder, never a drifting copy.
+      const worldFrame = intentWorldFrame(PremiseContract.parse(bebopContract()));
       // (a) the scream through the REAL intent probe.
       const intent = await probe(() =>
         callProbe(SELECTION, {
@@ -107,7 +112,7 @@ export const authorshipDetection: Suite = {
           campaignId,
           turnNumber: 1,
           system: INTENT_SYSTEM,
-          prompt: `PLAYER INPUT: ${SCREAM}`,
+          prompt: buildIntentPrompt({ worldFrame, playerInput: SCREAM }),
           maxTokens: 1_500,
         }),
       );
@@ -177,7 +182,7 @@ export const authorshipDetection: Suite = {
           campaignId,
           turnNumber: 2,
           system: INTENT_SYSTEM,
-          prompt: `PLAYER INPUT: ${NEGATIVE}`,
+          prompt: buildIntentPrompt({ worldFrame, playerInput: NEGATIVE }),
           maxTokens: 1_500,
         }),
       );

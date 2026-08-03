@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { flushLangfuse } from "@/lib/observability/langfuse";
 import { authorshipDetection } from "./suites/authorship-detection";
 import { budgetAssertions } from "./suites/budget-assertions";
+import { channelRouting } from "./suites/channel-routing";
 import { goldenProfile } from "./suites/golden-profile";
 import { notAnotherAnime } from "./suites/not-another-anime";
 import { rendererEfficacy } from "./suites/renderer-efficacy";
@@ -29,6 +30,7 @@ const allSuites: Suite[] = [
   rendererEfficacy,
   sakkanNeutrality,
   authorshipDetection,
+  channelRouting,
   ...scaffolds,
 ];
 const suites =

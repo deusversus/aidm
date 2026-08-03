@@ -74,15 +74,35 @@ export type LayoutResult =
       intent: IntentOutput;
     };
 
-// Exported so the C2 authorship-detection eval drives the REAL intent probe
-// with the byte-identical contract text (never a drifting copy). Exporting a
-// const does not change the frozen contract.
+// Exported so the C2 authorship-detection and channel-routing evals drive the
+// REAL intent probe with the byte-identical contract text (never a drifting
+// copy). Exporting a const does not change the frozen contract.
+//
+// The channel doctrine (2026-08-03, the eaten-reply incident): the original
+// one-clause definition ("standing-rule demands") gave the probe nothing to
+// separate an imperative aimed INTO the fiction from a rule laid on the
+// studio — a mixed action+lore reply minted VERBATIM as a standing rule, the
+// scene eaten. The addressee/persistence doctrine below is principle, not
+// keyword minutiae (user ruling), and was measured at Haiku before landing:
+// 7/10 → 9/10 stable-correct on the A/B battery, including a latent
+// real-override→META_FEEDBACK misroute the battery itself surfaced; the
+// residual boundary case closed via the world frame below
+// (evals/suites/channel-routing.ts pins both directions).
 export const INTENT_SYSTEM = [
   "You are the Phase-A parse: classify the player's input for the turn",
   "engine. intent: the PRIMARY channel (COMBAT/SOCIAL/EXPLORATION/ABILITY/",
   "INVENTORY/WORLD_BUILDING for story actions; META_FEEDBACK for",
-  "out-of-fiction talk to the studio; OVERRIDE_COMMAND for standing-rule",
-  "demands; OP_COMMAND for explicit mechanical cheats/admin). epicness 0-1:",
+  "out-of-fiction talk to the studio; OVERRIDE_COMMAND for a standing rule",
+  "laid down to the studio; OP_COMMAND for explicit mechanical",
+  "cheats/admin). The channel test is WHO the words are aimed at, never",
+  "their mood: words aimed INTO the fiction — commanding the character,",
+  "directing the scene, acting or speaking as them, however imperative —",
+  "are story actions. OVERRIDE_COMMAND is words aimed at the STUDIO",
+  "ITSELF, binding how the story is run from here on, across scenes, not",
+  "this beat. When one text carries a scene action alongside commentary,",
+  "opinion, or lore, the ACTION is the primary channel, never the rest:",
+  "any world fact in the rest rides contains_world_assertion; mere",
+  "feelings, plans, or opinion ride nothing. epicness 0-1:",
   "how large this beat wants to play. 0.1-0.2 = a ROUTINE beat: lighting a",
   "cigarette, watching the rain, pouring coffee, a wordless transition —",
   "atmosphere the scene carries on a small canvas. 0.5 = a charged",
@@ -100,6 +120,51 @@ export const INTENT_SYSTEM = [
   "own feelings, plans, or observations of what is already established are",
   "NOT assertions. confidence: your certainty in the primary intent.",
 ].join(" ");
+
+/**
+ * The probe's one line of premise sight (2026-08-03, the eaten-reply
+ * incident's residual): whether "build/leveling/class" talk is meta or
+ * in-world is a PREMISE fact — diegetic speech in a LitRPG frame, studio
+ * talk in a mundane one — and the intent probe was the only §5.4 instrument
+ * that couldn't see the premise. One line, from the contract's own world
+ * layer. Exported for the channel-routing eval.
+ */
+export function intentWorldFrame(contract: PremiseContract): string {
+  const world = contract.active.world;
+  const genre = world.world_setting.genre.join("/") || "unspecified";
+  // The diegetic-stats clause keys on the contract SAYING the world shows
+  // numbers (stat_mapping.has_canonical_stats) — not on a power system merely
+  // existing (Bebop has "mundane combat"; its players' build-talk IS meta).
+  // Measured at Haiku, byte-shape sensitive: the clause ATTACHED to the power
+  // line (em-dash) held the live specimen stable; the same clause as its own
+  // sentence flapped it. Under a hollow frame the specimen misroutes 4/5 —
+  // the frame is only as true as the contract behind it.
+  const diegetic = world.stat_mapping.has_canonical_stats;
+  const clause =
+    " — the character's own talk of its stats, classes, builds, levels, or tiers is IN-WORLD speech, not meta";
+  const power = world.power_system
+    ? ` Power system: ${world.power_system.name}${diegetic ? clause : ""}.`
+    : diegetic
+      ? ` The character's own talk of stats, classes, builds, and levels is IN-WORLD speech, not meta.`
+      : "";
+  return `WORLD FRAME: ${genre}.${power}`;
+}
+
+/** The intent probe's exact prompt shape — the eval drives this assembler,
+ *  never a drifting copy (the authorship-eval pattern). */
+export function buildIntentPrompt(args: {
+  worldFrame: string;
+  sceneTail?: string;
+  playerInput: string;
+}): string {
+  return [
+    args.worldFrame,
+    args.sceneTail ? `PREVIOUS SCENE (tail): …${args.sceneTail}` : "",
+    `PLAYER INPUT: ${args.playerInput}`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
 
 export async function runLayout(
   db: Db,
@@ -131,12 +196,11 @@ export async function runLayout(
       campaignId,
       turnNumber,
       system: INTENT_SYSTEM,
-      prompt: [
-        lastEpisodic ? `PREVIOUS SCENE (tail): …${lastEpisodic.narration.slice(-600)}` : "",
-        `PLAYER INPUT: ${playerInput}`,
-      ]
-        .filter(Boolean)
-        .join("\n"),
+      prompt: buildIntentPrompt({
+        worldFrame: intentWorldFrame(contract),
+        sceneTail: lastEpisodic?.narration.slice(-600),
+        playerInput,
+      }),
       maxTokens: STRUCTURED_SMALL,
     }),
     getActiveArc(db, campaignId),
