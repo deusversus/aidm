@@ -1,4 +1,9 @@
-import { closeBoothIfOpen, mintOverride, runBoothExchange } from "@/lib/booth/booth";
+import {
+  closeBoothIfOpen,
+  comprehendOverride,
+  mintOverride,
+  runBoothExchange,
+} from "@/lib/booth/booth";
 import { settleG2IfPending } from "@/lib/compositor/g2";
 import * as schema from "@/lib/db/schema";
 import { ingestAssertion } from "@/lib/ingestion/ingest";
@@ -33,6 +38,7 @@ vi.mock("@/lib/llm/voyage", async (importOriginal) => {
 vi.mock("@/lib/booth/booth", () => ({
   runBoothExchange: vi.fn(),
   mintOverride: vi.fn(),
+  comprehendOverride: vi.fn(),
   closeBoothIfOpen: vi.fn(async () => {}),
 }));
 vi.mock("@/lib/ingestion/ingest", () => ({
@@ -49,6 +55,7 @@ const mockStream = vi.mocked(streamNarration);
 const mockEmbed = vi.mocked(embedTexts);
 const mockBooth = vi.mocked(runBoothExchange);
 const mockMint = vi.mocked(mintOverride);
+const mockComprehend = vi.mocked(comprehendOverride);
 const mockClose = vi.mocked(closeBoothIfOpen);
 const mockIngest = vi.mocked(ingestAssertion);
 
@@ -250,20 +257,22 @@ describe.skipIf(!url)("C9 channel wiring (real Postgres, scripted models)", () =
     });
   });
 
-  it("OVERRIDE_COMMAND mints an override with minimal ceremony (§7.4)", async () => {
+  it("OVERRIDE_COMMAND comprehends, then mints the RESTATEMENT with minimal ceremony (§7.4, M3R1)", async () => {
     if (!db) throw new Error("unreachable");
     const campaignId = await makeCampaign();
     armStoryModels("OVERRIDE_COMMAND");
+    mockComprehend.mockResolvedValue({
+      contains_standing_rule: true,
+      rule: "Never harm the dog.",
+      scope: "standing",
+    });
     mockMint.mockResolvedValue({ acknowledgement: "Standing rule recorded." });
 
     const { events, turnId } = await collectTurn(db, campaignId, "override: never harm the dog");
 
-    expect(mockMint).toHaveBeenCalledWith(
-      expect.anything(),
-      campaignId,
-      1,
-      "override: never harm the dog",
-    );
+    // The mint carries the studio's restatement, never the raw bytes.
+    expect(mockComprehend).toHaveBeenCalledTimes(1);
+    expect(mockMint).toHaveBeenCalledWith(expect.anything(), campaignId, 1, "Never harm the dog.");
     expect(mockBooth).not.toHaveBeenCalled();
     const terminal = events.at(-1);
     expect(terminal).toMatchObject({
@@ -274,7 +283,150 @@ describe.skipIf(!url)("C9 channel wiring (real Postgres, scripted models)", () =
     const [row] = await db.select().from(schema.turns).where(eq(schema.turns.id, turnId));
     expect(row?.status).toBe("channel");
     expect(row?.sidecar).toMatchObject({ acknowledgement: "Standing rule recorded." });
+    // The verdict is CHECKPOINTED with the classification (§5.7): a crash
+    // between them and the mint must never re-comprehend.
+    expect(row?.checkpoints).toMatchObject({
+      channel_intent: "OVERRIDE_COMMAND",
+      override_verdict: { contains_standing_rule: true, rule: "Never harm the dog." },
+    });
   });
+
+  it("OP_COMMAND still mints the raw input — comprehension is the override channel's alone (M3R1 scope)", async () => {
+    if (!db) throw new Error("unreachable");
+    const campaignId = await makeCampaign();
+    armStoryModels("OP_COMMAND");
+    mockMint.mockResolvedValue({ acknowledgement: "Done." });
+
+    await collectTurn(db, campaignId, "set my HP to full");
+
+    expect(mockComprehend).not.toHaveBeenCalled();
+    expect(mockMint).toHaveBeenCalledWith(expect.anything(), campaignId, 1, "set my HP to full");
+  });
+
+  it(
+    "the bounce floor: no standing rule found → the turn plays as the scene it was (M3R1)",
+    { timeout: 30_000 },
+    async () => {
+      if (!db) throw new Error("unreachable");
+      const campaignId = await makeCampaign();
+      // The probe misroutes a story action to OVERRIDE_COMMAND (the eaten-reply
+      // incident); comprehension is the second instrument that catches it.
+      armStoryModels("OVERRIDE_COMMAND");
+      mockComprehend.mockResolvedValue({
+        contains_standing_rule: false,
+        rule: "",
+        scope: "standing",
+      });
+
+      const { events, turnId } = await collectTurn(
+        db,
+        campaignId,
+        "Refuse the appeal flatly and let the entry stand.",
+      );
+
+      // The scene ran: story terminal, no mint, nothing entered the ledger.
+      expect(mockComprehend).toHaveBeenCalledTimes(1);
+      expect(mockMint).not.toHaveBeenCalled();
+      const terminal = events.at(-1);
+      expect(terminal).toMatchObject({ type: "done", turnNumber: 1 });
+      const [row] = await db.select().from(schema.turns).where(eq(schema.turns.id, turnId));
+      expect(row?.status).toBe("complete");
+      expect((row?.narration ?? "").length).toBeGreaterThan(0);
+      expect(row?.checkpoints).toMatchObject({ override_bounced: true, phase_a: true });
+      const minted = await db
+        .select({ id: schema.overrides.id })
+        .from(schema.overrides)
+        .where(eq(schema.overrides.campaignId, campaignId));
+      expect(minted).toHaveLength(0);
+      await settleG2IfPending(db, campaignId);
+    },
+  );
+
+  it("a one_shot verdict still MINTS its restatement — never dice on a request (M3R1 walk-back)", async () => {
+    if (!db) throw new Error("unreachable");
+    const campaignId = await makeCampaign();
+    armStoryModels("OVERRIDE_COMMAND");
+    mockComprehend.mockResolvedValue({
+      contains_standing_rule: true,
+      rule: "Keep this scene short.",
+      scope: "one_shot",
+    });
+    mockMint.mockResolvedValue({ acknowledgement: "Standing rule recorded." });
+
+    const { events } = await collectTurn(db, campaignId, "keep this next scene short please");
+
+    expect(mockMint).toHaveBeenCalledWith(
+      expect.anything(),
+      campaignId,
+      1,
+      "Keep this scene short.",
+    );
+    expect(events.at(-1)).toMatchObject({ type: "channel", intent: "OVERRIDE_COMMAND" });
+  });
+
+  it("override crash-replay mints from the CHECKPOINTED verdict — no re-comprehension (§5.7, M3R1)", async () => {
+    if (!db) throw new Error("unreachable");
+    const campaignId = await makeCampaign();
+    const [row] = await db
+      .insert(schema.turns)
+      .values({
+        campaignId,
+        turnNumber: 1,
+        tier: "genga",
+        status: "queued",
+        playerInput: "override: never harm the dog",
+        checkpoints: {
+          channel_intent: "OVERRIDE_COMMAND",
+          override_verdict: {
+            contains_standing_rule: true,
+            rule: "Never harm the dog.",
+            scope: "standing",
+          },
+        },
+      })
+      .returning({ id: schema.turns.id });
+    if (!row) throw new Error("turn insert failed");
+    mockMint.mockResolvedValue({ acknowledgement: "Standing rule recorded." });
+
+    await executeTurn(db, row.id);
+
+    expect(mockProbe).not.toHaveBeenCalled();
+    expect(mockComprehend).not.toHaveBeenCalled();
+    expect(mockMint).toHaveBeenCalledWith(expect.anything(), campaignId, 1, "Never harm the dog.");
+    const [after] = await db.select().from(schema.turns).where(eq(schema.turns.id, row.id));
+    expect(after?.status).toBe("channel");
+  });
+
+  it(
+    "bounce crash-replay re-enters the story path directly — never a re-audition at the channel gate (§5.7, M3R1)",
+    { timeout: 30_000 },
+    async () => {
+      if (!db) throw new Error("unreachable");
+      const campaignId = await makeCampaign();
+      const [row] = await db
+        .insert(schema.turns)
+        .values({
+          campaignId,
+          turnNumber: 1,
+          tier: "genga",
+          status: "queued",
+          playerInput: "Refuse the appeal flatly and let the entry stand.",
+          checkpoints: { override_bounced: true },
+        })
+        .returning({ id: schema.turns.id });
+      if (!row) throw new Error("turn insert failed");
+      // The probe still classifies OVERRIDE on replay — forceStory must win.
+      armStoryModels("OVERRIDE_COMMAND");
+
+      await executeTurn(db, row.id);
+
+      expect(mockComprehend).not.toHaveBeenCalled();
+      expect(mockMint).not.toHaveBeenCalled();
+      const [after] = await db.select().from(schema.turns).where(eq(schema.turns.id, row.id));
+      expect(after?.status).toBe("complete");
+      await settleG2IfPending(db, campaignId);
+    },
+  );
 
   it("a channel responder failure still lands the turn with an apologetic acknowledgement", async () => {
     if (!db) throw new Error("unreachable");

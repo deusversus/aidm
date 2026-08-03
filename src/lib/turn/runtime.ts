@@ -1,10 +1,16 @@
 import { assembleForCampaign } from "@/lib/blocks/campaign";
-import { closeBoothIfOpen, mintOverride, runBoothExchange } from "@/lib/booth/booth";
+import {
+  closeBoothIfOpen,
+  comprehendOverride,
+  mintOverride,
+  runBoothExchange,
+} from "@/lib/booth/booth";
 import { settleG1 } from "@/lib/compositor/g1";
 import { settleG2, settleG2IfPending } from "@/lib/compositor/g2";
 import type { Db } from "@/lib/db";
 import { campaigns, episodicRecords, turns } from "@/lib/db/schema";
 import { DEV_TIER_SELECTION, TierSelection } from "@/lib/llm/tiers";
+import type { OverrideComprehension } from "@/lib/types/booth";
 import { Conte } from "@/lib/types/conte";
 import type { CommitScene } from "@/lib/types/sidecar";
 import { TURN_CONTRACTS, type TurnTier } from "@/lib/types/turn";
@@ -238,19 +244,38 @@ async function runPhases(
     trailer_source?: TrailerSource;
     error?: string;
     channel_intent?: string;
+    /** M3R1: the comprehension verdict, checkpointed WITH channel_intent —
+     *  a crash-replay must never re-comprehend (a flipped verdict across a
+     *  crash would be two different turns). */
+    override_verdict?: OverrideComprehension;
+    /** M3R1: comprehension found no standing rule — the turn re-enters the
+     *  story pipeline; replay goes straight there, never back to the mint. */
+    override_bounced?: boolean;
+    /** M3R1: the verdict above is the fail-open SYNTHETIC (comprehension
+     *  threw; the mint carried raw bytes) — durable provenance, the
+     *  trailer_source precedent. */
+    override_comprehension_failed?: boolean;
   };
 
-  // §5.4 channel responders (C9). META_FEEDBACK → the booth (streams its
-  // reply as prose); OVERRIDE_COMMAND/OP_COMMAND → the override ledger with
-  // minimal ceremony (§7.4). RE-ENTRANT like every phase (C9 audit): the
-  // classification is CHECKPOINTED (channel_intent) before the responder
-  // runs, so a crash-replay never re-triages (nor re-classifies a channel
-  // input as story), and both responders are idempotent per turn — the
-  // booth replays its persisted exchange, mintOverride finds its own row.
+  // §5.4 channel responders (C9, amended M3R1). META_FEEDBACK → the booth
+  // (streams its reply as prose); OVERRIDE_COMMAND/OP_COMMAND → the override
+  // ledger with minimal ceremony (§7.4). The re-entrancy invariant (§5.7) is
+  // now: NO ACTED-ON VERDICT IS EVER RE-DERIVED. An OVERRIDE classification
+  // is pinned (channel_intent + override_verdict) only after comprehension
+  // rules, so a crash inside that seconds-wide window replays with a full
+  // re-triage — safe, because nothing durable precedes the pin, and exactly
+  // one outcome is ever acted on. A pinned verdict replays without a model
+  // call; a pinned bounce (override_bounced) replays straight into story —
+  // the one designed channel→story reclassification. Both responders stay
+  // idempotent per turn — the booth replays its persisted exchange,
+  // mintOverride finds its own row.
   // A responder failure is still terminal: the channel turn lands with an
   // apologetic acknowledgement, never a wedged campaign. Channel rows keep
   // status "channel" — they never enter episodic, Block 3, or compaction.
-  const dispatchChannel = async (intent: string): Promise<void> => {
+  const dispatchChannel = async (
+    intent: string,
+    verdict?: OverrideComprehension,
+  ): Promise<void> => {
     let channelText = "";
     let meta: {
       responder?: "director" | "ka";
@@ -269,7 +294,17 @@ async function runPhases(
         channelText = booth.reply;
         meta = { responder: booth.responder, closed: booth.closed };
       } else {
-        const minted = await mintOverride(db, turn.campaignId, turn.turnNumber, turn.playerInput);
+        // M3R1: an OVERRIDE_COMMAND mints the comprehension step's RESTATEMENT
+        // — the mutual-understanding surface — never the raw bytes. The raw
+        // input survives on this turn row. Clamped consumer-side (the schema
+        // cannot carry bounds, M3 C1); a blank restatement falls back to the
+        // raw text rather than minting an empty law. OP_COMMAND is unchanged
+        // (one-shot mechanical apply is its own deferred design — M3R1 plan).
+        const content =
+          intent === "OVERRIDE_COMMAND" && verdict
+            ? verdict.rule.trim().slice(0, 400) || turn.playerInput
+            : turn.playerInput;
+        const minted = await mintOverride(db, turn.campaignId, turn.turnNumber, content);
         meta = { acknowledgement: minted.acknowledgement };
       }
     } catch (err) {
@@ -290,9 +325,10 @@ async function runPhases(
     emit({ type: "channel", intent, turnNumber: turn.turnNumber, ...meta });
   };
 
-  // Crash-replay of a channel turn: the stashed classification skips Layout.
+  // Crash-replay of a channel turn: the stashed classification skips Layout,
+  // and the stashed verdict (M3R1) skips re-comprehension.
   if (checkpoints.channel_intent) {
-    await dispatchChannel(checkpoints.channel_intent);
+    await dispatchChannel(checkpoints.channel_intent, checkpoints.override_verdict);
     return;
   }
 
@@ -300,19 +336,89 @@ async function runPhases(
   let conte: Conte;
   let ladderSteps: LadderStep[] = checkpoints.ladder ?? [];
   if (!checkpoints.phase_a) {
-    const result = await runLayout(db, turn.campaignId, turn.turnNumber, turn.playerInput, (e) =>
-      emit({ type: "staging", text: e.text }),
+    // M3R1 crash-replay: a bounced override resumes as the story turn it was
+    // ruled to be — forceStory, never a re-audition at the channel gate.
+    let result = await runLayout(
+      db,
+      turn.campaignId,
+      turn.turnNumber,
+      turn.playerInput,
+      (e) => emit({ type: "staging", text: e.text }),
+      { forceStory: Boolean(checkpoints.override_bounced) },
     );
     if (result.kind === "channel") {
       const intent = result.intent.intent;
-      await db
-        .update(turns)
-        .set({
-          checkpoints: sql`${turns.checkpoints} || ${JSON.stringify({ channel_intent: intent })}::jsonb`,
-        })
-        .where(eq(turns.id, turnId));
-      await dispatchChannel(intent);
-      return;
+      if (intent === "OVERRIDE_COMMAND") {
+        // M3R1 (§7.4): comprehension before compliance. The most destructive
+        // write in §5.4 fires only when a second, stronger instrument agrees
+        // there is a standing rule; a judge failure fails OPEN to the raw
+        // mint (player authority: a rule must not silently become a scene
+        // over an API blip — pre-M3R1 behavior, and the ack shows the quote).
+        let verdict: OverrideComprehension;
+        let comprehensionFailed = false;
+        try {
+          verdict = await comprehendOverride(
+            selection,
+            turn.campaignId,
+            turn.turnNumber,
+            turn.playerInput,
+          );
+        } catch (err) {
+          console.warn(`[runtime] override comprehension failed (turn ${turn.turnNumber}):`, err);
+          verdict = { contains_standing_rule: true, rule: "", scope: "standing" };
+          comprehensionFailed = true;
+        }
+        if (!verdict.contains_standing_rule) {
+          // The bounce floor: no standing rule here — the scene the probe
+          // nearly ate gets played instead. Checkpoint BEFORE the re-run so
+          // a crash never re-auditions the channel gate. one_shot verdicts
+          // do NOT bounce (M3R1 review walk-back): a real one-beat rule
+          // complies via its restatement — bouncing it re-entered the story
+          // machinery as a mislabeled action and rolled dice on a request;
+          // its self-retiring lifecycle is deferred with the OP design.
+          await db
+            .update(turns)
+            .set({
+              checkpoints: sql`${turns.checkpoints} || ${JSON.stringify({ override_bounced: true })}::jsonb`,
+            })
+            .where(eq(turns.id, turnId));
+          result = await runLayout(
+            db,
+            turn.campaignId,
+            turn.turnNumber,
+            turn.playerInput,
+            (e) => emit({ type: "staging", text: e.text }),
+            { forceStory: true },
+          );
+          if (result.kind === "channel")
+            throw new Error("unreachable: forceStory returned channel");
+        } else {
+          // The fail-open synthetic verdict carries durable provenance
+          // (the trailer_source precedent, C1 audit): a raw mint born of an
+          // API blip must never read as a judged extraction after the fact.
+          await db
+            .update(turns)
+            .set({
+              checkpoints: sql`${turns.checkpoints} || ${JSON.stringify({
+                channel_intent: intent,
+                override_verdict: verdict,
+                ...(comprehensionFailed ? { override_comprehension_failed: true } : {}),
+              })}::jsonb`,
+            })
+            .where(eq(turns.id, turnId));
+          await dispatchChannel(intent, verdict);
+          return;
+        }
+      } else {
+        await db
+          .update(turns)
+          .set({
+            checkpoints: sql`${turns.checkpoints} || ${JSON.stringify({ channel_intent: intent })}::jsonb`,
+          })
+          .where(eq(turns.id, turnId));
+        await dispatchChannel(intent);
+        return;
+      }
     }
     conte = result.conte;
     ladderSteps = result.ladderSteps;

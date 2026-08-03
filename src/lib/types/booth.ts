@@ -86,3 +86,26 @@ export type BoothResolution = z.infer<typeof BoothResolution>;
 /** Emission ceilings the schema can no longer carry (see above). */
 export const BOOTH_MARKS_MAX = 4;
 export const BOOTH_OVERRIDES_MAX = 2;
+
+/**
+ * §7.4 comprehension-before-compliance (M3R1): the override channel's one
+ * judged look before the most destructive write in §5.4 — the probe's
+ * OVERRIDE_COMMAND classification alone must never be enough to eat a scene
+ * and bind the studio (the 2026-08-03 eaten-reply incident; ~25% residual
+ * misroute on the hardest input at a Haiku probe). NO LENGTH BOUNDS (M3 C1
+ * grammar rule): the prompt states the one-sentence limit; the runtime clamps.
+ */
+export const OverrideComprehension = z.object({
+  /** True ONLY for words aimed at the STUDIO laying down a rule that binds
+   *  future scenes. An imperative aimed into the fiction is false. */
+  contains_standing_rule: z.boolean(),
+  /** The rule restated in ONE imperative sentence, the studio's own words —
+   *  never an echo. Empty when contains_standing_rule is false. */
+  rule: z.string(),
+  /** one_shot = this beat only. It still MINTS its restatement (M3R1 review
+   *  walk-back: bouncing a real one-beat rule re-entered the story machinery
+   *  as a mislabeled action and rolled dice on a request); the self-retiring
+   *  lifecycle is deferred with the OP-command design. */
+  scope: z.enum(["standing", "one_shot"]),
+});
+export type OverrideComprehension = z.infer<typeof OverrideComprehension>;

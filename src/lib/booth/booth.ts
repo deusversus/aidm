@@ -14,6 +14,7 @@ import {
   type BoothResponder,
   BoothRoute,
   BoothState,
+  OverrideComprehension,
 } from "@/lib/types/booth";
 import { PremiseContract } from "@/lib/types/premise";
 import { and, eq } from "drizzle-orm";
@@ -389,4 +390,49 @@ export async function mintOverride(
   return {
     acknowledgement: `Standing rule recorded: "${content}" — in force from the next scene.`,
   };
+}
+
+const OVERRIDE_COMPREHENSION_SYSTEM = [
+  "You are the override channel's comprehension step (§7.4): the input was",
+  "classified as a standing-rule demand, and your verdict decides whether",
+  "the studio binds itself. contains_standing_rule is true ONLY when the",
+  "words are aimed at the STUDIO ITSELF, laying down a rule for how the",
+  "story is run from here on, across scenes. An imperative aimed into the",
+  "fiction — commanding the character, directing the scene, speaking or",
+  "acting as them, however forceful — is NOT a rule: false. A one-beat",
+  "request (this scene only) is scope one_shot: direction, not law. rule:",
+  "restate the player's rule in ONE short imperative sentence, in the",
+  "studio's own words — never an echo of their text; empty string when",
+  "contains_standing_rule is false. When in doubt, false — a wrongly minted",
+  "rule corrupts every future scene; a bounced one costs a single beat and",
+  "the player can lay it down again in so many words.",
+].join(" ");
+
+/**
+ * §7.4 comprehension-before-compliance (M3R1): one judged look before the
+ * override ledger's write. The probe's OVERRIDE_COMMAND classification alone
+ * is never enough to eat a scene — the mint fires only when this second,
+ * stronger instrument agrees there is a standing rule; anything else bounces
+ * back to the story pipeline. Compliance stays immediate and unnegotiated
+ * for real rules: the acknowledgement quotes the RESTATEMENT, which is the
+ * mutual-understanding surface — a wrong reading is visible the moment it
+ * lands, and the correction is just the next player input.
+ */
+export async function comprehendOverride(
+  selection: TierSelection,
+  campaignId: string,
+  turnNumber: number,
+  text: string,
+): Promise<OverrideComprehension> {
+  return callJudgment(selection, {
+    name: "override_comprehension",
+    phase: "turn",
+    schema: OverrideComprehension,
+    campaignId,
+    turnNumber,
+    effort: "high",
+    maxTokens: CLASSIFY,
+    system: OVERRIDE_COMPREHENSION_SYSTEM,
+    prompt: `PLAYER INPUT: ${text}`,
+  });
 }

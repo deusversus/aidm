@@ -172,6 +172,7 @@ export async function runLayout(
   turnNumber: number,
   playerInput: string,
   emit: (e: LayoutEvent) => void = () => {},
+  opts: { forceStory?: boolean } = {},
 ): Promise<LayoutResult> {
   const [campaign] = await db.select().from(campaigns).where(eq(campaigns.id, campaignId));
   if (!campaign) throw new Error("campaign not found");
@@ -212,8 +213,17 @@ export async function runLayout(
       .limit(3),
   ]);
 
+  // forceStory (M3R1): the override channel's comprehension step bounced the
+  // input back — a second, stronger instrument found no standing rule, so the
+  // turn plays as the scene it always was. The re-probe on this rare path is
+  // accepted; the channel short-circuit is disabled, and a still-channel
+  // re-probe is RELABELED before the story machinery reads it — tiering,
+  // retrieval's system-command skip, and the outcome judge all read this
+  // field, and a scene wearing OVERRIDE_COMMAND would degrade exactly the
+  // turn the bounce floor exists to save (M3R1 review).
   if (isChannelInput(intent)) {
-    return { kind: "channel", intent };
+    if (!opts.forceStory) return { kind: "channel", intent };
+    intent.intent = "DEFAULT";
   }
 
   // Arc state for the Pacer (§7.2): phase ownership is the Director's —

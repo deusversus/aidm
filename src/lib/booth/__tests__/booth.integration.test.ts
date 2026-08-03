@@ -8,7 +8,13 @@ import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { BOOTH_PROVENANCE, closeBoothIfOpen, mintOverride, runBoothExchange } from "../booth";
+import {
+  BOOTH_PROVENANCE,
+  closeBoothIfOpen,
+  comprehendOverride,
+  mintOverride,
+  runBoothExchange,
+} from "../booth";
 
 /**
  * The meta booth + override channel (§5.4, §7.4; C9) against real Postgres
@@ -379,6 +385,34 @@ describe.skipIf(!url)("Meta booth + override channel (real Postgres, scripted mo
     expect(mockProbe).not.toHaveBeenCalled();
     expect(mockJudgment).not.toHaveBeenCalled();
     expect(mockStream).not.toHaveBeenCalled();
+  });
+
+  it("comprehendOverride round-trip (M3R1): the judged call carries the doctrine and the verdict passes through", async () => {
+    if (!db) throw new Error("unreachable");
+    const campaignId = await makeCampaign();
+    const verdict = {
+      contains_standing_rule: true,
+      rule: "Never harm the dog.",
+      scope: "standing" as const,
+    };
+    mockJudgment.mockResolvedValue(verdict as never);
+
+    const out = await comprehendOverride(SELECTION, campaignId, 7, "override: never harm the dog");
+
+    expect(out).toEqual(verdict);
+    expect(mockJudgment).toHaveBeenCalledTimes(1);
+    const opts = mockJudgment.mock.calls[0]?.[1] as unknown as Record<string, unknown>;
+    expect(opts.name).toBe("override_comprehension");
+    expect(opts.phase).toBe("turn");
+    expect(opts.effort).toBe("high");
+    // The doctrine's load-bearing clauses: addressee, restatement-not-echo,
+    // and the when-in-doubt-bounce default (§7.4 — a wrong mint corrupts
+    // every future scene; a bounce costs one beat).
+    const system = String(opts.system);
+    expect(system).toContain("aimed at the STUDIO ITSELF");
+    expect(system).toContain("never an echo");
+    expect(system).toContain("When in doubt, false");
+    expect(String(opts.prompt)).toContain("override: never harm the dog");
   });
 
   it("booth-cache prefix reuse: the responder receives the assembled blocks system array verbatim", async () => {

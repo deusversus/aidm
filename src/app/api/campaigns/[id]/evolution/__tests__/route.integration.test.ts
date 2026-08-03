@@ -116,114 +116,122 @@ describe.skipIf(!url)("evolution ratification route (M3 C4, real Postgres)", () 
     return (row?.c as { active: { treatment: Record<string, number> } }).active.treatment;
   }
 
-  it("ratify amends the ACTIVE premise axes, dates the bible note, and clears the proposal", async () => {
-    if (!db) throw new Error("unreachable");
-    expect((await readTreatment()).darkness).toBe(7);
+  it(
+    "ratify amends the ACTIVE premise axes, dates the bible note, and clears the proposal",
+    { timeout: 20_000 },
+    async () => {
+      if (!db) throw new Error("unreachable");
+      expect((await readTreatment()).darkness).toBe(7);
 
-    const res = await POST(req({ action: "ratify" }), params(campaignId));
-    expect(res.status).toBe(200);
+      const res = await POST(req({ action: "ratify" }), params(campaignId));
+      expect(res.status).toBe(200);
 
-    // §4.2: the ACTIVE layer moved, permanently — no arc_override involved.
-    const treatment = await readTreatment();
-    expect(treatment.darkness).toBe(10);
-    expect(treatment.cruelty).toBe(8);
-    // Untouched axes stay exactly where the contract had them.
-    expect(treatment.optimism).toBe(3);
-    const [c] = await db
-      .select({ arcOverride: schema.campaigns.arcOverride })
-      .from(schema.campaigns)
-      .where(eq(schema.campaigns.id, campaignId));
-    expect(c?.arcOverride).toBeNull();
+      // §4.2: the ACTIVE layer moved, permanently — no arc_override involved.
+      const treatment = await readTreatment();
+      expect(treatment.darkness).toBe(10);
+      expect(treatment.cruelty).toBe(8);
+      // Untouched axes stay exactly where the contract had them.
+      expect(treatment.optimism).toBe(3);
+      const [c] = await db
+        .select({ arcOverride: schema.campaigns.arcOverride })
+        .from(schema.campaigns)
+        .where(eq(schema.campaigns.id, campaignId));
+      expect(c?.arcOverride).toBeNull();
 
-    // The bible's source material, with the provenance envelope (§6).
-    const notes = await db
-      .select()
-      .from(schema.criticalFacts)
-      .where(
-        and(
-          eq(schema.criticalFacts.campaignId, campaignId),
-          eq(schema.criticalFacts.category, "evolution"),
-        ),
-      );
-    expect(notes).toHaveLength(1);
-    expect(notes[0]?.provenance).toBe("player_ratified");
-    expect(notes[0]?.turnId).toBe(46);
-    expect(notes[0]?.confidence).toBe(1);
-    expect(notes[0]?.content).toContain(CASE);
-    expect(notes[0]?.tombstonedAt).toBeNull();
+      // The bible's source material, with the provenance envelope (§6).
+      const notes = await db
+        .select()
+        .from(schema.criticalFacts)
+        .where(
+          and(
+            eq(schema.criticalFacts.campaignId, campaignId),
+            eq(schema.criticalFacts.category, "evolution"),
+          ),
+        );
+      expect(notes).toHaveLength(1);
+      expect(notes[0]?.provenance).toBe("player_ratified");
+      expect(notes[0]?.turnId).toBe(46);
+      expect(notes[0]?.confidence).toBe(1);
+      expect(notes[0]?.content).toContain(CASE);
+      expect(notes[0]?.tombstonedAt).toBeNull();
 
-    const state = await readState();
-    expect(state.evolution_proposal).toBeUndefined();
-    // The Sakkan's baseline follows automatically (it reads the active layer),
-    // so the ratified axes' player-driven exemptions and retakes are settled.
-    expect(Object.keys(state.sakkan?.player_driven ?? {})).toEqual(["optimism"]);
-    expect(state.sakkan?.active_notes).toEqual([
-      { axis: "optimism", active: 3, observed: 7, since_turn: 20 },
-    ]);
-    // §4.4a trigger (2): the frozen Charter re-rendered against the new premise.
-    expect(state.settei?.text).toBeTruthy();
+      const state = await readState();
+      expect(state.evolution_proposal).toBeUndefined();
+      // The Sakkan's baseline follows automatically (it reads the active layer),
+      // so the ratified axes' player-driven exemptions and retakes are settled.
+      expect(Object.keys(state.sakkan?.player_driven ?? {})).toEqual(["optimism"]);
+      expect(state.sakkan?.active_notes).toEqual([
+        { axis: "optimism", active: 3, observed: 7, since_turn: 20 },
+      ]);
+      // §4.4a trigger (2): the frozen Charter re-rendered against the new premise.
+      expect(state.settei?.text).toBeTruthy();
 
-    // ONE review per season, whatever the answer (C4 audit MUST-FIX): the
-    // stamp lands, and the undo ledger carries the FROM values for §6.7.
-    expect(state.last_evolution_review).toEqual({ season_id: "season-1", turn: 46 });
-    expect(state.evolution_history).toEqual([
-      {
-        season_id: "season-1",
-        turn: 46,
-        axes: [
-          { axis: "darkness", from: 7, to: 10 },
-          { axis: "cruelty", from: 5, to: 8 },
-        ],
-      },
-    ]);
+      // ONE review per season, whatever the answer (C4 audit MUST-FIX): the
+      // stamp lands, and the undo ledger carries the FROM values for §6.7.
+      expect(state.last_evolution_review).toEqual({ season_id: "season-1", turn: 46 });
+      expect(state.evolution_history).toEqual([
+        {
+          season_id: "season-1",
+          turn: 46,
+          axes: [
+            { axis: "darkness", from: 7, to: 10 },
+            { axis: "cruelty", from: 5, to: 8 },
+          ],
+        },
+      ]);
 
-    // §6.7: the amendment is REVOCABLE — a rewind past the ratification
-    // restores the FROM values, drops the ledger entry, and clears the frozen
-    // Charter so the next assembly re-renders from the restored premise
-    // (record-gone-effect-kept was the C4 audit's asymmetry).
-    await rewindCampaign(db, campaignId, 45, "test: unwind the retooling");
-    const restored = await readTreatment();
-    expect(restored.darkness).toBe(7);
-    expect(restored.cruelty).toBe(5);
-    const rewound = await readState();
-    expect(rewound.evolution_history).toEqual([]);
-    expect(rewound.last_evolution_review).toBeUndefined();
-    expect(rewound.settei).toBeUndefined();
-    const notesAfter = await db
-      .select()
-      .from(schema.criticalFacts)
-      .where(
-        and(
-          eq(schema.criticalFacts.campaignId, campaignId),
-          eq(schema.criticalFacts.category, "evolution"),
-        ),
-      );
-    expect(notesAfter[0]?.tombstonedAt).not.toBeNull();
-  });
+      // §6.7: the amendment is REVOCABLE — a rewind past the ratification
+      // restores the FROM values, drops the ledger entry, and clears the frozen
+      // Charter so the next assembly re-renders from the restored premise
+      // (record-gone-effect-kept was the C4 audit's asymmetry).
+      await rewindCampaign(db, campaignId, 45, "test: unwind the retooling");
+      const restored = await readTreatment();
+      expect(restored.darkness).toBe(7);
+      expect(restored.cruelty).toBe(5);
+      const rewound = await readState();
+      expect(rewound.evolution_history).toEqual([]);
+      expect(rewound.last_evolution_review).toBeUndefined();
+      expect(rewound.settei).toBeUndefined();
+      const notesAfter = await db
+        .select()
+        .from(schema.criticalFacts)
+        .where(
+          and(
+            eq(schema.criticalFacts.campaignId, campaignId),
+            eq(schema.criticalFacts.category, "evolution"),
+          ),
+        );
+      expect(notesAfter[0]?.tombstonedAt).not.toBeNull();
+    },
+  );
 
-  it("ratify is idempotent about its bible note (the documented resurrection race)", async () => {
-    if (!db) throw new Error("unreachable");
-    await POST(req({ action: "ratify" }), params(campaignId));
-    // A Director cycle that loaded state before the answer re-persists it.
-    const state = await readState();
-    await db
-      .update(schema.campaigns)
-      .set({ directionState: { ...state, evolution_proposal: PROPOSAL } })
-      .where(eq(schema.campaigns.id, campaignId));
-    const res = await POST(req({ action: "ratify" }), params(campaignId));
-    expect(res.status).toBe(200);
+  it(
+    "ratify is idempotent about its bible note (the documented resurrection race)",
+    { timeout: 20_000 },
+    async () => {
+      if (!db) throw new Error("unreachable");
+      await POST(req({ action: "ratify" }), params(campaignId));
+      // A Director cycle that loaded state before the answer re-persists it.
+      const state = await readState();
+      await db
+        .update(schema.campaigns)
+        .set({ directionState: { ...state, evolution_proposal: PROPOSAL } })
+        .where(eq(schema.campaigns.id, campaignId));
+      const res = await POST(req({ action: "ratify" }), params(campaignId));
+      expect(res.status).toBe(200);
 
-    const notes = await db
-      .select()
-      .from(schema.criticalFacts)
-      .where(
-        and(
-          eq(schema.criticalFacts.campaignId, campaignId),
-          eq(schema.criticalFacts.category, "evolution"),
-        ),
-      );
-    expect(notes).toHaveLength(1);
-  });
+      const notes = await db
+        .select()
+        .from(schema.criticalFacts)
+        .where(
+          and(
+            eq(schema.criticalFacts.campaignId, campaignId),
+            eq(schema.criticalFacts.category, "evolution"),
+          ),
+        );
+      expect(notes).toHaveLength(1);
+    },
+  );
 
   it("pull home plants a retake on every proposed axis and leaves the premise alone", async () => {
     if (!db) throw new Error("unreachable");

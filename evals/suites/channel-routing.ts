@@ -1,3 +1,4 @@
+import { comprehendOverride } from "@/lib/booth/booth";
 import { getDb } from "@/lib/db";
 import { campaigns, modelCalls, players } from "@/lib/db/schema";
 import { callProbe } from "@/lib/llm/calls";
@@ -263,6 +264,64 @@ export const channelRouting: Suite = {
               : `${cs.id}: contains_world_assertion TRUE on a no-lore input — over-flagging runs ingestion at confidence 1`,
           );
         }
+      }
+
+      // --- The comprehension FLOOR (M3R1, §7.4): the probe's advisory tail is
+      // closed structurally — the mint fires only when this second instrument
+      // agrees. Two live pins at the DEV judgment tier: the specimen (the
+      // ~25%-misroute input) must BOUNCE, and a real keyword-less override
+      // must extract a standing restatement.
+      const bounce = await probe(() =>
+        comprehendOverride(DEV_TIER_SELECTION, campaignId, 90, SPECIMEN),
+      );
+      details.push(
+        `floor: specimen → contains_standing_rule=${bounce.contains_standing_rule} scope=${bounce.scope}`,
+      );
+      if (bounce.contains_standing_rule && bounce.scope === "standing") {
+        failures.push(
+          "floor: the specimen read as a STANDING RULE — the bounce floor would mint the eaten reply",
+        );
+      }
+      const extract = await probe(() =>
+        comprehendOverride(
+          DEV_TIER_SELECTION,
+          campaignId,
+          91,
+          "From now on, keep combat scenes short and don't ever describe gore in detail.",
+        ),
+      );
+      details.push(
+        `floor: real override → contains_standing_rule=${extract.contains_standing_rule} rule="${extract.rule.slice(0, 80)}"`,
+      );
+      if (!extract.contains_standing_rule || extract.scope !== "standing") {
+        failures.push(
+          "floor: a real keyword-less override failed to extract — §7.4 compliance lost",
+        );
+      }
+      // The over-bounce direction for CANON-CONTENT rules (M3R1 review): the
+      // process-rule pin above doesn't cover a rule about the fiction's own
+      // content laid on the studio — the class the when-in-doubt-false
+      // default is most tempted to bounce.
+      const canonRule = await probe(() =>
+        comprehendOverride(
+          DEV_TIER_SELECTION,
+          campaignId,
+          92,
+          "New rule for you as narrator: my character's dreams are always prophetic.",
+        ),
+      );
+      details.push(
+        `floor: canon-content rule → contains_standing_rule=${canonRule.contains_standing_rule} rule="${canonRule.rule.slice(0, 80)}"`,
+      );
+      if (!canonRule.contains_standing_rule || !canonRule.rule.trim()) {
+        failures.push(
+          "floor: a canon-content rule failed to extract — when-in-doubt-false is over-bouncing real law",
+        );
+      }
+      if (extract.contains_standing_rule && !extract.rule.trim()) {
+        failures.push(
+          "floor: extraction returned an empty rule — the mint would fall back to raw bytes",
+        );
       }
     } finally {
       const [{ total } = { total: "0" }] = await getDb()
