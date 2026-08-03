@@ -131,7 +131,7 @@ export async function judgeOutcome(
 
 // --- Validation (sakuga tier; one retry — §5.1) ------------------------------
 
-const ValidationOutput = z.object({
+export const ValidationOutput = z.object({
   is_valid: z.boolean(),
   /** Present when invalid: what the re-judge must respect. */
   correction: z.string().optional(),

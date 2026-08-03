@@ -100,7 +100,7 @@ const DistillEntityUpdate = z.object({
 const DISTILL_FACTS_MAX = 8;
 const DISTILL_ENTITY_UPDATES_MAX = 4;
 
-const DistillOutput = z.object({
+export const DistillOutput = z.object({
   /** One subtext-first sentence: what the scene MEANT, not what happened. */
   narrated_fragment: z.string(),
   /** ≤8; clamped engine-side. */
@@ -147,7 +147,7 @@ const DISTILL_SYSTEM = [
   "the player voiced (usually none). Do not invent; distill what is on the page.",
 ].join(" ");
 
-const ArcTransitionCheck = z.object({
+export const ArcTransitionCheck = z.object({
   transitioned: z.boolean(),
   evidence: z.string().optional(),
 });
@@ -158,7 +158,7 @@ const ArcTransitionCheck = z.object({
  * out-of-range number is filtered at the call site rather than failing the
  * parse and costing every real confirmation in the same emit.
  */
-const SeedMentionCheck = z.object({ surfaced: z.array(z.number().int()).default([]) });
+export const SeedMentionCheck = z.object({ surfaced: z.array(z.number().int()).default([]) });
 
 // --- Checkpoint plumbing ----------------------------------------------------
 

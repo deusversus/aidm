@@ -250,6 +250,17 @@ describe.skipIf(!url)("C7 direction wiring (real Postgres, scripted models)", ()
             confirmed_seed_descriptions: [],
             meta_comments: [],
           }) as never;
+        // M3R2 C1: the cycle's final emit is TWO calls — the ops half first
+        // (endsWith guard), then the plan half falls through below.
+        if (typeof opts.name === "string" && opts.name.endsWith("_ops"))
+          return Promise.resolve({
+            arc_relevance: [],
+            seed_ops: [],
+            spotlight_directives: [{ name: "Jet", note: "he noticed the cornering" }],
+            demote_criticals: [],
+            director_notes: ["hold the noir patience"],
+            voice_patterns: [],
+          }) as never;
         if (typeof opts.name === "string" && opts.name.startsWith("director_"))
           return Promise.resolve({
             analysis: "The dock thread is ready to become the arc's spine.",
@@ -264,13 +275,8 @@ describe.skipIf(!url)("C7 direction wiring (real Postgres, scripted models)", ()
               status: "active",
             },
             clear_override: false,
+            scene_shape_trajectory: "",
             scene_shape_notes: ["let silence do the threatening"],
-            arc_relevance: [],
-            seed_ops: [],
-            spotlight_directives: [{ name: "Jet", note: "he noticed the cornering" }],
-            demote_criticals: [],
-            director_notes: ["hold the noir patience"],
-            voice_patterns: [],
           }) as never;
         return Promise.reject(new Error(`unscripted judgment ${opts.name}`)) as never;
       });

@@ -30,8 +30,11 @@ import {
   DIRECTOR_MIN_TURNS_BETWEEN,
   DirectionState,
   DirectorArcPlan,
-  DirectorOutput,
+  DirectorEmitOps,
+  DirectorEmitPlan,
+  type DirectorOutput,
   type DirectorTrigger,
+  mergeDirectorEmits,
 } from "@/lib/types/direction";
 import { PartialDNAScales } from "@/lib/types/dna";
 import { OpeningStatePackage } from "@/lib/types/opening";
@@ -111,7 +114,12 @@ export function evaluateDirectorTrigger(
   state: DirectionState,
   turnNumber: number,
 ): DirectorTrigger {
-  const turnsSince = turnNumber - state.last_director_turn;
+  // M3R2 C1: the gate spaces from the last ATTEMPT, not just the last
+  // success — a failing cycle backs off instead of refiring every turn
+  // (the grammar-400 ratchet: accumulators only reset on success, so a
+  // doomed cycle fired on every turn and burned $0.15 each time).
+  const lastFired = Math.max(state.last_director_turn, state.last_director_attempt ?? 0);
+  const turnsSince = turnNumber - lastFired;
   const gate = turnNumber > 0 && turnsSince >= DIRECTOR_MIN_TURNS_BETWEEN;
   const reasons: string[] = [];
   if (gate) {
@@ -165,8 +173,43 @@ const clampTo = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo,
  */
 function clampDirectorOutput(output: DirectorOutput, campaignId: string): DirectorOutput {
   const cap = <T>(list: T[], max: number, field: string) => capList(list, max, field, campaignId);
+  // The emit halves carry no .min(1) (grammar-lean by design) and the merge
+  // never re-parses through DirectorOutput — so blank-required objects drop
+  // HERE with a warn, before an empty arc_name reaches the stored ArcOverride
+  // or an unnamed episode closes (M3R2 C1 review).
+  const blank = (v: string | undefined) => !v || v.trim() === "";
+  const dropIf = (cond: boolean, field: string): boolean => {
+    if (cond) {
+      console.warn(`[director] ${field} with blank required text — dropped`, { campaignId });
+    }
+    return cond;
+  };
+  const arcOverride =
+    output.arc_override &&
+    !dropIf(
+      blank(output.arc_override.arc_name) || blank(output.arc_override.transition_signal),
+      "arc_override",
+    )
+      ? output.arc_override
+      : undefined;
+  const episodeClose =
+    output.episode_close &&
+    !dropIf(
+      blank(output.episode_close.name) || blank(output.episode_close.dramatic_question),
+      "episode_close",
+    )
+      ? output.episode_close
+      : undefined;
+  const evolutionProposal =
+    output.evolution_proposal &&
+    !dropIf(blank(output.evolution_proposal.director_case), "evolution_proposal")
+      ? output.evolution_proposal
+      : undefined;
   return {
     ...output,
+    arc_override: arcOverride,
+    episode_close: episodeClose,
+    evolution_proposal: evolutionProposal,
     tension_level: clampTo(output.tension_level, 0, 1),
     scene_shape_notes: cap(
       output.scene_shape_notes,
@@ -325,6 +368,19 @@ export async function runDirectorCycle(
   const selection = resolveSelection(campaign.tierModels);
   const state = DirectionState.parse(campaign.directionState ?? {});
   const profileIds = contract.anchors_used;
+
+  // M3R2 C1: stamp the ATTEMPT durably before any model call — a cycle that
+  // throws after this still backs off (evaluateDirectorTrigger reads the
+  // stamp), instead of refiring on every subsequent turn. Surgical jsonb so
+  // the wholesale state save at success (which spreads the state loaded
+  // above) does not race it — the success save re-includes the stamp below.
+  state.last_director_attempt = turnNumber;
+  await db
+    .update(campaigns)
+    .set({
+      directionState: sql`jsonb_set(coalesce(${campaigns.directionState}, '{}'::jsonb), '{last_director_attempt}', ${JSON.stringify(turnNumber)}::jsonb)`,
+    })
+    .where(eq(campaigns.id, campaignId));
 
   // --- The batched seed adjudication (§7.6) FIRST ---------------------------
   // Before the dossier is compiled, so the Director plans against a settled
@@ -495,7 +551,7 @@ export async function runDirectorCycle(
       : "None yet.",
     "",
     "## Your task",
-    `Investigate with your tools (up to ${DIRECTOR_MAX_TOOL_ROUNDS} rounds — seeds, arc, canon, past scenes), then emit ONE typed plan: the arc plan (name/phase/shape/budget/payoff), tension_level, any single arc_override (latest wins, with its transition signal; express premise shifts as axis/value pairs) OR clear_override, seed ops, criticals to demote, the Scene-Shape base, an arc_relevance ranking of secondary axes, director notes (advisory), and voice patterns.`,
+    `Investigate with your tools (up to ${DIRECTOR_MAX_TOOL_ROUNDS} rounds — seeds, arc, canon, past scenes), then file your cycle in TWO emits: first the PLAN (the arc plan — name/phase/shape/budget/payoff — tension_level, any single arc_override with its transition signal — express premise shifts as axis/value pairs — OR clear_override, an episode_close when a story movement just ended, the Scene-Shape base; write '' for scene_shape_trajectory when you have no trajectory note), then, asked separately, the OPS (seed ops, criticals to demote, an arc_relevance ranking of secondary axes, spotlight directives, director notes, voice patterns). Decide BOTH during investigation; the second emit only files what you already planned.`,
     // The push-out has an op now (§7.6, M3 C2). Without saying so here, the
     // Director's only way to give a seed more room was a near-duplicate plant
     // — which is why the audit found seeds that could never leave the ledger.
@@ -531,9 +587,17 @@ export async function runDirectorCycle(
     }
   };
 
-  const emitted = await callJudgment(selection, {
+  // M3R2 C1: the final emit is TWO structured calls, not one. The grammar
+  // cliff is MODEL-DEPENDENT — Haiku compiles the full DirectorOutput, Sonnet
+  // 5 rejects it ("the compiled grammar is too large"), which killed every
+  // cycle on the live Sonnet-judgment campaign while every DEV-tier test
+  // passed. Either half compiles on Haiku, Sonnet and Opus with margin
+  // (measured 2026-08-03; the schema-grammar canary keeps it true). The plan
+  // half carries the investigation (tools); the ops half rides the same
+  // cached persona+dossier head plus the plan's own JSON — no re-investigation.
+  const plan = await callJudgment(selection, {
     name: `director_${opts?.trigger ?? "cycle"}`,
-    schema: DirectorOutput,
+    schema: DirectorEmitPlan,
     campaignId,
     turnNumber,
     // A Director cycle rides a turn number but is not the player's turn —
@@ -550,11 +614,37 @@ export async function runDirectorCycle(
     maxToolRounds: DIRECTOR_MAX_TOOL_ROUNDS,
     // M2R5 C2: persona + dossier are a 1.2–3.5k head this cycle re-sends on
     // every investigation round. 5m, not 1h — the rounds are seconds apart
-    // and cycles are turns apart, so the cheaper write amortizes across up to
-    // six reads at 0.1× and nothing is left paying 2× for a dead entry.
+    // and cycles are turns apart. Honest count (review 2026-08-03): the
+    // INVESTIGATION rounds read it; the final structured emit is built
+    // without tools and structurally cannot (tools render ahead of system
+    // in the cache key), so the write amortizes across the rounds alone.
     cacheHead: "5m",
   });
-  const output = clampDirectorOutput(emitted, campaignId);
+  // NO cacheHead on the ops emit (review, 2026-08-03): its opening user block
+  // is byte-different from the plan call's bare dossier, the persona alone is
+  // under the cache minimum, and cycles are >=3 turns apart — a breakpoint
+  // here is a 1.25x write nothing reads, the exact anti-pattern M2R5 C1
+  // exists to kill. The ops half re-bills the dossier as fresh input; that is
+  // the honest cost of the split, ~$0.01/cycle at Sonnet.
+  const emittedOps = await callJudgment(selection, {
+    name: `director_${opts?.trigger ?? "cycle"}_ops`,
+    schema: DirectorEmitOps,
+    campaignId,
+    turnNumber,
+    phase: "director_cycle",
+    maxTokens: LOOPED_LARGE,
+    effort: "high",
+    system: directorPersona(contract),
+    prompt: [
+      dossier,
+      "",
+      "## Your plan (already filed this cycle — emit the OPS consistent with it)",
+      JSON.stringify(plan),
+      "",
+      "You have NO tools on this request — the investigation is over; its digest is the plan's analysis. Emit the operations half directly: arc_relevance, seed_ops, spotlight_directives, demote_criticals, director_notes, voice_patterns. Sentinels: write '' or 0 for any per-op field that does not apply.",
+    ].join("\n"),
+  });
+  const output = clampDirectorOutput(mergeDirectorEmits(plan, emittedOps), campaignId);
 
   // --- APPLY (§7.1) ---------------------------------------------------------
   const { arcId, phaseChanged } = await applyArcPlan(db, campaignId, turnNumber, output.arc_plan);
@@ -566,7 +656,6 @@ export async function runDirectorCycle(
   // §4.5 M2R3 steering-honesty notice + finding clear, computed during the
   // override apply and folded into the saved state below.
   let steeringNotice: DirectionState["steering_notice"];
-  let clearedSakkan: DirectionState["sakkan"];
 
   // arc_override latest-wins onto the campaign; a new one supersedes any clear.
   // The model speaks in axis/value PAIRS (the strict-output grammar caps
@@ -613,30 +702,34 @@ export async function runDirectorCycle(
         set: answered.wanted,
         at_turn: turnNumber,
       };
-      if (state.sakkan) {
-        clearedSakkan = {
-          ...state.sakkan,
-          // Clear ONLY the noticed finding (audit): an override answering
-          // several player-driven axes surfaces them SEQUENTIALLY - one
-          // notice per cycle - so no evolution on a player-authored axis
-          // lands silently. Un-noticed answered findings stay pending and
-          // raise their own notice on a later cycle (or auto-clear when
-          // the moved premise reads them back in band).
-          player_driven: Object.fromEntries(
-            Object.entries(pd).filter(([axis]) => axis !== answered.axis),
-          ),
-        };
-      }
+      // Clear ONLY the noticed finding (audit): an override answering
+      // several player-driven axes surfaces them SEQUENTIALLY — one notice
+      // per cycle. The clear itself applies onto the FRESH sakkan at save
+      // (freshSakkanCleared below) so a sample landing mid-cycle survives.
     }
   } else if (output.clear_override) {
     await db.update(campaigns).set({ arcOverride: null }).where(eq(campaigns.id, campaignId));
   }
 
+  // Per-op isolation (M3R2 C1 review): the sentinel contract makes empty
+  // strings reachable and plantSeed throws hard on one — a bad op skips with
+  // its reason logged; it must never lose a half-applied cycle mid-loop.
   for (const op of output.seed_ops) {
-    if (op.op === "plant") {
-      await plantSeed(db, campaignId, turnNumber, op, DIRECTOR_PROVENANCE);
-    } else {
-      await settleSeed(db, campaignId, turnNumber, op);
+    if (op.op === "plant" && !op.description?.trim()) {
+      console.warn("[director] plant op with empty description — dropped", { campaignId });
+      continue;
+    }
+    try {
+      if (op.op === "plant") {
+        await plantSeed(db, campaignId, turnNumber, op, DIRECTOR_PROVENANCE);
+      } else {
+        await settleSeed(db, campaignId, turnNumber, op);
+      }
+    } catch (err) {
+      console.warn(`[director] seed op ${op.op} failed — skipped, cycle kept`, {
+        campaignId,
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
   }
 
@@ -732,8 +825,28 @@ export async function runDirectorCycle(
   const relevanceRecord: Record<string, number> = {};
   for (const r of output.arc_relevance) relevanceRecord[r.axis] = r.relevance;
 
+  // The final save spreads FRESH state, not the snapshot loaded before two
+  // model emits (M3R2 C1 review): a Sakkan sample or a Layout flag landing
+  // mid-cycle must not be clobbered by a stale wholesale write. Cycle-owned
+  // fields overwrite below; the answered-finding clear re-applies onto the
+  // FRESH sakkan by axis; flags consumed by this dossier drop, flags added
+  // mid-cycle survive.
+  const fresh = await loadDirectionState(db, campaignId);
+  const consumedFlags = new Set(state.pending_flags);
+  const freshSakkanCleared =
+    steeringNotice && fresh.sakkan
+      ? {
+          ...fresh.sakkan,
+          player_driven: Object.fromEntries(
+            Object.entries(fresh.sakkan.player_driven ?? {}).filter(
+              ([axis]) => axis !== steeringNotice?.axis,
+            ),
+          ),
+        }
+      : undefined;
+
   const newState: DirectionState = {
-    ...state,
+    ...fresh,
     tension_level: output.tension_level,
     scene_shape: {
       trajectory_note: output.scene_shape_trajectory,
@@ -746,7 +859,7 @@ export async function runDirectorCycle(
     // spotlight_hints — a Director writer with no reader is a defect (axiom 8).
     spotlight_directives: output.spotlight_directives,
     // §4.5 M2R3: the answered player-driven finding cleared, the notice raised.
-    ...(clearedSakkan ? { sakkan: clearedSakkan } : {}),
+    ...(freshSakkanCleared ? { sakkan: freshSakkanCleared } : {}),
     ...(steeringNotice ? { steering_notice: steeringNotice } : {}),
     // A pending proposal rides through `...state` untouched: silence persists
     // the card across cycles until the player answers it (§7.1).
@@ -754,8 +867,9 @@ export async function runDirectorCycle(
     // Accumulators reset; the trigger begins re-arming from here.
     accumulated_epicness: 0,
     arc_events: [],
-    pending_flags: [],
+    pending_flags: fresh.pending_flags.filter((f) => !consumedFlags.has(f)),
     last_director_turn: turnNumber,
+    last_director_attempt: turnNumber,
     // phase_state stamps from arc_plan.phase — the SAME field applyArcPlan
     // persisted and derived phaseChanged from. Stamping the (now removed)
     // separate top-level phase field let the Pacer's stall gates run against
@@ -779,7 +893,7 @@ export async function runDirectorCycle(
 
 /** Unbounded for the same reason DirectorOutput is (types/direction.ts): a
  *  sixth cold-open constraint must not cost the campaign its pilot plan. */
-const StartupPlan = z.object({
+export const StartupPlan = z.object({
   arc: DirectorArcPlan,
   cold_open_constraints: z.array(z.string()).default([]),
   scene_shape_notes: z.array(z.string()).default([]),
@@ -922,7 +1036,11 @@ export async function directorStartup(db: Db, campaignId: string): Promise<void>
 
 /**
  * Session-open review (subsequent opens): a Director cycle with trigger
- * "session_open" — reads the last session memo, refreshes the plan.
+ * "session_open" — reads the last session memo, refreshes the plan. Backoff
+ * rides for free (M3R2 C1): the cycle stamps last_director_attempt before
+ * any model call, so the G2 trigger after this open spaces from it — an
+ * open-time review never double-fires the same turn, and a FAILING review
+ * costs at most one attempt per human-paced open.
  */
 export async function directorReview(
   db: Db,

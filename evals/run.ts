@@ -9,6 +9,7 @@ import { notAnotherAnime } from "./suites/not-another-anime";
 import { rendererEfficacy } from "./suites/renderer-efficacy";
 import { sakkanNeutrality } from "./suites/sakkan-neutrality";
 import { scaffolds } from "./suites/scaffolds";
+import { schemaGrammar } from "./suites/schema-grammar";
 import type { Suite, SuiteResult } from "./types";
 
 /**
@@ -31,6 +32,7 @@ const allSuites: Suite[] = [
   sakkanNeutrality,
   authorshipDetection,
   channelRouting,
+  schemaGrammar,
   ...scaffolds,
 ];
 const suites =

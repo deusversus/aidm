@@ -168,7 +168,7 @@ export async function synthesizePowerSystem(
  * profile research run down with it (this call is awaited unguarded).
  */
 const VOICE_CARDS_MAX = 8;
-const VoiceCards = z.object({ cards: z.array(VoiceCard) });
+export const VoiceCards = z.object({ cards: z.array(VoiceCard) });
 
 export async function synthesizeVoiceCards(
   quotesByCharacter: Record<string, string[]>,

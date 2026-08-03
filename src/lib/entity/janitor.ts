@@ -51,7 +51,7 @@ export interface JanitorReport {
  * stated in the prompt and pinned below; the verdict is read only through the
  * MERGE_AUTO/MERGE_SUGGEST thresholds, so pinning is lossless.
  */
-const PairVerdict = z.object({
+export const PairVerdict = z.object({
   same: z.boolean(),
   confidence: z.number(),
   reason: z.string(),

@@ -27,7 +27,7 @@ import {
  * skip is possible. Revisit at M2 if the contract grows target_tier.
  */
 
-const ScaleJudgment = z.object({
+export const ScaleJudgment = z.object({
   /** 0.1–1.0 multiplier per detected context suppressor; omit undetected kinds.
    *  kind is a STRING in the model-facing schema, filtered to
    *  CONTEXT_MODIFIER_KINDS in code (M1 soak: the API's strict output let an

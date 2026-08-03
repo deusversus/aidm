@@ -101,7 +101,7 @@ export type VoiceDimensionRead = z.infer<typeof VoiceDimensionRead>;
  * (the caller filters to the dimensions it asked about) rather than in the
  * schema. Same shape discipline as score.ts's ScoreSheet.
  */
-const VoiceChecklistSheet = z.object({ dimensions: z.array(VoiceDimensionRead) });
+export const VoiceChecklistSheet = z.object({ dimensions: z.array(VoiceDimensionRead) });
 
 export const VOICE_CHECKLIST_SYSTEM = [
   "You are the Sakkan's VOICE checklist for a prose story engine — the author's-hand",

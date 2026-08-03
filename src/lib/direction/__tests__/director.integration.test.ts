@@ -127,6 +127,45 @@ function directorOutput(over: Partial<DirectorOutput> = {}): DirectorOutput {
   } as DirectorOutput;
 }
 
+/** M3R2 C1: the cycle's final emit is TWO calls (plan, then ops). This arm
+ *  routes the mocked judgment by call name and serves each half in its EMIT
+ *  shape (sentinels, not optionals) from one full logical fixture. */
+// biome-ignore lint/suspicious/noExplicitAny: mock harness spans generic signatures
+function armDirectorEmits(full: DirectorOutput): void {
+  mockJudgment.mockImplementation((_s: any, opts: any) => {
+    if (String(opts.name).endsWith("_ops")) {
+      return Promise.resolve({
+        arc_relevance: full.arc_relevance,
+        seed_ops: full.seed_ops.map((op) => ({
+          op: op.op,
+          description: op.description ?? "",
+          expected_payoff: op.expected_payoff ?? "",
+          payoff_window_from: op.payoff_window_from ?? 0,
+          payoff_window_to: op.payoff_window_to ?? 0,
+          dependencies: op.dependencies ?? [],
+          seed_description: op.seed_description ?? "",
+          reason: op.reason ?? "",
+        })),
+        spotlight_directives: full.spotlight_directives,
+        demote_criticals: full.demote_criticals,
+        director_notes: full.director_notes,
+        voice_patterns: full.voice_patterns,
+      }) as never;
+    }
+    return Promise.resolve({
+      analysis: full.analysis,
+      tension_level: full.tension_level,
+      arc_plan: full.arc_plan,
+      ...(full.episode_close ? { episode_close: full.episode_close } : {}),
+      ...(full.arc_override ? { arc_override: full.arc_override } : {}),
+      clear_override: full.clear_override,
+      ...(full.evolution_proposal ? { evolution_proposal: full.evolution_proposal } : {}),
+      scene_shape_trajectory: full.scene_shape_trajectory ?? "",
+      scene_shape_notes: full.scene_shape_notes,
+    }) as never;
+  });
+}
+
 const FORBIDDEN = ["no amnesia cold open", "don't kill a named character in scene 1"];
 function ospFixture(): OpeningStatePackage {
   return {
@@ -176,6 +215,21 @@ describe("evaluateDirectorTrigger (v3 hybrid trigger, verbatim)", () => {
     const r = evaluateDirectorTrigger(st({ last_director_turn: 0 }), 8);
     expect(r.fire).toBe(true);
     expect(r.reasons).toContain("max_interval");
+  });
+
+  it("a FAILED attempt backs off like a success — the grammar-400 ratchet is dead (M3R2 C1)", () => {
+    // Cycle attempted at turn 5 and died (attempt stamped, success never
+    // landed). Accumulators still loaded — but the gate spaces from the
+    // attempt, so turns 6-7 stay quiet and turn 8 may retry.
+    const state = st({
+      last_director_turn: 0,
+      last_director_attempt: 5,
+      accumulated_epicness: 9,
+      arc_events: ["boss_defeat"],
+    });
+    expect(evaluateDirectorTrigger(state, 6).fire).toBe(false);
+    expect(evaluateDirectorTrigger(state, 7).fire).toBe(false);
+    expect(evaluateDirectorTrigger(state, 8).fire).toBe(true);
   });
 
   it("never fires at turn 0", () => {
@@ -357,7 +411,7 @@ describe.skipIf(!url)("Director (real Postgres, scripted model)", () => {
       })
       .where(eq(schema.campaigns.id, campaignId));
 
-    mockJudgment.mockResolvedValue(
+    armDirectorEmits(
       directorOutput({
         tension_level: 0.72,
         arc_override: {
@@ -382,11 +436,21 @@ describe.skipIf(!url)("Director (real Postgres, scripted model)", () => {
         demote_criticals: ["safe combination"],
         director_notes: ["let the bounty breathe one more scene"],
         voice_patterns: ["clipped, jazz-phrased"],
-      }) as never,
+      }),
     );
 
     const output = await runDirectorCycle(db, campaignId, 8);
     expect(output.tension_level).toBe(0.72);
+
+    // The two-call shape itself (M3R2 C1 review): plan with tools, then ops
+    // by name suffix with NO tools — pinned directly, not just transitively
+    // through the merged output.
+    expect(mockJudgment).toHaveBeenCalledTimes(2);
+    // biome-ignore lint/suspicious/noExplicitAny: mock harness
+    const opsOpts = mockJudgment.mock.calls[1]?.[1] as any;
+    expect(String(opsOpts?.name).endsWith("_ops")).toBe(true);
+    expect(opsOpts?.tools).toBeUndefined();
+    expect(opsOpts?.cacheHead).toBeUndefined();
 
     // The judgment call carried the investigation toolkit and budget.
     const callOpts = mockJudgment.mock.calls[0]?.[1];
@@ -531,7 +595,7 @@ describe.skipIf(!url)("Director (real Postgres, scripted model)", () => {
     vi.mocked(arcs.getActiveArc).mockResolvedValue(fakeArc(campaignId));
     const many = (n: number, tag: string) => Array.from({ length: n }, (_, i) => `${tag} ${i + 1}`);
 
-    mockJudgment.mockResolvedValue(
+    armDirectorEmits(
       directorOutput({
         // Out of band on both ends, and out of count on every list.
         tension_level: 1.4,
@@ -558,7 +622,7 @@ describe.skipIf(!url)("Director (real Postgres, scripted model)", () => {
           })),
           composition_shifts: many(6, "framing").map((axis) => ({ axis, value: "falling" })),
         },
-      }) as never,
+      }),
     );
 
     const output = await runDirectorCycle(db, campaignId, 8);
@@ -593,13 +657,58 @@ describe.skipIf(!url)("Director (real Postgres, scripted model)", () => {
     warn.mockRestore();
   });
 
+  it("a cycle that THROWS still leaves the durable attempt stamp — the ratchet's actual kill switch (M3R2 C1)", async () => {
+    if (!db) throw new Error("unreachable");
+    const campaignId = await makeCampaign();
+    vi.mocked(arcs.getActiveArc).mockResolvedValue(fakeArc(campaignId));
+    // The named failure mode, replayed: the emit dies exactly as the live
+    // grammar-400 did. The stamp precedes every model call, so it must
+    // survive the throw — it is the ONLY thing standing between a repeat
+    // regression and the 37-doomed-call burn.
+    mockJudgment.mockRejectedValue(new Error("400 The compiled grammar is too large"));
+
+    await expect(runDirectorCycle(db, campaignId, 8)).rejects.toThrow("compiled grammar");
+
+    const state = await loadDirectionState(db, campaignId);
+    expect(state.last_director_attempt).toBe(8);
+    expect(state.last_director_turn).toBe(0); // success never landed
+    // And the trigger reads the stamp: quiet until min-turns re-arms.
+    expect(evaluateDirectorTrigger({ ...state, accumulated_epicness: 9 }, 9).fire).toBe(false);
+    expect(evaluateDirectorTrigger({ ...state, accumulated_epicness: 9 }, 11).fire).toBe(true);
+  });
+
+  it("a plant op with an empty description drops; a throwing settle op skips — the cycle survives its ops (M3R2 C1)", async () => {
+    if (!db) throw new Error("unreachable");
+    const campaignId = await makeCampaign();
+    vi.mocked(arcs.getActiveArc).mockResolvedValue(fakeArc(campaignId));
+    vi.mocked(seeds.settleSeed).mockRejectedValue(new Error("no seed matches"));
+    armDirectorEmits(
+      directorOutput({
+        seed_ops: [
+          { op: "plant", description: "", dependencies: [] },
+          { op: "resolve", seed_description: "a thread that does not exist", dependencies: [] },
+          { op: "plant", description: "a photograph left behind", dependencies: [] },
+        ],
+      }),
+    );
+
+    const output = await runDirectorCycle(db, campaignId, 8);
+
+    // The blank plant never reached the thrower; the failing settle was
+    // skipped; the good plant landed; the cycle returned whole.
+    expect(vi.mocked(seeds.plantSeed)).toHaveBeenCalledTimes(1);
+    expect(output.tension_level).toBe(0.5);
+    const state = await loadDirectionState(db, campaignId);
+    expect(state.last_director_turn).toBe(8);
+  });
+
   it("clears an active arc_override on clear_override", async () => {
     if (!db) throw new Error("unreachable");
     const campaignId = await makeCampaign({
       arcOverride: { arc_name: "prior", started_turn: 2, transition_signal: "the door opens" },
     });
     vi.mocked(arcs.getActiveArc).mockResolvedValue(fakeArc(campaignId));
-    mockJudgment.mockResolvedValue(directorOutput({ clear_override: true }) as never);
+    armDirectorEmits(directorOutput({ clear_override: true }));
 
     await runDirectorCycle(db, campaignId, 8);
 
@@ -638,7 +747,7 @@ describe.skipIf(!url)("Director (real Postgres, scripted model)", () => {
       .set({ directionState: playerDrivenState() })
       .where(eq(schema.campaigns.id, campaignId));
 
-    mockJudgment.mockResolvedValue(directorOutput() as never);
+    armDirectorEmits(directorOutput());
     await runDirectorCycle(db, campaignId, 20);
 
     const dossier = String((mockJudgment.mock.calls[0]?.[1] as { prompt?: string })?.prompt ?? "");
@@ -660,7 +769,7 @@ describe.skipIf(!url)("Director (real Postgres, scripted model)", () => {
       .set({ directionState: playerDrivenState() })
       .where(eq(schema.campaigns.id, campaignId));
 
-    mockJudgment.mockResolvedValue(
+    armDirectorEmits(
       directorOutput({
         arc_override: {
           arc_name: "the long evening",
@@ -668,7 +777,7 @@ describe.skipIf(!url)("Director (real Postgres, scripted model)", () => {
           dna_shifts: [{ axis: "darkness", value: 8 }],
           composition_shifts: [],
         },
-      }) as never,
+      }),
     );
 
     await runDirectorCycle(db, campaignId, 20);
@@ -701,7 +810,7 @@ describe.skipIf(!url)("Director (real Postgres, scripted model)", () => {
       .set({ directionState: playerDrivenState() })
       .where(eq(schema.campaigns.id, campaignId));
 
-    mockJudgment.mockResolvedValue(
+    armDirectorEmits(
       directorOutput({
         arc_override: {
           arc_name: "a tonal turn elsewhere",
@@ -709,7 +818,7 @@ describe.skipIf(!url)("Director (real Postgres, scripted model)", () => {
           dna_shifts: [{ axis: "optimism", value: 2 }],
           composition_shifts: [],
         },
-      }) as never,
+      }),
     );
 
     await runDirectorCycle(db, campaignId, 20);
@@ -764,7 +873,7 @@ describe.skipIf(!url)("Director (real Postgres, scripted model)", () => {
           "We set out to make a caper and we have been making a wake. I think the wake is the better show — should that become what we are making?",
         axes: [{ axis: "darkness", to: 10 }],
       },
-    }) as never;
+    });
 
   it("mid-season: no EVOLUTION REVIEW section, and a proposal emitted anyway is DROPPED", async () => {
     if (!db) throw new Error("unreachable");
@@ -777,7 +886,7 @@ describe.skipIf(!url)("Director (real Postgres, scripted model)", () => {
       .where(eq(schema.campaigns.id, campaignId));
     vi.mocked(arcs.seasonBoundary).mockResolvedValue(null);
 
-    mockJudgment.mockResolvedValue(proposalOutput());
+    armDirectorEmits(proposalOutput());
     await runDirectorCycle(db, campaignId, 46);
 
     const dossier = String((mockJudgment.mock.calls[0]?.[1] as { prompt?: string })?.prompt ?? "");
@@ -818,7 +927,7 @@ describe.skipIf(!url)("Director (real Postgres, scripted model)", () => {
       })
       .where(eq(schema.campaigns.id, campaignId));
 
-    mockJudgment.mockResolvedValue(directorOutput() as never);
+    armDirectorEmits(directorOutput());
     await runDirectorCycle(db, campaignId, 46);
 
     const dossier = String((mockJudgment.mock.calls[0]?.[1] as { prompt?: string })?.prompt ?? "");
@@ -835,7 +944,7 @@ describe.skipIf(!url)("Director (real Postgres, scripted model)", () => {
       .set({ directionState: evolutionEvidence() })
       .where(eq(schema.campaigns.id, campaignId));
 
-    mockJudgment.mockResolvedValue(proposalOutput());
+    armDirectorEmits(proposalOutput());
     await runDirectorCycle(db, campaignId, 46);
 
     const dossier = String((mockJudgment.mock.calls[0]?.[1] as { prompt?: string })?.prompt ?? "");
@@ -881,7 +990,7 @@ describe.skipIf(!url)("Director (real Postgres, scripted model)", () => {
       .set({ directionState: { ...evolutionEvidence(), evolution_proposal: pending } })
       .where(eq(schema.campaigns.id, campaignId));
 
-    mockJudgment.mockResolvedValue(proposalOutput());
+    armDirectorEmits(proposalOutput());
     await runDirectorCycle(db, campaignId, 48);
 
     const dossier = String((mockJudgment.mock.calls[0]?.[1] as { prompt?: string })?.prompt ?? "");

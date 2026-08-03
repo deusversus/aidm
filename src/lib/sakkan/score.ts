@@ -41,7 +41,7 @@ export const AxisScore = z.object({
 });
 export type AxisScore = z.infer<typeof AxisScore>;
 
-const ScoreSheet = z.object({ scores: z.array(AxisScore) });
+export const ScoreSheet = z.object({ scores: z.array(AxisScore) });
 
 /**
  * Blind-protocol invariant (§4.5): NO field here can carry the values the

@@ -243,7 +243,7 @@ export const FILTER_CAP = 5;
  * RANK_FLOOR exactly as a clamped one would. Stated in the prompt, clamped in
  * code — the ranker is the whole point of the call.
  */
-const RankOutput = z.object({
+export const RankOutput = z.object({
   scores: z.array(z.object({ index: z.number().int(), score: z.number() })).default([]),
 });
 

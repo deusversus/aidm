@@ -331,6 +331,36 @@ describe.skipIf(!url)("Session lifecycle (real Postgres, scripted models)", () =
     expect(mockStartup).not.toHaveBeenCalled();
   });
 
+  it("a review throw DEGRADES the open, never kills it (M3R2 C1 — the 20-hour no-session outage)", async () => {
+    if (!db) throw new Error("unreachable");
+    const campaignId = await makeCampaign();
+    await insertTurn(campaignId, 1, "The bounty slipped away again.");
+    mockReview.mockRejectedValueOnce(new Error("400 the compiled grammar is too large"));
+
+    const result = await openSession(db, campaignId);
+
+    // The sitting starts: row kept, recap composed, Settei rebuilt — a
+    // sitting without its review is degraded; one that cannot start is dead.
+    expect(result.opened).toBe(true);
+    expect(result.recap).toBe("Previously, the crew chased a ghost across Mars.");
+    const rows = await db
+      .select({ id: schema.sessionRecords.id, closedAt: schema.sessionRecords.closedAt })
+      .from(schema.sessionRecords)
+      .where(eq(schema.sessionRecords.campaignId, campaignId));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.closedAt).toBeNull();
+    // The pilot contract is untouched: a STARTUP throw still fails the open
+    // (turn 1 without its plan must retry — the delete-on-fail path).
+    const campaignId2 = await makeCampaign();
+    mockStartup.mockRejectedValueOnce(new Error("startup died"));
+    await expect(openSession(db, campaignId2)).rejects.toThrow("startup died");
+    const rows2 = await db
+      .select({ id: schema.sessionRecords.id })
+      .from(schema.sessionRecords)
+      .where(eq(schema.sessionRecords.campaignId, campaignId2));
+    expect(rows2).toHaveLength(0);
+  });
+
   it("recap SKIP sentinel → recap undefined (premise declines to recap)", async () => {
     if (!db) throw new Error("unreachable");
     const campaignId = await makeCampaign();

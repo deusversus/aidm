@@ -35,7 +35,7 @@ import {
 import { PencilMark, activeMarks } from "@/lib/types/marks";
 import { PremiseContract } from "@/lib/types/premise";
 import type { TextBlockParam } from "@anthropic-ai/sdk/resources/messages/messages";
-import { and, asc, desc, eq, inArray, isNotNull, isNull } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 
 /**
@@ -201,10 +201,38 @@ export async function openSession(
   try {
     // (3) Director: startup on the cold pilot, review otherwise (the review
     // cycle reads the last session memo in its dossier — Learned reader #2).
+    // M3R2 C1: the REVIEW degrades on failure — a review throw was killing
+    // the whole open (the catch below deletes the claimed row), which on the
+    // live grammar-400 campaign meant NO session opened for 20 hours: no
+    // recap, no Settei rebuild, no prewarm, and every mount 500'd. A sitting
+    // without its review is degraded; a sitting that cannot start is dead.
+    // The pilot STARTUP still fails hard — turn 1 without its plan must
+    // retry, exactly as the delete-on-fail contract below intends.
     if (isPilot) {
       await directorStartup(db, campaignId);
     } else {
-      await directorReview(db, campaignId, currentMaxTurn);
+      try {
+        await directorReview(db, campaignId, currentMaxTurn);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error("[session] director review failed on open (degraded, non-fatal)", {
+          campaignId,
+          error: msg,
+        });
+        // The degrade is DURABLE, not a console line (M3R2 C1 review): the
+        // flag rides pending_flags — a channel the next Director dossier
+        // already reads — so a frozen §7 layer announces itself to the very
+        // cycle that recovers it. Surgical jsonb append: the review may have
+        // half-written state before throwing, and a wholesale save here
+        // would race it.
+        const flag = `Session ${newSessionNumber} opened DEGRADED: your open-time review failed (${msg.slice(0, 140)}) — you owe this sitting a cycle.`;
+        await db
+          .update(campaigns)
+          .set({
+            directionState: sql`jsonb_set(coalesce(${campaigns.directionState}, '{}'::jsonb), '{pending_flags}', coalesce(${campaigns.directionState}->'pending_flags', '[]'::jsonb) || ${JSON.stringify([flag])}::jsonb)`,
+          })
+          .where(eq(campaigns.id, campaignId));
+      }
     }
 
     // (4) The §4.4a regeneration trigger: bake pending marks into a frozen Settei.

@@ -443,6 +443,11 @@ export type MergeSuggestion = z.infer<typeof MergeSuggestion>;
 
 export const DirectionState = z.object({
   last_director_turn: z.number().int().nonnegative().default(0),
+  /** M3R2 C1: stamped at cycle START (before the emit can fail). A failed
+   *  cycle backs off DIRECTOR_MIN_TURNS_BETWEEN turns instead of refiring
+   *  every turn — the live grammar-400 ratchet burned 37 doomed calls
+   *  because only SUCCESS ever reset the trigger accumulators. */
+  last_director_attempt: z.number().int().nonnegative().optional(),
   accumulated_epicness: z.number().nonnegative().default(0),
   /** Since the last Director run: level_up | sakuga_moment | boss_defeat |
    *  foreshadowing_mentioned | phase_transition_suggested:<phase> | … */
@@ -518,6 +523,9 @@ export function rewindDirectionState(state: DirectionState, toTurn: number): Dir
   return {
     ...state,
     last_director_turn: Math.min(state.last_director_turn, toTurn),
+    ...(state.last_director_attempt !== undefined
+      ? { last_director_attempt: Math.min(state.last_director_attempt, toTurn) }
+      : {}),
     accumulated_epicness: 0,
     arc_events: [],
     // Suggestions referencing un-happened turns die with the dead timeline;
@@ -696,6 +704,98 @@ export const DirectorOutput = z.object({
   voice_patterns: z.array(z.string()),
 });
 export type DirectorOutput = z.infer<typeof DirectorOutput>;
+
+// ---------------------------------------------------------------------------
+// The two-half EMIT schemas (M3R2 C1). The grammar cliff is MODEL-DEPENDENT:
+// Haiku compiles the full DirectorOutput; Sonnet 5 rejects it with 400 "the
+// compiled grammar is too large" — which is why every DEV-tier test passed
+// while the live Sonnet-judgment campaign burned 37 doomed cycle calls
+// ($1.71) writing nothing. Hand-probed 2026-08-03: either half alone
+// compiles on Haiku, Sonnet AND Opus; the whole does not on Sonnet. So the
+// cycle's final emit is TWO structured calls (plan with the tool loop, then
+// ops against the re-sent dossier + the plan's JSON), merged engine-side
+// into the unchanged DirectorOutput shape — downstream code never sees the
+// split. The seed op drops ALL optionals via required sentinels ('' / 0),
+// the same C7 doctrine that keeps always-emitted arrays required;
+// mergeDirectorEmits() normalizes sentinels back to undefined, and
+// clampDirectorOutput drops blank-required objects the lean grammar can no
+// longer refuse. The schema-grammar canary re-proves both halves at Sonnet
+// and Opus (the compilers that matter — Haiku is the permissive floor) on
+// every paid eval run.
+// ---------------------------------------------------------------------------
+
+const DirectorEmitSeedOp = z.object({
+  op: z.enum(SEED_OPS),
+  /** '' when not applicable (sentinel — the grammar carries no optionals). */
+  description: z.string(),
+  expected_payoff: z.string(),
+  /** 0 when not applicable. */
+  payoff_window_from: z.number().int(),
+  payoff_window_to: z.number().int(),
+  dependencies: z.array(z.string()),
+  seed_description: z.string(),
+  reason: z.string(),
+});
+
+export const DirectorEmitPlan = z.object({
+  analysis: z.string(),
+  tension_level: z.number(),
+  arc_plan: DirectorArcPlan,
+  episode_close: z.object({ name: z.string(), dramatic_question: z.string() }).optional(),
+  arc_override: z
+    .object({
+      arc_name: z.string(),
+      transition_signal: z.string(),
+      dna_shifts: z.array(z.object({ axis: z.string(), value: z.number() })),
+      composition_shifts: z.array(z.object({ axis: z.string(), value: z.string() })),
+    })
+    .optional(),
+  clear_override: z.boolean(),
+  evolution_proposal: z
+    .object({
+      director_case: z.string(),
+      axes: z.array(z.object({ axis: z.string(), to: z.number() })),
+    })
+    .optional(),
+  /** '' = no trajectory note (sentinel). */
+  scene_shape_trajectory: z.string(),
+  scene_shape_notes: z.array(z.string()),
+});
+export type DirectorEmitPlan = z.infer<typeof DirectorEmitPlan>;
+
+export const DirectorEmitOps = z.object({
+  arc_relevance: z.array(z.object({ axis: z.string(), relevance: z.number() })),
+  seed_ops: z.array(DirectorEmitSeedOp),
+  spotlight_directives: z.array(z.object({ name: z.string(), note: z.string() })),
+  demote_criticals: z.array(z.string()),
+  director_notes: z.array(z.string()),
+  voice_patterns: z.array(z.string()),
+});
+export type DirectorEmitOps = z.infer<typeof DirectorEmitOps>;
+
+/** Sentinel → undefined, halves → the one DirectorOutput downstream code reads. */
+export function mergeDirectorEmits(plan: DirectorEmitPlan, ops: DirectorEmitOps): DirectorOutput {
+  const clean = (s: string) => (s.trim() === "" ? undefined : s);
+  return {
+    ...plan,
+    scene_shape_trajectory: clean(plan.scene_shape_trajectory),
+    arc_relevance: ops.arc_relevance,
+    seed_ops: ops.seed_ops.map((op) => ({
+      op: op.op,
+      description: clean(op.description),
+      expected_payoff: clean(op.expected_payoff),
+      payoff_window_from: op.payoff_window_from === 0 ? undefined : op.payoff_window_from,
+      payoff_window_to: op.payoff_window_to === 0 ? undefined : op.payoff_window_to,
+      dependencies: op.dependencies,
+      seed_description: clean(op.seed_description),
+      reason: clean(op.reason),
+    })),
+    spotlight_directives: ops.spotlight_directives,
+    demote_criticals: ops.demote_criticals,
+    director_notes: ops.director_notes,
+    voice_patterns: ops.voice_patterns,
+  };
+}
 
 /**
  * The DirectorOutput emission ceilings, in one place — the schema can no

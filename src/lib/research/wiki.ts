@@ -396,7 +396,7 @@ export async function categoryMembers(
  * (research.ts sorts ascending), so the band is stated in the description and
  * clamped in `planScrape`.
  */
-const ScrapePlan = z.object({
+export const ScrapePlan = z.object({
   categories: z.array(
     z.object({
       wiki_category: z.string(),

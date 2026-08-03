@@ -581,7 +581,7 @@ export function gapVerdict(resolved: ResolvedObservations, hasProfile: boolean):
 // --- OSP synthesis (the one model call; injectable) --------------------------
 
 /** Model-facing OSP: content only — the compiler stamps every envelope. */
-const OspDraft = z.object({
+export const OspDraft = z.object({
   director_inputs: z.object({
     opening_situation: z.string(),
     spark_reading: z.string(),

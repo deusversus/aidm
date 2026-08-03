@@ -53,7 +53,7 @@ export const COMPACT_BEATS_MAX = 4;
  * that never truncates. The count is stated in the prompt (twice) and applied
  * in `judgmentCompactor`; blanks are filtered there too.
  */
-const CompactBeats = z.object({
+export const CompactBeats = z.object({
   beats: z.array(z.string()),
 });
 
@@ -345,7 +345,7 @@ export function selectEpochSpan(beats: EpochCandidate[]): EpochCandidate[] {
 /** Writes one epoch summary over a span of beats; the judgment-tier version is below. */
 export type EpochSummarizer = (span: EpochCandidate[]) => Promise<string>;
 
-const EpochSummary = z.object({ summary: z.string() });
+export const EpochSummary = z.object({ summary: z.string() });
 
 /**
  * The §6.2 epoch summarist: ONE judgment-tier call over the era leaving Block

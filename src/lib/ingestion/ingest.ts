@@ -219,7 +219,7 @@ export const EXTRACTOR_SYSTEM = [
   "When in doubt, accept. There is no REJECT.",
 ].join(" ");
 
-const RevisedBlock = z.object({ revised_block: z.string() });
+export const RevisedBlock = z.object({ revised_block: z.string() });
 
 export const REVISE_SYSTEM = [
   "You are the record-keeper for a collaborative story engine. A player has",
