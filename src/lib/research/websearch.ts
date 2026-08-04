@@ -48,7 +48,7 @@ const SOURCE_TRUST_LADDER = [
 // Level A/B: identity
 // ---------------------------------------------------------------------------
 
-const WebIdentity = z.object({
+export const WebIdentity = z.object({
   /** Live sources verify this work exists (citations, not vibes). */
   exists: z.boolean(),
   /** Candidate official titles, best first — fed back to AniList search. */

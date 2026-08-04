@@ -8,11 +8,12 @@ import { IngestionExtraction, RevisedBlock } from "@/lib/ingestion/ingest";
 import { callJudgment, streamNarration } from "@/lib/llm/calls";
 import type { TierSelection } from "@/lib/llm/tiers";
 import { bebopContract } from "@/lib/renderer/__tests__/fixtures";
-import { NarrativeSynthesis, VoiceCards } from "@/lib/research/synthesize";
+import { GroundingVerdicts, NarrativeSynthesis, VoiceCards } from "@/lib/research/synthesize";
+import { WebIdentity } from "@/lib/research/websearch";
 import { ScrapePlan } from "@/lib/research/wiki";
 import { ScoreSheet } from "@/lib/sakkan/score";
 import { VoiceChecklistSheet } from "@/lib/sakkan/voice";
-import { OspDraft } from "@/lib/sz/compiler";
+import { OspDraft, VoiceTransposition } from "@/lib/sz/compiler";
 import { ValidationOutput } from "@/lib/turn/outcome";
 import { RankOutput } from "@/lib/turn/retrieval";
 import { ScaleJudgment } from "@/lib/turn/scale";
@@ -113,6 +114,13 @@ const LIVE_PLAY_SCHEMAS: Array<{ name: string; schema: z.ZodType<any> }> = [
   { name: "ScrapePlan", schema: ScrapePlan },
   { name: "PowerSystem", schema: PowerSystem },
   { name: "StatMapping", schema: StatMapping },
+  // M3R3: the research desk's C2/C3 additions + C4a's transposition. Small
+  // grammars belong in the sweep too — the discipline is EVERY production
+  // schema, because the cliff's location is model-dependent and unknowable
+  // from local Zod (the Director 400 shipped through exactly this gap).
+  { name: "WebIdentity", schema: WebIdentity },
+  { name: "GroundingVerdicts", schema: GroundingVerdicts },
+  { name: "VoiceTransposition", schema: VoiceTransposition },
 ];
 
 /** 400s whose message names the grammar/schema — the canary's one true FAIL. */

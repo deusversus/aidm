@@ -19,6 +19,7 @@ import { STRUCTURED_SMALL } from "@/lib/llm/budgets";
 import { callJudgment, callProbe } from "@/lib/llm/calls";
 import { DEV_TIER_SELECTION, TierSelection } from "@/lib/llm/tiers";
 import { cosineSimilarity, embedTexts } from "@/lib/llm/voyage";
+import type { CanonCastMode, TimelineMode } from "@/lib/types/premise";
 import { VoiceCard } from "@/lib/types/profile";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
@@ -492,6 +493,15 @@ export async function ingestAssertion(
     /** §5.4 dossier (M2 C2): the active arc line ("name — dramatic question"),
      *  passed by the turn path (layout has it in hand; SZ has no arc yet). */
     arcLine?: string;
+    /**
+     * §4.1 canonicality (M3R3 C4a, lesson L6): the two axes that gate CANON
+     * matter entering this campaign. Absent = ungated, exactly as before —
+     * ingestion outside a compiled premise (fixtures, bare assertions) keeps
+     * its prior behavior rather than inheriting a guessed mode.
+     */
+    canonicality?: { timeline_mode: TimelineMode; canon_cast_mode: CanonCastMode };
+    /** The player's protagonist name — the `replaced_protagonist` identity test. */
+    pcName?: string;
   },
 ): Promise<IngestionResult> {
   const [campaign] = await db.select().from(campaigns).where(eq(campaigns.id, campaignId));
@@ -785,6 +795,33 @@ export async function ingestAssertion(
     return card ? voiceCardFingerprint(card) : undefined;
   };
 
+  // §4.1 canonicality gate (M3R3 C4a, lesson L6): the stamp above is the SECOND
+  // door canon voice matter walks through — the SZ compiler is the first. For an
+  // `inspired` premise the compiler drops the cards entirely and this door stays
+  // shut for the campaign's life: a canon name-match at play time would resurrect
+  // exactly what compile dropped, which is the whole reason this commit exists.
+  // The card is not merely deferred — on this timeline no card is ever minted by
+  // name recognition. If the table deliberately establishes a canon character,
+  // their voice enters through the PLAYER's own channels (a booth correction, a
+  // supply_canon paste), never silently. `replaced_protagonist` keeps every card
+  // except the one belonging to the seat the player took.
+  const gate = opts.canonicality;
+  // The PC name for that identity test: the caller's word first, else the
+  // catalog's own marked protagonist row — already loaded above, so the turn
+  // path (which holds the contract but not the name) costs no extra query.
+  const pcName =
+    opts.pcName?.trim() ||
+    entityRows.find((e) => e.entityType === "npc" && marksPlayerProtagonistState(e.state))?.name;
+  const voiceCardAllowed = (entityName: string): boolean => {
+    if (!gate) return true;
+    if (gate.timeline_mode === "inspired") return false;
+    if (gate.canon_cast_mode === "replaced_protagonist") {
+      const pcKey = pcName ? identityKey(pcName) : null;
+      return !(pcKey && identityKey(entityName) === pcKey);
+    }
+    return true;
+  };
+
   // Semantic-layer embeddings for every writable fact (§5.4 step 3), batched.
   const semanticEmbeddings = await embedTexts(
     writable.map((f) => f.content),
@@ -797,6 +834,10 @@ export async function ingestAssertion(
     if (!fact) continue;
     const semanticEmb = semanticEmbeddings[i];
     if (!semanticEmb) throw new Error(`ingestAssertion: missing embedding for fact ${i}`);
+
+    // §4.1 hard cast gate (M3R3 C4a): set on the mint path below, surfaced with
+    // the fact's own posture at the end of this iteration.
+    let castGateNote: string | undefined;
 
     const name = fact.entity_name?.trim();
     if (name) {
@@ -847,9 +888,28 @@ export async function ingestAssertion(
         // the SZ compiler's brief admission does not link canon, so this ingest
         // site is the single writer.
         const voiceCard =
-          resolved && entityType === "npc"
+          resolved && entityType === "npc" && voiceCardAllowed(name)
             ? await voiceCardFor(resolved.profileId, name)
             : undefined;
+        // §4.1 hard cast gate (M3R3 C4a): a full_cast campaign declared that its
+        // people ARE the source's people. A new named actor who does NOT resolve
+        // to canon is not forbidden — the editor never rejects (§5.4, WorldBuilder
+        // is an editor) — but it is a craft concern the Director must see. FLAG
+        // semantics exactly as they already are: the write lands, the note surfaces.
+        // The timeline short-circuits the same way voiceCardAllowed's does: an
+        // `inspired` world has no canon cast to introduce anyone through, so a
+        // full_cast axis arriving on that timeline (a pre-C4a stored contract, a
+        // caller passing its own pair) is incoherent and every original character
+        // would flag. Defense in depth — the compiler no longer derives that pair.
+        if (
+          gate?.canon_cast_mode === "full_cast" &&
+          gate.timeline_mode !== "inspired" &&
+          entityType === "npc" &&
+          !resolved
+        ) {
+          fact.posture = "flag";
+          castGateNote = `new named cast in a full-canon-cast campaign — canon has no "${name}"; confirm this is deliberate`;
+        }
         const state: Record<string, unknown> = {};
         if (anchor) {
           state.relationships = {
@@ -946,9 +1006,13 @@ export async function ingestAssertion(
         .where(eq(criticalFacts.id, promotedReplacementId));
     }
 
-    // FLAG writes normally AND surfaces the craft note (§5.4).
+    // FLAG writes normally AND surfaces the craft note (§5.4). The cast gate's
+    // note rides ALONGSIDE the extractor's own concern, never instead of it.
     if (fact.posture === "flag") {
-      flags.push(fact.posture_reason?.trim() || `Craft flag on: ${fact.content}`);
+      const own = fact.posture_reason?.trim();
+      if (own) flags.push(own);
+      if (castGateNote) flags.push(castGateNote);
+      if (!own && !castGateNote) flags.push(`Craft flag on: ${fact.content}`);
     }
   }
 

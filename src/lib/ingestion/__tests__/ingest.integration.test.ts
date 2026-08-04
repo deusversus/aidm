@@ -87,6 +87,9 @@ describe.skipIf(!url)("Universal ingestion (real Postgres, scripted extractor)",
   const playerId = `test_player_${crypto.randomUUID()}`;
   // Profile-keyed canon lives outside the campaign cascade — randomize + clean.
   const profileId = `test_profile_${crypto.randomUUID()}`;
+  // M3R3 C4a needs an anchor with TWO cards; the Vicious profile is seeded
+  // onConflictDoNothing and other tests depend on Julia having none.
+  const castProfileId = `test_cast_profile_${crypto.randomUUID()}`;
   let campaignId: string;
 
   beforeAll(async () => {
@@ -116,7 +119,9 @@ describe.skipIf(!url)("Universal ingestion (real Postgres, scripted extractor)",
     try {
       await db.delete(schema.campaigns).where(eq(schema.campaigns.id, campaignId));
       await db.delete(schema.canonChunks).where(eq(schema.canonChunks.profileId, profileId));
+      await db.delete(schema.canonChunks).where(eq(schema.canonChunks.profileId, castProfileId));
       await db.delete(schema.profiles).where(eq(schema.profiles.id, profileId));
+      await db.delete(schema.profiles).where(eq(schema.profiles.id, castProfileId));
       await db.delete(schema.players).where(eq(schema.players.id, playerId));
     } finally {
       await pool.end();
@@ -138,6 +143,7 @@ describe.skipIf(!url)("Universal ingestion (real Postgres, scripted extractor)",
     await db.delete(schema.entities).where(eq(schema.entities.campaignId, campaignId));
     await db.delete(schema.criticalFacts).where(eq(schema.criticalFacts.campaignId, campaignId));
     await db.delete(schema.canonChunks).where(eq(schema.canonChunks.profileId, profileId));
+    await db.delete(schema.canonChunks).where(eq(schema.canonChunks.profileId, castProfileId));
   });
 
   it("resolver: 'The Syndicate' links to canon and never duplicates on re-mention", async () => {
@@ -369,6 +375,290 @@ describe.skipIf(!url)("Universal ingestion (real Postgres, scripted extractor)",
     expect(row?.block).toContain("canon:"); // still a canon link…
     const state = (row?.state ?? {}) as { voice_card?: string };
     expect(state.voice_card).toBeUndefined(); // …but no card matched, so no stamp
+  });
+
+  // --- M3R3 C4a: the canonicality gates (lesson L6) --------------------------
+  // The stamp above is the SECOND door canon voice matter walks through. The SZ
+  // compiler drops the cards a premise forbids; if this door stays open, a canon
+  // name-match at play time walks them straight back in.
+
+  /** Anchor with two cards + a canon chunk each; names embed to distinct bases
+   *  so resolveCanon links each NPC to ITS chunk, not whichever tied first. */
+  async function seedCastProfile(): Promise<void> {
+    if (!db) throw new Error("unreachable");
+    await db
+      .insert(schema.profiles)
+      .values({
+        id: castProfileId,
+        title: "Cowboy Bebop",
+        profile: {
+          ip_mechanics: {
+            voice_cards: [
+              {
+                name: "Vicious",
+                speech_patterns: "Clipped, imperative, contemptuous — never wastes a word.",
+                humor_type: "none",
+                signature_phrases: ["I'm the only one who can keep you alive."],
+                dialogue_rhythm: "Long silences, then a single cutting line.",
+                emotional_expression: "Restrained",
+              },
+              {
+                name: "Spike Spiegel",
+                speech_patterns: "Lazy drawl that sharpens without warning.",
+                humor_type: "Sardonic",
+                signature_phrases: ["Whatever happens, happens."],
+                dialogue_rhythm: "Slouched half-sentences, then one clean line.",
+                emotional_expression: "Deflecting",
+              },
+            ],
+          },
+        },
+      })
+      .onConflictDoNothing();
+    await db.insert(schema.canonChunks).values([
+      {
+        profileId: castProfileId,
+        pageType: "characters",
+        title: "Vicious",
+        content: "Vicious is a cold, ruthless member of the Red Dragon Syndicate.",
+        embedding: basis(0),
+        turnId: 0,
+        provenance: "sz_research",
+        confidence: 1,
+      },
+      {
+        profileId: castProfileId,
+        pageType: "characters",
+        title: "Spike Spiegel",
+        content: "Spike Spiegel is a bounty hunter aboard the Bebop, a former syndicate enforcer.",
+        embedding: basis(1),
+        turnId: 0,
+        provenance: "sz_research",
+        confidence: 1,
+      },
+    ]);
+    // "Spike" texts land on basis(1); everything else on basis(0).
+    mockEmbed.mockImplementation(async (texts: string[]) =>
+      texts.map((t) => (/spike/i.test(t) ? basis(1) : basis(0))),
+    );
+  }
+
+  const cardOf = (row: { state: unknown } | undefined): string | undefined =>
+    ((row?.state ?? {}) as { voice_card?: string }).voice_card;
+
+  it("gate (C4a): an `inspired` premise NEVER stamps, even on a canon name-match", async () => {
+    if (!db) throw new Error("unreachable");
+    await seedCastProfile();
+    armExtractor([
+      {
+        kind: "cast_fact",
+        entity_name: "Vicious",
+        content: "Vicious steps out of the shadows, katana drawn.",
+        posture: "accept",
+      },
+    ]);
+    const res = await ingestAssertion(db, campaignId, 30, "vicious appears", {
+      profileIds: [castProfileId],
+      canonicality: { timeline_mode: "inspired", canon_cast_mode: "full_cast" },
+    });
+    expect(res.writes.some((w) => w.kind === "entity_created")).toBe(true);
+
+    const [row] = await db
+      .select()
+      .from(schema.entities)
+      .where(and(eq(schema.entities.campaignId, campaignId), eq(schema.entities.name, "Vicious")));
+    // The canon LINK still happens — the world's material is the premise's
+    // whole point. Only the VOICE is withheld: an original story must not be
+    // narrated in the anchor cast's voice (the Elymas Edvan defect).
+    expect(row?.block).toContain("canon:");
+    expect(cardOf(row)).toBeUndefined();
+    // …and full_cast's hard gate never fires on a RESOLVED entity.
+    expect(res.flags).toHaveLength(0);
+  });
+
+  it("gate (C4a): `replaced_protagonist` suppresses ONLY the seat the player took", async () => {
+    if (!db) throw new Error("unreachable");
+    await seedCastProfile();
+    armExtractor([
+      {
+        kind: "cast_fact",
+        entity_name: "Spike Spiegel",
+        content: "Spike lights a cigarette on the gangway.",
+        posture: "accept",
+      },
+      {
+        kind: "cast_fact",
+        entity_name: "Vicious",
+        content: "Vicious watches from the catwalk above.",
+        posture: "accept",
+      },
+    ]);
+    const res = await ingestAssertion(db, campaignId, 31, "we meet on the gangway", {
+      profileIds: [castProfileId],
+      canonicality: { timeline_mode: "canon_adjacent", canon_cast_mode: "replaced_protagonist" },
+      pcName: "spike  spiegel", // normalized identity, not string equality
+    });
+    expect(res.writes.filter((w) => w.kind === "entity_created")).toHaveLength(2);
+
+    const rows = await db
+      .select()
+      .from(schema.entities)
+      .where(
+        and(eq(schema.entities.campaignId, campaignId), eq(schema.entities.entityType, "npc")),
+      );
+    const spike = rows.find((r) => r.name === "Spike Spiegel");
+    const vicious = rows.find((r) => r.name === "Vicious");
+    // The player holds this seat — the engine must not voice their character.
+    expect(spike?.block).toContain("canon:");
+    expect(cardOf(spike)).toBeUndefined();
+    // Every other canon voice is exactly what the player asked for.
+    expect(cardOf(vicious)).toContain("Clipped, imperative");
+  });
+
+  it("gate (C4a): the marked PC row supplies the name when the caller has none", async () => {
+    if (!db) throw new Error("unreachable");
+    // The turn path holds the contract but NOT the protagonist's name — it is
+    // not on the contract. The catalog's own marker closes that gap.
+    await seedCastProfile();
+    await db.insert(schema.entities).values({
+      campaignId,
+      name: "Spike Spiegel",
+      entityType: "npc",
+      block: "The player's self-insert, sitting in the canon lead's seat.",
+      state: { is_player_protagonist: true },
+      turnId: 0,
+      provenance: "sz_compiler",
+      confidence: 1,
+    });
+    armExtractor([
+      {
+        kind: "cast_fact",
+        entity_name: "Vicious",
+        content: "Vicious waits at the cathedral.",
+        posture: "accept",
+      },
+    ]);
+    await ingestAssertion(db, campaignId, 32, "vicious waits", {
+      profileIds: [castProfileId],
+      canonicality: { timeline_mode: "canon_adjacent", canon_cast_mode: "replaced_protagonist" },
+    });
+    const [vicious] = await db
+      .select()
+      .from(schema.entities)
+      .where(and(eq(schema.entities.campaignId, campaignId), eq(schema.entities.name, "Vicious")));
+    // Vicious is not the PC — the card lands.
+    expect(cardOf(vicious)).toContain("Clipped, imperative");
+  });
+
+  it("hard cast gate (C4a): full_cast + a new UNRESOLVED npc → FLAG, and the write still lands", async () => {
+    if (!db) throw new Error("unreachable");
+    armExtractor([
+      {
+        kind: "cast_fact",
+        entity_name: "Marek Dane",
+        content: "Marek Dane runs the salvage yard on the ring.",
+        posture: "accept",
+      },
+    ]);
+    const res = await ingestAssertion(db, campaignId, 33, "marek runs the yard", {
+      profileIds: [],
+      canonicality: { timeline_mode: "canon_adjacent", canon_cast_mode: "full_cast" },
+    });
+    // The editor raises a craft concern; it NEVER rejects (§5.4).
+    expect(res.flags).toHaveLength(1);
+    expect(res.flags[0]).toContain("full-canon-cast");
+    expect(res.flags[0]).toContain("Marek Dane");
+    expect(res.writes.some((w) => w.kind === "entity_created")).toBe(true);
+    expect(res.writes.some((w) => w.kind === "semantic_fact")).toBe(true);
+    const [row] = await db
+      .select()
+      .from(schema.entities)
+      .where(
+        and(eq(schema.entities.campaignId, campaignId), eq(schema.entities.name, "Marek Dane")),
+      );
+    expect(row?.block).toContain("salvage yard");
+  });
+
+  it("hard cast gate (C4a): an `inspired` timeline disarms it even when the caller says full_cast", async () => {
+    if (!db) throw new Error("unreachable");
+    // The pair is incoherent — an original story has no canon cast to introduce
+    // anyone THROUGH — but a stale contract or a careless caller can still hand
+    // it over, and the compiler used to derive exactly this pair. The timeline
+    // wins at this door too: every face in an original story is the premise
+    // working, never a craft concern.
+    armExtractor([
+      {
+        kind: "cast_fact",
+        entity_name: "Iselle Varr",
+        content: "Iselle Varr keeps the only working still on the ring.",
+        posture: "accept",
+      },
+    ]);
+    const res = await ingestAssertion(db, campaignId, 36, "iselle keeps the still", {
+      profileIds: [],
+      canonicality: { timeline_mode: "inspired", canon_cast_mode: "full_cast" },
+    });
+    expect(res.flags).toHaveLength(0);
+    expect(res.writes.some((w) => w.kind === "entity_created")).toBe(true);
+    const [row] = await db
+      .select()
+      .from(schema.entities)
+      .where(
+        and(eq(schema.entities.campaignId, campaignId), eq(schema.entities.name, "Iselle Varr")),
+      );
+    expect(row?.block).toContain("still on the ring");
+  });
+
+  it("hard cast gate (C4a): npcs_only and non-npc kinds never trip it; the extractor's own flag survives", async () => {
+    if (!db) throw new Error("unreachable");
+    // npcs_only invited original cast — a new face is the premise working.
+    armExtractor([
+      {
+        kind: "cast_fact",
+        entity_name: "Marek Dane",
+        content: "Marek Dane runs the salvage yard on the ring.",
+        posture: "accept",
+      },
+      {
+        kind: "faction",
+        entity_name: "The Blue Crows",
+        content: "The Blue Crows are a rival bounty crew.",
+        posture: "accept",
+      },
+    ]);
+    const quiet = await ingestAssertion(db, campaignId, 34, "new faces on the ring", {
+      profileIds: [],
+      canonicality: { timeline_mode: "canon_adjacent", canon_cast_mode: "npcs_only" },
+    });
+    expect(quiet.flags).toHaveLength(0);
+
+    // A new FACTION in a full_cast campaign is not cast — no gate either.
+    armExtractor([
+      {
+        kind: "faction",
+        entity_name: "The Ashen Circle",
+        content: "The Ashen Circle now taxes the ring.",
+        posture: "accept",
+      },
+      {
+        kind: "cast_fact",
+        entity_name: "Slayer",
+        content: "Slayer destroyed an ISSP cruiser single-handedly.",
+        posture: "flag",
+        posture_reason: "Tier-inflation: a lone gunman one-shotting a cruiser breaks scale.",
+      },
+    ]);
+    const both = await ingestAssertion(db, campaignId, 35, "the circle taxes; slayer boasts", {
+      profileIds: [],
+      canonicality: { timeline_mode: "canon_adjacent", canon_cast_mode: "full_cast" },
+    });
+    // The extractor's own concern AND the gate's ride together — the gate note
+    // never displaces the craft note the editor already raised.
+    expect(both.flags.some((f) => f.includes("Tier-inflation"))).toBe(true);
+    expect(both.flags.some((f) => f.includes("full-canon-cast") && f.includes("Slayer"))).toBe(
+      true,
+    );
+    expect(both.flags.some((f) => f.includes("Ashen Circle"))).toBe(false);
   });
 
   it("resolver: protagonist placeholder spellings enrich the ONE PC row (§6.5)", async () => {

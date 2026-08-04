@@ -10,7 +10,7 @@ import {
 } from "@/lib/db/schema";
 import { identityKey, isProtagonistName, marksSelfInsert } from "@/lib/entity-identity";
 import { ingestAssertion } from "@/lib/ingestion/ingest";
-import { LOOPED_LARGE } from "@/lib/llm/budgets";
+import { LOOPED_LARGE, STRUCTURED_RICH } from "@/lib/llm/budgets";
 import { callJudgment } from "@/lib/llm/calls";
 import { DEV_TIER_SELECTION, TierSelection } from "@/lib/llm/tiers";
 import { Composition } from "@/lib/types/composition";
@@ -23,8 +23,9 @@ import {
   PremiseContract,
   PresentationVocabulary,
   SuggestionAffordance,
+  type VoiceFingerprint,
 } from "@/lib/types/premise";
-import { PowerTier, Profile } from "@/lib/types/profile";
+import { AuthorVoice, PowerTier, Profile } from "@/lib/types/profile";
 import { and, eq, inArray, lt, or } from "drizzle-orm";
 import { z } from "zod";
 import type { ConductorDraft, Observation } from "./conductor";
@@ -704,6 +705,248 @@ export const defaultOspSynthesizer: OspSynthesizer = async ({
   });
 };
 
+// --- Voice transposition (M3R3 C4a, lesson L6) -------------------------------
+
+/** The transposed half of the Voice component: the craft, re-grounded. */
+export const VoiceTransposition = z.object({
+  author_voice: AuthorVoice,
+  director_personality: z.string().min(1),
+});
+
+/**
+ * L6's other half, code-side: v3 transposed by never loading the profile (its
+ * custom-profile path built original worlds from the player's stated vision).
+ * v5 loads an anchor and then has to EARN the same separation — keep the hand,
+ * replace the matter. The standing test is in the prompt: no emitted sentence
+ * may identify the source work.
+ */
+export const VOICE_TRANSPOSITION_SYSTEM = [
+  "You are transposing an author's CRAFT onto a different story. The campaign below is an",
+  "ORIGINAL story set in a world INSPIRED BY a source work: its people, places, factions and",
+  "events are its own. You are given the source author's voice fingerprint and directing",
+  "personality. Keep the HAND; replace the MATTER.",
+  "",
+  "KEEP — this is the whole point; the player chose this hand:",
+  "- sentence rhythm and construction: clause length, cadence, where the beat falls;",
+  "- structural motifs: how scenes open, how they turn, how they end;",
+  "- emotional rhythm: how feeling is built, withheld, and released;",
+  "- dialogue TECHNIQUE: deflection, understatement, interruption, silence used as an answer.",
+  "",
+  "REPLACE — every one of these is leakage:",
+  "- every proper noun: character names, place names, factions, technologies, titles, honorifics;",
+  "- every catchphrase, signature line, or quoted idiom belonging to the source;",
+  "- every example and sample sentence: rewrite it from THIS campaign's own matter, or state the",
+  "  technique in neutral form.",
+  "",
+  "THE TEST: no sentence you emit may identify the source work. A reader who has never heard of it",
+  "must find nothing to look up. If a craft note cannot survive without naming the source, state",
+  "the technique plainly instead of naming it.",
+  "",
+  "example_voice must be written FRESH for THIS campaign: a short passage in the transposed voice,",
+  "drawn from the spark and the campaign's own material, naming only what exists in THIS story.",
+  "",
+  "director_personality: 3-5 sentences of directing voice for THIS campaign — the same temperament",
+  "and instincts, re-grounded in this story's material. Never name the source or any of its people.",
+].join("\n");
+
+/** Campaign-own facts fed to the transposition — enough to ground it, bounded. */
+const TRANSPOSITION_MATTER_CAP = 6;
+
+async function transposeVoice(
+  selection: TierSelection,
+  args: {
+    campaignId: string;
+    authorVoice: z.infer<typeof AuthorVoice>;
+    directorPersonality: string;
+    spark: string;
+    pcConcept?: string;
+    ownMatter: string[];
+  },
+): Promise<z.infer<typeof VoiceTransposition>> {
+  const list = (xs: string[]) => xs.filter((x) => x.trim()).join(" | ") || "(none recorded)";
+  return callJudgment(selection, {
+    name: "compile_voice_transposition",
+    campaignId: args.campaignId,
+    phase: "sz",
+    schema: VoiceTransposition,
+    system: VOICE_TRANSPOSITION_SYSTEM,
+    prompt: [
+      "SOURCE AUTHOR VOICE (the hand to keep — never the matter):",
+      `- sentence_patterns: ${list(args.authorVoice.sentence_patterns)}`,
+      `- structural_motifs: ${list(args.authorVoice.structural_motifs)}`,
+      `- dialogue_quirks: ${list(args.authorVoice.dialogue_quirks)}`,
+      `- emotional_rhythm: ${list(args.authorVoice.emotional_rhythm)}`,
+      `- example_voice: ${args.authorVoice.example_voice || "(none)"}`,
+      "",
+      `SOURCE DIRECTOR PERSONALITY: ${args.directorPersonality}`,
+      "",
+      `THIS CAMPAIGN'S SPARK (verbatim — the moment the player wants more of): ${args.spark}`,
+      `THIS CAMPAIGN'S PROTAGONIST: ${
+        args.pcConcept ?? "(concept deferred — the character emerges in play)"
+      }`,
+      "THIS CAMPAIGN'S OWN MATTER (world and cast facts the player established):",
+      args.ownMatter.length > 0
+        ? args.ownMatter.map((m) => `- ${m}`).join("\n")
+        : "- (none yet — work from the spark alone)",
+      "",
+      "Return the transposed author_voice and director_personality for THIS campaign.",
+    ].join("\n"),
+    effort: "high",
+    maxTokens: STRUCTURED_RICH,
+  });
+}
+
+/**
+ * The cast axis when the conversation never settled one — DERIVED from the
+ * timeline, never assumed. The conductor deliberately skips canonicality's door
+ * 2 "entirely for inspired", so an absent `canon_cast_mode` is the NORMAL shape
+ * of an inspired premise, not a hole to plug with the strictest member:
+ * backfilling `full_cast` armed the ingestion cast gate and the Pacer's cast
+ * directive against original characters in an original story — the source's
+ * people declared to be this story's people in a story that has none of them.
+ * `npcs_only` is the least-wrong member the enum holds for inspired: the
+ * protagonist is original (true here) and canon people may still appear as NPCs
+ * (permissible in a world worn without its cast). A dedicated member would say
+ * it exactly; that is a type ripple through the contract, both gates, the Pacer
+ * and every stored contract — deliberately not bought today.
+ */
+function defaultCanonCastMode(
+  timeline: Canonicality["timeline_mode"],
+): Canonicality["canon_cast_mode"] {
+  return timeline === "inspired" ? "npcs_only" : "full_cast";
+}
+
+/**
+ * The FIRST canonicality branch in the codebase (M3R3 C4a, lesson L6). Until
+ * now all three axes were consumed as PROMPT PROSE only — so an `inspired`
+ * original received the anchor's voice matter VERBATIM, and the anchor
+ * protagonist's voice pressured a story he is not in (live: Elymas Edvan in
+ * Deus Versus). Voice is conditioned HERE because this is the one place it is
+ * copied off the profile; the ingestion stamp is the second door, gated there.
+ *
+ * Returns the conditioned fingerprint plus any compile notes for the handoff.
+ */
+async function conditionVoice(args: {
+  campaignId: string;
+  profile: z.infer<typeof Profile>;
+  canonicality: Canonicality;
+  resolved: ResolvedObservations;
+  spark: string;
+}): Promise<{ voice: VoiceFingerprint; notes: string[] }> {
+  const { profile, canonicality, resolved } = args;
+  const authorVoice = profile.ip_mechanics.author_voice;
+  const cards = profile.ip_mechanics.voice_cards;
+  const castDepthPosture = profile.cast_depth_posture ?? {
+    main_cast: "broad-and-deep",
+    supporting: "sharp silhouettes with one true note",
+    recurring_bits: "role-filling",
+  };
+  const notes: string[] = [];
+
+  if (canonicality.timeline_mode === "inspired") {
+    // An original story in the world's clothes. The voice CARDS describe people
+    // who may not exist here, so they are dropped whole — and on this timeline
+    // they STAY dropped: ingestion's canon-link stamp is closed here too (the
+    // same leak through the second door), so no card walks back in on a silent
+    // name-match. If the table deliberately establishes a canon character, their
+    // voice enters through the PLAYER's own channels — a booth correction, a
+    // supply_canon paste — never by the engine recognizing a name. author_voice
+    // and director_personality are CRAFT, not cast, so they survive — transposed
+    // onto this campaign's nouns, never carried verbatim. cast_depth_posture is
+    // structural (how deep a tier is drawn, not who fills it) and rides as-is.
+    const ownMatter = [...resolved.worldFacts, ...resolved.castFacts]
+      .map((o) => o.content)
+      .slice(0, TRANSPOSITION_MATTER_CAP);
+    try {
+      const transposed = await transposeVoice(resolved.tierSelection ?? DEV_TIER_SELECTION, {
+        campaignId: args.campaignId,
+        authorVoice,
+        directorPersonality: profile.director_personality,
+        spark: args.spark,
+        ...(resolved.pcConcept ? { pcConcept: resolved.pcConcept } : {}),
+        ownMatter,
+      });
+      return {
+        voice: {
+          author_voice: transposed.author_voice,
+          voice_cards: [],
+          director_personality: transposed.director_personality,
+          cast_depth_posture: castDepthPosture,
+        },
+        notes,
+      };
+    } catch (err) {
+      // Failing OPEN is forbidden: the defect this branch exists to kill IS
+      // verbatim leakage, so a failed transposition must never fall back to the
+      // anchor's own words. Degrade to the STRUCTURE that carries no names, and
+      // drop the two channels made of the anchor's nouns — its dialogue quirks
+      // and its example prose. director_personality is IP-specific BY CONTRACT
+      // (§4.6: every sentence should be one that could not apply elsewhere), so
+      // it is rebuilt from the campaign's own spark rather than inherited.
+      console.warn(
+        `[sz.compile] voice transposition failed — the charter runs on structure only: ${err}`,
+      );
+      notes.push(
+        "the voice transposition failed at compile — the Style Charter runs on STRUCTURE only (sentence rhythm, structural motifs, emotional rhythm); the anchor's dialogue quirks, example prose, and directing voice were dropped rather than carried verbatim into an original story",
+      );
+      return {
+        voice: {
+          author_voice: {
+            sentence_patterns: authorVoice.sentence_patterns,
+            structural_motifs: authorVoice.structural_motifs,
+            dialogue_quirks: [],
+            emotional_rhythm: authorVoice.emotional_rhythm,
+            example_voice: "",
+          },
+          voice_cards: [],
+          director_personality: `Direct this story from its own spark: ${args.spark} Hold the structural motifs and emotional rhythm above; introduce no idiom, catchphrase, or reference belonging to any other work.`,
+          cast_depth_posture: castDepthPosture,
+        },
+        notes,
+      };
+    }
+  }
+
+  if (canonicality.canon_cast_mode === "replaced_protagonist") {
+    // The player took the canon lead's seat. Exactly ONE card leaves — the one
+    // belonging to that seat — because a card for the character the PLAYER now
+    // plays would have the engine voicing the player's own protagonist. Every
+    // other card is still describing someone the story will actually meet.
+    // A thin profile carries no cards and an unmatched name drops nothing: the
+    // player's self-report is authoritative for the MODE; the identity test only
+    // picks WHICH card, never whether the mode applies.
+    const pcKey = resolved.pcName ? identityKey(resolved.pcName) : null;
+    const kept = pcKey ? cards.filter((c) => identityKey(c.name) !== pcKey) : cards;
+    if (kept.length !== cards.length) {
+      notes.push(
+        `the canon voice card for "${resolved.pcName}" was dropped — the player replaced that protagonist, and the seat is theirs to voice`,
+      );
+    }
+    return {
+      voice: {
+        author_voice: authorVoice,
+        voice_cards: kept,
+        director_personality: profile.director_personality,
+        cast_depth_posture: castDepthPosture,
+      },
+      notes,
+    };
+  }
+
+  // full_cast / npcs_only on a canon_adjacent or alternate timeline: the source's
+  // people ARE this story's people, so the anchor's voice matter is exactly what
+  // the player asked for. VERBATIM here is now a DECISION, not the absence of one.
+  return {
+    voice: {
+      author_voice: authorVoice,
+      voice_cards: cards,
+      director_personality: profile.director_personality,
+      cast_depth_posture: castDepthPosture,
+    },
+    notes,
+  };
+}
+
 // --- Compile-time catalog dedup (§6.5: one entity per campaign+type+identity)-
 // The DB unique index is EXACT (campaign, type, name); near-duplicate briefs
 // slip it, so overlapping admissions are collapsed HERE, deterministically,
@@ -929,6 +1172,15 @@ export async function compileSessionZero(
     // OSP uncertainty instead of vanishing. The deterministic critical_facts
     // sz_fact writes below are unchanged — guaranteed injection stays
     // guaranteed regardless of what ingestion does.
+    // M3R3 C4a: the axes the ingestion gates read. Resolved here rather than
+    // from the contract because the contract is assembled further down, and the
+    // SZ ingest call runs first (its clarify has to reach the OSP prompt).
+    const ingestTimelineMode = resolved.canonicality?.timeline_mode ?? "inspired";
+    const ingestCanonicality = {
+      timeline_mode: ingestTimelineMode,
+      canon_cast_mode:
+        resolved.canonicality?.canon_cast_mode ?? defaultCanonCastMode(ingestTimelineMode),
+    } as const;
     const assertedText = [...resolved.worldFacts, ...resolved.castFacts]
       .map((o) => o.content)
       .join("\n");
@@ -940,6 +1192,10 @@ export async function compileSessionZero(
           // pasted is exactly the name the resolver must not mint twice.
           profileIds: anchorsUsed,
           provenance: "sz_compiler",
+          // M3R3 C4a: the same axes that conditioned the voice above gate the
+          // stamp below — one door is not enough when there are two.
+          canonicality: ingestCanonicality,
+          ...(resolved.pcName ? { pcName: resolved.pcName } : {}),
         });
         if (ingested.clarify)
           resolved.playerDeferred.push(`unresolved at the table: ${ingested.clarify}`);
@@ -971,22 +1227,29 @@ export async function compileSessionZero(
 
     // Canonical components from the profile; active = canonical + player moves.
     const canonicality: Canonicality = Canonicality.parse({
-      timeline_mode: resolved.canonicality?.timeline_mode ?? "inspired",
-      canon_cast_mode: resolved.canonicality?.canon_cast_mode ?? "full_cast",
+      // The SAME derived pair the ingestion gates were handed above — one
+      // derivation, so the stored contract and the gates can never disagree
+      // about an axis the conversation never walked.
+      timeline_mode: ingestCanonicality.timeline_mode,
+      canon_cast_mode: ingestCanonicality.canon_cast_mode,
       event_fidelity: resolved.canonicality?.event_fidelity ?? "influenceable",
       accepted_divergences: resolved.canonicality?.accepted_divergences ?? [],
       forbidden_contradictions: resolved.canonicality?.forbidden_contradictions ?? [],
     });
-    const voice = {
-      author_voice: profile.ip_mechanics.author_voice,
-      voice_cards: profile.ip_mechanics.voice_cards,
-      director_personality: profile.director_personality,
-      cast_depth_posture: profile.cast_depth_posture ?? {
-        main_cast: "broad-and-deep",
-        supporting: "sharp silhouettes with one true note",
-        recurring_bits: "role-filling",
-      },
-    };
+    // M3R3 C4a (lesson L6): the copy point. Voice used to be lifted off the
+    // profile with zero conditioning, and the Settei renders contract.active.voice
+    // EVERY turn — so an original story wore the anchor cast's voices for its
+    // whole life. The axes now decide what crosses.
+    const { voice, notes: voiceNotes } = await conditionVoice({
+      campaignId,
+      profile,
+      canonicality,
+      resolved,
+      spark: resolved.spark ?? "",
+    });
+    // Pushed BEFORE the OSP synthesis so a degraded voice reaches the synthesizer's
+    // deferred context and the conductor's open-items summary, not just the log.
+    resolved.playerDeferred.push(...voiceNotes);
     const { author_voice: _av, voice_cards: _vc, ...worldOnly } = profile.ip_mechanics;
     const canonical: PremiseComponents = {
       world: worldOnly,
@@ -1037,7 +1300,12 @@ export async function compileSessionZero(
       title: profile.title,
       spark: contract.spark,
       resolved,
-      directorPersonality: profile.director_personality,
+      // The THIRD copy point (M3R3 C4a). The OSP fixes the opening constraints,
+      // the forbidden moves and the admit_to_catalog briefs — anchor idiom that
+      // rides in here becomes catalog entities the player meets in scene one.
+      // Every consumer downstream of conditionVoice reads the CONDITIONED voice,
+      // no exceptions; off the inspired path it is the profile's own string.
+      directorPersonality: voice.director_personality,
     });
     const opening = OpeningStatePackage.parse({
       ...ospDraft,

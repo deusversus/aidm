@@ -206,9 +206,13 @@ describe.skipIf(!url)("Layout (real Postgres, scripted models)", () => {
     if (!db) throw new Error("unreachable");
     mockEmbed.mockImplementation(async (texts: string[]) => texts.map(() => basis(0)));
     let judgePrompt = "";
+    let pacerPrompt = "";
     const calls = armHarness({
       intent_triage: GENGA_INTENT,
-      pacer_micro: { beat_classification: "investigation", tone: "wary", escalation: false },
+      pacer_micro: (prompt: string) => {
+        pacerPrompt = prompt;
+        return { beat_classification: "investigation", tone: "wary", escalation: false };
+      },
       relevance_filter: {
         // Keep the two aligned memories, drop everything below the 0.4 floor.
         scores: [
@@ -284,6 +288,13 @@ describe.skipIf(!url)("Layout (real Postgres, scripted models)", () => {
     // Callbacks from the seed ledger; entity card via presence detection.
     expect(conte.callbacks.some((c) => c.includes("bounty"))).toBe(true);
     expect(conte.entity_cards.some((c) => c.includes("Vicious"))).toBe(true);
+
+    // M3R3 C4a: layout forwards ALL THREE canonicality axes to the Pacer — the
+    // cast mode is the one that constrains WHO may walk on, and it used to stop
+    // at the contract (PacerInput's type omitted it, so nothing complained).
+    expect(pacerPrompt).toContain(
+      "CANONICALITY: timeline canon_adjacent, cast full_cast, events influenceable",
+    );
 
     // Checkpoint: the turns row carries the conte (retry-same-dice substrate).
     const [turnRow] = await db

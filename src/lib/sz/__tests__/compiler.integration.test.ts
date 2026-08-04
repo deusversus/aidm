@@ -1,11 +1,12 @@
 import * as schema from "@/lib/db/schema";
+import { callJudgment } from "@/lib/llm/calls";
 import { bebopContract } from "@/lib/renderer/__tests__/fixtures";
 import { renderSettei } from "@/lib/renderer/settei";
 import { NarrativeFocus, TensionSource } from "@/lib/types/composition";
 import { and, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import {
   compileSessionZero,
   dedupeAdmissions,
@@ -16,6 +17,14 @@ import {
 import type { ConductorDraft, Observation } from "../conductor";
 
 /** Real-DB compile: scripted draft → contract + OSP → persisted handoff. */
+
+// The OSP synthesizer is injected per test; the ONE remaining live model call
+// in the compiler is M3R3 C4a's voice transposition, mocked at this seam.
+vi.mock("@/lib/llm/calls", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/llm/calls")>();
+  return { ...actual, callJudgment: vi.fn() };
+});
+const mockJudgment = vi.mocked(callJudgment);
 
 const url = process.env.DATABASE_URL;
 if (!url) console.warn("[sz.compiler] DATABASE_URL not set — skipping");
@@ -164,6 +173,66 @@ const STUB_OSP = {
   ],
   orphan_facts: ["the player hums the OP when happy"],
 };
+
+// --- M3R3 C4a fixtures: an anchor that actually CARRIES voice matter --------
+// The defect this commit kills needs cards to leak; the shared stub profile has
+// none, so the canonicality suite gets its own anchor.
+
+const ANCHOR_AUTHOR_VOICE = {
+  sentence_patterns: ["clipped, jazz-phrased"],
+  structural_motifs: ["cold open", "smash cut to quiet"],
+  dialogue_quirks: ["deflection as intimacy"],
+  emotional_rhythm: ["long cool, sudden ache"],
+  example_voice: "Whatever happens, happens.",
+};
+
+const ANCHOR_DIRECTOR =
+  "A jazz musician directing a noir film: improvises, digresses, and always lands the final note a beat after you expect it.";
+
+const ANCHOR_CARDS = [
+  {
+    name: "Spike Spiegel",
+    speech_patterns: "Lazy drawl that sharpens without warning.",
+    humor_type: "Sardonic" as const,
+    signature_phrases: ["Whatever happens, happens."],
+    dialogue_rhythm: "Slouched half-sentences, then one clean line.",
+    emotional_expression: "Deflecting" as const,
+  },
+  {
+    name: "Faye Valentine",
+    speech_patterns: "Brash, transactional, guarded under the volume.",
+    humor_type: "Sardonic" as const,
+    signature_phrases: ["You're gonna carry that weight."],
+    dialogue_rhythm: "Fast, overlapping, allergic to a pause.",
+    emotional_expression: "Explosive" as const,
+  },
+];
+
+/** The transposed voice the mocked judgment returns — no source nouns in it. */
+const TRANSPOSED = {
+  author_voice: {
+    sentence_patterns: ["clipped, jazz-phrased"],
+    structural_motifs: ["cold open", "smash cut to quiet"],
+    dialogue_quirks: ["deflection as intimacy"],
+    emotional_rhythm: ["long cool, sudden ache"],
+    example_voice: "The trawler's hold smells of brine. Nobody says the name out loud.",
+  },
+  director_personality:
+    "Direct the debt and the dock, not the legend: let the crew talk around what they owe until the silence does the work.",
+};
+
+/** Arm the ONE live compiler call; anything else named is a test bug. */
+function armTransposition(impl: () => unknown): void {
+  mockJudgment.mockImplementation(
+    // biome-ignore lint/suspicious/noExplicitAny: harness spans the generic judgment signature
+    (_s: any, o: any) => {
+      if (o.name !== "compile_voice_transposition") {
+        throw new Error(`unexpected judgment call in the compiler: ${o.name}`);
+      }
+      return Promise.resolve(impl()) as never;
+    },
+  );
+}
 
 describe("suggestion affordance resolution (anchored, never guessed from prose)", () => {
   it("does not read prose 'never' as the value (live misparse 2026-07-10)", () => {
@@ -664,6 +733,31 @@ describe.skipIf(!url)("SZ compiler (real Postgres)", () => {
         },
       })
       .onConflictDoNothing();
+    // M3R3 C4a anchor: same world, but it CARRIES voice matter to leak.
+    await db
+      .insert(schema.profiles)
+      .values({
+        id: "test_sz_profile_voice",
+        title: "Cowboy Bebop",
+        profile: {
+          id: "test_sz_profile_voice",
+          title: "Cowboy Bebop",
+          alternate_titles: [],
+          media_type: "anime",
+          status: "completed",
+          relation_type: "canonical",
+          ip_mechanics: {
+            ...contract.canonical.world,
+            author_voice: ANCHOR_AUTHOR_VOICE,
+            voice_cards: ANCHOR_CARDS,
+          },
+          canonical_dna: contract.canonical.treatment,
+          canonical_composition: contract.canonical.framing,
+          director_personality: ANCHOR_DIRECTOR,
+          cast_depth_posture: contract.canonical.voice.cast_depth_posture,
+        },
+      })
+      .onConflictDoNothing();
     const draft: ConductorDraft = {
       transcript: [{ role: "user", content: "let's play bebop" }],
       observations: SCRIPTED_OBSERVATIONS,
@@ -684,6 +778,7 @@ describe.skipIf(!url)("SZ compiler (real Postgres)", () => {
       await db.delete(schema.campaigns).where(eq(schema.campaigns.id, campaignId));
       await db.delete(schema.profiles).where(eq(schema.profiles.id, "test_sz_profile"));
       await db.delete(schema.profiles).where(eq(schema.profiles.id, "test_sz_profile_b"));
+      await db.delete(schema.profiles).where(eq(schema.profiles.id, "test_sz_profile_voice"));
       await db.delete(schema.players).where(eq(schema.players.id, playerId));
     } finally {
       await pool.end();
@@ -1138,6 +1233,207 @@ describe.skipIf(!url)("SZ compiler (real Postgres)", () => {
     } finally {
       await db.delete(schema.campaigns).where(eq(schema.campaigns.id, campaign.id));
     }
+  });
+
+  // --- M3R3 C4a: canonicality compiles (lesson L6) --------------------------
+  // The live defect: an "inspired" original received the anchor profile's
+  // VERBATIM voice matter — the anchor protagonist's voice pressuring an
+  // original story (Elymas Edvan in Deus Versus). These four pin the branch.
+
+  /** Compile a draft against the voice-carrying anchor with a canonicality override. */
+  async function compileWithCanonicality(
+    title: string,
+    canonicality: string,
+    extra: Observation[] = [],
+  ) {
+    if (!db) throw new Error("unreachable");
+    const draft: ConductorDraft = {
+      transcript: [],
+      // The scripted canonicality is dropped rather than merged under: these
+      // cases turn on what the conversation did NOT walk (an inspired premise
+      // never walks the cast door), and a merge would quietly supply the axis
+      // the derivation exists to fill.
+      observations: [
+        ...SCRIPTED_OBSERVATIONS.filter((o) => o.kind !== "canonicality"),
+        obs("canonicality", canonicality),
+        ...extra,
+      ],
+      profileIds: ["test_sz_profile_voice"],
+      readyToCompile: true,
+    };
+    const [campaign] = await db
+      .insert(schema.campaigns)
+      .values({ playerId, title, status: "draft", szTranscript: draft })
+      .returning();
+    if (!campaign) throw new Error("insert failed");
+    let seenDeferred: string[] = [];
+    let seenPrompt = "";
+    let seenOspDirector = "";
+    let seenIngestCanonicality: { timeline_mode?: string; canon_cast_mode?: string } | undefined;
+    try {
+      const result = await compileSessionZero(db, campaign.id, {
+        ospSynthesizer: async (input) => {
+          seenDeferred = [...input.resolved.playerDeferred];
+          seenOspDirector = input.directorPersonality;
+          return STUB_OSP;
+        },
+        ingestor: async (_db, _campaignId, _turnNumber, _text, ingestOpts) => {
+          seenIngestCanonicality = ingestOpts.canonicality;
+          return { writes: [], flags: [] };
+        },
+      });
+      const call = mockJudgment.mock.calls.find(
+        (c) => (c[1] as { name?: string })?.name === "compile_voice_transposition",
+      );
+      seenPrompt = (call?.[1] as { prompt?: string })?.prompt ?? "";
+      return { result, seenDeferred, seenPrompt, seenOspDirector, seenIngestCanonicality };
+    } finally {
+      await db.delete(schema.campaigns).where(eq(schema.campaigns.id, campaign.id));
+    }
+  }
+
+  it("inspired: the cards are DROPPED and the craft is TRANSPOSED, posture untouched", async () => {
+    mockJudgment.mockReset();
+    armTransposition(() => TRANSPOSED);
+    const { result, seenPrompt, seenOspDirector } = await compileWithCanonicality(
+      "inspired fixture",
+      '{"timeline_mode": "inspired"}',
+    );
+    expect(result.gaps).toEqual([]);
+
+    const voice = result.contract.active.voice;
+    // The cards describe people who may not exist in this story — gone whole.
+    expect(voice.voice_cards).toEqual([]);
+    // The HAND survives, but it is the transposed hand, not the anchor's.
+    expect(voice.author_voice).toEqual(TRANSPOSED.author_voice);
+    expect(voice.director_personality).toBe(TRANSPOSED.director_personality);
+    expect(voice.director_personality).not.toBe(ANCHOR_DIRECTOR);
+    // cast_depth_posture is STRUCTURAL (how deep a tier is drawn, not who
+    // fills it) — it rides verbatim on every path.
+    expect(voice.cast_depth_posture).toEqual(bebopContract().canonical.voice.cast_depth_posture);
+    // Both layers are conditioned: a canonical layer holding the dropped
+    // matter would smuggle it back through any future canonical read.
+    expect(result.contract.canonical.voice.voice_cards).toEqual([]);
+    expect(result.contract.canonical.voice.author_voice).toEqual(TRANSPOSED.author_voice);
+
+    // The call is grounded in THIS campaign: spark verbatim + its own matter.
+    expect(seenPrompt).toContain("whatever happens, happens");
+    expect(seenPrompt).toContain("fishing trawler");
+    expect(seenPrompt).toContain("bounty hunter"); // the pc_concept
+
+    // The THIRD copy point: the OSP synthesis reads the CONDITIONED voice too.
+    // Its briefs become catalog entities the player meets in scene one, so
+    // anchor idiom riding in here is a leak with a longer life than the prompt.
+    expect(seenOspDirector).toBe(TRANSPOSED.director_personality);
+    expect(seenOspDirector).not.toBe(ANCHOR_DIRECTOR);
+  });
+
+  it("inspired with the cast door unwalked: the axis DERIVES to npcs_only, both gates included", async () => {
+    mockJudgment.mockReset();
+    armTransposition(() => TRANSPOSED);
+    // The conductor skips door 2 entirely for inspired, so this — timeline only
+    // — is the NORMAL inspired observation. Defaulting it to full_cast armed the
+    // ingestion cast gate and the Pacer's cast directive against the original
+    // characters of an original story.
+    const { result, seenIngestCanonicality } = await compileWithCanonicality(
+      "inspired derived cast fixture",
+      '{"timeline_mode": "inspired"}',
+    );
+    expect(result.gaps).toEqual([]);
+    expect(result.contract.active.canonicality.canon_cast_mode).toBe("npcs_only");
+    expect(result.contract.canonical.canonicality.canon_cast_mode).toBe("npcs_only");
+    // The same pair the gates were handed — one derivation, no drift.
+    expect(seenIngestCanonicality).toEqual({
+      timeline_mode: "inspired",
+      canon_cast_mode: "npcs_only",
+    });
+  });
+
+  it("inspired + a FAILED transposition degrades to structure — it never fails open", async () => {
+    mockJudgment.mockReset();
+    armTransposition(() => {
+      throw new Error("transposition boom");
+    });
+    const { result, seenDeferred } = await compileWithCanonicality(
+      "inspired degrade fixture",
+      '{"timeline_mode": "inspired"}',
+    );
+    expect(result.gaps).toEqual([]);
+
+    const av = result.contract.active.voice.author_voice;
+    // The name-free STRUCTURE survives…
+    expect(av.sentence_patterns).toEqual(ANCHOR_AUTHOR_VOICE.sentence_patterns);
+    expect(av.structural_motifs).toEqual(ANCHOR_AUTHOR_VOICE.structural_motifs);
+    expect(av.emotional_rhythm).toEqual(ANCHOR_AUTHOR_VOICE.emotional_rhythm);
+    // …and the two channels made of the anchor's own words do NOT.
+    expect(av.dialogue_quirks).toEqual([]);
+    expect(av.example_voice).toBe("");
+    expect(result.contract.active.voice.voice_cards).toEqual([]);
+    // The IP-specific directing voice is rebuilt from the campaign's spark,
+    // never inherited — carrying it verbatim is the leak this commit kills.
+    expect(result.contract.active.voice.director_personality).not.toBe(ANCHOR_DIRECTOR);
+    expect(result.contract.active.voice.director_personality).toContain(
+      "whatever happens, happens",
+    );
+    // The degrade is SAID, not swallowed — it reaches the OSP's open items.
+    expect(seenDeferred.some((d) => d.includes("voice transposition failed"))).toBe(true);
+  });
+
+  it("replaced_protagonist: ONLY the replaced seat's card leaves; a miss drops nothing", async () => {
+    mockJudgment.mockReset();
+    armTransposition(() => TRANSPOSED); // must never fire on this path
+    const hit = await compileWithCanonicality(
+      "replaced pc fixture",
+      '{"timeline_mode": "canon_adjacent", "canon_cast_mode": "replaced_protagonist"}',
+      [obs("pc_name", "Spike Spiegel — the player took the seat")],
+    );
+    expect(hit.result.gaps).toEqual([]);
+    const kept = hit.result.contract.active.voice.voice_cards;
+    expect(kept.map((c) => c.name)).toEqual(["Faye Valentine"]);
+    // Every other card is untouched — this is a surgical drop, not a purge.
+    expect(kept[0]).toEqual(ANCHOR_CARDS[1]);
+    // The craft is the source's craft here: the timeline is still canon.
+    expect(hit.result.contract.active.voice.author_voice).toEqual(ANCHOR_AUTHOR_VOICE);
+    expect(hit.result.contract.active.voice.director_personality).toBe(ANCHOR_DIRECTOR);
+    expect(
+      mockJudgment.mock.calls.some(
+        (c) => (c[1] as { name?: string })?.name === "compile_voice_transposition",
+      ),
+    ).toBe(false);
+
+    // A name matching NO card drops nothing: the player's self-report is
+    // authoritative for the MODE; the identity test only picks WHICH card.
+    const miss = await compileWithCanonicality(
+      "replaced pc miss fixture",
+      '{"timeline_mode": "canon_adjacent", "canon_cast_mode": "replaced_protagonist"}',
+      [obs("pc_name", "Kaelen — an original lead in the canon seat")],
+    );
+    expect(miss.result.contract.active.voice.voice_cards).toEqual(ANCHOR_CARDS);
+  });
+
+  it("full_cast + canon_adjacent: the voice is BYTE-IDENTICAL to the anchor (deliberate verbatim)", async () => {
+    mockJudgment.mockReset();
+    armTransposition(() => TRANSPOSED); // must never fire on this path
+    const { result, seenOspDirector, seenIngestCanonicality } = await compileWithCanonicality(
+      "full cast fixture",
+      '{"timeline_mode": "canon_adjacent", "canon_cast_mode": "full_cast"}',
+    );
+    expect(result.gaps).toEqual([]);
+    expect(result.contract.active.voice).toEqual({
+      author_voice: ANCHOR_AUTHOR_VOICE,
+      voice_cards: ANCHOR_CARDS,
+      director_personality: ANCHOR_DIRECTOR,
+      cast_depth_posture: bebopContract().canonical.voice.cast_depth_posture,
+    });
+    // Reading the CONDITIONED voice at the OSP call is behavior-neutral here:
+    // off the inspired path conditionVoice hands back the profile's own string.
+    expect(seenOspDirector).toBe(ANCHOR_DIRECTOR);
+    // A stated cast door is carried, never re-derived.
+    expect(seenIngestCanonicality).toEqual({
+      timeline_mode: "canon_adjacent",
+      canon_cast_mode: "full_cast",
+    });
+    expect(mockJudgment).not.toHaveBeenCalled();
   });
 
   it("gap verdict blocks a sparkless handoff (§8)", () => {

@@ -467,10 +467,40 @@ describe("canonicality-aware pacing (v3 rule #10, M2R R2)", () => {
   it("the prompt carries the CANONICALITY line when the contract supplies it", () => {
     const prompt = buildPrompt(
       makeInput({
-        canonicality: { timeline_mode: "canon_adjacent", event_fidelity: "observable" },
+        canonicality: {
+          timeline_mode: "canon_adjacent",
+          canon_cast_mode: "full_cast",
+          event_fidelity: "observable",
+        },
       }),
     );
-    expect(prompt).toContain("CANONICALITY: timeline canon_adjacent, events observable");
+    expect(prompt).toContain(
+      "CANONICALITY: timeline canon_adjacent, cast full_cast, events observable",
+    );
+  });
+
+  it("the CAST mode rides the line and the system rule (M3R3 C4a — who may be introduced)", () => {
+    // The Pacer paces cast introductions; before C4a it could not see the one
+    // axis that says whether a brand-new named face is even admissible.
+    const prompt = buildPrompt(
+      makeInput({
+        // A COHERENT pair (M3R3 C4a review): an inspired world has no canon lead
+        // to replace, and the compiler derives npcs_only for exactly this shape.
+        canonicality: {
+          timeline_mode: "inspired",
+          canon_cast_mode: "npcs_only",
+          event_fidelity: "background",
+        },
+      }),
+    );
+    expect(prompt).toContain("cast npcs_only");
+    const system = buildSystem(true);
+    expect(system).toContain("CAST mode constrains WHO may be introduced");
+    expect(system).toContain("full_cast");
+    expect(system).toContain("replaced_protagonist");
+    // The npcs_only clause has to stay coherent for the derived-inspired
+    // campaign that now lands on it: canon supplies no one at all there.
+    expect(system).toContain("on an inspired timeline canon supplies no one at all");
   });
 
   it("no canonicality, no line (pre-SV campaigns degrade quietly)", () => {

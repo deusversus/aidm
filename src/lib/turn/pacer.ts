@@ -97,8 +97,10 @@ export interface PacerInput {
   recentBeats: string[];
   /** Null until a Director has run — beat classification only, strength held at suggestion. */
   arcState: PacerArcState | null;
-  /** §7.2 "canonicality-aware" (v3 pacing rule #10, restored M2R R2). */
-  canonicality?: { timeline_mode: string; event_fidelity: string };
+  /** §7.2 "canonicality-aware" (v3 pacing rule #10, restored M2R R2). The cast
+   *  mode joined at M3R3 C4a: the Pacer weighs cast-introduction pacing and was
+   *  blind to the one axis that constrains WHO may be introduced. */
+  canonicality?: { timeline_mode: string; canon_cast_mode: string; event_fidelity: string };
   campaignId?: string;
   turnNumber?: number;
 }
@@ -150,7 +152,7 @@ export function buildPrompt(input: PacerInput): string {
   }
   if (input.canonicality) {
     lines.push(
-      `CANONICALITY: timeline ${input.canonicality.timeline_mode}, events ${input.canonicality.event_fidelity}`,
+      `CANONICALITY: timeline ${input.canonicality.timeline_mode}, cast ${input.canonicality.canon_cast_mode}, events ${input.canonicality.event_fidelity}`,
     );
   }
   if (input.recentBeats.length > 0) lines.push(`RECENT BEATS: ${input.recentBeats.join(" → ")}`);
@@ -171,7 +173,7 @@ export function buildSystem(hasArcState: boolean): string {
     "- pacing_note: one actionable sentence. When the beat wants a driving close, NAME the concrete pressure this scene should END on (an arrival, a discovery landing, a clock advancing) — vary it turn to turn, grounded in what is live; never re-pose the standing fork the recent beats already posed. When the beat is a breather, say so plainly.",
     "- Defer to active player momentum: if the player is driving the story somewhere, go with them — gates prevent STALLING, never player agency (§7.4: expressed player word > premise-truth > the engine's inferred impulse).",
     "- strength is a PROPOSAL (suggestion/strong/override). The engine enforces the stall table; propose override ONLY when the phase gate's override threshold is met. When in doubt, suggestion.",
-    "- CANONICALITY shapes pacing (v3 rule #10): canon_adjacent timeline + observable events → the external canon timeline provides structure; lean on upcoming canon events as natural escalation anchors. alternate timeline or influenceable events → the timeline is mutable; pacing is fully player-driven. inspired timeline or background events → no external timeline exists; pacing rests entirely on player action and Director planning.",
+    "- CANONICALITY shapes pacing (v3 rule #10): canon_adjacent timeline + observable events → the external canon timeline provides structure; lean on upcoming canon events as natural escalation anchors. alternate timeline or influenceable events → the timeline is mutable; pacing is fully player-driven. inspired timeline or background events → no external timeline exists; pacing rests entirely on player action and Director planning. The CAST mode constrains WHO may be introduced: full_cast → the source's people are this story's people, so pace introductions through them and treat a brand-new named face as a deliberate act; replaced_protagonist → the lead's seat is the player's, never a canon character's; npcs_only → canon supplies supporting cast, never the lead — and on an inspired timeline canon supplies no one at all, so every new face is this story's own and introducing them is the premise working.",
     "- phase_transition: name the target phase ONLY when a transition is genuinely due; otherwise omit.",
     hasArcState
       ? ""

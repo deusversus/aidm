@@ -332,6 +332,15 @@ export async function runLayout(
       ? ingestAssertion(db, campaignId, turnNumber, playerInput, {
           profileIds: contract.anchors_used,
           provenance: "player_assertion",
+          // M3R3 C4a: the SZ compiler dropped canon voice matter the premise
+          // forbids; the same axes have to gate the play-time stamp, or a canon
+          // name-match walks it straight back in. The PC name is NOT on the
+          // contract — ingestion resolves it from the marked protagonist row it
+          // already loads (see `pcName` there).
+          canonicality: {
+            timeline_mode: contract.active.canonicality.timeline_mode,
+            canon_cast_mode: contract.active.canonicality.canon_cast_mode,
+          },
           ...(activeArc ? { arcLine: `${activeArc.name} — ${activeArc.dramaticQuestion}` } : {}),
         })
           .then((r) => {
@@ -424,6 +433,7 @@ export async function runLayout(
           arcState,
           canonicality: {
             timeline_mode: contract.active.canonicality.timeline_mode,
+            canon_cast_mode: contract.active.canonicality.canon_cast_mode,
             event_fidelity: contract.active.canonicality.event_fidelity,
           },
           campaignId,
