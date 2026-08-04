@@ -102,7 +102,21 @@ export interface UsageStats {
    * price flat at the 1h rate below.
    */
   cache_creation?: CacheCreationSplit;
+  /**
+   * Billable server-side web searches (`usage.server_tool_use
+   * .web_search_requests`, M3R3 C2). The per-search fee is real spend the
+   * token fields cannot see — dropping it here would ship an unmetered
+   * organ (the choke-point doctrine forbids exactly that).
+   */
+  web_search_requests?: number;
 }
+
+/**
+ * Web search server-tool fee: $10 per 1,000 searches (verified live against
+ * platform.claude.com docs 2026-08-04; errored searches are not billed and
+ * never reach the usage counter).
+ */
+export const WEB_SEARCH_USD_PER_SEARCH = 0.01;
 
 /** Compute total USD cost for a given model + usage breakdown. */
 export function estimateCostUsd(model: string, usage: UsageStats): number {
@@ -129,5 +143,6 @@ export function estimateCostUsd(model: string, usage: UsageStats): number {
       ? (split.ephemeral_5m_input_tokens / 1_000_000) * p.cacheCreation5mPer1M +
         (split.ephemeral_1h_input_tokens / 1_000_000) * p.cacheCreationPer1M
       : (flat / 1_000_000) * p.cacheCreationPer1M;
-  return inputCost + outputCost + cacheReadCost + cacheCreationCost;
+  const searchCost = (usage.web_search_requests ?? 0) * WEB_SEARCH_USD_PER_SEARCH;
+  return inputCost + outputCost + cacheReadCost + cacheCreationCost + searchCost;
 }

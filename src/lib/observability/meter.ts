@@ -80,6 +80,7 @@ export async function recordModelCall(record: ModelCallRecord): Promise<number> 
         outputTokens: record.usage.output_tokens,
         cacheReadInputTokens: record.usage.cache_read_input_tokens ?? 0,
         cacheCreationInputTokens: record.usage.cache_creation_input_tokens ?? 0,
+        webSearchRequests: record.usage.web_search_requests,
         costUsd: costUsd.toFixed(6),
         latencyMs: record.latencyMs,
         fallbackUsed: record.fallbackUsed ?? false,

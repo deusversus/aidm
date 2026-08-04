@@ -50,23 +50,45 @@ export function mechanicsImplied(genres: string[], tagNames: string[]): boolean 
 }
 
 /**
+ * What KIND of fetched page fed an organ — `null` means nothing did. The
+ * api_thin trap this exists to close: wiki found, zero pages fetched, and
+ * every label still reading "wiki_page" would repeat the founding defect one
+ * field down (asserted provenance instead of asserted confidence). M3R3 C2
+ * widens the same discipline to search-fed organs: a field the fallback
+ * chain grounded reads "web_search", never "wiki_page" — the honest label is
+ * the whole point, and a search page is not a canon wiki page.
+ */
+export type OrganSource = "wiki" | "search" | null;
+
+/**
  * Inputs for the per-field provenance map — each keyed on whether CONTENT
- * actually flowed from pages, never on a wiki merely existing. The api_thin
- * trap this exists to close: wiki found, zero pages fetched, and every
- * label still reading "wiki_page" would repeat the founding defect one
- * field down (asserted provenance instead of asserted confidence).
+ * actually flowed from pages, and from WHICH kind, never on a wiki merely
+ * existing.
  */
 export interface FieldSourceInputs {
-  /** Location + faction pages fetched — the only wiki-fed world_setting content. */
-  settingPages: number;
-  /** A stat mapping was synthesized FROM lore/items pages AND kept (the
-   *  ≥90 bar in synthesize.ts) — the discarded default came from NO organ. */
-  statMappingGrounded: boolean;
-  /** A power system was synthesized (only ever happens from technique pages). */
-  powerSystemPresent: boolean;
-  /** Characters with REAL extracted quotes behind their voice cards. */
-  quoteCharacters: number;
+  /**
+   * Where the IDENTITY itself came from (M3R3 C2). A Level B profile's genre
+   * list came from the web identity, not from an AniList row that was never
+   * asked — labeling its ungrounded world_setting "anilist" would contradict
+   * the same record's sources_consulted, which deliberately omits AniList
+   * there. One record, one story about its own sources.
+   */
+  identityOrigin: "anilist" | "web_search";
+  /** Location + faction pages — the only page-fed world_setting content. */
+  settingSource: OrganSource;
+  /** A stat mapping synthesized FROM lore/items pages AND kept (the ≥90 bar
+   *  in synthesize.ts) — the discarded default came from NO organ. */
+  statMappingSource: OrganSource;
+  /** A power system synthesized from technique pages. */
+  powerSystemSource: OrganSource;
+  /** Pages behind characters with REAL extracted quotes. */
+  voiceSource: OrganSource;
 }
+
+const LABEL = { wiki: "wiki_page", search: "web_search" } as const satisfies Record<
+  Exclude<OrganSource, null>,
+  FieldSource
+>;
 
 export function buildFieldSources(i: FieldSourceInputs): Record<string, FieldSource> {
   return {
@@ -81,14 +103,19 @@ export function buildFieldSources(i: FieldSourceInputs): Record<string, FieldSou
     cast_depth_posture: "model_recall",
     combat_style: "model_recall",
     power_distribution: "model_recall",
-    // genre is AniList in every branch; locations/factions are the only
-    // page-fed content — no setting pages, no wiki_page label.
-    world_setting: i.settingPages > 0 ? "wiki_page" : "anilist",
-    ...(i.powerSystemPresent ? { power_system: "wiki_page" as const } : {}),
+    // locations/factions are the only page-fed content — no setting pages, no
+    // page label at all, and the fallback names whichever identity carried the
+    // genre list that is then all world_setting holds.
+    world_setting: i.settingSource
+      ? LABEL[i.settingSource]
+      : i.identityOrigin === "web_search"
+        ? "web_search"
+        : "anilist",
+    ...(i.powerSystemSource ? { power_system: LABEL[i.powerSystemSource] } : {}),
     // Absence IS the label for an ungrounded stat mapping: the hardcoded
     // default was fed by no source, so it carries no provenance entry.
-    ...(i.statMappingGrounded ? { stat_mapping: "wiki_page" as const } : {}),
-    voice_cards: i.quoteCharacters > 0 ? "wiki_page" : "model_recall",
+    ...(i.statMappingSource ? { stat_mapping: LABEL[i.statMappingSource] } : {}),
+    voice_cards: i.voiceSource ? LABEL[i.voiceSource] : "model_recall",
   };
 }
 
@@ -115,8 +142,13 @@ export interface TrustInputs {
 
 export function deriveTrust(inputs: TrustInputs): ResearchTrust {
   const gaps: string[] = [];
-  let score = 20; // floor: an AniList identity alone is a rumor, not a profile
-  score += 15; // AniList identity verified (researchTitle throws without it)
+  let score = 20; // floor: an identity alone is a rumor, not a profile
+  // Identity verification, method-aware (M3R3 C2). researchTitle throws when
+  // NEITHER an AniList row nor live citation verifies the work, so this term is
+  // always earned — but Level B's identity is verified BY CITATION, which is
+  // real verification and weaker than an API row. It must not borrow AniList's
+  // credit on a title AniList was never able to answer for.
+  score += inputs.method === "web_search" ? 10 : 15;
 
   const richScrape = inputs.pagesFetched >= 10 && inputs.contentChars >= RICH_CONTENT_CHARS;
   if (richScrape) score += 30;

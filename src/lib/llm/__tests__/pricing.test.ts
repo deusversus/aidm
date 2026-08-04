@@ -33,7 +33,7 @@ describe("pricing table (2026-07 rates)", () => {
     expect(() => pricingFor("claude-opus-4-7")).toThrow(/menus are closed/);
   });
 
-  it("estimateCostUsd sums all four buckets", () => {
+  it("estimateCostUsd sums the four token buckets", () => {
     const cost = estimateCostUsd("claude-sonnet-5", {
       input_tokens: 1_000_000,
       output_tokens: 1_000_000,
@@ -113,6 +113,25 @@ describe("pricing table (2026-07 rates)", () => {
     });
     expect(Number.isNaN(partial)).toBe(false);
     expect(partial).toBeCloseTo(2);
+  });
+
+  it("adds the per-search server-tool fee on top of the token buckets (M3R3 C2)", () => {
+    const tokensOnly = { input_tokens: 1_000, output_tokens: 500 };
+    const base = estimateCostUsd("claude-sonnet-5", tokensOnly);
+    // $10 per 1,000 searches: real spend NO token counter can see, so it has
+    // to be additive — five searches is five cents, whatever the prose cost.
+    expect(
+      estimateCostUsd("claude-sonnet-5", { ...tokensOnly, web_search_requests: 5 }),
+    ).toBeCloseTo(base + 0.05);
+    // A search-capable call that fired nothing is free, and prices identically
+    // to a call that never could search — the 0 is provenance, not spend.
+    expect(
+      estimateCostUsd("claude-haiku-4-5", {
+        input_tokens: 0,
+        output_tokens: 0,
+        web_search_requests: 0,
+      }),
+    ).toBe(estimateCostUsd("claude-haiku-4-5", { input_tokens: 0, output_tokens: 0 }));
   });
 
   it("a realistic cached narration turn prices sanely", () => {

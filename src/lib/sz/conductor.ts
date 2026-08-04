@@ -3,7 +3,9 @@ import { campaigns, players, profiles } from "@/lib/db/schema";
 import { PROSE_COMPOSER } from "@/lib/llm/budgets";
 import { streamNarration } from "@/lib/llm/calls";
 import { DEV_TIER_SELECTION, TierSelection } from "@/lib/llm/tiers";
+import { writePlayerCanon } from "@/lib/research/corpus";
 import { researchTitle } from "@/lib/research/research";
+import { CANONICAL_PAGE_TYPES } from "@/lib/research/wiki";
 import {
   CompositionMode,
   NarrativeFocus,
@@ -39,7 +41,7 @@ THE ITINERARY. The conversation has a shape — carry it in your head and always
 
 THE AUDITION. Your first reply to a premise demonstrates feel-level understanding — what the source DOES to a person, not a synopsis. Your confidence scales with the work's popularity: for anything obscure, recent, or uncertain, say plainly "give me a minute to look" and use research_title. NEVER confirm a title, season, or spinoff you cannot verify — a hallucinated Season 4 is an instant trust-kill for exactly the superfan you serve. The customer is not always right about what exists.
 
-PROFILE HEALTH IS PLAYER-FACING. research_title returns profile_health — what the studio ACTUALLY knows about this IP. When derived_confidence is under 60, post_cutoff is true, or coverage_gaps name holes: tell the player plainly, in one honest breath, what the desk found and did not find ("the wiki's empty and this adaptation is newer than anything I've read — I know the shape of it, not the specifics"). Then offer the real choices: lean original where canon is thin, or have THEM fill the gaps — the player who chose a little-known IP usually knows it better than any archive, and what they tell you becomes canon through the normal channels. NEVER perform confident fluency the health record contradicts; the superfan will catch it, and one caught bluff costs the whole table.
+PROFILE HEALTH IS PLAYER-FACING. research_title returns profile_health — what the studio ACTUALLY knows about this IP. When derived_confidence is under 60, post_cutoff is true, or coverage_gaps name holes: tell the player plainly, in one honest breath, what the desk found and did not find ("the wiki's empty and this adaptation is newer than anything I've read — I know the shape of it, not the specifics"). Then offer the real choices: lean original where canon is thin, or have THEM fill the gaps via supply_canon — the player who chose a little-known IP usually knows it better than any archive, and what they paste becomes real, retrievable canon. NEVER perform confident fluency the health record contradicts; the superfan will catch it, and one caught bluff costs the whole table.
 
 WHILE RESEARCH LOADS, NO DEAD AIR. Interview the player — they are the one subject no wiki holds. What they loved, when they watched it, who they were then.
 
@@ -159,6 +161,27 @@ const CONDUCTOR_TOOLS: Tool[] = [
     },
   },
   {
+    name: "supply_canon",
+    description:
+      "File source material the PLAYER supplies — a pasted synopsis, chapter, wiki text, or their own character/world notes. It becomes canon the engine actually retrieves during play, so use it whenever the player hands you material about the world (especially where research came back thin). Call it ONCE per pasted block, right after the paste. For a short fact you may pass `content` inline; for anything long OMIT content — the tool reads the player's pasted message straight from the transcript, and re-emitting a chapter just truncates the call. Slow (~15-60s embedding) — tell the player you're filing it and keep talking.",
+    input_schema: {
+      type: "object",
+      properties: {
+        title: {
+          type: "string",
+          description: "What to call this material, e.g. 'Volume 3 synopsis'",
+        },
+        page_type: { type: "string", enum: [...CANONICAL_PAGE_TYPES] },
+        content: {
+          type: "string",
+          description:
+            "the exact material, for SHORT facts only; OMIT for pastes — the tool reads the player's pasted message from the transcript",
+        },
+      },
+      required: ["title", "page_type"],
+    },
+  },
+  {
     name: "propose_contract",
     description:
       "Signal the table is set: spark, finitude, intensity contract, tier selection, and calibration are all recorded, the protagonist is named with a concept (or the player explicitly deferred either), and the player has recognized themselves in your summary. Compilation runs after this.",
@@ -197,6 +220,19 @@ export interface ConductorDraft {
   readyToCompile: boolean;
   /** Conductor-proposed campaign title (propose_contract); applied at persist. */
   title?: string;
+  /**
+   * M3R3 C2: the campaign-scoped pseudo-profile holding player-pasted canon.
+   * The compiler merges it into the contract's `anchors_used` so retrieval
+   * reads it — but it NEVER joins `profileIds`, which is the base-profile
+   * index (element 0) and whose length > 1 is the hybrid-mode switch.
+   */
+  playerCanonId?: string;
+  /**
+   * M3R3 C2 review: cheap identity keys of already-filed pastes —
+   * `${text.length}:${text.slice(0, 40)}` — so a later supply_canon never
+   * re-files an earlier paste; recency then picks the right one.
+   */
+  playerCanonFiled?: string[];
 }
 
 export function emptyDraft(): ConductorDraft {
@@ -270,8 +306,50 @@ function transcriptMessages(transcript: TranscriptMessage[]): MessageParam[] {
   return messages;
 }
 
+const SupplyCanonInput = z.object({
+  title: z.string().min(1),
+  page_type: z.enum(CANONICAL_PAGE_TYPES),
+  content: z.string().optional(),
+});
+
+/** Identity of a filed paste: enough to tell two pastes apart, cheap to store. */
+function canonFilingKey(text: string): string {
+  return `${text.length}:${text.slice(0, 40)}`;
+}
+
+/**
+ * The material a supply_canon call is actually about (M3R3 C2). Inline
+ * `content` wins whenever it carries anything at all — the model CHOSE
+ * inline, and a 28-char hard fact is exactly the short supplement the tool
+ * description invites. Otherwise the paste itself is the payload and it is
+ * already in the transcript; asking the model to re-emit a pasted chapter
+ * just truncates the tool call.
+ *
+ * The scan takes the MOST RECENT qualifying plain-string user message that
+ * has not already been filed (tool_result rounds are arrays, so they fall out
+ * naturally). Recency is the primary rule — the tool description says to call
+ * once per pasted block, right after the paste — and the filed set makes a
+ * stale pick impossible even when the model is late: taking the LONGEST
+ * instead meant a second paste was re-filed as the first one's text under the
+ * second one's title, and the new material was never stored at all.
+ */
+function resolveSuppliedText(draft: ConductorDraft, content: string | undefined): string {
+  const inline = content?.trim() ?? "";
+  if (inline.length > 0) return inline;
+  const filed = new Set(draft.playerCanonFiled ?? []);
+  const recent = draft.transcript.slice(-8);
+  for (let i = recent.length - 1; i >= 0; i--) {
+    const message = recent[i];
+    if (!message || message.role !== "user" || typeof message.content !== "string") continue;
+    const text = message.content.trim();
+    if (text.length >= 200 && !filed.has(canonFilingKey(text))) return text;
+  }
+  return "";
+}
+
 async function executeTool(
   db: Db,
+  campaignId: string,
   draft: ConductorDraft,
   name: string,
   input: unknown,
@@ -321,6 +399,49 @@ async function executeTool(
       guidance:
         "The table is set. Weave the open items honestly into your summary — the player sees what stays open — and READ THE CARVED LAWS BACK in their own words for confirmation before the contract is signed. Compilation runs when they confirm.",
     });
+  }
+  if (name === "supply_canon") {
+    const parsed = SupplyCanonInput.safeParse(input);
+    if (!parsed.success) {
+      return JSON.stringify({
+        ingested: false,
+        error: parsed.error.issues[0]?.message ?? "invalid supply_canon input",
+        guidance: "Filing failed — tell the player plainly and continue; they can retry.",
+      });
+    }
+    const { title, page_type } = parsed.data;
+    const text = resolveSuppliedText(draft, parsed.data.content);
+    if (!text) {
+      return JSON.stringify({
+        ingested: false,
+        guidance:
+          "Nothing to file — ask the player to paste the material first, then call supply_canon again.",
+      });
+    }
+    emit({ type: "staging", text: `filing "${title}" into the campaign's canon…` });
+    try {
+      const result = await writePlayerCanon(db, campaignId, [{ title, pageType: page_type, text }]);
+      draft.playerCanonId = result.profileId;
+      // Marked filed only on success: a failed write must leave the paste
+      // available to the retry the guidance below invites.
+      draft.playerCanonFiled = [
+        ...new Set([...(draft.playerCanonFiled ?? []), canonFilingKey(text)]),
+      ];
+      return JSON.stringify({
+        ingested: true,
+        chunks: result.chunks,
+        title,
+        page_type,
+        guidance:
+          "Filed as player-supplied canon. Confirm to the player in ONE line what you took as canon — never recite it back.",
+      });
+    } catch (err) {
+      return JSON.stringify({
+        ingested: false,
+        error: err instanceof Error ? err.message : String(err),
+        guidance: "Filing failed — tell the player plainly and continue; they can retry.",
+      });
+    }
   }
   if (name === "research_title") {
     const { title, anilist_id } = input as { title: string; anilist_id?: number };
@@ -476,7 +597,7 @@ export async function runConductorTurn(
     const results = [];
     for (const block of toolUses) {
       if (block.type !== "tool_use") continue;
-      const output = await executeTool(db, draft, block.name, block.input, emit);
+      const output = await executeTool(db, campaignId, draft, block.name, block.input, emit);
       results.push({ type: "tool_result" as const, tool_use_id: block.id, content: output });
     }
     draft.transcript.push({ role: "user", content: results });
@@ -502,6 +623,22 @@ export async function runConductorTurn(
         profileIds: [...new Set([...stored.profileIds, ...draft.profileIds])],
         readyToCompile: stored.readyToCompile || draft.readyToCompile,
         ...(draft.title || stored.title ? { title: draft.title ?? stored.title } : {}),
+        // The pseudo-profile id is the ONLY handle on filed player canon; a
+        // concurrent-write merge that dropped it would leave the chunks
+        // written and unreadable.
+        ...(draft.playerCanonId || stored.playerCanonId
+          ? { playerCanonId: draft.playerCanonId ?? stored.playerCanonId }
+          : {}),
+        // The filed-paste keys carry forward the same way: losing one would
+        // let the very next supply_canon re-file a paste already in the
+        // corpus and drop the block the player just handed over.
+        ...(draft.playerCanonFiled || stored.playerCanonFiled
+          ? {
+              playerCanonFiled: [
+                ...new Set([...(stored.playerCanonFiled ?? []), ...(draft.playerCanonFiled ?? [])]),
+              ],
+            }
+          : {}),
       };
     }
     await tx

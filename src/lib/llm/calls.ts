@@ -27,15 +27,17 @@ import {
 } from "./tiers";
 
 /**
- * The traced trio (blueprint substrate discipline): every model call in the
- * codebase flows through streamNarration / callJudgment / callProbe. Each
- * call is Langfuse-traced and cost-metered here, at the choke point — if it
- * isn't traced and metered, it doesn't ship.
+ * The traced calls (blueprint substrate discipline): every model call in the
+ * codebase flows through streamNarration / callJudgment / callProbe /
+ * callSearch. Each call is Langfuse-traced and cost-metered here, at the
+ * choke point — if it isn't traced and metered, it doesn't ship.
  *
  * Narration streams FREE PROSE (the one structured-output exemption, §5.7);
  * its typed sidecar arrives as the mandatory commit_scene tool trailer.
  * Judgment and probe use native strict structured output via
- * output_config.format — no prose-JSON parsing anywhere.
+ * output_config.format — no prose-JSON parsing anywhere. Search (M3R3 C2)
+ * is the second free-prose exemption: server web_search results shape
+ * DOWNSTREAM through a separate structured call, never in-request.
  */
 
 export type Effort = "low" | "medium" | "high" | "xhigh" | "max";
@@ -157,6 +159,15 @@ function usageStats(usage: Usage) {
     // The per-TTL split (M2R5 C2): without it the meter prices every write at
     // the 2× 1h rate and overcharges the loops that write at 1.25×.
     ...(usage.cache_creation ? { cache_creation: usage.cache_creation } : {}),
+    // The per-search fee (M3R3 C2): a server-tool search bills $10/1k
+    // OUTSIDE the token counters — dropping this field ships unmetered spend.
+    // The guard is on the OBJECT, not the count: a search-capable round that
+    // fired nothing reports 0, and 0 is the state schema.ts documents
+    // ("search-capable call, no searches fired"). Guarding on truthiness
+    // discarded it as NULL — indistinguishable from every pre-feature row.
+    ...(usage.server_tool_use
+      ? { web_search_requests: usage.server_tool_use.web_search_requests ?? 0 }
+      : {}),
   };
 }
 
@@ -429,6 +440,258 @@ export function callJudgment<T>(
 /** Probe tier: intent/triage, transition checks, routers, extractions. */
 export function callProbe<T>(selection: TierSelection, opts: StructuredCallOptions<T>): Promise<T> {
   return callStructured("probe", selection, opts);
+}
+
+// ---------------------------------------------------------------------------
+// callSearch — the fourth traced call (M3R3 C2)
+// ---------------------------------------------------------------------------
+
+export interface SearchCallOptions extends CallContext {
+  /** Trace label, e.g. "research_search_power_system". */
+  name: string;
+  prompt: string;
+  system?: string;
+  /**
+   * Per-CALL search ceiling (the cost knob; $10/1k searches). It takes two
+   * enforcements to mean that: `max_uses` caps each API REQUEST server-side,
+   * and this function's loop refuses to resume once the accumulated count
+   * reaches it. Without the second, every pause_turn resume is a fresh request
+   * with a fresh server-side budget and the real ceiling is maxUses ×
+   * MAX_ROUNDS.
+   */
+  maxUses?: number;
+  maxTokens?: number;
+  effort?: Effort;
+}
+
+export interface SearchCallResult {
+  /** All prose the model produced across the (possibly paused) turn. */
+  text: string;
+  /** Claim-level receipts: prose spans tied to their source URLs. */
+  citations: { url: string; title: string | null; cited_text: string }[];
+  /** Every result the searches surfaced — the consulted-source list. */
+  searchedUrls: { url: string; title: string }[];
+  /** Billable searches actually fired (metered per round). */
+  searchCount: number;
+  /**
+   * Error codes from searches that FAILED (`web_search_tool_result_error`:
+   * too_many_requests, unavailable, max_uses_exceeded…). They arrive on a
+   * normal 200, unbilled and result-less, so the model answers anyway — from
+   * memory. A result carrying errors and NO searchedUrls is parametric
+   * RECALL, not research; callers must gate on it before labelling anything
+   * web-sourced.
+   */
+  errors: string[];
+  /**
+   * The turn did not finish cleanly — max_tokens clipped it, or the pause
+   * budget ran out mid-pause (MAX_ROUNDS or the per-call maxUses ceiling).
+   * The prose is partial; the citations that DID land are still real.
+   */
+  truncated: boolean;
+}
+
+/**
+ * Free-prose research over the SERVER-SIDE web_search tool (M3R3 C2 — the
+ * fallback chain's eyes; v3's complete_with_search carried forward). This is
+ * deliberately NOT callStructured with a server tool bolted on:
+ *
+ * - The house law stands, and it is about output_config.FORMAT: a grammar
+ *   never shares a request with tools. Search runs free-text here; callers
+ *   shape the prose with a separate callJudgment. (v3 learned the same split:
+ *   search + schema in one call produced prose-wrapped JSON and a repair
+ *   ladder.) `effort` is not part of that law — streamNarration already sends
+ *   tools alongside output_config.effort — so the thinking dial rides along.
+ * - The server runs its own sampling loop and can PAUSE it: stop_reason
+ *   "pause_turn" means "re-send my content unchanged and let me continue" —
+ *   a shape the investigation loop has no branch for.
+ * - web_search_20250305 (basic) on purpose: it runs on every judgment-menu
+ *   model including Haiku, needs no dynamic-filtering code-execution
+ *   plumbing, and research calls fire 2–5 searches, not 20.
+ *
+ * Every round is metered — including the per-search fee, which bills OUTSIDE
+ * the token counters (usageStats threads server_tool_use through).
+ */
+export async function callSearch(
+  selection: TierSelection,
+  opts: SearchCallOptions,
+): Promise<SearchCallResult> {
+  const model = selection.judgment;
+  const caps = MODEL_CAPS[model];
+  const outputBudget = opts.maxTokens ?? 8192;
+  const effectiveCap = computeEffectiveMaxTokens(outputBudget, model, opts.effort);
+  const lf = getLangfuse();
+  const trace = lf?.trace({
+    name: opts.name,
+    tags: ["judgment", "web_search"],
+    metadata: { campaignId: opts.campaignId },
+  });
+
+  const maxUses = opts.maxUses ?? 3;
+  const tools: ToolUnion[] = [
+    { type: "web_search_20250305", name: "web_search", max_uses: maxUses },
+  ];
+  const messages: MessageParam[] = [{ role: "user", content: opts.prompt }];
+
+  const collected: Message["content"][] = [];
+  let searchCount = 0;
+  let truncated = false;
+  // True only when the loop's own bound ended a turn the server still wanted
+  // to continue — the deliberate breaks below clear it.
+  let pendingPause = false;
+  // The server loop pauses on long turns; each resume re-sends the paused
+  // assistant content UNCHANGED (no closing nudge — the API detects the
+  // trailing server_tool_use and continues). Bounded: a turn that pauses
+  // more than 4 times is runaway, not research.
+  const MAX_ROUNDS = 5;
+  for (let round = 0; round < MAX_ROUNDS; round++) {
+    const generation = trace?.generation({
+      name: round === 0 ? opts.name : `${opts.name}_resume_${round}`,
+      model,
+      input: round === 0 ? opts.prompt : "(pause_turn resume)",
+    });
+    const started = Date.now();
+    let message: Message;
+    try {
+      message = await createStreamed({
+        model,
+        max_tokens: effectiveCap,
+        ...(opts.system ? { system: opts.system } : {}),
+        messages,
+        tools,
+        ...(caps?.adaptiveThinking ? { thinking: { type: "adaptive" } } : {}),
+        ...(opts.effort && caps?.effortControl ? { output_config: { effort: opts.effort } } : {}),
+      });
+    } catch (err) {
+      const statusMessage = err instanceof Error ? err.message : String(err);
+      generation?.end({
+        level: "ERROR",
+        statusMessage,
+        metadata: { latencyMs: Date.now() - started },
+      });
+      throw err;
+    }
+    const latencyMs = Date.now() - started;
+    const usage = usageStats(message.usage);
+    searchCount += usage.web_search_requests ?? 0;
+    await recordModelCall({
+      provider: "anthropic",
+      model,
+      tier: "judgment",
+      usage,
+      latencyMs,
+      campaignId: opts.campaignId,
+      turnNumber: opts.turnNumber,
+      phase: resolvePhase(opts),
+      traceId: trace?.id,
+    });
+    const refused = message.stop_reason === "refusal";
+    generation?.end({
+      ...(refused ? { level: "ERROR" as const, statusMessage: "refusal" } : {}),
+      usage: { input: message.usage.input_tokens, output: message.usage.output_tokens },
+      metadata: {
+        latencyMs,
+        stopReason: message.stop_reason,
+        webSearchRequests: usage.web_search_requests ?? 0,
+      },
+    });
+    // A declined search is not an empty search: returned as ordinary success
+    // it becomes "no live source found this work", and research reports the
+    // refusal to the player as a verdict that the work does not exist.
+    if (refused) throw new Error(`${opts.name}: model declined (stop_reason=refusal)`);
+    if (message.stop_reason === "max_tokens") {
+      truncated = true;
+      console.warn("[llm] TRUNCATED at max_tokens", {
+        name: opts.name,
+        outputBudget,
+        effectiveCap,
+        model,
+      });
+    }
+
+    collected.push(message.content);
+    pendingPause = message.stop_reason === "pause_turn";
+    if (!pendingPause) break;
+    // The ceiling is per CALL, so it has to be enforced here: each resume is a
+    // new API request carrying a fresh server-side max_uses, and a turn that
+    // pauses four times would bill 5× the budget the caller asked for.
+    if (searchCount >= maxUses) {
+      pendingPause = false;
+      truncated = true;
+      console.warn("[llm] search budget exhausted mid-pause — returning what landed", {
+        name: opts.name,
+        searchCount,
+        maxUses,
+        model,
+      });
+      break;
+    }
+    messages.push({ role: "assistant", content: message.content as ContentBlockParam[] });
+  }
+  if (pendingPause) {
+    truncated = true;
+    console.warn("[llm] search turn cut off mid-pause — MAX_ROUNDS exhausted", {
+      name: opts.name,
+      rounds: MAX_ROUNDS,
+      searchCount,
+      model,
+    });
+  }
+
+  const result: SearchCallResult = {
+    text: "",
+    citations: [],
+    searchedUrls: [],
+    searchCount,
+    errors: [],
+    truncated,
+  };
+  const texts: string[] = [];
+  const seenUrls = new Set<string>();
+  for (const blocks of collected) {
+    for (const block of blocks) {
+      if (block.type === "text") {
+        texts.push(block.text);
+        for (const c of block.citations ?? []) {
+          if (c.type === "web_search_result_location") {
+            result.citations.push({ url: c.url, title: c.title, cited_text: c.cited_text });
+          }
+        }
+      } else if (block.type === "web_search_tool_result") {
+        // A FAILED search arrives as an error OBJECT on a normal 200 — not a
+        // throw, not an empty array (SDK: WebSearchToolResultBlockContent =
+        // WebSearchToolResultError | WebSearchResultBlock[]). Discarding it
+        // returned a sourceless answer that downstream labels "web research".
+        if (Array.isArray(block.content)) {
+          for (const r of block.content) {
+            if (r.type === "web_search_result" && !seenUrls.has(r.url)) {
+              seenUrls.add(r.url);
+              result.searchedUrls.push({ url: r.url, title: r.title });
+            }
+          }
+        } else {
+          result.errors.push(block.content.error_code);
+        }
+      }
+    }
+  }
+  result.text = texts.join("");
+  if (result.errors.length > 0) {
+    console.warn("[llm] web search errors — searches failed, the prose may be unsourced", {
+      name: opts.name,
+      errors: result.errors,
+      sources: result.searchedUrls.length,
+    });
+  }
+  trace?.update({
+    output: {
+      searchCount,
+      sources: result.searchedUrls.length,
+      chars: result.text.length,
+      errors: result.errors,
+      truncated,
+    },
+  });
+  return result;
 }
 
 /**

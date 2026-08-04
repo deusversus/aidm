@@ -189,6 +189,12 @@ export const modelCalls = pgTable(
     cacheCreationInputTokens: integer().notNull().default(0),
     costUsd: numeric({ precision: 12, scale: 6 }).notNull().default("0"),
     latencyMs: integer(),
+    /**
+     * M3R3 C2: billable server-side web searches on this call ($10/1k,
+     * folded into costUsd). Nullable — rows predating the fallback chain
+     * never searched; 0 means "search-capable call, no searches fired".
+     */
+    webSearchRequests: integer(),
     /** Fable→Opus server-side fallback fired (§3) — Sakkan-relevant. */
     fallbackUsed: boolean().notNull().default(false),
     traceId: text(),

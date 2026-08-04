@@ -158,10 +158,16 @@ export async function checkWikiRelevance(base: string, titles: string[]): Promis
     const hits = search?.query?.searchinfo?.totalhits ?? search?.query?.search?.length ?? 0;
     if (hits > 0) return true;
   }
-  // Secondary gate (v3): a distinctive title word inside the sitename.
+  // Secondary gate (v3): a distinctive title word inside the sitename —
+  // PRIMARY title only (M3R3 C2 parity fix). v3 deliberately excluded romaji
+  // alternates here: generic Japanese words ("tensei", "shitara") sit in
+  // many unrelated wiki names, and feeding them to this gate is exactly the
+  // tensei.fandom.com-is-an-RPF-wiki failure the gate exists to stop. Alt
+  // titles still feed the search probe above, where they belong.
   const sitename = stats.query?.general?.sitename?.toLowerCase() ?? "";
-  for (const title of titles) {
-    const distinctive = title
+  const primary = titles[0];
+  if (primary) {
+    const distinctive = primary
       .toLowerCase()
       .split(/\s+/)
       .filter((w) => w.length >= 4 && !STOPWORDS.has(w));
@@ -331,6 +337,13 @@ export interface WikiPage {
   pageType: CanonicalPageType;
   text: string;
   url: string;
+  /**
+   * Where this page's text came from (M3R3 C2). Absent = "wiki" (every
+   * pre-C2 producer). The fallback chain fabricates WikiPage-shaped pages
+   * from web search and player paste — same downstream contract, honestly
+   * labeled: field_sources, corpus provenance, and trust all read this.
+   */
+  origin?: "wiki" | "web_search" | "player";
 }
 
 export async function fetchPage(
@@ -434,6 +447,9 @@ export async function planScrape(title: string, categories: string[]): Promise<S
     prompt: `Wiki: ${title}\n\nCategories (up to 500):\n${categories.join("\n")}`,
     effort: "low",
     maxTokens: STRUCTURED_RICH,
+    // M3R3 C2 tidy-up: this was the one research-adjacent call filing its
+    // spend as "(unattributed)" — classification stays on the DEV tier.
+    phase: "research",
   });
   return {
     ...plan,

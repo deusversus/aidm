@@ -1,5 +1,6 @@
 import * as schema from "@/lib/db/schema";
 import { streamNarration } from "@/lib/llm/calls";
+import { writePlayerCanon } from "@/lib/research/corpus";
 import { researchTitle } from "@/lib/research/research";
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
@@ -26,6 +27,12 @@ vi.mock("@/lib/llm/calls", async (importOriginal) => {
 vi.mock("@/lib/research/research", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/research/research")>();
   return { ...actual, researchTitle: vi.fn() };
+});
+// The corpus WRITE is proven against real Postgres in corpus.prose.test.ts;
+// what the conductor owes is picking the right TEXT, so the writer is captured.
+vi.mock("@/lib/research/corpus", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/research/corpus")>();
+  return { ...actual, writePlayerCanon: vi.fn() };
 });
 
 const url = process.env.DATABASE_URL;
@@ -69,6 +76,17 @@ function scriptedRound(blocks: ContentBlock[], stopReason: "end_turn" | "tool_us
 
 const mockStream = vi.mocked(streamNarration);
 const mockResearch = vi.mocked(researchTitle);
+const mockWriteCanon = vi.mocked(writePlayerCanon);
+
+/** The entries a supply_canon round handed the corpus writer. */
+function filedEntries(call: number): { title: string; pageType: string; text: string }[] {
+  const entries = mockWriteCanon.mock.calls[call]?.[2];
+  if (!entries) throw new Error(`no writePlayerCanon call ${call}`);
+  return entries;
+}
+
+const supplyRound = (id: string, input: unknown) =>
+  scriptedRound([{ type: "tool_use", id, name: "supply_canon", input }], "tool_use");
 
 const obs = (kind: Observation["kind"], content: string): Observation => ({
   kind,
@@ -540,5 +558,145 @@ describe.skipIf(!url)("SZ conductor draft-resume (real Postgres, scripted model)
     } finally {
       await db.delete(schema.campaigns).where(eq(schema.campaigns.id, c.id));
     }
+  });
+
+  /**
+   * supply_canon's text resolution (M3R3 C2 review). The tool never receives a
+   * long paste inline — it reads the transcript — so WHICH message it reads is
+   * the whole correctness question, and the durable filed-set is what keeps a
+   * second call off the first paste's text.
+   */
+  describe("supply_canon: the material a call is actually about", () => {
+    // A first paste that is DELIBERATELY longer than the second: under the
+    // longest-wins scan this is what both calls filed.
+    const pasteOne = Array.from(
+      { length: 120 },
+      (_, i) => `Chapter one, line ${i}: the knight rode east through the salt flats.`,
+    ).join("\n");
+    const pasteTwo = Array.from(
+      { length: 30 },
+      (_, i) => `Chapter two, line ${i}: his mother waited at the gate, and did not wave.`,
+    ).join("\n");
+
+    it("the SECOND paste is what reaches the corpus under the second title", async () => {
+      if (!db) throw new Error("unreachable");
+      mockStream.mockReset();
+      mockWriteCanon.mockReset();
+      expect(pasteOne.length).toBeGreaterThan(pasteTwo.length);
+      const [c] = await db
+        .insert(schema.campaigns)
+        .values({ playerId, title: "double paste", status: "draft" })
+        .returning();
+      if (!c) throw new Error("insert failed");
+      mockWriteCanon.mockResolvedValue({ chunks: 3, profileId: `player_canon_${c.id}` });
+      try {
+        mockStream
+          .mockReturnValueOnce(supplyRound("sc_1", { title: "Chapter 1", page_type: "arcs" }))
+          .mockReturnValueOnce(scriptedRound([{ type: "text", text: "Filed." }], "end_turn"))
+          .mockReturnValueOnce(supplyRound("sc_2", { title: "Chapter 2", page_type: "arcs" }))
+          .mockReturnValueOnce(
+            scriptedRound([{ type: "text", text: "That one too." }], "end_turn"),
+          );
+
+        await runConductorTurn(db, c.id, pasteOne, () => {});
+        // Turn 2 rehydrates from Postgres: the filed keys have to survive the
+        // round trip, or the longer first paste is a live candidate again.
+        const result = await runConductorTurn(db, c.id, pasteTwo, () => {});
+
+        expect(mockWriteCanon).toHaveBeenCalledTimes(2);
+        expect(filedEntries(0)[0]).toEqual({
+          title: "Chapter 1",
+          pageType: "arcs",
+          text: pasteOne,
+        });
+        expect(filedEntries(1)[0]).toEqual({
+          title: "Chapter 2",
+          pageType: "arcs",
+          text: pasteTwo,
+        });
+
+        // Both pastes are marked filed, and the marks are durable.
+        expect(result.playerCanonFiled).toHaveLength(2);
+        expect(result.playerCanonFiled?.[0]).toContain(pasteOne.slice(0, 40));
+        expect(result.playerCanonFiled?.[1]).toContain(pasteTwo.slice(0, 40));
+        expect(result.playerCanonId).toBe(`player_canon_${c.id}`);
+        const [row] = await db.select().from(schema.campaigns).where(eq(schema.campaigns.id, c.id));
+        expect((row?.szTranscript as ConductorDraft).playerCanonFiled).toEqual(
+          result.playerCanonFiled,
+        );
+      } finally {
+        await db.delete(schema.campaigns).where(eq(schema.campaigns.id, c.id));
+      }
+    });
+
+    it("a short inline `content` is filed verbatim — the model chose inline", async () => {
+      if (!db) throw new Error("unreachable");
+      mockStream.mockReset();
+      mockWriteCanon.mockReset();
+      const [c] = await db
+        .insert(schema.campaigns)
+        .values({ playerId, title: "inline fact", status: "draft" })
+        .returning();
+      if (!c) throw new Error("insert failed");
+      mockWriteCanon.mockResolvedValue({ chunks: 1, profileId: `player_canon_${c.id}` });
+      try {
+        mockStream
+          .mockReturnValueOnce(
+            supplyRound("sc_1", {
+              title: "Power cost",
+              page_type: "lore",
+              content: "Mana costs lifespan, always.",
+            }),
+          )
+          .mockReturnValueOnce(scriptedRound([{ type: "text", text: "Noted." }], "end_turn"));
+
+        // The decoy: a long spark answer sitting in the same 8-message window.
+        // Under the ≥50-char gate the 28-char fact was dropped and THIS was
+        // embedded under the title "Power cost".
+        const spark = Array.from(
+          { length: 8 },
+          (_, i) => `The scene I keep rewatching, take ${i}: the rain, the rooftop, the silence.`,
+        ).join(" ");
+        expect(spark.length).toBeGreaterThan(200);
+        const result = await runConductorTurn(db, c.id, spark, () => {});
+
+        expect(mockWriteCanon).toHaveBeenCalledTimes(1);
+        expect(filedEntries(0)[0]).toEqual({
+          title: "Power cost",
+          pageType: "lore",
+          text: "Mana costs lifespan, always.",
+        });
+        expect(JSON.parse(toolResultFor(result, "sc_1")).ingested).toBe(true);
+      } finally {
+        await db.delete(schema.campaigns).where(eq(schema.campaigns.id, c.id));
+      }
+    });
+
+    it("no paste and no content: the call returns 'Nothing to file' and writes nothing", async () => {
+      if (!db) throw new Error("unreachable");
+      mockStream.mockReset();
+      mockWriteCanon.mockReset();
+      const [c] = await db
+        .insert(schema.campaigns)
+        .values({ playerId, title: "nothing to file", status: "draft" })
+        .returning();
+      if (!c) throw new Error("insert failed");
+      try {
+        mockStream
+          .mockReturnValueOnce(supplyRound("sc_1", { title: "Volume 3", page_type: "arcs" }))
+          .mockReturnValueOnce(
+            scriptedRound([{ type: "text", text: "Paste it whenever." }], "end_turn"),
+          );
+
+        const result = await runConductorTurn(db, c.id, "here, take this", () => {});
+        const parsed = JSON.parse(toolResultFor(result, "sc_1"));
+        expect(parsed.ingested).toBe(false);
+        expect(parsed.guidance).toContain("Nothing to file");
+        expect(mockWriteCanon).not.toHaveBeenCalled();
+        expect(result.playerCanonFiled).toBeUndefined();
+      } finally {
+        await db.delete(schema.campaigns).where(eq(schema.campaigns.id, c.id));
+      }
+    });
   });
 });

@@ -774,6 +774,43 @@ describe.skipIf(!url)("SZ compiler (real Postgres)", () => {
     }
   });
 
+  it("player canon joins anchors_used and canon-matching, never profileIds (M3R3 C2)", async () => {
+    if (!db) throw new Error("unreachable");
+    const withCanon: ConductorDraft = {
+      transcript: [],
+      observations: SCRIPTED_OBSERVATIONS,
+      profileIds: ["test_sz_profile"],
+      playerCanonId: "player_canon_abc",
+      readyToCompile: true,
+    };
+    const [campaign] = await db
+      .insert(schema.campaigns)
+      .values({ playerId, title: "player canon fixture", status: "draft", szTranscript: withCanon })
+      .returning();
+    if (!campaign) throw new Error("insert failed");
+    let seenProfileIds: string[] = [];
+    try {
+      const result = await compileSessionZero(db, campaign.id, {
+        ospSynthesizer: async () => STUB_OSP,
+        ingestor: async (_db, _cid, _turn, _text, opts) => {
+          seenProfileIds = [...opts.profileIds];
+          return { writes: [], flags: [] };
+        },
+      });
+      expect(result.gaps).toEqual([]);
+      // Retrieval reads anchors_used — the pasted canon must be IN it, in
+      // order, or it was written and can never be read.
+      expect(result.contract.anchors_used).toEqual(["test_sz_profile", "player_canon_abc"]);
+      // …and the resolver sees it too, so a pasted name isn't minted twice.
+      expect(seenProfileIds).toEqual(["test_sz_profile", "player_canon_abc"]);
+      // It is NOT a second source: the hybrid switch (profileIds.length > 1)
+      // stays off, so no hybrid_recipe appears.
+      expect(result.contract.hybrid_recipe).toBeUndefined();
+    } finally {
+      await db.delete(schema.campaigns).where(eq(schema.campaigns.id, campaign.id));
+    }
+  });
+
   it("binds ONE protagonist npc from overlapping self-insert briefs (§6.5)", async () => {
     if (!db) throw new Error("unreachable");
     // Today's live defect: two cast_facts about the self-insert (one backstory-

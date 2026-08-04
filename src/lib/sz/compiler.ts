@@ -877,6 +877,11 @@ export async function compileSessionZero(
   if (gaps.length > 0) {
     return { gaps } as CompileResult; // blocking — handoff halted (§8)
   }
+  // M3R3 C2: retrieval reads `anchors_used`, so player-pasted canon has to be
+  // merged in HERE or it is written and never read — a writer with no reader.
+  // It rides alongside profileIds, never inside them: profileIds[0] is the
+  // base-profile index and length > 1 flips hybrid mode.
+  const anchorsUsed = [...draft.profileIds, ...(draft.playerCanonId ? [draft.playerCanonId] : [])];
   const profile = Profile.parse(profileRow?.profile);
   if (isHybrid) {
     resolved.playerDeferred.push(
@@ -931,7 +936,9 @@ export async function compileSessionZero(
       const ingest = opts.ingestor ?? ingestAssertion;
       try {
         const ingested = await ingest(db, campaignId, 0, assertedText, {
-          profileIds: draft.profileIds,
+          // Player canon participates in canon-matching: a name the player
+          // pasted is exactly the name the resolver must not mint twice.
+          profileIds: anchorsUsed,
           provenance: "sz_compiler",
         });
         if (ingested.clarify)
@@ -1021,7 +1028,7 @@ export async function compileSessionZero(
       // Block 1's world-rules freight beside the control key — the pen reads
       // the laws EVERY turn, not only through per-turn hard_constraints.
       premise_laws: resolved.premiseLaws,
-      anchors_used: draft.profileIds,
+      anchors_used: anchorsUsed,
     });
 
     const synthesize = opts.ospSynthesizer ?? defaultOspSynthesizer;

@@ -156,8 +156,13 @@ export type FieldSource = z.infer<typeof FieldSource>;
  * coverage gates read it before a campaign compiles on top.
  */
 export const ResearchTrust = z.object({
-  /** How the profile was built. C2 adds web-search + hybrid methods. */
-  method: z.enum(["api_wiki", "api_thin", "anilist_only", "legacy"]),
+  /**
+   * How the profile was built. `api_search` is the hybrid (AniList identity,
+   * corpus supplemented by live web search); `web_search` is the level below
+   * it — no AniList row at all, identity itself verified by citation (M3R3
+   * C2's Level B).
+   */
+  method: z.enum(["api_wiki", "api_search", "api_thin", "web_search", "anilist_only", "legacy"]),
   derived_confidence: z.number().min(0).max(100),
   sources_consulted: z.array(z.string()).default([]),
   pages_fetched: z.number().int().nonnegative().default(0),

@@ -30,7 +30,13 @@ import type { AniListMedia } from "./anilist";
 import { relevantTags } from "./anilist";
 import type { WikiPage } from "./wiki";
 
-const SELECTION = { ...DEV_TIER_SELECTION, judgment: "claude-sonnet-5" as const };
+/**
+ * The research pin: quality above Haiku, never Fable (Fable exists only on
+ * the narration menu). Exported for websearch.ts (M3R3 C2) — the fallback
+ * chain's search + shaping calls run the same tier as every synthesis call.
+ */
+export const RESEARCH_SELECTION = { ...DEV_TIER_SELECTION, judgment: "claude-sonnet-5" as const };
+const SELECTION = RESEARCH_SELECTION;
 
 function witnessAnchorBlock(): string {
   const { anchors } = loadGrounding();

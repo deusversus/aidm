@@ -127,29 +127,40 @@ describe("deriveTrust (M3R3 C1)", () => {
     expect(t.post_cutoff).toBe(true);
     expect(t.coverage_gaps.join(" | ")).toContain("thin");
   });
+
+  it("M3R3 C2: a Level B identity is verified by CITATION — real, but not AniList's credit", () => {
+    // Same coverage, same everything: only the identity term moves.
+    const api = deriveTrust({ ...base });
+    const web = deriveTrust({ ...base, method: "web_search" });
+    expect(api.derived_confidence).toBe(35); // 20 + 15 (AniList row)
+    expect(web.derived_confidence).toBe(30); // 20 + 10 (citation)
+  });
 });
 
-describe("buildFieldSources (M3R3 C1)", () => {
+describe("buildFieldSources (M3R3 C1, source-typed at C2)", () => {
   it("the api_thin trap: wiki found, zero pages → NOTHING is labeled wiki_page", () => {
     const fs = buildFieldSources({
-      settingPages: 0,
-      statMappingGrounded: false,
-      powerSystemPresent: false,
-      quoteCharacters: 0,
+      identityOrigin: "anilist",
+      settingSource: null,
+      statMappingSource: null,
+      powerSystemSource: null,
+      voiceSource: null,
     });
     expect(fs.world_setting).toBe("anilist");
     expect(fs.stat_mapping).toBeUndefined();
     expect(fs.power_system).toBeUndefined();
     expect(fs.voice_cards).toBe("model_recall");
     expect(Object.values(fs)).not.toContain("wiki_page");
+    expect(Object.values(fs)).not.toContain("web_search");
   });
 
   it("grounded content earns the wiki_page label — per field, on content", () => {
     const fs = buildFieldSources({
-      settingPages: 3,
-      statMappingGrounded: true,
-      powerSystemPresent: true,
-      quoteCharacters: 2,
+      identityOrigin: "anilist",
+      settingSource: "wiki",
+      statMappingSource: "wiki",
+      powerSystemSource: "wiki",
+      voiceSource: "wiki",
     });
     expect(fs.world_setting).toBe("wiki_page");
     expect(fs.stat_mapping).toBe("wiki_page");
@@ -157,13 +168,53 @@ describe("buildFieldSources (M3R3 C1)", () => {
     expect(fs.voice_cards).toBe("wiki_page");
   });
 
+  it("M3R3 C2: a search-fed organ says web_search — it never borrows wiki's label", () => {
+    const fs = buildFieldSources({
+      identityOrigin: "anilist",
+      settingSource: "search",
+      statMappingSource: "search",
+      powerSystemSource: "wiki",
+      voiceSource: null,
+    });
+    expect(fs.world_setting).toBe("web_search");
+    expect(fs.stat_mapping).toBe("web_search");
+    // A hybrid profile labels per organ: the scraped one stays wiki_page.
+    expect(fs.power_system).toBe("wiki_page");
+    expect(fs.voice_cards).toBe("model_recall");
+  });
+
+  it("LEVEL B: an ungrounded world_setting names the WEB identity that fed its genre", () => {
+    const fs = buildFieldSources({
+      identityOrigin: "web_search",
+      settingSource: null,
+      statMappingSource: null,
+      powerSystemSource: null,
+      voiceSource: null,
+    });
+    // The same record's sources_consulted omits anilist deliberately — the
+    // field label must not contradict it.
+    expect(fs.world_setting).toBe("web_search");
+    // An AniList-backed profile in the identical coverage shape still says
+    // anilist: the genre list really did come from the row.
+    expect(
+      buildFieldSources({
+        identityOrigin: "anilist",
+        settingSource: null,
+        statMappingSource: null,
+        powerSystemSource: null,
+        voiceSource: null,
+      }).world_setting,
+    ).toBe("anilist");
+  });
+
   it("tonal fields are model_recall in every shape until C3 grounds them", () => {
-    for (const grounded of [true, false]) {
+    for (const source of ["wiki", "search", null] as const) {
       const fs = buildFieldSources({
-        settingPages: grounded ? 5 : 0,
-        statMappingGrounded: grounded,
-        powerSystemPresent: grounded,
-        quoteCharacters: grounded ? 3 : 0,
+        identityOrigin: "anilist",
+        settingSource: source,
+        statMappingSource: source,
+        powerSystemSource: source,
+        voiceSource: source,
       });
       expect(fs.canonical_dna).toBe("model_recall");
       expect(fs.author_voice).toBe("model_recall");
