@@ -5,7 +5,7 @@ import { and, eq, isNotNull } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { assembleBlocks, block3Text } from "../assemble";
+import { assembleBlocks, exchangesText } from "../assemble";
 import {
   BLOCK2_CEILING_TOKENS,
   type CompactionReport,
@@ -321,7 +321,7 @@ describe.skipIf(!url)("epoch merge (real Postgres)", () => {
 
     const after = assembleBlocks(await inputs());
     expect(after.system[0]?.text).toBe(before.system[0]?.text); // Block 1 untouched
-    expect(block3Text(after.system)).toBe(block3Text(before.system)); // Block 3 untouched
+    expect(exchangesText(after.exchangeMessages)).toBe(exchangesText(before.exchangeMessages)); // Block 3 untouched
     expect(after.system[1]?.text).not.toBe(before.system[1]?.text); // Block 2 rewritten
     expect(after.budgets.b2Tokens).toBeLessThan(before.budgets.b2Tokens);
     expect(after.budgets.epochCount).toBe(1);

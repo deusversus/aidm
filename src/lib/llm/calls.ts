@@ -451,6 +451,9 @@ export async function prewarmPrefix(
   system: TextBlockParam[],
   tools: ToolUnion[],
   ctx: CallContext = {},
+  /** M3R2 C2: Block 3 lives in messages now — the warm must cover it or the
+   *  first real call re-writes the whole window. */
+  exchangeMessages: MessageParam[] = [],
 ): Promise<{ cacheCreation: number; cacheRead: number; costUsd: number }> {
   const model = selection.narration;
   const lf = getLangfuse();
@@ -467,13 +470,17 @@ export async function prewarmPrefix(
       max_tokens: 0,
       // No tool_choice: {type:"tool"|"any"} — those are rejected alongside
       // max_tokens=0, and tool_choice does not enter the tools/system cache
-      // key anyway, so the KA's `auto` costs the prefix nothing.
+      // key, so the KA's `auto` costs that prefix nothing. (The MESSAGES
+      // tier — where Block 3 lives post-C2 — keys on message bytes, which
+      // the exchangeMessages param reproduces verbatim.)
       ...(tools.length > 0 ? { tools } : {}),
       system,
       // The documented pre-warm form keeps a placeholder user turn — an empty
-      // `messages` array is a 400. It sits AFTER the last breakpoint (the
-      // Block-3 tail), so it never enters the cached prefix.
-      messages: [{ role: "user", content: "warmup" }],
+      // `messages` array is a 400. The exchange window (Block 3, now real
+      // conversation turns) precedes it so the warm covers the moving
+      // breakpoint; the placeholder sits AFTER the last breakpoint and never
+      // enters the cached prefix.
+      messages: [...exchangeMessages, { role: "user", content: "warmup" }],
     });
   } catch (err) {
     const statusMessage = err instanceof Error ? err.message : String(err);

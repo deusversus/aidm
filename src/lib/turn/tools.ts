@@ -129,7 +129,11 @@ export async function executeRecallScene(
       ),
     );
   if (!row) return `No record of turn ${input.turn_number}.`;
-  return `[Turn ${row.turnNumber}]\nPlayer: ${row.playerInput}\n\n${row.narration}`;
+  // Same grammar as the live window (M3R2 C2): a recalled scene must not
+  // arrive in a different transcript shape than the scene sitting in the
+  // conversation. Player half labelled by turn; narration bare (it is the
+  // writer's own prior work there too).
+  return `[Turn ${row.turnNumber}]\n${row.playerInput}\n\n${row.narration}`;
 }
 
 export async function executeGetTurnNarrative(

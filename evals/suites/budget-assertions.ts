@@ -75,6 +75,12 @@ export const COLD_TURN_CEILING_USD: Record<TurnTier, number> = {
   // allowance raises the modeled Fable cold to ~$0.90; ceiling ~10% over.
   // Like the allowance, this RE-BASELINES from the first flat-high soak
   // (M3 C5) — an interim over-model, never a quality budget.
+  //
+  // M3R2 C2 (+50% output rider, user-directed): outputBudgetTokens rose to
+  // 900/1800/3000, adding ~$0.015-0.05 to the modeled Fable colds. The
+  // ceilings HOLD (the assertion below proves it live) with margins
+  // tightened from ~10% to ~7-8% — acceptable until the flat-high soak
+  // re-baselines everything in this file at once.
   douga: 0.99,
   genga: 1.05,
   sakuga: 1.95,

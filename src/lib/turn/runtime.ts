@@ -470,6 +470,7 @@ async function runPhases(
           conte,
           playerInput: turn.playerInput,
           system: blocks.system,
+          exchangeMessages: blocks.exchangeMessages,
           selection,
           effort: contract.effort,
           // Retry-same-dice, bigger jar (M2R2 audit): a truncation-caused

@@ -5,6 +5,7 @@ import { campaigns, overrides, pencilMarks, players } from "@/lib/db/schema";
 import { CLASSIFY, PROSE_COMPOSER, STRUCTURED_RICH } from "@/lib/llm/budgets";
 import { callJudgment, callProbe, streamNarration } from "@/lib/llm/calls";
 import { DEV_TIER_SELECTION, TierSelection } from "@/lib/llm/tiers";
+import { KA_TOOLS } from "@/lib/turn/tools";
 import {
   BOOTH_EXCHANGE_CAP,
   BOOTH_MARKS_MAX,
@@ -177,11 +178,19 @@ export async function runBoothExchange(
     phase: "booth",
     selection,
     system: blocks?.system ?? [],
-    messages: [{ role: "user", content: userMessage }],
+    // The booth reads the same conversation the pen writes in (M3R2 C2):
+    // recent play threads ahead of the booth frame as real turns, so the
+    // responder discusses scenes it can actually see.
+    messages: [...(blocks?.exchangeMessages ?? []), { role: "user", content: userMessage }],
     maxTokens: PROSE_COMPOSER,
-    // No trailer: a booth reply is player-facing conversation, not a scene.
-    // Empty tools drops tool_choice (an empty tools array is an API 400).
-    tools: [],
+    // The composer tool-law (M3 C1, restated by the C2 review): tools render
+    // AHEAD of system in the cache key, so `tools: []` guaranteed a miss on
+    // the KA's cached prefix however identical the blocks were. The KA's
+    // array under tool_choice `none` makes the prefix bytes match while the
+    // booth stays structurally unable to call a tool — §5.4's reuse mandate,
+    // actually satisfied.
+    tools: KA_TOOLS,
+    toolChoice: { type: "none" },
     campaignId,
     turnNumber,
   });

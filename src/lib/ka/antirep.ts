@@ -169,7 +169,7 @@ export function pickBreakDirective(type: OpeningType, campaignId: string, counte
   const bag = breakBag(type);
   const idx = (hashString(campaignId) + counter) % bag.length;
   const move = bag[idx] ?? bag[0] ?? "vary the opening";
-  return `${PATTERN_LEAD[type]} ${move} this time (unless the scene actively resists it — then write what the scene wants).`;
+  return `${PATTERN_LEAD[type]} ${move} this time (unless the scene actively resists it — then write what the scene wants). Vary the DOOR, never the HAND: a different entry, shot, or technique — the voice, the register, and the display grammar this campaign has established are identity, not pattern, and are not yours to vary.`;
 }
 
 // ── 2. Vocabulary freshness ──────────────────────────────────────────────────

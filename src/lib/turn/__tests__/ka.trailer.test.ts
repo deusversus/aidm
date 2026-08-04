@@ -79,6 +79,7 @@ function kaArgs(over: Partial<KAArgs> = {}): KAArgs {
     turnNumber: 7,
     conte: Conte.parse({ turn_id: 7, tier: "genga" }),
     playerInput: "I wait by the door",
+    exchangeMessages: [],
     system: [{ type: "text", text: "settei" }],
     selection: {
       narration: "claude-sonnet-5",

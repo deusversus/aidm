@@ -1,4 +1,4 @@
-import type { TextBlockParam } from "@anthropic-ai/sdk/resources/messages/messages";
+import type { MessageParam, TextBlockParam } from "@anthropic-ai/sdk/resources/messages/messages";
 import { describe, expect, it, vi } from "vitest";
 import {
   type BlockInputs,
@@ -7,7 +7,7 @@ import {
   MAX_CACHE_BREAKPOINTS,
   PIN_MAX_COUNT,
   assembleBlocks,
-  block3Text,
+  exchangesText,
   selectPins,
 } from "../assemble";
 import { WINDOW_MAX_EXCHANGES, naiveCompactor, shouldCompact } from "../compaction";
@@ -38,109 +38,111 @@ const window = (n: number): ExchangeRow[] => Array.from({ length: n }, (_, i) =>
 const breakpointIndexes = (system: TextBlockParam[]): number[] =>
   system.flatMap((b, i) => (b.cache_control ? [i] : []));
 
-/**
- * The pre-C3 single-block rendering of Block 3, frozen here on purpose.
- * C3 moved cache boundaries; the load-bearing claim is that it moved NOTHING
- * ELSE. Deliberately independent of the module (its own exchange rendering,
- * its own joins) so a change to either side shows up as a diff, not a drift.
- */
-function legacyBlock3(input: BlockInputs): string {
-  const { kept } = selectPins(input.pins, input.watermark);
-  const pinText =
-    kept.length === 0
-      ? ""
-      : `## Pinned passages (player-held, verbatim)\n\n${kept.map((p) => p.content).join("\n\n")}\n\n`;
-  const windowText = [...input.exchanges]
-    .sort((a, b) => a.turnNumber - b.turnNumber)
-    .map((e) => `[Turn ${e.turnNumber}]\nPlayer: ${e.playerInput}\n\n${e.narration}`)
-    .join("\n\n");
-  return `${pinText}## Recent play (verbatim)\n\n${windowText}`;
-}
+const msgText = (m: MessageParam | undefined): string =>
+  m === undefined
+    ? ""
+    : Array.isArray(m.content)
+      ? m.content.map((b) => ("text" in b ? b.text : "")).join("")
+      : String(m.content);
 
-describe("BYTE EQUALITY: per-exchange blocks concatenate to the pre-C3 single block", () => {
-  const cases: Array<[string, BlockInputs]> = [
-    ["no pins, two exchanges", inputs()],
-    ["pins at the head", inputs({ pins: [pin(0, "Whatever happens, happens."), pin(1, "Bang.")] })],
-    ["a single exchange", inputs({ exchanges: [exchange(7)] })],
-    ["a full window at the compaction trigger", inputs({ exchanges: window(16) })],
-    ["a full window with pins", inputs({ exchanges: window(16), pins: [pin(0, "Bang.")] })],
-    ["exchanges handed in out of turn order", inputs({ exchanges: [exchange(3), exchange(1)] })],
-    [
-      "narration carrying blank lines and trailing whitespace",
+const msgBreakpointIndexes = (messages: MessageParam[]): number[] =>
+  messages.flatMap((m, i) =>
+    Array.isArray(m.content) && m.content.some((b) => "cache_control" in b && b.cache_control)
+      ? [i]
+      : [],
+  );
+
+// ---------------------------------------------------------------------------
+// M3R2 C2 — THE PEN'S OWN HAND. The pre-C3 byte-equality lineage ends here BY
+// DESIGN: the wiring audit (2026-08-03) found the KA received its own prose
+// as an unattributed system transcript with zero assistant turns — the
+// disparate-writer symptom as architecture. The window now renders as real
+// user/assistant conversation turns, and the load-bearing invariants are
+// attribution, verbatim fidelity, and the relocated cache discipline.
+// ---------------------------------------------------------------------------
+
+describe("the pen's own hand (M3R2 C2): the window is attributed conversation", () => {
+  it("N exchanges → alternating user/assistant pairs; the narration is the assistant's OWN turn, verbatim", () => {
+    const { exchangeMessages } = assembleBlocks(inputs());
+    expect(exchangeMessages).toHaveLength(4);
+    expect(exchangeMessages.map((m) => m.role)).toEqual(["user", "assistant", "user", "assistant"]);
+    expect(msgText(exchangeMessages[0])).toBe("[Turn 1]\ninput 1");
+    expect(msgText(exchangeMessages[1])).toBe("The scene for turn 1 unfolds.");
+    expect(msgText(exchangeMessages[2])).toBe("[Turn 2]\ninput 2");
+    expect(msgText(exchangeMessages[3])).toBe("The scene for turn 2 unfolds.");
+  });
+
+  it("whitespace fidelity: blank lines and trailing spaces in narration survive untouched", () => {
+    const { exchangeMessages } = assembleBlocks(
       inputs({
         exchanges: [
           { turnNumber: 1, playerInput: "look up  ", narration: "Rain.\n\n\nThen nothing.  \n" },
           { turnNumber: 2, playerInput: "", narration: "\n\nHe does not answer." },
         ],
       }),
-    ],
-  ];
-  for (const [name, fixture] of cases) {
-    it(name, () => {
-      const { system } = assembleBlocks(fixture);
-      expect(block3Text(system)).toBe(legacyBlock3(fixture));
-    });
-  }
-
-  it("EMPTY WINDOW is the one deliberate deviation: no exchanges → no orphan header", () => {
-    const fixture = inputs({ exchanges: [] });
-    const { system } = assembleBlocks(fixture);
-    // Pre-C3 turn 1 wrote a "recent play" promise with nothing under it.
-    expect(legacyBlock3(fixture)).toBe("## Recent play (verbatim)\n\n");
-    expect(block3Text(system)).toBe("");
-    expect(system).toHaveLength(2);
+    );
+    expect(msgText(exchangeMessages[1])).toBe("Rain.\n\n\nThen nothing.  \n");
+    expect(msgText(exchangeMessages[3])).toBe("\n\nHe does not answer.");
   });
 
-  it("pins over an empty window: the pin head renders, the header still does not", () => {
-    // The deviation composes with pins (SZ-era pins before any play): B3 is
-    // the pin text alone, and legacy differs by exactly the orphan header.
-    const fixture = inputs({ exchanges: [], pins: [pin(0, "Bang.")] });
-    const { system } = assembleBlocks(fixture);
-    const pinText = "## Pinned passages (player-held, verbatim)\n\nBang.\n\n";
-    expect(block3Text(system)).toBe(pinText);
-    expect(legacyBlock3(fixture)).toBe(`${pinText}## Recent play (verbatim)\n\n`);
-    expect(system).toHaveLength(3);
+  it("exchanges handed in out of turn order sort into the conversation's real order", () => {
+    const { exchangeMessages } = assembleBlocks(inputs({ exchanges: [exchange(3), exchange(1)] }));
+    expect(msgText(exchangeMessages[0])).toBe("[Turn 1]\ninput 1");
+    expect(msgText(exchangeMessages[2])).toBe("[Turn 3]\ninput 3");
+  });
+
+  it("turn 1 (no exchanges): empty conversation, system is B1 · B2 alone", () => {
+    const empty = assembleBlocks(inputs({ exchanges: [] }));
+    expect(empty.exchangeMessages).toHaveLength(0);
+    expect(empty.system).toHaveLength(2);
+    const pinned = assembleBlocks(inputs({ exchanges: [], pins: [pin(0, "Bang.")] }));
+    expect(pinned.system).toHaveLength(3);
+    expect(pinned.system[2]?.text).toContain("Pinned passages");
+    expect(breakpointIndexes(pinned.system)).toEqual([0, 1, 2]);
+  });
+
+  it("the transcript view (exchangesText) reads in play order — budgets and tests share it", () => {
+    const { exchangeMessages, budgets } = assembleBlocks(inputs());
+    const t = exchangesText(exchangeMessages);
+    expect(t.indexOf("input 1")).toBeLessThan(t.indexOf("The scene for turn 1 unfolds."));
+    expect(t.indexOf("The scene for turn 1 unfolds.")).toBeLessThan(t.indexOf("input 2"));
+    expect(budgets.b3Tokens).toBeGreaterThan(0);
   });
 });
 
-describe("assembleBlocks (§5.6, amended 2026-07-26)", () => {
-  it("no pins: B1 · B2 · header · one block per exchange, breakpoints on B1/B2/tail", () => {
-    const { system } = assembleBlocks(inputs());
-    expect(system).toHaveLength(5);
-    expect(system[2]?.text).toBe("## Recent play (verbatim)\n\n");
-    expect(system[3]?.text).toBe("[Turn 1]\nPlayer: input 1\n\nThe scene for turn 1 unfolds.");
-    expect(system[4]?.text).toBe("\n\n[Turn 2]\nPlayer: input 2\n\nThe scene for turn 2 unfolds.");
-    expect(breakpointIndexes(system)).toEqual([0, 1, 4]);
-    for (const block of system) expect(block.type).toBe("text");
-    for (const i of breakpointIndexes(system)) {
-      expect(system[i]?.cache_control).toEqual({ type: "ephemeral", ttl: "1h" });
+describe("cache discipline (§5.6, relocated to messages — M3R2 C2)", () => {
+  it("breakpoints: B1 · B2 in system (pins third when present); exactly ONE in messages, riding the last assistant turn", () => {
+    const bare = assembleBlocks(inputs());
+    expect(breakpointIndexes(bare.system)).toEqual([0, 1]);
+    expect(msgBreakpointIndexes(bare.exchangeMessages)).toEqual([bare.exchangeMessages.length - 1]);
+    // The 1h TTL rides every breakpoint (C9's measured think-time law).
+    const tail = bare.exchangeMessages.at(-1)?.content;
+    if (Array.isArray(tail) && tail[0] && "cache_control" in tail[0]) {
+      expect(tail[0].cache_control).toEqual({ type: "ephemeral", ttl: "1h" });
+    } else {
+      throw new Error("tail message lost its content-block shape");
     }
-  });
-
-  it("pins present: the pin head takes breakpoint 3 and the window tail takes breakpoint 4", () => {
-    const { system } = assembleBlocks(inputs({ pins: [pin(0, "Bang.")] }));
-    expect(system).toHaveLength(6);
-    expect(system[2]?.text).toBe("## Pinned passages (player-held, verbatim)\n\nBang.\n\n");
-    expect(breakpointIndexes(system)).toEqual([0, 1, 2, 5]);
-  });
-
-  it("turn 1 (no exchanges) emits no window blocks at all", () => {
-    expect(assembleBlocks(inputs({ exchanges: [] })).system).toHaveLength(2);
-    const pinned = assembleBlocks(inputs({ exchanges: [], pins: [pin(0, "Bang.")] })).system;
-    expect(pinned).toHaveLength(3);
-    expect(breakpointIndexes(pinned)).toEqual([0, 1, 2]);
+    for (const i of breakpointIndexes(bare.system)) {
+      expect(bare.system[i]?.cache_control).toEqual({ type: "ephemeral", ttl: "1h" });
+    }
+    const pinned = assembleBlocks(inputs({ pins: [pin(0, "Bang.")] }));
+    expect(breakpointIndexes(pinned.system)).toEqual([0, 1, 2]);
+    expect(msgBreakpointIndexes(pinned.exchangeMessages)).toEqual([
+      pinned.exchangeMessages.length - 1,
+    ]);
   });
 
   it("NEVER exceeds the API's four breakpoints, at any window size or pin count", () => {
-    // Windows at n=18 legitimately cross the walk-back warn threshold — spy
-    // the warn so the sweep stays silent on stderr (the warn's own behavior
-    // is pinned in its dedicated test below).
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     try {
       for (let n = 0; n <= 18; n++) {
         for (const pins of [[], [pin(0, "Bang.")], [pin(0, "Bang."), pin(1, "See you, cowboy.")]]) {
-          const { system } = assembleBlocks(inputs({ exchanges: window(n), pins }));
-          expect(breakpointIndexes(system).length).toBeLessThanOrEqual(MAX_CACHE_BREAKPOINTS);
+          const { system, exchangeMessages } = assembleBlocks(
+            inputs({ exchanges: window(n), pins }),
+          );
+          const total =
+            breakpointIndexes(system).length + msgBreakpointIndexes(exchangeMessages).length;
+          expect(total).toBeLessThanOrEqual(MAX_CACHE_BREAKPOINTS);
         }
       }
     } finally {
@@ -148,44 +150,67 @@ describe("assembleBlocks (§5.6, amended 2026-07-26)", () => {
     }
   });
 
-  it("PREFIX STABILITY: an append leaves every prior block byte-identical and adds exactly one", () => {
+  it("PREFIX STABILITY: an append leaves every prior message byte-identical and adds exactly one user+assistant pair", () => {
     const before = assembleBlocks(inputs());
     const after = assembleBlocks(inputs({ exchanges: [exchange(1), exchange(2), exchange(3)] }));
-    expect(after.system).toHaveLength(before.system.length + 1);
+    expect(after.exchangeMessages).toHaveLength(before.exchangeMessages.length + 2);
+    for (const [i, m] of before.exchangeMessages.entries()) {
+      expect(msgText(after.exchangeMessages[i])).toBe(msgText(m));
+      expect(after.exchangeMessages[i]?.role).toBe(m.role);
+    }
+    // The tail breakpoint MOVES: it leaves the old last message (which now
+    // reads at 0.1x) and lands on the one new assistant turn (the only 2x
+    // write of the turn). The system blocks are untouched entirely.
+    const oldTail = before.exchangeMessages.length - 1;
+    expect(msgBreakpointIndexes(before.exchangeMessages)).toEqual([oldTail]);
+    expect(msgBreakpointIndexes(after.exchangeMessages)).toEqual([
+      after.exchangeMessages.length - 1,
+    ]);
     for (const [i, block] of before.system.entries()) {
       expect(after.system[i]?.text).toBe(block.text);
     }
-    // The tail breakpoint MOVES: it leaves the old last block (which now reads
-    // at 0.1x) and lands on the one new block (the only 2x write of the turn).
-    const oldTail = before.system.length - 1;
-    expect(before.system[oldTail]?.cache_control).toBeTruthy();
-    expect(after.system[oldTail]?.cache_control).toBeUndefined();
-    expect(after.system.at(-1)?.cache_control).toEqual({ type: "ephemeral", ttl: "1h" });
-    expect(breakpointIndexes(after.system)).toEqual([0, 1, after.system.length - 1]);
   });
 
-  it("a pin ADD busts the pin head but leaves Blocks 1-2 and the window byte-identical", () => {
+  it("a pin ADD busts only the pin block: B1/B2 identical, the conversation completely untouched", () => {
     const base = inputs();
     const before = assembleBlocks(base);
     const after = assembleBlocks({ ...base, pins: [pin(0, "Whatever happens, happens.")] });
     expect(after.system[0]?.text).toBe(before.system[0]?.text);
     expect(after.system[1]?.text).toBe(before.system[1]?.text);
     expect(after.system[2]?.text).toContain("Pinned passages");
-    expect(after.system.slice(3).map((b) => b.text)).toEqual(
-      before.system.slice(2).map((b) => b.text),
+    expect(after.exchangeMessages.map(msgText)).toEqual(before.exchangeMessages.map(msgText));
+    expect(msgBreakpointIndexes(after.exchangeMessages)).toEqual(
+      msgBreakpointIndexes(before.exchangeMessages),
     );
   });
 
-  it("warns — never throws — when the window reaches the cache walk-back margin", () => {
+  it("NEVER warns on window size (C2 review: the walk-back risk died with the relocation — per-turn growth is one pair)", () => {
     const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
     try {
-      // header + 17 exchanges = 18 blocks: inside the margin.
-      assembleBlocks(inputs({ exchanges: window(CACHE_WALKBACK_BLOCKS - 3) }));
+      // Steady-state sizes incl. keep-tail (10) and the trigger band (16+):
+      // a permanently-tripped alarm is worse than none.
+      for (const n of [9, 10, 16, 20]) {
+        assembleBlocks(inputs({ exchanges: window(n) }));
+      }
       expect(spy).not.toHaveBeenCalled();
-      // header + 18 exchanges = 19 blocks: one short of the walk-back ceiling.
-      const at = assembleBlocks(inputs({ exchanges: window(CACHE_WALKBACK_BLOCKS - 2) }));
+      expect(CACHE_WALKBACK_BLOCKS).toBe(20); // the bound itself stays documented
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it("an EMPTY-narration row skips as a pair, loudly — an empty text block is an API 400 (C2 review)", () => {
+    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const { exchangeMessages } = assembleBlocks(
+        inputs({
+          exchanges: [exchange(1), { turnNumber: 2, playerInput: "hello?", narration: "   " }],
+        }),
+      );
+      expect(exchangeMessages).toHaveLength(2); // only turn 1's pair
       expect(spy).toHaveBeenCalledTimes(1);
-      expect(at.system.length).toBeGreaterThan(0);
+      // The tail breakpoint still lands on the surviving last assistant turn.
+      expect(msgBreakpointIndexes(exchangeMessages)).toEqual([1]);
     } finally {
       spy.mockRestore();
     }
@@ -229,7 +254,7 @@ describe("pins (§5.4: ≤5, ≤2k tokens, dedup by source turn, order-stable)",
     const catchphrase = "Whatever happens, happens.";
     const base = inputs({ pins: [pin(0, catchphrase, 0)] });
     const before = assembleBlocks(base);
-    expect(block3Text(before.system)).toContain(catchphrase);
+    expect(before.system[2]?.text).toContain(catchphrase);
     // The KA echoes the pinned wording in the next turn's narration —
     // exactly what pins invite. Membership must not flip (C5 audit).
     const echo = {
@@ -239,10 +264,12 @@ describe("pins (§5.4: ≤5, ≤2k tokens, dedup by source turn, order-stable)",
     };
     const after = assembleBlocks({ ...base, exchanges: [...base.exchanges, echo] });
     expect(after.droppedPins).toHaveLength(0);
-    expect(block3Text(after.system).startsWith(block3Text(before.system))).toBe(true);
-    // Block-list form: the pin head and every prior window block are untouched.
+    // The pin block and every prior conversation turn are untouched.
     for (const [i, block] of before.system.entries()) {
       expect(after.system[i]?.text).toBe(block.text);
+    }
+    for (const [i, m] of before.exchangeMessages.entries()) {
+      expect(msgText(after.exchangeMessages[i])).toBe(msgText(m));
     }
   });
 

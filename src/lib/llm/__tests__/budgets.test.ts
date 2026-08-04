@@ -49,12 +49,12 @@ beforeEach(() => createMock.mockReset());
 afterEach(() => vi.restoreAllMocks());
 
 describe("budget classes (M2R2 §6 rationale pins)", () => {
-  it("named output-budget classes hold their values", () => {
-    expect(CLASSIFY).toBe(1_000);
-    expect(STRUCTURED_SMALL).toBe(2_000);
-    expect(STRUCTURED_RICH).toBe(8_000);
-    expect(LOOPED_LARGE).toBe(16_000);
-    expect(PROSE_COMPOSER).toBe(8_000);
+  it("named output-budget classes hold their values (+50% headroom rider, user-directed 2026-08-03)", () => {
+    expect(CLASSIFY).toBe(1_500);
+    expect(STRUCTURED_SMALL).toBe(3_000);
+    expect(STRUCTURED_RICH).toBe(12_000);
+    expect(LOOPED_LARGE).toBe(24_000);
+    expect(PROSE_COMPOSER).toBe(12_000);
   });
 });
 

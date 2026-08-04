@@ -73,6 +73,28 @@ describe("prewarmPrefix request shape", () => {
     expect(req.tool_choice).toBeUndefined();
   });
 
+  it("the exchange window precedes the placeholder — the warm covers the moving message breakpoint (M3R2 C2)", async () => {
+    const exchanges = [
+      { role: "user" as const, content: [{ type: "text" as const, text: "[Turn 1]\ngo" }] },
+      {
+        role: "assistant" as const,
+        content: [
+          {
+            type: "text" as const,
+            text: "The scene lands.",
+            cache_control: { type: "ephemeral" as const, ttl: "1h" as const },
+          },
+        ],
+      },
+    ];
+    await prewarmPrefix(DEV_TIER_SELECTION, SYSTEM, KA_TOOLS, { campaignId: "c1" }, exchanges);
+    const req = createMock.mock.calls[0]?.[0];
+    expect(req.messages).toHaveLength(3);
+    expect(req.messages[0]).toBe(exchanges[0]);
+    expect(req.messages[1]).toBe(exchanges[1]);
+    expect(req.messages[2]).toEqual({ role: "user", content: "warmup" });
+  });
+
   it("the placeholder turn cannot enter the cached prefix", async () => {
     await prewarmPrefix(DEV_TIER_SELECTION, SYSTEM, KA_TOOLS);
 

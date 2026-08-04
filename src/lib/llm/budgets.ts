@@ -17,15 +17,20 @@
  * shaped by the premise and the beat, not by a class here.
  */
 
+// M3R2 C2 rider (user-directed 2026-08-03): every class +50% — "I'm not
+// convinced we wouldn't get better writing with more headroom." A budget is
+// a truncation guard, not spend (output bills by usage); the raise costs
+// nothing until a call earns it. budget-assertions re-baselined with it.
+
 /** Single small verdict objects — router, transition check, merge pair, gauge classification. */
-export const CLASSIFY = 1_000;
+export const CLASSIFY = 1_500;
 
 /**
  * Small structured emits — intent triage, pacer directive, outcome validation,
  * relevance ranking, world-assertion extraction, block revision, sidecar
  * fallback, suggestions.
  */
-export const STRUCTURED_SMALL = 2_000;
+export const STRUCTURED_SMALL = 3_000;
 
 /**
  * Multi-part structured emits with prose fields — outcome judgment, scale,
@@ -33,13 +38,13 @@ export const STRUCTURED_SMALL = 2_000;
  * voice journal, wiki scrape plan, and the interpretive research calls (mapped
  * to the nearest class ≥ their current size, never shrunk).
  */
-export const STRUCTURED_RICH = 8_000;
+export const STRUCTURED_RICH = 12_000;
 
 /**
  * Tool-loop calls emitting large contracts — Director cycle + startup, SZ OSP
  * synthesis, and the deepest research synthesis.
  */
-export const LOOPED_LARGE = 16_000;
+export const LOOPED_LARGE = 24_000;
 
 /** Player-facing prose composers — recap, yokoku, booth responder, SZ conductor. */
-export const PROSE_COMPOSER = 8_000;
+export const PROSE_COMPOSER = 12_000;

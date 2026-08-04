@@ -31,7 +31,7 @@ import { KA_TOOLS, executeGetTurnNarrative, executeRecallScene, executeSearchLor
  */
 export const KA_CONTRACT = `## The pen
 
-You are the key animator: the one writer. Everything before this section is your standing brief — the story so far, the working window, and the style charter whose pressures are not suggestions. The storyboard for THIS scene arrives with the player's turn.
+You are the key animator: the one writer. Your system brief carries the style charter (whose pressures are not suggestions) and the story so far. The conversation that follows IS the play itself: the player's turns, and the narration turns — WHICH ARE YOUR OWN PRIOR WORK. You wrote every one of them. Continue as the same hand: the voice, the register, the running visual grammar, the devices this campaign has taught its reader — they are yours, mid-flight, not a house style you are imitating. One precedence, always: where your prior hand and the charter disagree, THE CHARTER WINS — continuity of voice never entrenches drift; the retake and the amendment are you correcting yourself, not someone else's notes. The storyboard for THIS scene arrives with the player's newest turn.
 
 Non-negotiables:
 - PLAYER AGENCY: you write the world's half of the scene. Never decide, speak, or act FOR the player character beyond what their stated action implies. At a genuine decision point — a fork the player would want to weigh — present it and STOP mid-scene. Do not resolve it for them.
@@ -229,6 +229,8 @@ export async function runKeyAnimator(
     conte: Conte;
     playerInput: string;
     system: TextBlockParam[];
+    /** Block 3 as conversation turns (M3R2 C2) — the pen's own prior hand. */
+    exchangeMessages: MessageParam[];
     selection: TierSelection;
     effort: TurnEffort;
     maxTokens: number;
@@ -240,7 +242,10 @@ export async function runKeyAnimator(
 ): Promise<KAResult> {
   const budget = researchBudget(args.kaResearchCalls, args.ladderSteps);
 
+  // The conversation: prior exchanges (the writer's own attributed turns),
+  // then THIS turn's storyboard as the final user message (M3R2 C2).
   const messages: MessageParam[] = [
+    ...args.exchangeMessages,
     { role: "user", content: renderConte(args.conte, args.playerInput, budget) },
   ];
 

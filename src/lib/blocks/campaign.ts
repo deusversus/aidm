@@ -97,7 +97,12 @@ export async function assembleForCampaign(
     contract.presentation_vocabulary.directives,
   );
 
-  const block1 = `${setteiText}${presentation}\n\n${KA_CONTRACT}`;
+  // Block-1 order (M3R2 C2, the plan's position re-exam): the INVARIANT
+  // execution contract leads; the campaign's own voice matter — charter,
+  // exemplars, presentation grants — sits LAST, in the recency-privileged
+  // tail nearest the conversation. Pre-C2 the 1,652-token invariant contract
+  // outranked every campaign-specific voice cue for recency; inverted now.
+  const block1 = `${KA_CONTRACT}\n\n${setteiText}${presentation}`;
 
   return assembleBlocks({
     settei: block1,

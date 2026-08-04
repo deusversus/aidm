@@ -35,8 +35,14 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     return NextResponse.json({ error: "campaign has no premise contract yet" }, { status: 409 });
   }
 
-  const result = await prewarmPrefix(selection.data, blocks.system, KA_TOOLS, {
-    campaignId: id,
-  });
+  const result = await prewarmPrefix(
+    selection.data,
+    blocks.system,
+    KA_TOOLS,
+    {
+      campaignId: id,
+    },
+    blocks.exchangeMessages,
+  );
   return NextResponse.json({ ...result, budgets: blocks.budgets });
 }

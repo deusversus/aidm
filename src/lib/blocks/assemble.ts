@@ -1,42 +1,43 @@
 import type { DirectiveGrant } from "@/lib/types/premise";
-import type { TextBlockParam } from "@anthropic-ai/sdk/resources/messages/messages";
+import type { MessageParam, TextBlockParam } from "@anthropic-ai/sdk/resources/messages/messages";
 import { approxTokens } from "./tokens";
 
 /**
- * The four-block prompt strategy (blueprint §5.6), as pure assembly.
+ * The four-block prompt strategy (blueprint §5.6), as pure assembly —
+ * amended M3R2 C2: THE PEN'S OWN HAND.
  *
  * Block order and lifetimes:
  *   [1] Settei + world rules — changes only at session boundaries / premise
- *       edits (§4.4a). Cached; its tail is breakpoint 1.
+ *       edits (§4.4a). System; cached; its tail is breakpoint 1.
  *   [2] Compacted history — changes only at compaction events and epoch
- *       merges (§6.2), both sanctioned wholesale rewrites. Beats and epoch
- *       summaries render identically and in position order: an epoch takes
- *       its era's position, so folding one changes Block 2's bytes but never
- *       its shape. Cached; its tail is breakpoint 2.
- *   [3] Working memory: the pin head, then the verbatim exchange tail —
- *       APPEND-ONLY between compaction events. Rendered as DISCRETE blocks:
- *       pin head (breakpoint 3) · window header · one block per exchange,
- *       with breakpoint 4 riding the LAST exchange block and MOVING each
- *       turn (§5.6, amended 2026-07-26).
- *   [4] The conte — dynamic, uncached, rendered into the user message by
+ *       merges (§6.2), both sanctioned wholesale rewrites. System; cached;
+ *       its tail is breakpoint 2. Pins (player-held passages) ride a third
+ *       system block with their own breakpoint.
+ *   [3] Working memory — the verbatim exchange window — is NO LONGER system
+ *       text. It renders as REAL CONVERSATION TURNS: the player's input as a
+ *       user message, the narration as an ASSISTANT message. The wiring
+ *       audit (2026-08-03) found the disparate-writer symptom was the
+ *       architecture: the KA received its own prose as an unattributed
+ *       system transcript with zero assistant turns in its own conversation
+ *       — structurally "a writer handed someone else's manuscript." Now the
+ *       model sees its prior scenes as its OWN turns, the shape the API's
+ *       conversation contract was built for. Still APPEND-ONLY between
+ *       compaction events; breakpoint 4 rides the LAST assistant message
+ *       and MOVES each turn (M2R5 C3's cache discipline, relocated).
+ *   [4] The conte — dynamic, uncached, rendered as the FINAL user message by
  *       the turn engine (not this module).
  *
- * Why the window breathes in exchanges (M2R5 C3, measured 2026-07-26): as
- * one growing text block, B3 re-wrote its whole window at the 2× 1h-write
- * rate every turn — a 12k-token median creation per first-narration-call
- * that nothing read back, because 60 of 82 turns made exactly one narration
- * call and the next turn's growth busted the entry again. With a moving tail
- * breakpoint the prior window reads at 0.1× and only the new exchange
- * writes. The prompt the model reads is byte-identical either way — only the
- * cache boundaries moved, and `assemble.test.ts` pins that equality.
+ * Cache economics carry over from M2R5 C3 unchanged: prior exchange
+ * messages read at 0.1×; only the new pair writes; compaction remains the
+ * single sanctioned shrink event. The prefix-stability tests assert the
+ * invariant in message form: appending an exchange leaves every prior
+ * message byte-identical and adds exactly one user+assistant pair.
  *
  * Append-only by construction: this module exposes no mutation surface at
  * all — it renders whatever rows it is given, and the row sources are
  * themselves append-only (episodic records insert-only; compaction is the
  * single sanctioned truncation, implemented in compaction.ts as
- * beats-written + watermark-advanced, never row edits). The prefix-
- * stability tests assert the cache invariant directly: appending an
- * exchange leaves every prior block byte-identical and adds exactly one.
+ * beats-written + watermark-advanced, never row edits).
  */
 
 export interface ExchangeRow {
@@ -115,37 +116,41 @@ export const MAX_CACHE_BREAKPOINTS = 4;
 
 /**
  * A cache read walks back at most this many blocks from a breakpoint looking
- * for a match. Everything between the pin/Block-2 breakpoint and the moving
- * tail is the window, so the window's block count is the number that has to
- * stay under the ceiling. Compaction (trigger 16, keep-tail 10) should hold
- * it at ≤16 exchanges + header, but the assembly checks rather than trusting
- * that cadence forever.
+ * for a match. Post-C2 this bound is structurally safe: the moving tail
+ * breakpoint advances by one exchange pair (2 blocks) per turn, so a read
+ * never walks farther than pair + conte — the old window-size tripwire is
+ * retired (see the note at the assembly site).
  */
 export const CACHE_WALKBACK_BLOCKS = 20;
 
-/** Blocks 1 and 2 come first; everything after them is Block 3. */
-export const B3_FIRST_BLOCK_INDEX = 2;
-
-const WINDOW_HEADER = "## Recent play (verbatim)\n\n";
-
 /**
- * What the model actually reads as Block 3 — the window blocks concatenated.
- * The split into blocks is a CACHE fact, not a prompt fact: this string is
- * byte-identical to the single block the assembler emitted before M2R5 C3.
+ * The window as the model-visible transcript — for budgets, tests, and any
+ * reader that wants Block 3 as text. One entry per exchange message.
  */
-export function block3Text(system: TextBlockParam[]): string {
-  return system
-    .slice(B3_FIRST_BLOCK_INDEX)
-    .map((b) => b.text)
-    .join("");
+export function exchangesText(messages: MessageParam[]): string {
+  return messages
+    .map((m) =>
+      (Array.isArray(m.content) ? m.content : [{ type: "text" as const, text: String(m.content) }])
+        .map((b) => ("text" in b ? b.text : ""))
+        .join(""),
+    )
+    .join("\n\n");
 }
 
 export interface AssembledBlocks {
   /**
-   * Blocks 1–3 as system blocks. Breakpoints: Block 1 tail · Block 2 tail ·
-   * pin head (when pins exist) · last exchange block (moving).
+   * Blocks 1–2 + pins as system blocks. Breakpoints: Block 1 tail · Block 2
+   * tail · pin block (when pins exist).
    */
   system: TextBlockParam[];
+  /**
+   * Block 3 as REAL conversation turns (M3R2 C2): user = the player's input
+   * (turn-labelled), assistant = the narration VERBATIM — the pen's own
+   * hand, attributed. Breakpoint 4 (moving) rides the last message. The
+   * turn engine appends the conte as the final user message; the booth and
+   * the recap thread these ahead of their own frames.
+   */
+  exchangeMessages: MessageParam[];
   budgets: {
     b1Tokens: number;
     b2Tokens: number;
@@ -163,8 +168,10 @@ export interface AssembledBlocks {
   droppedPins: PinRow[];
 }
 
-function renderExchange(e: ExchangeRow): string {
-  return `[Turn ${e.turnNumber}]\nPlayer: ${e.playerInput}\n\n${e.narration}`;
+/** The player's half — the role IS the attribution; the label keeps turn
+ *  references legible (numbering may skip: channel turns consume numbers). */
+function exchangeUserText(e: ExchangeRow): string {
+  return `[Turn ${e.turnNumber}]\n${e.playerInput}`;
 }
 
 /**
@@ -226,14 +233,6 @@ export function assembleBlocks(inputs: BlockInputs): AssembledBlocks {
       ? ""
       : `## Pinned passages (player-held, verbatim)\n\n${kept.map((p) => p.content).join("\n\n")}\n\n`;
 
-  // The `\n\n` that joins two exchanges rides the HEAD of the later block,
-  // never the tail of the earlier one: a trailing separator would rewrite the
-  // previous block on every append, which is the exact rewrite this structure
-  // exists to stop.
-  const windowTexts = [...inputs.exchanges]
-    .sort((a, b) => a.turnNumber - b.turnNumber)
-    .map((e, i) => (i === 0 ? renderExchange(e) : `\n\n${renderExchange(e)}`));
-
   // C9 (§5.6, measured 2026-07-18): live inter-turn think-time runs 19-65
   // minutes within a sitting (p50 ~36m) — ZERO gaps fell under 5 minutes,
   // 80% under 1 hour. A 5m TTL never survives a real player; every
@@ -245,52 +244,70 @@ export function assembleBlocks(inputs: BlockInputs): AssembledBlocks {
     { type: "text", text: b2, ...breakpoint },
   ];
   if (pinText.length > 0) {
-    // Pins get their own breakpoint so a rare pin add busts pins + window and
-    // never Blocks 1–2.
+    // Pins get their own breakpoint so a rare pin add busts pins and never
+    // Blocks 1–2 (the window lives in messages and is untouched by a pin).
     system.push({ type: "text", text: pinText, ...breakpoint });
   }
-  // An empty window (turn 1) renders NO header — the one byte C3 deliberately
-  // stopped writing: the pre-C3 block promised "recent play" with nothing
-  // under it. Every non-empty window is byte-for-byte what it always was.
-  if (windowTexts.length > 0) {
-    system.push({ type: "text", text: WINDOW_HEADER });
-    for (const [i, text] of windowTexts.entries()) {
-      const isTail = i === windowTexts.length - 1;
-      system.push({ type: "text", text, ...(isTail ? breakpoint : {}) });
-    }
+
+  // Block 3 as conversation (M3R2 C2): one user + one assistant message per
+  // exchange, in turn order. The moving breakpoint rides the LAST message's
+  // content block. An empty window (turn 1) is an empty array.
+  // An empty text block is an API 400 ("text content blocks must be
+  // non-empty") — a blank-narration row would permanently kill every
+  // narration call for the campaign (C2 review MUST-FIX). The runtime
+  // rejects empty narration before the episodic insert, so this is
+  // defense against a corrupt row: the whole pair skips, loudly, because
+  // rendering the user half alone would break the conversation.
+  const ordered = [...inputs.exchanges]
+    .sort((a, b) => a.turnNumber - b.turnNumber)
+    .filter((e) => {
+      if (e.narration.trim() === "") {
+        console.warn("[blocks] exchange with EMPTY narration — pair skipped (corrupt row)", {
+          turnNumber: e.turnNumber,
+        });
+        return false;
+      }
+      return true;
+    });
+  const exchangeMessages: MessageParam[] = [];
+  for (const [i, e] of ordered.entries()) {
+    const isLast = i === ordered.length - 1;
+    exchangeMessages.push({
+      role: "user",
+      content: [{ type: "text", text: exchangeUserText(e) }],
+    });
+    exchangeMessages.push({
+      role: "assistant",
+      content: [{ type: "text", text: e.narration, ...(isLast ? breakpoint : {}) }],
+    });
   }
 
-  const b3 = block3Text(system);
+  const b3 = exchangesText(exchangeMessages);
 
-  const breakpointCount = system.filter((b) => b.cache_control).length;
-  if (breakpointCount > MAX_CACHE_BREAKPOINTS) {
+  const systemBreakpoints = system.filter((b) => b.cache_control).length;
+  const messageBreakpoints = exchangeMessages.length > 0 ? 1 : 0;
+  if (systemBreakpoints + messageBreakpoints > MAX_CACHE_BREAKPOINTS) {
     throw new Error(
-      `assembleBlocks emitted ${breakpointCount} cache breakpoints; the API allows ${MAX_CACHE_BREAKPOINTS}`,
+      `assembleBlocks emitted ${systemBreakpoints + messageBreakpoints} cache breakpoints; the API allows ${MAX_CACHE_BREAKPOINTS}`,
     );
   }
 
-  // Degraded caching is not a failed turn — this warns, never throws. If it
-  // ever fires, compaction's cadence has drifted past the walk-back margin
-  // and the window's reads are silently missing.
-  const windowBlockCount = system.length - B3_FIRST_BLOCK_INDEX - (pinText.length > 0 ? 1 : 0);
-  if (windowBlockCount >= CACHE_WALKBACK_BLOCKS - 1) {
-    console.warn(
-      "[blocks] Block-3 window is at the cache walk-back margin — compaction is overdue and reads will start missing",
-      {
-        windowBlockCount,
-        walkBackLimit: CACHE_WALKBACK_BLOCKS,
-        exchanges: inputs.exchanges.length,
-      },
-    );
-  }
+  // The walk-back tripwire is RETIRED (C2 review): the risk it guarded died
+  // with the relocation. Pre-C2 a compaction could rewrite the whole window
+  // behind one breakpoint; now the distance a read must walk back from the
+  // moving tail is exactly one exchange pair (2 blocks) plus the conte —
+  // structurally under the ~20-block walk-back at any window size. The old
+  // threshold (>=19 message blocks) would have fired on EVERY healthy
+  // assembly, since compaction's keep-tail alone is 10 exchanges = 20
+  // blocks: a permanently-tripped alarm is worse than none.
 
   const budgets = {
     b1Tokens: approxTokens(b1),
     b2Tokens: approxTokens(b2),
     b3Tokens: approxTokens(b3),
     pinTokens: approxTokens(pinText),
-    totalTokens: approxTokens(b1) + approxTokens(b2) + approxTokens(b3),
+    totalTokens: approxTokens(b1) + approxTokens(b2) + approxTokens(pinText) + approxTokens(b3),
     epochCount: inputs.beats.filter((b) => b.isEpoch).length,
   };
-  return { system, budgets, droppedPins: dropped };
+  return { system, exchangeMessages, budgets, droppedPins: dropped };
 }

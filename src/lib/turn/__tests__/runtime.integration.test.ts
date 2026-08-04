@@ -546,6 +546,7 @@ describe.skipIf(!url)("Turn Runtime (real Postgres, scripted models)", () => {
       } as unknown as Conte,
       playerInput: "test",
       system: [{ type: "text", text: "settei" }],
+      exchangeMessages: [],
       selection: {
         narration: "claude-sonnet-5",
         judgment: "claude-sonnet-5",
@@ -602,6 +603,7 @@ describe.skipIf(!url)("Turn Runtime (real Postgres, scripted models)", () => {
       } as unknown as Conte,
       playerInput: "test",
       system: [{ type: "text", text: "settei" }],
+      exchangeMessages: [],
       selection: {
         narration: "claude-sonnet-5",
         judgment: "claude-sonnet-5",

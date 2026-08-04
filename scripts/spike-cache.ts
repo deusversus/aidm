@@ -67,7 +67,15 @@ async function main(): Promise<void> {
   console.log(`budgets: ${JSON.stringify(blocks.budgets)}`);
   console.log(`tools:   ${KA_TOOLS.map((t) => t.name).join(", ")}`);
 
-  const warm = await prewarmPrefix(DEV_TIER_SELECTION, blocks.system, KA_TOOLS, { campaignId });
+  // M3R2 C2: the window is MESSAGES now — the proof must exercise the moved
+  // shape or it validates only the half that did not change.
+  const warm = await prewarmPrefix(
+    DEV_TIER_SELECTION,
+    blocks.system,
+    KA_TOOLS,
+    { campaignId },
+    blocks.exchangeMessages,
+  );
   console.log(
     `prewarm:   cacheCreation=${warm.cacheCreation} cacheRead=${warm.cacheRead} cost=$${warm.costUsd.toFixed(6)}`,
   );
@@ -89,6 +97,7 @@ async function main(): Promise<void> {
       selection: DEV_TIER_SELECTION,
       system: blocks.system,
       messages: [
+        ...blocks.exchangeMessages,
         {
           role: "user",
           content:

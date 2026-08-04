@@ -93,6 +93,7 @@ function kaArgs(over: Partial<KAArgs> = {}): KAArgs {
     turnNumber: 7,
     conte: Conte.parse({ turn_id: 7, tier: "genga" }),
     playerInput: "I wait by the door",
+    exchangeMessages: [],
     system: [{ type: "text", text: "settei" }],
     selection: {
       narration: "claude-sonnet-5",
@@ -232,5 +233,41 @@ describe("the research budget is enforced in the loop, not in the tool array", (
     expect(vi.mocked(executeRecallScene)).toHaveBeenCalledTimes(1);
     expect(result.researchCalls).toBe(1);
     expect(JSON.stringify(mockStream.mock.calls[1]?.[0].messages)).not.toContain(RESEARCH_REFUSAL);
+  });
+});
+
+describe("the pen's own hand reaches the wire (M3R2 C2)", () => {
+  it("prior exchanges thread ahead of the conte as real turns", async () => {
+    mockStream.mockImplementation(() =>
+      kaRound(
+        [
+          { type: "text", text: "ok " },
+          { type: "tool_use", id: "t1", name: "commit_scene", input: SIDECAR },
+        ],
+        "tool_use",
+      ),
+    );
+    await runKeyAnimator(
+      noDb,
+      kaArgs({
+        kaResearchCalls: 0,
+        exchangeMessages: [
+          { role: "user", content: [{ type: "text", text: "[Turn 1]\ngo" }] },
+          {
+            role: "assistant",
+            content: [{ type: "text", text: "The prior scene, in the writer's own hand." }],
+          },
+        ],
+      }),
+    );
+    // biome-ignore lint/suspicious/noExplicitAny: mock harness
+    const call = mockStream.mock.calls[0]?.[0] as any;
+    expect(call.messages).toHaveLength(3);
+    expect(call.messages[0].role).toBe("user");
+    expect(call.messages[1].role).toBe("assistant");
+    expect(
+      Array.isArray(call.messages[1].content) ? call.messages[1].content[0]?.text : "",
+    ).toContain("the writer's own hand");
+    expect(call.messages[2].role).toBe("user"); // the conte closes the thread
   });
 });

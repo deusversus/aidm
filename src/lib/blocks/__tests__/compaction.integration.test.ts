@@ -5,7 +5,7 @@ import { and, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { assembleBlocks, block3Text } from "../assemble";
+import { assembleBlocks, exchangesText } from "../assemble";
 import {
   COMPACT_BEATS_MAX,
   compactionWatermark,
@@ -167,11 +167,15 @@ describe.skipIf(!url)("compaction event (real Postgres)", () => {
       watermark,
     });
 
-    expect(block3Text(after.system).startsWith(block3Text(before.system))).toBe(true);
+    expect(
+      exchangesText(after.exchangeMessages).startsWith(exchangesText(before.exchangeMessages)),
+    ).toBe(true);
     expect(after.system[1]?.text).toBe(before.system[1]?.text);
-    // Block-list form (M2R5 C3): the append adds exactly one block and leaves
-    // every prior one byte-identical — the moving tail's whole premise.
-    expect(after.system).toHaveLength(before.system.length + 1);
+    // Message form (M3R2 C2): the append adds exactly one user+assistant
+    // pair, leaves every prior message byte-identical, and never touches the
+    // system blocks — the moving tail's whole premise, relocated.
+    expect(after.exchangeMessages).toHaveLength(before.exchangeMessages.length + 2);
+    expect(after.system).toHaveLength(before.system.length);
     for (const [i, block] of before.system.entries()) {
       expect(after.system[i]?.text).toBe(block.text);
     }

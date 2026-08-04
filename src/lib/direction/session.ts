@@ -34,7 +34,7 @@ import {
 } from "@/lib/types/direction";
 import { PencilMark, activeMarks } from "@/lib/types/marks";
 import { PremiseContract } from "@/lib/types/premise";
-import type { TextBlockParam } from "@anthropic-ai/sdk/resources/messages/messages";
+import type { MessageParam, TextBlockParam } from "@anthropic-ai/sdk/resources/messages/messages";
 import { and, asc, desc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 
@@ -245,7 +245,7 @@ export async function openSession(
     // Pre-warm must never fail the open — the sitting starts regardless.
     if (blocks) {
       try {
-        await prewarmPrefix(tier, blocks.system, KA_TOOLS, { campaignId });
+        await prewarmPrefix(tier, blocks.system, KA_TOOLS, { campaignId }, blocks.exchangeMessages);
       } catch (err) {
         console.warn("[session] prewarm failed on open (non-fatal)", {
           campaignId,
@@ -260,7 +260,7 @@ export async function openSession(
     let recap: string | undefined;
     if (!isPilot && blocks) {
       try {
-        recap = await composeRecap(db, campaignId, tier, blocks.system);
+        recap = await composeRecap(db, campaignId, tier, blocks.system, blocks.exchangeMessages);
         // Persist the paid composition (M2R R3) — a reload re-serves it from
         // the row instead of losing it; failure never fails the open.
         if (recap) {
@@ -544,12 +544,15 @@ async function collectNarration(
   prompt: string,
   campaignId: string,
   phase: ModelCallPhase,
+  // M3R2 C2: composers that should SEE recent play (the recap) thread the
+  // exchange turns ahead of their frame; composers that shouldn't pass none.
+  exchangeMessages: MessageParam[] = [],
 ): Promise<string | undefined> {
   const { done } = streamNarration({
     name,
     selection,
     system,
-    messages: [{ role: "user", content: prompt }],
+    messages: [...exchangeMessages, { role: "user", content: prompt }],
     // The KA's array under tool_choice `none` (M3 C1). These composers must
     // never call a tool — but `tools: []` made that true by removing the
     // array, and tools render AHEAD of `system` in the cache key, so their
@@ -588,6 +591,9 @@ async function composeRecap(
   campaignId: string,
   tier: TierSelection,
   system: TextBlockParam[],
+  // M3R2 C2: the window left the system blocks — the recap reads recent play
+  // through the same conversation turns the pen writes in.
+  exchangeMessages: MessageParam[] = [],
 ): Promise<string | undefined> {
   const [beats, fragments, arc, direction, [priorClosed], [playerRow]] = await Promise.all([
     db
@@ -677,7 +683,15 @@ async function composeRecap(
   parts.push("## Current tension");
   parts.push(`${direction.tension_level.toFixed(2)} on a 0 (calm) … 1 (breaking point) scale.`);
 
-  return collectNarration("recap", tier, system, parts.join("\n"), campaignId, "session_open");
+  return collectNarration(
+    "recap",
+    tier,
+    system,
+    parts.join("\n"),
+    campaignId,
+    "session_open",
+    exchangeMessages,
+  );
 }
 
 /** §9.4 yokoku — narration tier, in-voice tease; vibe-promise, never events. */
@@ -719,6 +733,8 @@ async function composeYokoku(
   }
   parts.push("Now write the yokoku.");
 
+  // The tease reads the sitting it is closing (M3R2 C2 review MUST-FIX:
+  // the window left blocks.system and the yokoku silently went blind).
   return collectNarration(
     "yokoku",
     tier,
@@ -726,6 +742,7 @@ async function composeYokoku(
     parts.join("\n"),
     campaignId,
     "session_close",
+    blocks.exchangeMessages,
   );
 }
 

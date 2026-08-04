@@ -668,9 +668,13 @@ describe.skipIf(!url)("Session lifecycle (real Postgres, scripted models)", () =
       (c) => (c[0] as { name?: string })?.name === "recap",
     );
     expect(recapCall).toBeDefined();
-    const prompt = String(
-      (recapCall?.[0] as { messages?: { content?: unknown }[] })?.messages?.[0]?.content ?? "",
-    );
+    // M3R2 C2: the recap threads exchange turns ahead of its frame — the
+    // frame is the LAST message, and content may be a block array.
+    const msgs = (recapCall?.[0] as { messages?: { content?: unknown }[] })?.messages ?? [];
+    const last = msgs.at(-1)?.content;
+    const prompt = Array.isArray(last)
+      ? last.map((b) => (b as { text?: string }).text ?? "").join("")
+      : String(last ?? "");
     expect(prompt).toContain("The tease made at last close");
     expect(prompt).toContain("Next time: the debt comes due.");
     expect(prompt).toContain("never owed");
