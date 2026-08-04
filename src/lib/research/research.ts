@@ -8,7 +8,7 @@
 import type { Db } from "@/lib/db";
 import { profiles } from "@/lib/db/schema";
 import { getVoyage } from "@/lib/llm/voyage";
-import { Profile } from "@/lib/types/profile";
+import { Profile, type ResearchTrust } from "@/lib/types/profile";
 import { eq } from "drizzle-orm";
 import type { z } from "zod";
 import {
@@ -29,6 +29,7 @@ import {
   synthesizeStatMapping,
   synthesizeVoiceCards,
 } from "./synthesize";
+import { KNOWLEDGE_CUTOFF_YEAR, buildFieldSources, deriveTrust, mechanicsImplied } from "./trust";
 import {
   type WikiPage,
   categoryMembers,
@@ -74,6 +75,8 @@ export interface ResearchReport {
   chunksWritten: number;
   confidence: number;
   notes: string[];
+  /** M3R3 C1: the derived trust record — the conductor's honesty surface. */
+  trust: ResearchTrust;
 }
 
 export interface ResearchOptions {
@@ -121,6 +124,14 @@ export async function researchTitle(
     .map((id) => walk.fetched.get(id))
     .filter((m): m is AniListMedia => !!m);
   const media = mergeSeasons(seasons.length > 0 ? seasons : [best]);
+  // Recency reads the NEWEST season in the merged run: mergeSeasons clones
+  // the ROOT's startDate, and the root is usually the old season — a 2026
+  // sequel folded into a 2019 root must still read post-cutoff (L7).
+  const startYears = seasons
+    .map((s) => s.startDate?.year)
+    .filter((y): y is number => typeof y === "number");
+  const newestStartYear =
+    startYears.length > 0 ? Math.max(...startYears) : (media.startDate?.year ?? null);
   for (const group of walk.continuityGroups.slice(1)) {
     notes.push(
       `distinct continuity in franchise: ${group.displayTitle} (${group.ids.length} season${group.ids.length > 1 ? "s" : ""})`,
@@ -141,16 +152,48 @@ export async function researchTitle(
         pagesFetched?: number;
       };
       notes.push("profile cached (§8) — paid research skipped");
+      // M3R3 C1: a cached profile's trust rides the stored record; a
+      // pre-M3R3 row derives a LEGACY floor from its own provenance — a
+      // hollow row (pagesFetched 0) reads THIN, never its asserted number
+      // (the founding defect shipped at 90 with zero pages).
+      const storedTrust = (existing.profile as { research_trust?: ResearchTrust } | null)
+        ?.research_trust;
+      const legacyPages = prov.pagesFetched ?? 0;
+      const trust: ResearchTrust =
+        storedTrust ??
+        ({
+          method: "legacy",
+          derived_confidence: legacyPages > 0 ? Math.min(prov.confidence ?? 60, 75) : 25,
+          sources_consulted: prov.wikiBase ? [prov.wikiBase] : [],
+          pages_fetched: legacyPages,
+          // Derived, never asserted, even here: identity resolution runs on
+          // the cached path too, so the seasons walked above carry the same
+          // recency signal the fresh path reads.
+          post_cutoff: newestStartYear !== null && newestStartYear >= KNOWLEDGE_CUTOFF_YEAR,
+          ...(newestStartYear !== null ? { start_year: newestStartYear } : {}),
+          field_sources: {},
+          field_pages: {},
+          // coverage_gaps is the PLAYER-facing channel — only real holes in
+          // what's known about the IP belong here. The migration fact rides
+          // method:"legacy"; a richly-scraped old row is not a hole.
+          coverage_gaps:
+            legacyPages > 0
+              ? []
+              : [
+                  "pre-M3R3 profile built from ZERO fetched pages — every field is unlabeled model recall; re-research recommended",
+                ],
+        } satisfies ResearchTrust);
       return {
         profileId: slug,
         title: existing.title,
         scope: (existing.scopeClass ?? "standard") as ScopeClass,
         seasonsMerged: prov.seasonsMerged ?? 0,
         wikiBase: prov.wikiBase ?? null,
-        pagesFetched: prov.pagesFetched ?? 0,
+        pagesFetched: legacyPages,
         chunksWritten: 0,
-        confidence: prov.confidence ?? 85,
+        confidence: trust.derived_confidence,
         notes,
+        trust,
       };
     }
   }
@@ -238,7 +281,52 @@ export async function researchTitle(
     synopsis: media.description ?? undefined,
   });
 
-  // 8. Assemble + validate the typed Profile.
+  // 8. Derive the trust record (M3R3 C1) — computed from coverage, never
+  // asserted. Field labels follow CONTENT, not wiki existence: a found-but-
+  // unfetched wiki (the founding case's own shape) sources nothing.
+  const quoteCharacters = Object.keys(quotesByCharacter).length;
+  const settingPages = [...byType("locations"), ...byType("factions")];
+  const lorePages = [...byType("lore"), ...byType("items")];
+  const contentChars = pages.reduce((n, p) => n + p.text.length, 0);
+  const fieldSources = buildFieldSources({
+    settingPages: settingPages.length,
+    statMappingGrounded: statMapping.has_canonical_stats,
+    powerSystemPresent: !!powerSystem,
+    quoteCharacters,
+  });
+  const fieldPages: Record<string, string[]> = {
+    ...(powerSystem ? { power_system: techniquePages.map((p) => p.url) } : {}),
+    ...(statMapping.has_canonical_stats ? { stat_mapping: lorePages.map((p) => p.url) } : {}),
+    ...(settingPages.length > 0 ? { world_setting: settingPages.map((p) => p.url) } : {}),
+    ...(quoteCharacters > 0
+      ? {
+          voice_cards: byType("characters")
+            .filter((p) => quotesByCharacter[p.title])
+            .map((p) => p.url),
+        }
+      : {}),
+  };
+  const trust = deriveTrust({
+    startYear: newestStartYear,
+    pagesFetched: pages.length,
+    contentChars,
+    sourcesConsulted: ["anilist", ...(wiki ? [wiki.base] : []), ...pages.map((p) => p.url)],
+    powerSystemPresent: !!powerSystem,
+    powerSystemFromPages: !!powerSystem && techniquePages.length > 0,
+    statsCanonical: statMapping.has_canonical_stats,
+    statConfidence: statMapping.confidence,
+    voiceQuoteCharacters: quoteCharacters,
+    mechanicsImplied: mechanicsImplied(
+      media.genres,
+      relevantTags(media).map((t) => t.name),
+    ),
+    method: pages.length > 0 ? "api_wiki" : wiki ? "api_thin" : "anilist_only",
+    fieldSources,
+    fieldPages,
+  });
+  for (const gap of trust.coverage_gaps) notes.push(`trust: ${gap}`);
+
+  // 8b. Assemble + validate the typed Profile.
   const profileId = profileSlug(title);
   const profile: z.infer<typeof Profile> = Profile.parse({
     id: profileId,
@@ -278,11 +366,13 @@ export async function researchTitle(
     canonical_composition: interpretation.framing,
     director_personality: narrative.director_personality,
     cast_depth_posture: narrative.cast_depth_posture,
+    research_trust: trust,
   });
 
-  // v3's confidence math: base 85, +5 AniList, +5 wiki — the wiki bonus
-  // requires actual pages, not just a found wiki (audit fix).
-  const confidence = 85 + 5 + (wiki && pages.length > 0 ? 5 : 0);
+  // M3R3 C1: confidence is the DERIVED number — the 85+5+5 assertion died
+  // with the founding defect (confidence 90, pagesFetched 0, "scrape is
+  // not viable" in its own notes).
+  const confidence = trust.derived_confidence;
 
   // 9. Persist corpus FIRST, then the profile: a crash mid-persist leaves
   // an old profile with fresh chunks (harmless) rather than a fresh profile
@@ -305,6 +395,9 @@ export async function researchTitle(
         wikiBase: wiki?.base ?? null,
         seasonsMerged: seasons.length,
         pagesFetched: pages.length,
+        // M3R3 C1: the full record rides provenance too — ops queries see
+        // method + gaps, never a bare number with no way to ask why.
+        trust,
         // v5 addition alongside narrative synthesis: cast depth posture.
         cast_depth_posture: narrative.cast_depth_posture,
         notes,
@@ -324,6 +417,7 @@ export async function researchTitle(
           wikiBase: wiki?.base ?? null,
           seasonsMerged: seasons.length,
           pagesFetched: pages.length,
+          trust,
           cast_depth_posture: narrative.cast_depth_posture,
           notes,
         },
@@ -336,6 +430,7 @@ export async function researchTitle(
     title,
     scope,
     seasonsMerged: seasons.length,
+    trust,
     wikiBase: wiki?.base ?? null,
     pagesFetched: pages.length,
     chunksWritten: chunks,

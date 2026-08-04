@@ -130,8 +130,8 @@ function directorOutput(over: Partial<DirectorOutput> = {}): DirectorOutput {
 /** M3R2 C1: the cycle's final emit is TWO calls (plan, then ops). This arm
  *  routes the mocked judgment by call name and serves each half in its EMIT
  *  shape (sentinels, not optionals) from one full logical fixture. */
-// biome-ignore lint/suspicious/noExplicitAny: mock harness spans generic signatures
 function armDirectorEmits(full: DirectorOutput): void {
+  // biome-ignore lint/suspicious/noExplicitAny: mock harness spans generic signatures
   mockJudgment.mockImplementation((_s: any, opts: any) => {
     if (String(opts.name).endsWith("_ops")) {
       return Promise.resolve({

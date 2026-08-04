@@ -144,6 +144,38 @@ export type IPMechanics = z.infer<typeof IPMechanics>;
 export type VoiceCard = z.infer<typeof VoiceCard>;
 export type AuthorVoice = z.infer<typeof AuthorVoice>;
 
+/** Where a profile field's content actually came from (M3R3 C1). `player`
+ *  and `web_search` arrive with C2's ingress/fallback chain. */
+export const FieldSource = z.enum(["wiki_page", "anilist", "model_recall", "web_search", "player"]);
+export type FieldSource = z.infer<typeof FieldSource>;
+
+/**
+ * The derived trust record (M3R3 C1): confidence COMPUTED from coverage
+ * (research/trust.ts), sources listed, recall labeled, gaps named. This is
+ * the honesty surface — the conductor reads it to the player, and C3's
+ * coverage gates read it before a campaign compiles on top.
+ */
+export const ResearchTrust = z.object({
+  /** How the profile was built. C2 adds web-search + hybrid methods. */
+  method: z.enum(["api_wiki", "api_thin", "anilist_only", "legacy"]),
+  derived_confidence: z.number().min(0).max(100),
+  sources_consulted: z.array(z.string()).default([]),
+  pages_fetched: z.number().int().nonnegative().default(0),
+  /** The title starts at/after the knowledge cutoff — recall is demoted. */
+  post_cutoff: z.boolean().default(false),
+  start_year: z.number().int().optional(),
+  /** Coarse per-field provenance: which organ each field's content came from.
+   *  Absence of a field means NOTHING sourced it (e.g. the default stat
+   *  mapping) — never "unknown"; legacy rows carry method:"legacy" instead. */
+  field_sources: z.record(z.string(), FieldSource).default({}),
+  /** Page-level grain (plan C1's `page:<url>`): for wiki-fed fields, the
+   *  page URLs actually consulted for that field's content. */
+  field_pages: z.record(z.string(), z.array(z.string())).default({}),
+  /** Human-readable gaps — the conductor speaks these to the player. */
+  coverage_gaps: z.array(z.string()).default([]),
+});
+export type ResearchTrust = z.infer<typeof ResearchTrust>;
+
 export const Profile = z.object({
   // --- Identification ---
   id: z.string().min(1),
@@ -183,6 +215,18 @@ export const Profile = z.object({
       recurring_bits: z.string().min(1),
     })
     .optional(),
+
+  /**
+   * M3R3 C1 — the trust surface v5 dropped from v3's AnimeResearchOutput
+   * (research_method, sources_consulted, confidence…) and paid for: a
+   * profile shipped at asserted-confidence 90 with ZERO fetched pages and
+   * "scrape is not viable" in its own notes, and nothing could tell. Trust
+   * now rides ON the profile — the compiler, the conductor, and the player
+   * all read the same record of how well this IP is actually known.
+   * Optional for pre-M3R3 rows; readers treat absence as "legacy, derive
+   * from researchProvenance or assume thin".
+   */
+  research_trust: ResearchTrust.optional(),
 });
 
 export type Profile = z.infer<typeof Profile>;

@@ -1,0 +1,39 @@
+# M3R3 — The research desk: profiles for IP the model has never seen
+
+**Status:** draft for user ratification (lessons enumerated 2026-08-04; scope/ordering below awaits his word). Source: the Deus Versus test campaign — a deliberate probe with a little-known IP whose anime adaptation post-dates every training cutoff — plus two reference investigations (v5 pipeline map; v3 empirical record, `reference/aidm_v3`).
+
+**The smoking gun, in the pipeline's own words** (profiles.research_provenance for `the_exiled_heavy_knight_knows_how_to_game_the_system`):
+`notes: "wiki … Scrape is not viable." · pagesFetched: 0 · confidence: 90`
+Zero sources, self-declared non-viable, shipped at confidence 90. Every downstream defect of the test campaign — the hollow world layer, the wrong-protagonist voice matter, the KA flying without §4 power constraints — descends from this row.
+
+---
+
+## The lessons (named failure modes, each with its evidence)
+
+**L1 — Confidence is asserted, not derived.** v5's run confidence is arithmetic theater (`research.ts:285`: 90 vs 95), and its ONLY reader is the cache echo — it never reaches the conductor, the player, or any gate. v3 *derived* confidence from coverage (`_assess_and_adjust_confidence`, anime_research.py:1114-1142: penalties for missing power_system/DNA/sources, clamped 20-100) and capped training-data fallbacks at 75.
+
+**L2 — There is no fallback chain.** v5 is AniList → one Fandom guess → give up (`findWiki` null ⇒ note + scope micro + budget 0 ⇒ hollow profile persists). v3 fell back to LIVE WEBSEARCH at three distinct levels — franchise disambiguation, no-AniList-match, no-relevant-wiki (carrying AniList data forward so the fallback wasn't blind) — using the provider's native search tool, no external key, with a training-recall terminal fallback at capped confidence. **Answer to the user's question: yes, this is still possible and cheaper than v3 had it — the current API's server-side web_search tool runs on Sonnet/Opus, and v5's `callJudgment` already supports tools; research simply passes none.**
+
+**L3 — Model recall is unlabeled, and the tonal read is recall BY CONSTRUCTION.** The deepest finding: `interpretTonal` is fed only the AniList synopsis block (`synthesize.ts:56-67`) — no wiki text — so every profile's canonical DNA, framing, tropes, and visual style have always been recall + community tags, even for rich wikis. No Profile field records source; `canon_chunks.confidence` is a constant 1. For post-cutoff IP (the user's normal case: new adaptations), recall diverges from canon by construction and nothing can tell. v3 kept `research_method`, `sources_consulted`, `raw_content`, `research_passes` — v5's Profile schema dropped the entire trust surface.
+
+**L4 — Nothing gates a hollow profile.** `Profile.parse` is shape-only: a LitRPG with `power_system: null`, zero quotes, and stat-confidence 0 parses clean and compiles into a campaign. v3 had one hard gate (lore < 200 chars ⇒ 3× retry ⇒ RuntimeError) plus loud LOW COVERAGE warnings. Genre-conditional coverage (a LitRPG/battle-shonen profile without a power system is presumptively broken) existed nowhere in either version — new organ, not parity.
+
+**L5 — The player never sees the profile's health.** v5: confidence dies in the provenance blob; the conductor's tool result omits it; the SZ surface shows nothing. v3 at least streamed "Research complete! Confidence: N%" via SSE. The player who KNOWS the IP (the user usually does) is the best possible fallback source and is never asked — there is no player-supplied canon ingress at all (`writeCorpus` accepts only WikiPage[]).
+
+**L6 — Canonicality does not drive compilation.** v5 carries v3's three-axis model (timeline_mode / canon_cast_mode / event_fidelity) but consumes it as PROMPT PROSE only — an `inspired` original receives the identical verbatim canon payload (author_voice, voice_cards, director_personality, cast posture) as a full-canon campaign: Elymas Edvan's voice pressuring Deus Versus's story. **Honest v3 correction (the record, not the myth):** v3 had the SAME injection hole — voice cards matched on NPC name with no cast-mode check; nothing transposed. What saved v3 was structural: the CUSTOM-PROFILE PATH (`generate_custom_profile`) built original worlds with NO IP voice cards, DNA from player calibration, and creative fields synthesized from the player's stated vision. v3 transposed by never loading the profile. v5 must have both: the true-original path AND a transposition gate for anchored-but-inspired premises (protagonist not in the anchor's cast ⇒ craft qualities re-grounded in the campaign's own nouns; canon cast cards dropped or rebuilt from play).
+
+**L7 — Recency is fetched and ignored.** AniList `startDate.year` is retrieved and never compared against a knowledge cutoff; a 2026 adaptation gets its recall trusted like a 1998 classic. v3's `recent_updates` field is gone.
+
+**L8 — v3 operational hygiene worth carrying:** wiki RELEVANCE validation before accepting a wiki; thin-scrape supplementation; AniList-id dedup + alias fuzzy-load + season-variant collapse (v5 has some); atomic save ordering; hand-editable profile as the manual override; SSE research progress; the title-normalization truncation guard; three incompatible canonicality vocabularies in v3 was itself a trap — v5 keeps ONE enum set.
+
+---
+
+## Commit plan (pending user ratification)
+
+- **C1 — The trust substrate.** Per-field provenance (shipped as `field_sources` coarse organ labels — `wiki_page | anilist | model_recall | web_search | player` — plus `field_pages`, the page-URL grain, as a companion record: one field is usually fed by MANY pages, so a single `page:<url>` token could not carry the truth), DERIVED confidence (coverage arithmetic, not vibes), the dropped v3 trust fields restored to Profile, recency distrust (startDate vs cutoff ⇒ recall demoted), and the honesty surface: conductor tool result carries profile health; SZ tells the player plainly ("zero sources; running on recall; thin on mechanics — research deeper, or tell me what you know?").
+- **C2 — The fallback chain.** Native web_search on the research calls at v3's three levels; wiki relevance validation; thin-scrape supplement; training-recall terminal fallback at capped confidence; PLAYER CANON INGRESS (paste synopses/chapters ⇒ corpus chunks with `player` provenance — the best source for little-known IP is the fan who chose it). Search spend is metered like everything else.
+- **C3 — Grounded synthesis + gates.** `interpretTonal` reads retrieved text, not synopsis alone; a grounding pass ties claims to sources; genre-conditional coverage gates (LitRPG ⇒ power_system + stat_mapping or the profile is marked DEFECTIVE and SZ says so); the lore-length hard gate with retries.
+- **C4 — Canonicality compiles.** Three-axis branching in the compiler: cast-mode filters voice_cards; inspired/replaced_protagonist transposes voice matter (craft qualities onto the campaign's nouns, judged call, SZ-time); the true-original path synthesizes voice from the player's stated vision (v3 parity); a hard cast gate in ingestion's posture machinery for full_cast campaigns.
+- **Verification.** A thin-IP drill eval (fixture wiki-less title ⇒ gates fire, health surfaces, fallback chain walks); golden-profile suite extended with a coverage case; live re-research of the Exiled Heavy Knight profile through the new chain and a diff against the hollow row — the original test case becomes the regression fixture.
+
+**Also folded here from M3R2 C3** (engine-side, unaffected by the campaign being disposable): trim-ladder inversion (voice matter last), the §4.4a budget amendment proposal (measured 2,124 tokens vs the 600-900 target; proposed band 1,200-2,200 — cached, ~$0.001/turn), window calibration (16k → 28k, ~8-10 real scenes verbatim, ~+$0.01/turn warm). The live-campaign voice healing is DROPPED per the user (test campaign, disposable).
