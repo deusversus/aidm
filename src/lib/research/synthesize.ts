@@ -28,7 +28,7 @@ import {
 import { z } from "zod";
 import type { AniListMedia } from "./anilist";
 import { relevantTags } from "./anilist";
-import type { WikiPage } from "./wiki";
+import type { CanonicalPageType, WikiPage } from "./wiki";
 
 /**
  * The research pin: quality above Haiku, never Fable (Fable exists only on
@@ -72,6 +72,54 @@ function mediaBlock(media: AniListMedia): string {
   ].join("\n");
 }
 
+/**
+ * Excerpt selection for the TONAL read (M3R3 C3, lesson L3). Priority is that
+ * read's need, not the wiki's shape: lore and arcs carry HOW the story is
+ * told; characters, places and factions carry who and where; techniques and
+ * items are the most mechanical and the least tonal, so they fill only what
+ * the rest leave.
+ *
+ * The grounding pass does NOT read this block. Its ranking is the tonal
+ * read's, so an eight-page cap over a rich harvest could exclude the technique
+ * pages a power-system claim was synthesized FROM — and an auditor told
+ * "when in doubt, unsupported" then demotes a genuinely sourced claim by
+ * construction. Grounding carries its own per-claim evidence instead.
+ */
+const EXCERPT_PRIORITY: CanonicalPageType[] = [
+  "lore",
+  "arcs",
+  "characters",
+  "locations",
+  "factions",
+  "techniques",
+  "items",
+];
+const EXCERPT_MAX_PAGES = 8;
+const EXCERPT_PAGE_CHARS = 600;
+const EXCERPT_BLOCK_CHARS = 5_000;
+
+/**
+ * Up to eight pages of fetched text, priority-ordered, each clipped to its
+ * opening — the lead of a wiki or research page is where the work is actually
+ * characterised; deeper sections are episode tables and trivia.
+ */
+export function sourceExcerptBlock(pages: WikiPage[]): string {
+  if (pages.length === 0) return "";
+  const parts: string[] = [];
+  let used = 0;
+  const ranked = pages
+    .map((page, index) => ({ page, index, rank: EXCERPT_PRIORITY.indexOf(page.pageType) }))
+    .sort((a, b) => a.rank - b.rank || a.index - b.index)
+    .slice(0, EXCERPT_MAX_PAGES);
+  for (const { page } of ranked) {
+    const entry = `## [${page.pageType}] ${page.title}\n${page.text.slice(0, EXCERPT_PAGE_CHARS)}`;
+    if (used + entry.length > EXCERPT_BLOCK_CHARS) break;
+    parts.push(entry);
+    used += entry.length + 2;
+  }
+  return parts.join("\n\n");
+}
+
 const INTERPRET_SYSTEM = [
   "You score a source work's canonical fingerprint for a story engine.",
   "The AniList tags are the PRIMARY signal — they are community-voted",
@@ -79,18 +127,40 @@ const INTERPRET_SYSTEM = [
 ].join(" ");
 
 /**
+ * L3's correction, stated to the model: the synopsis is a marketing blurb and
+ * recall is unverifiable, so where the fetched pages speak, they win.
+ */
+const GROUNDED_INTERPRET_SENTENCE =
+  "Where the FETCHED SOURCE EXCERPTS conflict with the synopsis or with your own recollection of this work, the EXCERPTS win — the synopsis is promotional copy and the excerpts are the record.";
+
+/**
  * Split into three strict-output calls: the combined schema (24 axes + 13
  * enums + 15 tropes + distributions) compiles to a grammar the API rejects
  * as too large. Same tokens, three small grammars.
+ *
+ * `pages` closes lesson L3, the plan's deepest finding: this call read ONLY
+ * the AniList synopsis block, so a profile's canonical DNA, framing, tropes
+ * and visual style were model recall BY CONSTRUCTION — even when the run had
+ * scraped a rich wiki, and even for a post-cutoff adaptation recall cannot
+ * know. Default empty so a caller with no harvest is honest by shape.
  */
-export async function interpretTonal(media: AniListMedia): Promise<TonalInterpretation> {
-  const block = mediaBlock(media);
+export async function interpretTonal(
+  media: AniListMedia,
+  pages: WikiPage[] = [],
+): Promise<TonalInterpretation> {
+  const excerpts = sourceExcerptBlock(pages);
+  const block = excerpts
+    ? `${mediaBlock(media)}\n\nFETCHED SOURCE EXCERPTS (ground your scores in these where they speak; the synopsis is a blurb, these are the record):\n${excerpts}`
+    : mediaBlock(media);
+  const interpretSystem = excerpts
+    ? `${INTERPRET_SYSTEM} ${GROUNDED_INTERPRET_SENTENCE}`
+    : INTERPRET_SYSTEM;
   const [treatmentPart, framingPart, worldPart] = await Promise.all([
     callJudgment(SELECTION, {
       name: "research_interpret_treatment",
       phase: "research",
       schema: z.object({ treatment: DNAScales }),
-      system: `${INTERPRET_SYSTEM} Calibrate the 0-10 treatment axes against these witness anchors (same scales the engine measures with):\n${witnessAnchorBlock()}`,
+      system: `${interpretSystem} Calibrate the 0-10 treatment axes against these witness anchors (same scales the engine measures with):\n${witnessAnchorBlock()}`,
       prompt: block,
       effort: "high",
       maxTokens: LOOPED_LARGE,
@@ -104,7 +174,7 @@ export async function interpretTonal(media: AniListMedia): Promise<TonalInterpre
         power_distribution: PowerDistribution,
       }),
       system: [
-        INTERPRET_SYSTEM,
+        interpretSystem,
         "Framing enums describe how the source is NATURALLY told — structure,",
         "not tone. combat_style describes the PROTAGONIST'S DECISION PROCESS",
         "and what fights are FOR — never how the camera dresses them (stylish",
@@ -128,7 +198,7 @@ export async function interpretTonal(media: AniListMedia): Promise<TonalInterpre
         storytelling_tropes: StorytellingTropes,
         visual_style: VisualStyle,
       }),
-      system: `${INTERPRET_SYSTEM} Trope flags are structural facts about the source; visual style feeds reference conditioning later — be concrete.`,
+      system: `${interpretSystem} Trope flags are structural facts about the source; visual style feeds reference conditioning later — be concrete.`,
       prompt: block,
       effort: "low",
       maxTokens: STRUCTURED_RICH,
@@ -146,12 +216,37 @@ export async function interpretTonal(media: AniListMedia): Promise<TonalInterpre
 
 // --- 2. Power system (only when technique pages exist) ----------------------
 
+/**
+ * What each source-fed synthesis call actually READS, by organ. The grounding
+ * pass hands its auditor the SAME slice, by importing this — that is the whole
+ * reason it is a constant rather than two inline literals.
+ *
+ * The re-audit's finding: the claim evidence was clipped to 3 pages × 800
+ * chars while synthesizePowerSystem had read 5 × 1,000, so a power system
+ * synthesized from technique pages 4-5 (or from chars 800-1,000 of pages 1-3)
+ * met an auditor told "when in doubt, unsupported" against text that could not
+ * contain it — a false demotion BY CONSTRUCTION, on exactly the rich harvests
+ * where grounding matters most. Parity now holds by construction instead: the
+ * two sides cannot drift without moving this one object.
+ */
+export const SYNTHESIS_FEEDS = {
+  power_system: { pages: 5, chars: 1_000 },
+  stat_mapping: { pages: 3, chars: 800 },
+} as const;
+
+/** The shape a caller needs to read a feed the way its synthesis call did. */
+export interface SynthesisFeedSpec {
+  pages: number;
+  chars: number;
+}
+
 export async function synthesizePowerSystem(
   techniquePages: WikiPage[],
 ): Promise<z.infer<typeof PowerSystem>> {
+  const feed = SYNTHESIS_FEEDS.power_system;
   const excerpts = techniquePages
-    .slice(0, 5)
-    .map((p) => `## ${p.title}\n${p.text.slice(0, 1_000)}`)
+    .slice(0, feed.pages)
+    .map((p) => `## ${p.title}\n${p.text.slice(0, feed.chars)}`)
     .join("\n\n");
   return callJudgment(SELECTION, {
     name: "research_power_system",
@@ -322,9 +417,10 @@ export async function synthesizeStatMapping(
   lorePages: WikiPage[],
 ): Promise<z.infer<typeof StatMapping>> {
   if (lorePages.length === 0) return DEFAULT_STAT_MAPPING;
+  const feed = SYNTHESIS_FEEDS.stat_mapping;
   const excerpts = lorePages
-    .slice(0, 3)
-    .map((p) => `## ${p.title}\n${p.text.slice(0, 800)}`)
+    .slice(0, feed.pages)
+    .map((p) => `## ${p.title}\n${p.text.slice(0, feed.chars)}`)
     .join("\n\n");
   const result = await callJudgment(SELECTION, {
     name: "research_stat_mapping",
@@ -338,4 +434,82 @@ export async function synthesizeStatMapping(
   });
   // v3's bar: apply only at ≥90 confidence; below it, the default stands.
   return result.has_canonical_stats && result.confidence >= 90 ? result : DEFAULT_STAT_MAPPING;
+}
+
+// --- The grounding pass (M3R3 C3) --------------------------------------------
+
+/**
+ * One claim the desk is about to ship, carrying the source text it was
+ * synthesized FROM. `key` is the caller's own id — it comes back verbatim on
+ * the verdict, so the caller can wire consequences without matching prose.
+ *
+ * `evidence` is per-claim, and that is the whole design: a single shared
+ * excerpt block ranked for the tonal read (lore first, techniques sixth of
+ * seven, hard-capped at eight pages) systematically excluded the pages each
+ * claim came from, so the auditor judged a wiki-sourced power system against
+ * text that structurally could not contain it — and its own "when in doubt,
+ * unsupported" rule made that a guaranteed false demotion on the richest
+ * harvests. Evidence now travels WITH the claim, clipped by SYNTHESIS_FEEDS —
+ * the same object the synthesis call read its own feed through.
+ */
+export interface GroundingClaim {
+  key: string;
+  claim: string;
+  evidence: string;
+}
+
+/**
+ * The claims block: each claim immediately followed by its own evidence, so
+ * the boundary the system prompt draws is visible in the text itself. Pure and
+ * exported so the rendering is testable without buying a model call.
+ */
+export function renderClaims(claims: GroundingClaim[]): string {
+  return claims
+    .map((c) => `### CLAIM ${c.key}\n${c.claim}\n### EVIDENCE FOR ${c.key}\n${c.evidence}`)
+    .join("\n\n");
+}
+
+/**
+ * Enum-free by design: the schema cannot enumerate keys the caller builds at
+ * runtime, and a grammar-level enum would fail the whole parse on a key the
+ * model paraphrased. Unrecognised keys are dropped by the caller instead.
+ */
+export const GroundingVerdicts = z.object({
+  verdicts: z.array(z.object({ key: z.string(), supported: z.boolean() })),
+});
+export type GroundingVerdicts = z.infer<typeof GroundingVerdicts>;
+
+/**
+ * The desk audits itself against its own harvest (M3R3 C3). Synthesis calls
+ * are asked to produce an answer, and a model asked for a power system will
+ * write one whether or not the sources carry it — that is exactly how the
+ * founding profile shipped fluent recall at confidence 90. This call inverts
+ * the question: given only the text that FED this claim, is it actually in
+ * there?
+ *
+ * Verdicts do not delete anything the player can see (C4 owns that surgery);
+ * they demote PROVENANCE — an unsupported claim stops being labeled as
+ * sourced, and says so in the gap channel.
+ */
+export async function groundProfile(
+  title: string,
+  claims: GroundingClaim[],
+): Promise<GroundingVerdicts> {
+  return callJudgment(SELECTION, {
+    name: "research_grounding",
+    phase: "research",
+    schema: GroundingVerdicts,
+    system: [
+      "You verify a research desk's claims against its own fetched sources.",
+      "Each claim below carries its OWN evidence section. Judge a claim ONLY",
+      "against the EVIDENCE FOR that claim — sources elsewhere in this run do",
+      "not exist for it. supported=true ONLY when that evidence states or",
+      "clearly implies the claim; its absence of comment is NOT support. When",
+      "in doubt, unsupported. Return exactly one verdict per claim, echoing its",
+      "key verbatim; never judge from what you remember about this work.",
+    ].join(" "),
+    prompt: [`Work: ${title}`, "", "CLAIMS TO VERIFY:", "", renderClaims(claims)].join("\n"),
+    effort: "low",
+    maxTokens: STRUCTURED_SMALL,
+  });
 }

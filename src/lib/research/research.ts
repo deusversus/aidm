@@ -11,7 +11,7 @@
 import type { Db } from "@/lib/db";
 import { profiles } from "@/lib/db/schema";
 import { getVoyage } from "@/lib/llm/voyage";
-import { Profile, type ResearchTrust } from "@/lib/types/profile";
+import { type FieldSource, Profile, ResearchTrust } from "@/lib/types/profile";
 import { eq } from "drizzle-orm";
 import type { z } from "zod";
 import {
@@ -26,6 +26,10 @@ import {
 import { writeCorpus } from "./corpus";
 import {
   DEFAULT_STAT_MAPPING,
+  type GroundingClaim,
+  SYNTHESIS_FEEDS,
+  type SynthesisFeedSpec,
+  groundProfile,
   interpretTonal,
   synthesizeNarrative,
   synthesizePowerSystem,
@@ -37,6 +41,7 @@ import {
   type OrganSource,
   RICH_CONTENT_CHARS,
   buildFieldSources,
+  coverageGates,
   deriveTrust,
   mechanicsImplied,
 } from "./trust";
@@ -140,6 +145,23 @@ export interface ResearchOptions {
 type ProfileRow = typeof profiles.$inferSelect;
 
 /**
+ * A claim's evidence block: the pages that FED it, clipped through the SAME
+ * feed spec its synthesis call read them through (M3R3 C3 + re-audit).
+ * Parity is by construction — both sides read SYNTHESIS_FEEDS — because two
+ * literals that merely agree today drift tomorrow, and this one already did:
+ * evidence clipped to 3 × 800 against a power system synthesized from 5 ×
+ * 1,000 demoted, by construction, any system built from technique page 4.
+ *
+ * Exported and pure so the parity itself is testable without buying a call.
+ */
+export function claimEvidence(feed: WikiPage[], spec: SynthesisFeedSpec): string {
+  return feed
+    .slice(0, spec.pages)
+    .map((p) => `## ${p.title}\n${p.text.slice(0, spec.chars)}`)
+    .join("\n\n");
+}
+
+/**
  * The cached-profile return (§8). Shared by BOTH cache doors — the slug
  * lookup and the alias probe that guards the paid identity rescue — so the
  * legacy-trust floor is derived in exactly one place.
@@ -148,6 +170,7 @@ function cachedReport(
   existing: ProfileRow,
   newestStartYear: number | null,
   notes: string[],
+  tagNames: string[],
 ): ResearchReport {
   const prov = (existing.researchProvenance ?? {}) as {
     confidence?: number;
@@ -160,34 +183,108 @@ function cachedReport(
   // pre-M3R3 row derives a LEGACY floor from its own provenance — a
   // hollow row (pagesFetched 0) reads THIN, never its asserted number
   // (the founding defect shipped at 90 with zero pages).
-  const storedTrust = (existing.profile as { research_trust?: ResearchTrust } | null)
-    ?.research_trust;
+  const storedProfile = existing.profile as {
+    research_trust?: unknown;
+    ip_mechanics?: {
+      power_system?: unknown;
+      stat_mapping?: { has_canonical_stats?: boolean };
+      world_setting?: { genre?: string[] };
+    };
+  } | null;
+  // PARSE, never cast (M3R3 C3 re-audit). `profiles.profile` is bare jsonb —
+  // nothing validates it between the select and here — so a C1/C2-era record
+  // read through a type assertion arrives with `defective`/`grounding`/
+  // `field_pages` UNDEFINED behind types that promise otherwise, and
+  // JSON.stringify then drops those keys out of the conductor's
+  // profile_health entirely. Parsing applies the schema defaults instead.
+  // A record that cannot parse falls through to the legacy floor below rather
+  // than throwing: a malformed row must degrade to the honest, conservative
+  // number, never take down a cache read that costs nothing.
+  let parsedTrust: ResearchTrust | undefined;
+  if (storedProfile?.research_trust !== undefined) {
+    try {
+      parsedTrust = ResearchTrust.parse(storedProfile.research_trust);
+    } catch (err) {
+      console.warn("[research] stored research_trust failed to parse — deriving the legacy floor", {
+        profileId: existing.id,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+  const storedTrust = parsedTrust;
   const legacyPages = prov.pagesFetched ?? 0;
-  const trust: ResearchTrust =
-    storedTrust ??
-    ({
-      method: "legacy",
-      derived_confidence: legacyPages > 0 ? Math.min(prov.confidence ?? 60, 75) : 25,
-      sources_consulted: prov.wikiBase ? [prov.wikiBase] : [],
-      pages_fetched: legacyPages,
-      // Derived, never asserted, even here: when identity resolution found a
-      // row, the seasons it walked carry the same recency signal the fresh
-      // path reads. The alias-probe door has no row to walk, so a legacy
-      // record arriving through it honestly derives none.
-      post_cutoff: newestStartYear !== null && newestStartYear >= KNOWLEDGE_CUTOFF_YEAR,
-      ...(newestStartYear !== null ? { start_year: newestStartYear } : {}),
-      field_sources: {},
-      field_pages: {},
-      // coverage_gaps is the PLAYER-facing channel — only real holes in
-      // what's known about the IP belong here. The migration fact rides
-      // method:"legacy"; a richly-scraped old row is not a hole.
-      coverage_gaps:
-        legacyPages > 0
-          ? []
-          : [
-              "pre-M3R3 profile built from ZERO fetched pages — every field is unlabeled model recall; re-research recommended",
-            ],
-    } satisfies ResearchTrust);
+  // THE GATES RUN OVER EVERY CACHED ROW that is not already marked (M3R3 C3
+  // audit + re-audit). The row itself carries every input the mechanics rules
+  // need, they are pure and idempotent, and they cost nothing — so a C3-clean
+  // row re-derives clean while a C1/C2-era LitRPG with power_system null,
+  // written before the gates existed, is finally marked. Without this a 2019
+  // LitRPG reached Session Zero at confidence 75 with an empty gap list and
+  // defective:false — the exact shape the gates exist to catch, with every
+  // trigger in the conductor's disclosure rule silent.
+  const legacyMechanics = storedProfile?.ip_mechanics;
+  const gateDefects =
+    storedTrust?.defective === true
+      ? []
+      : coverageGates({
+          // The stored genre list can only ever be AniList's fixed genre
+          // vocabulary (Action/Adventure/Fantasy/…), which contains no
+          // mechanics fragment at all — genres alone made this gate dead code.
+          // The signal lives in TAGS, which the caller has walked and passes
+          // in. (The alias-probe door has no AniList row and passes none; its
+          // Level B rows carry free-form web genres, which DO trip the
+          // fragments, so that door is not blind either.)
+          mechanicsImplied: mechanicsImplied(legacyMechanics?.world_setting?.genre ?? [], tagNames),
+          powerSystemPresent: !!legacyMechanics?.power_system,
+          statsCanonical: legacyMechanics?.stat_mapping?.has_canonical_stats === true,
+          contentChars: 0,
+          pagesFetched: legacyPages,
+          // The row keeps no page TEXT, so the groundable-text floor has
+          // nothing to measure and would fire on every migrated profile. The
+          // hollow case it exists to catch is already the pagesFetched-0 gap
+          // below.
+          skipTextFloor: true,
+        }).defects;
+  const trust: ResearchTrust = storedTrust
+    ? {
+        ...storedTrust,
+        // Newly-derived DEFECTs lead, as everywhere else; a gate that already
+        // spoke in the stored record is not made to say it twice.
+        coverage_gaps: [
+          ...gateDefects.filter((d) => !storedTrust.coverage_gaps.includes(d)),
+          ...storedTrust.coverage_gaps,
+        ],
+        defective: storedTrust.defective || gateDefects.length > 0,
+      }
+    : ({
+        method: "legacy",
+        derived_confidence: legacyPages > 0 ? Math.min(prov.confidence ?? 60, 75) : 25,
+        sources_consulted: prov.wikiBase ? [prov.wikiBase] : [],
+        pages_fetched: legacyPages,
+        // Derived, never asserted, even here: when identity resolution found a
+        // row, the seasons it walked carry the same recency signal the fresh
+        // path reads. The alias-probe door has no row to walk, so a legacy
+        // record arriving through it honestly derives none.
+        post_cutoff: newestStartYear !== null && newestStartYear >= KNOWLEDGE_CUTOFF_YEAR,
+        ...(newestStartYear !== null ? { start_year: newestStartYear } : {}),
+        field_sources: {},
+        field_pages: {},
+        // coverage_gaps is the PLAYER-facing channel — only real holes in
+        // what's known about the IP belong here. The migration fact rides
+        // method:"legacy"; a richly-scraped old row is not a hole. DEFECTs
+        // lead, as everywhere else.
+        coverage_gaps: [
+          ...gateDefects,
+          ...(legacyPages > 0
+            ? []
+            : [
+                "pre-M3R3 profile built from ZERO fetched pages — every field is unlabeled model recall; re-research recommended",
+              ]),
+        ],
+        defective: gateDefects.length > 0,
+        // The pass predates this row and cannot be run over it now: the page
+        // text it would audit was never stored.
+        grounding: "unknown",
+      } satisfies ResearchTrust);
   return {
     profileId: existing.id,
     title: existing.title,
@@ -252,8 +349,12 @@ export async function researchTitle(
     if (options.reuseExisting) {
       const cached = await probeAliasCache(db, rawTitle);
       // No AniList row means no season walk, so there is no fresh recency
-      // signal to hand the legacy floor — a stored record carries its own.
-      if (cached) return cachedReport(cached, null, notes);
+      // signal to hand the legacy floor — a stored record carries its own —
+      // and no tag list either. The mechanics gate falls back to the stored
+      // genres, which on this door are a Level B row's free-form WEB genres
+      // ("LitRPG", "dungeon crawler"), not AniList's closed vocabulary — so
+      // the gate still has real signal to read here.
+      if (cached) return cachedReport(cached, null, notes, []);
     }
     try {
       rescue = await searchIdentity(rawTitle);
@@ -342,7 +443,17 @@ export async function researchTitle(
   if (options.reuseExisting) {
     const slug = profileSlug(title);
     const [existing] = await db.select().from(profiles).where(eq(profiles.id, slug));
-    if (existing) return cachedReport(existing, newestStartYear, notes);
+    // The walked TAGS are the mechanics gate's only live signal for a cached
+    // row — stored genres are AniList's closed vocabulary and carry no
+    // mechanics fragment. They are in scope here, so they are passed.
+    if (existing) {
+      return cachedReport(
+        existing,
+        newestStartYear,
+        notes,
+        relevantTags(media).map((t) => t.name),
+      );
+    }
   }
 
   // Embedding preflight — after the reuse early-return (the cached path
@@ -433,7 +544,11 @@ export async function researchTitle(
    * wiki pages qualify (M3R3 C2 findings [6]/[9]).
    */
   const wikiOnly = (feed: WikiPage[]) => feed.filter((p) => (p.origin ?? "wiki") === "wiki");
-  const interpretation = await interpretTonal(media);
+  // L3, closed: the tonal read gets the HARVEST, not just the synopsis — and
+  // the snapshot is what the provenance label is derived from below, so a
+  // future page appended after this line cannot silently inflate that label.
+  const tonalPages = [...pages];
+  const interpretation = await interpretTonal(media, tonalPages);
 
   const techniquePages = byType("techniques");
   const powerSystem =
@@ -443,6 +558,9 @@ export async function researchTitle(
     .filter((e) => e.role === "MAIN")
     .map((e) => e.node.name.full);
   const quotesByCharacter: Record<string, string[]> = {};
+  /** The pages that fed the quote block — the mechanical voice check reads
+   *  their FULL text below, not an excerpt of it. */
+  const quoteSourcePages: WikiPage[] = [];
   // The key IS the speaker, and only a wiki character page is one-page-one-
   // character. A search "characters" page carries the whole cast under a
   // single synthetic title, so extracting from it would lump every voice
@@ -453,7 +571,10 @@ export async function researchTitle(
   // "no character quotes" gap instead of faking a speaker.
   for (const page of wikiOnly(byType("characters"))) {
     const quotes = extractQuotes(page.text);
-    if (quotes.length > 0) quotesByCharacter[page.title] = quotes;
+    if (quotes.length > 0) {
+      quotesByCharacter[page.title] = quotes;
+      quoteSourcePages.push(page);
+    }
   }
   const gapFill = mainCast.filter((n) => !quotesByCharacter[n]);
   const voiceCards =
@@ -465,7 +586,9 @@ export async function researchTitle(
   // stats topic feeds this exactly as a scraped lore category does
   // (synthesizeStatMapping returns the default, unbilled, on an empty feed).
   const lorePages = [...byType("lore"), ...byType("items")];
-  const statMapping =
+  // `let`: an ungrounded mapping is REPLACED by the default below, so the
+  // persisted profile agrees with its own trust record (M3R3 C3 audit).
+  let statMapping =
     wiki || lorePages.length > 0
       ? await synthesizeStatMapping(title, lorePages)
       : DEFAULT_STAT_MAPPING;
@@ -485,6 +608,165 @@ export async function researchTitle(
       : undefined,
     synopsis: media.description ?? undefined,
   });
+
+  // 7b. THE GROUNDING PASS (M3R3 C3). Every synthesis call above was asked to
+  // produce an answer, and a model asked for a power system writes one whether
+  // the sources carry it or not — the founding profile's fluent recall at
+  // confidence 90 is that failure in one row. So the desk's own claims are put
+  // back to a reader of the pages that produced them, and what that evidence
+  // does not carry loses its SOURCED label (never the content — C4 owns
+  // player-facing surgery, and the stat mapping's demotion below is a
+  // consistency repair, not surgery). A claim only exists when its own feed
+  // does, so a page-less run buys no call at all rather than running blind.
+  const groundingGaps: string[] = [];
+  const claims: GroundingClaim[] = [];
+  if (powerSystem) {
+    claims.push({
+      key: "power_system",
+      claim: `The work's power system is "${powerSystem.name}": ${powerSystem.mechanics.slice(0, 200)}`,
+      // Exactly the technique-page text synthesizePowerSystem consumed.
+      evidence: claimEvidence(techniquePages, SYNTHESIS_FEEDS.power_system),
+    });
+  }
+  if (statMapping.has_canonical_stats) {
+    claims.push({
+      key: "stat_mapping",
+      claim: `The work shows a CANONICAL on-screen stat system ("${statMapping.system_name ?? "unnamed"}") — status windows, numeric ranks or explicit levels the audience sees.`,
+      // Exactly the lore/items text synthesizeStatMapping consumed.
+      evidence: claimEvidence(lorePages, SYNTHESIS_FEEDS.stat_mapping),
+    });
+  }
+  // NO TONAL CLAIM, and no voice claim — the model auditor judges FACTUAL
+  // claims only (M3R3 C3 audit).
+  //
+  // Tonal: an auditor that cannot falsify must not vote — the blueprint's
+  // measured-not-vibed axiom. A 0-10 interpretive score is not a source-
+  // checkable fact (the sources carry no scale, no polarity, no anchor), and
+  // one all-or-nothing verdict over three axes controlled the provenance label
+  // of all six Group A fields. The interpretation's grounding is STRUCTURAL
+  // instead: interpretTonal READ the pages, and `tonalSource` below is a label
+  // of what was read, never a second model's opinion of a score. This narrows
+  // the ratified plan's "grounding pass ties claims to sources" to factual
+  // claims — a deliberate narrowing, surfaced at commit.
+  //
+  // Voice: the check is mechanical below, because no judgment call exists —
+  // the phrase came out of a fetched page or it did not.
+  const unsupported = new Set<string>();
+  // The initial state is the honest reading of a run with nothing auditable:
+  // a work with no technique pages and no canonical stats offers the auditor
+  // no source-checkable claim, and that is the ORDINARY shape of most anime,
+  // not a hole. Only the branch below can move it.
+  let grounding: ResearchTrust["grounding"] = "no_claims";
+  if (claims.length > 0) {
+    try {
+      const { verdicts } = await groundProfile(title, claims);
+      // ANY FALSE WINS on a duplicated key. Map-last-wins was fail-OPEN
+      // through duplicates: GroundingVerdicts is an unconstrained array, so the
+      // grammar cannot forbid two entries for one claim, and "return exactly
+      // one verdict per claim" is prose. An auditor that said unsupported once
+      // is never talked out of it by a second entry.
+      const answered = new Map<string, boolean>();
+      for (const v of verdicts) {
+        const prev = answered.get(v.key);
+        answered.set(v.key, prev === undefined ? v.supported : prev && v.supported);
+      }
+      // FAIL CLOSED. The auditor's when-in-doubt-unsupported rule must hold in
+      // CODE, not just in its prompt: reading only the verdicts that came back
+      // meant a dropped or re-keyed answer kept the sourced label — fail-OPEN,
+      // the one place the pass's own doctrine inverted. Reconciliation walks
+      // what was ASKED.
+      for (const claim of claims) {
+        const verdict = answered.get(claim.key);
+        if (verdict === undefined) {
+          unsupported.add(claim.key);
+          groundingGaps.push(
+            `grounding: no verdict returned for ${claim.key} — treated as unsupported`,
+          );
+        } else if (!verdict) {
+          unsupported.add(claim.key);
+        }
+      }
+      grounding = "audited";
+    } catch (err) {
+      // The chain must not die on its own auditor: an unavailable grounding
+      // pass leaves the synthesis labels standing and says so — in the
+      // PLAYER-facing channel too, because an unaudited profile must never be
+      // indistinguishable from an audited-clean one.
+      console.warn("[research] grounding pass failed — labels ride synthesis provenance", {
+        error: err instanceof Error ? err.message : String(err),
+      });
+      grounding = "unavailable";
+      notes.push("grounding pass unavailable — labels ride synthesis provenance");
+      if (pages.length > 0) {
+        groundingGaps.push(
+          "grounding pass unavailable — provenance labels ride synthesis structure, unaudited",
+        );
+      }
+    }
+  }
+  if (unsupported.has("power_system")) {
+    groundingGaps.push(
+      "grounding: the power system as synthesized is not supported by the fetched sources — treated as recall",
+    );
+  }
+  if (unsupported.has("stat_mapping")) {
+    groundingGaps.push(
+      "grounding: the canonical stat mapping is not supported by the fetched sources — the profile carries no sourced stat system",
+    );
+  }
+  // MECHANICAL VOICE GROUNDING. A signature phrase either appears in the pages
+  // that fed the voice call or it does not — deterministic, free, and not a
+  // question a model should be asked. The phrase is RE-EMITTED by
+  // synthesizeVoiceCards, not copied from extractQuotes' output, so it passes
+  // when the model echoes the quote faithfully MODULO PUNCTUATION; what fails
+  // is model-invented or paraphrased voice matter. Skipped when no page fed
+  // the quote block at all: with nothing to check against, every phrase would
+  // fail by construction, and deriveTrust's "no character quotes" gap already
+  // says the true thing about that run.
+  //
+  // Folding every non-alphanumeric run to one space absorbs the typographic
+  // rewrites a model routinely makes when echoing a quote — curly quotes, "…"
+  // for "...", em/en dashes for hyphens, a dropped comma. ("&" for "and"
+  // stays unfixed: a word-level substitution, and rare.) Unicode-aware so a
+  // non-Latin phrase folds to itself rather than to nothing.
+  const normalizeVoice = (s: string) =>
+    s
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N}]+/gu, " ")
+      .trim();
+  if (quoteSourcePages.length > 0) {
+    const haystacks = quoteSourcePages.map((p) => normalizeVoice(p.text));
+    let ungroundedPhrases = 0;
+    const ungroundedCards = new Set<string>();
+    for (const card of voiceCards) {
+      for (const phrase of card.signature_phrases) {
+        const needle = normalizeVoice(phrase);
+        if (!needle) continue;
+        if (!haystacks.some((h) => h.includes(needle))) {
+          ungroundedPhrases += 1;
+          ungroundedCards.add(card.name);
+        }
+      }
+    }
+    if (ungroundedPhrases > 0) {
+      groundingGaps.push(
+        `grounding: ${ungroundedPhrases} signature phrase(s) across ${ungroundedCards.size} voice card(s) do not appear in the source pages — model-invented voice matter`,
+      );
+    }
+  }
+  // The demoted values, from here down. `powerSystemPresent` deliberately
+  // survives: the system is still IN the profile and the KA will still use it;
+  // what died is the claim that a source backed it.
+  const powerSystemGrounded = !!powerSystem && !unsupported.has("power_system");
+  // The stat mapping is the opposite case, and it must be demoted in the
+  // CONTENT, not only in the record: §5's compiler spreads ip_mechanics
+  // straight into the premise contract, and layout keys the diegetic status
+  // window on `has_canonical_stats` — so persisting the kept ≥90 mapping under
+  // a trust record that names no source would ship invented status windows as
+  // canon. Falling back to the default makes the profile, the labels, the
+  // coverage gate below and the KA's routing tell one story.
+  if (unsupported.has("stat_mapping")) statMapping = DEFAULT_STAT_MAPPING;
+  const statsCanonical = statMapping.has_canonical_stats;
 
   // 8. Derive the trust record (M3R3 C1) — computed from coverage, never
   // asserted. Field labels follow CONTENT, not wiki existence: a found-but-
@@ -506,16 +788,27 @@ export async function researchTitle(
     const searched = organSource(feed) === "search" ? topicUrls[topicKey] : undefined;
     return searched && searched.length > 0 ? searched : feed.map((p) => p.url);
   };
-  const fieldSources = buildFieldSources({
-    identityOrigin: media.id === 0 ? "web_search" : "anilist",
-    settingSource: organSource(settingPages),
-    statMappingSource: statMapping.has_canonical_stats ? organSource(lorePages) : null,
-    powerSystemSource: powerSystem ? organSource(techniquePages) : null,
-    voiceSource: quoteCharacters > 0 ? organSource(quotedCharacterPages) : null,
-  });
+  const fieldSources: Record<string, FieldSource> = {
+    ...buildFieldSources({
+      identityOrigin: media.id === 0 ? "web_search" : "anilist",
+      // L3's label, now earned: the pages interpretTonal actually read. It is
+      // a statement about WHAT WAS READ and nothing more — no model verdict
+      // moves it, because no model was asked to grade an interpretive score.
+      tonalSource: organSource(tonalPages),
+      settingSource: organSource(settingPages),
+      statMappingSource: statsCanonical ? organSource(lorePages) : null,
+      powerSystemSource: powerSystemGrounded ? organSource(techniquePages) : null,
+      voiceSource: quoteCharacters > 0 ? organSource(quotedCharacterPages) : null,
+    }),
+    // An ungrounded power system is not absent — it is recall, and says so.
+    // (An ungrounded stat mapping IS absent: it was replaced by the default
+    // above, which no organ fed, so no provenance entry is its honest label —
+    // exactly as the ≥90-bar's own discarded default carries none.)
+    ...(powerSystem && !powerSystemGrounded ? { power_system: "model_recall" as const } : {}),
+  };
   const fieldPages: Record<string, string[]> = {
-    ...(powerSystem ? { power_system: organPages(techniquePages, "power_system") } : {}),
-    ...(statMapping.has_canonical_stats ? { stat_mapping: organPages(lorePages, "stats") } : {}),
+    ...(powerSystemGrounded ? { power_system: organPages(techniquePages, "power_system") } : {}),
+    ...(statsCanonical ? { stat_mapping: organPages(lorePages, "stats") } : {}),
     ...(settingPages.length > 0 ? { world_setting: organPages(settingPages, "world") } : {}),
     ...(quoteCharacters > 0 ? { voice_cards: organPages(quotedCharacterPages, "characters") } : {}),
   };
@@ -535,6 +828,21 @@ export async function researchTitle(
           : wiki
             ? "api_thin"
             : "anilist_only";
+  // 8a. THE COVERAGE GATES (M3R3 C3, lesson L4). Read POST-grounding, and
+  // post-DEMOTION: `statsCanonical` is now read off the demoted mapping, so a
+  // mechanics IP whose stat system the sources never backed trips this gate on
+  // the same value the profile actually ships.
+  const impliesMechanics = mechanicsImplied(
+    media.genres,
+    relevantTags(media).map((t) => t.name),
+  );
+  const { defects } = coverageGates({
+    mechanicsImplied: impliesMechanics,
+    powerSystemPresent: !!powerSystem,
+    statsCanonical,
+    contentChars,
+    pagesFetched: pages.length,
+  });
   const trust = deriveTrust({
     startYear: newestStartYear,
     pagesFetched: pages.length,
@@ -550,17 +858,17 @@ export async function researchTitle(
       ]),
     ],
     powerSystemPresent: !!powerSystem,
-    powerSystemFromPages: !!powerSystem && techniquePages.length > 0,
-    statsCanonical: statMapping.has_canonical_stats,
-    statConfidence: statMapping.confidence,
+    powerSystemFromPages: powerSystemGrounded && techniquePages.length > 0,
+    statsCanonical,
+    statConfidence: statsCanonical ? statMapping.confidence : 0,
     voiceQuoteCharacters: quoteCharacters,
-    mechanicsImplied: mechanicsImplied(
-      media.genres,
-      relevantTags(media).map((t) => t.name),
-    ),
+    mechanicsImplied: impliesMechanics,
     method,
     fieldSources,
     fieldPages,
+    defects,
+    groundingGaps,
+    grounding,
   });
   for (const gap of trust.coverage_gaps) notes.push(`trust: ${gap}`);
 

@@ -320,6 +320,8 @@ describe.skipIf(!url)("SZ conductor draft-resume (real Postgres, scripted model)
         field_sources: {},
         field_pages: {},
         coverage_gaps: [],
+        defective: false,
+        grounding: "unknown" as const,
       },
       wikiBase: null,
       pagesFetched: 3,

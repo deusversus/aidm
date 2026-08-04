@@ -135,9 +135,231 @@ describe("research Voyage preflight (§4.6 fail-fast ordering)", () => {
     expect(report.trust.coverage_gaps).toHaveLength(0);
     expect(report.trust.post_cutoff).toBe(false);
     expect(report.trust.start_year).toBe(2000);
+    // M3R3 C3: the gates run on this row too — a sound stored shape passes
+    // them, so clean stays clean. The grounding state is "unknown" because no
+    // pass ever ran over a legacy profile, and none can now: the page text it
+    // would audit was never stored.
+    expect(report.trust.defective).toBe(false);
+    expect(report.trust.grounding).toBe("unknown");
     // The cached return precedes the preflight — no key needed, nothing paid.
     expect(findWikiMock).not.toHaveBeenCalled();
     expect(embedTextsMock).not.toHaveBeenCalled();
+  });
+
+  /**
+   * M3R3 C3 audit: the legacy path stamped defective:false with empty
+   * coverage_gaps for ANY row that fetched pages, so a pre-C3 profile in the
+   * exact shape the gates exist to catch reached Session Zero at confidence 75
+   * with every trigger in the conductor's disclosure rule silent — while the
+   * stored row carried each input the gates needed.
+   */
+  it("a legacy row in a DEFECTIVE shape is judged from its own stored fields", async () => {
+    Reflect.deleteProperty(process.env, "VOYAGE_API_KEY");
+    const { researchTitle } = await import("../research");
+    const existing = {
+      id: "test_show",
+      title: "Test Show",
+      scopeClass: "standard",
+      // A mechanics IP with no power system — the LitRPG defect, cached.
+      profile: {
+        ip_mechanics: {
+          world_setting: { genre: ["Fantasy", "LitRPG"] },
+          stat_mapping: { has_canonical_stats: false },
+        },
+      },
+      researchProvenance: {
+        confidence: 90,
+        wikiBase: "https://test.fandom.com/wiki",
+        seasonsMerged: 1,
+        pagesFetched: 20,
+      },
+    };
+    const cachedDb = {
+      select: () => ({ from: () => ({ where: async () => [existing] }) }),
+    } as unknown as Db;
+
+    const report = await researchTitle(cachedDb, "Test Show", { reuseExisting: true });
+    expect(report.trust.defective).toBe(true);
+    // The DEFECT leads the gap list, as it does on the fresh path.
+    expect(report.trust.coverage_gaps[0]).toContain(
+      "DEFECT: genre/tags imply a game-mechanics power system",
+    );
+    // The stored page text is gone, so the groundable-text floor sits out —
+    // it would fire on every migrated row for a substrate never persisted.
+    expect(report.trust.coverage_gaps.join(" | ")).not.toContain("groundable source text");
+    // The gates MARK; the legacy floor still caps the number at 75.
+    expect(report.confidence).toBe(75);
+    expect(report.trust.method).toBe("legacy");
+    expect(findWikiMock).not.toHaveBeenCalled();
+  });
+
+  /**
+   * M3R3 C3 re-audit, findings [2]/[6]/[7]: the rows M3R3 C1 and C2 wrote —
+   * the CURRENT production population — carry a `research_trust` that predates
+   * `defective`, `grounding` and `field_pages`. Read through a type cast those
+   * arrive as undefined behind types promising otherwise, and JSON.stringify
+   * drops the keys out of the conductor's profile_health entirely; and because
+   * a stored record short-circuited the gates, a LitRPG with no power system
+   * kept a clean bill forever. The parse supplies the defaults, and the gates
+   * re-run over the stored fields — reading the walked TAGS, since AniList's
+   * genre vocabulary contains no mechanics fragment at all.
+   */
+  const C1_ERA_TRUST = {
+    method: "api_wiki",
+    derived_confidence: 80,
+    sources_consulted: ["anilist", "https://test.fandom.com/wiki"],
+    pages_fetched: 20,
+    post_cutoff: false,
+    field_sources: { world_setting: "wiki_page" },
+    coverage_gaps: [],
+  };
+
+  const cachedRowWith = (trust: unknown, genre: string[]) => ({
+    id: "test_show",
+    title: "Test Show",
+    scopeClass: "standard",
+    profile: {
+      ip_mechanics: {
+        world_setting: { genre },
+        stat_mapping: { has_canonical_stats: false },
+      },
+      research_trust: trust,
+    },
+    researchProvenance: {
+      confidence: 80,
+      wikiBase: "https://test.fandom.com/wiki",
+      seasonsMerged: 1,
+      pagesFetched: 20,
+    },
+  });
+
+  const dbReturning = (row: unknown) =>
+    ({ select: () => ({ from: () => ({ where: async () => [row] }) }) }) as unknown as Db;
+
+  it("a C1/C2-era stored trust PARSES: the C3 defaults exist and survive JSON.stringify", async () => {
+    Reflect.deleteProperty(process.env, "VOYAGE_API_KEY");
+    const { researchTitle } = await import("../research");
+    const report = await researchTitle(
+      dbReturning(cachedRowWith(C1_ERA_TRUST, ["Fantasy", "Action"])),
+      "Test Show",
+      { reuseExisting: true },
+    );
+
+    // The stored record still rules the numbers — parsing adds, never edits.
+    expect(report.trust.method).toBe("api_wiki");
+    expect(report.confidence).toBe(80);
+    // The keys the conductor's disclosure law reads are all PRESENT. Undefined
+    // here is the whole bug: JSON.stringify would delete them silently.
+    expect(report.trust.defective).toBe(false);
+    expect(report.trust.grounding).toBe("unknown");
+    expect(report.trust.field_pages).toEqual({});
+    const health = JSON.parse(
+      JSON.stringify({
+        derived_confidence: report.trust.derived_confidence,
+        method: report.trust.method,
+        pages_fetched: report.trust.pages_fetched,
+        post_cutoff: report.trust.post_cutoff,
+        defective: report.trust.defective,
+        grounding: report.trust.grounding,
+        coverage_gaps: report.trust.coverage_gaps,
+      }),
+    );
+    for (const key of [
+      "derived_confidence",
+      "method",
+      "pages_fetched",
+      "post_cutoff",
+      "defective",
+      "grounding",
+      "coverage_gaps",
+    ]) {
+      expect(health).toHaveProperty(key);
+    }
+    expect(findWikiMock).not.toHaveBeenCalled();
+  });
+
+  it("the gates re-run over a stored-trust row, and the walked TAGS are what fire them", async () => {
+    Reflect.deleteProperty(process.env, "VOYAGE_API_KEY");
+    // AniList's genre vocabulary carries no mechanics fragment — the LitRPG
+    // signal lives in the tags, which the slug door walks and now passes in.
+    const litrpg: AniListMedia = {
+      ...MEDIA,
+      genres: ["Fantasy", "Action"],
+      tags: [{ name: "LitRPG", rank: 85, isMediaSpoiler: false }],
+    };
+    searchAnimeMock.mockResolvedValue([litrpg]);
+    walkFranchiseMock.mockResolvedValue({
+      ...WALK,
+      fetched: new Map([[litrpg.id, litrpg]]),
+    } satisfies FranchiseWalk);
+    const { researchTitle } = await import("../research");
+    const report = await researchTitle(
+      dbReturning(cachedRowWith(C1_ERA_TRUST, ["Fantasy", "Action"])),
+      "Test Show",
+      { reuseExisting: true },
+    );
+
+    // A row written before the gates existed is finally marked — the stored
+    // record said defective:false by omission, and the shape says otherwise.
+    expect(report.trust.defective).toBe(true);
+    expect(report.trust.coverage_gaps[0]).toContain(
+      "DEFECT: genre/tags imply a game-mechanics power system",
+    );
+    // The stored text substrate is gone, so the floor sits out here too.
+    expect(report.trust.coverage_gaps.join(" | ")).not.toContain("groundable source text");
+    // Marking is all that moves: the stored number and method are untouched.
+    expect(report.confidence).toBe(80);
+    expect(report.trust.method).toBe("api_wiki");
+    expect(report.trust.grounding).toBe("unknown");
+  });
+
+  it("a stored DEFECT is not duplicated when the gates re-derive it", async () => {
+    Reflect.deleteProperty(process.env, "VOYAGE_API_KEY");
+    const litrpg: AniListMedia = {
+      ...MEDIA,
+      tags: [{ name: "LitRPG", rank: 85, isMediaSpoiler: false }],
+    };
+    searchAnimeMock.mockResolvedValue([litrpg]);
+    walkFranchiseMock.mockResolvedValue({
+      ...WALK,
+      fetched: new Map([[litrpg.id, litrpg]]),
+    } satisfies FranchiseWalk);
+    const defect =
+      "DEFECT: genre/tags imply a game-mechanics power system and none survived research — the KA would improvise §4 constraints";
+    const { researchTitle } = await import("../research");
+    const report = await researchTitle(
+      dbReturning(
+        cachedRowWith(
+          { ...C1_ERA_TRUST, defective: true, grounding: "audited", coverage_gaps: [defect] },
+          ["Fantasy"],
+        ),
+      ),
+      "Test Show",
+      { reuseExisting: true },
+    );
+
+    expect(report.trust.defective).toBe(true);
+    expect(report.trust.coverage_gaps.filter((g) => g === defect)).toHaveLength(1);
+    // A C3-era record keeps its own audited state — re-running pure gates is
+    // not a re-audit.
+    expect(report.trust.grounding).toBe("audited");
+  });
+
+  it("a MALFORMED stored trust degrades to the legacy floor instead of throwing", async () => {
+    Reflect.deleteProperty(process.env, "VOYAGE_API_KEY");
+    const { researchTitle } = await import("../research");
+    // method is not in the enum: the record cannot be trusted at its word.
+    const report = await researchTitle(
+      dbReturning(cachedRowWith({ ...C1_ERA_TRUST, method: "vibes" }, ["Fantasy"])),
+      "Test Show",
+      { reuseExisting: true },
+    );
+
+    expect(report.trust.method).toBe("legacy");
+    // The legacy floor caps the asserted number, exactly as for a row that
+    // carried no record at all.
+    expect(report.confidence).toBe(75);
+    expect(report.trust.grounding).toBe("unknown");
   });
 
   it("a post-cutoff HOLLOW legacy row reads thin AND post-cutoff — both honesty signals derive", async () => {

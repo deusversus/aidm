@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { KNOWLEDGE_CUTOFF_YEAR, buildFieldSources, deriveTrust, mechanicsImplied } from "../trust";
+import {
+  GROUNDABLE_TEXT_FLOOR_CHARS,
+  KNOWLEDGE_CUTOFF_YEAR,
+  buildFieldSources,
+  coverageGates,
+  deriveTrust,
+  mechanicsImplied,
+} from "../trust";
 
 /**
  * The trust derivation (M3R3 C1). The founding case is pinned exactly: the
@@ -141,6 +148,7 @@ describe("buildFieldSources (M3R3 C1, source-typed at C2)", () => {
   it("the api_thin trap: wiki found, zero pages → NOTHING is labeled wiki_page", () => {
     const fs = buildFieldSources({
       identityOrigin: "anilist",
+      tonalSource: null,
       settingSource: null,
       statMappingSource: null,
       powerSystemSource: null,
@@ -157,6 +165,7 @@ describe("buildFieldSources (M3R3 C1, source-typed at C2)", () => {
   it("grounded content earns the wiki_page label — per field, on content", () => {
     const fs = buildFieldSources({
       identityOrigin: "anilist",
+      tonalSource: "wiki",
       settingSource: "wiki",
       statMappingSource: "wiki",
       powerSystemSource: "wiki",
@@ -171,6 +180,7 @@ describe("buildFieldSources (M3R3 C1, source-typed at C2)", () => {
   it("M3R3 C2: a search-fed organ says web_search — it never borrows wiki's label", () => {
     const fs = buildFieldSources({
       identityOrigin: "anilist",
+      tonalSource: "search",
       settingSource: "search",
       statMappingSource: "search",
       powerSystemSource: "wiki",
@@ -186,6 +196,7 @@ describe("buildFieldSources (M3R3 C1, source-typed at C2)", () => {
   it("LEVEL B: an ungrounded world_setting names the WEB identity that fed its genre", () => {
     const fs = buildFieldSources({
       identityOrigin: "web_search",
+      tonalSource: null,
       settingSource: null,
       statMappingSource: null,
       powerSystemSource: null,
@@ -199,6 +210,7 @@ describe("buildFieldSources (M3R3 C1, source-typed at C2)", () => {
     expect(
       buildFieldSources({
         identityOrigin: "anilist",
+        tonalSource: null,
         settingSource: null,
         statMappingSource: null,
         powerSystemSource: null,
@@ -206,20 +218,234 @@ describe("buildFieldSources (M3R3 C1, source-typed at C2)", () => {
       }).world_setting,
     ).toBe("anilist");
   });
+});
 
-  it("tonal fields are model_recall in every shape until C3 grounds them", () => {
+/**
+ * L3's close (M3R3 C3): the tonal read used to be recall BY CONSTRUCTION —
+ * interpretTonal saw only the AniList synopsis. Now it reads the harvest, and
+ * the labels follow the pages. Group B does NOT follow: the narrative call
+ * reads the assembled profile, a synthesis of syntheses, so no page can
+ * honestly be named as its source.
+ */
+describe("buildFieldSources tonal grounding (M3R3 C3, L3)", () => {
+  const GROUP_A = [
+    "canonical_dna",
+    "canonical_composition",
+    "storytelling_tropes",
+    "visual_style",
+    "combat_style",
+    "power_distribution",
+  ];
+  const GROUP_B = ["director_personality", "author_voice", "cast_depth_posture"];
+
+  const build = (tonalSource: "wiki" | "search" | null) =>
+    buildFieldSources({
+      identityOrigin: "anilist",
+      tonalSource,
+      settingSource: null,
+      statMappingSource: null,
+      powerSystemSource: null,
+      voiceSource: null,
+    });
+
+  it("wiki pages fed the tonal read → the six interpreted fields say wiki_page", () => {
+    const fs = build("wiki");
+    for (const field of GROUP_A) expect(fs[field]).toBe("wiki_page");
+  });
+
+  it("a search-fed tonal read says web_search — it never borrows the wiki label", () => {
+    const fs = build("search");
+    for (const field of GROUP_A) expect(fs[field]).toBe("web_search");
+  });
+
+  it("no pages reached interpretTonal → the tonal read is recall, and says so", () => {
+    const fs = build(null);
+    for (const field of GROUP_A) expect(fs[field]).toBe("model_recall");
+  });
+
+  it("GROUP B stays model_recall in every shape — it reads the profile, not the sources", () => {
     for (const source of ["wiki", "search", null] as const) {
-      const fs = buildFieldSources({
-        identityOrigin: "anilist",
-        settingSource: source,
-        statMappingSource: source,
-        powerSystemSource: source,
-        voiceSource: source,
-      });
-      expect(fs.canonical_dna).toBe("model_recall");
-      expect(fs.author_voice).toBe("model_recall");
-      expect(fs.director_personality).toBe("model_recall");
+      const fs = build(source);
+      for (const field of GROUP_B) expect(fs[field]).toBe("model_recall");
     }
+  });
+});
+
+/**
+ * The coverage gates (M3R3 C3, lesson L4): v3 had ONE hard gate and v5 had
+ * none — a LitRPG with power_system null, zero quotes and stat-confidence 0
+ * parsed clean and compiled into a campaign. These fire on the shapes that
+ * are presumptively broken, and MARK rather than throw.
+ */
+describe("coverageGates (M3R3 C3, L4)", () => {
+  const clean = {
+    mechanicsImplied: false,
+    powerSystemPresent: false,
+    statsCanonical: false,
+    contentChars: 40_000,
+    pagesFetched: 30,
+  };
+
+  it("a thin-but-honest profile is NOT defective — thin is a gap, not a defect", () => {
+    const g = coverageGates(clean);
+    expect(g.defective).toBe(false);
+    expect(g.defects).toHaveLength(0);
+  });
+
+  it("mechanics implied, no power system → the KA would improvise §4 constraints", () => {
+    const g = coverageGates({ ...clean, mechanicsImplied: true });
+    expect(g.defective).toBe(true);
+    expect(g.defects).toHaveLength(1);
+    expect(g.defects[0]).toContain("DEFECT: genre/tags imply a game-mechanics power system");
+  });
+
+  it("mechanics IP WITH a power system but no canonical stats → invented status windows", () => {
+    const g = coverageGates({ ...clean, mechanicsImplied: true, powerSystemPresent: true });
+    expect(g.defective).toBe(true);
+    expect(g.defects).toHaveLength(1);
+    expect(g.defects[0]).toContain("without a canonical stat mapping");
+  });
+
+  it("a mechanics IP with BOTH organs clears the mechanics gates", () => {
+    const g = coverageGates({
+      ...clean,
+      mechanicsImplied: true,
+      powerSystemPresent: true,
+      statsCanonical: true,
+    });
+    expect(g.defective).toBe(false);
+  });
+
+  it("v3's lore floor, carried: under 200 characters of source text is recall in a trench coat", () => {
+    const g = coverageGates({ ...clean, contentChars: 0, pagesFetched: 0 });
+    expect(g.defective).toBe(true);
+    expect(g.defects[0]).toContain("groundable source text");
+  });
+
+  it("the floor is exact: 199 fires, 200 does not", () => {
+    expect(
+      coverageGates({ ...clean, contentChars: GROUNDABLE_TEXT_FLOOR_CHARS - 1 }).defective,
+    ).toBe(true);
+    expect(coverageGates({ ...clean, contentChars: GROUNDABLE_TEXT_FLOOR_CHARS }).defective).toBe(
+      false,
+    );
+  });
+
+  it("the founding case trips two gates at once, both named", () => {
+    const g = coverageGates({
+      mechanicsImplied: true,
+      powerSystemPresent: false,
+      statsCanonical: false,
+      contentChars: 0,
+      pagesFetched: 0,
+    });
+    expect(g.defects).toHaveLength(2);
+    expect(g.defects.every((d) => d.startsWith("DEFECT:"))).toBe(true);
+  });
+
+  /**
+   * The legacy shape (M3R3 C3 audit): a cached pre-C3 row stores its own
+   * mechanics but never the page text behind them. The mechanics rules can
+   * still be run against it at zero cost — and must be, because that row
+   * otherwise reaches Session Zero at confidence 75 with an empty gap list.
+   * The text floor is the one rule that has nothing to read there.
+   */
+  it("skipTextFloor: the text rule sits out, the mechanics rules still fire", () => {
+    const g = coverageGates({
+      mechanicsImplied: true,
+      powerSystemPresent: false,
+      statsCanonical: false,
+      contentChars: 0,
+      pagesFetched: 20,
+      skipTextFloor: true,
+    });
+    expect(g.defective).toBe(true);
+    expect(g.defects).toHaveLength(1);
+    expect(g.defects[0]).toContain("DEFECT: genre/tags imply a game-mechanics power system");
+    expect(g.defects.join(" ")).not.toContain("groundable source text");
+  });
+
+  it("skipTextFloor cannot manufacture a clean bill — a sound shape stays clean either way", () => {
+    const legacyClean = { ...clean, contentChars: 0, pagesFetched: 20, skipTextFloor: true };
+    expect(coverageGates(legacyClean).defective).toBe(false);
+    // …and the floor is only skipped when asked: the same inputs without the
+    // flag still fail on zero groundable text.
+    expect(coverageGates({ ...legacyClean, skipTextFloor: false }).defective).toBe(true);
+  });
+});
+
+describe("deriveTrust defect + grounding plumbing (M3R3 C3)", () => {
+  it("defects lead coverage_gaps and set defective — grounding gaps do neither", () => {
+    const t = deriveTrust({
+      ...base,
+      pagesFetched: 15,
+      contentChars: 60_000,
+      voiceQuoteCharacters: 2,
+      defects: ["DEFECT: named hole"],
+      groundingGaps: ["grounding: unsupported claim"],
+    });
+    expect(t.defective).toBe(true);
+    expect(t.coverage_gaps[0]).toBe("DEFECT: named hole");
+    expect(t.coverage_gaps).toContain("grounding: unsupported claim");
+    // The gates answer a DIFFERENT question than coverage — a defect must not
+    // silently move the confidence number.
+    expect(t.derived_confidence).toBe(75);
+  });
+
+  it("grounding gaps alone never mark a profile defective", () => {
+    const t = deriveTrust({
+      ...base,
+      pagesFetched: 15,
+      contentChars: 60_000,
+      voiceQuoteCharacters: 2,
+      groundingGaps: ["grounding: unsupported claim"],
+    });
+    expect(t.defective).toBe(false);
+    expect(t.coverage_gaps).toContain("grounding: unsupported claim");
+  });
+
+  it("a run with neither is not defective — the flag defaults off, never on", () => {
+    expect(deriveTrust({ ...base }).defective).toBe(false);
+  });
+});
+
+/**
+ * The grounding state (M3R3 C3 audit; widened to an enum by the re-audit). An
+ * auditor that threw used to leave a record indistinguishable from an
+ * audited-clean one — every label standing, no gap, `notes` the only witness
+ * and nothing instructed to read it. The boolean that fixed that then
+ * conflated "the auditor failed" with "there was nothing to audit", and the
+ * conductor's disclosure rule keyed on the conflation. Four states, one fact
+ * each.
+ */
+describe("deriveTrust grounding state (M3R3 C3)", () => {
+  const withGrounding = (grounding?: Parameters<typeof deriveTrust>[0]["grounding"]) =>
+    deriveTrust({
+      ...base,
+      pagesFetched: 15,
+      contentChars: 60_000,
+      ...(grounding ? { grounding } : {}),
+    });
+
+  it("every state rides through as an INPUT — none moves confidence arithmetic", () => {
+    const baseline = withGrounding().derived_confidence;
+    for (const state of ["audited", "no_claims", "unavailable", "unknown"] as const) {
+      const t = withGrounding(state);
+      expect(t.grounding).toBe(state);
+      expect(t.derived_confidence).toBe(baseline);
+    }
+  });
+
+  it("defaults unknown — an unstated pass is an unjudged row, never a passed one", () => {
+    expect(deriveTrust({ ...base }).grounding).toBe("unknown");
+    expect(withGrounding().grounding).toBe("unknown");
+  });
+
+  it("no_claims is not a gap: nothing auditable is the ordinary non-mechanics shape", () => {
+    const t = withGrounding("no_claims");
+    // The state is a fact about the RUN; only real holes reach the player.
+    expect(t.coverage_gaps.some((g) => g.includes("unaudited"))).toBe(false);
+    expect(t.defective).toBe(false);
   });
 });
 

@@ -24,6 +24,15 @@ import { z } from "zod";
  * The Session Zero conductor (blueprint §8): ONE conversation with tools on
  * tap — never a staged pipeline, never a form. The persona below is the
  * product's first handshake; its review is a named user checkpoint.
+ *
+ * PROFILE HEALTH's disclosure triggers are confidence, recency and named gaps
+ * — deliberately NOT the grounding state (M3R3 C3 re-audit). A fourth trigger
+ * on "unaudited" fired on every healthy non-mechanics profile, because a work
+ * with no technique pages and no canonical stats offers the auditor nothing to
+ * check: a rich 40-page Bebop scrape would have opened the audition with a
+ * wrongness caveat that had nothing to name. The one case that trigger caught
+ * honestly — the auditor itself failing — already pushes its own coverage gap,
+ * so the gaps trigger carries it.
  */
 
 export const CONDUCTOR_SYSTEM = `You are the DM at the player's anime table — the first voice they hear, and the co-author's handshake. What you run together are long-form campaigns in the register of a series they love — anime, manga, light novel — built to still feel like that series hundreds of turns in. A player arrives carrying a feeling they want to recapture, reproduce, or reimagine, wearing a premise as its clothes. Your whole job is to catch that feeling and set up a campaign that can multiply it.
@@ -41,7 +50,7 @@ THE ITINERARY. The conversation has a shape — carry it in your head and always
 
 THE AUDITION. Your first reply to a premise demonstrates feel-level understanding — what the source DOES to a person, not a synopsis. Your confidence scales with the work's popularity: for anything obscure, recent, or uncertain, say plainly "give me a minute to look" and use research_title. NEVER confirm a title, season, or spinoff you cannot verify — a hallucinated Season 4 is an instant trust-kill for exactly the superfan you serve. The customer is not always right about what exists.
 
-PROFILE HEALTH IS PLAYER-FACING. research_title returns profile_health — what the studio ACTUALLY knows about this IP. When derived_confidence is under 60, post_cutoff is true, or coverage_gaps name holes: tell the player plainly, in one honest breath, what the desk found and did not find ("the wiki's empty and this adaptation is newer than anything I've read — I know the shape of it, not the specifics"). Then offer the real choices: lean original where canon is thin, or have THEM fill the gaps via supply_canon — the player who chose a little-known IP usually knows it better than any archive, and what they paste becomes real, retrievable canon. NEVER perform confident fluency the health record contradicts; the superfan will catch it, and one caught bluff costs the whole table.
+PROFILE HEALTH IS PLAYER-FACING. research_title returns profile_health — what the studio ACTUALLY knows about this IP. When derived_confidence is under 60, post_cutoff is true, or coverage_gaps name holes: tell the player plainly, in one honest breath, what the desk found and did not find ("the wiki's empty and this adaptation is newer than anything I've read — I know the shape of it, not the specifics"). Then offer the real choices: lean original where canon is thin, or have THEM fill the gaps via supply_canon — the player who chose a little-known IP usually knows it better than any archive, and what they paste becomes real, retrievable canon. NEVER perform confident fluency the health record contradicts; the superfan will catch it, and one caught bluff costs the whole table. When defective is true the desk hit a NAMED structural hole — the DEFECT lines lead coverage_gaps and say which — and you MUST disclose it plainly before you ever call propose_contract: name what broke in one sentence, then put the real outs on the table (lean original where canon is thin, have THEM supply_canon, or pick a different title); they may absolutely choose to play it anyway, but never unknowingly.
 
 WHILE RESEARCH LOADS, NO DEAD AIR. Interview the player — they are the one subject no wiki holds. What they loved, when they watched it, who they were then.
 
@@ -474,6 +483,16 @@ async function executeTool(
           method: report.trust.method,
           pages_fetched: report.trust.pages_fetched,
           post_cutoff: report.trust.post_cutoff,
+          // M3R3 C3: a coverage gate fired — the profile is presumptively
+          // BROKEN, not merely thin. Nothing refuses to build on it; the
+          // disclosure obligation below is what stands in for v3's throw.
+          defective: report.trust.defective,
+          // M3R3 C3: what the grounding pass has to say — "audited",
+          // "no_claims", "unavailable" or "unknown". Context for the record
+          // above, never a disclosure trigger on its own: an auditor failure
+          // reaches the player through its own coverage gap, and "no_claims"
+          // is the ordinary shape of a work with no mechanics to check.
+          grounding: report.trust.grounding,
           coverage_gaps: report.trust.coverage_gaps,
         },
         notes: report.notes,

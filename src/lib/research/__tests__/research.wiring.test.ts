@@ -3,7 +3,7 @@ import { BEBOP_DNA } from "@/lib/renderer/__tests__/fixtures";
 import type { Profile } from "@/lib/types/profile";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AniListMedia, FranchiseWalk } from "../anilist";
-import type { NarrativeSynthesis, TonalInterpretation } from "../synthesize";
+import type { GroundingClaim, NarrativeSynthesis, TonalInterpretation } from "../synthesize";
 import type { IdentityRescue, TopicSearchResult } from "../websearch";
 import type { CanonicalPageType, WikiPage } from "../wiki";
 
@@ -30,6 +30,7 @@ const {
   synthesizeVoiceCardsMock,
   synthesizeStatMappingMock,
   synthesizeNarrativeMock,
+  groundProfileMock,
   searchIdentityMock,
   searchTopicsMock,
   writeCorpusMock,
@@ -47,6 +48,7 @@ const {
   synthesizeVoiceCardsMock: vi.fn(),
   synthesizeStatMappingMock: vi.fn(),
   synthesizeNarrativeMock: vi.fn(),
+  groundProfileMock: vi.fn(),
   searchIdentityMock: vi.fn(),
   searchTopicsMock: vi.fn(),
   writeCorpusMock: vi.fn(),
@@ -78,6 +80,9 @@ vi.mock("@/lib/research/wiki", async (importOriginal) => {
 });
 vi.mock("@/lib/research/synthesize", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/research/synthesize")>();
+  // sourceExcerptBlock stays REAL: what interpretTonal and the grounding pass
+  // actually SEE is part of the wiring under test (grounding.test.ts pins the
+  // selector itself).
   return {
     ...actual,
     interpretTonal: interpretTonalMock,
@@ -85,6 +90,7 @@ vi.mock("@/lib/research/synthesize", async (importOriginal) => {
     synthesizeVoiceCards: synthesizeVoiceCardsMock,
     synthesizeStatMapping: synthesizeStatMappingMock,
     synthesizeNarrative: synthesizeNarrativeMock,
+    groundProfile: groundProfileMock,
   };
 });
 vi.mock("@/lib/research/websearch", async (importOriginal) => {
@@ -192,6 +198,8 @@ const NARRATIVE: NarrativeSynthesis = {
 
 const QUOTED = 'She only said, "I do not chase what is already gone, and neither should you."';
 
+type Claim = GroundingClaim;
+
 function searchPage(key: string, pageType: CanonicalPageType, text: string, url: string): WikiPage {
   return { title: `Test Show — ${key} (web research)`, pageType, text, url, origin: "web_search" };
 }
@@ -275,6 +283,11 @@ describe("researchTitle fallback chain (M3R3 C2)", () => {
       display_order: [],
     });
     synthesizeNarrativeMock.mockResolvedValue(NARRATIVE);
+    // The grounding auditor upholds everything unless a test says otherwise —
+    // the demotion cases below are the interesting ones.
+    groundProfileMock.mockImplementation(async (_t: string, claims: Claim[]) => ({
+      verdicts: claims.map((c) => ({ key: c.key, supported: true })),
+    }));
     searchTopicsMock.mockResolvedValue(topicResult([], {}));
     writeCorpusMock.mockResolvedValue({ chunks: 7 });
   });
@@ -386,6 +399,497 @@ describe("researchTitle fallback chain (M3R3 C2)", () => {
     expect(gapFill).toEqual(["Spike"]); // the AniList cast carries voice instead
     expect(sources.voice_cards).toBe("model_recall");
     expect(report.trust.coverage_gaps.join(" | ")).toContain("no character quotes");
+
+    // M3R3 C3 / L3: the tonal read gets the HARVEST, not the synopsis alone.
+    // Until C3 this call saw `mediaBlock(media)` and nothing else, so canonical
+    // DNA, framing, tropes and visual style were recall BY CONSTRUCTION even on
+    // a run that fetched four grounded pages.
+    const [, tonalPages] = interpretTonalMock.mock.calls[0] as [AniListMedia, WikiPage[]];
+    expect(tonalPages).toHaveLength(4);
+    expect([...tonalPages].map((p) => p.pageType).sort()).toEqual([
+      "characters",
+      "locations",
+      "lore",
+      "techniques",
+    ]);
+    const { sourceExcerptBlock } = await import("../synthesize");
+    expect(sourceExcerptBlock(tonalPages)).toContain("Ashfall Reach");
+    // …and the label follows the pages: search-fed, so it says web_search.
+    expect(sources.canonical_dna).toBe("web_search");
+    expect(sources.visual_style).toBe("web_search");
+    // Group B still reads the assembled profile, not the sources.
+    expect(sources.author_voice).toBe("model_recall");
+    // The auditor was shown the desk's own FACTUAL claims, keyed for wiring —
+    // and each one carries the pages that fed it, never a run-wide window.
+    const asked = groundProfileMock.mock.calls[0]?.[1] as Claim[];
+    expect(asked.map((c) => c.key).sort()).toEqual(["power_system", "stat_mapping"]);
+    const evidenceFor = (key: string) => asked.find((c) => c.key === key)?.evidence ?? "";
+    expect(evidenceFor("power_system")).toContain("Ember Threads burn memory");
+    expect(evidenceFor("stat_mapping")).toContain("RANK and THREADCOUNT");
+    // Each claim's evidence is its OWN organ's pages: the stat mapping's lore
+    // page is not what the power system is judged against, and vice versa.
+    expect(evidenceFor("power_system")).not.toContain("THREADCOUNT");
+    expect(evidenceFor("stat_mapping")).not.toContain("Ember Threads");
+    // NO TONAL CLAIM EXISTS. A 0-10 interpretive score is not a source-
+    // checkable fact, so the auditor is never asked to grade one — and the
+    // tonal labels below stand on what interpretTonal structurally READ.
+    expect(asked.some((c) => c.key.includes("tonal"))).toBe(false);
+    // The pass ran and reconciled, so the record says the profile was audited.
+    expect(report.trust.grounding).toBe("audited");
+  }, 20_000);
+
+  it("GROUNDING DEMOTION: the sources don't carry the power system → its label falls to recall", async () => {
+    // A full sweep with one grounded techniques page: enough source text to
+    // clear the L4 floor, so the ONLY thing under test is the verdict.
+    searchTopicsMock.mockResolvedValue(
+      topicResult(
+        [
+          searchPage(
+            "power_system",
+            "techniques",
+            "The Ashfall Reach is walled and the Ledger Houses run its trade. Bearers are ranked by the Ledger, which the sources describe at length across several pages of history, geography, and the trade compacts between the Houses that keep the Reach fed through winter.",
+            "https://src/power",
+          ),
+        ],
+        { power_system: ["https://src/power"] },
+      ),
+    );
+    groundProfileMock.mockImplementation(async (_t: string, claims: Claim[]) => ({
+      verdicts: claims.map((c) => ({ key: c.key, supported: c.key !== "power_system" })),
+    }));
+
+    const rows: InsertedProfileRow[] = [];
+    const { researchTitle } = await import("../research");
+    const report = await researchTitle(stubDb(rows), "Test Show");
+
+    // The system is STILL in the profile — C4 owns player-facing surgery.
+    // What died is the claim that a source backed it.
+    expect(rows[0]?.profile.ip_mechanics.power_system?.name).toBe("Ember Threads");
+    expect(report.trust.field_sources.power_system).toBe("model_recall");
+    expect(report.trust.field_pages.power_system).toBeUndefined();
+    expect(report.trust.coverage_gaps.join(" | ")).toContain(
+      "grounding: the power system as synthesized is not supported by the fetched sources",
+    );
+    // 20 floor + 15 (AniList identity) + 15 (one thin page: pagesFetched > 0
+    // but under the 10-page/15k-char rich bar) + 5 (power system present but
+    // NOT from pages — the demotion is worth exactly the 10-vs-5 difference).
+    // No stats credit (the mapping is the default) and no quote credit. An
+    // upheld verdict would read 60.
+    expect(report.trust.derived_confidence).toBe(55);
+    // A rejected claim is a gap, never a defect: the profile is not broken.
+    expect(report.trust.defective).toBe(false);
+    // THE TONAL LABELS ARE UNTOUCHED BY ANY VERDICT. No tonal claim is ever
+    // put to the auditor — the label states what interpretTonal READ, and a
+    // rejected power system says nothing about that.
+    const asked = groundProfileMock.mock.calls[0]?.[1] as Claim[];
+    expect(asked.map((c) => c.key)).toEqual(["power_system"]);
+    expect(report.trust.field_sources.canonical_dna).toBe("web_search");
+    expect(report.trust.grounding).toBe("audited");
+  }, 20_000);
+
+  it("FAIL CLOSED: a claim the auditor never answers is UNSUPPORTED, and says so", async () => {
+    // Two claims asked (power system + stat mapping), one verdict returned —
+    // the shape the schema explicitly allows and the old wiring read as
+    // consent. A dropped or re-keyed answer must land where doubt lands.
+    searchTopicsMock.mockResolvedValue(
+      topicResult(
+        [
+          searchPage(
+            "power_system",
+            "techniques",
+            "Ember Threads burn memory for speed, and the sources describe the cost at length across the compacts, the histories, and the trade of the Reach.",
+            "https://src/power",
+          ),
+          searchPage(
+            "stats",
+            "lore",
+            "The Ledger shows RANK and THREADCOUNT for every bearer, recorded in the Houses' own books.",
+            "https://src/stats",
+          ),
+        ],
+        { power_system: ["https://src/power"], stats: ["https://src/stats"] },
+      ),
+    );
+    synthesizeStatMappingMock.mockResolvedValue({
+      has_canonical_stats: true,
+      confidence: 95,
+      system_name: "The Ledger",
+      aliases: {},
+      meta_resources: {},
+      hidden: [],
+      display_order: [],
+    });
+    groundProfileMock.mockResolvedValue({
+      verdicts: [{ key: "stat_mapping", supported: true }],
+    });
+
+    const rows: InsertedProfileRow[] = [];
+    const { researchTitle } = await import("../research");
+    const report = await researchTitle(stubDb(rows), "Test Show");
+
+    expect((groundProfileMock.mock.calls[0]?.[1] as Claim[]).map((c) => c.key).sort()).toEqual([
+      "power_system",
+      "stat_mapping",
+    ]);
+    expect(report.trust.coverage_gaps.join(" | ")).toContain(
+      "grounding: no verdict returned for power_system — treated as unsupported",
+    );
+    // …and the silence carries the full consequence, not just a note.
+    expect(report.trust.field_sources.power_system).toBe("model_recall");
+    expect(report.trust.field_pages.power_system).toBeUndefined();
+    // The answered claim keeps everything it earned.
+    expect(report.trust.field_sources.stat_mapping).toBe("web_search");
+    expect(report.trust.grounding).toBe("audited");
+  }, 20_000);
+
+  it("ANY FALSE WINS: a duplicated key cannot talk the auditor out of an unsupported verdict", async () => {
+    // GroundingVerdicts is an unconstrained array — the grammar cannot forbid
+    // two entries for one claim, and "exactly one verdict per claim" is prose.
+    // Map-last-wins made a contradicting second entry fail-OPEN.
+    searchTopicsMock.mockResolvedValue(
+      topicResult(
+        [
+          searchPage(
+            "power_system",
+            "techniques",
+            "Ember Threads burn memory for speed, and the sources describe the cost at length across the compacts, the histories, and the trade of the Reach.",
+            "https://src/power",
+          ),
+        ],
+        { power_system: ["https://src/power"] },
+      ),
+    );
+    groundProfileMock.mockResolvedValue({
+      verdicts: [
+        { key: "power_system", supported: false },
+        { key: "power_system", supported: true },
+      ],
+    });
+
+    const rows: InsertedProfileRow[] = [];
+    const { researchTitle } = await import("../research");
+    const report = await researchTitle(stubDb(rows), "Test Show");
+
+    // The FALSE verdict stands: the label falls to recall and the gap is named.
+    expect(report.trust.field_sources.power_system).toBe("model_recall");
+    expect(report.trust.field_pages.power_system).toBeUndefined();
+    expect(report.trust.coverage_gaps.join(" | ")).toContain(
+      "grounding: the power system as synthesized is not supported by the fetched sources",
+    );
+    // The pass itself still RAN and reconciled every claim it was asked.
+    expect(report.trust.grounding).toBe("audited");
+  }, 20_000);
+
+  it("EVIDENCE PARITY: the auditor is shown every page synthesizePowerSystem read, uncut", async () => {
+    // Five technique pages, each fatter than the per-page clip. Under the old
+    // 3-pages × 800-chars evidence window, pages 4 and 5 were invisible to the
+    // auditor while the synthesis had read them — a false demotion BY
+    // CONSTRUCTION for any system built on them.
+    const filler = "the Reach and its compacts, recorded at length. ".repeat(30);
+    const techniquePages = Array.from({ length: 6 }, (_, i) =>
+      searchPage(
+        `power_system_${i}`,
+        "techniques",
+        `PAGE-${i}-HEAD Ember Threads burn memory. ${filler} PAGE-${i}-TAIL`,
+        `https://src/power/${i}`,
+      ),
+    );
+    searchTopicsMock.mockResolvedValue(
+      topicResult(techniquePages, { power_system: ["https://src/power"] }),
+    );
+
+    const { researchTitle } = await import("../research");
+    await researchTitle(stubDb([]), "Test Show");
+
+    const { SYNTHESIS_FEEDS } = await import("../synthesize");
+    const asked = groundProfileMock.mock.calls[0]?.[1] as Claim[];
+    const evidence = asked.find((c) => c.key === "power_system")?.evidence ?? "";
+    // Every page inside the feed window reached the auditor — 4 and 5 included.
+    for (let i = 0; i < SYNTHESIS_FEEDS.power_system.pages; i++) {
+      expect(evidence).toContain(`PAGE-${i}-HEAD`);
+    }
+    // …and nothing beyond it did: the window is the synthesis call's, exactly.
+    expect(evidence).not.toContain(`PAGE-${SYNTHESIS_FEEDS.power_system.pages}-HEAD`);
+    // The per-page clip is the synthesis call's too — the tail sits past it.
+    expect(filler.length).toBeGreaterThan(SYNTHESIS_FEEDS.power_system.chars);
+    expect(evidence).not.toContain("PAGE-0-TAIL");
+  }, 20_000);
+
+  it("STAT MAPPING DEMOTION: the DEFAULT is what persists — profile, record and gate agree", async () => {
+    // A mechanics IP whose stat mapping the sources don't back. Before this
+    // fix the trust record demoted the label while the profile still shipped
+    // has_canonical_stats=true at confidence 95 into the premise contract,
+    // where layout keys the diegetic status window on it.
+    const litrpg: AniListMedia = {
+      ...MEDIA,
+      genres: ["Fantasy"],
+      tags: [{ name: "LitRPG", rank: 85, isMediaSpoiler: false }],
+    };
+    searchAnimeMock.mockResolvedValue([litrpg]);
+    walkFranchiseMock.mockResolvedValue({
+      ...WALK,
+      fetched: new Map([[litrpg.id, litrpg]]),
+    } satisfies FranchiseWalk);
+    searchTopicsMock.mockResolvedValue(
+      topicResult(
+        [
+          searchPage(
+            "power_system",
+            "techniques",
+            "Ember Threads burn memory for speed, and the sources describe the cost at length across the compacts, the histories, and the trade of the Reach.",
+            "https://src/power",
+          ),
+          searchPage(
+            "stats",
+            "lore",
+            "The Ledger shows RANK and THREADCOUNT for every bearer, recorded in the Houses' own books.",
+            "https://src/stats",
+          ),
+        ],
+        { power_system: ["https://src/power"], stats: ["https://src/stats"] },
+      ),
+    );
+    synthesizeStatMappingMock.mockResolvedValue({
+      has_canonical_stats: true,
+      confidence: 95,
+      system_name: "The Ledger",
+      aliases: {},
+      meta_resources: {},
+      hidden: [],
+      display_order: [],
+    });
+    groundProfileMock.mockImplementation(async (_t: string, claims: Claim[]) => ({
+      verdicts: claims.map((c) => ({ key: c.key, supported: c.key !== "stat_mapping" })),
+    }));
+
+    const rows: InsertedProfileRow[] = [];
+    const { researchTitle } = await import("../research");
+    const report = await researchTitle(stubDb(rows), "Test Show");
+
+    // The PERSISTED profile carries the default — the one v3's ≥90 bar
+    // discards — not the kept mapping.
+    const stats = rows[0]?.profile.ip_mechanics.stat_mapping;
+    expect(stats?.has_canonical_stats).toBe(false);
+    expect(stats?.confidence).toBe(0);
+    expect(stats?.system_name).toBeUndefined();
+    // Absence IS the honest label for content no organ fed.
+    expect(report.trust.field_sources.stat_mapping).toBeUndefined();
+    expect(report.trust.field_pages.stat_mapping).toBeUndefined();
+    expect(report.trust.coverage_gaps.join(" | ")).toContain(
+      "grounding: the canonical stat mapping is not supported by the fetched sources",
+    );
+    // ORDERING PIN: the coverage gate reads the POST-demotion value, so a
+    // mechanics IP whose stat system just died is defective on the same truth
+    // the profile ships — not clean because the pre-demotion object said true.
+    expect(report.trust.defective).toBe(true);
+    expect(report.trust.coverage_gaps[0]).toContain("without a canonical stat mapping");
+  }, 20_000);
+
+  it("MECHANICAL VOICE GROUNDING: an invented signature phrase is caught without a model verdict", async () => {
+    // The phrase check is a substring test against the pages that fed the
+    // voice call — deterministic and free. extractQuotes pulls its phrases
+    // verbatim, so a real one passes by construction whatever its casing or
+    // quote marks; what fails is voice matter the model made up.
+    findWikiMock.mockResolvedValue({ base: "https://test.fandom.com", articles: 40 });
+    listCategoriesMock.mockResolvedValue(["Characters"]);
+    planScrapeMock.mockResolvedValue({
+      categories: [{ wiki_category: "Characters", canonical_type: "characters", priority: 1 }],
+      ip_notes: "",
+    });
+    categoryMembersMock.mockResolvedValue(["Spike"]);
+    fetchPageMock.mockImplementation(
+      async (base: string, title: string, pageType: CanonicalPageType) => ({
+        title,
+        pageType,
+        text: QUOTED,
+        url: `${base}/wiki/${title}`,
+      }),
+    );
+    // A technique page from the thin-scrape supplement, so the auditor IS
+    // called — and can be shown to have been asked nothing about voice.
+    searchTopicsMock.mockResolvedValue(
+      topicResult(
+        [
+          searchPage(
+            "power_system",
+            "techniques",
+            "Ember Threads burn memory for speed, and the sources describe the cost at length across the compacts, the histories, and the trade of the Reach.",
+            "https://src/power",
+          ),
+        ],
+        { power_system: ["https://src/power"] },
+      ),
+    );
+    synthesizeVoiceCardsMock.mockResolvedValue([
+      {
+        name: "Spike",
+        // Curly quotes and a different case: normalization is what makes the
+        // verbatim-extracted phrase survive the trip.
+        signature_phrases: ["“I DO NOT CHASE what is already gone”"],
+        speech_patterns: "clipped",
+        humor_type: "Sardonic",
+        dialogue_rhythm: "drawled",
+        emotional_expression: "Deflecting",
+      },
+      {
+        name: "Vicious",
+        signature_phrases: ["Bang. See you, space cowboy."],
+        speech_patterns: "flat",
+        humor_type: "none",
+        dialogue_rhythm: "terse",
+        emotional_expression: "Restrained",
+      },
+      {
+        name: "Faye",
+        // TYPOGRAPHY, not invention: the card's phrase is the page's line with
+        // an ellipsis and an em dash where the page had a comma and a space.
+        // synthesizeVoiceCards RE-EMITS phrases rather than copying them, so
+        // this rewrite is routine — and it used to be reported to the player
+        // as model-invented voice matter.
+        signature_phrases: ["I do not chase … what is already gone—and neither should you"],
+        speech_patterns: "wry",
+        humor_type: "Deadpan",
+        dialogue_rhythm: "loose",
+        emotional_expression: "Deflecting",
+      },
+    ]);
+
+    const rows: InsertedProfileRow[] = [];
+    const { researchTitle } = await import("../research");
+    const report = await researchTitle(stubDb(rows), "Test Show");
+
+    // ONE ungrounded phrase, not two: the typographic variant folds into the
+    // page text, and only the invented line is named.
+    expect(report.trust.coverage_gaps.join(" | ")).toContain(
+      "grounding: 1 signature phrase(s) across 1 voice card(s) do not appear in the source pages",
+    );
+    // The cards themselves are untouched — C4 owns player-facing surgery.
+    expect(rows[0]?.profile.ip_mechanics.voice_cards).toHaveLength(3);
+    expect(rows[0]?.profile.ip_mechanics.voice_cards[1]?.signature_phrases).toEqual([
+      "Bang. See you, space cowboy.",
+    ]);
+    // NO MODEL VERDICT IS INVOLVED: the auditor was asked about the factual
+    // claims only. The phrase came out of the page or it did not.
+    const asked = (groundProfileMock.mock.calls[0]?.[1] as Claim[]).map((c) => c.key);
+    expect(asked).toEqual(["power_system"]);
+    expect(asked.some((k) => k.startsWith("voice"))).toBe(false);
+  }, 20_000);
+
+  it("THE AUDITOR FAILS: grounding is 'unavailable' and the record says the profile is unaudited", async () => {
+    searchTopicsMock.mockResolvedValue(
+      topicResult(
+        [
+          searchPage(
+            "power_system",
+            "techniques",
+            "Ember Threads burn memory for speed, and the sources describe the cost at length across the compacts, the histories, and the trade of the Reach — enough text to clear the groundable-text floor, so the only thing under test here is the auditor's own failure.",
+            "https://src/power",
+          ),
+        ],
+        { power_system: ["https://src/power"] },
+      ),
+    );
+    groundProfileMock.mockRejectedValue(new Error("grounding: 529 overloaded"));
+
+    const rows: InsertedProfileRow[] = [];
+    const { researchTitle } = await import("../research");
+    const report = await researchTitle(stubDb(rows), "Test Show");
+
+    // The run survives its own auditor — but never silently.
+    expect(report.trust.grounding).toBe("unavailable");
+    expect(report.trust.coverage_gaps.join(" | ")).toContain(
+      "grounding pass unavailable — provenance labels ride synthesis structure, unaudited",
+    );
+    // The state rides ON the persisted record, not only in the return: a later
+    // reader of this row must be able to tell it was never checked.
+    expect(rows[0]?.profile.research_trust?.grounding).toBe("unavailable");
+    expect(rows[0]?.profile.research_trust?.coverage_gaps.join(" | ")).toContain("unaudited");
+    // Labels stand where synthesis put them — an unrun audit demotes nothing.
+    expect(report.trust.field_sources.power_system).toBe("web_search");
+    expect(report.trust.defective).toBe(false);
+  }, 20_000);
+
+  it("NOTHING TO AUDIT: a rich non-mechanics scrape is 'no_claims' — not a hole, and no gap", async () => {
+    // The re-audit's finding [1]/[5]: a Bebop-shaped run (deep wiki, no
+    // technique pages, no canonical stats) offers the auditor no source-
+    // checkable claim at all. Under the old boolean that landed as
+    // grounded:false — indistinguishable from an auditor failure — and the
+    // conductor's disclosure rule then forced a wrongness caveat at the
+    // audition with nothing to name.
+    findWikiMock.mockResolvedValue({ base: "https://test.fandom.com", articles: 40 });
+    listCategoriesMock.mockResolvedValue(["Characters"]);
+    planScrapeMock.mockResolvedValue({
+      categories: [{ wiki_category: "Characters", canonical_type: "characters", priority: 1 }],
+      ip_notes: "",
+    });
+    categoryMembersMock.mockResolvedValue(Array.from({ length: 12 }, (_, i) => `Character ${i}`));
+    fetchPageMock.mockImplementation(
+      async (base: string, title: string, pageType: CanonicalPageType) => ({
+        title,
+        pageType,
+        // Rich enough to clear the 10-page / 15k-char bar: this run is healthy
+        // by every measure the record carries.
+        text: `${QUOTED} ${"The rain kept its own time on the Reach. ".repeat(40)}`,
+        url: `${base}/wiki/${title}`,
+      }),
+    );
+
+    const rows: InsertedProfileRow[] = [];
+    const { researchTitle } = await import("../research");
+    const report = await researchTitle(stubDb(rows), "Test Show");
+
+    // No claim existed, so no call was bought — and the state says exactly why.
+    expect(groundProfileMock).not.toHaveBeenCalled();
+    expect(report.trust.grounding).toBe("no_claims");
+    expect(rows[0]?.profile.research_trust?.grounding).toBe("no_claims");
+    // NOT a hole: the player-facing channel stays empty and the profile is
+    // sound. This is the shape the false "unaudited" caveat fired on.
+    expect(report.trust.coverage_gaps).toHaveLength(0);
+    expect(report.trust.defective).toBe(false);
+    expect(report.trust.derived_confidence).toBe(75);
+  }, 20_000);
+
+  it("THE GATE FIRES (L4): a mechanics IP with no power system is DEFECTIVE — and still persists", async () => {
+    const litrpg: AniListMedia = {
+      ...MEDIA,
+      genres: ["Fantasy"],
+      tags: [{ name: "LitRPG", rank: 85, isMediaSpoiler: false }],
+    };
+    searchAnimeMock.mockResolvedValue([litrpg]);
+    walkFranchiseMock.mockResolvedValue({
+      ...WALK,
+      fetched: new Map([[litrpg.id, litrpg]]),
+    } satisfies FranchiseWalk);
+    // Story pages only: nothing feeds a power system, and the text clears the
+    // groundable-text floor so this case isolates the mechanics gate.
+    searchTopicsMock.mockResolvedValue(
+      topicResult(
+        [
+          searchPage(
+            "story",
+            "arcs",
+            "The arcs run from the Reach's fall through the Ledger war and into the long winter, each summarized by the sources in enough detail to establish the order of events and the cast that carries them across the seasons.",
+            "https://src/story",
+          ),
+        ],
+        { story: ["https://src/story"] },
+      ),
+    );
+
+    const rows: InsertedProfileRow[] = [];
+    const { researchTitle } = await import("../research");
+    const report = await researchTitle(stubDb(rows), "Test Show");
+
+    expect(report.trust.defective).toBe(true);
+    // DEFECT leads the array — it is the first thing the conductor reads.
+    expect(report.trust.coverage_gaps[0]).toContain(
+      "DEFECT: genre/tags imply a game-mechanics power system",
+    );
+    expect(report.notes.join(" | ")).toContain("DEFECT");
+    // v3 THREW here. v5 ships the profile and makes SZ say so — the run
+    // completes, the row persists, and the flag rides ON the profile.
+    expect(rows[0]?.profile.id).toBe("test_show");
+    expect(rows[0]?.profile.research_trust?.defective).toBe(true);
   }, 20_000);
 
   it("LEVEL A: AniList misses the player's name for it, search rescues the identity, the run proceeds", async () => {

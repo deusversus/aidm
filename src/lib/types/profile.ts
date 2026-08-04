@@ -178,6 +178,39 @@ export const ResearchTrust = z.object({
   field_pages: z.record(z.string(), z.array(z.string())).default({}),
   /** Human-readable gaps — the conductor speaks these to the player. */
   coverage_gaps: z.array(z.string()).default([]),
+  /**
+   * M3R3 C3 (lesson L4): a coverage gate fired — this profile is
+   * presumptively BROKEN, not merely thin (a LitRPG with no power system, a
+   * mechanics IP with no stat mapping, a run with no groundable text at all).
+   * The matching DEFECT lines lead coverage_gaps. Nothing refuses to build on
+   * it — Session Zero must disclose it before the contract instead, so the
+   * player can lean original, supply the canon themselves, or pick another
+   * title. Defaults false: pre-C3 rows are unjudged, never certified clean.
+   */
+  defective: z.boolean().default(false),
+  /**
+   * M3R3 C3: what the factual-claim grounding pass has to say about this row.
+   * An enum because the boolean it replaces conflated three unlike silences
+   * under `false`, and the conductor's disclosure rule keyed on the
+   * conflation — forcing a wrongness caveat at the audition for healthy
+   * profiles. The four states:
+   *
+   * - `audited` — the pass ran and every claim it was asked came back
+   *   reconciled. The only state that means "checked".
+   * - `no_claims` — research completed with nothing source-checkable to put
+   *   to an auditor. NOT a hole: it is the ordinary shape of any work without
+   *   technique pages or a canonical stat system (Bebop, Monster, Your Name),
+   *   and a rich 40-page scrape lands here routinely.
+   * - `unavailable` — the auditor ITSELF failed; the synthesis labels stand
+   *   unchecked, and the paired coverage gap says so in the player-facing
+   *   channel.
+   * - `unknown` — rows predating the pass. Never certified clean, never
+   *   accused of a hole either.
+   *
+   * Not a quality score: this says whether the check happened, and
+   * coverage_gaps says what it found.
+   */
+  grounding: z.enum(["audited", "no_claims", "unavailable", "unknown"]).default("unknown"),
 });
 export type ResearchTrust = z.infer<typeof ResearchTrust>;
 
