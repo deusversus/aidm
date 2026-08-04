@@ -219,7 +219,9 @@ export const TRAILER_DEMAND =
 /**
  * Run Phase B: stream prose, execute budgeted research round-trips, end on
  * the commit_scene trailer (or reconstruct it via probe). The prior
- * exchanges live in Block 3 — the message list here is just this turn.
+ * exchanges ARE the message list (M3R2 C2): the conversation opens with the
+ * window's user/assistant pairs — the pen's own attributed hand — and this
+ * turn's storyboard closes it as the final user message.
  */
 export async function runKeyAnimator(
   db: Db,

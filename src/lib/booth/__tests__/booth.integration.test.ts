@@ -45,7 +45,17 @@ const mockStream = vi.mocked(streamNarration);
 const mockAssemble = vi.mocked(assembleForCampaign);
 
 /** The blocks 1–3 prefix the responder must reuse verbatim (§5.4 cache mandate). */
-const BLOCKS = { system: [{ type: "text" as const, text: "BLOCK1" }] };
+const BLOCKS = {
+  system: [{ type: "text" as const, text: "BLOCK1" }],
+  // M3R2 C2: the booth reads the same conversation the pen writes in.
+  exchangeMessages: [
+    { role: "user" as const, content: [{ type: "text" as const, text: "[Turn 1]\ngo" }] },
+    {
+      role: "assistant" as const,
+      content: [{ type: "text" as const, text: "The prior scene, in the writer's own hand." }],
+    },
+  ],
+};
 
 /** The { stream, done } shape streamNarration returns; only prose is read by the booth. */
 function narr(prose: string) {
@@ -286,8 +296,9 @@ describe.skipIf(!url)("Meta booth + override channel (real Postgres, scripted mo
     expect(res.closed).toBe(true);
     expect(res.summary).toBe("Here's the wrap-up of what we decided.");
 
+    // M3R2 C2: the frame is the LAST message (the window threads ahead).
     const streamOpts = mockStream.mock.calls[0]?.[0] as { messages: { content: string }[] };
-    expect(streamOpts.messages[0]?.content).toContain("final exchange");
+    expect(String(streamOpts.messages.at(-1)?.content)).toContain("final exchange");
 
     expect(await readBoothState(campaignId)).toBeNull();
 
@@ -413,6 +424,26 @@ describe.skipIf(!url)("Meta booth + override channel (real Postgres, scripted mo
     expect(system).toContain("never an echo");
     expect(system).toContain("When in doubt, false");
     expect(String(opts.prompt)).toContain("override: never harm the dog");
+  });
+
+  it("the booth threads the exchange window ahead of its frame — and sends the KA's tools under `none` (M3R2 C2)", async () => {
+    if (!db) throw new Error("unreachable");
+    const campaignId = await makeCampaign();
+    // Router armed by the beforeEach default (director).
+    mockStream.mockImplementation(() => narr("We hear you."));
+
+    await runBoothExchange(db, campaignId, 3, "Is the pacing okay?", () => {});
+
+    // biome-ignore lint/suspicious/noExplicitAny: mock harness
+    const call = mockStream.mock.calls[0]?.[0] as any;
+    expect(call.messages).toHaveLength(3);
+    expect(call.messages[0].role).toBe("user");
+    expect(call.messages[1].role).toBe("assistant");
+    expect(call.messages[2].role).toBe("user"); // the booth frame
+    expect(String(call.messages[2].content)).toContain("Is the pacing okay?");
+    // The composer tool-law: the KA's array, the door bolted shut.
+    expect(call.tools?.length).toBeGreaterThan(0);
+    expect(call.toolChoice).toEqual({ type: "none" });
   });
 
   it("booth-cache prefix reuse: the responder receives the assembled blocks system array verbatim", async () => {

@@ -5,11 +5,14 @@ import type { TextBlockParam } from "@anthropic-ai/sdk/resources/messages/messag
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
- * Pre-warm request-shape parity (M2R5 C1). The pre-warm exists to write the
- * entry the KA reads; the API renders `tools` ahead of `system` in the cache
- * key, so any divergence in either field writes an entry the narration call
- * structurally cannot hit. Pinned by mock capture: same tools, same system,
- * max_tokens 0, nothing cacheable in the message turn.
+ * Pre-warm request-shape parity (M2R5 C1, amended M3R2 C2). The pre-warm
+ * exists to write the entry the KA reads; the API renders `tools` ahead of
+ * `system` in the cache key, so any divergence there writes an entry the
+ * narration call structurally cannot hit — and post-C2 the exchange WINDOW
+ * lives in messages, so the warm must reproduce those bytes too or the
+ * moving message breakpoint stays cold. Pinned by mock capture: same tools,
+ * same system, the exchange messages verbatim ahead of the placeholder,
+ * max_tokens 0, nothing cacheable after the last breakpoint.
  */
 
 const { createMock, streamMock } = vi.hoisted(() => ({
