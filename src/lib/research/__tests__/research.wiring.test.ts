@@ -1024,6 +1024,92 @@ describe("researchTitle fallback chain (M3R3 C2)", () => {
     expect(writeCorpusMock).not.toHaveBeenCalled();
   }, 20_000);
 
+  it("PRIVATE WORLDS never leave their table: a player_vision row is invisible to the alias probe", async () => {
+    searchAnimeMock.mockResolvedValue([]);
+    searchIdentityMock.mockResolvedValue(rescueFor({ official_title: "Real Title" }));
+    searchTopicsMock.mockResolvedValue(topicResult([], {}));
+
+    /** A select stub the ALIAS probe (no .where) and the SLUG door (.where)
+     *  both read — the probe's miss falls through to the second door. */
+    const selectStub = (stored: unknown[]) => () => ({
+      from: () => Object.assign(Promise.resolve(stored), { where: async () => [] }),
+    });
+
+    // One table's invented world, stored in the SHARED profiles table under
+    // the world's own NAME — which is exactly what this door matches on.
+    const privateWorld = {
+      id: "original_11111111-2222-3333-4444-555555555555",
+      title: "The Kettle Reach",
+      scopeClass: "micro",
+      profile: {
+        alternate_titles: [],
+        research_trust: {
+          method: "player_vision",
+          derived_confidence: 95,
+          sources_consulted: ["player"],
+          pages_fetched: 0,
+          post_cutoff: false,
+          field_sources: {},
+          field_pages: {},
+          coverage_gaps: [],
+        },
+      },
+      researchProvenance: { confidence: 95, wikiBase: null, seasonsMerged: 0, pagesFetched: 0 },
+    };
+
+    const rows: InsertedProfileRow[] = [];
+    const privateDb = {
+      select: selectStub([privateWorld]),
+      insert: () => ({
+        values: (row: InsertedProfileRow) => {
+          rows.push(row);
+          return { onConflictDoUpdate: async () => undefined };
+        },
+      }),
+    } as unknown as Db;
+
+    const { researchTitle } = await import("../research");
+    const report = await researchTitle(privateDb, "the kettle reach", { reuseExisting: true });
+
+    // §8's cache law covers RESEARCHED sources. Serving one campaign's private
+    // world to another as cached "research" at confidence 95 is not caching.
+    expect(report.profileId).not.toBe(privateWorld.id);
+    expect(report.trust.method).not.toBe("player_vision");
+    expect(report.title).toBe("Real Title");
+    expect(searchIdentityMock).toHaveBeenCalled();
+
+    // …and a RESEARCHED row under the same title still answers, unpaid: the
+    // filter is on the record's method, not on the door itself.
+    searchIdentityMock.mockClear();
+    searchTopicsMock.mockClear();
+    const researched = {
+      ...privateWorld,
+      id: "kettle_reach",
+      scopeClass: "standard",
+      profile: {
+        alternate_titles: [],
+        research_trust: {
+          ...privateWorld.profile.research_trust,
+          method: "web_search",
+          derived_confidence: 45,
+          sources_consulted: ["https://anidb.net/kettle"],
+          pages_fetched: 1,
+        },
+      },
+      researchProvenance: { confidence: 45, wikiBase: null, seasonsMerged: 0, pagesFetched: 1 },
+    };
+    const cachedDb = {
+      select: selectStub([privateWorld, researched]),
+      insert: () => {
+        throw new Error("the cached path must not rewrite the profile");
+      },
+    } as unknown as Db;
+    const hit = await researchTitle(cachedDb, "the kettle reach", { reuseExisting: true });
+    expect(hit.profileId).toBe("kettle_reach");
+    expect(hit.trust.method).toBe("web_search");
+    expect(searchIdentityMock).not.toHaveBeenCalled();
+  }, 20_000);
+
   it("TERMINAL RECALL: no wiki AND search unavailable — the run completes and says so out loud", async () => {
     searchTopicsMock.mockRejectedValue(new Error("web_search: unavailable"));
 

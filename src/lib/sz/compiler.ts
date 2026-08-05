@@ -25,7 +25,17 @@ import {
   SuggestionAffordance,
   type VoiceFingerprint,
 } from "@/lib/types/premise";
-import { AuthorVoice, PowerTier, Profile } from "@/lib/types/profile";
+import {
+  AuthorVoice,
+  CombatStyle,
+  PowerDistribution,
+  PowerSystem,
+  PowerTier,
+  Profile,
+  StorytellingTropes,
+  VisualStyle,
+  WorldSetting,
+} from "@/lib/types/profile";
 import { and, eq, inArray, lt, or } from "drizzle-orm";
 import { z } from "zod";
 import type { ConductorDraft, Observation } from "./conductor";
@@ -559,9 +569,50 @@ export function resolveObservations(observations: Observation[]): ResolvedObserv
 
 // --- Gap verdict (deterministic, blocking) ----------------------------------
 
-export function gapVerdict(resolved: ResolvedObservations, hasProfile: boolean): string[] {
+/**
+ * How many world/cast/calibration records an original world must carry before
+ * the synthesis has a vision to compile rather than a genre to guess. Two is
+ * v3's own bar in v5's units: `generate_custom_profile` consumed a calibration
+ * block and refused to run on nothing.
+ */
+const ORIGINAL_VISION_FLOOR = 2;
+
+/**
+ * `hasProfile` and `originalWorld` are two answers to ONE question — where
+ * does the World come from — and only their absence together is a hole. A
+ * true-original campaign has no researched profile BY DESIGN (M3R3 C4b: v3
+ * escaped voice leakage by never loading one), so "the World never loaded"
+ * must not fire on it. What fires instead is the bar v3's custom path held —
+ * calibration BEFORE generation: the gate stops silent guesses, not original
+ * worlds, and a spark with nothing beside it leaves the synthesis inventing a
+ * world the player never described.
+ *
+ * The vision floor keys on `originalWorld`, not on the ABSENCE of a profile:
+ * the player's word is what decides the World is synthesized (a table may
+ * research a title and then choose its own world anyway), and on every path
+ * where a world gets synthesized there has to be something to synthesize from.
+ *
+ * `originalWorld` defaults false so every anchored caller reads unchanged.
+ */
+export function gapVerdict(
+  resolved: ResolvedObservations,
+  hasProfile: boolean,
+  originalWorld = false,
+): string[] {
   const gaps: string[] = [];
-  if (!hasProfile) gaps.push("no researched profile — the World never loaded");
+  if (!hasProfile && !originalWorld) {
+    gaps.push("no researched profile — the World never loaded");
+  } else if (originalWorld) {
+    const spoken =
+      resolved.worldFacts.length +
+      resolved.castFacts.length +
+      Object.keys(resolved.calibration).length;
+    if (spoken < ORIGINAL_VISION_FLOOR) {
+      gaps.push(
+        "an original world needs its vision spoken — a world name, its tone, how power works there — before the table is set",
+      );
+    }
+  }
   if (!resolved.spark) gaps.push("the spark was never gathered (§8's one mandatory question)");
   if (!resolved.finitude) gaps.push("finitude undetermined — the Series contract is sacrosanct");
   if (!resolved.pcName && !resolved.pcNameDeferred)
@@ -796,6 +847,295 @@ async function transposeVoice(
   });
 }
 
+// --- The true-original path (M3R3 C4b, lesson L6) ----------------------------
+
+/**
+ * An original world's profile id is CAMPAIGN-SCOPED on purpose. Researched
+ * profiles are cross-campaign cache rows keyed by the work they describe; this
+ * one describes one table's own world, invented at one table, and it is never
+ * shared IP — a second campaign asking for "an original world" gets its own
+ * synthesis, not this one.
+ *
+ * MINTING ONLY. Nothing downstream may discriminate on this prefix: researched
+ * profiles share the same flat id namespace (research.ts mints `profileSlug
+ * (title)`, so "Original Sin" becomes `original_sin`), and a prefix test there
+ * fails OPEN — a researched anchor taking the original-world branch is exactly
+ * the verbatim leak C4a exists to close. Readers ask the RECORD what it is:
+ * `research_trust.method === "player_vision"`.
+ */
+const ORIGINAL_PROFILE_PREFIX = "original_";
+
+export function originalProfileId(campaignId: string): string {
+  return `${ORIGINAL_PROFILE_PREFIX}${campaignId}`;
+}
+
+/**
+ * Call (a) of the synthesis: the two gauges. Split from the world call for the
+ * same reason research's interpretation is split three ways (synthesize.ts) —
+ * the combined grammar compiles server-side and the cliff is real; the tokens
+ * are identical either way.
+ */
+export const OriginalTreatmentDraft = z.object({ treatment: DNAScales, framing: Composition });
+
+/** Call (b): the world itself. v3's `generate_custom_profile` creative fields,
+ *  in v5's shapes — plus the two flags that decide the stat mapping. */
+export const OriginalWorldDraft = z.object({
+  world_name: z.string().min(1),
+  director_personality: z.string().min(1),
+  author_voice: AuthorVoice,
+  visual_style: VisualStyle,
+  world_setting: WorldSetting,
+  combat_style: CombatStyle,
+  power_distribution: PowerDistribution,
+  power_system: PowerSystem.optional(),
+  stat_mapping_has_stats: z.boolean(),
+  stat_system_name: z.string(),
+});
+
+export const ORIGINAL_TREATMENT_SYSTEM = [
+  "You score the canonical fingerprint of an ORIGINAL story world — one with no source work",
+  "behind it. Everything below is the player's own vision, spoken at their table: the spark",
+  "they want multiplied, the facts they asserted about this world, the tonal moves they made.",
+  "There is nothing to recall and nothing to look up. The vision IS the source.",
+  "",
+  "Score the world the PLAYER described, never the genre it resembles. A named genre is where",
+  "they started, not the answer — two grimdark fantasies calibrate differently, and the whole",
+  "difference is in what THIS player said. Where the vision is silent, choose the value that",
+  "best serves the spark; never let a convention overwrite something they stated.",
+  "",
+  "TONAL MOVES ARE THE PLAYER'S OWN WORD on their axis — score that axis AT the number they",
+  "gave, and let it pull the axes around it into agreement.",
+  "",
+  "treatment: 24 axes, 0-10. framing: 13 categorical axes describing STRUCTURE — whose story,",
+  "what opposition, what arc shape, how it resolves — not tone.",
+].join("\n");
+
+export const ORIGINAL_WORLD_SYSTEM = [
+  "You are writing the world bible for an ORIGINAL story world — the player's own, with no",
+  "source work behind it. Every line comes from what they actually said at their table.",
+  "",
+  "THE STANDING TEST: every sentence should be something that could NOT apply to a different",
+  "world. Generic output is useless — 'balance wonder and danger', 'clean detailed lines',",
+  "'NPCs speak naturally with setting-appropriate diction' are failures, not answers. Use the",
+  "player's own nouns, their own images, their own stated feeling, and write direction only",
+  "THIS world could receive.",
+  "",
+  "INVENT NOTHING THEY DID NOT ASK FOR. This is the one hard rule of the call:",
+  "- power_system: emit it ONLY if they described how power works there — its flavor, its",
+  "  costs, its rules. If they did not, omit the field entirely. A world where 'it's just",
+  "  money and guns' HAS no power system, and giving it one is a defect.",
+  "- stat_mapping_has_stats: true ONLY if they asked for an on-screen stat or level system",
+  "  (status windows, ranks with numbers, explicit levels). Most worlds have none, and an",
+  "  invented one ships fabricated status windows as this world's canon.",
+  "- stat_system_name: their own name for it, or an empty string.",
+  "",
+  "world_name: their name for the world if they gave one; otherwise a short name built from",
+  "their own words — never a placeholder like 'Original World'.",
+  "director_personality: 3-5 sentences of directing voice for THIS world, second person.",
+  "author_voice: the prose hand this world is told in; example_voice is ONE sentence written",
+  "fresh from this world's own matter, naming only what exists in it.",
+  "visual_style, world_setting, combat_style: concrete, drawn from the vision.",
+  "power_distribution: where people actually stand here — T10 is an ordinary human, T1 borders",
+  "omnipotence, and the gradient says whether the gap between peak and floor is a cliff or a slope.",
+].join("\n");
+
+/**
+ * v3 parity, verbatim in intent: every trope flag OFF. The flags are structural
+ * facts about a SOURCE, and an original world has no source yet — v3's own note
+ * on this line is that they evolve during play. Derived from the schema so a
+ * future flag arrives off rather than missing.
+ */
+const ORIGINAL_TROPES: Record<string, boolean> = Object.fromEntries(
+  Object.keys(StorytellingTropes.shape).map((k) => [k, false]),
+);
+
+/**
+ * The player's stated vision, as the two synthesis calls read it. One block for
+ * both calls: they are scoring and building the SAME world, and a divergence
+ * between what the gauge saw and what the bible saw is a silent contradiction
+ * inside one profile.
+ */
+function originalVisionBlock(resolved: ResolvedObservations): string {
+  const bullets = (obs: Observation[]) =>
+    obs.length > 0 ? obs.map((o) => `- ${o.content}`).join("\n") : "- (none recorded)";
+  const list = (xs: string[]) => xs.filter((x) => x.trim()).join(" | ") || "(none)";
+  return [
+    `THE SPARK (verbatim — the moment the player wants more of): ${resolved.spark ?? "(none recorded)"}`,
+    `THE CHARACTER they will play: ${
+      resolved.pcConcept ?? "(deferred — the character emerges in play; do not pre-shape them)"
+    }`,
+    "",
+    "WORLD FACTS the player asserted — this world's physics, places, factions, rules:",
+    bullets(resolved.worldFacts),
+    "",
+    "CAST FACTS the player asserted — who is already in this story:",
+    bullets(resolved.castFacts),
+    "",
+    `TONAL MOVES (axis = the 0-10 value the player chose): ${
+      Object.entries(resolved.calibration)
+        .map(([axis, value]) => `${axis}=${value}`)
+        .join(", ") || "(none)"
+    }`,
+    `FRAMING the player chose: ${
+      resolved.framingChoices.map((f) => `${f.axis}=${f.value}`).join(", ") || "(none)"
+    }`,
+    `PREMISE LAWS — absolute, the player's own words, write inside them: ${list(resolved.premiseLaws)}`,
+    `Intensity: death physics — ${resolved.deathPhysics ?? "(ungathered)"}; lethality — ${
+      resolved.lethalityPosture ?? "(ungathered)"
+    }`,
+    `Hard lines (absolute): ${list(resolved.hardLines)}`,
+    `Left OPEN for the story to discover — never resolve these: ${list(resolved.playerDeferred)}`,
+  ].join("\n");
+}
+
+/**
+ * L6's honest correction, built (M3R3 C4b). v3's structural escape from voice
+ * leakage was `generate_custom_profile`: an original world with NO voice_cards
+ * key at all, DNA from calibration, creative fields synthesized from the
+ * player's stated vision. v5 loads anchors for everything, so "no anchor" had
+ * become an ERROR state — the gate said the World never loaded and the player
+ * who wanted something wholly their own had no door. This is the door.
+ *
+ * DELIBERATE DEVIATION FROM v3: there is no `_default_creative_fields`. v3 fell
+ * back to a genre-vibe table when synthesis failed, which is the "generic output
+ * is useless" defect institutionalized — a world nobody described, wearing the
+ * confidence of one that was. A failure here throws; the player re-proposes and
+ * buys the call again, which is cheap next to a campaign compiled on a stranger.
+ */
+async function synthesizeOriginalProfile(
+  db: Db,
+  campaignId: string,
+  campaignTitle: string,
+  resolved: ResolvedObservations,
+): Promise<z.infer<typeof Profile>> {
+  const selection = resolved.tierSelection ?? DEV_TIER_SELECTION;
+  const vision = originalVisionBlock(resolved);
+  const [gauge, world] = await Promise.all([
+    callJudgment(selection, {
+      name: "compile_original_treatment",
+      campaignId,
+      phase: "sz",
+      schema: OriginalTreatmentDraft,
+      system: ORIGINAL_TREATMENT_SYSTEM,
+      prompt: vision,
+      effort: "high",
+      maxTokens: LOOPED_LARGE,
+    }),
+    callJudgment(selection, {
+      name: "compile_original_world",
+      campaignId,
+      phase: "sz",
+      schema: OriginalWorldDraft,
+      system: ORIGINAL_WORLD_SYSTEM,
+      prompt: vision,
+      effort: "high",
+      maxTokens: STRUCTURED_RICH,
+    }),
+  ]);
+
+  const statSystemName = world.stat_system_name.trim();
+  const profile = Profile.parse({
+    id: originalProfileId(campaignId),
+    title: world.world_name.trim() || campaignTitle,
+    alternate_titles: [],
+    media_type: "anime",
+    status: "ongoing",
+    relation_type: "canonical",
+    ip_mechanics: {
+      ...(world.power_system ? { power_system: world.power_system } : {}),
+      power_distribution: world.power_distribution,
+      // The player SAID there is a stat system, so there is one at full
+      // confidence — expressed player word outranks premise-truth, and v3's
+      // ≥90 bar exists to stop the model INVENTING a mapping, not to doubt the
+      // player. No player word, no mapping: the default stands untouched.
+      stat_mapping: world.stat_mapping_has_stats
+        ? {
+            has_canonical_stats: true,
+            confidence: 100,
+            ...(statSystemName ? { system_name: statSystemName } : {}),
+          }
+        : { has_canonical_stats: false, confidence: 0 },
+      combat_style: world.combat_style,
+      storytelling_tropes: ORIGINAL_TROPES,
+      world_setting: world.world_setting,
+      // THE line this whole path exists for (lesson L6). v3 never transposed a
+      // voice because it never LOADED one — an original world was built with no
+      // voice_cards key at all, so there was nothing to leak. v5 reproduces that
+      // structurally: [] BY CONSTRUCTION, not by a filter that could miss.
+      voice_cards: [],
+      author_voice: world.author_voice,
+      visual_style: world.visual_style,
+    },
+    canonical_dna: gauge.treatment,
+    canonical_composition: gauge.framing,
+    director_personality: world.director_personality,
+    research_trust: {
+      method: "player_vision",
+      // High and honest at zero pages: the trust ladder measures fidelity to
+      // SOURCES, and this profile has none to be unfaithful to. It is not 100
+      // because the synthesis still interprets — the player spoke a vision, a
+      // model wrote the sentences.
+      derived_confidence: 95,
+      sources_consulted: ["player"],
+      pages_fetched: 0,
+      post_cutoff: false,
+      // Only SYNTHESIZED organs carry a label. Absence is the label everywhere
+      // else (trust.ts's own discipline): the all-false tropes, the empty voice
+      // cards and a default stat mapping were fed by nothing at all.
+      field_sources: {
+        canonical_dna: "player",
+        canonical_composition: "player",
+        visual_style: "player",
+        combat_style: "player",
+        power_distribution: "player",
+        world_setting: "player",
+        director_personality: "player",
+        author_voice: "player",
+        ...(world.power_system ? { power_system: "player" } : {}),
+        ...(world.stat_mapping_has_stats ? { stat_mapping: "player" } : {}),
+      },
+      field_pages: {},
+      // Nothing was fetched, so nothing is missing: a coverage gap here would
+      // tell the conductor to apologize for an archive this world never had.
+      coverage_gaps: [],
+      grounding: "no_claims",
+      defective: false,
+    },
+  });
+
+  const researchProvenance = {
+    researchedAt: new Date().toISOString(),
+    confidence: 95,
+    wikiBase: null,
+    seasonsMerged: 0,
+    pagesFetched: 0,
+    notes: ["original world — synthesized from the player's stated vision (M3R3 C4b)"],
+  };
+  // Written outside the compile transaction, like every other profiles row: a
+  // stub that outlives a failed compile costs nothing, and the recompile
+  // overwrites its own id rather than minting a second world.
+  await db
+    .insert(profiles)
+    .values({
+      id: profile.id,
+      title: profile.title,
+      profile,
+      scopeClass: "micro",
+      researchProvenance,
+    })
+    .onConflictDoUpdate({
+      target: profiles.id,
+      set: {
+        title: profile.title,
+        profile,
+        scopeClass: "micro",
+        researchProvenance,
+        updatedAt: new Date(),
+      },
+    });
+  return profile;
+}
+
 /**
  * The cast axis when the conversation never settled one — DERIVED from the
  * timeline, never assumed. The conductor deliberately skips canonicality's door
@@ -842,6 +1182,34 @@ async function conditionVoice(args: {
     recurring_bits: "role-filling",
   };
   const notes: string[] = [];
+
+  // M3R3 C4b: a synthesized original world's voice was written FOR THIS
+  // CAMPAIGN, from this player's vision — there is no source hand to separate
+  // from source matter, and its cards are [] by construction. An original world
+  // is FORCED onto the `inspired` timeline below (it cannot be adjacent to a
+  // source it does not have), so without this guard every original campaign
+  // would launder its own voice through a second model call to strip nouns that
+  // belong to it. Verbatim is correct here, and it is the only place in this
+  // function where verbatim needs no defense.
+  //
+  // The test is the record's OWN self-description, not the id. Researched
+  // profiles live in the same flat id namespace — research.ts mints
+  // `profileSlug(title)`, so a work titled "Original Sin" is stored as
+  // `original_sin` — and an id-prefix guard would hand that anchor's voice
+  // cards and directing voice VERBATIM to an inspired campaign: failing open
+  // into precisely the leak C4a exists to close. `player_vision` is a method
+  // only this compiler writes, on a profile only it synthesizes.
+  if (profile.research_trust?.method === "player_vision") {
+    return {
+      voice: {
+        author_voice: authorVoice,
+        voice_cards: cards,
+        director_personality: profile.director_personality,
+        cast_depth_posture: castDepthPosture,
+      },
+      notes,
+    };
+  }
 
   if (canonicality.timeline_mode === "inspired") {
     // An original story in the world's clothes. The voice CARDS describe people
@@ -1102,8 +1470,22 @@ export async function compileSessionZero(
   // deferred context so the Director honors it in prose until M4's
   // per-component assembly replaces this. The BASE is the world the player
   // chose to stand in (their world pick), else the first source loaded.
-  const isHybrid = draft.profileIds.length > 1;
-  let profileRow = rows.find((r) => r.id === draft.profileIds[0]);
+  // M3R3 C4b: the player's own CHOICE is the third state, and it is their
+  // LATEST word — it does not go inert the moment a profile row exists.
+  // "I looked at some sources, but this is MY world" is a normal table, not an
+  // error: player authority is expressed word > premise-truth > the engine's
+  // inference (§0), and `draft.profileIds` has no removal path, so keying this
+  // on `!profileRow` made the retraction unreachable for the rest of the
+  // campaign's life. The stub becomes the BASE (world, treatment, framing and
+  // voice all compile from it); the researched rows ride on in `anchors_used`
+  // as reference corpora — retrievable canon the player asked for, never a
+  // voice or a DNA the contract inherits.
+  const isOriginal = draft.originalWorld === true;
+  // A hybrid is a blend of SOURCES. An original world is not one of them, so
+  // the anchors beside it are corpora rather than components — no base to pick
+  // between, no recipe to record.
+  const isHybrid = !isOriginal && draft.profileIds.length > 1;
+  let profileRow = isOriginal ? undefined : rows.find((r) => r.id === draft.profileIds[0]);
   const worldPick = resolved.blendChoices.find((b) => b.component === "world");
   if (isHybrid && worldPick) {
     const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "");
@@ -1116,16 +1498,31 @@ export async function compileSessionZero(
     if (match) profileRow = match;
   }
   const profileId = profileRow?.id;
-  const gaps = gapVerdict(resolved, !!profileRow);
+  // "No anchor" is an error for a table that meant to load a source and the
+  // NORMAL shape of a true-original one; nothing the engine can infer separates
+  // them, so the conductor records which it is and the gate reads that. On the
+  // original path the gate reads the VISION floor instead — the world is about
+  // to be synthesized, so what must exist is something to synthesize from.
+  const gaps = gapVerdict(resolved, !!profileRow, isOriginal);
   if (gaps.length > 0) {
     return { gaps } as CompileResult; // blocking — handoff halted (§8)
   }
   // M3R3 C2: retrieval reads `anchors_used`, so player-pasted canon has to be
   // merged in HERE or it is written and never read — a writer with no reader.
   // It rides alongside profileIds, never inside them: profileIds[0] is the
-  // base-profile index and length > 1 flips hybrid mode.
-  const anchorsUsed = [...draft.profileIds, ...(draft.playerCanonId ? [draft.playerCanonId] : [])];
-  const profile = Profile.parse(profileRow?.profile);
+  // base-profile index and length > 1 flips hybrid mode. C4b: the synthesized
+  // original world is an anchor like any other — retrieval and the ingestion
+  // resolver both key on this list, and the player-canon pseudo-profile still
+  // rides beside it rather than inside it. The stub goes FIRST and any
+  // researched rows follow: on this path they are reference corpora the player
+  // asked to keep looking at, so their canon chunks stay retrievable while the
+  // compiled premise is the player's own world.
+  const anchorsUsed = [
+    ...(isOriginal ? [originalProfileId(campaignId)] : []),
+    ...draft.profileIds,
+    ...(draft.playerCanonId ? [draft.playerCanonId] : []),
+  ];
+  let profile = profileRow ? Profile.parse(profileRow.profile) : undefined;
   if (isHybrid) {
     resolved.playerDeferred.push(
       `hybrid premise compiled single-source (base: ${profileId}) — per-component assembly lands at M4; honor the recorded blend in prose meanwhile`,
@@ -1163,6 +1560,14 @@ export async function compileSessionZero(
   }
 
   try {
+    // M3R3 C4b: the true-original path mints its world HERE — after the claim,
+    // so a compile that lost the race buys no model calls, and inside the try,
+    // so a synthesis failure reverts the claim like any other. There is no
+    // fallback world by design (synthesizeOriginalProfile): the gate above
+    // guarantees `profile` is only missing when the player asked for original.
+    if (!profile) {
+      profile = await synthesizeOriginalProfile(db, campaignId, campaign.title, resolved);
+    }
     // The C6 rebind (§5.4): SZ world/cast facts flow through the SAME
     // universal-ingestion subsystem as gameplay assertions — the resolver
     // links against canon and never duplicates; entities mint here and the
@@ -1174,12 +1579,27 @@ export async function compileSessionZero(
     // guaranteed regardless of what ingestion does.
     // M3R3 C4a: the axes the ingestion gates read. Resolved here rather than
     // from the contract because the contract is assembled further down, and the
-    // SZ ingest call runs first (its clarify has to reach the OSP prompt).
-    const ingestTimelineMode = resolved.canonicality?.timeline_mode ?? "inspired";
+    // SZ ingest call runs first (its clarify has to reach the OSP prompt). This
+    // is the SHARED derivation — the ingestion gates and the stored contract
+    // both read this pair, so an axis can never mean two things in one campaign.
+    //
+    // C4b: on the original path the two cast/timeline axes are forced BY
+    // CONSTRUCTION, not defaulted. A stray canonicality observation (the
+    // conductor's itinerary walks that beat unconditionally) would otherwise
+    // have the contract claim adjacency to a source that does not exist, and
+    // `full_cast` would arm the ingestion cast gate and the Pacer's cast
+    // directive against the player's OWN characters — the C4a defect wearing a
+    // different hat. `event_fidelity` is left alone: fidelity to the events the
+    // player asserted about their own world is coherent, and theirs to set.
+    const ingestTimelineMode: Canonicality["timeline_mode"] = isOriginal
+      ? "inspired"
+      : (resolved.canonicality?.timeline_mode ?? "inspired");
+    const ingestCanonCastMode: Canonicality["canon_cast_mode"] = isOriginal
+      ? "npcs_only"
+      : (resolved.canonicality?.canon_cast_mode ?? defaultCanonCastMode(ingestTimelineMode));
     const ingestCanonicality = {
       timeline_mode: ingestTimelineMode,
-      canon_cast_mode:
-        resolved.canonicality?.canon_cast_mode ?? defaultCanonCastMode(ingestTimelineMode),
+      canon_cast_mode: ingestCanonCastMode,
     } as const;
     const assertedText = [...resolved.worldFacts, ...resolved.castFacts]
       .map((o) => o.content)

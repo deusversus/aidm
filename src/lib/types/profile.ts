@@ -161,8 +161,23 @@ export const ResearchTrust = z.object({
    * corpus supplemented by live web search); `web_search` is the level below
    * it — no AniList row at all, identity itself verified by citation (M3R3
    * C2's Level B).
+   *
+   * `player_vision` is OFF that ladder entirely (M3R3 C4b): the profile was
+   * built from the player's stated vision for a world that has no source —
+   * v3's `generate_custom_profile` path. Every rung above it measures
+   * fidelity to SOURCES, and there is no source here to be wrong about; this
+   * record's fidelity is to the player's own words, which is why it carries a
+   * high confidence with zero pages fetched and that is not a contradiction.
    */
-  method: z.enum(["api_wiki", "api_search", "api_thin", "web_search", "anilist_only", "legacy"]),
+  method: z.enum([
+    "api_wiki",
+    "api_search",
+    "api_thin",
+    "web_search",
+    "anilist_only",
+    "player_vision",
+    "legacy",
+  ]),
   derived_confidence: z.number().min(0).max(100),
   sources_consulted: z.array(z.string()).default([]),
   pages_fetched: z.number().int().nonnegative().default(0),

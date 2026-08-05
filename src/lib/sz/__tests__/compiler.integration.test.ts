@@ -234,6 +234,72 @@ function armTransposition(impl: () => unknown): void {
   );
 }
 
+// --- M3R3 C4b fixtures: the true-original path -------------------------------
+// v3's structural escape from voice leakage was generate_custom_profile — a
+// world built with NO voice_cards key at all. These fixtures stand in for the
+// two judged calls that rebuild it from the player's stated vision.
+
+/** Call (a): the gauges. Bebop's shape with two axes MOVED, so a synthesized
+ *  canonical value is distinguishable from the anchored fixtures'. */
+const ORIGINAL_GAUGE = {
+  treatment: { ...bebopContract().canonical.treatment, darkness: 3 },
+  framing: { ...bebopContract().canonical.framing, narrative_focus: "party" as const },
+};
+
+/** Call (b): v3's creative fields in v5's shapes — a world nobody researched. */
+const ORIGINAL_WORLD = {
+  world_name: "The Kettle Reach",
+  director_personality:
+    "Direct the Reach like a debt coming due: let the tide keep better books than the men who own it, and never let a favor be free.",
+  author_voice: {
+    sentence_patterns: ["short lines, then one long one that spends the whole breath"],
+    structural_motifs: ["open on the ledger, close on the weather"],
+    dialogue_quirks: ["nobody names the debt out loud"],
+    emotional_rhythm: ["patience, then one cracked note"],
+    example_voice: "The tide came back for the Reach before the collectors did.",
+  },
+  visual_style: {
+    art_style: "salt-bleached ink over watercolor",
+    color_palette: "brine green and lamp-oil amber",
+    reference_descriptors: ["low horizons", "rope and rust"],
+  },
+  world_setting: {
+    genre: ["maritime fantasy", "crime"],
+    locations: ["The Kettle", "Lowwater Market"],
+    factions: ["the Ledgermen", "the Tide Choir"],
+  },
+  combat_style: "tactical" as const,
+  power_distribution: {
+    peak_tier: "T5" as const,
+    typical_tier: "T8" as const,
+    floor_tier: "T10" as const,
+    gradient: "flat" as const,
+  },
+  stat_mapping_has_stats: false,
+  stat_system_name: "",
+};
+
+/** Arm C4b's synthesis pair. A transposition call on this path is the defect
+ *  the guard exists to prevent, so it throws like any unexpected name. */
+function armOriginalSynthesis(opts: { failWorldCall?: boolean } = {}): void {
+  mockJudgment.mockImplementation(
+    // biome-ignore lint/suspicious/noExplicitAny: harness spans the generic judgment signature
+    (_s: any, o: any) => {
+      if (o.name === "compile_original_treatment") {
+        return Promise.resolve(ORIGINAL_GAUGE) as never;
+      }
+      if (o.name === "compile_original_world") {
+        return (
+          opts.failWorldCall
+            ? Promise.reject(new Error("original world synthesis boom"))
+            : Promise.resolve(ORIGINAL_WORLD)
+        ) as never;
+      }
+      throw new Error(`unexpected judgment call in the compiler: ${o.name}`);
+    },
+  );
+}
+
 describe("suggestion affordance resolution (anchored, never guessed from prose)", () => {
   it("does not read prose 'never' as the value (live misparse 2026-07-10)", () => {
     const r = resolveObservations([
@@ -645,6 +711,80 @@ describe("the law channel (M2R6 — the China Shop, 35a4823d)", () => {
   });
 });
 
+describe("the original-world gate (M3R3 C4b, deterministic)", () => {
+  /** Everything a table needs EXCEPT anything that counts as spoken vision. */
+  const VISIONLESS = SCRIPTED_OBSERVATIONS.filter(
+    (o) => o.kind !== "world_fact" && o.kind !== "calibration",
+  );
+
+  it("the anchored gate is unchanged: no profile and no original-world word is still an ERROR", () => {
+    const resolved = resolveObservations(SCRIPTED_OBSERVATIONS);
+    // Two-arg callers — every pre-C4b call site and pin — read byte-identically.
+    expect(gapVerdict(resolved, false)).toContain("no researched profile — the World never loaded");
+    expect(gapVerdict(resolved, true)).toEqual([]);
+  });
+
+  it("original world: the missing-profile gap does NOT fire on a spoken vision", () => {
+    expect(gapVerdict(resolveObservations(SCRIPTED_OBSERVATIONS), false, true)).toEqual([]);
+  });
+
+  it("a vision too thin to synthesize from BLOCKS — the gate stops silent guesses, not original worlds", () => {
+    const none = gapVerdict(resolveObservations(VISIONLESS), false, true);
+    expect(none.some((g) => g.includes("needs its vision spoken"))).toBe(true);
+    // The anchored complaint never rides along: nothing failed to load here.
+    expect(none.some((g) => g.includes("no researched profile"))).toBe(false);
+
+    // One record is still under v3's bar; a second clears it — and world facts,
+    // cast facts and calibration moves all count as vision.
+    const one = gapVerdict(
+      resolveObservations([...VISIONLESS, obs("world_fact", "The Reach pays its debts in tide")]),
+      false,
+      true,
+    );
+    expect(one.some((g) => g.includes("needs its vision spoken"))).toBe(true);
+    const two = gapVerdict(
+      resolveObservations([
+        ...VISIONLESS,
+        obs("world_fact", "The Reach pays its debts in tide"),
+        obs("cast_fact", "The Ledgermen keep the book"),
+      ]),
+      false,
+      true,
+    );
+    expect(two).toEqual([]);
+    const calibrated = gapVerdict(
+      resolveObservations([
+        ...VISIONLESS,
+        obs("calibration", '{"axis": "darkness", "value": 8}'),
+        obs("calibration", '{"axis": "comedy", "value": 2}'),
+      ]),
+      false,
+      true,
+    );
+    expect(calibrated).toEqual([]);
+  });
+
+  it("the vision floor follows the SYNTHESIS, not the absence of a row (research-then-original)", () => {
+    // A table that researched a title and then chose its own world anyway
+    // still compiles the STUB — so the bar is what it always was: something to
+    // synthesize from. A stored profile row does not excuse it.
+    const thin = gapVerdict(resolveObservations(VISIONLESS), true, true);
+    expect(thin.some((g) => g.includes("needs its vision spoken"))).toBe(true);
+    // Nothing failed to load here, so the anchored complaint stays silent.
+    expect(thin.some((g) => g.includes("no researched profile"))).toBe(false);
+    expect(gapVerdict(resolveObservations(SCRIPTED_OBSERVATIONS), true, true)).toEqual([]);
+  });
+
+  it("the original-world word never excuses the rest of the table", () => {
+    const sparkless = gapVerdict(
+      resolveObservations(SCRIPTED_OBSERVATIONS.filter((o) => o.kind !== "spark")),
+      false,
+      true,
+    );
+    expect(sparkless.some((g) => g.includes("spark"))).toBe(true);
+  });
+});
+
 describe("presentation directive resolution (M3-DG, deterministic)", () => {
   it("resolves structured device grants latest-wins per name; malformed defers", () => {
     const r = resolveObservations([
@@ -758,6 +898,61 @@ describe.skipIf(!url)("SZ compiler (real Postgres)", () => {
         },
       })
       .onConflictDoNothing();
+    // M3R3 C4b audit: the exact-guard pair. A RESEARCHED profile whose id
+    // begins with "original_" — research.ts mints `profileSlug(title)`, so
+    // "Original Sin" is stored exactly like this — and a `player_vision`
+    // record whose id carries no prefix at all. The original-world branch must
+    // read the RECORD in both directions, never the id.
+    await db
+      .insert(schema.profiles)
+      .values({
+        id: "original_sin",
+        title: "Original Sin",
+        profile: {
+          id: "original_sin",
+          title: "Original Sin",
+          alternate_titles: [],
+          media_type: "anime",
+          status: "completed",
+          relation_type: "canonical",
+          ip_mechanics: {
+            ...contract.canonical.world,
+            author_voice: ANCHOR_AUTHOR_VOICE,
+            voice_cards: ANCHOR_CARDS,
+          },
+          canonical_dna: contract.canonical.treatment,
+          canonical_composition: contract.canonical.framing,
+          director_personality: ANCHOR_DIRECTOR,
+          cast_depth_posture: contract.canonical.voice.cast_depth_posture,
+          research_trust: { method: "api_wiki", derived_confidence: 80 },
+        },
+      })
+      .onConflictDoNothing();
+    await db
+      .insert(schema.profiles)
+      .values({
+        id: "test_sz_profile_vision",
+        title: "A Table's Own World",
+        profile: {
+          id: "test_sz_profile_vision",
+          title: "A Table's Own World",
+          alternate_titles: [],
+          media_type: "anime",
+          status: "ongoing",
+          relation_type: "canonical",
+          ip_mechanics: {
+            ...contract.canonical.world,
+            author_voice: ANCHOR_AUTHOR_VOICE,
+            voice_cards: ANCHOR_CARDS,
+          },
+          canonical_dna: contract.canonical.treatment,
+          canonical_composition: contract.canonical.framing,
+          director_personality: ANCHOR_DIRECTOR,
+          cast_depth_posture: contract.canonical.voice.cast_depth_posture,
+          research_trust: { method: "player_vision", derived_confidence: 95 },
+        },
+      })
+      .onConflictDoNothing();
     const draft: ConductorDraft = {
       transcript: [{ role: "user", content: "let's play bebop" }],
       observations: SCRIPTED_OBSERVATIONS,
@@ -779,6 +974,8 @@ describe.skipIf(!url)("SZ compiler (real Postgres)", () => {
       await db.delete(schema.profiles).where(eq(schema.profiles.id, "test_sz_profile"));
       await db.delete(schema.profiles).where(eq(schema.profiles.id, "test_sz_profile_b"));
       await db.delete(schema.profiles).where(eq(schema.profiles.id, "test_sz_profile_voice"));
+      await db.delete(schema.profiles).where(eq(schema.profiles.id, "original_sin"));
+      await db.delete(schema.profiles).where(eq(schema.profiles.id, "test_sz_profile_vision"));
       await db.delete(schema.players).where(eq(schema.players.id, playerId));
     } finally {
       await pool.end();
@@ -1245,6 +1442,7 @@ describe.skipIf(!url)("SZ compiler (real Postgres)", () => {
     title: string,
     canonicality: string,
     extra: Observation[] = [],
+    opts: { profileIds?: string[] } = {},
   ) {
     if (!db) throw new Error("unreachable");
     const draft: ConductorDraft = {
@@ -1258,7 +1456,7 @@ describe.skipIf(!url)("SZ compiler (real Postgres)", () => {
         obs("canonicality", canonicality),
         ...extra,
       ],
-      profileIds: ["test_sz_profile_voice"],
+      profileIds: opts.profileIds ?? ["test_sz_profile_voice"],
       readyToCompile: true,
     };
     const [campaign] = await db
@@ -1434,6 +1632,369 @@ describe.skipIf(!url)("SZ compiler (real Postgres)", () => {
       canon_cast_mode: "full_cast",
     });
     expect(mockJudgment).not.toHaveBeenCalled();
+  });
+
+  it("the original-world branch is EXACT: it reads the trust record, never the id prefix", async () => {
+    mockJudgment.mockReset();
+    armTransposition(() => TRANSPOSED);
+    // "Original Sin" is stored as `original_sin` (research.ts profileSlug), so
+    // an id-prefix guard sent a RESEARCHED anchor down the verbatim branch and
+    // shipped its cast's voice cards into an inspired original story — failing
+    // open into the exact leak C4a exists to close. Pinned dead.
+    const leak = await compileWithCanonicality(
+      "original-prefixed anchor fixture",
+      '{"timeline_mode": "inspired"}',
+      [],
+      { profileIds: ["original_sin"] },
+    );
+    expect(leak.result.gaps).toEqual([]);
+    const leaked = leak.result.contract.active.voice;
+    expect(leaked.voice_cards).toEqual([]);
+    expect(leaked.author_voice).toEqual(TRANSPOSED.author_voice);
+    expect(leaked.director_personality).toBe(TRANSPOSED.director_personality);
+    expect(JSON.stringify(leak.result.contract)).not.toContain("Spike Spiegel");
+    expect(
+      mockJudgment.mock.calls.some(
+        (c) => (c[1] as { name?: string })?.name === "compile_voice_transposition",
+      ),
+    ).toBe(true);
+
+    // The other direction: a `player_vision` record rides VERBATIM on the same
+    // inspired timeline, with no prefix on its id and no transposition bought.
+    mockJudgment.mockReset();
+    armTransposition(() => TRANSPOSED); // firing at all is the failure here
+    const own = await compileWithCanonicality(
+      "player-vision record fixture",
+      '{"timeline_mode": "inspired"}',
+      [],
+      { profileIds: ["test_sz_profile_vision"] },
+    );
+    expect(own.result.gaps).toEqual([]);
+    expect(own.result.contract.active.voice.voice_cards).toEqual(ANCHOR_CARDS);
+    expect(own.result.contract.active.voice.author_voice).toEqual(ANCHOR_AUTHOR_VOICE);
+    expect(own.result.contract.active.voice.director_personality).toBe(ANCHOR_DIRECTOR);
+    expect(mockJudgment).not.toHaveBeenCalled();
+  });
+
+  // --- M3R3 C4b: the true-original path (lesson L6) -------------------------
+  // v3 transposed nothing because it never LOADED a profile: generate_custom_
+  // profile built original worlds with no voice cards, DNA from calibration and
+  // creative fields from the player's stated vision. "No anchor" was an ERROR
+  // state in v5 until here.
+
+  /** A table with no source at all — the player's own world, spoken. */
+  const ORIGINAL_OBSERVATIONS: Observation[] = [
+    // The scripted canonicality names a canon timeline; an original world has
+    // no canon, so it is dropped and the derivation runs — which puts this
+    // fixture on the `inspired` branch, exactly where the transposition WOULD
+    // fire without C4b's guard.
+    ...SCRIPTED_OBSERVATIONS.filter((o) => o.kind !== "canonicality"),
+    obs("world_fact", "The Ledgermen keep the book and never forgive a line"),
+  ];
+
+  async function compileOriginal(
+    title: string,
+    opts: { failWorldCall?: boolean; profileIds?: string[]; extra?: Observation[] } = {},
+  ) {
+    if (!db) throw new Error("unreachable");
+    const draft: ConductorDraft = {
+      transcript: [],
+      observations: [...ORIGINAL_OBSERVATIONS, ...(opts.extra ?? [])],
+      profileIds: opts.profileIds ?? [],
+      originalWorld: true,
+      readyToCompile: true,
+    };
+    mockJudgment.mockReset();
+    armOriginalSynthesis(opts);
+    const [campaign] = await db
+      .insert(schema.campaigns)
+      .values({ playerId, title, status: "draft", szTranscript: draft })
+      .returning();
+    if (!campaign) throw new Error("insert failed");
+    return { campaign, stubId: `original_${campaign.id}` };
+  }
+
+  it("an original world compiles: the stub is synthesized, persisted, and carries NO voice cards", async () => {
+    if (!db) throw new Error("unreachable");
+    const { campaign, stubId } = await compileOriginal("original world fixture");
+    let seenOspTitle = "";
+    let seenOspDirector = "";
+    let seenIngestProfileIds: string[] = [];
+    try {
+      const result = await compileSessionZero(db, campaign.id, {
+        ospSynthesizer: async (input) => {
+          seenOspTitle = input.title;
+          seenOspDirector = input.directorPersonality;
+          return STUB_OSP;
+        },
+        ingestor: async (_db, _cid, _turn, _text, ingestOpts) => {
+          seenIngestProfileIds = [...ingestOpts.profileIds];
+          return { writes: [], flags: [] };
+        },
+      });
+      expect(result.gaps).toEqual([]);
+
+      // Both halves of the synthesis fired — and the transposition did NOT.
+      // A voice written for THIS campaign has no source nouns to launder.
+      const names = mockJudgment.mock.calls.map((c) => (c[1] as { name?: string })?.name);
+      expect(names).toContain("compile_original_treatment");
+      expect(names).toContain("compile_original_world");
+      expect(names).not.toContain("compile_voice_transposition");
+
+      // The stub is a real profiles row, scoped to THIS campaign — an original
+      // world is one table's truth, never shared IP.
+      const [row] = await db.select().from(schema.profiles).where(eq(schema.profiles.id, stubId));
+      expect(row?.title).toBe("The Kettle Reach");
+      expect(row?.scopeClass).toBe("micro");
+      const stub = row?.profile as {
+        ip_mechanics: {
+          voice_cards: unknown[];
+          storytelling_tropes: Record<string, boolean>;
+          stat_mapping: { has_canonical_stats: boolean };
+          power_system?: unknown;
+        };
+        research_trust: {
+          method: string;
+          derived_confidence: number;
+          sources_consulted: string[];
+          pages_fetched: number;
+          field_sources: Record<string, string>;
+          coverage_gaps: string[];
+          defective: boolean;
+          grounding: string;
+        };
+      };
+      // THE assertion of the commit: [] by construction, not by a filter.
+      expect(stub.ip_mechanics.voice_cards).toEqual([]);
+      // v3 parity: every trope off — they evolve during play.
+      expect(Object.values(stub.ip_mechanics.storytelling_tropes)).toHaveLength(15);
+      expect(Object.values(stub.ip_mechanics.storytelling_tropes).some(Boolean)).toBe(false);
+      // The player never asked for a stat system, so none was invented.
+      expect(stub.ip_mechanics.stat_mapping.has_canonical_stats).toBe(false);
+      expect(stub.ip_mechanics.power_system).toBeUndefined();
+      // The trust record says what this is: no source to be wrong about.
+      expect(stub.research_trust.method).toBe("player_vision");
+      expect(stub.research_trust.derived_confidence).toBe(95);
+      expect(stub.research_trust.sources_consulted).toEqual(["player"]);
+      expect(stub.research_trust.pages_fetched).toBe(0);
+      expect(stub.research_trust.field_sources.canonical_dna).toBe("player");
+      expect(stub.research_trust.field_sources.author_voice).toBe("player");
+      // Absence IS the label for organs nothing fed (trust.ts's discipline).
+      expect(stub.research_trust.field_sources.stat_mapping).toBeUndefined();
+      expect(stub.research_trust.field_sources.voice_cards).toBeUndefined();
+      expect(stub.research_trust.coverage_gaps).toEqual([]);
+      expect(stub.research_trust.defective).toBe(false);
+      expect(stub.research_trust.grounding).toBe("no_claims");
+      expect((row?.researchProvenance as { notes: string[] }).notes[0]).toContain("original world");
+
+      // Retrieval and the ingestion resolver both read anchors_used.
+      expect(result.contract.anchors_used).toEqual([stubId]);
+      expect(seenIngestProfileIds).toEqual([stubId]);
+      // The synthesized gauge IS the canonical layer; the player's calibration
+      // still moves only the active one (the two-layer discipline is untouched).
+      expect(result.contract.canonical.treatment.darkness).toBe(3);
+      expect(result.contract.active.treatment.darkness).toBe(8);
+      expect(result.contract.canonical.framing.narrative_focus).toBe("party");
+      // The voice rides VERBATIM here, and that needs no defense: it was
+      // written for this campaign out of this player's vision.
+      expect(result.contract.active.voice.voice_cards).toEqual([]);
+      expect(result.contract.active.voice.author_voice).toEqual(ORIGINAL_WORLD.author_voice);
+      expect(result.contract.active.voice.director_personality).toBe(
+        ORIGINAL_WORLD.director_personality,
+      );
+      // The OSP synthesis works from the world's own name and voice.
+      expect(seenOspTitle).toBe("The Kettle Reach");
+      expect(seenOspDirector).toBe(ORIGINAL_WORLD.director_personality);
+
+      const [after] = await db
+        .select()
+        .from(schema.campaigns)
+        .where(eq(schema.campaigns.id, campaign.id));
+      expect(after?.status).toBe("active");
+    } finally {
+      await db.delete(schema.campaigns).where(eq(schema.campaigns.id, campaign.id));
+      await db.delete(schema.profiles).where(eq(schema.profiles.id, stubId));
+    }
+  });
+
+  it("research THEN original: the player's latest word wins the base; the anchors ride as reference corpora", async () => {
+    if (!db) throw new Error("unreachable");
+    // "I looked at some sources, but this is MY world." Before the fix the
+    // flag went INERT the moment any profile row loaded — and profileIds has
+    // no removal path, so the retraction was unreachable forever after.
+    const { campaign, stubId } = await compileOriginal("research then original fixture", {
+      profileIds: ["test_sz_profile_voice", "test_sz_profile_b"],
+    });
+    let seenIngestProfileIds: string[] = [];
+    let seenDeferred: string[] = [];
+    let seenOspTitle = "";
+    try {
+      const result = await compileSessionZero(db, campaign.id, {
+        ospSynthesizer: async (input) => {
+          seenOspTitle = input.title;
+          seenDeferred = [...input.resolved.playerDeferred];
+          return STUB_OSP;
+        },
+        ingestor: async (_db, _cid, _turn, _text, ingestOpts) => {
+          seenIngestProfileIds = [...ingestOpts.profileIds];
+          return { writes: [], flags: [] };
+        },
+      });
+      expect(result.gaps).toEqual([]);
+
+      // The stub was synthesized and IS the base — no transposition, because
+      // there is no source hand in the contract to launder.
+      const names = mockJudgment.mock.calls.map((c) => (c[1] as { name?: string })?.name);
+      expect(names).toContain("compile_original_world");
+      expect(names).not.toContain("compile_voice_transposition");
+      // Treatment, framing, world and voice ALL compile from the stub — the
+      // anchor's own DNA (darkness 7, ensemble focus, the Bebop) is nowhere.
+      expect(result.contract.canonical.treatment.darkness).toBe(3);
+      expect(result.contract.canonical.framing.narrative_focus).toBe("party");
+      expect(result.contract.canonical.world.world_setting.locations).toEqual([
+        "The Kettle",
+        "Lowwater Market",
+      ]);
+      expect(result.contract.active.voice.voice_cards).toEqual([]);
+      expect(result.contract.active.voice.author_voice).toEqual(ORIGINAL_WORLD.author_voice);
+      expect(result.contract.active.voice.director_personality).toBe(
+        ORIGINAL_WORLD.director_personality,
+      );
+      const serialized = JSON.stringify(result.contract);
+      expect(serialized).not.toContain("Spike Spiegel");
+      expect(serialized).not.toContain(ANCHOR_DIRECTOR);
+      expect(serialized).not.toContain("clipped, jazz-phrased");
+      expect(seenOspTitle).toBe("The Kettle Reach");
+
+      // The researched rows are REFERENCE CORPORA: still retrievable, still
+      // canon-matched by the resolver, but AFTER the stub and never the base.
+      expect(result.contract.anchors_used).toEqual([
+        stubId,
+        "test_sz_profile_voice",
+        "test_sz_profile_b",
+      ]);
+      expect(seenIngestProfileIds).toEqual(result.contract.anchors_used);
+      // Two anchors, and still no blend: an original world is not a component,
+      // so there is no base to pick between and no recipe to record.
+      expect(result.contract.hybrid_recipe).toBeUndefined();
+      expect(seenDeferred.some((d) => d.includes("hybrid premise"))).toBe(false);
+    } finally {
+      await db.delete(schema.campaigns).where(eq(schema.campaigns.id, campaign.id));
+      await db.delete(schema.profiles).where(eq(schema.profiles.id, stubId));
+    }
+  });
+
+  it("an original world FORCES its axes: a stray canonicality record cannot claim a source that does not exist", async () => {
+    if (!db) throw new Error("unreachable");
+    // The conductor's itinerary walks the canonicality beat unconditionally,
+    // so this record is reachable on an original table. Defaulted (not forced)
+    // it made the contract claim canon-adjacency to nothing, and armed the
+    // full_cast cast gate against the player's own characters.
+    const { campaign, stubId } = await compileOriginal("original forced axes fixture", {
+      extra: [
+        obs(
+          "canonicality",
+          '{"timeline_mode": "canon_adjacent", "canon_cast_mode": "full_cast", "event_fidelity": "background"}',
+        ),
+      ],
+    });
+    let seenIngestCanonicality: { timeline_mode?: string; canon_cast_mode?: string } | undefined;
+    try {
+      const result = await compileSessionZero(db, campaign.id, {
+        ospSynthesizer: async () => STUB_OSP,
+        ingestor: async (_db, _cid, _turn, _text, ingestOpts) => {
+          seenIngestCanonicality = ingestOpts.canonicality;
+          return { writes: [], flags: [] };
+        },
+      });
+      expect(result.gaps).toEqual([]);
+      for (const layer of [result.contract.canonical, result.contract.active]) {
+        expect(layer.canonicality.timeline_mode).toBe("inspired");
+        expect(layer.canonicality.canon_cast_mode).toBe("npcs_only");
+      }
+      // Both consumption points share ONE derivation — the gate was handed the
+      // same forced pair the contract stored.
+      expect(seenIngestCanonicality).toEqual({
+        timeline_mode: "inspired",
+        canon_cast_mode: "npcs_only",
+      });
+      // event_fidelity is NOT forced: fidelity to the events the player
+      // asserted about their OWN world is coherent, and theirs to set.
+      expect(result.contract.active.canonicality.event_fidelity).toBe("background");
+    } finally {
+      await db.delete(schema.campaigns).where(eq(schema.campaigns.id, campaign.id));
+      await db.delete(schema.profiles).where(eq(schema.profiles.id, stubId));
+    }
+  });
+
+  it("a failed synthesis fails the compile LOUDLY — no default world, no stub row, campaign re-draftable", async () => {
+    if (!db) throw new Error("unreachable");
+    const { campaign, stubId } = await compileOriginal("original world failure fixture", {
+      failWorldCall: true,
+    });
+    try {
+      // v3's _default_creative_fields is deliberately NOT carried: a generic
+      // fallback world is "generic output is useless" institutionalized.
+      await expect(
+        compileSessionZero(db, campaign.id, {
+          ospSynthesizer: async () => {
+            throw new Error("the OSP must never run without a world");
+          },
+          ingestor: async () => ({ writes: [], flags: [] }),
+        }),
+      ).rejects.toThrow(/original world synthesis boom/);
+
+      const rows = await db.select().from(schema.profiles).where(eq(schema.profiles.id, stubId));
+      expect(rows).toHaveLength(0);
+      const [row] = await db
+        .select()
+        .from(schema.campaigns)
+        .where(eq(schema.campaigns.id, campaign.id));
+      // The claim reverted: the player re-proposes and buys the call again.
+      expect(row?.status).toBe("draft");
+      expect(row?.premiseContract).toBeNull();
+      const facts = await db
+        .select()
+        .from(schema.criticalFacts)
+        .where(eq(schema.criticalFacts.campaignId, campaign.id));
+      expect(facts).toHaveLength(0);
+    } finally {
+      await db.delete(schema.campaigns).where(eq(schema.campaigns.id, campaign.id));
+      await db.delete(schema.profiles).where(eq(schema.profiles.id, stubId));
+    }
+  });
+
+  it("a table with no anchor and no original-world word still HALTS at the compile (unchanged)", async () => {
+    if (!db) throw new Error("unreachable");
+    const anchorless: ConductorDraft = {
+      transcript: [],
+      observations: SCRIPTED_OBSERVATIONS,
+      profileIds: [],
+      readyToCompile: true,
+    };
+    const [blocked] = await db
+      .insert(schema.campaigns)
+      .values({ playerId, title: "anchorless fixture", status: "draft", szTranscript: anchorless })
+      .returning();
+    if (!blocked) throw new Error("insert failed");
+    mockJudgment.mockReset();
+    try {
+      const result = await compileSessionZero(db, blocked.id, {
+        ospSynthesizer: async () => {
+          throw new Error("the OSP must never run on a gapped draft");
+        },
+      });
+      expect(result.gaps.some((g) => g.includes("no researched profile"))).toBe(true);
+      // No world was synthesized to paper over the hole.
+      expect(mockJudgment).not.toHaveBeenCalled();
+      const rows = await db
+        .select()
+        .from(schema.profiles)
+        .where(eq(schema.profiles.id, `original_${blocked.id}`));
+      expect(rows).toHaveLength(0);
+    } finally {
+      await db.delete(schema.campaigns).where(eq(schema.campaigns.id, blocked.id));
+    }
   });
 
   it("gap verdict blocks a sparkless handoff (§8)", () => {

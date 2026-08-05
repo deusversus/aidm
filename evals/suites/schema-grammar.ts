@@ -13,7 +13,12 @@ import { WebIdentity } from "@/lib/research/websearch";
 import { ScrapePlan } from "@/lib/research/wiki";
 import { ScoreSheet } from "@/lib/sakkan/score";
 import { VoiceChecklistSheet } from "@/lib/sakkan/voice";
-import { OspDraft, VoiceTransposition } from "@/lib/sz/compiler";
+import {
+  OriginalTreatmentDraft,
+  OriginalWorldDraft,
+  OspDraft,
+  VoiceTransposition,
+} from "@/lib/sz/compiler";
 import { ValidationOutput } from "@/lib/turn/outcome";
 import { RankOutput } from "@/lib/turn/retrieval";
 import { ScaleJudgment } from "@/lib/turn/scale";
@@ -121,6 +126,12 @@ const LIVE_PLAY_SCHEMAS: Array<{ name: string; schema: z.ZodType<any> }> = [
   { name: "WebIdentity", schema: WebIdentity },
   { name: "GroundingVerdicts", schema: GroundingVerdicts },
   { name: "VoiceTransposition", schema: VoiceTransposition },
+  // C4b's true-original path. OriginalTreatmentDraft is the largest grammar SZ
+  // compiles (24 numeric axes + 13 enums in one object) — the split that keeps
+  // it off the cliff is the split from the world call, and only a live compile
+  // can prove the remaining half fits.
+  { name: "OriginalTreatmentDraft", schema: OriginalTreatmentDraft },
+  { name: "OriginalWorldDraft", schema: OriginalWorldDraft },
 ];
 
 /** 400s whose message names the grammar/schema — the canary's one true FAIL. */

@@ -54,6 +54,8 @@ PROFILE HEALTH IS PLAYER-FACING. research_title returns profile_health — what 
 
 WHILE RESEARCH LOADS, NO DEAD AIR. Interview the player — they are the one subject no wiki holds. What they loved, when they watched it, who they were then.
 
+ORIGINAL WORLDS. Some players arrive with no source at all — something of their own wearing anime's shape. That is a first-class table, not a consolation: say so plainly, then gather ITS vision exactly the way you would gather a premise, in their own words. What the world is CALLED. Its genre and its tone. How power works there — the flavor AND the rules, their phrasing not yours ("no magic, just money and old debts" is a complete answer). And what the stories in it feel like: what a great episode of this would be. Record every piece as it lands — world_fact for what they assert about the place, cast_fact for who is already in it, calibration for the tonal moves, premise_law for anything the axes cannot hold — the same channels as any anchored campaign; there is no separate original-world channel and there is no research to run. Never look up a stand-in title just to have something loaded, and never fill their silences with genre: an unspoken piece of the world is one you ASK about, never one you invent. When you call propose_contract, pass original_world: true — that flag is the only thing that tells the desk nothing is missing. If they hand you material they wrote themselves, supply_canon files it like any other canon.
+
 THE CONCEPT — who are you in this? The seat is the player's CHOICE, never your assumption: a canon world does NOT put them in the canon protagonist's shoes, and you never proceed as if it did. Once the premise has a world (single source: right after the audition; blends: once the blend settles whose world they stand in), walk the seat as doors in the premise's own terms, prose not a menu: they could play the canon protagonist themselves (that seat, their hands) · stand beside the canon cast as someone new among them · replace the protagonist (the cast remains, but this seat belongs to the player's own character now) · or be someone else entirely, in a corner of the world the canon never visits. For an original world, skip the doors and go straight to the idea. Then the big question: what's the BIG IDEA for this character — the tagline the opening credits would promise? ("A reincarnated programmer who treats the world like a game system." "A talentless underdog who trains harder than anyone.") Record it with record_observation kind "pc_concept", the player's own words verbatim — and every pc_concept record carries the COMPLETE concept as it stands, seat choice and big idea together in one content, because the newest record replaces every earlier one. Never record a fragment alone: when the seat lands first, re-record the whole concept once the big idea arrives. A seat choice is ALSO canonicality data: when it settles how the canon cast factors in, record that canonicality observation too, and never re-ask later what the concept already answered. If the player explicitly wants the character to emerge in play, that is their word: record pc_concept with content beginning exactly "deferred" plus their reasoning.
 
 THE BLEND (two or more sources — run this BEFORE deep calibration; it is where a hybrid campaign is actually designed):
@@ -202,6 +204,11 @@ const CONDUCTOR_TOOLS: Tool[] = [
           description:
             "A short, evocative title for THIS campaign — theirs, not the source title verbatim.",
         },
+        original_world: {
+          type: "boolean",
+          description:
+            "true when the player explicitly chose THEIR OWN world rather than a source's — including when titles were researched along the way (those stay as reference material; the compiled world is theirs). Pass false to retract it if they change their mind and settle on a source. Their latest word wins.",
+        },
       },
     },
   },
@@ -236,6 +243,15 @@ export interface ConductorDraft {
    * index (element 0) and whose length > 1 is the hybrid-mode switch.
    */
   playerCanonId?: string;
+  /**
+   * M3R3 C4b: the player chose a fully ORIGINAL world — no source anchor, no
+   * research. It is a gate key, not a preference: an empty `profileIds` is a
+   * blocking hole for a table that meant to load a source and the normal shape
+   * of this one, and no inference separates them. Set from propose_contract's
+   * own input, because the only authority on which table this is, is the
+   * player's word carried by the conductor.
+   */
+  originalWorld?: boolean;
   /**
    * M3R3 C2 review: cheap identity keys of already-filed pastes —
    * `${text.length}:${text.slice(0, 40)}` — so a later supply_canon never
@@ -374,14 +390,23 @@ async function executeTool(
     return "recorded";
   }
   if (name === "propose_contract") {
-    const { campaign_title } = (input ?? {}) as { campaign_title?: string };
+    const { campaign_title, original_world } = (input ?? {}) as {
+      campaign_title?: string;
+      original_world?: boolean;
+    };
     if (campaign_title?.trim()) draft.title = campaign_title.trim();
+    // M3R3 C4b: recorded BEFORE the gate reads it — the flag IS the key to
+    // where the World comes from, whether or not anchors were loaded. An
+    // explicit value wins latest (the same discipline as an observation), on
+    // this path and through the concurrent-write merge below; omission never
+    // retracts a prior true.
+    if (typeof original_world === "boolean") draft.originalWorld = original_world;
     // M2 C4: the gate runs HERE, deterministically, before the player is told
     // the table is set — and the compile's guesses/deferrals surface as OPEN
     // ITEMS for the conductor's summary. The compiler never ships a silent guess.
     const { gapVerdict, resolveObservations } = await import("./compiler");
     const resolved = resolveObservations(draft.observations);
-    const gaps = gapVerdict(resolved, draft.profileIds.length > 0);
+    const gaps = gapVerdict(resolved, draft.profileIds.length > 0, draft.originalWorld === true);
     if (gaps.length > 0) {
       draft.readyToCompile = false;
       return JSON.stringify({
@@ -647,6 +672,16 @@ export async function runConductorTurn(
         // written and unreadable.
         ...(draft.playerCanonId || stored.playerCanonId
           ? { playerCanonId: draft.playerCanonId ?? stored.playerCanonId }
+          : {}),
+        // M3R3 C4b: the original-world flag survives the merge for the same
+        // reason — it is the gate key, and dropping it would re-block a table
+        // the player already declared set, with the one gap they cannot fill.
+        // Carried with ?? rather than ||: executeTool documents and implements
+        // LATEST-WINS, so a retraction spoken THIS turn ("scratch that, let's
+        // use a source") must not be silently restored to true by a raced
+        // write. An untouched turn still inherits the stored word.
+        ...(draft.originalWorld !== undefined || stored.originalWorld !== undefined
+          ? { originalWorld: draft.originalWorld ?? stored.originalWorld }
           : {}),
         // The filed-paste keys carry forward the same way: losing one would
         // let the very next supply_canon re-file a paste already in the

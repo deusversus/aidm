@@ -74,6 +74,29 @@ function scriptedRound(blocks: ContentBlock[], stopReason: "end_turn" | "tool_us
   } as unknown as ReturnType<typeof streamNarration>;
 }
 
+/**
+ * A scripted round that lets ANOTHER writer land between this turn's read and
+ * its persist — the orphaned-turn race the merge path exists for (a client
+ * disconnected, the turn ran to completion server-side, a fresh turn started).
+ */
+function racedRound(
+  blocks: ContentBlock[],
+  stopReason: "end_turn" | "tool_use",
+  race: () => Promise<void>,
+): ReturnType<typeof streamNarration> {
+  const base = scriptedRound(blocks, stopReason) as unknown as {
+    stream: unknown;
+    done: () => Promise<unknown>;
+  };
+  return {
+    stream: base.stream,
+    done: async () => {
+      await race();
+      return base.done();
+    },
+  } as unknown as ReturnType<typeof streamNarration>;
+}
+
 const mockStream = vi.mocked(streamNarration);
 const mockResearch = vi.mocked(researchTitle);
 const mockWriteCanon = vi.mocked(writePlayerCanon);
@@ -279,6 +302,171 @@ describe.skipIf(!url)("SZ conductor draft-resume (real Postgres, scripted model)
       const parsed = JSON.parse(toolResultFor(result, "pc_1"));
       expect(parsed.ready).toBe(false);
       expect(parsed.gaps.some((g: string) => g.includes("protagonist is unnamed"))).toBe(true);
+    } finally {
+      await db.delete(schema.campaigns).where(eq(schema.campaigns.id, c.id));
+    }
+  });
+
+  it("propose_contract gate (M3R3 C4b): original_world:true passes with ZERO profiles; without it the anchor gap still blocks", async () => {
+    if (!db) throw new Error("unreachable");
+    mockStream.mockReset();
+    const draft: ConductorDraft = {
+      transcript: [],
+      observations: [
+        ...TABLE_MINUS_NAME,
+        obs("pc_name", "Kaelen — he chose it himself"),
+        // The spoken vision the original path compiles FROM (v3's bar:
+        // calibration before generation).
+        obs("world_fact", "The Kettle Reach pays its debts in tide-water"),
+        obs("world_fact", "The Ledgermen keep the book and never forgive a line"),
+      ],
+      profileIds: [],
+      readyToCompile: false,
+    };
+    const [c] = await db
+      .insert(schema.campaigns)
+      .values({ playerId, title: "gate original world", status: "draft", szTranscript: draft })
+      .returning();
+    if (!c) throw new Error("insert failed");
+    try {
+      // Round 1 — no flag. An anchorless table is still the ERROR state: the
+      // engine cannot tell "meant to load a source" from "meant not to".
+      mockStream
+        .mockReturnValueOnce(
+          scriptedRound(
+            [
+              {
+                type: "tool_use",
+                id: "pc_1",
+                name: "propose_contract",
+                input: { campaign_title: "The Kettle Reach" },
+              },
+            ],
+            "tool_use",
+          ),
+        )
+        .mockReturnValueOnce(
+          scriptedRound([{ type: "text", text: "One thing first — whose world?" }], "end_turn"),
+        );
+      const blocked = await runConductorTurn(db, c.id, "I think we're ready", () => {});
+      expect(blocked.readyToCompile).toBe(false);
+      const blockedResult = JSON.parse(toolResultFor(blocked, "pc_1"));
+      expect(blockedResult.ready).toBe(false);
+      expect(blockedResult.gaps.some((g: string) => g.includes("no researched profile"))).toBe(
+        true,
+      );
+
+      // Round 2 — the player's own word, carried as the flag.
+      mockStream
+        .mockReturnValueOnce(
+          scriptedRound(
+            [
+              {
+                type: "tool_use",
+                id: "pc_2",
+                name: "propose_contract",
+                input: { campaign_title: "The Kettle Reach", original_world: true },
+              },
+            ],
+            "tool_use",
+          ),
+        )
+        .mockReturnValueOnce(
+          scriptedRound([{ type: "text", text: "Then the table is set." }], "end_turn"),
+        );
+      const original = await runConductorTurn(db, c.id, "it's my own world, no source", () => {});
+      expect(original.readyToCompile).toBe(true);
+      expect(original.originalWorld).toBe(true);
+      const parsed = JSON.parse(toolResultFor(original, "pc_2"));
+      expect(parsed.ready).toBe(true);
+      expect(parsed.gaps).toBeUndefined();
+
+      // Durable: the compile reads the flag off the STORED draft, not memory.
+      const [row] = await db.select().from(schema.campaigns).where(eq(schema.campaigns.id, c.id));
+      expect((row?.szTranscript as ConductorDraft).originalWorld).toBe(true);
+    } finally {
+      await db.delete(schema.campaigns).where(eq(schema.campaigns.id, c.id));
+    }
+  });
+
+  it("the concurrent-write merge is LATEST-WINS on the original-world flag, not a ratchet (M3R3 C4b)", async () => {
+    if (!db) throw new Error("unreachable");
+    const seed: ConductorDraft = {
+      transcript: [],
+      observations: [],
+      profileIds: [],
+      readyToCompile: false,
+      originalWorld: true,
+    };
+    const [c] = await db
+      .insert(schema.campaigns)
+      .values({ playerId, title: "merge retraction", status: "draft", szTranscript: seed })
+      .returning();
+    if (!c) throw new Error("insert failed");
+    /** The raced write: a stored draft that still says original, later clock. */
+    const raceStoringTrue = async () => {
+      await db
+        .update(schema.campaigns)
+        .set({
+          szTranscript: {
+            ...seed,
+            transcript: [{ role: "user", content: "the raced turn's own line" }],
+          },
+          updatedAt: new Date(Date.now() + 60_000),
+        })
+        .where(eq(schema.campaigns.id, c.id));
+    };
+    try {
+      // "Scratch the original world, let's use a source." An explicit false
+      // this turn — the OR-merge silently restored it to true.
+      mockStream.mockReset();
+      mockStream
+        .mockReturnValueOnce(
+          racedRound(
+            [
+              {
+                type: "tool_use",
+                id: "pc_1",
+                name: "propose_contract",
+                input: { original_world: false },
+              },
+            ],
+            "tool_use",
+            raceStoringTrue,
+          ),
+        )
+        .mockReturnValueOnce(
+          scriptedRound([{ type: "text", text: "Understood — which source?" }], "end_turn"),
+        );
+      await runConductorTurn(db, c.id, "actually, scratch the original world", () => {});
+
+      const [row] = await db.select().from(schema.campaigns).where(eq(schema.campaigns.id, c.id));
+      const merged = row?.szTranscript as ConductorDraft;
+      // The merge really ran (the raced turn's line survived) AND the player's
+      // latest word won — executeTool's documented latest-wins, end to end.
+      expect(merged.transcript[0]?.content).toBe("the raced turn's own line");
+      expect(merged.originalWorld).toBe(false);
+
+      // An UNTOUCHED turn still inherits: the flag is the gate key, and losing
+      // it would re-block a table the player already declared set.
+      await db
+        .update(schema.campaigns)
+        .set({
+          szTranscript: { transcript: [], observations: [], profileIds: [], readyToCompile: false },
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.campaigns.id, c.id));
+      mockStream.mockReset();
+      mockStream.mockReturnValueOnce(
+        racedRound(
+          [{ type: "text", text: "Tell me more about the Reach." }],
+          "end_turn",
+          raceStoringTrue,
+        ),
+      );
+      await runConductorTurn(db, c.id, "it pays its debts in tide-water", () => {});
+      const [after] = await db.select().from(schema.campaigns).where(eq(schema.campaigns.id, c.id));
+      expect((after?.szTranscript as ConductorDraft).originalWorld).toBe(true);
     } finally {
       await db.delete(schema.campaigns).where(eq(schema.campaigns.id, c.id));
     }

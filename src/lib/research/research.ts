@@ -317,7 +317,22 @@ async function probeAliasCache(db: Db, rawTitle: string): Promise<ProfileRow | n
   if (!key) return null;
   const rows = await db.select().from(profiles);
   for (const row of rows) {
-    const alternates = (row.profile as { alternate_titles?: unknown } | null)?.alternate_titles;
+    const stored = row.profile as {
+      alternate_titles?: unknown;
+      research_trust?: { method?: unknown };
+    } | null;
+    // PRIVATE WORLDS NEVER LEAVE THEIR TABLE (M3R3 C4b). `profiles` is a
+    // shared cross-campaign cache, and the SZ compiler writes a synthesized
+    // original world into it under the world's own NAME — which is exactly
+    // what this door matches on. Without this filter, one table's invention
+    // would be served to another campaign as cached "research" at confidence
+    // 95 ("let's play in the Kettle Reach", a name collision, a second
+    // player). §8's cache law covers RESEARCHED sources; a private world is
+    // not one, and its row is campaign-scoped for this reason. The slug door
+    // upstream needs no equivalent guard — it looks up `profileSlug(title)`
+    // by primary key, and no title a player types slugs to `original_<uuid>`.
+    if (stored?.research_trust?.method === "player_vision") continue;
+    const alternates = stored?.alternate_titles;
     const candidates: unknown[] = [
       row.id,
       row.title,
