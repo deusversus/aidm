@@ -738,6 +738,61 @@ describe.skipIf(!url)("Director (real Postgres, scripted model)", () => {
     },
   });
 
+  it("dossier renders arc_events + uncovered_extremes — the Pacer's transition finally reaches the Director (M3R2 C5)", async () => {
+    if (!db) throw new Error("unreachable");
+    const campaignId = await makeCampaign();
+    vi.mocked(arcs.getActiveArc).mockResolvedValue(fakeArc(campaignId));
+    await db
+      .update(schema.campaigns)
+      .set({
+        directionState: {
+          last_director_turn: 0,
+          accumulated_epicness: 0,
+          // G2 records these per turn; the trigger read only their COUNT, so
+          // the Pacer's suggestion died at the gate it opened.
+          arc_events: [
+            "sakuga_moment",
+            "phase_transition_suggested:climax",
+            "phase_transition_suggested:climax",
+          ],
+          tension_level: 0.5,
+          director_notes: [],
+          voice_patterns: [],
+          spotlight_directives: [],
+          pending_flags: [],
+          merge_suggestions: [],
+          evolution_history: [],
+          settei: {
+            text: "(charter)",
+            charter_tokens: 900,
+            charter_over_target: false,
+            rendered_axes: ["darkness"],
+            // The renderer could not press these — no exemplar grounds the band.
+            uncovered_extremes: ["moral_complexity", "power_fantasy"],
+            rebuilt_at_turn: 0,
+            rebuilt_at: new Date().toISOString(),
+          },
+        },
+      })
+      .where(eq(schema.campaigns.id, campaignId));
+
+    armDirectorEmits(directorOutput());
+    await runDirectorCycle(db, campaignId, 20);
+
+    const dossier = String((mockJudgment.mock.calls[0]?.[1] as { prompt?: string })?.prompt ?? "");
+    expect(dossier).toContain("## What happened since your last cycle");
+    expect(dossier).toContain("phase_transition_suggested:climax");
+    expect(dossier).toContain("sakuga_moment");
+    // Deduped: two identical suggestions are one line, not a tally.
+    expect(dossier.match(/phase_transition_suggested:climax/g)).toHaveLength(1);
+    // …and the §7.2 contract is stated where the Director reads it.
+    expect(dossier).toContain("you own the phase");
+
+    expect(dossier).toContain("## Premise extremes the Charter cannot press");
+    expect(dossier).toContain("moral_complexity");
+    expect(dossier).toContain("power_fantasy");
+  });
+
   it("dossier carries the player-driven drift as a first-class steering-honesty section", async () => {
     if (!db) throw new Error("unreachable");
     const campaignId = await makeCampaign();

@@ -1,6 +1,6 @@
 import { STRUCTURED_SMALL } from "@/lib/llm/budgets";
 import { callProbe } from "@/lib/llm/calls";
-import type { TierSelection } from "@/lib/llm/tiers";
+import { MODEL_CAPS, type TierSelection } from "@/lib/llm/tiers";
 import type { PacerBeat } from "@/lib/types/conte";
 import {
   ESCALATION_BANDS,
@@ -10,6 +10,8 @@ import {
   PacerDirective,
   TENSION_CLIMAX_SUGGEST,
 } from "@/lib/types/direction";
+import { TURN_CONTRACTS, type TurnTier } from "@/lib/types/turn";
+import { PHASE_A_BUDGET_MS, RUNG_OVERRUN } from "./degrade";
 
 /**
  * The Pacer (blueprint §7.2, C7): the per-turn beat director, carried whole
@@ -25,7 +27,87 @@ import {
  * the turn proceeds without a directive and the degrade ladder logs it.
  */
 
-export const PACER_TIMEBOX_MS = 6_000;
+/**
+ * The Pacer's timebox — MODEL-KEYED (M3R2 C5, the measured repair).
+ *
+ * The old flat 6,000 ms was authored against a Haiku probe and was
+ * STRUCTURALLY unsatisfiable on any reasoning model: on the player's live
+ * campaign (probe = Sonnet 5) every one of seven pacer_micro traces ran
+ * 7.5-25.7 s (Langfuse, campaign 86135b1f, turns 1-6), so the race lost 7/7
+ * and `pacer_beat` was NULL on every live turn — the per-scene continuity
+ * channel dark since the campaign began, while the call was billed in full.
+ * Haiku itself measured 1.4-13.0 s across 23 traces (p50 ~3.5 s), so even the
+ * fast tier lost roughly one beat in five.
+ *
+ * The timebox is a RUNAWAY guard, never a latency dial (§5.5: the ladder
+ * catches waste, never deliberate depth). It costs the turn nothing to wait:
+ * the Pacer runs inside the Phase-A fan-out beside retrieval, canon and
+ * ingestion — on the same live turns those members ran 26-47 s, so the Pacer
+ * has never been the critical path. What the old number bought was a discarded
+ * result we had already paid for.
+ *
+ * A reasoning probe (Sonnet/Opus — `effortControl`, the honest discriminator
+ * from tiers.ts) asks for 30 s, past the measured 25.7 s worst case; a
+ * non-reasoning probe (Haiku) asks for 15 s, past its measured 13.0 s worst
+ * case. Both are what the MODEL needs; what the turn can afford is
+ * {@link PACER_TIMEBOX_CAP_MS}, and the smaller number wins.
+ */
+export const PACER_TIMEBOX_MS = 15_000;
+export const PACER_TIMEBOX_THINKING_MS = 30_000;
+
+/** The tiers that actually consult the Pacer — §5.1's douga row has none. */
+const PACER_TIERS = (Object.keys(TURN_CONTRACTS) as TurnTier[]).filter((t) =>
+  TURN_CONTRACTS[t].consultants.includes("pacer"),
+);
+const TIGHTEST_PACER_BUDGET_MS = Math.min(
+  ...PACER_TIERS.map((t) => PHASE_A_BUDGET_MS[t] ?? Number.POSITIVE_INFINITY),
+);
+
+/**
+ * THE LADDER CEILING on that timebox (M3R3 close).
+ *
+ * The two numbers above are what the probe MODEL needs; this is what the turn
+ * can AFFORD to give it, and the smaller of the two wins. The Pacer runs
+ * inside the Phase-A fan-out, and the degrade ladder measures that same wall
+ * clock — re-checked (layout.ts `applyLadder`) after every serial stage that
+ * follows the fan-out: the relevance filter, the outcome judgment, validation,
+ * scale. So a slow Pacer does not merely sit beside its peers; whenever it is
+ * the last fan-out member to resolve, its whole box is carried into every
+ * later reading. Past `cap_research_2` the ladder cuts the KA's Phase-B
+ * research to 2 calls and past `cap_research_0` to none (ka.ts) — the Pacer
+ * would be buying its beat with the writer's research, §5.5 exactly inverted.
+ * The beat is a nicety; the research is the substance.
+ *
+ * So the box is capped at the slack the ladder leaves between "on budget"
+ * (`skip_validation_retry`, ×1.0) and the FIRST research-capping rung
+ * (`cap_research_2`, ×1.4), on the tightest Phase-A budget of any tier that
+ * consults the Pacer (genga, 35 s):
+ *
+ *   35_000 ms × (1.4 − 1.0) = 14_000 ms
+ *
+ * Read it as the guarantee it is: a Phase A otherwise exactly on budget can
+ * absorb the entire Pacer box and still not reach the rung — the Pacer ALONE
+ * can never cost the KA a research call. Every term is read from degrade.ts
+ * and the §5.1 contract table, so retuning a budget or a rung retunes this;
+ * nothing here is a hand-picked number.
+ *
+ * The cost is honest and accepted: a reasoning probe's measured worst case
+ * (25.7 s live) no longer fits, so some Sonnet beats will time out — logged,
+ * beat absent, scene proceeds. That is the §5.5 trade in the right direction.
+ */
+export const PACER_TIMEBOX_CAP_MS = Math.round(
+  TIGHTEST_PACER_BUDGET_MS * (RUNG_OVERRUN.cap_research_2 - RUNG_OVERRUN.skip_validation_retry),
+);
+
+/** The timebox this probe model can actually meet, under the ladder ceiling. */
+export function pacerTimeboxFor(probeModel: string): number {
+  const caps = MODEL_CAPS[probeModel];
+  const box =
+    caps && (caps.adaptiveThinking || caps.effortControl)
+      ? PACER_TIMEBOX_THINKING_MS
+      : PACER_TIMEBOX_MS;
+  return Math.min(box, PACER_TIMEBOX_CAP_MS);
+}
 
 type Strength = "suggestion" | "strong" | "override";
 const STRENGTH_RANK: Record<Strength, number> = { suggestion: 0, strong: 1, override: 2 };
@@ -191,7 +273,7 @@ export function buildSystem(hasArcState: boolean): string {
 export async function runPacer(
   selection: TierSelection,
   input: PacerInput,
-  timeboxMs = PACER_TIMEBOX_MS,
+  timeboxMs = pacerTimeboxFor(selection.probe),
 ): Promise<PacerResult> {
   const arc = input.arcState;
 
@@ -212,9 +294,32 @@ export async function runPacer(
     timer = setTimeout(() => resolve(null), timeboxMs);
   });
   // A rejected probe is treated like a timeout: no directive, the turn proceeds.
-  const directive = await Promise.race([call.catch(() => null), timeout]);
+  // The rejection is LOGGED, not swallowed silently (C5): a throwing Pacer and
+  // a slow one produced the same invisible null, which is why the live outage
+  // had to be diagnosed from the trace store instead of the logs.
+  const started = Date.now();
+  const directive = await Promise.race([
+    call.catch((err) => {
+      console.warn(`[pacer] probe failed (turn ${input.turnNumber ?? "?"}) — no beat this scene`, {
+        model: selection.probe,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return null;
+    }),
+    timeout,
+  ]);
   if (timer) clearTimeout(timer);
-  if (!directive) return { timedOut: true };
+  if (!directive) {
+    console.warn(
+      `[pacer] no beat (turn ${input.turnNumber ?? "?"}) — the continuity channel is dark`,
+      {
+        model: selection.probe,
+        timeboxMs,
+        waitedMs: Date.now() - started,
+      },
+    );
+    return { timedOut: true };
+  }
 
   const notes: string[] = [];
   if (directive.pacing_note) notes.push(directive.pacing_note);

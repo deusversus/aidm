@@ -493,6 +493,18 @@ export async function runDirectorCycle(
   const charterFlag = state.settei?.charter_over_target
     ? `The Style Charter is over its §4.4a budget (${state.settei.charter_tokens} tokens) — trims are exhausting; expect coarser premise pressure until the next rebuild.`
     : "";
+  // The Settei's OTHER telemetry finds its reader here (M3R2 C5). An uncovered
+  // extreme is a premise axis at 0-3 or 7-10 that the renderer could NOT press,
+  // because no exemplar in the library grounds that band — so the charter is
+  // silent on one of the premise's loudest dials and the drift band will keep
+  // measuring an axis nothing is steering. It was a console.warn in
+  // blocks/campaign.ts and nothing else. The Director cannot author exemplars,
+  // but it CAN steer around a known blind spot and say so in its notes.
+  const uncovered = state.settei?.uncovered_extremes ?? [];
+  const uncoveredNote =
+    uncovered.length > 0
+      ? `The Charter could not press these premise extremes — no grounding exemplar exists for their band: ${uncovered.join(", ")}. Nothing is steering them this session, so read any drift on them as UNPRESSED rather than resisted, and consider carrying the pressure yourself in a scene-shape note or spotlight directive.`
+      : "";
   // Dailies consumer #3 (M2R3): drifts the gate-trip attribution charged to the
   // player. A first-class section — the exit from the eternal retake (§4.5/§8).
   const playerDrift = playerDrivenTrend(state);
@@ -529,6 +541,21 @@ export async function runDirectorCycle(
     "",
     ...(trend ? ["## Gauge trend (Sakkan, §4.5 — the dailies' drift read)", trend, ""] : []),
     ...(charterFlag ? ["## The charter's budget", charterFlag, ""] : []),
+    ...(uncoveredNote ? ["## Premise extremes the Charter cannot press", uncoveredNote, ""] : []),
+    // What has happened since your last cycle (M3R2 C5). The accumulator was
+    // read only as a COUNT by the trigger — its contents never reached the
+    // dossier, so the Pacer's phase_transition suggestion (recorded here as
+    // `phase_transition_suggested:<phase>` on the very turn it fired) died at
+    // the gate. §7.2's contract is "the Pacer suggests, the Director disposes";
+    // without this section there was nothing to dispose of.
+    ...(state.arc_events.length > 0
+      ? [
+          "## What happened since your last cycle (accumulated events)",
+          [...new Set(state.arc_events)].map((e) => `- ${e}`).join("\n"),
+          "A `phase_transition_suggested:<phase>` line is the PACER's read of a beat, not a decision — you own the phase. Honor it, or set arc_plan.phase where the story actually is and say why in your analysis.",
+          "",
+        ]
+      : []),
     ...(playerDrift
       ? [
           "## Player-driven drift (§8 steering honesty + §4.2 — the story is being pulled by PLAY)",

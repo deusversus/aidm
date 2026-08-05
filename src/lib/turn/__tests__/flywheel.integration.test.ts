@@ -310,8 +310,10 @@ describe.skipIf(!url)(
       async () => {
         if (!db) throw new Error("unreachable");
         const campaignId = await makeCampaign();
-        // 17 verbatim exchanges > the 16-exchange trigger.
-        for (let i = 1; i <= 17; i++) {
+        // 21 verbatim exchanges > the 20-exchange trigger (RE-BASELINED for the
+        // 32k window ruling, user 2026-08-05: the trigger scaled 16 → 20 and the
+        // keep-tail 10 → 12 with it, so 17 exchanges no longer fire an event).
+        for (let i = 1; i <= 21; i++) {
           await db.insert(schema.episodicRecords).values({
             campaignId,
             turnNumber: i,
@@ -329,7 +331,7 @@ describe.skipIf(!url)(
           return Promise.reject(new Error(`unscripted judgment ${opts.name}`)) as never;
         });
 
-        const report = await maybeCompact(db, campaignId, 17, SELECTION);
+        const report = await maybeCompact(db, campaignId, 21, SELECTION);
         expect(report.compacted).toBe(true);
 
         const beats = await loadBeats(db, campaignId);

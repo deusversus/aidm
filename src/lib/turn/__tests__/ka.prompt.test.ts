@@ -44,6 +44,14 @@ describe("KA contract camera faculty (SV4)", () => {
     expect(KA_CONTRACT).toContain("mark the variant");
   });
 
+  it("the contract warns that turn numbering may SKIP (M3R2 C5)", () => {
+    // Block 3 labels the player's half `[Turn N]` (blocks/assemble.ts), and
+    // channel turns — booth, override, op commands — consume numbers without
+    // producing a scene. Unwarned, a gap reads to the pen as a scene it lost.
+    expect(KA_CONTRACT).toContain("may SKIP");
+    expect(KA_CONTRACT).toContain("never a missing scene");
+  });
+
   it("the trailer instruction asks for suggested_moves at decision points (M2R R1)", () => {
     // Audit 2026-07-19: nothing ever asked the KA for moves — emission was
     // model whim, so the player's default_on chips almost never appeared.

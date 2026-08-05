@@ -8,6 +8,7 @@ import { and, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { PHASE_A_BUDGET_MS } from "../degrade";
 import { runLayout } from "../layout";
 import { computeHeat, fetchCandidates } from "../retrieval";
 
@@ -356,6 +357,111 @@ describe.skipIf(!url)("Layout (real Postgres, scripted models)", () => {
       expect(result.conte.tier).toBe("genga");
     } finally {
       await db.delete(schema.campaigns).where(eq(schema.campaigns.id, fresh.id));
+    }
+  });
+
+  it("the Pacer's beat reaches the conte — and SURVIVES a late timebox_pacer rung (M3R2 C5)", async () => {
+    if (!db) throw new Error("unreachable");
+    mockEmbed.mockImplementation(async (texts: string[]) => texts.map(() => basis(0)));
+    armHarness({
+      intent_triage: GENGA_INTENT,
+      pacer_micro: {
+        beat_classification: "investigation",
+        tone: "wary",
+        must_reference: ["the freighter's silence"],
+        strength: "suggestion",
+        pacing_note: "end on the hatch opening",
+      },
+      relevance_filter: { scores: [] },
+      outcome_judgment: {
+        success_level: "success",
+        difficulty_class: 10,
+        modifiers: [],
+        narrative_weight: "SIGNIFICANT",
+        rationale: "scripted",
+      },
+    });
+
+    // The healthy path first: the beat lands (the live campaign had NULL on
+    // 5/5 turns — this is the assertion that would have caught it).
+    const healthy = await runLayout(db, campaignId, 21, "I search the derelict", () => {});
+    expect(healthy.kind).toBe("conte");
+    if (healthy.kind !== "conte") return;
+    expect(healthy.conte.pacer_beat?.beat_classification).toBe("investigation");
+    expect(healthy.conte.pacer_beat?.pacing_note).toBe("end on the hatch opening");
+
+    // Now force EVERY rung: a 1ms Phase-A budget fires the ladder the moment
+    // the fan-out returns — after the Pacer has already resolved and billed.
+    // The beat must survive: §5.5 rung 2 means "don't WAIT for it", and
+    // throwing away an answer already paid for buys no latency back.
+    const realBudget = PHASE_A_BUDGET_MS.genga ?? 35_000;
+    PHASE_A_BUDGET_MS.genga = 1;
+    try {
+      const degraded = await runLayout(db, campaignId, 22, "I search the derelict", () => {});
+      expect(degraded.kind).toBe("conte");
+      if (degraded.kind !== "conte") return;
+      expect(degraded.ladderSteps).toContain("timebox_pacer");
+      expect(degraded.conte.pacer_beat?.beat_classification).toBe("investigation");
+    } finally {
+      PHASE_A_BUDGET_MS.genga = realBudget;
+    }
+  });
+
+  it("the contract's voice cards reach the present-cast card (§4.1 authority, M3R2 C5)", async () => {
+    if (!db) throw new Error("unreachable");
+    // The SZ-admitted cast carries NO stamped voice_card (only the ingestion
+    // canon-link mint stamps one), so before C5 the compiled cards had no
+    // reader at all on this path.
+    const base = bebopContract();
+    const withCard = {
+      ...base,
+      active: {
+        ...base.active,
+        voice: {
+          ...base.active.voice,
+          voice_cards: [
+            {
+              name: "Vicious",
+              speech_patterns: "flat declaratives, never raises his voice",
+              humor_type: "none" as const,
+              signature_phrases: ["You're already dead."],
+              dialogue_rhythm: "long pauses, then one short line",
+              emotional_expression: "Restrained" as const,
+            },
+          ],
+        },
+      },
+    };
+    await db
+      .update(schema.campaigns)
+      .set({ premiseContract: withCard })
+      .where(eq(schema.campaigns.id, campaignId));
+    try {
+      mockEmbed.mockImplementation(async (texts: string[]) => texts.map(() => basis(0)));
+      armHarness({
+        intent_triage: GENGA_INTENT,
+        pacer_micro: { beat_classification: "quiet", tone: "calm" },
+        relevance_filter: { scores: [] },
+        outcome_judgment: {
+          success_level: "success",
+          difficulty_class: 10,
+          modifiers: [],
+          narrative_weight: "MINOR",
+          rationale: "scripted",
+        },
+      });
+      const result = await runLayout(db, campaignId, 23, "I go to meet Vicious", () => {});
+      expect(result.kind).toBe("conte");
+      if (result.kind !== "conte") return;
+      const card = result.conte.entity_cards.find((c) => c.includes("Vicious"));
+      expect(card).toBeDefined();
+      expect(card).toContain("voice: flat declaratives");
+      expect(card).toContain('e.g. "You\'re already dead."');
+    } finally {
+      await db
+        .update(schema.campaigns)
+        .set({ premiseContract: base })
+        .where(eq(schema.campaigns.id, campaignId));
     }
   });
 

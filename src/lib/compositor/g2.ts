@@ -167,12 +167,51 @@ type G2Markers = Record<string, boolean>;
 interface Checkpoints {
   g2?: G2Markers;
   g2_payload?: unknown;
+  /** Per-step failure counter (M3R2 C5) — the bound on honest retries. */
+  g2_attempts?: Record<string, number>;
+  /** Steps given up on after G2_MAX_STEP_ATTEMPTS, with the last reason. */
+  g2_abandoned?: Record<string, string>;
   [key: string]: unknown;
 }
 
 function checkpointSql(g2: G2Markers, patch: Record<string, unknown> = {}) {
   return sql`${turns.checkpoints} || ${JSON.stringify({ g2, ...patch })}::jsonb`;
 }
+
+/**
+ * How many settles a failing step may cost before G2 gives up on it (M3R2 C5).
+ *
+ * "Never mark a failed step done" and "never retry forever" are both real: a
+ * step that fails permanently (a poisoned row, a schema the model cannot
+ * satisfy) would otherwise re-run — and re-BILL, the distiller is a judgment
+ * call — at the top of every submit for the life of the campaign, and the
+ * turn would never reach its terminal marker, so `settleG2IfPending` would
+ * re-scan it forever. Three attempts, then the step is recorded as abandoned
+ * with its reason and stops running. Abandoned is a LOUD state: it rides the
+ * checkpoint row where the audit found it, not a console line.
+ */
+export const G2_MAX_STEP_ATTEMPTS = 3;
+
+/** The steps whose completion the terminal marker waits on (order = run order). */
+const G2_STEPS = [
+  "distill",
+  "fragment",
+  "semantic",
+  "promotion",
+  "entities",
+  "seeds",
+  "seed_sweep",
+  "arc_watcher",
+  "marks",
+  "heat_batch",
+  "compaction",
+  "director_trigger",
+  "rolling_checkpoint",
+  "sakkan",
+] as const;
+
+/** A step name, plus `media` — the terminal marker, which no step waits on. */
+type G2Step = (typeof G2_STEPS)[number] | "media";
 
 // ---------------------------------------------------------------------------
 
@@ -190,6 +229,14 @@ export async function settleG2(db: Db, turnId: string): Promise<void> {
  * Catch-up (§5.8): settle every complete-status turn whose G2 has not reached
  * its last marker, oldest first — run at the top of the next submit so the
  * next Phase A never reads a half-written semantic layer.
+ *
+ * NEVER throws (M3R2 C5). This runs inside `submitTurn`, so before the step
+ * isolation below a single failing G2 step — an embedding timeout, one bad
+ * jsonb row — propagated out of here and 500'd the player's NEXT SUBMIT, and
+ * every retry after it, until someone fixed the data by hand. A lagging
+ * background write group must never take the player's turn with it: the
+ * failure is logged, the remaining turns still settle, and the unfinished
+ * steps retry on the next pass (bounded by G2_MAX_STEP_ATTEMPTS).
  */
 export async function settleG2IfPending(db: Db, campaignId: string): Promise<void> {
   const rows = await db
@@ -200,7 +247,15 @@ export async function settleG2IfPending(db: Db, campaignId: string): Promise<voi
   for (const r of rows) {
     const g2 = (r.checkpoints as Checkpoints | null)?.g2;
     if (!g2?.media) {
-      await settleG2(db, r.id);
+      try {
+        await settleG2(db, r.id);
+      } catch (err) {
+        console.error("[g2] settle failed for a pending turn — drain continues", {
+          campaignId,
+          turnId: r.id,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
     }
   }
 }
@@ -221,200 +276,340 @@ async function settleG2Inner(db: Db, turnId: string): Promise<void> {
 
   const checkpoints = (turn.checkpoints ?? {}) as Checkpoints;
   const g2: G2Markers = { ...(checkpoints.g2 ?? {}) };
+  const attempts: Record<string, number> = { ...(checkpoints.g2_attempts ?? {}) };
+  const abandoned: Record<string, string> = { ...(checkpoints.g2_abandoned ?? {}) };
+  /**
+   * The failure-ledger write: the marker map EXACTLY as it stands, plus the
+   * attempts/abandoned patch. Only `step`'s catch and the abandon paths use
+   * it, and they rely on the map being unpoisoned — see the marker rule below.
+   */
   const markDb = (patch: Record<string, unknown> = {}) =>
     db
       .update(turns)
       .set({ checkpoints: checkpointSql(g2, patch) })
       .where(eq(turns.id, turnId));
 
+  /**
+   * THE MARKER RULE (M3R3 close). A step's marker must land in the SAME
+   * transaction as its writes — a marker that could commit without them (or
+   * vice versa) means replay either double-applies the work or loses it. But
+   * the SHARED `g2` map may only learn about the marker once that transaction
+   * has actually COMMITTED, because `step`'s catch serializes this very map:
+   * a step that set `g2[name] = true` before its closing `tx.update` and then
+   * failed at the update (or at COMMIT) was persisted as DONE with its writes
+   * rolled back, and nothing would ever retry it — the same opposite lie the
+   * per-step isolation was written to remove.
+   *
+   * So: the persisted marker is always a COPY, and the shared map is mutated
+   * only after the await returns.
+   */
+  const marked = (name: G2Step): G2Markers => ({ ...g2, [name]: true });
+  /** Completion write for a step that owns no transaction. */
+  const markStep = async (name: G2Step, patch: Record<string, unknown> = {}) => {
+    await db
+      .update(turns)
+      .set({ checkpoints: checkpointSql(marked(name), patch) })
+      .where(eq(turns.id, turnId));
+    g2[name] = true;
+  };
+  /** The same write, inside a step's transaction — atomic with its writes.
+   *  The caller sets `g2[name]` after `db.transaction(...)` resolves. */
+  const txMarkStep = (tx: Tx, name: G2Step, patch: Record<string, unknown> = {}) =>
+    tx
+      .update(turns)
+      .set({ checkpoints: checkpointSql(marked(name), patch) })
+      .where(eq(turns.id, turnId));
+
+  /**
+   * Per-step failure isolation (M3R2 C5). Before this, eleven of the fifteen
+   * steps ran bare inside one function: the FIRST failure threw out of the
+   * settle, so every later step was skipped (a failed embedding cost the
+   * turn its promotions, its seed sweep, its heat batch AND its Director
+   * cycle) and — because `settleG2IfPending` is awaited inside submitTurn —
+   * it wedged the player's next turn. The other four caught their own errors
+   * and then marked themselves DONE anyway, which is the opposite lie: the
+   * work never happened and nothing would ever retry it.
+   *
+   * Now: a step runs when its dependencies are marked, marks itself inside
+   * its own transaction (the marker rule above), and on failure marks
+   * NOTHING — the attempt is counted, the reason is recorded on the row, and
+   * the next settle tries again until G2_MAX_STEP_ATTEMPTS.
+   */
+  const step = async (
+    name: (typeof G2_STEPS)[number],
+    fn: () => Promise<void>,
+    opts: { requires?: (typeof G2_STEPS)[number][] } = {},
+  ): Promise<void> => {
+    if (g2[name] || abandoned[name]) return;
+    // Abandoned counts as "not available" even when the marker says done: the
+    // corrupt-stash path below marks distill complete (it WAS paid for) while
+    // its result is unusable, and a dependent must read that as dead, not as
+    // satisfied.
+    const blocked = (opts.requires ?? []).find((d) => !g2[d] || abandoned[d]);
+    if (blocked) {
+      // Ordering is a correctness property here, not tidiness: promotion reads
+      // the rows `semantic` writes, so running it against a failed semantic
+      // step would mark a promotion that promoted nothing.
+      if (abandoned[blocked]) {
+        // Its dependency is never coming. Abandon transitively rather than
+        // defer forever — a step waiting on a dead one would hold the terminal
+        // marker open and make the drain re-scan this turn at every submit.
+        abandoned[name] = `blocked: ${blocked} abandoned`;
+        console.error(`[g2] step ${name} abandoned — its dependency ${blocked} was given up on`, {
+          campaignId,
+          turnNumber,
+        });
+        await markDb({ g2_attempts: attempts, g2_abandoned: abandoned }).catch(() => {});
+        return;
+      }
+      console.warn(`[g2] step ${name} waits on ${blocked} — deferred to the next settle`, {
+        campaignId,
+        turnNumber,
+      });
+      return;
+    }
+    try {
+      await fn();
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : String(err);
+      const n = (attempts[name] ?? 0) + 1;
+      attempts[name] = n;
+      if (n >= G2_MAX_STEP_ATTEMPTS) abandoned[name] = reason.slice(0, 200);
+      console.error(
+        `[g2] step ${name} FAILED (attempt ${n}/${G2_MAX_STEP_ATTEMPTS})${
+          abandoned[name] ? " — abandoned" : " — retries next settle"
+        }`,
+        { campaignId, turnNumber, error: reason },
+      );
+      // The marker map is written UNCHANGED; only the failure ledger moves.
+      // That is only true because a step's marker reaches this map after its
+      // transaction commits, never before it (the marker rule above) — the
+      // rolled-back step is absent here, so it retries.
+      await markDb({ g2_attempts: attempts, g2_abandoned: abandoned }).catch(() => {});
+    }
+  };
+
   // 1. distill — the ONE bundled judgment call; result stashed for replay.
-  let payload: DistillOutput;
-  if (!g2.distill) {
-    const emitted = await callJudgment(selection, {
-      name: "g2_distill",
-      schema: DistillOutput,
-      campaignId,
-      turnNumber,
-      effort: "high",
-      maxTokens: STRUCTURED_RICH,
-      system: DISTILL_SYSTEM,
-      prompt: `PLAYER INPUT:\n${turn.playerInput}\n\nNARRATION:\n${narration}`,
-    });
-    // Clamp BEFORE the stash so crash-replay reads the same shape (the ceilings
-    // are no longer schema-enforceable — see the contract note above).
-    payload = clampDistill(emitted, { campaignId, turnNumber });
-    g2.distill = true;
-    await markDb({ g2_payload: payload });
+  let payload: DistillOutput | undefined;
+  if (g2.distill) {
+    // A corrupt stash is not recoverable without re-billing the distiller, and
+    // the marker says it was already paid for — so it is recorded as an
+    // abandoned step (which abandons its dependents transitively) instead of
+    // throwing out of the settle on every submit forever.
+    const stashed = DistillOutput.safeParse(checkpoints.g2_payload);
+    if (stashed.success) {
+      payload = stashed.data;
+    } else {
+      abandoned.distill = `stashed payload unparseable: ${stashed.error.message.slice(0, 160)}`;
+      console.error("[g2] the stashed distill payload is corrupt — downstream steps abandoned", {
+        campaignId,
+        turnNumber,
+      });
+      await markDb({ g2_attempts: attempts, g2_abandoned: abandoned }).catch(() => {});
+    }
   } else {
-    payload = DistillOutput.parse(checkpoints.g2_payload);
+    await step("distill", async () => {
+      const emitted = await callJudgment(selection, {
+        name: "g2_distill",
+        schema: DistillOutput,
+        campaignId,
+        turnNumber,
+        effort: "high",
+        maxTokens: STRUCTURED_RICH,
+        system: DISTILL_SYSTEM,
+        prompt: `PLAYER INPUT:\n${turn.playerInput}\n\nNARRATION:\n${narration}`,
+      });
+      // Clamp BEFORE the stash so crash-replay reads the same shape (the ceilings
+      // are no longer schema-enforceable — see the contract note above).
+      payload = clampDistill(emitted, { campaignId, turnNumber });
+      await markStep("distill", { g2_payload: payload });
+    });
   }
+  // Every payload consumer below declares `distill` as its dependency, so an
+  // abandoned distill leaves them deferred rather than running on nothing —
+  // this local is the type-level half of the same fact.
+  const distilled = payload;
 
   // 2. fragment — the subtext-first sentence onto the episodic row.
-  if (!g2.fragment) {
-    await db
-      .update(episodicRecords)
-      .set({ narratedFragment: payload.narrated_fragment })
-      .where(
-        and(
-          eq(episodicRecords.campaignId, campaignId),
-          eq(episodicRecords.turnNumber, turnNumber),
-          notTombstoned(episodicRecords),
-        ),
-      );
-    g2.fragment = true;
-    await markDb();
-  }
+  await step(
+    "fragment",
+    async () => {
+      if (!distilled) return;
+      await db
+        .update(episodicRecords)
+        .set({ narratedFragment: distilled.narrated_fragment })
+        .where(
+          and(
+            eq(episodicRecords.campaignId, campaignId),
+            eq(episodicRecords.turnNumber, turnNumber),
+            notTombstoned(episodicRecords),
+          ),
+        );
+      await markStep("fragment");
+    },
+    { requires: ["distill"] },
+  );
 
   // 3. semantic — embed facts (batch) → semantic layer with the heat envelope.
-  if (!g2.semantic) {
-    const facts = payload.facts;
-    const embeddings =
-      facts.length > 0
-        ? await embedTexts(
-            facts.map((f) => f.content),
-            { inputType: "document", patience: "interactive", campaignId, turnNumber },
-          )
-        : [];
-    await db.transaction(async (tx) => {
-      const rows: (typeof semanticMemories.$inferInsert)[] = [];
-      for (const [i, f] of facts.entries()) {
-        const embedding = embeddings[i];
-        if (!embedding) continue;
-        // v3: a plot-critical relationship fact keeps a heat floor of 40 so
-        // the bond never decays out of reach; everything else floors at 1.
-        const relCritical = f.category === "relationship" && f.is_plot_critical;
-        rows.push({
-          campaignId,
-          content: f.content,
-          embedding,
-          category: f.category,
-          baseHeat: 100,
-          heatFloor: relCritical ? 40 : 1,
-          lastBoostedTurn: turnNumber,
-          plotCritical: f.is_plot_critical,
-          turnId: turnNumber,
-          provenance: G2_PROVENANCE,
-          confidence: 0.8,
-        });
-      }
-      if (rows.length > 0) await tx.insert(semanticMemories).values(rows);
-      g2.semantic = true;
-      await tx
-        .update(turns)
-        .set({ checkpoints: checkpointSql(g2) })
-        .where(eq(turns.id, turnId));
-    });
-  }
-
-  // 4. promotion (§6.3) — plot-critical facts ALSO enter the Critical layer.
-  //    (Demotion of stale criticals is the Director's dailies job, C7.)
-  if (!g2.promotion) {
-    await db.transaction(async (tx) => {
-      const promotable = await tx
-        .select({ id: semanticMemories.id, content: semanticMemories.content })
-        .from(semanticMemories)
-        .where(
-          and(
-            eq(semanticMemories.campaignId, campaignId),
-            eq(semanticMemories.turnId, turnNumber),
-            eq(semanticMemories.plotCritical, true),
-            notTombstoned(semanticMemories),
-          ),
-        );
-      if (promotable.length > 0) {
-        await tx.insert(criticalFacts).values(
-          promotable.map((m) => ({
+  await step(
+    "semantic",
+    async () => {
+      if (!distilled) return;
+      const facts = distilled.facts;
+      const embeddings =
+        facts.length > 0
+          ? await embedTexts(
+              facts.map((f) => f.content),
+              { inputType: "document", patience: "interactive", campaignId, turnNumber },
+            )
+          : [];
+      await db.transaction(async (tx) => {
+        const rows: (typeof semanticMemories.$inferInsert)[] = [];
+        for (const [i, f] of facts.entries()) {
+          const embedding = embeddings[i];
+          if (!embedding) continue;
+          // v3: a plot-critical relationship fact keeps a heat floor of 40 so
+          // the bond never decays out of reach; everything else floors at 1.
+          const relCritical = f.category === "relationship" && f.is_plot_critical;
+          rows.push({
             campaignId,
-            content: m.content,
-            category: "promoted",
-            sourceMemoryId: m.id,
-            turnId: turnNumber,
-            provenance: PROMOTION_PROVENANCE,
-            confidence: 0.9,
-          })),
-        );
-      }
-      g2.promotion = true;
-      await tx
-        .update(turns)
-        .set({ checkpoints: checkpointSql(g2) })
-        .where(eq(turns.id, turnId));
-    });
-  }
-
-  // 5. entities — background enrichment (never creates, §6.5) + spotlight debt.
-  if (!g2.entities) {
-    await db.transaction(async (tx) => {
-      const active = await tx
-        .select()
-        .from(entities)
-        .where(
-          and(
-            eq(entities.campaignId, campaignId),
-            eq(entities.status, "active"),
-            notTombstoned(entities),
-          ),
-        );
-      for (const e of active) {
-        const state = { ...((e.state ?? {}) as Record<string, unknown>) };
-        let block = e.block;
-        let dirty = false;
-
-        const update = payload.entity_updates.find(
-          (u) => u.name.toLowerCase() === e.name.toLowerCase(),
-        );
-        if (update) {
-          if (!block.includes(update.note)) {
-            block = block ? `${block}\n${update.note}` : update.note;
-          }
-          if (update.relationship_shift) {
-            const rel = { ...((state.relationships as Record<string, unknown>) ?? {}) };
-            rel[String(turnNumber)] = update.relationship_shift;
-            state.relationships = rel;
-          }
-          if (update.faction_ripple) {
-            const fac = { ...((state.factionReputation as Record<string, unknown>) ?? {}) };
-            fac[String(turnNumber)] = update.faction_ripple;
-            state.factionReputation = fac;
-          }
-          state.interiorityEvents = ((state.interiorityEvents as number) ?? 0) + 1;
-          dirty = true;
-
-          await tx.insert(entityVersions).values({
-            entityId: e.id,
-            version: await nextVersion(tx, e.id),
-            block,
+            content: f.content,
+            embedding,
+            category: f.category,
+            baseHeat: 100,
+            heatFloor: relCritical ? 40 : 1,
+            lastBoostedTurn: turnNumber,
+            plotCritical: f.is_plot_critical,
             turnId: turnNumber,
             provenance: G2_PROVENANCE,
             confidence: 0.8,
           });
         }
+        if (rows.length > 0) await tx.insert(semanticMemories).values(rows);
+        await txMarkStep(tx, "semantic");
+      });
+      // Committed — only now may the shared map say so (the marker rule).
+      g2.semantic = true;
+    },
+    { requires: ["distill"] },
+  );
 
-        // Spotlight debt: present this scene → 0; absent → +1 (npc/faction only).
-        // Word-boundary match, never substring — "Rei" inside "reign" is not
-        // a scene appearance (C6 audit: short names corrupted the debt). The
-        // boundaries are Unicode lookarounds, not \b: \b is ASCII-only, so a
-        // name ending in a macron/accent ("Ryū") would never test present
-        // and accrue phantom debt every scene it appears in (C6 re-audit).
-        if (e.entityType === "npc" || e.entityType === "faction") {
-          const escaped = e.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-          const namePattern = new RegExp(`(?<![\\p{L}\\p{N}_])${escaped}(?![\\p{L}\\p{N}_])`, "iu");
-          const present = Boolean(update) || namePattern.test(narration);
-          state.spotlightDebt = present ? 0 : ((state.spotlightDebt as number) ?? 0) + 1;
-          dirty = true;
+  // 4. promotion (§6.3) — plot-critical facts ALSO enter the Critical layer.
+  //    (Demotion of stale criticals is the Director's dailies job, C7.)
+  await step(
+    "promotion",
+    async () => {
+      await db.transaction(async (tx) => {
+        const promotable = await tx
+          .select({ id: semanticMemories.id, content: semanticMemories.content })
+          .from(semanticMemories)
+          .where(
+            and(
+              eq(semanticMemories.campaignId, campaignId),
+              eq(semanticMemories.turnId, turnNumber),
+              eq(semanticMemories.plotCritical, true),
+              notTombstoned(semanticMemories),
+            ),
+          );
+        if (promotable.length > 0) {
+          await tx.insert(criticalFacts).values(
+            promotable.map((m) => ({
+              campaignId,
+              content: m.content,
+              category: "promoted",
+              sourceMemoryId: m.id,
+              turnId: turnNumber,
+              provenance: PROMOTION_PROVENANCE,
+              confidence: 0.9,
+            })),
+          );
         }
+        await txMarkStep(tx, "promotion");
+      });
+      g2.promotion = true;
+    },
+    // The promotable set IS what step 3 just wrote (§6.3).
+    { requires: ["semantic"] },
+  );
 
-        if (dirty) {
-          await tx.update(entities).set({ block, state }).where(eq(entities.id, e.id));
+  // 5. entities — background enrichment (never creates, §6.5) + spotlight debt.
+  await step(
+    "entities",
+    async () => {
+      if (!distilled) return;
+      await db.transaction(async (tx) => {
+        const active = await tx
+          .select()
+          .from(entities)
+          .where(
+            and(
+              eq(entities.campaignId, campaignId),
+              eq(entities.status, "active"),
+              notTombstoned(entities),
+            ),
+          );
+        for (const e of active) {
+          const state = { ...((e.state ?? {}) as Record<string, unknown>) };
+          let block = e.block;
+          let dirty = false;
+
+          const update = distilled.entity_updates.find(
+            (u) => u.name.toLowerCase() === e.name.toLowerCase(),
+          );
+          if (update) {
+            if (!block.includes(update.note)) {
+              block = block ? `${block}\n${update.note}` : update.note;
+            }
+            if (update.relationship_shift) {
+              const rel = { ...((state.relationships as Record<string, unknown>) ?? {}) };
+              rel[String(turnNumber)] = update.relationship_shift;
+              state.relationships = rel;
+            }
+            if (update.faction_ripple) {
+              const fac = { ...((state.factionReputation as Record<string, unknown>) ?? {}) };
+              fac[String(turnNumber)] = update.faction_ripple;
+              state.factionReputation = fac;
+            }
+            state.interiorityEvents = ((state.interiorityEvents as number) ?? 0) + 1;
+            dirty = true;
+
+            await tx.insert(entityVersions).values({
+              entityId: e.id,
+              version: await nextVersion(tx, e.id),
+              block,
+              turnId: turnNumber,
+              provenance: G2_PROVENANCE,
+              confidence: 0.8,
+            });
+          }
+
+          // Spotlight debt: present this scene → 0; absent → +1 (npc/faction only).
+          // Word-boundary match, never substring — "Rei" inside "reign" is not
+          // a scene appearance (C6 audit: short names corrupted the debt). The
+          // boundaries are Unicode lookarounds, not \b: \b is ASCII-only, so a
+          // name ending in a macron/accent ("Ryū") would never test present
+          // and accrue phantom debt every scene it appears in (C6 re-audit).
+          if (e.entityType === "npc" || e.entityType === "faction") {
+            const escaped = e.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+            const namePattern = new RegExp(
+              `(?<![\\p{L}\\p{N}_])${escaped}(?![\\p{L}\\p{N}_])`,
+              "iu",
+            );
+            const present = Boolean(update) || namePattern.test(narration);
+            state.spotlightDebt = present ? 0 : ((state.spotlightDebt as number) ?? 0) + 1;
+            dirty = true;
+          }
+
+          if (dirty) {
+            await tx.update(entities).set({ block, state }).where(eq(entities.id, e.id));
+          }
         }
-      }
+        await txMarkStep(tx, "entities");
+      });
       g2.entities = true;
-      await tx
-        .update(turns)
-        .set({ checkpoints: checkpointSql(g2) })
-        .where(eq(turns.id, turnId));
-    });
-  }
+    },
+    { requires: ["distill"] },
+  );
 
   // 6. seeds, DECLARED path (§7.6): the writer's own claim about this scene —
   //    the sidecar's intended mentions plus any the distiller named — put to
@@ -431,78 +626,80 @@ async function settleG2Inner(db: Db, turnId: string): Promise<void> {
   let declaredMentionIds: string[] = Array.isArray(checkpoints.seed_declared)
     ? (checkpoints.seed_declared as string[])
     : [];
-  if (!g2.seeds) {
-    const declared = [
-      ...new Set(
-        [...(sidecar?.intended_seed_mentions ?? []), ...payload.confirmed_seed_descriptions]
-          .map((s) => s.trim())
-          .filter(Boolean),
-      ),
-    ];
-    const named = new Map<string, { id: string; description: string }>();
-    for (const m of declared) {
-      // Literal containment: %/_ inside the model's string are live ILIKE
-      // wildcards unless escaped — unescaped, one stray "50%" matches seeds
-      // nobody named (the same hazard the C7 audit found in demote_criticals).
-      const literal = m.replace(/([\\%_])/g, "\\$1");
-      const matched = await db
-        .select({ id: seeds.id, description: seeds.description })
-        .from(seeds)
-        .where(
-          and(
-            eq(seeds.campaignId, campaignId),
-            inArray(seeds.status, ["planted", "confirmed"]),
-            notTombstoned(seeds),
-            sql`(${seeds.id}::text = ${m} OR ${seeds.description} ILIKE ${`%${literal}%`})`,
-          ),
-        );
-      for (const s of matched) named.set(s.id, s);
-    }
+  await step(
+    "seeds",
+    async () => {
+      if (!distilled) return;
+      const declared = [
+        ...new Set(
+          [...(sidecar?.intended_seed_mentions ?? []), ...distilled.confirmed_seed_descriptions]
+            .map((s) => s.trim())
+            .filter(Boolean),
+        ),
+      ];
+      const named = new Map<string, { id: string; description: string }>();
+      for (const m of declared) {
+        // Literal containment: %/_ inside the model's string are live ILIKE
+        // wildcards unless escaped — unescaped, one stray "50%" matches seeds
+        // nobody named (the same hazard the C7 audit found in demote_criticals).
+        const literal = m.replace(/([\\%_])/g, "\\$1");
+        const matched = await db
+          .select({ id: seeds.id, description: seeds.description })
+          .from(seeds)
+          .where(
+            and(
+              eq(seeds.campaignId, campaignId),
+              inArray(seeds.status, ["planted", "confirmed"]),
+              notTombstoned(seeds),
+              sql`(${seeds.id}::text = ${m} OR ${seeds.description} ILIKE ${`%${literal}%`})`,
+            ),
+          );
+        for (const s of matched) named.set(s.id, s);
+      }
 
-    // Cost discipline (§7.6): nothing declared, or nothing declared that maps
-    // onto a live seed → no probe at all.
-    const roster = [...named.values()];
-    let surfaced: { id: string }[] = [];
-    if (roster.length > 0) {
-      const check = await callProbe(selection, {
-        name: "seed_mention_check",
-        schema: SeedMentionCheck,
-        campaignId,
-        turnNumber,
-        system: [
-          "A SEED is a planted narrative promise a story owes an answer to. The writer",
-          "claimed this scene would touch the seeds below. Read the scene and say which",
-          "of them ACTUALLY SURFACED ON THE PAGE — named, alluded to, or acted upon so a",
-          "reader would feel the thread. Sharing a setting, a character, or a mood with a",
-          "seed is not surfacing it. Return only the numbers that surfaced; return none",
-          "if the scene kept no promise.",
-        ].join(" "),
-        prompt: [
-          "SEEDS:",
-          ...roster.map((s, i) => `${i}. ${s.description}`),
-          "",
-          "SCENE:",
-          narration,
-        ].join("\n"),
-        maxTokens: CLASSIFY,
+      // Cost discipline (§7.6): nothing declared, or nothing declared that maps
+      // onto a live seed → no probe at all.
+      const roster = [...named.values()];
+      let surfaced: { id: string }[] = [];
+      if (roster.length > 0) {
+        const check = await callProbe(selection, {
+          name: "seed_mention_check",
+          schema: SeedMentionCheck,
+          campaignId,
+          turnNumber,
+          system: [
+            "A SEED is a planted narrative promise a story owes an answer to. The writer",
+            "claimed this scene would touch the seeds below. Read the scene and say which",
+            "of them ACTUALLY SURFACED ON THE PAGE — named, alluded to, or acted upon so a",
+            "reader would feel the thread. Sharing a setting, a character, or a mood with a",
+            "seed is not surfacing it. Return only the numbers that surfaced; return none",
+            "if the scene kept no promise.",
+          ].join(" "),
+          prompt: [
+            "SEEDS:",
+            ...roster.map((s, i) => `${i}. ${s.description}`),
+            "",
+            "SCENE:",
+            narration,
+          ].join("\n"),
+          maxTokens: CLASSIFY,
+        });
+        // The grammar strips bounds, so an out-of-range index is a live outcome:
+        // filter, never fail (a bad number must not cost the real confirmations).
+        surfaced = [...new Set(check.surfaced)]
+          .map((i) => roster[i])
+          .filter((s): s is { id: string; description: string } => Boolean(s));
+      }
+
+      declaredMentionIds = surfaced.map((s) => s.id);
+      await db.transaction(async (tx) => {
+        for (const s of surfaced) await recordSeedMention(tx, s.id);
+        await txMarkStep(tx, "seeds", { seed_declared: declaredMentionIds });
       });
-      // The grammar strips bounds, so an out-of-range index is a live outcome:
-      // filter, never fail (a bad number must not cost the real confirmations).
-      surfaced = [...new Set(check.surfaced)]
-        .map((i) => roster[i])
-        .filter((s): s is { id: string; description: string } => Boolean(s));
-    }
-
-    declaredMentionIds = surfaced.map((s) => s.id);
-    await db.transaction(async (tx) => {
-      for (const s of surfaced) await recordSeedMention(tx, s.id);
       g2.seeds = true;
-      await tx
-        .update(turns)
-        .set({ checkpoints: checkpointSql(g2, { seed_declared: declaredMentionIds }) })
-        .where(eq(turns.id, turnId));
-    });
-  }
+    },
+    { requires: ["distill"] },
+  );
 
   // 6b. seeds, ORGANIC path (§7.6): the sweep the prose never declared. Pure
   //     code — one embedding of this scene cosined against every open seed's
@@ -513,24 +710,23 @@ async function settleG2Inner(db: Db, turnId: string): Promise<void> {
   //     BETWEEN step 6 and this one replays with an empty exclusion list — the
   //     cost is one extra candidate on a seed the page genuinely surfaced,
   //     which the adjudicator still judges on the evidence.)
-  if (!g2.seed_sweep) {
-    try {
+  // The catch that swallowed this failure AND marked it done is gone (C5): a
+  // failed sweep is candidates the ledger never saw, and the sweep dedups by
+  // turn (seeds.ts), so re-running it on the next settle is free of doubles.
+  await step(
+    "seed_sweep",
+    async () => {
       await sweepSeedCandidates(db, campaignId, turnNumber, narration, {
         alreadyMentioned: declaredMentionIds,
       });
-    } catch (err) {
-      console.warn(
-        `[g2] organic seed sweep failed (turn ${turnNumber}) — candidates skipped:`,
-        err,
-      );
-    }
-    g2.seed_sweep = true;
-    await markDb();
-  }
+      await markStep("seed_sweep");
+    },
+    { requires: ["seeds"] },
+  );
 
   // 7. arc_watcher (§4.2) — if an override is active, one probe asks whether
   //    the scene crossed its transition signal; on yes, clear it + leave a mark.
-  if (!g2.arc_watcher) {
+  await step("arc_watcher", async () => {
     const parsedOverride = ArcOverride.safeParse(campaign.arcOverride);
     if (parsedOverride.success) {
       const override = parsedOverride.data;
@@ -558,46 +754,44 @@ async function settleG2Inner(db: Db, turnId: string): Promise<void> {
             confidence: 0.85,
           });
         }
-        g2.arc_watcher = true;
-        await tx
-          .update(turns)
-          .set({ checkpoints: checkpointSql(g2) })
-          .where(eq(turns.id, turnId));
+        await txMarkStep(tx, "arc_watcher");
       });
-    } else {
       g2.arc_watcher = true;
-      await markDb();
+    } else {
+      await markStep("arc_watcher");
     }
-  }
+  });
 
   // 8. marks — player meta-comments become craft-note pencil marks (§6.6).
-  if (!g2.marks) {
-    await db.transaction(async (tx) => {
-      if (payload.meta_comments.length > 0) {
-        await tx.insert(pencilMarks).values(
-          payload.meta_comments.map((comment) => ({
-            campaignId,
-            kind: "craft_note",
-            topic: "player_meta",
-            direction: comment,
-            evidence: "probe-detected player meta-comment",
-            turnId: turnNumber,
-            provenance: G2_PROVENANCE,
-            confidence: 0.85,
-          })),
-        );
-      }
+  await step(
+    "marks",
+    async () => {
+      if (!distilled) return;
+      await db.transaction(async (tx) => {
+        if (distilled.meta_comments.length > 0) {
+          await tx.insert(pencilMarks).values(
+            distilled.meta_comments.map((comment) => ({
+              campaignId,
+              kind: "craft_note",
+              topic: "player_meta",
+              direction: comment,
+              evidence: "probe-detected player meta-comment",
+              turnId: turnNumber,
+              provenance: G2_PROVENANCE,
+              confidence: 0.85,
+            })),
+          );
+        }
+        await txMarkStep(tx, "marks");
+      });
       g2.marks = true;
-      await tx
-        .update(turns)
-        .set({ checkpoints: checkpointSql(g2) })
-        .where(eq(turns.id, turnId));
-    });
-  }
+    },
+    { requires: ["distill"] },
+  );
 
   // 9. heat_batch — CLOSE THE C4 SEAM. Fold accumulated access boosts into
   //    base heat as one batched UPDATE per memory, then delete the boosts.
-  if (!g2.heat_batch) {
+  await step("heat_batch", async () => {
     await db.transaction(async (tx) => {
       const boosts = await tx
         .select()
@@ -628,21 +822,17 @@ async function settleG2Inner(db: Db, turnId: string): Promise<void> {
             and(eq(heatBoosts.campaignId, campaignId), lte(heatBoosts.turnNumber, turnNumber)),
           );
       }
-      g2.heat_batch = true;
-      await tx
-        .update(turns)
-        .set({ checkpoints: checkpointSql(g2) })
-        .where(eq(turns.id, turnId));
+      await txMarkStep(tx, "heat_batch");
     });
-  }
+    g2.heat_batch = true;
+  });
 
   // 10. compaction — run the real (subtext-first) compactor when due (§6.2).
   //     Idempotent per watermark, so it lives outside the marker transaction.
-  if (!g2.compaction) {
+  await step("compaction", async () => {
     await maybeCompact(db, campaignId, turnNumber, selection);
-    g2.compaction = true;
-    await markDb();
-  }
+    await markStep("compaction");
+  });
 
   // 11. director_trigger — the §7.1 hybrid trigger, bound (C7). Fold this
   //     turn into the accumulators (Layout stashed epicness + any pacer
@@ -651,92 +841,128 @@ async function settleG2Inner(db: Db, turnId: string): Promise<void> {
   //     accumulator save + marker land BEFORE the cycle: a failed Director
   //     run is a skipped daily (the next trigger fires within 8 turns), never
   //     a wedged G2 — and a replayed cycle would double-apply seed plants.
-  if (!g2.director_trigger) {
-    const stash = checkpoints as { epicness?: number; pacer_transition?: string | null };
-    const conteForEvents = turn.conte as {
-      outcome?: { narrative_weight?: string };
-      mechanics?: { combat_results?: string };
-    } | null;
-    const events: string[] = [];
-    if (turn.tier === "sakuga") events.push("sakuga_moment");
-    if (conteForEvents?.outcome?.narrative_weight === "CLIMACTIC") {
-      events.push(conteForEvents.mechanics?.combat_results ? "boss_defeat" : "climactic_beat");
-    }
-    if (
-      (sidecar?.intended_seed_mentions?.length ?? 0) > 0 ||
-      payload.confirmed_seed_descriptions.length > 0
-    ) {
-      events.push("foreshadowing_mentioned");
-    }
-    if (stash.pacer_transition) {
-      events.push(`phase_transition_suggested:${stash.pacer_transition}`);
-    }
-
-    let direction = accumulate(await loadDirectionState(db, campaignId), {
-      epicness: stash.epicness ?? 0,
-      events,
-    });
-    const overdue = await overdueSeeds(db, campaignId, turnNumber);
-    if (overdue.length > 0) {
-      direction = {
-        ...direction,
-        tension_level: Math.min(1, direction.tension_level + overdueTensionBump(overdue.length)),
-      };
-    }
-    const trigger = evaluateDirectorTrigger(direction, turnNumber);
-    await saveDirectionState(db, campaignId, direction);
-    g2.director_trigger = true;
-    await markDb();
-    if (trigger.fire) {
-      try {
-        await runDirectorCycle(db, campaignId, turnNumber, {
-          trigger: trigger.reasons.join(","),
-        });
-      } catch (err) {
-        console.warn(
-          `[g2] director cycle failed (turn ${turnNumber}) — skipped daily, next trigger ≤${DIRECTOR_MAX_INTERVAL} turns:`,
-          err,
-        );
+  await step(
+    "director_trigger",
+    async () => {
+      if (!distilled) return;
+      const stash = checkpoints as { epicness?: number; pacer_transition?: string | null };
+      const conteForEvents = turn.conte as {
+        outcome?: { narrative_weight?: string };
+        mechanics?: { combat_results?: string };
+      } | null;
+      const events: string[] = [];
+      if (turn.tier === "sakuga") events.push("sakuga_moment");
+      if (conteForEvents?.outcome?.narrative_weight === "CLIMACTIC") {
+        events.push(conteForEvents.mechanics?.combat_results ? "boss_defeat" : "climactic_beat");
       }
-    }
-  }
+      if (
+        (sidecar?.intended_seed_mentions?.length ?? 0) > 0 ||
+        distilled.confirmed_seed_descriptions.length > 0
+      ) {
+        events.push("foreshadowing_mentioned");
+      }
+      if (stash.pacer_transition) {
+        events.push(`phase_transition_suggested:${stash.pacer_transition}`);
+      }
+
+      let direction = accumulate(await loadDirectionState(db, campaignId), {
+        epicness: stash.epicness ?? 0,
+        events,
+      });
+      const overdue = await overdueSeeds(db, campaignId, turnNumber);
+      if (overdue.length > 0) {
+        direction = {
+          ...direction,
+          tension_level: Math.min(1, direction.tension_level + overdueTensionBump(overdue.length)),
+        };
+      }
+      const trigger = evaluateDirectorTrigger(direction, turnNumber);
+      await saveDirectionState(db, campaignId, direction);
+      await markStep("director_trigger");
+      // The marker stays BEFORE the cycle deliberately (unchanged, C7): a
+      // replayed cycle would double-apply seed plants, so the daily is skipped
+      // rather than retried — the trigger re-arms within DIRECTOR_MAX_INTERVAL
+      // turns and M3R2 C1's attempt stamp backs the refire off. What changes
+      // here is only that the failure stops being a console line: it rides
+      // pending_flags, the channel the next dossier already reads, exactly as
+      // C1 made the session-open review failure durable. The append is
+      // surgical — a failed cycle may have half-written state, and a wholesale
+      // save would race it.
+      if (trigger.fire) {
+        try {
+          await runDirectorCycle(db, campaignId, turnNumber, {
+            trigger: trigger.reasons.join(","),
+          });
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          console.warn(
+            `[g2] director cycle failed (turn ${turnNumber}) — skipped daily, next trigger ≤${DIRECTOR_MAX_INTERVAL} turns:`,
+            err,
+          );
+          const flag = `Your turn-${turnNumber} cycle FAILED (${msg.slice(0, 140)}) — that daily never ran; its arc, seed and spotlight decisions are still owed.`;
+          await db
+            .update(campaigns)
+            .set({
+              directionState: sql`jsonb_set(coalesce(${campaigns.directionState}, '{}'::jsonb), '{pending_flags}', coalesce(${campaigns.directionState}->'pending_flags', '[]'::jsonb) || ${JSON.stringify([flag])}::jsonb)`,
+            })
+            .where(eq(campaigns.id, campaignId))
+            .catch(() => {});
+        }
+      }
+    },
+    { requires: ["distill"] },
+  );
 
   // 11b. rolling checkpoint (§9.4 close trigger 3): every 12 turns the open
   //      session's memo refreshes in place, so a never-closed session still
-  //      accrues Learned-layer content. Non-fatal like the cycle above.
-  if (!g2.rolling_checkpoint) {
-    try {
-      await rollingCheckpoint(db, campaignId, turnNumber);
-    } catch (err) {
-      console.warn(`[g2] rolling checkpoint failed (turn ${turnNumber}):`, err);
-    }
-    g2.rolling_checkpoint = true;
-    await markDb();
-  }
+  //      accrues Learned-layer content. Off-cadence it is a no-op, and the
+  //      memo write is idempotent — so a failure now retries instead of
+  //      marking a checkpoint that never happened (C5).
+  await step("rolling_checkpoint", async () => {
+    await rollingCheckpoint(db, campaignId, turnNumber);
+    await markStep("rolling_checkpoint");
+  });
 
   // 11c. sakkan (§4.5, C8): drift sampled on cadence — every 8 turns or a
   //      sakuga scene (session close hooks separately). Trust rule: advisory
-  //      only; a failed sample is a skipped measurement, never a wedged G2.
-  if (!g2.sakkan) {
-    try {
-      const direction = await loadDirectionState(db, campaignId);
-      if (sakkanDue(direction, turnNumber, { sakuga: turn.tier === "sakuga" })) {
-        await runSakkanSample(db, campaignId, turnNumber, {
-          trigger: turn.tier === "sakuga" ? "sakuga" : "interval",
+  //      only; a failed sample is a skipped measurement — but the SKIP is now
+  //      retried rather than recorded as a sample that never ran (C5); the
+  //      cadence guard (last_sample_turn) keeps the retry from double-sampling.
+  await step("sakkan", async () => {
+    const direction = await loadDirectionState(db, campaignId);
+    if (sakkanDue(direction, turnNumber, { sakuga: turn.tier === "sakuga" })) {
+      await runSakkanSample(db, campaignId, turnNumber, {
+        trigger: turn.tier === "sakuga" ? "sakuga" : "interval",
+      });
+    }
+    await markStep("sakkan");
+  });
+
+  // 12. media — the §9.5 disabled seam, and the TERMINAL marker: it is the
+  //     flag settleG2IfPending reads to decide a turn is settled, so it may
+  //     only land once every other step has finished or been abandoned.
+  //     Marking it while a step still owes work would tell the catch-up that
+  //     a half-written turn is done — the §5.8 guarantee inverted.
+  const unfinished = G2_STEPS.filter((s) => !g2[s] && !abandoned[s]);
+  if (!g2.media) {
+    if (unfinished.length > 0) {
+      console.warn("[g2] settle incomplete — terminal marker withheld", {
+        campaignId,
+        turnNumber,
+        unfinished,
+      });
+    } else {
+      dispatchMediaTriggers();
+      const abandonedSteps = G2_STEPS.filter((s) => abandoned[s]);
+      if (abandonedSteps.length > 0) {
+        console.error("[g2] turn settled with ABANDONED steps — this work never ran", {
+          campaignId,
+          turnNumber,
+          abandoned: abandonedSteps,
         });
       }
-    } catch (err) {
-      console.warn(`[g2] sakkan sample failed (turn ${turnNumber}):`, err);
+      await markStep("media");
     }
-    g2.sakkan = true;
-    await markDb();
-  }
-
-  // 12. media — the §9.5 disabled seam.
-  if (!g2.media) {
-    dispatchMediaTriggers();
-    g2.media = true;
-    await markDb();
   }
 }
 

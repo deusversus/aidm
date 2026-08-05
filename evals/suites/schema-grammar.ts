@@ -23,7 +23,12 @@ import { ValidationOutput } from "@/lib/turn/outcome";
 import { RankOutput } from "@/lib/turn/retrieval";
 import { ScaleJudgment } from "@/lib/turn/scale";
 import { KA_TOOLS } from "@/lib/turn/tools";
-import { BoothResolution, BoothRoute, OverrideComprehension } from "@/lib/types/booth";
+import {
+  BoothResolution,
+  BoothRoute,
+  CorrectionComprehension,
+  OverrideComprehension,
+} from "@/lib/types/booth";
 import {
   AttributionResult,
   DirectorEmitOps,
@@ -112,6 +117,11 @@ const LIVE_PLAY_SCHEMAS: Array<{ name: string; schema: z.ZodType<any> }> = [
   { name: "BoothRoute", schema: BoothRoute },
   { name: "BoothResolution", schema: BoothResolution },
   { name: "OverrideComprehension", schema: OverrideComprehension },
+  // M3R2 C4: the corrections channel's gate. BoothRoute and BoothResolution
+  // both GREW this commit (the correction signal, the corrections array) —
+  // they are already swept above, which is the point of sweeping every
+  // production schema rather than only the new ones.
+  { name: "CorrectionComprehension", schema: CorrectionComprehension },
   // SZ + research (player-facing at SZ time; judgment/probe tiers)
   { name: "OspDraft", schema: OspDraft },
   { name: "NarrativeSynthesis", schema: NarrativeSynthesis },

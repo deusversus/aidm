@@ -298,7 +298,7 @@ export function assembleBlocks(inputs: BlockInputs): AssembledBlocks {
   // moving tail is exactly one exchange pair (2 blocks) plus the conte —
   // structurally under the ~20-block walk-back at any window size. The old
   // threshold (>=19 message blocks) would have fired on EVERY healthy
-  // assembly, since compaction's keep-tail alone is 10 exchanges = 20
+  // assembly, since compaction's keep-tail alone is 12 exchanges = 24
   // blocks: a permanently-tripped alarm is worse than none.
 
   const budgets = {

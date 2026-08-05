@@ -12,15 +12,23 @@
  *
  *   pnpm cache:gauge [days]     (days = window, default 14)
  *
- * Read-only: one aggregate query, no model calls, no spend. Run it before and
- * after any cache-touching commit — the net number moves the right way or the
- * commit doesn't push.
+ * Since M3R2 C5 it also prints the assembled PROMPT SHAPE per campaign — the
+ * §5.6 block budgets and the dropped-pin count the assembler computes and
+ * nothing read. The ledger says what the cache bought; the shape says what it
+ * is buying.
+ *
+ * No model calls, no spend. Not quite read-only: assembling a campaign that has
+ * never been assembled lazily freezes its Settei snapshot, exactly as the first
+ * real assembly would (blocks/campaign.ts) — a played campaign always has one.
+ * Run it before and after any cache-touching commit — the net number moves the
+ * right way or the commit doesn't push.
  */
 
+import { assembleForCampaign } from "@/lib/blocks/campaign";
 import { getDb } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { pricingFor } from "@/lib/llm/pricing";
-import { gte, sql } from "drizzle-orm";
+import { desc, gte, inArray, sql } from "drizzle-orm";
 
 const DEFAULT_DAYS = 14;
 
@@ -157,7 +165,58 @@ function printPhases(phases: PhaseRow[]): void {
   );
 }
 
-function printReport(days: number, since: Date, rows: Row[], phases: PhaseRow[]): void {
+/** One campaign's assembled prompt shape — what the cached prefix WEIGHS. */
+interface BlockBudgetRow {
+  campaignId: string;
+  title: string;
+  b1: number;
+  b2: number;
+  b3: number;
+  pins: number;
+  total: number;
+  epochs: number;
+  droppedPins: number;
+}
+
+/**
+ * The assembler's budgets, metered (M3R2 C5). `assembleBlocks` has always
+ * returned per-block token counts and a droppedPins list; the only readers
+ * were two spike scripts and a prewarm route that echoes them into a JSON
+ * response nobody prints. The gauge is where they belong: the ledger above
+ * says what the cache BOUGHT, and this says what it is buying — which block
+ * grew, whether Block 2 is compacting, and whether the pin bound is silently
+ * dropping player-held passages.
+ *
+ * DB reads only; no model calls, so the script stays free to run.
+ */
+function printBlockBudgets(rows: BlockBudgetRow[]): void {
+  if (rows.length === 0) return;
+  console.log("");
+  console.log("Assembled prompt shape (what the cached prefix weighs, per campaign):");
+  console.log(
+    `${"campaign".padEnd(26)} ${"B1 settei".padStart(10)} ${"B2 story".padStart(9)} ${"B3 window".padStart(10)} ${"pins".padStart(6)} ${"total".padStart(8)} ${"epochs".padStart(7)} ${"dropped".padStart(8)}`,
+  );
+  console.log("-".repeat(92));
+  for (const r of rows) {
+    console.log(
+      `${r.title.slice(0, 26).padEnd(26)} ${int(r.b1).padStart(10)} ${int(r.b2).padStart(9)} ${int(r.b3).padStart(10)} ${int(r.pins).padStart(6)} ${int(r.total).padStart(8)} ${String(r.epochs).padStart(7)} ${String(r.droppedPins).padStart(8)}`,
+    );
+  }
+  const dropping = rows.filter((r) => r.droppedPins > 0);
+  if (dropping.length > 0) {
+    console.log(
+      `  ${dropping.length} campaign(s) have pins the head of memory is NOT carrying — the play surface says so at pin time.`,
+    );
+  }
+}
+
+function printReport(
+  days: number,
+  since: Date,
+  rows: Row[],
+  phases: PhaseRow[],
+  blocks: BlockBudgetRow[],
+): void {
   console.log("");
   console.log(`=== Cache gauge — last ${days} day(s) ===`);
   console.log(`window since ${since.toISOString()} · ${rows.length} tier×model pair(s)`);
@@ -169,6 +228,7 @@ function printReport(days: number, since: Date, rows: Row[], phases: PhaseRow[])
   }
 
   printPhases(phases);
+  printBlockBudgets(blocks);
   console.log("");
 
   console.log(
@@ -284,7 +344,51 @@ async function main(): Promise<void> {
     costUsd: num(p.costUsd),
   }));
 
-  printReport(days, since, rows, phases);
+  printReport(days, since, rows, phases, await selectBlockBudgets(db, since));
+}
+
+/** The campaigns that actually billed in the window, assembled and measured. */
+async function selectBlockBudgets(
+  db: ReturnType<typeof getDb>,
+  since: Date,
+): Promise<BlockBudgetRow[]> {
+  const active = await db
+    .selectDistinct({ campaignId: schema.modelCalls.campaignId })
+    .from(schema.modelCalls)
+    .where(gte(schema.modelCalls.createdAt, since));
+  const ids = active.map((a) => a.campaignId).filter((id): id is string => Boolean(id));
+  if (ids.length === 0) return [];
+  const campaigns = await db
+    .select({ id: schema.campaigns.id, title: schema.campaigns.title })
+    .from(schema.campaigns)
+    .where(inArray(schema.campaigns.id, ids))
+    .orderBy(desc(schema.campaigns.updatedAt));
+
+  const out: BlockBudgetRow[] = [];
+  for (const c of campaigns) {
+    try {
+      const assembled = await assembleForCampaign(db, c.id);
+      if (!assembled) continue;
+      out.push({
+        campaignId: c.id,
+        title: c.title,
+        b1: assembled.budgets.b1Tokens,
+        b2: assembled.budgets.b2Tokens,
+        b3: assembled.budgets.b3Tokens,
+        pins: assembled.budgets.pinTokens,
+        total: assembled.budgets.totalTokens,
+        epochs: assembled.budgets.epochCount,
+        droppedPins: assembled.droppedPins.length,
+      });
+    } catch (err) {
+      // One unassemblable campaign (a pre-contract row, a bad jsonb) must not
+      // cost the whole report — the ledger above is the gauge's main job.
+      console.warn(
+        `[cache-gauge] block budgets skipped for ${c.id} — ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
+  return out;
 }
 
 async function selectPhases(
@@ -305,7 +409,15 @@ async function selectPhases(
       })
       .from(schema.modelCalls)
       .where(gte(schema.modelCalls.createdAt, since))
-      .groupBy(sql`coalesce(${schema.modelCalls.phase}, ${UNATTRIBUTED})`);
+      // Group by the RAW column, not the coalesce expression (M3R2 C5): the
+      // sentinel binds as a parameter, so `coalesce(phase, $1)` in the
+      // projection and `coalesce(phase, $2)` in GROUP BY are different
+      // expressions to Postgres — it rejected the query with "must appear in
+      // the GROUP BY clause" and the catch below swallowed it as a missing
+      // migration. The whole phase ledger (M3 C1's answer to the 47% invisible
+      // spend) has therefore been printing NOTHING. NULL forms its own group,
+      // which is exactly the "(unattributed)" bucket.
+      .groupBy(schema.modelCalls.phase);
   } catch (err) {
     console.warn(
       `\n[cache-gauge] phase table skipped — ${err instanceof Error ? err.message : String(err)}`,

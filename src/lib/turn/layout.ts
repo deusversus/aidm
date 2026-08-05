@@ -55,6 +55,15 @@ export interface LayoutEvent {
   text: string;
 }
 
+/**
+ * Per-channel note budgets inside the §4.4c Scene-Shape Directive. Both
+ * channels are the Director's, and both have to survive the same ≤150-token
+ * directive — so each gets a guaranteed floor instead of competing for one
+ * shared head slice (M3R2 C5; see the assembly site).
+ */
+export const SCENE_SHAPE_NOTE_BUDGET = 2;
+export const DIRECTOR_NOTE_BUDGET = 3;
+
 export type LayoutResult =
   | {
       kind: "conte";
@@ -396,7 +405,10 @@ export async function runLayout(
     // §5.1 douga row: retrieval is NONE — critical block only. Entity cards
     // and callbacks are fan-out members, so they're tier-gated too.
     turnContract.retrievalCandidates > 0
-      ? fetchEntityCards(db, campaignId, playerInput)
+      ? // The contract's compiled voice cards ride the present-cast card
+        // (M3R2 C5): §4.1's Voice component is the authority, and its cards
+        // had no reader on the path the SZ-admitted main cast takes.
+        fetchEntityCards(db, campaignId, playerInput, undefined, contract.active.voice.voice_cards)
       : Promise.resolve([]),
     turnContract.retrievalCandidates > 0
       ? fetchCallbacks(db, campaignId, turnNumber)
@@ -591,10 +603,17 @@ export async function runLayout(
     phase: arcState?.phase,
     trajectoryNote: direction.scene_shape?.trajectory_note,
   });
+  // Two Director channels, each with its OWN floor (M3R2 C5). A single
+  // `.slice(0, 3)` over the concatenation starved director_notes completely:
+  // the cycle may emit 3 scene_shape_notes AND 5 director_notes
+  // (DIRECTOR_CAPS), the scene-shape half is written first, so a full cycle's
+  // standing advisory notes never reached the pen at all. §4.4c's ≤150-token
+  // directive is why the ceilings stay tight — the fix is a fair split, not a
+  // bigger slice.
   const directorNotes = [
-    ...(direction.scene_shape?.notes ?? []),
-    ...direction.director_notes,
-  ].slice(0, 3);
+    ...(direction.scene_shape?.notes ?? []).slice(0, SCENE_SHAPE_NOTE_BUDGET),
+    ...direction.director_notes.slice(0, DIRECTOR_NOTE_BUDGET),
+  ];
   const pilot = turnNumber === 1 ? direction.pilot_plan : undefined;
   let sceneShapeText = sceneShape.text;
   if (directorNotes.length > 0) {
@@ -622,12 +641,16 @@ export async function runLayout(
     // when the rung fired, even though the probe itself already resolved.
     // pacingNote (model note + any gate note) rides the beat into the conte
     // (M2R2 — was computed at pacer.ts:304 and never written).
-    pacer_beat:
-      ladder.has("timebox_pacer") || !pacer.beat
-        ? undefined
-        : // beat.pacing_note is the raw model note; the joined pacer.pacingNote
-          // (strength bookkeeping included) stays engine-side (M2R2 audit).
-          pacer.beat,
+    // §5.5 rung 2 is "do not WAIT for the Pacer", and the fan-out gate above
+    // is where that decision belongs. A beat that RESOLVED is kept even when
+    // the rung fired later in Phase A (M3R2 C5): the call was made, billed and
+    // answered, and throwing the answer away bought no latency back — it only
+    // blanked the scene's continuity channel. Measured: campaign e4bb3080 turn
+    // 5's pacer returned in 4.7 s and the conte still carried no beat because a
+    // rung fired downstream.
+    // beat.pacing_note is the raw model note; the joined pacer.pacingNote
+    // (strength bookkeeping included) stays engine-side (M2R2 audit).
+    pacer_beat: pacer.beat,
     canonicality_directives: canonicalityDirectives,
     // Pilot constraints (§8 handoff, ratified pilot-as-normal-turn): the
     // OSP's forbidden opening moves + the Director's cold-open constraints

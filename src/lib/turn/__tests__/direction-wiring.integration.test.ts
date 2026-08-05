@@ -6,7 +6,7 @@ import { callJudgment, callProbe, streamNarration } from "@/lib/llm/calls";
 import type { TierSelection } from "@/lib/llm/tiers";
 import { embedTexts } from "@/lib/llm/voyage";
 import { bebopContract } from "@/lib/renderer/__tests__/fixtures";
-import { runLayout } from "@/lib/turn/layout";
+import { DIRECTOR_NOTE_BUDGET, SCENE_SHAPE_NOTE_BUDGET, runLayout } from "@/lib/turn/layout";
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
@@ -191,6 +191,42 @@ describe.skipIf(!url)("C7 direction wiring (real Postgres, scripted models)", ()
     expect(joined).toContain("the dockmaster's unpaid debt");
     // Gate holds: its dependency is unresolved, so it stays out of the conte.
     expect(joined).not.toContain("the syndicate's silent partner");
+  });
+
+  it("both Director note channels reach the scene shape — director_notes are no longer starved (M3R2 C5)", async () => {
+    if (!db) throw new Error("unreachable");
+    // A full cycle emits up to 3 scene_shape_notes AND 5 director_notes
+    // (DIRECTOR_CAPS). One `.slice(0, 3)` over the concatenation — scene-shape
+    // first — meant a full cycle's standing advisory notes never rendered.
+    const campaignId = await makeCampaign({
+      directionState: {
+        scene_shape: {
+          notes: ["let silence do the threatening", "keep the camera low", "no music cues"],
+        },
+        director_notes: [
+          "the debt is the season's spine",
+          "Faye is owed a scene",
+          "stop resolving the fork",
+          "surplus note four",
+          "surplus note five",
+        ],
+      },
+    });
+    armLayoutModels();
+
+    const result = await runLayout(db, campaignId, 3, "I wait for the call.");
+    if (result.kind !== "conte") throw new Error("expected a conte");
+    const shape = result.conte.scene_shape_directive;
+    // Each channel keeps its floor…
+    expect(shape).toContain("Director: let silence do the threatening");
+    expect(shape).toContain("Director: keep the camera low");
+    expect(shape).toContain("Director: the debt is the season's spine");
+    expect(shape).toContain("Director: Faye is owed a scene");
+    expect(shape).toContain("Director: stop resolving the fork");
+    // …and neither channel may flood the §4.4c budget.
+    expect(shape).not.toContain("no music cues");
+    expect(shape).not.toContain("surplus note four");
+    expect(shape.match(/Director: /g)).toHaveLength(SCENE_SHAPE_NOTE_BUDGET + DIRECTOR_NOTE_BUDGET);
   });
 
   it("Director spotlight directives surface as conte spotlight_hints", async () => {

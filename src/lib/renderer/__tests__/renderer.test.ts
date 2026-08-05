@@ -43,6 +43,67 @@ const mark = (topic: string, direction: string, superseded = false): PencilMark 
   ...(superseded ? { superseded_by: "mark_x" } : {}),
 });
 
+// A Re:ZERO-shaped example_voice: a full in-register paragraph, not a tagline
+// — the case the author's-hand deliverable exists for.
+const LONG_SAMPLE = [
+  "The cold came first, the way it always did, crawling up from the cobblestones into the",
+  "soles of his shoes, and Subaru understood — before the pain, before the sound of his own",
+  "name in someone else's mouth — that he had already lost this one. Again. The market was",
+  "loud. The market was always loud. Somewhere behind him a woman was laughing at a joke he",
+  "would never hear the end of, and he thought, with the awful clarity of a man who has done",
+  "this too many times: I know how she dies. I know the hour. I know I will not be enough,",
+  "and I am going to try anyway, because the alternative is to stand here in the cold and let",
+  "the clock run out on someone who still believes I am the kind of person who saves people.",
+].join(" ");
+
+/**
+ * A charter that genuinely exceeds the RULED 2,600 ceiling, so the trim ladder
+ * runs every rung. The bulk is all untrimmable matter — the author's own hand,
+ * a rich voice fingerprint, a long spark and director personality, and the
+ * standing calibration a forty-turn campaign accumulates — which is exactly
+ * the live shape that measured 2,124 tokens after eleven trims under the old
+ * 600–900 target. Under the ruled band the same premise renders whole; this
+ * fixture is deliberately heavier still, because the ladder's ORDER can only
+ * be pinned by a charter that makes it run.
+ */
+const MAXED_MARK_COUNT = 30;
+const maxedContract = () => {
+  const c = bebopContract();
+  c.active.voice.author_voice.example_voice = LONG_SAMPLE;
+  c.active.voice.author_voice.sentence_patterns = [
+    "clipped, jazz-phrased — the sentence stops a beat before the reader expects the landing",
+    "long cool inventories of a room, then one short line that costs somebody something",
+    "dialogue interrupts description mid-clause, the way people interrupt weather",
+  ];
+  c.active.voice.author_voice.structural_motifs = [
+    "cold open on an object, never a face",
+    "smash cut to quiet — the aftermath is where the scene actually happens",
+    "the flashback arrives one scene after you needed it",
+  ];
+  c.active.voice.author_voice.dialogue_quirks = [
+    "deflection as intimacy — the closer they are, the less they say straight",
+    "nobody answers the question they were asked",
+  ];
+  c.active.voice.author_voice.emotional_rhythm = [
+    "long cool, sudden ache",
+    "the joke lands a beat late and it hurts",
+  ];
+  c.active.voice.director_personality =
+    "A jazz musician directing a noir film: improvises, digresses, and always lands the final note a beat after you expect it. Every scene is a standard played once straight and once wrong, and the wrong one is the take that ships. Silence is an instrument here; so is a door closing two rooms away.";
+  c.spark =
+    "The moment someone says 'Whatever happens, happens' and walks toward the thing anyway — not because they are brave, but because they have already decided what they are willing to lose, and the deciding happened offscreen, years ago, in a room we will never see.";
+  return c;
+};
+const maxedMarks = () =>
+  Array.from({ length: MAXED_MARK_COUNT }, (_, i) =>
+    mark(
+      `calibration_${i}`,
+      `keep the aftermath quiet and let the crew's affection stay unstated — note ${i} of a long campaign's standing calibration, the kind that accumulates over forty turns of play`,
+    ),
+  );
+const firstTrimIndex = (trims: string[], prefix: string) =>
+  trims.findIndex((t) => t.startsWith(prefix));
+
 describe("extreme-axis selection (§4.4a)", () => {
   it("finds Bebop's nine extremes and ranks distance-then-schema-order", () => {
     const extremes = extremeAxes(BEBOP_DNA);
@@ -62,10 +123,24 @@ describe("extreme-axis selection (§4.4a)", () => {
 describe("renderSettei (§4.4a)", () => {
   const settei = renderSettei({ contract: bebopContract(), marks: [] });
 
+  it("the §4.4a band is the RULED one (user, 2026-08-05) — 1,200–2,600", () => {
+    // A pin, not a range: the old 600–900 target was authored before any
+    // charter had been measured, and a real premise renders 2,124 tokens after
+    // eleven trims. The plan proposed 1,200–2,200; the user widened the ceiling
+    // to 2,600 (2,200 was razor-thin against the measurement). One constant,
+    // every reader — the ladder, the overrun flag, and both snapshots.
+    expect(SETTEI_TOKEN_TARGET).toEqual({ min: 1_200, max: 2_600 });
+  });
+
   it("renders ≤6 axes; the charter lands inside the §4.4a budget", () => {
     expect(settei.renderedAxes.length).toBeLessThanOrEqual(SETTEI_MAX_RENDERED_AXES);
-    expect(settei.charterTokens).toBeGreaterThanOrEqual(SETTEI_TOKEN_TARGET.min);
     expect(settei.charterTokens).toBeLessThanOrEqual(SETTEI_TOKEN_TARGET.max);
+    // The lean fixture renders ~989 tokens — under the band's FLOOR, and that
+    // is correct: the floor describes what a live premise costs (a real spark,
+    // a real fingerprint, standing calibration), not the minimum this synthetic
+    // contract can be squeezed to. What the fixture proves is that a charter
+    // this size now ships WHOLE: the ladder never fires.
+    expect(settei.trims).toHaveLength(0);
     // Whole Block 1 = charter + the world-rules command block.
     expect(settei.tokens).toBeGreaterThan(settei.charterTokens);
     expect(approxTokens(settei.text)).toBe(settei.tokens);
@@ -73,20 +148,19 @@ describe("renderSettei (§4.4a)", () => {
   });
 
   it("the overrun flag reports the measurement, never a guess (M3 C1)", () => {
-    // Live campaigns run ~2× the §4.4a ceiling and the overrun was recorded
-    // only as a trim string nobody reads. The flag must track the number it
-    // claims to describe, on every contract the renderer can be handed.
-    for (const s of [
-      renderSettei({ contract: bebopContract(), marks: [] }),
-      // A contract carrying extra Block-1 freight — laws, a control key, and
-      // standing calibration — is where the ladder actually runs out of rope.
-      renderSettei({
-        contract: bebopContract({
-          premise_laws: Array.from({ length: 6 }, (_, i) => `Law ${i}: ${"x".repeat(200)}`),
-        }),
-        marks: [],
-      }),
-    ]) {
+    // Under the old 900 ceiling this was the normal state and the overrun was
+    // recorded only as a trim string nobody reads. The flag must track the
+    // number it claims to describe, on every contract the renderer can be
+    // handed — including one still over the RULED ceiling.
+    const overrun = renderSettei({
+      // A campaign whose standing calibration has outgrown even the ruled
+      // ceiling is where the ladder actually runs out of rope: every rung
+      // fires and the charter still ships over budget, loudly (~3,978 tokens).
+      contract: maxedContract(),
+      marks: [...maxedMarks(), ...maxedMarks().map((m) => ({ ...m, id: `${m.id}_b` }))],
+    });
+    expect(overrun.charterOverTarget).toBe(true);
+    for (const s of [renderSettei({ contract: bebopContract(), marks: [] }), overrun]) {
       expect(s.charterOverTarget).toBe(s.charterTokens > SETTEI_TOKEN_TARGET.max);
       // An over-budget charter always says so in its trims as well.
       if (s.charterOverTarget) {
@@ -167,18 +241,6 @@ describe("renderSettei (§4.4a)", () => {
 describe("the author's hand leads the exemplars (§4.4a, M2R4)", () => {
   const HAND =
     "(THIS AUTHOR'S OWN HAND, verbatim — when the passages below and this hand disagree, this hand wins)";
-  // A Re:ZERO-shaped example_voice: a full in-register paragraph, not a tagline
-  // — the case the deliverable exists for, and the one that maxes the charter.
-  const LONG_SAMPLE = [
-    "The cold came first, the way it always did, crawling up from the cobblestones into the",
-    "soles of his shoes, and Subaru understood — before the pain, before the sound of his own",
-    "name in someone else's mouth — that he had already lost this one. Again. The market was",
-    "loud. The market was always loud. Somewhere behind him a woman was laughing at a joke he",
-    "would never hear the end of, and he thought, with the awful clarity of a man who has done",
-    "this too many times: I know how she dies. I know the hour. I know I will not be enough,",
-    "and I am going to try anyway, because the alternative is to stand here in the cold and let",
-    "the clock run out on someone who still believes I am the kind of person who saves people.",
-  ].join(" ");
 
   it("renders the sample first in the exemplar section, framed as senior to the strangers", () => {
     const s = renderSettei({ contract: bebopContract(), marks: [] });
@@ -198,28 +260,74 @@ describe("the author's hand leads the exemplars (§4.4a, M2R4)", () => {
     expect(s.text).toContain("deflection as intimacy");
   });
 
-  it("is NEVER trimmed on a maxed charter — the foreign passages pay instead", () => {
-    const contract = bebopContract();
-    contract.active.voice.author_voice.example_voice = LONG_SAMPLE;
+  it("the trim ladder is INVERTED: caveats first, voice last, the sample never (ruled 2026-08-05)", () => {
     const s = renderSettei({
-      contract,
-      marks: [],
+      contract: maxedContract(),
+      marks: maxedMarks(),
       // Taste notes ride too, so every rung of the ladder is live.
-      tasteNotes: ["loves quiet aftermath scenes"],
+      tasteNotes: ["loves quiet aftermath scenes", "reaches for found family"],
     });
-    // The charter is genuinely at the ceiling here (the ladder fires in full).
+    // The charter is genuinely over the ruled ceiling here, so every rung fires.
     expect(s.charterTokens).toBeLessThanOrEqual(SETTEI_TOKEN_TARGET.max);
-    expect(s.charterTokens).toBeGreaterThan(SETTEI_TOKEN_TARGET.max - 60);
-    expect(s.trims.length).toBeGreaterThan(0);
-    // Everything else gave: taste, a foreign exemplar, craft caveats.
-    expect(s.trims.some((t) => t.startsWith("taste note dropped"))).toBe(true);
-    expect(s.trims.some((t) => t.startsWith("exemplar "))).toBe(true);
-    // The author's hand survives, whole and in place.
+    expect(s.charterTokens).toBeGreaterThan(SETTEI_TOKEN_TARGET.max - 120);
+
+    // THE ORDER IS THE POINT. Before the ruling this ran taste → exemplars →
+    // craft caveats: the register passages were spent to protect axis
+    // bookkeeping, and M3R2's founding complaint ("each reply seems disparate
+    // — not the same writer") was partly that trade. Now: taste, then every
+    // reducible caveat, and only then a stranger's passage.
+    const taste = firstTrimIndex(s.trims, "taste note dropped");
+    const craft = firstTrimIndex(s.trims, "craft guidance for");
+    const exemplar = firstTrimIndex(s.trims, "exemplar ");
+    expect(taste).toBe(0);
+    expect(craft).toBeGreaterThan(taste);
+    expect(exemplar).toBeGreaterThan(craft);
+    // Not one caveat left un-clipped before the voice matter started paying.
+    expect(s.trims.filter((t) => t.startsWith("craft guidance for"))).toHaveLength(
+      s.renderedAxes.length,
+    );
+
+    // The author's hand survives, whole and in place — no rung reaches it.
     expect(s.text).toContain(HAND);
     expect(s.text).toContain(LONG_SAMPLE);
     expect(s.trims.some((t) => t.includes("author"))).toBe(false);
+    // Nor does any rung reach the voice fingerprint.
+    expect(s.text).toContain("## Voice fingerprint (verbatim)");
+    expect(s.text).toContain("deflection as intimacy — the closer they are, the less they say");
     // Floor drops to ONE foreign passage when the sample renders: sample +
     // one stranger still meets §4.4a's "2–3 exemplars".
+    expect(s.exemplarIds).toHaveLength(1);
+    // The clipped axes still render their pressure — the value line stays, only
+    // the teaching sentence goes.
+    expect(s.text).toContain("**moral_complexity = 8/10.**");
+  });
+
+  it("the voice journal has a rung, and it gives BEFORE any exemplar (M3R3 close)", () => {
+    const line = "You held the cool one beat longer than comfort.";
+    const s = renderSettei({
+      contract: maxedContract(),
+      marks: maxedMarks(),
+      tasteNotes: ["loves quiet aftermath scenes"],
+      voiceJournal: `${line} `.repeat(30),
+    });
+    expect(s.charterTokens).toBeLessThanOrEqual(SETTEI_TOKEN_TARGET.max);
+
+    // The journal is voice matter and it renders in the voice section — but it
+    // is the MODEL's prose about the last sitting, and an exemplar is grounded
+    // text that shows the register. Carry-forward description never outranks
+    // the thing itself, so its rung sits under the caveats and over the
+    // strangers' passages.
+    const craft = firstTrimIndex(s.trims, "craft guidance for");
+    const journal = firstTrimIndex(s.trims, "voice journal dropped");
+    const exemplar = firstTrimIndex(s.trims, "exemplar ");
+    expect(journal).toBeGreaterThan(craft);
+    expect(exemplar).toBeGreaterThan(journal);
+    expect(s.text).not.toContain("## Where the last sitting left your hand");
+    expect(s.text).not.toContain(line);
+
+    // What the journal's 150 tokens used to be taken from, still standing: the
+    // author's hand and the foreign passage the floor keeps.
+    expect(s.text).toContain(LONG_SAMPLE);
     expect(s.exemplarIds).toHaveLength(1);
   });
 
@@ -254,9 +362,17 @@ describe("the author's hand leads the exemplars (§4.4a, M2R4)", () => {
     expect(withSample.charterTokens).toBeLessThanOrEqual(SETTEI_TOKEN_TARGET.max);
 
     // Same charter without the author sample: the third slot goes to a foreign
-    // passage — it is picked, and only then does the budget rule on it.
+    // passage — and under the RULED band (2026-08-05) it now KEEPS it. The old
+    // 900 ceiling dropped this passage on a charter of 1,007 tokens; the band
+    // buying back a whole register exemplar is the ruling's point, stated here
+    // as the measurement it is.
     const noSample = renderSettei({ contract: lean(""), marks: [] });
-    expect(noSample.trims).toContain("exemplar intimacy_b9_march dropped for budget");
+    expect(noSample.exemplarIds).toEqual([
+      "darkness_b9_berserk",
+      "comedy_b9_konosuba",
+      "intimacy_b9_march",
+    ]);
+    expect(noSample.trims).toHaveLength(0);
   });
 
   it("drops the seniority clause when no foreign passage follows (no pointing at ghosts)", () => {
@@ -314,7 +430,6 @@ describe("the control key in the Settei (§7.5, M2-C8)", () => {
     expect(s.text).toContain("the bloodrage takes hold");
     expect(s.text).toContain("briefly slip the player's control");
     expect(s.text).toContain("/override melts the key");
-    expect(s.charterTokens).toBeGreaterThanOrEqual(SETTEI_TOKEN_TARGET.min);
     expect(s.charterTokens).toBeLessThanOrEqual(SETTEI_TOKEN_TARGET.max);
   });
 
@@ -562,15 +677,16 @@ describe("the player, known (§6.9 Renderer reader, M2R R4)", () => {
   });
 
   it("at the budget ceiling, taste yields FIRST — premise pressure never pays for priors (R4 audit)", () => {
-    // Bebop's charter sits at SETTEI_TOKEN_TARGET.max; a taste block must be
-    // the trim that gives, with premise exemplars intact.
+    // A charter over the RULED ceiling (Bebop's own fixture now fits whole, so
+    // it no longer exercises the ladder at all): the taste block is the first
+    // trim that gives, with premise exemplars intact.
     const settei = renderSettei({
-      contract: bebopContract(),
-      marks: [],
+      contract: maxedContract(),
+      marks: maxedMarks(),
       tasteNotes: ["loves quiet aftermath scenes"],
     });
     expect(settei.text).not.toContain("## The player, known");
-    expect(settei.trims.some((t) => t.startsWith("taste note dropped"))).toBe(true);
+    expect(settei.trims[0]).toMatch(/^taste note dropped/);
     // Premise pressure intact: the author's hand plus a foreign passage — the
     // exemplar floor with a sample rendering (M2R4).
     expect(settei.text).toContain("THIS AUTHOR'S OWN HAND");
@@ -581,6 +697,25 @@ describe("the player, known (§6.9 Renderer reader, M2R R4)", () => {
   it("no taste, no section", () => {
     const settei = renderSettei({ contract: bebopContract(), marks: [] });
     expect(settei.text).not.toContain("## The player, known");
+  });
+
+  it("the voice journal renders as voice matter, clipped to its budget (M3R2 C5)", () => {
+    const journal = `${"You held the cool one beat longer than comfort. ".repeat(30)}END`;
+    const settei = renderSettei({ contract: roomy(), marks: [], voiceJournal: journal });
+    expect(settei.text).toContain("## Where the last sitting left your hand");
+    expect(settei.text).toContain("You held the cool one beat longer than comfort.");
+    // A 300-word journal verbatim would spend a tenth of the §4.4a band.
+    expect(settei.text).not.toContain("END");
+    expect(settei.text).toContain("…");
+    // It sits with the voice matter, not below the standing marks.
+    expect(settei.text.indexOf("## Voice fingerprint")).toBeLessThan(
+      settei.text.indexOf("## Where the last sitting left your hand"),
+    );
+  });
+
+  it("no journal, no section (an unplayed campaign renders nothing here)", () => {
+    const settei = renderSettei({ contract: bebopContract(), marks: [] });
+    expect(settei.text).not.toContain("Where the last sitting left your hand");
   });
 });
 

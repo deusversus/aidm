@@ -204,6 +204,40 @@ export async function rewindCampaign(
       }
     }
 
+    // A retirement anchor belongs to the timeline that just died. The sweep
+    // above skips rows that were ALREADY tombstoned (a retire-and-replace
+    // tombstones in place), so a row whose own write is past the target kept
+    // a retiredAtTurn from a timeline that no longer exists — and a LATER
+    // rewind, landing between that row's turnId and its stale retiredAtTurn,
+    // matched step 1a and resurrected a dead-timeline fact beside the live
+    // one. Clearing it in the same pass makes the anchor die with its
+    // timeline. Rows at or before the target keep theirs — 1a is what decides
+    // those, one line down.
+    await tx
+      .update(criticalFacts)
+      .set({ retiredAtTurn: null })
+      .where(and(eq(criticalFacts.campaignId, campaignId), gt(criticalFacts.turnId, toTurn)));
+
+    // 1a. §5.4 correction undo (M3R2 C4): a retire-and-replace tombstones the
+    //     OLD critical fact IN PLACE, and the sweep above only touches LIVE
+    //     rows — so rewinding past a correction tombstoned the replacement and
+    //     left the original retired, and the record vanished entirely rather
+    //     than reverting. retiredAtTurn is that retirement's place on the
+    //     timeline (demotedAtTurn's precedent); a retirement the rewind
+    //     un-happens is undone. The turnId guard keeps a row whose OWN write
+    //     is past the target dead — un-retiring must never resurrect a fact
+    //     from a turn that no longer happened.
+    await tx
+      .update(criticalFacts)
+      .set({ tombstonedAt: null, retiredAtTurn: null })
+      .where(
+        and(
+          eq(criticalFacts.campaignId, campaignId),
+          gt(criticalFacts.retiredAtTurn, toTurn),
+          lte(criticalFacts.turnId, toTurn),
+        ),
+      );
+
     // 1b. DirectionState's turn-anchored fields clamp to the surviving
     //     timeline (C8 re-audit): a stale last_sample_turn silently disabled
     //     the Sakkan's same-turn guard, and a stale last_director_turn made

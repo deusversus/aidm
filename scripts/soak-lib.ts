@@ -863,10 +863,11 @@ const SESSION_COMPOSER_CALLS = 4;
  *
  * The cadence, from `shouldCompact` + `maybeCompact` rather than from the
  * constants' difference: the event fires when the window is STRICTLY over the
- * trigger (`length > 16`, so first at 17 exchanges) and keeps a tail of 10, so
- * each event moves the watermark forward by 17 − 10 = 7 and the next event is
- * 7 turns later. First reset at turn 17, then 24, 31 … — at N=100 that is 12
- * resets, not the 15 the old `(16 − 10)`-step arithmetic reported.
+ * trigger (`length > 20`, so first at 21 exchanges) and keeps a tail of 12, so
+ * each event moves the watermark forward by 21 − 12 = 9 and the next event is
+ * 9 turns later. First reset at turn 21, then 30, 39 … — at N=100 that is 9
+ * resets. (Was 16/10 → 12 resets, before the 32k window ruling of 2026-08-05
+ * scaled the exchange numbers with it.)
  *
  * The TOKEN trigger (WINDOW_MAX_TOKENS) stays deliberately unmodeled: it
  * depends on measured prose length, which this estimator does not have. It can

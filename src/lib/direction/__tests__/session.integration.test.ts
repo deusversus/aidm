@@ -680,6 +680,54 @@ describe.skipIf(!url)("Session lifecycle (real Postgres, scripted models)", () =
     expect(prompt).toContain("never owed");
   });
 
+  it("the voice journal reaches BOTH its readers: the recap prompt and the rebuilt Settei (M3R2 C5)", async () => {
+    if (!db) throw new Error("unreachable");
+    // Written at every close since M1, read (on an ongoing campaign) by
+    // nothing: the only consumer was directorStartup's Learned section, which
+    // runs on a campaign's FIRST open. The pen picked up each sitting with no
+    // memory of how the last one sounded.
+    const campaignId = await makeCampaign();
+    await insertTurn(campaignId, 1, "The bounty slipped away again.");
+    await db
+      .update(schema.turns)
+      .set({ completedAt: new Date(Date.now() - 65 * 60 * 1000) })
+      .where(eq(schema.turns.campaignId, campaignId));
+    await insertSession(campaignId, 1, {
+      openedAt: new Date(Date.now() - 60 * 60 * 1000),
+      closedAt: new Date(Date.now() - 40 * 60 * 1000),
+      closeTrigger: "idle_timeout",
+      voiceJournal: "Your prose ran cold and clipped; you held the ache one beat past comfort.",
+    });
+
+    await openSession(db, campaignId);
+
+    // Reader 1 — the sitting's first prose.
+    const recapCall = mockStream.mock.calls.find(
+      (c) => (c[0] as { name?: string })?.name === "recap",
+    );
+    const msgs = (recapCall?.[0] as { messages?: { content?: unknown }[] })?.messages ?? [];
+    const last = msgs.at(-1)?.content;
+    const prompt = Array.isArray(last)
+      ? last.map((b) => (b as { text?: string }).text ?? "").join("")
+      : String(last ?? "");
+    expect(prompt).toContain("Your own voice notes from the last sitting");
+    expect(prompt).toContain("you held the ache one beat past comfort");
+
+    // Reader 2 — the §4.4a Charter the whole session renders from.
+    const stored = directionStore.get(campaignId) as DirectionState | undefined;
+    expect(stored?.settei?.text).toContain("Where the last sitting left your hand");
+    expect(stored?.settei?.text).toContain("you held the ache one beat past comfort");
+  });
+
+  it("a campaign with no prior journal renders no journal block (empty is valid, missing is not)", async () => {
+    if (!db) throw new Error("unreachable");
+    const campaignId = await makeCampaign();
+    await rebuildSettei(db, campaignId, 3);
+    const stored = directionStore.get(campaignId) as DirectionState | undefined;
+    expect(stored?.settei?.text).toBeDefined();
+    expect(stored?.settei?.text).not.toContain("Where the last sitting left your hand");
+  });
+
   it("the recap sends the KA's tool array under tool_choice none (M3 C1 — the cold write)", async () => {
     if (!db) throw new Error("unreachable");
     // Session-open composers used to send `tools: []`. Tools render AHEAD of

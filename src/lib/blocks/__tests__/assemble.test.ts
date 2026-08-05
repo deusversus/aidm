@@ -10,7 +10,15 @@ import {
   exchangesText,
   selectPins,
 } from "../assemble";
-import { WINDOW_MAX_EXCHANGES, naiveCompactor, shouldCompact } from "../compaction";
+import {
+  COMPACTION_KEEP_TAIL,
+  COMPACTION_TOKEN_KEEP_FRACTION,
+  COMPACTION_TRIGGER_EXCHANGES,
+  WINDOW_MAX_EXCHANGES,
+  WINDOW_MAX_TOKENS,
+  naiveCompactor,
+  shouldCompact,
+} from "../compaction";
 
 const exchange = (n: number): ExchangeRow => ({
   turnNumber: n,
@@ -304,14 +312,47 @@ describe("pins (§5.4: ≤5, ≤2k tokens, dedup by source turn, order-stable)",
 });
 
 describe("compaction triggers (§6.2)", () => {
+  it("the window constants are the RULED ones (user, 2026-08-05)", () => {
+    // 16k → 32k, and the exchange numbers scaled with it. The ruling: 10–12
+    // turns is the voice-consistency sweet spot, and at ~2k tokens per real
+    // scene the old ceiling collapsed the tail to the 4-exchange floor —
+    // M3R2's founding complaint ("each reply seems disparate — not the same
+    // writer") read partly as a memory that could not hold the writer's own
+    // recent hand. Pins, not ranges: each of these fails on its old value.
+    expect(WINDOW_MAX_TOKENS).toBe(32_000);
+    expect(COMPACTION_TRIGGER_EXCHANGES).toBe(20);
+    expect(COMPACTION_KEEP_TAIL).toBe(12);
+    expect(COMPACTION_TOKEN_KEEP_FRACTION).toBe(0.75);
+    // The tail the ruling actually buys: 12 exchanges of ~2k-token scenes
+    // survive the token-side shrink (24k ≤ 0.75 × 32k), where the old pair
+    // (0.6 × 16k = 9.6k) held four.
+    expect(COMPACTION_KEEP_TAIL * 2_000).toBeLessThanOrEqual(
+      WINDOW_MAX_TOKENS * COMPACTION_TOKEN_KEEP_FRACTION,
+    );
+    // Hysteresis survives the raise: the trigger still sits a real batch above
+    // the tail, so nothing trickle-compacts (§5.6).
+    expect(COMPACTION_TRIGGER_EXCHANGES - COMPACTION_KEEP_TAIL).toBeGreaterThanOrEqual(8);
+  });
+
   it("fires past the exchange ceiling", () => {
     const window = Array.from({ length: WINDOW_MAX_EXCHANGES + 1 }, (_, i) => exchange(i + 1));
     expect(shouldCompact(window)).toBe(true);
   });
 
   it("fires past the token ceiling even with few exchanges", () => {
-    const fat: ExchangeRow = { turnNumber: 1, playerInput: "x", narration: "y".repeat(70_000) };
+    // The ceiling is the RULED 32k (user, 2026-08-05 — 16k could not hold the
+    // 10–12 turns the voice needs), so the fat exchange has to be twice the
+    // size it used to be: 140k chars ≈ 35k tokens at chars/4.
+    const fat: ExchangeRow = { turnNumber: 1, playerInput: "x", narration: "y".repeat(140_000) };
     expect(shouldCompact([fat])).toBe(true);
+    // And 16k tokens no longer trips it — the pin fails if the old ceiling
+    // ever comes back.
+    const oldCeiling: ExchangeRow = {
+      turnNumber: 1,
+      playerInput: "x",
+      narration: "y".repeat(68_000),
+    };
+    expect(shouldCompact([oldCeiling])).toBe(false);
   });
 
   it("holds inside both ceilings", () => {

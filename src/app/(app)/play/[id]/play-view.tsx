@@ -13,6 +13,7 @@ import {
 } from "./evolution";
 import { ListenButton } from "./listen-button";
 import { NarrationProse } from "./narration-prose";
+import { type PinPostResponse, pinNoticeText } from "./pin-notice";
 import {
   beyondRetakeHorizon,
   firstUnwoundInput,
@@ -871,8 +872,13 @@ export function PlayView({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ content: selection, sourceTurn: source?.turnNumber ?? 0 }),
     });
-    setPinNotice(res.ok ? "Pinned — held verbatim at the head of memory." : "Pin failed.");
-    setTimeout(() => setPinNotice(null), 4_000);
+    // The assembler's droppedPins finally reaches the player (M3R2 C5): the
+    // old line claimed "held verbatim" even for a pin the head of memory was
+    // dropping on the ≤5/≤2k bound. Same one-line notice channel, true text —
+    // composed in pin-notice.ts, where the four cases are pinned by tests.
+    const body = res.ok ? ((await res.json().catch(() => ({}))) as PinPostResponse) : null;
+    setPinNotice(pinNoticeText(body));
+    setTimeout(() => setPinNotice(null), 8_000);
   };
 
   // The retake (§6.7, M2R7): the player picks the reply that becomes the new

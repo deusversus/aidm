@@ -8,12 +8,14 @@ import {
   semanticMemories,
 } from "@/lib/db/schema";
 import { callbackReadySeeds } from "@/lib/direction/seeds";
+import { identityKey } from "@/lib/entity-identity";
 import { STRUCTURED_SMALL } from "@/lib/llm/budgets";
 import { callJudgment } from "@/lib/llm/calls";
 import type { TierSelection } from "@/lib/llm/tiers";
 import { embedTexts } from "@/lib/llm/voyage";
 import type { CanonChunk, ConteMemory } from "@/lib/types/conte";
 import { EVOLUTION_CATEGORY } from "@/lib/types/direction";
+import type { VoiceCard } from "@/lib/types/profile";
 import type { IntentOutput } from "@/lib/types/turn";
 import { and, desc, eq, inArray, isNull, ne, sql } from "drizzle-orm";
 import { z } from "zod";
@@ -386,6 +388,58 @@ interface EntityCardRow {
   state: unknown;
 }
 
+/** Bounded voice line — the same ~200-char ceiling the ingestion stamp uses. */
+const VOICE_CARD_FINGERPRINT_CHARS = 200;
+
+/**
+ * §4.7/§4.1: the CONTRACT's compiled voice cards, made readable (M3R2 C5).
+ *
+ * There are two copies of this material and only one had a reader. The
+ * PROFILE copy (`profiles.profile.ip_mechanics.voice_cards`) is read at
+ * ingestion time and stamped onto `state.voice_card` — but only on the narrow
+ * path where a brand-new named NPC resolves to canon mid-play. The campaign's
+ * actual main cast is admitted at Session Zero from the OSP briefs, which
+ * stamps nothing, so those rows never carried a voice at all.
+ *
+ * The CONTRACT copy is the authority for this campaign (§4.1: "the Voice
+ * component is its sole authority… world and voice come from different sources
+ * and must not carry diverging copies"), and it is the only copy the SZ
+ * compiler's canonicality gate has already filtered — an `inspired` premise
+ * compiles to zero cards, a `replaced_protagonist` premise drops the seat the
+ * player took. Reading it here means the gate is honored for free.
+ *
+ * Retiring the field was the alternative the plan left open; it is the wrong
+ * call: retiring it would leave the ungated raw-profile copy as the only voice
+ * source and delete the M3R3 C4a gate's only product.
+ */
+export function voiceCardLine(card: VoiceCard): string {
+  const phrase = card.signature_phrases.find((p) => p.trim().length > 0);
+  const text = [
+    card.speech_patterns,
+    card.dialogue_rhythm,
+    card.emotional_expression.toLowerCase(),
+    phrase ? `e.g. "${phrase}"` : "",
+  ]
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .join("; ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return text.length > VOICE_CARD_FINGERPRINT_CHARS
+    ? `${text.slice(0, VOICE_CARD_FINGERPRINT_CHARS).trimEnd()}…`
+    : text;
+}
+
+/** name-key → contract card, for the present-cast fallback below. */
+export function voiceCardIndex(cards: readonly VoiceCard[]): Map<string, VoiceCard> {
+  const index = new Map<string, VoiceCard>();
+  for (const card of cards) {
+    const key = identityKey(card.name);
+    if (key && !index.has(key)) index.set(key, card);
+  }
+  return index;
+}
+
 /** The most recent turn-keyed relationships entry (§7.5) — highest numeric turn key. */
 function latestRelationship(rel: unknown): string | undefined {
   if (!rel || typeof rel !== "object") return undefined;
@@ -407,13 +461,23 @@ function latestRelationship(rel: unknown): string | undefined {
  * exactly the base line M1 shipped, so per-card growth stays bounded (the voice
  * card is clipped ~200 at stamp time; the latest beat clips here).
  */
-export function renderEntityCard(row: EntityCardRow): string {
+export function renderEntityCard(
+  row: EntityCardRow,
+  /** Contract voice cards by identity key — the §4.1 fallback (M3R2 C5). */
+  contractCards?: Map<string, VoiceCard>,
+): string {
   const base = `${row.name} (${row.entityType}): ${row.block}`;
   const state =
     row.state && typeof row.state === "object" ? (row.state as Record<string, unknown>) : {};
   const lines = [base];
 
-  const voiceCard = typeof state.voice_card === "string" ? state.voice_card.trim() : "";
+  const stamped = typeof state.voice_card === "string" ? state.voice_card.trim() : "";
+  // The stamped card wins: it was written against the row itself, at the moment
+  // the entity linked to canon. The contract card is the fallback that finally
+  // reaches the SZ-admitted main cast (voiceCardLine's contract note).
+  const key = contractCards && !stamped ? identityKey(row.name) : null;
+  const fallback = key ? contractCards?.get(key) : undefined;
+  const voiceCard = stamped || (fallback ? voiceCardLine(fallback) : "");
   if (voiceCard) lines.push(`  voice: ${voiceCard}`);
 
   const beats = typeof state.interiorityEvents === "number" ? state.interiorityEvents : 0;
@@ -435,6 +499,8 @@ export async function fetchEntityCards(
   campaignId: string,
   playerInput: string,
   cap = 4,
+  /** The contract's compiled voice cards (§4.1 authority) — Layout supplies them. */
+  contractVoiceCards: readonly VoiceCard[] = [],
 ): Promise<string[]> {
   const rows = await db
     .select({
@@ -446,10 +512,11 @@ export async function fetchEntityCards(
     .from(entities)
     .where(and(eq(entities.campaignId, campaignId), notTombstoned(entities)));
   const input = playerInput.toLowerCase();
+  const cards = contractVoiceCards.length > 0 ? voiceCardIndex(contractVoiceCards) : undefined;
   return rows
     .filter((r) => input.includes(r.name.toLowerCase()))
     .slice(0, cap)
-    .map(renderEntityCard);
+    .map((r) => renderEntityCard(r, cards));
 }
 
 /**

@@ -10,6 +10,7 @@ import { rendererEfficacy } from "./suites/renderer-efficacy";
 import { sakkanNeutrality } from "./suites/sakkan-neutrality";
 import { scaffolds } from "./suites/scaffolds";
 import { schemaGrammar } from "./suites/schema-grammar";
+import { thinIpDrill } from "./suites/thin-ip-drill";
 import type { Suite, SuiteResult } from "./types";
 
 /**
@@ -33,6 +34,7 @@ const allSuites: Suite[] = [
   authorshipDetection,
   channelRouting,
   schemaGrammar,
+  thinIpDrill,
   ...scaffolds,
 ];
 const suites =

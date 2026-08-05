@@ -180,22 +180,25 @@ describe("buildSoakPlan (the 100-turn mode)", () => {
 describe("estimateRunPrice (the pre-run banner)", () => {
   it("counts cold opens as sittings plus compaction resets", () => {
     expect(coldOpensFor(10, 2)).toEqual({ total: 2, compactions: 0 });
-    expect(coldOpensFor(100, 2).compactions).toBeGreaterThan(10);
+    expect(coldOpensFor(100, 2).compactions).toBe(9);
   });
 
-  it("walks the real compaction cadence: first at 17, then every 7", () => {
-    // shouldCompact fires on length > 16 (so at 17 exchanges) and keeps a tail
-    // of 10, advancing the watermark by 7 — resets at 17, 24, 31 … 94. The old
-    // (16 − 10)-step arithmetic reported 15 at N=100; the walk says 12.
-    expect(coldOpensFor(16, 1).compactions).toBe(0);
-    expect(coldOpensFor(17, 1).compactions).toBe(1);
-    expect(coldOpensFor(23, 1).compactions).toBe(1);
-    expect(coldOpensFor(24, 1).compactions).toBe(2);
-    expect(coldOpensFor(31, 1).compactions).toBe(3);
-    expect(coldOpensFor(93, 1).compactions).toBe(11);
-    expect(coldOpensFor(94, 1).compactions).toBe(12);
-    expect(coldOpensFor(100, 1).compactions).toBe(12);
-    expect(coldOpensFor(100, 2).total).toBe(14);
+  it("walks the real compaction cadence: first at 21, then every 9", () => {
+    // RE-BASELINED for the 32k window ruling (user, 2026-08-05): the exchange
+    // trigger scaled 16 → 20 and the keep-tail 10 → 12 alongside it, so
+    // shouldCompact fires on length > 20 (at 21 exchanges) and advances the
+    // watermark by 9 — resets at 21, 30, 39 … 93. Fewer, larger events: 9 at
+    // N=100 where the old 16/10 pair gave 12, which is the cache economics
+    // moving the right way even as the window doubled.
+    expect(coldOpensFor(20, 1).compactions).toBe(0);
+    expect(coldOpensFor(21, 1).compactions).toBe(1);
+    expect(coldOpensFor(29, 1).compactions).toBe(1);
+    expect(coldOpensFor(30, 1).compactions).toBe(2);
+    expect(coldOpensFor(39, 1).compactions).toBe(3);
+    expect(coldOpensFor(92, 1).compactions).toBe(8);
+    expect(coldOpensFor(93, 1).compactions).toBe(9);
+    expect(coldOpensFor(100, 1).compactions).toBe(9);
+    expect(coldOpensFor(100, 2).total).toBe(11);
   });
 
   it("agrees with a simulation of the window (the token trigger stays unmodeled)", () => {

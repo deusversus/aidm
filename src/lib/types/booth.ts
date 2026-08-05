@@ -38,6 +38,17 @@ export type BoothExchange = z.infer<typeof BoothExchange>;
 export const BoothState = z.object({
   exchanges: z.array(BoothExchange).default([]),
   opened_at_turn: z.number().int().nonnegative().default(0),
+  /**
+   * Idempotency keys for the corrections this booth has ALREADY filed
+   * (booth.ts `correctionKey`). A critical_fact correction is self-cancelling
+   * on a re-run — its target is tombstoned, so nothing resolves — but an
+   * entity revision never tombstones its row: the same correction re-run at
+   * close, or on crash-replay, revised a live dossier a second time. The
+   * ledger is what makes both filing sites idempotent for BOTH target kinds,
+   * and it rides booth_state so it is exactly as durable as the conversation
+   * that produced it. Absent on a pre-ledger stored state — defaults to empty.
+   */
+  filed_corrections: z.array(z.string()).default([]),
 });
 export type BoothState = z.infer<typeof BoothState>;
 
@@ -46,8 +57,52 @@ export const BoothRoute = z.object({
   /** Explicit summons win ("ask the director...", "let me talk to the writer"). */
   responder: BoothResponder,
   reason: z.string(),
+  /**
+   * M3R2 C4 — the §7.4 ladder's first rung for the corrections channel: TRUE
+   * when the player's words say an established RECORD is WRONG. The router
+   * already runs on every booth message, so the signal is free; only a true
+   * signal pays for the judged comprehension gate that can actually file.
+   * A false negative costs a correction the player can restate; a false
+   * positive costs one gate call that bounces.
+   */
+  record_correction_signal: z.boolean(),
 });
 export type BoothRoute = z.infer<typeof BoothRoute>;
+
+/**
+ * A record correction (M3R2 C4, the founding incident 2026-08-03): the player
+ * told the booth a hard line was recorded INVERTED, the Writer agreed and
+ * promised the fix, and the close-time resolution had no write path to the
+ * record — the booth had a voice but no pen. This is the pen.
+ *
+ * `target_kind` is EXACTLY what M2-C3's retire-and-replace supports, no more:
+ * a layer-9 critical fact (tombstone the row, insert the replacement) or a
+ * catalog entity's living dossier block (the revise judgment + a version row).
+ * A correction the machinery cannot land is never approximated into one it can.
+ *
+ * NO LENGTH BOUNDS (M3 C1 grammar rule, as on every field above): the engine
+ * drops empties and clamps; a bound here could only fail the parse and lose
+ * the whole resolution.
+ */
+export const BoothCorrection = z.object({
+  target_kind: z.enum(["critical_fact", "entity"]),
+  /**
+   * critical_fact: the established record's OWN words, quoted closely enough
+   * to match it. entity: the exact catalog name. This is what binds the
+   * correction to a row — an unmatched hint files NOTHING (never a guess).
+   */
+  target_hint: z.string(),
+  /** What the record must say INSTEAD, as a record line — not chat. */
+  corrected_content: z.string(),
+  /**
+   * The VERBATIM player statement that grounds this correction. The engine
+   * checks it against the player's own transcript lines: a correction the
+   * player did not say in so many words is the RESPONDER's inference, and
+   * inference never moves the record (§5.4 player authority runs one way).
+   */
+  player_words: z.string(),
+});
+export type BoothCorrection = z.infer<typeof BoothCorrection>;
 
 /**
  * Resolution extraction (judgment tier, strict output) — run once when the
@@ -79,6 +134,12 @@ export const BoothResolution = z.object({
    *  revealed one. Usually absent. Bounded by TASTE_NOTE_MAX (db/helpers.ts):
    *  notes ride the Settei budget, enforced at the consumer. */
   player_taste_note: z.string().optional(),
+  /** ≤BOOTH_CORRECTIONS_MAX record corrections the player's own words settled
+   *  (M3R2 C4). OPTIONAL, like the taste note: corrections are the rarest
+   *  outcome a booth has, and the field's absence must read as "none" rather
+   *  than costing the resolution a parse (a pre-C4 stored resolution has no
+   *  field at all). The engine treats absent and empty identically. */
+  corrections: z.array(BoothCorrection).optional(),
   summary: z.string().min(1),
 });
 export type BoothResolution = z.infer<typeof BoothResolution>;
@@ -86,6 +147,8 @@ export type BoothResolution = z.infer<typeof BoothResolution>;
 /** Emission ceilings the schema can no longer carry (see above). */
 export const BOOTH_MARKS_MAX = 4;
 export const BOOTH_OVERRIDES_MAX = 2;
+/** Corrections are the rarest booth outcome and the most authoritative write it can make. */
+export const BOOTH_CORRECTIONS_MAX = 3;
 
 /**
  * §7.4 comprehension-before-compliance (M3R1): the override channel's one
@@ -109,3 +172,30 @@ export const OverrideComprehension = z.object({
   scope: z.enum(["standing", "one_shot"]),
 });
 export type OverrideComprehension = z.infer<typeof OverrideComprehension>;
+
+/**
+ * The corrections channel's comprehension gate (M3R2 C4) — comprehendOverride's
+ * sibling, for the same reason: the write on the other side of it is
+ * destructive (a retire-and-replace RETIRES a line of the record), so a probe
+ * signal alone must never be enough to make it. The judged instrument decides,
+ * and when it hesitates the booth files nothing and says so.
+ *
+ * NO LENGTH BOUNDS (M3 C1 grammar rule): the prompt states the one-line limit.
+ */
+export const CorrectionComprehension = z.object({
+  /** True ONLY when the PLAYER'S OWN WORDS state that an established record is
+   *  WRONG. Musing, disagreement with the story, and a wish for the future are
+   *  all false — those are marks and overrides, not corrections. */
+  player_states_record_is_wrong: z.boolean(),
+  /** Which record the correction lands on — the two M2-C3 supports. */
+  target_kind: z.enum(["critical_fact", "entity"]),
+  /** The established record's own words (critical_fact) or the exact catalog
+   *  name (entity). Empty when the verdict is false. */
+  target_hint: z.string(),
+  /** The corrected record restated in ONE line, in the RECORD's register —
+   *  the M3R1 restatement pattern, never an echo of the chat. This is the text
+   *  that lands and the text the acknowledgement names, so a wrong reading is
+   *  visible the moment it lands. Empty when the verdict is false. */
+  record_text: z.string(),
+});
+export type CorrectionComprehension = z.infer<typeof CorrectionComprehension>;

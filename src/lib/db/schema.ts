@@ -623,6 +623,14 @@ export const criticalFacts = pgTable(
      *  re-home's GREATEST() is lossy, so a rewind restores from this snapshot,
      *  never from arithmetic. */
     demotionUndo: jsonb().$type<{ plot_critical: boolean; heat_floor: number }>(),
+    /** §5.4 correction (M3R2 C4): the turn a retire-and-replace RETIRED this
+     *  row — the rewind anchor, exactly as demotedAtTurn is for a demotion.
+     *  A retirement tombstones a row IN PLACE, which the rewind sweep cannot
+     *  reach (it only tombstones live writes past the target): without a place
+     *  on the timeline, rewinding past a correction killed the replacement and
+     *  left the original retired, and the record vanished instead of coming
+     *  back. Null for every row that was never corrected away. */
+    retiredAtTurn: integer(),
     ...provenanceColumns,
   },
   (t) => ({

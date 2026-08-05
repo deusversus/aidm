@@ -26,14 +26,30 @@ import type { PremiseContract } from "@/lib/types/premise";
 
 export const SETTEI_MAX_RENDERED_AXES = 6;
 export const SETTEI_MAX_EXEMPLARS = 3;
-export const SETTEI_TOKEN_TARGET = { min: 600, max: 900 };
+/**
+ * The §4.4a charter band — 600–900 → 1,200–2,600, USER-RULED 2026-08-05.
+ *
+ * This is a RULING, not a tunable: the old target was authored before any
+ * charter had been measured, and a real premise renders 2,124 tokens after
+ * ELEVEN trims — 2.36× a ceiling it could never reach, so every rich campaign
+ * ran the ladder to exhaustion and shipped over budget anyway. A budget no
+ * honest render can meet is not a budget; it is a standing trim order against
+ * the §0 voice. The plan proposed 1,200–2,200; the user widened the ceiling to
+ * 2,600 because 2,200 was razor-thin against the measured 2,124. The charter
+ * is Block-1 prefix, cached across the session: the whole band costs ~$0.001
+ * per turn.
+ *
+ * ONE CONSTANT, EVERY READER — the trim ladder, the overrun flag, the session
+ * and campaign snapshots (charter_over_target) all read this and nothing else.
+ */
+export const SETTEI_TOKEN_TARGET = { min: 1_200, max: 2_600 };
 
 /**
  * The §4.4c fields' Block-1 reader (M2R2 deliverable 4): escalation_pattern +
  * story_time_density render as one "How it moves" line in the identity block —
  * standing premise facts, deliberately NOT in the per-scene shape (≤150
- * budget). Note: on maxed charters this may trip the trim ladder (drop a third
- * exemplar) — that is the accepted trade per the plan.
+ * budget). Note: on maxed charters this may trip the trim ladder (clip a craft
+ * caveat) — that is the accepted trade per the plan.
  */
 const ESCALATION_LINE: Record<Composition["escalation_pattern"], string> = {
   linear: "stakes climb a steady step at a time — most scenes bank a little more than they spend",
@@ -138,7 +154,19 @@ export interface SetteiInput {
   /** §6.9 layer-10 taste notes (M2R R4) — Renderer defaults, lightly:
    *  priors the campaign premise always outranks. Most recent few only. */
   tasteNotes?: string[];
+  /**
+   * The KA voice journal from the last closed sitting (M3R2 C5): the §6.6
+   * Learned layer's cross-sitting voice thread. Written at every close since
+   * M1 and, on an ongoing campaign, read by nothing — the pen picked up each
+   * sitting with no memory of how the last one sounded. Clipped to
+   * VOICE_JOURNAL_MAX_CHARS here, because a 300-word journal verbatim would
+   * spend a tenth of the §4.4a band on bookkeeping prose.
+   */
+  voiceJournal?: string;
 }
+
+/** The journal's Block-1 budget — a few sentences of carry-forward, not the memo. */
+export const VOICE_JOURNAL_MAX_CHARS = 600;
 
 export interface Settei {
   text: string;
@@ -152,16 +180,17 @@ export interface Settei {
   /** Whole Block-1 artifact (§5.1: identity + Charter + world rules). */
   tokens: number;
   /**
-   * The Style Charter's pressure sections only — §4.4a's ~600–900 budget
-   * governs THIS number; the world-rules command block (axiom 3) is Block-1
-   * freight outside the charter budget.
+   * The Style Charter's pressure sections only — §4.4a's 1,200–2,600 band
+   * (user-ruled 2026-08-05) governs THIS number; the world-rules command block
+   * (axiom 3) is Block-1 freight outside the charter budget.
    */
   charterTokens: number;
   /**
-   * The charter is still over §4.4a's ceiling after every trim (M3 C1). Live
-   * campaigns run roughly 2× the budget and the overrun used to be recorded
-   * only as a trim string nobody reads — the snapshot now carries the fact
-   * itself, so the Director and the dailies can see a charter that never fit.
+   * The charter is still over §4.4a's ceiling after every trim (M3 C1). Under
+   * the old 900 ceiling this was the NORMAL state — live campaigns ran ~2.36×
+   * it — and the overrun was recorded only as a trim string nobody reads. The
+   * snapshot carries the fact itself, so the Director and the dailies can see
+   * a charter that never fit; against the ruled band it should now be rare.
    */
   charterOverTarget: boolean;
   /** Trims applied to hold the §4.4a budget — surfaced, never silent. */
@@ -342,9 +371,8 @@ export function renderSettei(input: SetteiInput): Settei {
 
   // The sample renders ONCE (M2R4): leading the exemplars when it exists, here
   // otherwise. A real example_voice is a full in-register paragraph — carrying
-  // it twice inside a ~900-token charter costs a foreign exemplar AND the craft
-  // caveats, and repetition adds no pressure the lead placement doesn't already
-  // carry ("this hand wins").
+  // it twice spends the band on a repetition that adds no pressure the lead
+  // placement doesn't already carry ("this hand wins").
   const voiceBlock = [
     "## Voice fingerprint (verbatim)",
     `Sentence patterns: ${voice.author_voice.sentence_patterns.join("; ")}`,
@@ -354,6 +382,26 @@ export function renderSettei(input: SetteiInput): Settei {
     ...(authorSample ? [] : [`In-register sample: ${voice.author_voice.example_voice}`]),
     `Cast depth: main cast ${voice.cast_depth_posture.main_cast}; supporting ${voice.cast_depth_posture.supporting}; bits ${voice.cast_depth_posture.recurring_bits}.`,
   ];
+
+  // The cross-sitting voice thread (M3R2 C5) — voice matter, so it RENDERS
+  // with the fingerprint, above the marks. Its rank under pressure is a
+  // different question, and the comment that used to sit here answered it
+  // wrongly ("the inverted ladder protects it for the same reason it protects
+  // the exemplars"). It does not: this is model-authored carry-forward prose
+  // ABOUT the hand, and a grounded exemplar SHOWS the register instead of
+  // describing it. So the journal has its own rung, below the craft caveats
+  // and above every foreign passage (see the ladder). It renders only when a
+  // prior sitting actually left one.
+  const journal = (input.voiceJournal ?? "").trim().replace(/\s+/g, " ");
+  const voiceJournalBlock =
+    journal.length === 0
+      ? []
+      : [
+          "## Where the last sitting left your hand (carry it forward)",
+          journal.length > VOICE_JOURNAL_MAX_CHARS
+            ? `${journal.slice(0, VOICE_JOURNAL_MAX_CHARS).trimEnd()}…`
+            : journal,
+        ];
 
   const standing = activeMarks(input.marks);
   const marksBlock =
@@ -382,33 +430,44 @@ export function renderSettei(input: SetteiInput): Settei {
       .map((s) => s.join("\n\n"))
       .join("\n\n");
   const buildCharter = () =>
-    assemble([identity, craft, exemplarBlocks, groupLines, voiceBlock, marksBlock, tasteBlock]);
+    assemble([
+      identity,
+      craft,
+      exemplarBlocks,
+      groupLines,
+      voiceBlock,
+      voiceJournalBlock,
+      marksBlock,
+      tasteBlock,
+    ]);
 
   let charter = buildCharter();
-  // Budget, stage 0 (R4 audit): the taste block yields FIRST. Its own header
-  // says everything above outranks it — cross-campaign priors must never
-  // cost a premise-pressure exemplar or craft caveat their budget.
+  // THE TRIM LADDER, INVERTED (user-ratified 2026-08-05). It used to run
+  // taste → exemplars → craft caveats: the register exemplars — the author's
+  // hand and the passages that show what the premise SOUNDS like — were
+  // sacrificed to protect axis bookkeeping, prose the KA can infer from the
+  // numbers beside it. M3R2's founding complaint ("each reply seems disparate
+  // — not the same writer") was partly this ladder's work: on every rich
+  // premise it ran, and what it took was the voice. The order is now
+  // reducible prose FIRST, voice matter LAST, the author's own sample NEVER:
+  // taste → craft caveats → the voice journal → foreign exemplars to the
+  // floor. (The journal's rung is M3R3's; it is model-authored carry-forward
+  // prose, so it ranks under the grounded passages, not with them.)
+  //
+  // Stage 0 is unchanged: the taste block still yields first. Its own header
+  // says everything above outranks it — cross-campaign priors must never cost
+  // a premise-pressure exemplar or a craft caveat their budget.
   while (approxTokens(charter) > SETTEI_TOKEN_TARGET.max && tasteBlock.length > 1) {
     const dropped = tasteBlock.pop();
     if (tasteBlock.length === 1) tasteBlock.pop(); // header alone renders nothing anyway
     trims.push(`taste note dropped for budget: ${(dropped ?? "").slice(0, 40)}`);
     charter = buildCharter();
   }
-  // Stage 1: trim FOREIGN exemplars last-in-first-out — craft instructions are
-  // the load-bearing pressure. Floor is 2 per §4.4a's "2–3", except when the
-  // author's own hand renders: the sample IS an exemplar and counts toward that
-  // expectation, so the floor drops to 1 foreign passage alongside it. The
-  // author sample itself is NEVER trimmed (M2R4) — it sits ahead of every
-  // foreign block, so this LIFO pop can only reach the strangers' passages.
-  const foreignFloor = authorSample ? 1 : 2;
-  while (approxTokens(charter) > SETTEI_TOKEN_TARGET.max && exemplarIds.length > foreignFloor) {
-    const droppedId = exemplarIds.pop();
-    exemplarBlocks.pop();
-    trims.push(`exemplar ${droppedId} dropped for budget`);
-    charter = buildCharter();
-  }
-  // Stage 2: clip craft guidance to one sentence, least-extreme axis first
-  // — the strongest pressures keep their caveats longest.
+  // Stage 1 (was stage 2): clip craft guidance to one sentence, least-extreme
+  // axis first — the strongest pressures keep their caveats longest. The axis
+  // and its value still render; only the teaching sentence goes. This is the
+  // reducible half of the charter: "darkness = 9/10" carries the pressure, the
+  // second sentence only elaborates it.
   for (
     let i = rendered.length - 1;
     i >= 0 && approxTokens(charter) > SETTEI_TOKEN_TARGET.max;
@@ -419,15 +478,44 @@ export function renderSettei(input: SetteiInput): Settei {
     craft = buildCraft();
     charter = buildCharter();
   }
+  // Stage 2 (M3R3 close): the voice journal yields — after every craft caveat
+  // has been clipped, before any register exemplar gives. It is voice matter
+  // and it sits in the voice section, but it is the model's own prose about
+  // the last sitting; an exemplar is grounded text that shows the register.
+  // Carry-forward description never outranks the thing itself. Whole, not
+  // clipped: it is already bounded to VOICE_JOURNAL_MAX_CHARS at construction,
+  // and half a remembered sentence carries less than none.
+  if (approxTokens(charter) > SETTEI_TOKEN_TARGET.max && voiceJournalBlock.length > 1) {
+    voiceJournalBlock.length = 0;
+    trims.push("voice journal dropped for budget");
+    charter = buildCharter();
+  }
+  // Stage 3 (was stage 1): trim FOREIGN exemplars last-in-first-out, and only
+  // after every caveat above has already been clipped. A register exemplar is
+  // the one thing in the charter that shows instead of telling — it is the
+  // last pressure to give. Floor is 2 per §4.4a's "2–3", except when the
+  // author's own hand renders: the sample IS an exemplar and counts toward
+  // that expectation, so the floor drops to 1 foreign passage alongside it.
+  // The author sample itself is NEVER trimmed (M2R4, re-ratified here) — it
+  // sits ahead of every foreign block, so this LIFO pop can only ever reach
+  // the strangers' passages, and no rung below it exists. The voice
+  // fingerprint block has no rung at all, for the same reason.
+  const foreignFloor = authorSample ? 1 : 2;
+  while (approxTokens(charter) > SETTEI_TOKEN_TARGET.max && exemplarIds.length > foreignFloor) {
+    const droppedId = exemplarIds.pop();
+    exemplarBlocks.pop();
+    trims.push(`exemplar ${droppedId} dropped for budget`);
+    charter = buildCharter();
+  }
 
   const charterTokens = approxTokens(charter);
   const charterOverTarget = charterTokens > SETTEI_TOKEN_TARGET.max;
   if (charterOverTarget) {
     trims.push(`charter still over budget after all trims: ${charterTokens} tokens`);
     // LOUD, not filed (M3 C1): the trim ladder ran out of things to drop and
-    // the charter went to the KA over budget anyway. Measured ~2× the §4.4a
-    // ceiling on live campaigns — a standing overrun that was only ever
-    // written into a string array no reader consumes.
+    // the charter went to the KA over budget anyway. Under the old 900 ceiling
+    // this fired on every rich premise (measured 2,124 = 2.36×); against the
+    // ruled 2,600 band it means a genuinely oversized charter, worth reading.
     console.warn("[settei] charter OVER the §4.4a budget after every trim", {
       charterTokens,
       target: SETTEI_TOKEN_TARGET,

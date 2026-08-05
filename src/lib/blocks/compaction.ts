@@ -24,8 +24,26 @@ import { approxTokens } from "./tokens";
  * event contract executable and testable.
  */
 
+/**
+ * §6.2's ~12-exchange target — now the FLOOR of the oscillation rather than
+ * its midpoint (see COMPACTION_KEEP_TAIL below), so a window at target is a
+ * window that just compacted.
+ */
 export const WINDOW_MAX_EXCHANGES = 12;
-export const WINDOW_MAX_TOKENS = 16_000;
+/**
+ * The verbatim window's token ceiling. 16k → 32k, USER-RULED 2026-08-05.
+ *
+ * WHY (M3R2's founding complaint, "each reply seems disparate — not the same
+ * writer"): the pen's own recent hand is the strongest voice-consistency
+ * pressure in the prompt, and 16k could not hold it. On the player's real
+ * scene lengths (~2k tokens/scene, measured) the tail collapsed to the
+ * 4-exchange floor and compaction fired every ~3 turns — past that line voice
+ * memory was beats written under "discard choreography." 10–12 turns is the
+ * ruled voice-consistency sweet spot; 32k is exactly double, which holds
+ * 10–12 DEEP scenes verbatim and 12–15 typical ones. Quality outranks cost
+ * (axiom): ~+$0.01/turn warm, and the cache carries it.
+ */
+export const WINDOW_MAX_TOKENS = 32_000;
 export const BLOCK2_CEILING_TOKENS = 8_000;
 
 /** Beats-writer signature; M1's Compositor supplies the narrated version. */
@@ -606,16 +624,22 @@ export async function enforceBlock2Ceiling(
 
 /**
  * Trigger and keep-tail for the real compactor (§6.2). HYSTERESIS is the
- * point: trigger (16) sits well above keep-tail (10), so each compaction
- * event batches ~6 exchanges and the next fires ~6 turns later — the window
- * oscillates 10–16 around §6.2's ~12-exchange target. Equal trigger/keep
+ * point: trigger (20) sits well above keep-tail (12), so each compaction
+ * event batches 8 exchanges and the next fires 8 turns later — the window
+ * oscillates 12–20, and §5.6's "~10 turns" cadence is met. Equal trigger/keep
  * would trickle-compact one exchange per turn past the threshold, which is
  * a sliding window by another name and self-invalidates the Block-2 prefix
  * every turn (§5.6 forbids exactly that). Tunable; the C10 soak's
  * cache-fraction assertions calibrate.
+ *
+ * SCALED WITH THE 32k WINDOW (user ruling, 2026-08-05): the exchange numbers
+ * are the token ceiling's other half, so 16/10 rose to 20/12. Keep-tail 12 is
+ * what makes "12–15 typical turns verbatim" a guarantee rather than an
+ * average — the post-compaction tail IS the floor the player's voice memory
+ * never drops below, and 10 could not carry the ruled count on its own.
  */
-export const COMPACTION_TRIGGER_EXCHANGES = 16;
-export const COMPACTION_KEEP_TAIL = 10;
+export const COMPACTION_TRIGGER_EXCHANGES = 20;
+export const COMPACTION_KEEP_TAIL = 12;
 /** The tail never shrinks below this many verbatim exchanges. */
 export const COMPACTION_MIN_TAIL = 4;
 /**
@@ -624,8 +648,17 @@ export const COMPACTION_MIN_TAIL = 4;
  * ceiling — so the batch is big enough that the next event is turns away.
  * A fixed keep-tail under a token trigger would trickle-compact one
  * exchange per turn on a token-heavy campaign (§5.6 forbids exactly that).
+ *
+ * 0.6 → 0.75 with the 32k ruling (2026-08-05). The fraction is what actually
+ * decided the live tail length, and at 0.6 the raise would have been half
+ * spent: 0.6 × 32k = 19.2k holds only 9 of the player's ~2k-token scenes, so
+ * the shrink loop would still have eaten the ruled 10–12. At 0.75 the cap is
+ * 24k — the full keep-tail of 12 deep scenes survives, and a heavier scene
+ * length shrinks it to 10–12 rather than to the floor. The batch stays a real
+ * batch: 32k − 24k = 8k ≈ 4 deep scenes of hysteresis on the token path, 8
+ * exchanges on the count path.
  */
-export const COMPACTION_TOKEN_KEEP_FRACTION = 0.6;
+export const COMPACTION_TOKEN_KEEP_FRACTION = 0.75;
 
 /**
  * The Chronicler G2 compaction step: run one real (judgment-tier, subtext-

@@ -22,7 +22,11 @@ import type { Suite, SuiteResult } from "../types";
  * honest about single-sample variance: mean-of-2 per arm. The integrator meters
  * this — DO NOT run it in a tuning loop.
  *
- * COST: ~4 narration + ~4 judgment Sonnet calls (~$0.10–0.20/run). Metered
+ * COST: ~4 narration + ~4 judgment Sonnet calls (measured $0.40/run,
+ * 2026-08-05 — the old ~$0.10–0.20 claim undersold it 2-4×). Also known:
+ * SAMPLES=2 cannot statistically support the >0.5 bar (the landing baseline
+ * was 0.5 exactly, so P(false red)=25%/run by construction); a bigger N
+ * waits for the funded-soak era. Metered
  * through the traced trio; a meter row is best-effort (never blocks the call).
  */
 
@@ -86,10 +90,12 @@ const Judgment = z.object({ verdict: z.boolean(), reason: z.string().min(1) });
 
 /** One tool-less narration call at Sonnet against the given Settei. */
 async function narrate(setteiText: string): Promise<string> {
-  const system: TextBlockParam[] = [
-    { type: "text", text: setteiText },
-    { type: "text", text: KA_CONTRACT },
-  ];
+  // Production Block-1 order (M3R2 C2 inversion, campaign.ts): the contract
+  // LEADS and the campaign voice sits in the recency tail. This suite shipped
+  // hardcoding the PRE-inversion order and measured an arrangement production
+  // no longer sends — in the flattering direction, since it kept the agency
+  // clause nearer the generation point (2026-08-05 forensics).
+  const system: TextBlockParam[] = [{ type: "text", text: `${KA_CONTRACT}\n\n${setteiText}` }];
   const { done } = streamNarration({
     name: "eval_control_key_narration",
     selection: SELECTION,

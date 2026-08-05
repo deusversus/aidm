@@ -120,6 +120,12 @@ const CASES: Case[] = [
     // opinion/plans into the assertion flag (the doctrine-contradiction
     // finding — over-flagging runs ingestion at confidence 1).
     wantAssertionFlag: false,
+    // Majority-of-3 (2026-08-05 flake forensics): this is the corpus's
+    // hardest family on the specimen's truncated head, and a single Haiku
+    // sample under a hard pin red-flagged a boundary that 3/3 re-runs and a
+    // byte-compare of everything the probe reads proved never moved. Same
+    // pin, same doctrine — a coin flip just isn't a measurement (~+$0.004).
+    reps: 3,
   },
   {
     id: "rule-diction trap (in context)",

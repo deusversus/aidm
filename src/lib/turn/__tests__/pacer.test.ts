@@ -6,14 +6,19 @@ import {
   type PacerArcState,
   type PacerPhase,
 } from "@/lib/types/direction";
+import { TURN_CONTRACTS } from "@/lib/types/turn";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { PHASE_A_BUDGET_MS, RUNG_OVERRUN } from "../degrade";
 import {
+  PACER_TIMEBOX_CAP_MS,
   PACER_TIMEBOX_MS,
+  PACER_TIMEBOX_THINKING_MS,
   type PacerInput,
   beatShapeAlternatives,
   beatShapeToken,
   buildPrompt,
   buildSystem,
+  pacerTimeboxFor,
   repeatedBeatShape,
   runPacer,
   stallDirective,
@@ -65,9 +70,84 @@ beforeEach(() => {
   mockProbe.mockReset();
 });
 
-describe("PacerContract", () => {
-  it("timebox is frozen at 6s (§5.5 degrade ladder step)", () => {
-    expect(PACER_TIMEBOX_MS).toBe(6_000);
+describe("PacerContract — a model-keyed timebox under a ladder ceiling", () => {
+  it("the model-side boxes are the measured ones (M3R2 C5): reasoning asks for more", () => {
+    expect(PACER_TIMEBOX_MS).toBe(15_000);
+    expect(PACER_TIMEBOX_THINKING_MS).toBe(30_000);
+    // The 6s flat box lost 7/7 live beats at Sonnet; these are what the models
+    // measured (Haiku ≤13.0s, Sonnet ≤25.7s on campaign 86135b1f).
+    expect(PACER_TIMEBOX_THINKING_MS).toBeGreaterThan(PACER_TIMEBOX_MS);
+  });
+
+  it("the ceiling is ARITHMETIC — the ladder's rung gap on the tightest pacer tier", () => {
+    // douga never consults the Pacer, so genga's 35s budget governs. The cap is
+    // the slack between "on budget" (×1.0) and the first research-capping rung
+    // (cap_research_2, ×1.4): 35_000 × 0.4 = 14_000.
+    expect(TURN_CONTRACTS.douga.consultants).not.toContain("pacer");
+    expect(TURN_CONTRACTS.genga.consultants).toContain("pacer");
+    const genga = PHASE_A_BUDGET_MS.genga ?? 0;
+    expect(PACER_TIMEBOX_CAP_MS).toBe(
+      Math.round(genga * (RUNG_OVERRUN.cap_research_2 - RUNG_OVERRUN.skip_validation_retry)),
+    );
+    expect(PACER_TIMEBOX_CAP_MS).toBe(14_000);
+  });
+
+  it("THE GUARANTEE: the Pacer alone can never reach a research-capping rung (§5.5)", () => {
+    // The Pacer sits in the Phase-A fan-out, and its box is carried into every
+    // ladder reading after it. A Phase A otherwise exactly on budget must be
+    // able to absorb the whole box and still not cross cap_research_2 — the
+    // beat is a nicety, the KA's research is the substance, and the beat may
+    // never be bought with it.
+    for (const tier of ["genga", "sakuga"] as const) {
+      const budget = PHASE_A_BUDGET_MS[tier] ?? 0;
+      expect(
+        budget * RUNG_OVERRUN.skip_validation_retry + PACER_TIMEBOX_CAP_MS,
+      ).toBeLessThanOrEqual(budget * RUNG_OVERRUN.cap_research_2);
+    }
+    for (const model of ["claude-haiku-4-5", "claude-sonnet-5", "claude-opus-5"]) {
+      expect(pacerTimeboxFor(model)).toBeLessThanOrEqual(PACER_TIMEBOX_CAP_MS);
+    }
+  });
+
+  it("the cap binds today, and the lost beats are the accepted trade", () => {
+    // Both boxes exceed the ceiling, so both land on it. Sonnet's measured
+    // 25.7s worst case no longer fits: that beat times out honestly (logged,
+    // no directive) rather than costing the writer a research call.
+    expect(pacerTimeboxFor("claude-sonnet-5")).toBe(PACER_TIMEBOX_CAP_MS);
+    expect(pacerTimeboxFor("claude-haiku-4-5")).toBe(PACER_TIMEBOX_CAP_MS);
+    // Still more than double the old flat 6s box that lost every live beat.
+    expect(PACER_TIMEBOX_CAP_MS).toBeGreaterThan(2 * 6_000);
+  });
+
+  it("an unknown model falls back to the fast box rather than waiting forever", () => {
+    expect(pacerTimeboxFor("some-future-model")).toBeLessThanOrEqual(PACER_TIMEBOX_MS);
+    expect(pacerTimeboxFor("some-future-model")).toBe(
+      Math.min(PACER_TIMEBOX_MS, PACER_TIMEBOX_CAP_MS),
+    );
+  });
+
+  it("runPacer derives its own timebox from the selection's probe model", async () => {
+    // A probe slower than the FAST box but inside the THINKING box: it must
+    // land at Sonnet and time out at Haiku, with no explicit timebox passed.
+    arm({ beat_classification: "slow_burn" });
+    mockProbe.mockImplementation(
+      () =>
+        new Promise((resolve) =>
+          setTimeout(() => resolve({ ...baseDirective, beat_classification: "slow_burn" }), 40),
+        ) as never,
+    );
+    const sonnet = await runPacer(
+      { ...DEV_TIER_SELECTION, probe: "claude-sonnet-5" },
+      makeInput(),
+      // A stand-in for "the thinking box": long enough for a 40ms probe.
+      200,
+    );
+    expect(sonnet.timedOut).toBe(false);
+    expect(sonnet.beat?.beat_classification).toBe("slow_burn");
+
+    const starved = await runPacer(DEV_TIER_SELECTION, makeInput(), 5);
+    expect(starved.timedOut).toBe(true);
+    expect(starved.beat).toBeUndefined();
   });
 });
 

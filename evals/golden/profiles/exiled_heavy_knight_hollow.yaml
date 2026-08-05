@@ -1,0 +1,62 @@
+# THE FOUNDING DEFECT, pinned — the original test case becomes the regression
+# fixture (M3R3 verification).
+#
+# Captured 2026-08-05 from the live aidm_v5 `profiles` row for this title,
+# BEFORE the regression re-research replaced it. Trimmed to what the trust
+# substrate actually reads: the asserted number, the empty scrape, and the
+# mechanics organs. The row claimed confidence 90 with pagesFetched 0 while
+# carrying "Scrape is not viable" in its own notes — nothing in v5 read either
+# fact, and it compiled into a campaign. Every gate here must call it dead.
+#
+# anilist_genres / anilist_tags: AniList id 180136, fetched from the public
+# API 2026-08-05 and filtered the way research.ts filters it (relevantTags,
+# minRank 20). AniList carries NO "LitRPG" tag for this title — the one
+# mechanics-bearing fragment in the whole list is "Dungeon" (rank 60), which
+# is precisely why the legacy gate reads TAGS: the genre vocabulary AniList
+# assigns here (Action, Fantasy) contains no mechanics signal at all.
+
+id: the_exiled_heavy_knight_knows_how_to_game_the_system
+title: The Exiled Heavy Knight Knows How to Game the System
+anilist_id: 180136
+# Post-cutoff by the trust substrate's own floor (KNOWLEDGE_CUTOFF_YEAR).
+start_year: 2026
+
+research_provenance:
+  # ASSERTED, never derived — 85+5+5 arithmetic. The defect itself.
+  confidence: 90
+  pages_fetched: 0
+  wiki_base: https://exiled.fandom.com
+  notes: >-
+    wiki: This wiki has no content categories—only technical/maintenance/media
+    infrastructure. No character, location, technique, faction, item, arc, or
+    lore categories exist. Scrape is not viable.
+
+anilist_genres: [Action, Fantasy]
+anilist_tags:
+  - Isekai
+  - CGI
+  - Reincarnation
+  - Male Protagonist
+  - Class Struggle
+  - Dungeon
+  - Swordplay
+  - Magic
+  - Royal Affairs
+  - Medieval
+  - Estranged Family
+  - Gore
+  - Survival
+  - Meta
+
+ip_mechanics:
+  # A dungeon-tagged, game-knowledge-premised title whose research produced no
+  # power system at all, and a stat mapping that is the discarded default.
+  power_system: null
+  stat_mapping:
+    has_canonical_stats: false
+    confidence: 0
+  world_setting:
+    genre: [Action, Fantasy]
+  # All three cards carry empty signature_phrases and "No direct quotes are
+  # available" in their own speech_patterns.
+  voice_cards_with_quotes: 0

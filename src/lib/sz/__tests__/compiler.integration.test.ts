@@ -1416,7 +1416,7 @@ describe.skipIf(!url)("SZ compiler (real Postgres)", () => {
 
       // Reader 2 — Block 1's world-rules freight, on the control key's
       // precedent: obeyed text the pen reads every turn, and NOT charter
-      // budget (the §4.4a 600-900 window is untouched by a law).
+      // budget (the §4.4a 1,200-2,600 band is untouched by a law).
       const settei = renderSettei({ contract: result.contract, marks: [] });
       expect(settei.text).toContain("Premise law (the player's word");
       expect(settei.text).toContain(LAW_CLAUSE);

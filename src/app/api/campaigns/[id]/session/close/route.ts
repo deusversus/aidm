@@ -1,4 +1,5 @@
 import { getCurrentUser } from "@/lib/auth";
+import { settleG2IfPending } from "@/lib/compositor/g2";
 import { getDb } from "@/lib/db";
 import { campaigns } from "@/lib/db/schema";
 import { closeSession } from "@/lib/direction/session";
@@ -31,6 +32,17 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if ((trigger ?? "explicit") !== "explicit") {
     return NextResponse.json({ error: "only an explicit close is accepted" }, { status: 400 });
   }
+
+  // §5.8 catch-up-before-reader, at the CLOSE boundary too (M3R2 C5). Every
+  // close artifact is a reader of what G2 writes: the memo reads narrated
+  // fragments, seed state and spotlight debt; the voice journal reads the
+  // session's narration; the Sakkan samples the record; the janitor reads the
+  // catalog. The open and rewind routes have always drained first — the close
+  // did not, so a sitting ended while the last turn's G2 lagged composed the
+  // whole Learned layer from a half-written record and then froze it. The
+  // drain lives here, not in closeSession, because direction/session cannot
+  // import compositor/g2 (g2 imports rollingCheckpoint from it — a cycle).
+  await settleG2IfPending(db, id);
 
   const result = await closeSession(db, id, "explicit");
   return NextResponse.json(result);

@@ -6,7 +6,7 @@ import {
   workingWindow,
 } from "@/lib/blocks/compaction";
 import { settleG1 } from "@/lib/compositor/g1";
-import { settleG2, settleG2IfPending } from "@/lib/compositor/g2";
+import { G2_MAX_STEP_ATTEMPTS, settleG2, settleG2IfPending } from "@/lib/compositor/g2";
 import * as schema from "@/lib/db/schema";
 import { callJudgment, callProbe, streamNarration } from "@/lib/llm/calls";
 import type { TierSelection } from "@/lib/llm/tiers";
@@ -787,6 +787,328 @@ describe.skipIf(!url)("Compositor (real Postgres, scripted models)", () => {
     },
   );
 
+  it(
+    "step hygiene (M3R2 C5): a failing step marks nothing, isolates, defers its dependents, and never wedges the next submit",
+    { timeout: 45_000 },
+    async () => {
+      if (!db) throw new Error("unreachable");
+      const errorLog = vi.spyOn(console, "error").mockImplementation(() => {});
+      const warnLog = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const campaignId = await makeCampaign();
+      const turnNumber = 9;
+      const narration = "The embedding service was, that evening, extremely unavailable.";
+      const [turnRow] = await db
+        .insert(schema.turns)
+        .values({
+          campaignId,
+          turnNumber,
+          tier: "genga",
+          status: "complete",
+          playerInput: "I file the report",
+          narration,
+          sidecar: CommitScene.parse({ decision_point: false, notable_beats: ["a filing"] }),
+          checkpoints: { phase_a: true, phase_b: true, g1: true },
+        })
+        .returning({ id: schema.turns.id });
+      if (!turnRow) throw new Error("turn insert failed");
+      await db.insert(schema.episodicRecords).values({
+        campaignId,
+        turnNumber,
+        playerInput: "I file the report",
+        narration,
+        turnId: turnNumber,
+        provenance: "chronicler_g1",
+        confidence: 1,
+      });
+
+      const distill = {
+        narrated_fragment: "Nothing was written down that could be written down.",
+        facts: [
+          {
+            content: "The report names the dockmaster",
+            category: "event",
+            is_plot_critical: true,
+            critical_reason: "it is the thread",
+          },
+        ],
+        entity_updates: [],
+        confirmed_seed_descriptions: [],
+        meta_comments: ["less flowery please"],
+      };
+      // biome-ignore lint/suspicious/noExplicitAny: harness spans generic signatures
+      mockJudgment.mockImplementation((_s: any, opts: any) => {
+        if (opts.name === "g2_distill") return Promise.resolve(distill) as never;
+        return Promise.reject(new Error(`unscripted judgment ${opts.name}`)) as never;
+      });
+      // The semantic step's embedder is down. Before C5 this THREW out of
+      // settleG2 — every later step was skipped and submitTurn 500'd.
+      mockEmbed.mockRejectedValue(new Error("voyage unavailable"));
+
+      await expect(settleG2(db, turnRow.id)).resolves.toBeUndefined();
+
+      const readCheckpoints = async () => {
+        const [row] = await db.select().from(schema.turns).where(eq(schema.turns.id, turnRow.id));
+        return (row?.checkpoints ?? {}) as {
+          g2?: Record<string, boolean>;
+          g2_attempts?: Record<string, number>;
+          g2_abandoned?: Record<string, string>;
+        };
+      };
+
+      const first = await readCheckpoints();
+      // The failed step marked NOTHING and counted its attempt.
+      expect(first.g2?.semantic).toBeUndefined();
+      expect(first.g2_attempts?.semantic).toBe(1);
+      // Its dependent was DEFERRED, not run against an empty layer.
+      expect(first.g2?.promotion).toBeUndefined();
+      // Isolation: everything independent of it still ran.
+      expect(first.g2?.distill).toBe(true);
+      expect(first.g2?.fragment).toBe(true);
+      expect(first.g2?.entities).toBe(true);
+      expect(first.g2?.marks).toBe(true);
+      expect(first.g2?.heat_batch).toBe(true);
+      expect(first.g2?.director_trigger).toBe(true);
+      // The TERMINAL marker is withheld — the catch-up must still see this turn.
+      expect(first.g2?.media).toBeUndefined();
+
+      // …and the next submit's drain does not throw on it.
+      await expect(settleG2IfPending(db, campaignId)).resolves.toBeUndefined();
+      const second = await readCheckpoints();
+      expect(second.g2_attempts?.semantic).toBe(2);
+      expect(second.g2?.media).toBeUndefined();
+
+      // Service restored: the retry lands, its dependent follows, the turn
+      // reaches its terminal marker — and the distiller is NOT re-billed.
+      mockEmbed.mockImplementation((texts: string[]) => Promise.resolve(texts.map(() => VEC())));
+      await settleG2IfPending(db, campaignId);
+
+      const done = await readCheckpoints();
+      expect(done.g2?.semantic).toBe(true);
+      expect(done.g2?.promotion).toBe(true);
+      expect(done.g2?.media).toBe(true);
+      expect(done.g2_abandoned ?? {}).toEqual({});
+      expect(distillCallCount("g2_distill")).toBe(1);
+
+      const promoted = await db
+        .select()
+        .from(schema.criticalFacts)
+        .where(eq(schema.criticalFacts.campaignId, campaignId));
+      expect(promoted.some((c) => c.content.includes("dockmaster"))).toBe(true);
+
+      errorLog.mockRestore();
+      warnLog.mockRestore();
+    },
+  );
+
+  it(
+    "step hygiene: a PERMANENTLY failing step is abandoned after its attempts, not retried forever",
+    { timeout: 45_000 },
+    async () => {
+      if (!db) throw new Error("unreachable");
+      const errorLog = vi.spyOn(console, "error").mockImplementation(() => {});
+      const warnLog = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const campaignId = await makeCampaign();
+      const turnNumber = 11;
+      const [turnRow] = await db
+        .insert(schema.turns)
+        .values({
+          campaignId,
+          turnNumber,
+          tier: "genga",
+          status: "complete",
+          playerInput: "x",
+          narration: "y",
+          checkpoints: { phase_a: true, phase_b: true, g1: true },
+        })
+        .returning({ id: schema.turns.id });
+      if (!turnRow) throw new Error("turn insert failed");
+      await db.insert(schema.episodicRecords).values({
+        campaignId,
+        turnNumber,
+        playerInput: "x",
+        narration: "y",
+        turnId: turnNumber,
+        provenance: "chronicler_g1",
+        confidence: 1,
+      });
+
+      // The distiller itself is unsatisfiable — a poisoned turn. Retrying it
+      // at every submit for the life of the campaign would BILL a judgment
+      // call each time; the bound is what makes "never mark a failure done"
+      // affordable.
+      mockJudgment.mockImplementation(
+        () => Promise.reject(new Error("permanent distill failure")) as never,
+      );
+      mockEmbed.mockImplementation((texts: string[]) => Promise.resolve(texts.map(() => VEC())));
+
+      for (let i = 0; i < G2_MAX_STEP_ATTEMPTS; i++) {
+        await expect(settleG2IfPending(db, campaignId)).resolves.toBeUndefined();
+      }
+      const callsAfterBound = distillCallCount("g2_distill");
+      expect(callsAfterBound).toBe(G2_MAX_STEP_ATTEMPTS);
+
+      const [row] = await db.select().from(schema.turns).where(eq(schema.turns.id, turnRow.id));
+      const cps = (row?.checkpoints ?? {}) as {
+        g2?: Record<string, boolean>;
+        g2_abandoned?: Record<string, string>;
+      };
+      expect(cps.g2_abandoned?.distill).toContain("permanent distill failure");
+      // Abandoned counts as settled: the terminal marker lands so the drain
+      // stops re-scanning — loudly (the abandoned map is on the row).
+      expect(cps.g2?.media).toBe(true);
+      expect(cps.g2?.distill).toBeUndefined();
+
+      // A further drain costs NOTHING — no fourth distill call.
+      await settleG2IfPending(db, campaignId);
+      expect(distillCallCount("g2_distill")).toBe(callsAfterBound);
+
+      errorLog.mockRestore();
+      warnLog.mockRestore();
+    },
+  );
+
+  it(
+    "a transaction that fails at its own marker update persists NEITHER the marker nor its writes (M3R3 close)",
+    { timeout: 45_000 },
+    async () => {
+      if (!db) throw new Error("unreachable");
+      const errorLog = vi.spyOn(console, "error").mockImplementation(() => {});
+      const warnLog = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const campaignId = await makeCampaign();
+      const turnNumber = 13;
+      const narration = "The ledger closed a beat before the money did.";
+      const [turnRow] = await db
+        .insert(schema.turns)
+        .values({
+          campaignId,
+          turnNumber,
+          tier: "genga",
+          status: "complete",
+          playerInput: "I check the books",
+          narration,
+          sidecar: CommitScene.parse({ decision_point: false, notable_beats: ["a discrepancy"] }),
+          checkpoints: { phase_a: true, phase_b: true, g1: true },
+        })
+        .returning({ id: schema.turns.id });
+      if (!turnRow) throw new Error("turn insert failed");
+      await db.insert(schema.episodicRecords).values({
+        campaignId,
+        turnNumber,
+        playerInput: "I check the books",
+        narration,
+        turnId: turnNumber,
+        provenance: "chronicler_g1",
+        confidence: 1,
+      });
+
+      // biome-ignore lint/suspicious/noExplicitAny: harness spans generic signatures
+      mockJudgment.mockImplementation((_s: any, opts: any) => {
+        if (opts.name === "g2_distill")
+          return Promise.resolve({
+            narrated_fragment: "Somebody had already been here with a pen.",
+            facts: [
+              {
+                content: "The ledger's last page was rewritten",
+                category: "event",
+                is_plot_critical: true,
+                critical_reason: "it is the thread",
+              },
+            ],
+            entity_updates: [],
+            confirmed_seed_descriptions: [],
+            meta_comments: [],
+          }) as never;
+        return Promise.reject(new Error(`unscripted judgment ${opts.name}`)) as never;
+      });
+      mockEmbed.mockImplementation((texts: string[]) => Promise.resolve(texts.map(() => VEC())));
+
+      // Fault injection on a REAL connection, not a mocked DB: the real
+      // transaction runs, and only the CLOSING checkpoint update inside it
+      // throws — the exact failure the marker rule exists for (that update, or
+      // the COMMIT behind it, going down after the step's writes are staged).
+      // Before the fix the step had already set its marker on the SHARED map,
+      // so the catch serialized "semantic: done" while its rows rolled back:
+      // a fact lost forever, and nothing left that would ever retry it.
+      let injected = 0;
+      const faulty = new Proxy(db, {
+        get(target, prop) {
+          if (prop !== "transaction") {
+            const value = Reflect.get(target, prop);
+            return typeof value === "function" ? value.bind(target) : value;
+          }
+          // biome-ignore lint/suspicious/noExplicitAny: drizzle's tx generics
+          return (cb: (tx: any) => Promise<unknown>) =>
+            // biome-ignore lint/suspicious/noExplicitAny: drizzle's tx generics
+            target.transaction(async (tx: any) => {
+              const guarded = new Proxy(tx, {
+                get(t: object, p: string | symbol) {
+                  const value = Reflect.get(t, p);
+                  if (p !== "update" || typeof value !== "function") {
+                    return typeof value === "function" ? value.bind(t) : value;
+                  }
+                  return (table: unknown) => {
+                    if (table === schema.turns && injected++ === 0) {
+                      throw new Error("checkpoint update lost the connection (scripted)");
+                    }
+                    return value.call(t, table);
+                  };
+                },
+              });
+              return cb(guarded);
+            });
+        },
+      });
+
+      await expect(settleG2(faulty, turnRow.id)).resolves.toBeUndefined();
+      expect(injected).toBeGreaterThan(0);
+
+      const readCheckpoints = async () => {
+        const [row] = await db.select().from(schema.turns).where(eq(schema.turns.id, turnRow.id));
+        return (row?.checkpoints ?? {}) as {
+          g2?: Record<string, boolean>;
+          g2_attempts?: Record<string, number>;
+        };
+      };
+      const readSemantic = () =>
+        db
+          .select()
+          .from(schema.semanticMemories)
+          .where(eq(schema.semanticMemories.campaignId, campaignId));
+
+      const failed = await readCheckpoints();
+      // THE REGRESSION: no marker, and the attempt counted.
+      expect(failed.g2?.semantic).toBeUndefined();
+      expect(failed.g2_attempts?.semantic).toBe(1);
+      // The rollback was real — the rows the marker would have claimed are gone.
+      expect(await readSemantic()).toHaveLength(0);
+      // Its reader deferred rather than promoting from an empty layer, and the
+      // terminal marker stayed withheld so the drain comes back for this turn.
+      expect(failed.g2?.promotion).toBeUndefined();
+      expect(failed.g2?.media).toBeUndefined();
+      // Isolation intact: the steps whose transactions committed are marked —
+      // the failure poisoned nothing, in either direction.
+      expect(failed.g2?.distill).toBe(true);
+      expect(failed.g2?.entities).toBe(true);
+      expect(failed.g2?.heat_batch).toBe(true);
+
+      // …and because the marker never landed, the next settle RETRIES it. This
+      // is what the persisted lie used to cost: the fact was unrecoverable.
+      await settleG2IfPending(db, campaignId);
+      const settled = await readCheckpoints();
+      expect(settled.g2?.semantic).toBe(true);
+      expect(settled.g2?.promotion).toBe(true);
+      expect(settled.g2?.media).toBe(true);
+      const rows = await readSemantic();
+      expect(rows).toHaveLength(1);
+      expect(rows[0]?.content).toContain("last page was rewritten");
+      // One distill call across both settles — the retry re-billed nothing.
+      expect(distillCallCount("g2_distill")).toBe(1);
+
+      errorLog.mockRestore();
+      warnLog.mockRestore();
+    },
+  );
+
   // -------------------------------------------------------------------------
   // (3) G2 catch-up after a crash — replays from the checkpoint payload
   // -------------------------------------------------------------------------
@@ -845,13 +1167,25 @@ describe.skipIf(!url)("Compositor (real Postgres, scripted models)", () => {
       mockEmbed.mockImplementation((texts: string[]) => Promise.resolve(texts.map(() => VEC())));
       mockEmbed.mockImplementationOnce(() => Promise.reject(new Error("voyage down (scripted)")));
 
-      await expect(settleG2(db, turnRow.id)).rejects.toThrow(/voyage down/);
+      // M3R2 C5 re-baseline: the settle no longer PROPAGATES a step failure —
+      // it is awaited inside submitTurn, so a throw here 500'd the player's
+      // next turn. The failure is isolated and recorded instead; the partial
+      // markers (and the un-marked semantic step) are unchanged.
+      await expect(settleG2(db, turnRow.id)).resolves.toBeUndefined();
 
       const [mid] = await db.select().from(schema.turns).where(eq(schema.turns.id, turnRow.id));
-      const midCk = mid?.checkpoints as { g2?: Record<string, boolean>; g2_payload?: unknown };
+      const midCk = mid?.checkpoints as {
+        g2?: Record<string, boolean>;
+        g2_payload?: unknown;
+        g2_attempts?: Record<string, number>;
+      };
       expect(midCk.g2?.distill).toBe(true);
       expect(midCk.g2?.fragment).toBe(true);
       expect(midCk.g2?.semantic).toBeUndefined();
+      expect(midCk.g2_attempts?.semantic).toBe(1);
+      // The terminal marker is withheld, which is what makes the catch-up
+      // below pick this turn up at all.
+      expect(midCk.g2?.media).toBeUndefined();
       expect(midCk.g2_payload).toBeTruthy();
       expect(distillCallCount("g2_distill")).toBe(1);
 
@@ -1031,16 +1365,17 @@ describe.skipIf(!url)("Compositor (real Postgres, scripted models)", () => {
   // -------------------------------------------------------------------------
 
   it(
-    "maybeCompact writes narrated beats past the 10-exchange window; newest 10 remain",
+    "maybeCompact writes narrated beats past the 12-exchange window; newest 12 remain",
     { timeout: 30_000 },
     async () => {
       if (!db) throw new Error("unreachable");
       const campaignId = await makeCampaign();
-      // 17 exchanges: past the hysteresis trigger (16), compacting down to
-      // the keep-tail (10) in ONE batched event — §5.6's sanctioned cadence,
-      // never a per-turn trickle.
+      // 21 exchanges: past the hysteresis trigger (20), compacting down to
+      // the keep-tail (12) in ONE batched event — §5.6's sanctioned cadence,
+      // never a per-turn trickle. RE-BASELINED for the 32k window ruling
+      // (user, 2026-08-05): 16/10 scaled to 20/12 with the doubled ceiling.
       await db.insert(schema.episodicRecords).values(
-        Array.from({ length: 17 }, (_, i) => ({
+        Array.from({ length: 21 }, (_, i) => ({
           campaignId,
           turnNumber: i + 1,
           playerInput: `input ${i + 1}`,
@@ -1064,18 +1399,20 @@ describe.skipIf(!url)("Compositor (real Postgres, scripted models)", () => {
       });
 
       expect(await compactionWatermark(db, campaignId)).toBe(0);
-      const report = await maybeCompact(db, campaignId, 17, SELECTION);
+      const report = await maybeCompact(db, campaignId, 21, SELECTION);
       expect(report.compacted).toBe(true);
-      expect(report.exchangesCompacted).toBe(7); // 17 − keepTail(10), one batch
+      expect(report.exchangesCompacted).toBe(9); // 21 − keepTail(12), one batch
       expect(report.beatsWritten).toBe(2);
 
-      expect(await compactionWatermark(db, campaignId)).toBe(7);
+      expect(await compactionWatermark(db, campaignId)).toBe(9);
       const window = await workingWindow(db, campaignId);
-      expect(window.map((e) => e.turnNumber)).toEqual([8, 9, 10, 11, 12, 13, 14, 15, 16, 17]);
+      expect(window.map((e) => e.turnNumber)).toEqual([
+        10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21,
+      ]);
 
       // Hysteresis: at exactly the keep-tail the next call is a NO-OP — the
-      // cadence is batched (~every 6 turns), never a per-turn trickle.
-      const followUp = await maybeCompact(db, campaignId, 17, SELECTION);
+      // cadence is batched (~every 8 turns), never a per-turn trickle.
+      const followUp = await maybeCompact(db, campaignId, 21, SELECTION);
       expect(followUp.compacted).toBe(false);
 
       const beats = await db
@@ -1086,7 +1423,7 @@ describe.skipIf(!url)("Compositor (real Postgres, scripted models)", () => {
       expect(beats).toHaveLength(2);
       expect(beats[0]?.provenance).toBe("chronicler_compaction");
       expect(beats[0]?.fromTurn).toBe(1);
-      expect(beats[0]?.toTurn).toBe(7);
+      expect(beats[0]?.toTurn).toBe(9);
       // Position-ordered — Block 2's content ordering is deterministic.
       expect((beats[0]?.position ?? 0) < (beats[1]?.position ?? 0)).toBe(true);
 
@@ -1103,10 +1440,10 @@ describe.skipIf(!url)("Compositor (real Postgres, scripted models)", () => {
       });
       await db.insert(schema.episodicRecords).values({
         campaignId,
-        turnNumber: 18,
-        playerInput: "input 18",
-        narration: "Narration for turn 18.",
-        turnId: 18,
+        turnNumber: 22,
+        playerInput: "input 22",
+        narration: "Narration for turn 22.",
+        turnId: 22,
         provenance: "chronicler_g1",
         confidence: 1,
       });

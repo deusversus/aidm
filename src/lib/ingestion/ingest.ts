@@ -333,6 +333,240 @@ export async function reviseBlock(
   return { revisedBlock: revised };
 }
 
+/**
+ * The provenance a correction the PLAYER filed in so many words carries
+ * (§5.4, §6 envelope). Distinct from `player_assertion`: an assertion adds to
+ * the record, a correction retires part of it — and a reader auditing why a
+ * line changed should find the player's hand on it, not an inference.
+ */
+export const PLAYER_CORRECTION_PROVENANCE = "player_correction";
+
+interface WriteEnvelope {
+  turnId: number;
+  provenance: string;
+  confidence: number;
+}
+
+type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0];
+
+/** The entity's next version number — every block mutation stacks a row so a rewind can restore any prior state. */
+async function nextEntityVersion(db: Db | Tx, entityId: string): Promise<number> {
+  const [{ maxVersion } = { maxVersion: null }] = await db
+    .select({ maxVersion: sql<number | null>`max(${entityVersions.version})` })
+    .from(entityVersions)
+    .where(eq(entityVersions.entityId, entityId));
+  return (maxVersion ? Number(maxVersion) : 0) + 1;
+}
+
+/**
+ * §5.4 retire-and-replace (M2 C3), as one callable move: tombstone the wrong
+ * critical fact and insert its replacement under the caller's envelope, the
+ * replacement inheriting the retired row's category. The substrate's own
+ * idiom — never a silent mutation — and the ONE place the pair happens, so
+ * the story channel and the booth (M3R2 C4) cannot drift apart.
+ *
+ * `retiredAtTurn` puts the RETIREMENT on the timeline: tombstoning is an
+ * in-place mutation the rewind sweep can't see, so without it a rewind past
+ * the correction took the replacement and left the original retired.
+ */
+async function retireAndReplaceCriticalFact(
+  db: Db,
+  args: {
+    campaignId: string;
+    row: { id: string; category: string };
+    content: string;
+    envelope: WriteEnvelope;
+  },
+): Promise<{ id: string } | null> {
+  await db
+    .update(criticalFacts)
+    .set({ tombstonedAt: new Date(), retiredAtTurn: args.envelope.turnId })
+    .where(eq(criticalFacts.id, args.row.id));
+  const [replacement] = await db
+    .insert(criticalFacts)
+    .values({
+      campaignId: args.campaignId,
+      content: args.content,
+      category: args.row.category,
+      ...args.envelope,
+    })
+    .returning({ id: criticalFacts.id });
+  return replacement ?? null;
+}
+
+/** The two records M2-C3's correction semantics can actually retire and replace. */
+export type CorrectionTargetKind = "critical_fact" | "entity";
+
+/**
+ * Normalized-hint floor for binding a CRITICAL FACT (audit finding). Bidirectional
+ * containment plus a degenerate hint ("the") matched an arbitrary live record
+ * and retired it. Entity binding needs no floor — it is identity-key EQUALITY,
+ * and real catalog names are short ("Ed", "Jet").
+ */
+const CORRECTION_HINT_MIN_CHARS = 12;
+
+export type CorrectionOutcome =
+  | {
+      filed: true;
+      kind: "critical_fact_replaced" | "entity_revised";
+      id: string;
+      /** What the record now reads — the text an acknowledgement may name. */
+      recordText: string;
+    }
+  /** Nothing was written, and WHY, in words a responder can say out loud. */
+  | { filed: false; reason: string };
+
+/**
+ * The booth-callable correction entry point (M3R2 C4). §5.4's correction
+ * semantics already existed — inside `ingestAssertion`, reachable only from
+ * the STORY channel. On 2026-08-03 the player told the booth a hard line was
+ * recorded inverted; the Writer agreed, promised the fix, and the close-time
+ * resolution had no write path to the record. The booth had a voice and no
+ * pen. This is that pen, and it is the SAME machinery — one target resolution,
+ * one retire-and-replace, one envelope — not a second correction dialect.
+ *
+ * Resolution is deliberate and unclever: a critical fact binds by
+ * normalized-containment on the record's own words, an entity by identity key.
+ * An unresolvable target writes NOTHING and returns the reason — the caller
+ * says it plainly rather than guessing at which line the player meant. A
+ * failed entity revision likewise files nothing (the story channel falls back
+ * to APPEND so a new fact is never lost, but appending a correction beside the
+ * error is exactly the failure a correction exists to undo).
+ *
+ * Idempotent only on the CRITICAL FACT path, and only by construction: a re-run
+ * finds the retired text no longer live and writes nothing. An entity revision
+ * has no such property — it leaves the row live and resolvable by the same
+ * name — so repeat suppression for entities belongs to the CALLER's ledger
+ * (booth.ts `correctionKey`), never to this function.
+ */
+export async function applyRecordCorrection(
+  db: Db,
+  selection: TierSelection,
+  args: {
+    campaignId: string;
+    turnNumber: number;
+    targetKind: CorrectionTargetKind;
+    /** The record's own words (critical_fact) or the exact catalog name (entity). */
+    targetHint: string;
+    correctedContent: string;
+    provenance?: string;
+  },
+): Promise<CorrectionOutcome> {
+  const hint = args.targetHint.trim();
+  const content = args.correctedContent.trim();
+  if (!hint) return { filed: false, reason: "the correction never named which record is wrong" };
+  if (!content)
+    return { filed: false, reason: "the correction never said what the record should say instead" };
+
+  const envelope: WriteEnvelope = {
+    turnId: args.turnNumber,
+    provenance: args.provenance ?? PLAYER_CORRECTION_PROVENANCE,
+    confidence: 1,
+  };
+
+  if (args.targetKind === "critical_fact") {
+    // The hint floor (audit finding): containment matches in EITHER direction,
+    // so a three-character hint is inside essentially every record line. Below
+    // this length the hint is not naming a line, it is naming the language —
+    // and the write on the other side RETIRES whatever it lands on.
+    if (normalizeForMatch(hint).length < CORRECTION_HINT_MIN_CHARS) {
+      return {
+        filed: false,
+        reason: `"${hint}" is too short to name a record line — quote the exact line as it stands`,
+      };
+    }
+    const rows = await db
+      .select({
+        id: criticalFacts.id,
+        content: criticalFacts.content,
+        category: criticalFacts.category,
+      })
+      .from(criticalFacts)
+      .where(and(eq(criticalFacts.campaignId, args.campaignId), notTombstoned(criticalFacts)));
+    // ALL matches, not the first: the select has no ORDER BY, so binding to
+    // whichever row Postgres happened to return first made a destructive
+    // retire-and-replace depend on physical row order. An ambiguous hint is
+    // the same failure as an unmatched one — the engine does not know which
+    // line the player meant, and says so.
+    const matches = rows.filter((r) => normalizedContains(r.content, hint));
+    const target = matches.length === 1 ? matches[0] : undefined;
+    if (!target) {
+      return {
+        filed: false,
+        reason:
+          matches.length === 0
+            ? `no live record matches "${hint}"`
+            : `"${hint}" matches ${matches.length} live records — quote the exact line as it stands so the right one can be found`,
+      };
+    }
+    const replacement = await retireAndReplaceCriticalFact(db, {
+      campaignId: args.campaignId,
+      row: target,
+      content,
+      envelope,
+    });
+    if (!replacement) {
+      return { filed: false, reason: "the replacement record failed to write" };
+    }
+    return { filed: true, kind: "critical_fact_replaced", id: replacement.id, recordText: content };
+  }
+
+  const key = identityKey(hint);
+  const rows = await db
+    .select({ id: entities.id, name: entities.name, block: entities.block })
+    .from(entities)
+    .where(and(eq(entities.campaignId, args.campaignId), notTombstoned(entities)));
+  // A hint either NAMES the entity or QUOTES the wrong line of its dossier —
+  // the player says whichever they have to hand. Name first, then the block.
+  const byName = key ? rows.find((e) => identityKey(e.name) === key) : undefined;
+  const target = byName ?? rows.find((e) => normalizedContains(e.block, hint));
+  if (!target) {
+    return { filed: false, reason: `no catalog entity matches "${hint}"` };
+  }
+  // A QUOTED line is handed to the revise judgment as the line being retired —
+  // that is what keeps a correction surgical, and what the revise's own sanity
+  // gate reads as the one line allowed to disappear. A hint that merely named
+  // the entity supersedes nothing: guessing which line the player meant is the
+  // silent-guess failure this channel exists to avoid.
+  const supersedes = byName
+    ? undefined
+    : target.block
+        .split("\n")
+        .map((l) => l.trim())
+        .find((l) => l.length > 0 && normalizedContains(l, hint));
+  try {
+    const { revisedBlock } = await reviseBlock(selection, {
+      campaignId: args.campaignId,
+      turnNumber: args.turnNumber,
+      entityName: target.name,
+      currentBlock: target.block,
+      correction: content,
+      ...(supersedes ? { supersedes } : {}),
+    });
+    // ONE transaction (audit finding): the revised block and the version row
+    // that makes it rewindable are the same write. Autocommitted separately,
+    // a failed version insert left a dossier revised with no version behind it
+    // — and the caller reported `filed: false`, which the booth renders to the
+    // player as "nothing in the record changed". `filed: false` must MEAN
+    // nothing changed. The model call stays OUTSIDE: no transaction is held
+    // open across a network round-trip to a writer.
+    await db.transaction(async (tx) => {
+      const version = await nextEntityVersion(tx, target.id);
+      await tx.update(entities).set({ block: revisedBlock }).where(eq(entities.id, target.id));
+      await tx
+        .insert(entityVersions)
+        .values({ entityId: target.id, version, block: revisedBlock, ...envelope });
+    });
+    return { filed: true, kind: "entity_revised", id: target.id, recordText: content };
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err);
+    console.warn(
+      `[ingestion] booth correction could not revise "${target.name}" (turn ${args.turnNumber}): ${detail}`,
+    );
+    return { filed: false, reason: `the record for "${target.name}" could not be revised cleanly` };
+  }
+}
+
 /** Total catalog entities rendered into the dossier before truncation (§5.4 C2). */
 const DOSSIER_ENTITY_CAP = 30;
 /** Per-entity one-line block head budget (~100 chars). */
@@ -701,13 +935,7 @@ export async function ingestAssertion(
 
   // The entity's next version number — every block mutation (enrich or revise)
   // stacks a new row so a rewind can restore any prior state.
-  const nextVersion = async (entityId: string): Promise<number> => {
-    const [{ maxVersion } = { maxVersion: null }] = await db
-      .select({ maxVersion: sql<number | null>`max(${entityVersions.version})` })
-      .from(entityVersions)
-      .where(eq(entityVersions.entityId, entityId));
-    return (maxVersion ? Number(maxVersion) : 0) + 1;
-  };
+  const nextVersion = (entityId: string): Promise<number> => nextEntityVersion(db, entityId);
 
   // Enrich a resolved catalog entity (append + version row) — shared by the
   // deterministic-match path and the semantic mint-guard path.
@@ -961,14 +1189,14 @@ export async function ingestAssertion(
       );
       if (cf) {
         tombstonedCriticalIds.add(cf.id);
-        await db
-          .update(criticalFacts)
-          .set({ tombstonedAt: new Date() })
-          .where(eq(criticalFacts.id, cf.id));
-        const [replacement] = await db
-          .insert(criticalFacts)
-          .values({ campaignId, content: fact.content, category: cf.category, ...envelope })
-          .returning({ id: criticalFacts.id });
+        // The shared move (M3R2 C4): the booth's corrections channel files
+        // through this exact pair, so neither channel can drift.
+        const replacement = await retireAndReplaceCriticalFact(db, {
+          campaignId,
+          row: cf,
+          content: fact.content,
+          envelope,
+        });
         if (replacement) {
           if (cf.category === "promoted") promotedReplacementId = replacement.id;
           writes.push({

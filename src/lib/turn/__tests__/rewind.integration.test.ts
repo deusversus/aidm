@@ -581,6 +581,88 @@ describe.skipIf(!url)("rewindCampaign (real Postgres)", () => {
     expect(memById.get(memC.id)?.plotCritical).toBe(false);
   }, 20_000);
 
+  it("§5.4 correction undo: a dead-timeline retirement anchor cannot resurrect a fact two rewinds later", async () => {
+    if (!db) throw new Error("unreachable");
+    // The chain the audit found: A (turn 2) retired at turn 5 by B; B (turn 5)
+    // retired at turn 8 by C. Retirement tombstones IN PLACE, so the sweep —
+    // which only touches LIVE rows — never sees B again.
+    const retired = (content: string, turnId: number, retiredAtTurn: number) => ({
+      campaignId,
+      content,
+      category: "contract",
+      tombstonedAt: new Date(),
+      retiredAtTurn,
+      ...envelope(turnId),
+    });
+    await db
+      .insert(schema.criticalFacts)
+      .values([
+        retired("fact A", 2, 5),
+        retired("fact B", 5, 8),
+        { campaignId, content: "fact C", category: "contract", ...envelope(8) },
+      ]);
+    await db.insert(schema.turns).values(
+      [1, 2, 3, 4, 5, 6, 7, 8].map((t) => ({
+        campaignId,
+        turnNumber: t,
+        tier: "genga",
+        status: "complete",
+        playerInput: `t${t}`,
+      })),
+    );
+
+    const live = async () =>
+      (
+        await db
+          ?.select()
+          .from(schema.criticalFacts)
+          .where(
+            and(
+              eq(schema.criticalFacts.campaignId, campaignId),
+              notTombstoned(schema.criticalFacts),
+            ),
+          )
+      )?.map((r) => r.content) ?? [];
+
+    // First rewind: A's retirement un-happens, C's write un-happens, B stays
+    // dead — its own write is past the target, so 1a must not raise it.
+    await rewindCampaign(db, campaignId, 3, "first regret");
+    expect((await live()).sort()).toEqual(["fact A"]);
+
+    const all = await db
+      .select()
+      .from(schema.criticalFacts)
+      .where(eq(schema.criticalFacts.campaignId, campaignId));
+    const byContent = Object.fromEntries(all.map((r) => [r.content, r]));
+    expect(byContent["fact A"]?.retiredAtTurn).toBeNull();
+    // THE FIX: B's anchor belonged to the timeline this rewind deleted. Left
+    // standing, it is a loaded gun pointed at every later rewind.
+    expect(byContent["fact B"]?.tombstonedAt).not.toBeNull();
+    expect(byContent["fact B"]?.retiredAtTurn).toBeNull();
+
+    // The player plays the new timeline forward and rewinds again, landing
+    // between B's turnId (5) and its ex-anchor (8) — the exact window in which
+    // the stale anchor made step 1a resurrect a fact from a story that never
+    // happened, live alongside the record that did.
+    await db.insert(schema.turns).values(
+      [4, 5, 6, 7].map((t) => ({
+        campaignId,
+        turnNumber: t,
+        tier: "genga",
+        status: "complete",
+        playerInput: `re-t${t}`,
+      })),
+    );
+    await db
+      .insert(schema.criticalFacts)
+      .values({ campaignId, content: "fact D", category: "contract", ...envelope(7) });
+
+    await rewindCampaign(db, campaignId, 6, "second regret");
+
+    // D un-happens; A survives; B stays buried where the first rewind left it.
+    expect((await live()).sort()).toEqual(["fact A"]);
+  }, 20_000);
+
   it("writeSnapshotIfDue snapshots catalog state every 5th turn (idempotently); rewind reads it back", async () => {
     if (!db) throw new Error("unreachable");
     const [pc] = await db

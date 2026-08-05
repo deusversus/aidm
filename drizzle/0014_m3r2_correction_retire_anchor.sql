@@ -1,0 +1,1 @@
+ALTER TABLE "critical_facts" ADD COLUMN "retired_at_turn" integer;

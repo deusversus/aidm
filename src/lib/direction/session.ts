@@ -295,6 +295,16 @@ export async function openSession(
   }
 }
 
+/**
+ * CALLER CONTRACT (M3R2 C5): drain lagging G2 first — the close route and the
+ * soaks do (settleG2IfPending). Every artifact composed below READS what G2
+ * writes (narrated fragments, seed state, spotlight debt, the catalog), so a
+ * close that races a lagging write group freezes a half-written sitting into
+ * the Learned layer. Same reason the open path drains, and the same placement:
+ * at the route, because this module cannot import compositor/g2 (it imports
+ * rollingCheckpoint from here — a cycle). The idle_timeout close inside
+ * openSession inherits the open route's drain.
+ */
 export async function closeSession(
   db: Db,
   campaignId: string,
@@ -428,6 +438,16 @@ export async function rebuildSettei(
 
   const marks = await loadActiveMarks(db, campaignId);
   const direction = await loadDirectionState(db, campaignId);
+  // §6.6 Learned reader (M3R2 C5): the last sitting's voice journal is baked
+  // into the Charter here — the one place standing calibration belongs, and
+  // the reason the journal is written at all.
+  const voiceJournal = await latestVoiceJournal(db, campaignId).catch((err) => {
+    console.warn("[session] voice journal read failed on Settei rebuild (non-fatal)", {
+      campaignId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return undefined;
+  });
   // §6.9 Renderer reader (M2R R4): the player's cross-campaign taste rides
   // the rebuild as light priors; a read failure never blocks the Charter
   // (the catch makes that promise true — audit).
@@ -449,6 +469,7 @@ export async function rebuildSettei(
     marks,
     arcRelevance: direction.arc_relevance as SetteiInput["arcRelevance"],
     tasteNotes,
+    ...(voiceJournal ? { voiceJournal } : {}),
   });
 
   direction.settei = SetteiSnapshot.parse({
@@ -483,6 +504,38 @@ async function latestTurn(
     .orderBy(desc(turns.turnNumber))
     .limit(1);
   return row ?? null;
+}
+
+/**
+ * The cross-sitting voice thread (§6.6 Learned layer; M3R2 C5).
+ *
+ * The KA voice journal has been written at every close since M1 and read by
+ * almost nothing: the only consumer was `directorStartup`'s Learned section,
+ * which by definition runs on a campaign's FIRST open — so on an ongoing
+ * campaign the journal was a writer without a reader (axiom 8), and the
+ * "voice adjustments to carry forward" it composes carried forward nowhere.
+ *
+ * Two readers now: the session-open recap (the first prose of the sitting,
+ * composed in the voice the last sitting ended in) and the Settei rebuild
+ * (§4.4a — where standing calibration belongs, baked into Block 1 for the
+ * session). Latest NON-NULL journal, not merely the latest session's: a
+ * composer failure at one close must not blank the thread.
+ */
+export async function latestVoiceJournal(db: Db, campaignId: string): Promise<string | undefined> {
+  const [row] = await db
+    .select({ voiceJournal: sessionRecords.voiceJournal })
+    .from(sessionRecords)
+    .where(
+      and(
+        eq(sessionRecords.campaignId, campaignId),
+        isNotNull(sessionRecords.voiceJournal),
+        notTombstoned(sessionRecords),
+      ),
+    )
+    .orderBy(desc(sessionRecords.sessionNumber))
+    .limit(1);
+  const journal = row?.voiceJournal?.trim();
+  return journal ? journal : undefined;
 }
 
 async function openSessionRow(db: Db, campaignId: string) {
@@ -595,46 +648,51 @@ async function composeRecap(
   // through the same conversation turns the pen writes in.
   exchangeMessages: MessageParam[] = [],
 ): Promise<string | undefined> {
-  const [beats, fragments, arc, direction, [priorClosed], [playerRow]] = await Promise.all([
-    db
-      .select({ content: compactedBeats.content, position: compactedBeats.position })
-      .from(compactedBeats)
-      .where(and(eq(compactedBeats.campaignId, campaignId), notTombstoned(compactedBeats)))
-      .orderBy(desc(compactedBeats.position))
-      .limit(6),
-    db
-      .select({
-        turnNumber: episodicRecords.turnNumber,
-        fragment: episodicRecords.narratedFragment,
-      })
-      .from(episodicRecords)
-      .where(and(eq(episodicRecords.campaignId, campaignId), notTombstoned(episodicRecords)))
-      .orderBy(desc(episodicRecords.turnNumber))
-      .limit(5),
-    getActiveArc(db, campaignId),
-    loadDirectionState(db, campaignId),
-    // §9.4: "next session's cold open may honor the tease; the recap is its
-    // sibling" — the prior sitting's yokoku finally reaches its sibling
-    // (M2R R3; on the idle_timeout path this is the tease's ONLY surface).
-    db
-      .select({ yokoku: sessionRecords.yokoku })
-      .from(sessionRecords)
-      .where(
-        and(
-          eq(sessionRecords.campaignId, campaignId),
-          isNotNull(sessionRecords.closedAt),
-          notTombstoned(sessionRecords),
-        ),
-      )
-      .orderBy(desc(sessionRecords.sessionNumber))
-      .limit(1),
-    // §6.9 layer 10 reader (M2R R4): recap tone knows the player — lightly.
-    db
-      .select({ profile: players.profile })
-      .from(players)
-      .innerJoin(campaigns, eq(campaigns.playerId, players.id))
-      .where(eq(campaigns.id, campaignId)),
-  ]);
+  const [beats, fragments, arc, direction, [priorClosed], [playerRow], voiceJournal] =
+    await Promise.all([
+      db
+        .select({ content: compactedBeats.content, position: compactedBeats.position })
+        .from(compactedBeats)
+        .where(and(eq(compactedBeats.campaignId, campaignId), notTombstoned(compactedBeats)))
+        .orderBy(desc(compactedBeats.position))
+        .limit(6),
+      db
+        .select({
+          turnNumber: episodicRecords.turnNumber,
+          fragment: episodicRecords.narratedFragment,
+        })
+        .from(episodicRecords)
+        .where(and(eq(episodicRecords.campaignId, campaignId), notTombstoned(episodicRecords)))
+        .orderBy(desc(episodicRecords.turnNumber))
+        .limit(5),
+      getActiveArc(db, campaignId),
+      loadDirectionState(db, campaignId),
+      // §9.4: "next session's cold open may honor the tease; the recap is its
+      // sibling" — the prior sitting's yokoku finally reaches its sibling
+      // (M2R R3; on the idle_timeout path this is the tease's ONLY surface).
+      db
+        .select({ yokoku: sessionRecords.yokoku })
+        .from(sessionRecords)
+        .where(
+          and(
+            eq(sessionRecords.campaignId, campaignId),
+            isNotNull(sessionRecords.closedAt),
+            notTombstoned(sessionRecords),
+          ),
+        )
+        .orderBy(desc(sessionRecords.sessionNumber))
+        .limit(1),
+      // §6.9 layer 10 reader (M2R R4): recap tone knows the player — lightly.
+      db
+        .select({ profile: players.profile })
+        .from(players)
+        .innerJoin(campaigns, eq(campaigns.playerId, players.id))
+        .where(eq(campaigns.id, campaignId)),
+      // The cross-sitting voice thread (M3R2 C5): the recap is the sitting's
+      // FIRST prose, so it is exactly where "how this hand was writing when we
+      // stopped" belongs.
+      latestVoiceJournal(db, campaignId),
+    ]);
 
   const orderedBeats = [...beats].reverse();
   const orderedFragments = [...fragments].reverse().filter((f) => f.fragment?.trim());
@@ -663,6 +721,14 @@ async function composeRecap(
   if (arc) {
     parts.push("## Active arc");
     parts.push(`${arc.name} — phase ${arc.phase}. Dramatic question: ${arc.dramaticQuestion}`);
+    parts.push("");
+  }
+  if (voiceJournal) {
+    parts.push("## Your own voice notes from the last sitting (calibration — never content)");
+    parts.push(voiceJournal);
+    parts.push(
+      "This is your hand's own record of how it was writing. Pick the register back up here; it never supplies EVENTS, only the way they sound.",
+    );
     parts.push("");
   }
   if (priorClosed?.yokoku) {

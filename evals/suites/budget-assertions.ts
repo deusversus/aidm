@@ -35,6 +35,19 @@ export const BUDGET_ASSUMPTIONS = {
 } as const;
 
 /**
+ * KNOWN UNDER-MODEL, recorded rather than papered over (32k window ruling,
+ * user 2026-08-05). The prefix below is derived from §5.1's
+ * `promptBudgetTokens` (genga 30k), and the verbatim window alone may now
+ * carry 32k — so on a mature, token-heavy campaign the modeled cold cost sits
+ * under the real one. The ceilings are NOT loosened for it here: they are
+ * regression margin over a MEASURED model, and the measurement instrument is
+ * the flat-high soak that re-baselines every number in this file at once (M3
+ * C5, deferred on budget). Raising §5.1's table on an estimate would be
+ * exactly the vibed tuning the doctrine forbids — the soak rules, then this
+ * moves.
+ */
+
+/**
  * Adaptive thinking bills as OUTPUT and the original cost model omitted it —
  * the M1 soak measured every genga/sakuga ceiling breach tracing to thinking
  * spend, not prose (§3: thinking depth is deliberate, so it belongs in the
