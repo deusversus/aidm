@@ -9,7 +9,12 @@ import {
   profiles,
   semanticMemories,
 } from "@/lib/db/schema";
-import { identityKey, isProtagonistName, marksPlayerProtagonistState } from "@/lib/entity-identity";
+import {
+  identityKey,
+  isProtagonistName,
+  marksPlayerProtagonistState,
+  voiceCardLine,
+} from "@/lib/entity-identity";
 import {
   MERGE_AUTO_CONFIDENCE,
   MERGE_CANDIDATE_MAX_DISTANCE,
@@ -49,37 +54,11 @@ export const CANON_MATCH_DISTANCE = 0.45;
 const CANON_BLOCK_CHARS = 600;
 /** Title + content-head window scanned for the entity name when confirming a canon link. */
 const CANON_HEAD_CHARS = 240;
-/** Bounded (~200 char) voice fingerprint stamped onto a canon-linked speaking-cast row. */
-const VOICE_CARD_FINGERPRINT_CHARS = 200;
 
 /** Narrow parse over the profile jsonb — only the voice cards the stamp reads. */
 const ProfileVoiceCards = z.object({
   ip_mechanics: z.object({ voice_cards: z.array(VoiceCard) }),
 });
-
-/**
- * §4.7/§6.5 (M2 C8): compress a research voice card into the ~200-char
- * fingerprint the KA reads on speaking-cast turns — how the character sounds,
- * not their biography. Stamped into `state.voice_card` when a new NPC links to
- * canon (below), rendered as a `voice:` line by fetchEntityCards.
- */
-function voiceCardFingerprint(card: z.infer<typeof VoiceCard>): string {
-  const phrase = card.signature_phrases.find((p) => p.trim().length > 0);
-  const text = [
-    card.speech_patterns,
-    card.dialogue_rhythm,
-    card.emotional_expression.toLowerCase(),
-    phrase ? `e.g. "${phrase}"` : "",
-  ]
-    .map((s) => s.trim())
-    .filter(Boolean)
-    .join("; ")
-    .replace(/\s+/g, " ")
-    .trim();
-  return text.length > VOICE_CARD_FINGERPRINT_CHARS
-    ? `${text.slice(0, VOICE_CARD_FINGERPRINT_CHARS).trimEnd()}…`
-    : text;
-}
 
 /**
  * Normalized-containment match (§5.4 correction semantics, M2 C3): lowercase +
@@ -1020,7 +999,7 @@ export async function ingestAssertion(
     const key = identityKey(entityName);
     if (!key) return undefined;
     const card = voiceCardsByProfile.get(profileId)?.find((c) => identityKey(c.name) === key);
-    return card ? voiceCardFingerprint(card) : undefined;
+    return card ? voiceCardLine(card) : undefined;
   };
 
   // §4.1 canonicality gate (M3R3 C4a, lesson L6): the stamp above is the SECOND

@@ -350,239 +350,246 @@ describe.skipIf(!url)("Director (real Postgres, scripted model)", () => {
     expect(loaded1.director_notes).toEqual(["hold the falling beat"]);
   });
 
-  it("runs the full cycle: applies plan, stamps arc_override, demotes a critical, resets accumulators", async () => {
-    if (!db) throw new Error("unreachable");
-    const campaignId = await makeCampaign();
-    vi.mocked(arcs.getActiveArc).mockResolvedValue(fakeArc(campaignId));
+  // 20s like its suite peers: healthy runtime is ~4.6s, which tips over the
+  // 5s default under full-suite DB load (the evolution-route class, 2026-08-03).
+  it(
+    "runs the full cycle: applies plan, stamps arc_override, demotes a critical, resets accumulators",
+    { timeout: 20_000 },
+    async () => {
+      if (!db) throw new Error("unreachable");
+      const campaignId = await makeCampaign();
+      vi.mocked(arcs.getActiveArc).mockResolvedValue(fakeArc(campaignId));
 
-    // Seed the demotion cast (§6.3): a PROMOTED critical with its semantic
-    // source (the Director may demote it — back to semantic-with-floor), and
-    // an sz_fact matching the same demote string (player authority — the
-    // category guard must leave it standing).
-    const embedding = Array.from({ length: EMBEDDING_DIMENSIONS }, (_, i) => (i === 0 ? 1 : 0));
-    const [sourceMemory] = await db
-      .insert(schema.semanticMemories)
-      .values({
-        campaignId,
-        content: "The safe combination is 4021.",
-        embedding,
-        category: "fact",
-        baseHeat: 100,
-        heatFloor: 1,
-        lastBoostedTurn: 1,
-        plotCritical: true,
-        turnId: 1,
-        provenance: "chronicler_g2",
-        confidence: 0.8,
-      })
-      .returning({ id: schema.semanticMemories.id });
-    if (!sourceMemory) throw new Error("semantic seed failed");
-    await db.insert(schema.criticalFacts).values([
-      {
-        campaignId,
-        content: "The safe combination is 4021.",
-        category: "promoted",
-        sourceMemoryId: sourceMemory.id,
-        turnId: 1,
-        provenance: "chronicler_promotion",
-        confidence: 0.9,
-      },
-      {
-        campaignId,
-        content: "HARD LINE (absolute): the safe combination was Julia's dying gift.",
-        category: "sz_fact",
-        turnId: 0,
-        provenance: "sz_resolution",
-        confidence: 1,
-      },
-    ]);
-    // Prime the accumulators so the reset is observable.
-    await db
-      .update(schema.campaigns)
-      .set({
-        directionState: {
-          last_director_turn: 3,
-          accumulated_epicness: 4,
-          arc_events: ["level_up", "boss_defeat"],
-          pending_flags: ["flag:x"],
-          director_notes: ["old note"],
-          tension_level: 0.5,
+      // Seed the demotion cast (§6.3): a PROMOTED critical with its semantic
+      // source (the Director may demote it — back to semantic-with-floor), and
+      // an sz_fact matching the same demote string (player authority — the
+      // category guard must leave it standing).
+      const embedding = Array.from({ length: EMBEDDING_DIMENSIONS }, (_, i) => (i === 0 ? 1 : 0));
+      const [sourceMemory] = await db
+        .insert(schema.semanticMemories)
+        .values({
+          campaignId,
+          content: "The safe combination is 4021.",
+          embedding,
+          category: "fact",
+          baseHeat: 100,
+          heatFloor: 1,
+          lastBoostedTurn: 1,
+          plotCritical: true,
+          turnId: 1,
+          provenance: "chronicler_g2",
+          confidence: 0.8,
+        })
+        .returning({ id: schema.semanticMemories.id });
+      if (!sourceMemory) throw new Error("semantic seed failed");
+      await db.insert(schema.criticalFacts).values([
+        {
+          campaignId,
+          content: "The safe combination is 4021.",
+          category: "promoted",
+          sourceMemoryId: sourceMemory.id,
+          turnId: 1,
+          provenance: "chronicler_promotion",
+          confidence: 0.9,
         },
-      })
-      .where(eq(schema.campaigns.id, campaignId));
+        {
+          campaignId,
+          content: "HARD LINE (absolute): the safe combination was Julia's dying gift.",
+          category: "sz_fact",
+          turnId: 0,
+          provenance: "sz_resolution",
+          confidence: 1,
+        },
+      ]);
+      // Prime the accumulators so the reset is observable.
+      await db
+        .update(schema.campaigns)
+        .set({
+          directionState: {
+            last_director_turn: 3,
+            accumulated_epicness: 4,
+            arc_events: ["level_up", "boss_defeat"],
+            pending_flags: ["flag:x"],
+            director_notes: ["old note"],
+            tension_level: 0.5,
+          },
+        })
+        .where(eq(schema.campaigns.id, campaignId));
 
-    armDirectorEmits(
-      directorOutput({
-        tension_level: 0.72,
-        arc_override: {
-          arc_name: "Cold Open on Ganymede",
-          transition_signal: "Spike leaves the ice",
-          dna_shifts: [
-            { axis: "darkness", value: 8 },
-            { axis: "not_a_real_axis", value: 5 },
+      armDirectorEmits(
+        directorOutput({
+          tension_level: 0.72,
+          arc_override: {
+            arc_name: "Cold Open on Ganymede",
+            transition_signal: "Spike leaves the ice",
+            dna_shifts: [
+              { axis: "darkness", value: 8 },
+              { axis: "not_a_real_axis", value: 5 },
+            ],
+            composition_shifts: [],
+          },
+          scene_shape_trajectory: "hold the ache before the cut",
+          scene_shape_notes: ["end on a smash cut"],
+          arc_relevance: [
+            { axis: "darkness", relevance: 7 },
+            { axis: "intimacy", relevance: 5 },
           ],
-          composition_shifts: [],
-        },
-        scene_shape_trajectory: "hold the ache before the cut",
-        scene_shape_notes: ["end on a smash cut"],
-        arc_relevance: [
-          { axis: "darkness", relevance: 7 },
-          { axis: "intimacy", relevance: 5 },
-        ],
-        seed_ops: [
-          { op: "plant", description: "a photograph left behind", dependencies: [] },
-          { op: "resolve", seed_description: "the outstanding debt", dependencies: [] },
-        ],
-        demote_criticals: ["safe combination"],
-        director_notes: ["let the bounty breathe one more scene"],
-        voice_patterns: ["clipped, jazz-phrased"],
-      }),
-    );
-
-    const output = await runDirectorCycle(db, campaignId, 8);
-    expect(output.tension_level).toBe(0.72);
-
-    // The two-call shape itself (M3R2 C1 review): plan with tools, then ops
-    // by name suffix with NO tools — pinned directly, not just transitively
-    // through the merged output.
-    expect(mockJudgment).toHaveBeenCalledTimes(2);
-    // biome-ignore lint/suspicious/noExplicitAny: mock harness
-    const opsOpts = mockJudgment.mock.calls[1]?.[1] as any;
-    expect(String(opsOpts?.name).endsWith("_ops")).toBe(true);
-    expect(opsOpts?.tools).toBeUndefined();
-    expect(opsOpts?.cacheHead).toBeUndefined();
-
-    // The judgment call carried the investigation toolkit and budget.
-    const callOpts = mockJudgment.mock.calls[0]?.[1];
-    expect(callOpts?.tools?.length).toBeGreaterThan(0);
-    expect(callOpts?.maxToolRounds).toBe(DIRECTOR_MAX_TOOL_ROUNDS);
-    expect(callOpts?.effort).toBe("high");
-    expect(callOpts?.maxTokens).toBe(LOOPED_LARGE);
-    // M2R5 C2: the loop re-sends persona + dossier every round, seconds apart —
-    // 5m, so the 1.25× write amortizes across up to six reads at 0.1×.
-    expect(callOpts?.cacheHead).toBe("5m");
-
-    // M2R R2: the dossier carries the Series contract — finitude's behavioral
-    // consumer (§8) plus the series-horizon line (the budget's reader).
-    const dossierPrompt = String((callOpts as { prompt?: string })?.prompt ?? "");
-    expect(dossierPrompt).toContain("## Series contract");
-    expect(dossierPrompt).toContain("FINITE");
-    expect(dossierPrompt).toContain("planned finale across seasons");
-    expect(dossierPrompt).toContain("Series horizon: ~24 episodes, ± 12.");
-
-    // §6.3 dailies line: the Director sees the demotable population, not just
-    // the layer size (2 seeded criticals, 1 of them promoted).
-    expect(dossierPrompt).toContain("2 active critical fact(s), of which 1 promoted");
-
-    // arc plan applied, with the current turn stamped.
-    expect(vi.mocked(arcs.applyArcPlan)).toHaveBeenCalledWith(
-      expect.anything(),
-      campaignId,
-      8,
-      expect.objectContaining({ name: "The Ganymede Bounty" }),
-    );
-
-    // arc_override written to the campaign with started_turn stamped.
-    const [c] = await db
-      .select({ arcOverride: schema.campaigns.arcOverride })
-      .from(schema.campaigns)
-      .where(eq(schema.campaigns.id, campaignId));
-    const parsedOverride = ArcOverride.parse(c?.arcOverride);
-    expect(parsedOverride).toMatchObject({
-      arc_name: "Cold Open on Ganymede",
-      started_turn: 8,
-      transition_signal: "Spike leaves the ice",
-    });
-    // Shift pairs convert to the stored partial; unknown axes are stripped
-    // (the model-facing schema stays lean — strict-output grammar cap).
-    expect(parsedOverride.dna).toEqual({ darkness: 8 });
-
-    // The PROMOTED fact was demoted, not deleted; the sz_fact matching the
-    // same string survived the category guard (player authority, §6.3).
-    const crits = await db
-      .select()
-      .from(schema.criticalFacts)
-      .where(eq(schema.criticalFacts.campaignId, campaignId));
-    const promoted = crits.find((c) => c.category === "promoted");
-    const szFact = crits.find((c) => c.category === "sz_fact");
-    expect(promoted?.demotedAt).not.toBeNull();
-    expect(szFact).toBeDefined();
-    expect(szFact?.demotedAt).toBeNull();
-
-    // Re-homed to semantic-with-floor: the no-decay pin released, floor 40.
-    const [source] = await db
-      .select({
-        plotCritical: schema.semanticMemories.plotCritical,
-        heatFloor: schema.semanticMemories.heatFloor,
-      })
-      .from(schema.semanticMemories)
-      .where(eq(schema.semanticMemories.id, sourceMemory.id));
-    expect(source?.plotCritical).toBe(false);
-    expect(source?.heatFloor).toBe(40);
-
-    // seed ops forwarded.
-    expect(vi.mocked(seeds.plantSeed)).toHaveBeenCalledTimes(1);
-    expect(vi.mocked(seeds.settleSeed)).toHaveBeenCalledTimes(1);
-
-    // §7.6: the ledger settles BEFORE the Director reads it — one batched
-    // adjudication per cycle, and the dossier it plans against is current.
-    expect(vi.mocked(adjudication.adjudicateSeeds)).toHaveBeenCalledTimes(1);
-    expect(vi.mocked(adjudication.adjudicateSeeds)).toHaveBeenCalledWith(db, campaignId, 8);
-    const adjudicatedAt = vi.mocked(adjudication.adjudicateSeeds).mock.invocationCallOrder[0] ?? 0;
-    expect(adjudicatedAt).toBeLessThan(mockJudgment.mock.invocationCallOrder[0] ?? 0);
-
-    // The push-out op is stated where the model can act on it (the C1 slip).
-    const dossier = String(mockJudgment.mock.calls[0]?.[1]?.prompt);
-    expect(dossier).toContain("adjust_window");
-
-    // State updated + accumulators reset + phase_state stamped (phaseChanged).
-    const state = await loadDirectionState(db, campaignId);
-    expect(state.accumulated_epicness).toBe(0);
-    expect(state.arc_events).toEqual([]);
-    expect(state.pending_flags).toEqual([]);
-    expect(state.last_director_turn).toBe(8);
-    expect(state.tension_level).toBe(0.72);
-    expect(state.director_notes).toEqual(["let the bounty breathe one more scene"]);
-    expect(state.voice_patterns).toEqual(["clipped, jazz-phrased"]);
-    expect(state.arc_relevance).toEqual({ darkness: 7, intimacy: 5 });
-    expect(state.scene_shape?.notes).toEqual(["end on a smash cut"]);
-    expect(state.phase_state).toEqual({ arc_id: "arc-xyz", phase: "rising", entered_at_turn: 8 });
-
-    // §6.7: the demotion is REVOCABLE. The cycle stamped the rewind anchor and
-    // snapshotted the pre-demotion pin; a rewind past turn 8 restores both
-    // sides — the fact re-enters the guaranteed injection and the source
-    // memory gets its exact pre-demotion pin back (snapshot, not arithmetic).
-    expect(promoted?.demotedAtTurn).toBe(8);
-    expect(promoted?.demotionUndo).toEqual({ plot_critical: true, heat_floor: 1 });
-    await rewindCampaign(db, campaignId, 7, "test: unwind the demotion");
-    const [restoredFact] = await db
-      .select()
-      .from(schema.criticalFacts)
-      .where(
-        and(
-          eq(schema.criticalFacts.campaignId, campaignId),
-          eq(schema.criticalFacts.category, "promoted"),
-        ),
+          seed_ops: [
+            { op: "plant", description: "a photograph left behind", dependencies: [] },
+            { op: "resolve", seed_description: "the outstanding debt", dependencies: [] },
+          ],
+          demote_criticals: ["safe combination"],
+          director_notes: ["let the bounty breathe one more scene"],
+          voice_patterns: ["clipped, jazz-phrased"],
+        }),
       );
-    expect(restoredFact?.demotedAt).toBeNull();
-    expect(restoredFact?.demotedAtTurn).toBeNull();
-    expect(restoredFact?.demotionUndo).toBeNull();
-    const [restoredSource] = await db
-      .select({
-        plotCritical: schema.semanticMemories.plotCritical,
-        heatFloor: schema.semanticMemories.heatFloor,
-      })
-      .from(schema.semanticMemories)
-      .where(eq(schema.semanticMemories.id, sourceMemory.id));
-    expect(restoredSource?.plotCritical).toBe(true);
-    expect(restoredSource?.heatFloor).toBe(1);
-    expect(await fetchCritical(db, campaignId)).toEqual(
-      expect.arrayContaining([
-        "The safe combination is 4021.",
-        "HARD LINE (absolute): the safe combination was Julia's dying gift.",
-      ]),
-    );
-  });
+
+      const output = await runDirectorCycle(db, campaignId, 8);
+      expect(output.tension_level).toBe(0.72);
+
+      // The two-call shape itself (M3R2 C1 review): plan with tools, then ops
+      // by name suffix with NO tools — pinned directly, not just transitively
+      // through the merged output.
+      expect(mockJudgment).toHaveBeenCalledTimes(2);
+      // biome-ignore lint/suspicious/noExplicitAny: mock harness
+      const opsOpts = mockJudgment.mock.calls[1]?.[1] as any;
+      expect(String(opsOpts?.name).endsWith("_ops")).toBe(true);
+      expect(opsOpts?.tools).toBeUndefined();
+      expect(opsOpts?.cacheHead).toBeUndefined();
+
+      // The judgment call carried the investigation toolkit and budget.
+      const callOpts = mockJudgment.mock.calls[0]?.[1];
+      expect(callOpts?.tools?.length).toBeGreaterThan(0);
+      expect(callOpts?.maxToolRounds).toBe(DIRECTOR_MAX_TOOL_ROUNDS);
+      expect(callOpts?.effort).toBe("high");
+      expect(callOpts?.maxTokens).toBe(LOOPED_LARGE);
+      // M2R5 C2: the loop re-sends persona + dossier every round, seconds apart —
+      // 5m, so the 1.25× write amortizes across up to six reads at 0.1×.
+      expect(callOpts?.cacheHead).toBe("5m");
+
+      // M2R R2: the dossier carries the Series contract — finitude's behavioral
+      // consumer (§8) plus the series-horizon line (the budget's reader).
+      const dossierPrompt = String((callOpts as { prompt?: string })?.prompt ?? "");
+      expect(dossierPrompt).toContain("## Series contract");
+      expect(dossierPrompt).toContain("FINITE");
+      expect(dossierPrompt).toContain("planned finale across seasons");
+      expect(dossierPrompt).toContain("Series horizon: ~24 episodes, ± 12.");
+
+      // §6.3 dailies line: the Director sees the demotable population, not just
+      // the layer size (2 seeded criticals, 1 of them promoted).
+      expect(dossierPrompt).toContain("2 active critical fact(s), of which 1 promoted");
+
+      // arc plan applied, with the current turn stamped.
+      expect(vi.mocked(arcs.applyArcPlan)).toHaveBeenCalledWith(
+        expect.anything(),
+        campaignId,
+        8,
+        expect.objectContaining({ name: "The Ganymede Bounty" }),
+      );
+
+      // arc_override written to the campaign with started_turn stamped.
+      const [c] = await db
+        .select({ arcOverride: schema.campaigns.arcOverride })
+        .from(schema.campaigns)
+        .where(eq(schema.campaigns.id, campaignId));
+      const parsedOverride = ArcOverride.parse(c?.arcOverride);
+      expect(parsedOverride).toMatchObject({
+        arc_name: "Cold Open on Ganymede",
+        started_turn: 8,
+        transition_signal: "Spike leaves the ice",
+      });
+      // Shift pairs convert to the stored partial; unknown axes are stripped
+      // (the model-facing schema stays lean — strict-output grammar cap).
+      expect(parsedOverride.dna).toEqual({ darkness: 8 });
+
+      // The PROMOTED fact was demoted, not deleted; the sz_fact matching the
+      // same string survived the category guard (player authority, §6.3).
+      const crits = await db
+        .select()
+        .from(schema.criticalFacts)
+        .where(eq(schema.criticalFacts.campaignId, campaignId));
+      const promoted = crits.find((c) => c.category === "promoted");
+      const szFact = crits.find((c) => c.category === "sz_fact");
+      expect(promoted?.demotedAt).not.toBeNull();
+      expect(szFact).toBeDefined();
+      expect(szFact?.demotedAt).toBeNull();
+
+      // Re-homed to semantic-with-floor: the no-decay pin released, floor 40.
+      const [source] = await db
+        .select({
+          plotCritical: schema.semanticMemories.plotCritical,
+          heatFloor: schema.semanticMemories.heatFloor,
+        })
+        .from(schema.semanticMemories)
+        .where(eq(schema.semanticMemories.id, sourceMemory.id));
+      expect(source?.plotCritical).toBe(false);
+      expect(source?.heatFloor).toBe(40);
+
+      // seed ops forwarded.
+      expect(vi.mocked(seeds.plantSeed)).toHaveBeenCalledTimes(1);
+      expect(vi.mocked(seeds.settleSeed)).toHaveBeenCalledTimes(1);
+
+      // §7.6: the ledger settles BEFORE the Director reads it — one batched
+      // adjudication per cycle, and the dossier it plans against is current.
+      expect(vi.mocked(adjudication.adjudicateSeeds)).toHaveBeenCalledTimes(1);
+      expect(vi.mocked(adjudication.adjudicateSeeds)).toHaveBeenCalledWith(db, campaignId, 8);
+      const adjudicatedAt =
+        vi.mocked(adjudication.adjudicateSeeds).mock.invocationCallOrder[0] ?? 0;
+      expect(adjudicatedAt).toBeLessThan(mockJudgment.mock.invocationCallOrder[0] ?? 0);
+
+      // The push-out op is stated where the model can act on it (the C1 slip).
+      const dossier = String(mockJudgment.mock.calls[0]?.[1]?.prompt);
+      expect(dossier).toContain("adjust_window");
+
+      // State updated + accumulators reset + phase_state stamped (phaseChanged).
+      const state = await loadDirectionState(db, campaignId);
+      expect(state.accumulated_epicness).toBe(0);
+      expect(state.arc_events).toEqual([]);
+      expect(state.pending_flags).toEqual([]);
+      expect(state.last_director_turn).toBe(8);
+      expect(state.tension_level).toBe(0.72);
+      expect(state.director_notes).toEqual(["let the bounty breathe one more scene"]);
+      expect(state.voice_patterns).toEqual(["clipped, jazz-phrased"]);
+      expect(state.arc_relevance).toEqual({ darkness: 7, intimacy: 5 });
+      expect(state.scene_shape?.notes).toEqual(["end on a smash cut"]);
+      expect(state.phase_state).toEqual({ arc_id: "arc-xyz", phase: "rising", entered_at_turn: 8 });
+
+      // §6.7: the demotion is REVOCABLE. The cycle stamped the rewind anchor and
+      // snapshotted the pre-demotion pin; a rewind past turn 8 restores both
+      // sides — the fact re-enters the guaranteed injection and the source
+      // memory gets its exact pre-demotion pin back (snapshot, not arithmetic).
+      expect(promoted?.demotedAtTurn).toBe(8);
+      expect(promoted?.demotionUndo).toEqual({ plot_critical: true, heat_floor: 1 });
+      await rewindCampaign(db, campaignId, 7, "test: unwind the demotion");
+      const [restoredFact] = await db
+        .select()
+        .from(schema.criticalFacts)
+        .where(
+          and(
+            eq(schema.criticalFacts.campaignId, campaignId),
+            eq(schema.criticalFacts.category, "promoted"),
+          ),
+        );
+      expect(restoredFact?.demotedAt).toBeNull();
+      expect(restoredFact?.demotedAtTurn).toBeNull();
+      expect(restoredFact?.demotionUndo).toBeNull();
+      const [restoredSource] = await db
+        .select({
+          plotCritical: schema.semanticMemories.plotCritical,
+          heatFloor: schema.semanticMemories.heatFloor,
+        })
+        .from(schema.semanticMemories)
+        .where(eq(schema.semanticMemories.id, sourceMemory.id));
+      expect(restoredSource?.plotCritical).toBe(true);
+      expect(restoredSource?.heatFloor).toBe(1);
+      expect(await fetchCritical(db, campaignId)).toEqual(
+        expect.arrayContaining([
+          "The safe combination is 4021.",
+          "HARD LINE (absolute): the safe combination was Julia's dying gift.",
+        ]),
+      );
+    },
+  );
 
   it("an over-count cycle lands CLAMPED — the plan is never lost to a surplus note (2026-08-01)", async () => {
     if (!db) throw new Error("unreachable");

@@ -4,8 +4,12 @@
  * be one catalog row (§6.5); the live failure mode was the protagonist existing
  * as three npc rows by turn 3 — compiler near-dupes plus a resolver exact-name
  * miss. Semantic alias resolution (different names, same meaning) is M2; this
- * tier is equality-after-normalization only.
+ * tier is equality-after-normalization only. Also home to the shared
+ * voice-card compression (bottom) — entity identity and entity voice are the
+ * two per-character truths more than one subsystem must agree on.
  */
+
+import type { VoiceCard } from "@/lib/types/profile";
 
 export function normalizeIdentity(name: string): string {
   return name
@@ -80,4 +84,35 @@ export function marksPlayerProtagonistState(state: unknown): boolean {
     state !== null &&
     (state as { is_player_protagonist?: unknown }).is_player_protagonist === true
   );
+}
+
+/** The ~200-char ceiling both voice-card readers share — one clip, one truth. */
+export const VOICE_CARD_FINGERPRINT_CHARS = 200;
+
+/**
+ * §4.7/§6.5 (M2 C8): compress a research voice card into the fingerprint the
+ * KA reads on speaking-cast turns — how the character sounds, not their
+ * biography. TWO call sites, ONE implementation on purpose: the ingest-time
+ * stamp (`state.voice_card` on canon link) and the read-time contract
+ * fallback for present-cast cards (§4.1) both surface through renderEntityCard's
+ * `voice:` line, so divergent copies would hand the pen two versions of the
+ * same character's sound. (Hoisted 2026-08-05 — the copies existed only
+ * because M3R2 C5 was fenced out of ingest.ts by a concurrent owner.)
+ */
+export function voiceCardLine(card: VoiceCard): string {
+  const phrase = card.signature_phrases.find((p) => p.trim().length > 0);
+  const text = [
+    card.speech_patterns,
+    card.dialogue_rhythm,
+    card.emotional_expression.toLowerCase(),
+    phrase ? `e.g. "${phrase}"` : "",
+  ]
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .join("; ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return text.length > VOICE_CARD_FINGERPRINT_CHARS
+    ? `${text.slice(0, VOICE_CARD_FINGERPRINT_CHARS).trimEnd()}…`
+    : text;
 }
