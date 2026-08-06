@@ -1,6 +1,6 @@
 # M3R5 — The playtester bridge (§13.5): a guest list and an allowance
 
-**Status:** draft for user ratification (direction confirmed 2026-08-06: "a couple playtesters would be nice", default $20/tester, per-tester caps on an admin-facing surface — "feedback quality and needs changes tester to tester"). This is the §13.5 allowlist + spend-caps bridge the blueprint schedules between M3 and M5's real billing; it is deliberately NOT billing — no payments, no credits ledger, no markup. One key (his), a guest list, and a meter that says no.
+**Status:** RATIFIED 2026-08-06 (direction + plan + the open question: testers SEE their own allowance meter in-app — "show it"). This is the §13.5 allowlist + spend-caps bridge the blueprint schedules between M3 and M5's real billing; it is deliberately NOT billing — no payments, no credits ledger, no markup. One key (his), a guest list, and a meter that says no. Build starts after the M3R4 push train lands.
 
 **Named failure mode (ledger rule):** an invited tester's all-nighter drains the shared API key — the exact class the §0.9 cost discipline exists for, now with someone else's hand on the faucet. **Pillar:** §13.5 / §9.5 (the meter is load-bearing; if it isn't metered it doesn't ship — here, if it isn't CAPPED it doesn't serve).
 
@@ -25,5 +25,5 @@
 ## Out of scope (stays M5)
 Real billing, credits, markup, self-serve top-ups, waitlists, abuse tooling beyond the cap, exporting campaigns for departed testers.
 
-## Open question for ratification
-Whether a tester hitting the cap can SEE their own spend meter in-app (a small "allowance" line on the play view) or only discovers it at the refusal. Recommendation: show it — §9.5's transparency doctrine, and it converts "why did it stop" support pings into self-service.
+## Resolved at ratification
+Testers see their own allowance meter in-app (a small "allowance" line on the play view) — RULED "show it" 2026-08-06, per §9.5's transparency doctrine. Lands with C3.

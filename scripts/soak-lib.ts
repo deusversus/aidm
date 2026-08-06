@@ -585,7 +585,7 @@ export async function meterTurn(
 
 // ---------------------------------------------------------------------------
 // Coverage: every settled turn metered, every played turn inside a sitting.
-// Both holes are M2 drift-soak ledger items (docs/retros/M2-drift-soak.md).
+// Both holes are M2 drift-soak ledger items (docs/retros/M2-drift-soak-24turn.md).
 // ---------------------------------------------------------------------------
 
 /**

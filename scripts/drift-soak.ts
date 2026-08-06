@@ -17,7 +17,7 @@
  * turns (`--resume` picks up at the first un-run beat; scripted beats are
  * keyed by turn number, so resume is deterministic).
  *
- *   pnpm drift-soak                LIVE run (user-gated spend) → docs/retros/M2-drift-soak.md
+ *   pnpm drift-soak                LIVE run (user-gated spend) → docs/retros/M2-drift-soak-24turn.md
  *   pnpm drift-soak -- --dry-run   prints the beat plan, seeds + tears down, ZERO model calls
  *   pnpm drift-soak -- --resume    continue the persisted soak campaign after a crash
  *
@@ -855,7 +855,7 @@ async function liveRun(db: Db, campaignId: string, resumedFrom: number): Promise
     resumedFrom,
     abort,
   );
-  const reportPath = join(process.cwd(), "docs", "retros", "M2-drift-soak.md");
+  const reportPath = join(process.cwd(), "docs", "retros", "M2-drift-soak-24turn.md");
   writeFileSync(reportPath, report);
   console.log(`\n[drift-soak] report → ${reportPath}`);
   console.log("\n=== DRIFT SOAK SUMMARY ===");

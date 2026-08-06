@@ -37,7 +37,7 @@ export const PROSPECTIVE_LAG_TURNS = 40;
 /**
  * The suite's stated minimum, honestly. §10.3 asks for 50–100 turn runs; the
  * M2 gate ran a 24-turn script against that letter (a discrepancy recorded in
- * docs/retros/M2-drift-soak.md rather than papered over). A 40-turn lag cannot
+ * docs/retros/M2-drift-soak-24turn.md rather than papered over). A 40-turn lag cannot
  * be observed at all below ~50 turns, so below this the suite SKIPS and says
  * why — it never grades a short run against a claim the run cannot carry.
  */
@@ -540,7 +540,7 @@ export const flywheelProspective: Suite = {
     const played = input.turns.filter((t) => t.status === "complete").length;
     if (played < MIN_SOAK_TURNS) {
       return skip(
-        `campaign ${input.campaignId} (${how}) has ${played} completed turns; this suite needs ≥ ${MIN_SOAK_TURNS} — §6.8's claim is a fact surfacing at lag ${PROSPECTIVE_LAG_TURNS}, which a shorter run cannot carry at all. §10.3 asks 50–100 turn runs; the M2 gate ran 24 against that letter (docs/retros/M2-drift-soak.md). ${HOW_TO_SOAK}`,
+        `campaign ${input.campaignId} (${how}) has ${played} completed turns; this suite needs ≥ ${MIN_SOAK_TURNS} — §6.8's claim is a fact surfacing at lag ${PROSPECTIVE_LAG_TURNS}, which a shorter run cannot carry at all. §10.3 asks 50–100 turn runs; the M2 gate ran 24 against that letter (docs/retros/M2-drift-soak-24turn.md). ${HOW_TO_SOAK}`,
       );
     }
 

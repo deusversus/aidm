@@ -17,7 +17,7 @@ import { COMPACTION_KEEP_TAIL, COMPACTION_TRIGGER_EXCHANGES } from "../src/lib/b
 import { DEV_TIER_SELECTION } from "../src/lib/llm/tiers";
 
 /**
- * The M2 drift-soak harness holes, as tests (docs/retros/M2-drift-soak.md):
+ * The M2 drift-soak harness holes, as tests (docs/retros/M2-drift-soak-24turn.md):
  * per-attempt metering, coverage that can SAY a turn was never asserted, and
  * the 100-turn plan/price wiring. Pure — no DB, no model.
  */
