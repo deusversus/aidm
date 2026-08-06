@@ -1,6 +1,37 @@
 import type { DNAScales } from "@/lib/types/dna";
 import type { PremiseContract } from "@/lib/types/premise";
 
+/**
+ * The Red Sash miss, verbatim (M1 soak, `scripts/soak.ts` SCRIPTED[5]): the
+ * player mints a faction INSIDE quoted dialogue and the extractor never
+ * surfaced it as a world claim. Kept here — the one copy both the deterministic
+ * ingestion pin and the live authorship eval read — so the fixture that names
+ * the defect cannot drift from the fixture that proves it fixed.
+ */
+export const RED_SASH_ASSERTION =
+  '"The Red Sash dockworkers\' syndicate runs these piers." I say it flat, watching the fixer for a flinch, and start asking who answers to them.';
+
+/**
+ * The EXEMPTION half of the same clause (M3R4 B3 audit R3), which had no
+ * coverage anywhere while the positive half was pinned twice. The clause reads:
+ * in-character speech asserts nothing "only when it is about the speaker's own
+ * feelings, plans, or questions, or when the input itself marks the claim as
+ * untrue". Two fixtures, one per exemption — kept beside RED_SASH_ASSERTION so
+ * the line that mints and the lines that must not can never drift apart.
+ *
+ * THE CARVE-OUT, deliberately untested: an UNMARKED bluff DOES mint canon, and
+ * that is correct. Player authority is the highest law (§5.4) — if the player
+ * does not tell the engine the claim is false, the engine takes them at their
+ * word and the world grows. Only the input marking it untrue exempts it. Do not
+ * add a test asserting the opposite.
+ */
+export const IN_CHARACTER_FEELINGS =
+  "\"I'm afraid. I don't know if I can walk through that door.\" I say it low, mostly to myself, and my hands will not stop shaking.";
+
+/** The claim and its retraction ride the SAME submission — the marker is the player's, not the engine's inference. */
+export const MARKED_UNTRUE_ASSERTION =
+  'I lie straight to his face: "The Iron Choir already paid me for this run." There is no Iron Choir — I made the name up on the spot to knock him off balance.';
+
 /** The Bebop golden profile's canonical DNA (evals/golden/profiles/cowboy_bebop.yaml). */
 export const BEBOP_DNA: DNAScales = {
   pacing: 6,

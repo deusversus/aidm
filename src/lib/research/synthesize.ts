@@ -271,20 +271,41 @@ export async function synthesizePowerSystem(
 const VOICE_CARDS_MAX = 8;
 export const VoiceCards = z.object({ cards: z.array(VoiceCard) });
 
+/**
+ * The unattributed cast corpus (M2R4/M2R5 starvation, repaired M3R4 B3). A
+ * SEARCHED characters page carries the whole cast under one synthetic title, so
+ * it can never key a speaker and is rightly kept out of the quote block — but
+ * M3R3 added that search topic precisely to harvest "personalities speech
+ * patterns notable quotes catchphrases", and none of it reached the card
+ * synthesis. A web-identity profile with no wiki and no AniList cast therefore
+ * shipped an EMPTY voice organ while the material sat in the corpus. It rides
+ * in here as prose, never as a speaker key.
+ */
+export const VOICE_CORPUS_FEED: SynthesisFeedSpec = { pages: 3, chars: 1_500 };
+
 export async function synthesizeVoiceCards(
   quotesByCharacter: Record<string, string[]>,
   gapFillMainCast: string[],
+  voiceCorpusPages: WikiPage[] = [],
 ): Promise<z.infer<typeof VoiceCard>[]> {
   const quoteBlock = Object.entries(quotesByCharacter)
     .slice(0, 8)
     .map(([name, quotes]) => `${name}:\n${quotes.map((q) => `  "${q}"`).join("\n")}`)
     .join("\n\n");
+  const corpus = voiceCorpusPages
+    .slice(0, VOICE_CORPUS_FEED.pages)
+    .map((p) => p.text.slice(0, VOICE_CORPUS_FEED.chars))
+    .join("\n\n");
   const result = await callJudgment(SELECTION, {
     name: "research_voice_cards",
     phase: "research",
     schema: VoiceCards,
-    system: `Build voice cards for the main cast from wiki-sourced quotes. Where a main-cast member has no quotes, derive the card from what the quotes of OTHERS reveal plus the character's role — mark speech_patterns conservatively rather than inventing tics. Emit at most ${VOICE_CARDS_MAX} cards, most central first — any beyond the eighth are discarded unread.`,
-    prompt: `Quotes:\n${quoteBlock}\n\nMain cast needing gap-fill: ${gapFillMainCast.join(", ") || "(none)"}`,
+    system: `Build voice cards for the main cast from wiki-sourced quotes. Where a main-cast member has no quotes, derive the card from what the quotes of OTHERS reveal plus the character's role — mark speech_patterns conservatively rather than inventing tics. CAST NOTES, when present, are unattributed prose about the cast gathered by search: read them for who these characters are and how they speak, but they are NOT a speaker — every card is named for a CHARACTER, never for the notes or their source. Emit at most ${VOICE_CARDS_MAX} cards, most central first — any beyond the eighth are discarded unread.`,
+    prompt: [
+      `Quotes:\n${quoteBlock || "(none)"}`,
+      corpus ? `\n\nCast notes (unattributed prose):\n${corpus}` : "",
+      `\n\nMain cast needing gap-fill: ${gapFillMainCast.join(", ") || "(none)"}`,
+    ].join(""),
     effort: "high",
     maxTokens: STRUCTURED_RICH,
   });

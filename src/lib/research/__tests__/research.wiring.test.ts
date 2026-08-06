@@ -273,7 +273,19 @@ describe("researchTitle fallback chain (M3R3 C2)", () => {
       limitations: "Each thread costs a year of recollection.",
       tiers: [],
     });
-    synthesizeVoiceCardsMock.mockResolvedValue([]);
+    // A HEALTHY default (M3R4 B3): zero cards is now a coverage DEFECT whenever
+    // the run had cast material, so the suite's baseline must be a run whose
+    // voice organ is not empty. The starvation case has its own test below.
+    synthesizeVoiceCardsMock.mockResolvedValue([
+      {
+        name: "Spike",
+        signature_phrases: [],
+        speech_patterns: "clipped",
+        humor_type: "Sardonic",
+        dialogue_rhythm: "drawled",
+        emotional_expression: "Deflecting",
+      },
+    ]);
     synthesizeStatMappingMock.mockResolvedValue({
       has_canonical_stats: false,
       confidence: 0,
@@ -389,15 +401,25 @@ describe("researchTitle fallback chain (M3R3 C2)", () => {
 
     // Nor is it a speaker: the one-page-one-character assumption holds only
     // for wiki pages, so the search characters page feeds no quote key and
-    // no voice card is minted under its pseudo-name.
+    // no voice card is minted under its pseudo-name. It is NOT discarded,
+    // though (M2R4/M2R5 starvation, repaired M3R4 B3): it rides in as the
+    // unattributed cast corpus, which is what M3R3 harvested it for.
     expect(synthesizeVoiceCardsMock).toHaveBeenCalledTimes(1);
-    const [quotes, gapFill] = synthesizeVoiceCardsMock.mock.calls[0] as [
+    const [quotes, gapFill, corpus] = synthesizeVoiceCardsMock.mock.calls[0] as [
       Record<string, string[]>,
       string[],
+      WikiPage[],
     ];
     expect(Object.keys(quotes)).toEqual([]);
-    expect(gapFill).toEqual(["Spike"]); // the AniList cast carries voice instead
-    expect(sources.voice_cards).toBe("model_recall");
+    expect(gapFill).toEqual(["Spike"]); // the AniList cast still carries the names
+    expect(corpus.map((p) => p.url)).toEqual(["https://src/chars"]);
+    expect(corpus[0]?.text).toBe(QUOTED);
+    // The label follows the material: searched prose fed the organ, so the
+    // record says web_search rather than borrowing wiki's credit — and rather
+    // than the model_recall it claimed while the corpus went unread.
+    expect(sources.voice_cards).toBe("web_search");
+    expect(report.trust.field_pages.voice_cards).toEqual(["https://src/chars"]);
+    // The quote gap is unchanged and still honest: no ATTRIBUTED quotes exist.
     expect(report.trust.coverage_gaps.join(" | ")).toContain("no character quotes");
 
     // M3R3 C3 / L3: the tonal read gets the HARVEST, not the synopsis alone.
@@ -436,6 +458,39 @@ describe("researchTitle fallback chain (M3R3 C2)", () => {
     expect(asked.some((c) => c.key.includes("tonal"))).toBe(false);
     // The pass ran and reconciled, so the record says the profile was audited.
     expect(report.trust.grounding).toBe("audited");
+  }, 20_000);
+
+  it("VOICE STARVATION (M2R4/M2R5 carry): a run with cast material and ZERO cards is a DEFECT", async () => {
+    // Same shape as the sweep above — an AniList main cast AND a searched
+    // characters harvest — but the synthesis comes back empty. For two
+    // milestones that passed in silence: every reader tolerates `[]`, the
+    // "no character quotes" gap reads identically for eight recall cards and
+    // for none, and nothing counted them.
+    const cast: AniListMedia = {
+      ...MEDIA,
+      characters: { edges: [{ role: "MAIN", node: { name: { full: "Spike", native: null } } }] },
+    };
+    searchAnimeMock.mockResolvedValue([cast]);
+    walkFranchiseMock.mockResolvedValue({
+      ...WALK,
+      fetched: new Map([[cast.id, cast]]),
+    } satisfies FranchiseWalk);
+    searchTopicsMock.mockResolvedValue(
+      topicResult([searchPage("characters", "characters", QUOTED, "https://src/chars")], {
+        characters: ["https://src/chars"],
+      }),
+    );
+    synthesizeVoiceCardsMock.mockResolvedValue([]);
+
+    const rows: InsertedProfileRow[] = [];
+    const { researchTitle } = await import("../research");
+    const report = await researchTitle(stubDb(rows), "Test Show");
+
+    expect(report.trust.defective).toBe(true);
+    expect(report.trust.coverage_gaps.join(" | ")).toContain("ZERO voice cards");
+    // …and the empty organ never claims a source it did not earn.
+    expect(report.trust.field_sources.voice_cards).toBe("model_recall");
+    expect(report.trust.field_pages.voice_cards).toBeUndefined();
   }, 20_000);
 
   it("GROUNDING DEMOTION: the sources don't carry the power system → its label falls to recall", async () => {

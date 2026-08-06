@@ -1,7 +1,7 @@
 import { getCurrentUser } from "@/lib/auth";
 import * as schema from "@/lib/db/schema";
 import { bebopContract } from "@/lib/renderer/__tests__/fixtures";
-import { synthesize } from "@/lib/tts/elevenlabs";
+import { PREVIEW_LINE, availableVoices, synthesize } from "@/lib/tts/elevenlabs";
 import { speechSegments } from "@/lib/tts/speech-text";
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
@@ -21,22 +21,33 @@ vi.mock("@/lib/auth", () => ({ getCurrentUser: vi.fn() }));
 const mockUser = vi.mocked(getCurrentUser);
 
 // The ElevenLabs HTTP boundary is stubbed (like auth); the DB stays real.
+// `availableVoices` is stubbed too — the real one lists the account's library
+// over the network, and no test may reach ElevenLabs.
 vi.mock("@/lib/tts/elevenlabs", async (importOriginal) => {
   const orig = await importOriginal<typeof import("@/lib/tts/elevenlabs")>();
-  return { ...orig, ttsConfigured: () => true, synthesize: vi.fn() };
+  return {
+    ...orig,
+    ttsConfigured: () => true,
+    synthesize: vi.fn(),
+    availableVoices: vi.fn(),
+  };
 });
 const mockSynthesize = vi.mocked(synthesize);
+const mockVoices = vi.mocked(availableVoices);
 
-const audioResponse = () =>
+/** An upstream body delivered in `chunks` pieces — the overcount's shape. */
+const chunkedAudio = (chunks: number) =>
   new Response(
     new ReadableStream<Uint8Array>({
       start(c) {
-        c.enqueue(new Uint8Array([1, 2, 3, 4]));
+        for (let i = 0; i < chunks; i++) c.enqueue(new Uint8Array([1, 2, 3, 4]));
         c.close();
       },
     }),
     { headers: { "Content-Type": "audio/mpeg" } },
   );
+
+const audioResponse = () => chunkedAudio(1);
 
 const url = process.env.DATABASE_URL;
 if (!url) console.warn("[tts-route] DATABASE_URL not set — skipping");
@@ -53,6 +64,21 @@ const NARRATION = "The pulse went on and the lamp kept its slow tick over the qu
 async function usageRows(campaignId: string) {
   if (!db) throw new Error("unreachable");
   return db.select().from(schema.modelCalls).where(eq(schema.modelCalls.campaignId, campaignId));
+}
+
+/**
+ * Poll for `expected` usage rows, then wait past that point so a row the route
+ * should NOT have written still has time to appear — the ledger claim under
+ * test is "exactly this many", not "at least".
+ */
+async function settledRows(campaignId: string, expected: number, graceMs = 400) {
+  let rows = await usageRows(campaignId);
+  for (let i = 0; i < 40 && rows.length < expected; i++) {
+    await new Promise((r) => setTimeout(r, 50));
+    rows = await usageRows(campaignId);
+  }
+  await new Promise((r) => setTimeout(r, graceMs));
+  return usageRows(campaignId);
 }
 
 describe.skipIf(!url)("tts route — segmented listen (real Postgres)", () => {
@@ -77,6 +103,11 @@ describe.skipIf(!url)("tts route — segmented listen (real Postgres)", () => {
   beforeEach(async () => {
     if (!db) throw new Error("unreachable");
     mockSynthesize.mockReset();
+    mockVoices.mockReset();
+    mockVoices.mockResolvedValue({
+      voices: [{ voice_id: "voice_fixture", name: "Fixture", hint: "test" }],
+      source: "curated",
+    });
     mockUser.mockResolvedValue({ id: playerId, email: "tts@example.com" });
     const [c] = await db
       .insert(schema.campaigns)
@@ -165,5 +196,117 @@ describe.skipIf(!url)("tts route — segmented listen (real Postgres)", () => {
     const res = await GET(new Request("http://test/tts?turn=1&meta=1&v=abc"), params(campaignId));
     expect(res.status).toBe(404);
     expect(mockSynthesize).not.toHaveBeenCalled();
+  });
+
+  // --- The ledger: one row per COMPLETED synthesis (M3R4 B3) -----------------
+  // The 2026-08-06 calibration: 359,927 recorded characters against a dashboard
+  // that measured 53.9K. The route metered the REQUEST — headers arrived, row
+  // written, delivery irrelevant — so every abandoned prefetch billed the
+  // ledger for a full segment it never converted.
+
+  it("a segment streamed in MANY chunks writes exactly ONE row, chars = the segment text", async () => {
+    mockSynthesize.mockImplementation(() => Promise.resolve(chunkedAudio(12)));
+    const segments = speechSegments(NARRATION);
+
+    const res = await GET(new Request("http://test/tts?turn=1&seg=0&v=abc"), params(campaignId));
+    expect(res.status).toBe(200);
+    expect((await res.arrayBuffer()).byteLength).toBe(48); // 12 chunks × 4 bytes
+
+    const rows = await settledRows(campaignId, 1);
+    expect(rows).toHaveLength(1);
+    // Not 12×, and not the whole narration — this one segment's own characters.
+    expect(rows[0]?.inputTokens).toBe(segments[0]?.length);
+    expect(rows[0]?.inputTokens).toBeLessThan(NARRATION.length);
+    expect(rows[0]?.phase).toBe("tts");
+  });
+
+  it("a listener who walks away mid-stream writes NO row — an abandoned prefetch is not spend we can claim", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    mockSynthesize.mockImplementation(() => Promise.resolve(chunkedAudio(20)));
+
+    const res = await GET(new Request("http://test/tts?turn=1&seg=0&v=abc"), params(campaignId));
+    const reader = res.body?.getReader();
+    if (!reader) throw new Error("no body");
+    await reader.read(); // one chunk delivered…
+    await reader.cancel("navigated away"); // …then the element is discarded
+
+    expect(await settledRows(campaignId, 0)).toHaveLength(0);
+    expect(warn).toHaveBeenCalledWith(
+      "[tts] synthesis abandoned — no ledger row",
+      expect.objectContaining({ why: "client cancelled" }),
+    );
+    warn.mockRestore();
+  });
+
+  it("an upstream that breaks mid-transfer writes NO row", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    mockSynthesize.mockImplementation(() =>
+      Promise.resolve(
+        new Response(
+          new ReadableStream<Uint8Array>({
+            pull(c) {
+              c.enqueue(new Uint8Array([1, 2, 3, 4]));
+              c.error(new Error("upstream died"));
+            },
+          }),
+          { headers: { "Content-Type": "audio/mpeg" } },
+        ),
+      ),
+    );
+
+    const res = await GET(new Request("http://test/tts?turn=1&seg=0&v=abc"), params(campaignId));
+    await expect(res.arrayBuffer()).rejects.toThrow();
+
+    expect(await settledRows(campaignId, 0)).toHaveLength(0);
+    warn.mockRestore();
+  });
+
+  it("a RE-request re-synthesizes and earns its own row — a retry is real spend, never deduped", async () => {
+    mockSynthesize.mockImplementation(() => Promise.resolve(chunkedAudio(2)));
+    for (let i = 0; i < 2; i++) {
+      const res = await GET(new Request("http://test/tts?turn=1&seg=0&v=abc"), params(campaignId));
+      await res.arrayBuffer();
+    }
+
+    expect(mockSynthesize).toHaveBeenCalledTimes(2);
+    const rows = await settledRows(campaignId, 2);
+    expect(rows).toHaveLength(2);
+    const segments = speechSegments(NARRATION);
+    for (const r of rows) expect(r.inputTokens).toBe(segments[0]?.length);
+  });
+
+  it("a preview clicked through and abandoned writes NO row either — the voice menu is the worst offender", async () => {
+    // The segment path has this pin; the preview path did not (B3 audit nit).
+    // Clicking down a voice list is exactly the abandon-heavy pattern that
+    // produced the 6.7× overcount, so its ledger claim needs its own test.
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    mockSynthesize.mockImplementation(() => Promise.resolve(chunkedAudio(20)));
+
+    const res = await GET(new Request("http://test/tts?preview=voice_fixture"), params(campaignId));
+    expect(res.status).toBe(200);
+    const reader = res.body?.getReader();
+    if (!reader) throw new Error("no body");
+    await reader.read(); // one chunk auditioned…
+    await reader.cancel("next voice"); // …then the next voice is clicked
+
+    expect(await settledRows(campaignId, 0)).toHaveLength(0);
+    expect(warn).toHaveBeenCalledWith(
+      "[tts] synthesis abandoned — no ledger row",
+      expect.objectContaining({ why: "client cancelled", chars: PREVIEW_LINE.length }),
+    );
+    warn.mockRestore();
+  });
+
+  it("the voice preview is metered on completion too, at the preview line's length", async () => {
+    mockSynthesize.mockImplementation(() => Promise.resolve(chunkedAudio(4)));
+
+    const res = await GET(new Request("http://test/tts?preview=voice_fixture"), params(campaignId));
+    expect(res.status).toBe(200);
+    await res.arrayBuffer();
+
+    const rows = await settledRows(campaignId, 1);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.inputTokens).toBe(PREVIEW_LINE.length);
+    expect(rows[0]?.turnNumber).toBeNull();
   });
 });

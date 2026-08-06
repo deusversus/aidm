@@ -16,7 +16,14 @@ import { eq, sql } from "drizzle-orm";
  * key collision), interiority events sum.
  */
 
-export type MergeProvenance = "merge:janitor" | "merge:player";
+/**
+ * The janitor's two candidate FILTERS are distinguished (M3R4 B3 audit R2c):
+ * `merge:janitor` is the shipped name-vector tier, `merge:janitor:semantic` the
+ * meaning-vector tier whose candidacy threshold is deliberately permissive and
+ * still unmeasured. A bad auto-merge must be attributable to the filter that
+ * offered the pair, or the threshold can never be held responsible for it.
+ */
+export type MergeProvenance = "merge:janitor" | "merge:janitor:semantic" | "merge:player";
 
 export interface MergeResult {
   survivorId: string;

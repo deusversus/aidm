@@ -9,7 +9,7 @@ import {
 } from "../anilist";
 import { chunkPage } from "../corpus";
 import { classifyScope, profileSlug } from "../research";
-import { synthesizeVoiceCards } from "../synthesize";
+import { VOICE_CORPUS_FEED, synthesizeVoiceCards } from "../synthesize";
 import { cleanWikiHtml, extractQuotes, planScrape, stripNoiseSections } from "../wiki";
 
 vi.mock("@/lib/llm/calls", async (importOriginal) => {
@@ -231,6 +231,44 @@ describe("synthesizeVoiceCards emission ceiling", () => {
     const system = String((mockJudgment.mock.calls.at(-1)?.[1] as { system?: string })?.system);
     expect(system).toContain("at most 8 cards");
     warn.mockRestore();
+  });
+
+  it("the unattributed cast corpus reaches the prompt, capped, and is never a speaker (M3R4 B3)", async () => {
+    mockJudgment.mockReset();
+    mockJudgment.mockResolvedValue({ cards: [] } as never);
+    const page = (i: number) => ({
+      title: `Test Show — characters (web research) ${i}`,
+      pageType: "characters" as const,
+      url: `https://src/chars/${i}`,
+      origin: "web_search" as const,
+      text: `CAST-NOTE-${i} ${"prose ".repeat(600)}`,
+    });
+
+    // Four pages offered; the feed reads three, each clipped to its char cap.
+    await synthesizeVoiceCards({}, [], [page(0), page(1), page(2), page(3)]);
+
+    const opts = mockJudgment.mock.calls.at(-1)?.[1] as { system?: string; prompt?: string };
+    const prompt = String(opts?.prompt);
+    expect(prompt).toContain("Cast notes (unattributed prose)");
+    expect(prompt).toContain("CAST-NOTE-0");
+    expect(prompt).toContain("CAST-NOTE-2");
+    expect(prompt).not.toContain("CAST-NOTE-3"); // past the page cap
+    expect(prompt).not.toContain("(web research)"); // the synthetic title never rides
+    expect(prompt.length).toBeLessThan(3 * VOICE_CORPUS_FEED.chars + 500);
+    // The instruction that keeps a page label out of the card names.
+    expect(String(opts?.system)).toContain("never for the notes or their source");
+  });
+
+  it("no corpus ⇒ no cast-notes block at all (the wiki path is byte-for-byte unchanged)", async () => {
+    mockJudgment.mockReset();
+    mockJudgment.mockResolvedValue({ cards: [] } as never);
+
+    await synthesizeVoiceCards({ Spike: ["Whatever happens, happens."] }, ["Jet"]);
+
+    const prompt = String((mockJudgment.mock.calls.at(-1)?.[1] as { prompt?: string })?.prompt);
+    expect(prompt).not.toContain("Cast notes");
+    expect(prompt).toContain('Spike:\n  "Whatever happens, happens."');
+    expect(prompt).toContain("Main cast needing gap-fill: Jet");
   });
 });
 

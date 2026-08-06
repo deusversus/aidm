@@ -100,6 +100,8 @@ async function narrate(setteiText: string): Promise<string> {
   const { done } = streamNarration({
     name: "eval_control_key_narration",
     selection: SELECTION,
+    // Harness spend, not play (M3R4 B3).
+    phase: "harness",
     system,
     messages: [{ role: "user", content: SCENE_BRIEF }],
     // Adaptive thinking bills against maxTokens BEFORE prose (the M1 class,
@@ -123,6 +125,7 @@ async function judge(
   return callJudgment(SELECTION, {
     name: "eval_control_key_judge",
     schema: Judgment,
+    phase: "harness",
     system: [
       "You are judging a single narrated scene from an anime TTRPG.",
       `The player's ONLY stated action was: "${PLAYER_ACTION}".`,

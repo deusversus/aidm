@@ -42,6 +42,9 @@ export const notAnotherAnime: Suite = {
         callJudgment(SELECTION, {
           name: "eval_not_another_anime",
           schema: Verdict,
+          // Eval spend is the harness's, never play's (M3R4 B3) — without a
+          // phase these rows report as "(unattributed)".
+          phase: "harness",
           system: [
             "You judge synthesized pastiche passages for a story engine's grounding library.",
             "SOURCING POLICY (legal): passages are FORBIDDEN from using canon character names,",

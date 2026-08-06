@@ -10,35 +10,106 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
- * Wrap the upstream audio stream so its completion or failure is logged — the
- * instrument for the next mid-play stream death (§9.5, 2026-07-20). It counts
- * bytes and reports whether the segment finished cleanly or the upstream broke;
- * the client receives the same bytes, unchanged.
+ * Wrap the upstream audio stream so its completion or failure is logged AND
+ * metered — the instrument for the next mid-play stream death (§9.5,
+ * 2026-07-20), and since M3R4 B3 the ledger's only writer on this route. It
+ * counts bytes and reports whether the segment finished cleanly or the upstream
+ * broke; the client receives the same bytes, unchanged.
+ *
+ * THE OVERCOUNT (found by the 2026-08-06 ElevenLabs calibration): over 30 days
+ * model_calls recorded ~359,927 characters across 165 rows while the dashboard
+ * measured 53.9K — ~6.7×. The cause was NOT a row per stream chunk, and not the
+ * whole narration's length on a segment row (each row already carried only its
+ * own segment's text). It was that the route metered the REQUEST, not the
+ * SYNTHESIS: the insert fired the moment ElevenLabs' response headers arrived,
+ * before a byte reached the client and regardless of whether the client was
+ * still there. The listen button opens the NEXT segment eagerly
+ * (listen-button.tsx, `preload = "auto"`) and discards it on stop, unmount or
+ * navigation — an aborted transfer converts only a fraction of its characters
+ * upstream, but wrote a full-length row here. Prefetch-and-abandon at roughly
+ * one abandoned request per played one, compounded over restarts, is the
+ * multiplier.
+ *
+ * The rule now: ONE row per COMPLETED synthesis, carrying that synthesis's true
+ * character count. A stream that is cancelled or breaks mid-transfer writes NO
+ * row and warns with the characters it would have claimed — ElevenLabs meters
+ * conversion as it happens, we cannot observe the partial from here, and the
+ * dashboard stays the character truth for that residue (a known, logged,
+ * under-count-not-over-count gap).
+ *
+ * THE RACE, resolved by `settled`: completion and cancellation both arrive
+ * asynchronously and either can land first. Whoever settles first WINS, and
+ * that is the honest ordering in both directions. A cancel arriving BEFORE the
+ * final read (the listener walks away mid-transfer) suppresses the row — the
+ * conversion never finished. A cancel arriving AFTER the upstream `done` — the
+ * element is discarded a beat after the last byte — LOSES, and the row stands:
+ * ElevenLabs converted and billed the whole segment, so the ledger owes it a
+ * row whether or not anyone stayed to listen.
+ *
+ * RETRIES are honest by construction: nothing in this route or in
+ * `synthesize()` retries. A re-request from the client (a discarded prefetch
+ * played again, a restart after an error) is a SECOND upstream POST and second
+ * real spend, so it completes into its own row — retries are counted, not
+ * deduped.
  */
-function instrumentStream(
+function meteredStream(
   upstream: ReadableStream<Uint8Array>,
-  turnNumber: number,
-  seg: number,
+  args: { campaignId: string; chars: number; turnNumber?: number; seg?: number },
 ): ReadableStream<Uint8Array> {
   const reader = upstream.getReader();
   let bytes = 0;
+  // Exactly-once: a `done` read and a late cancel/error must not both settle.
+  let settled = false;
+
+  const abandon = (why: string, detail?: unknown) => {
+    if (settled) return;
+    settled = true;
+    console.warn("[tts] synthesis abandoned — no ledger row", { ...args, bytes, why, detail });
+  };
+
+  const complete = () => {
+    if (settled) return;
+    settled = true;
+    console.log("[tts] stream done", { ...args, bytes });
+    getDb()
+      .insert(modelCalls)
+      .values({
+        campaignId: args.campaignId,
+        turnNumber: args.turnNumber,
+        provider: "elevenlabs",
+        model: process.env.ELEVENLABS_MODEL_ID ?? "eleven_multilingual_v2",
+        tier: "tts",
+        phase: "tts",
+        // ElevenLabs bills ITS OWN subscription credits per character — costUsd
+        // 0 keeps the Anthropic ledger honest while the character count
+        // preserves the usage trail (§3 metering posture).
+        inputTokens: args.chars,
+        costUsd: "0",
+      })
+      .then(
+        () => {},
+        (err) => console.warn("[tts] usage row failed (non-fatal)", err),
+      );
+  };
+
   return new ReadableStream<Uint8Array>({
     async pull(controller) {
       try {
         const { done, value } = await reader.read();
         if (done) {
-          console.log("[tts] stream done", { turnNumber, seg, bytes });
+          complete();
           controller.close();
           return;
         }
         bytes += value.byteLength;
         controller.enqueue(value);
       } catch (err) {
-        console.warn("[tts] upstream stream error", { turnNumber, seg, bytes, err });
+        abandon("upstream stream error", err);
         controller.error(err);
       }
     },
     cancel(reason) {
+      abandon("client cancelled", reason);
       void reader.cancel(reason).catch(() => {});
     },
   });
@@ -80,21 +151,18 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     }
     try {
       const upstream = await synthesize(PREVIEW_LINE, previewVoice);
-      db.insert(modelCalls)
-        .values({
-          campaignId: id,
-          provider: "elevenlabs",
-          model: process.env.ELEVENLABS_MODEL_ID ?? "eleven_multilingual_v2",
-          tier: "tts",
-          phase: "tts",
-          inputTokens: PREVIEW_LINE.length,
-          costUsd: "0",
-        })
-        .then(
-          () => {},
-          (err) => console.warn("[tts] preview usage row failed (non-fatal)", err),
-        );
-      return new Response(upstream.body, {
+      if (!upstream.body) {
+        console.error("[tts] preview upstream returned no body");
+        return NextResponse.json({ error: "voice synthesis failed" }, { status: 502 });
+      }
+      // Same discipline as the segment path: the preview is metered when it
+      // finishes converting, never when the request is accepted — a voice
+      // menu clicked through quickly abandons previews mid-stream.
+      const body = meteredStream(upstream.body, {
+        campaignId: id,
+        chars: PREVIEW_LINE.length,
+      });
+      return new Response(body, {
         headers: {
           "Content-Type": "audio/mpeg",
           "Cache-Control": "private, max-age=604800, immutable",
@@ -165,33 +233,19 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     return NextResponse.json({ error: "voice synthesis failed" }, { status: 502 });
   }
 
-  // Usage record (per segment): ElevenLabs bills ITS OWN subscription credits
-  // per character — costUsd 0 keeps the Anthropic ledger honest while the
-  // character count preserves the usage trail (§3 metering posture).
-  db.insert(modelCalls)
-    .values({
-      campaignId: id,
-      turnNumber,
-      provider: "elevenlabs",
-      model: process.env.ELEVENLABS_MODEL_ID ?? "eleven_multilingual_v2",
-      tier: "tts",
-      phase: "tts",
-      inputTokens: text.length,
-      costUsd: "0",
-    })
-    .then(
-      () => {},
-      (err) => console.warn("[tts] usage row failed (non-fatal)", err),
-    );
-
-  return new Response(instrumentStream(body, turnNumber, seg), {
-    headers: {
-      "Content-Type": "audio/mpeg",
-      // Immutable per (turn, seg, fingerprint) — the URL varies by all three,
-      // so per-segment browser caching still makes a re-listen free.
-      "Cache-Control": "private, max-age=604800, immutable",
-      "X-Segment-Count": String(segments.length),
-      "X-Segment-Index": String(seg),
+  // The usage record rides the stream's completion (see meteredStream): one row
+  // per finished segment synthesis, carrying THAT segment's characters.
+  return new Response(
+    meteredStream(body, { campaignId: id, turnNumber, seg, chars: text.length }),
+    {
+      headers: {
+        "Content-Type": "audio/mpeg",
+        // Immutable per (turn, seg, fingerprint) — the URL varies by all three,
+        // so per-segment browser caching still makes a re-listen free.
+        "Cache-Control": "private, max-age=604800, immutable",
+        "X-Segment-Count": String(segments.length),
+        "X-Segment-Index": String(seg),
+      },
     },
-  });
+  );
 }

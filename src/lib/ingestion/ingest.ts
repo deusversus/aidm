@@ -152,6 +152,35 @@ export const EXTRACTOR_SYSTEM = [
   "offscreen character, backstory pressure, and a tonal bid at once. Extract",
   "each discrete fact.",
   "",
+  "IN-CHARACTER SPEECH IS STILL AUTHORSHIP: a world fact does not stop being",
+  "one because the player put it in their character's mouth. Quoted dialogue,",
+  "reported speech, a line delivered at an NPC — '\"The Red Sash dockworkers'",
+  "syndicate runs these piers.\" I say it flat, watching the fixer for a flinch'",
+  "— asserts that the Red Sash EXISTS, that it is a dockworkers' syndicate, and",
+  "that it runs these piers. Extract those facts exactly as you would from bare",
+  "narration, and read the WHOLE input: one submission is often a quoted claim",
+  "PLUS the action wrapped around it, and both halves can carry facts.",
+  "",
+  "WHAT SPEECH DOES NOT ASSERT — check this BEFORE you extract from any quoted",
+  "claim: read the whole submission for the player's OWN marker first. Speech",
+  "asserts nothing when it is about the speaker's own feelings, plans, or",
+  "questions, and NOTHING world-shaped survives a claim the input itself marks",
+  "untrue — a lie or bluff the player names as one, a hypothetical, a thing a",
+  "character merely wonders. The marker sits on either side of the line ('I spin",
+  "him a story:' before it, 'none of that was true' after it) and it disarms the",
+  "claim either way. Worked: 'I spin him a story: \"My brother rides with the Ash",
+  'Company, and they know every turn of this road." There is no Ash Company — I',
+  "built the name out of nothing to buy myself an hour' yields NO Ash Company, NO",
+  "brother, NO entity of any kind, and no fact about that road. A name the player",
+  "has just told you is fiction must never become a row. At most ONE bare",
+  "cast_fact may record that the character told this lie — the deception is real",
+  "even though its content is not — and it carries NO entity_name at all: the",
+  "player's own character is never a catalog entity, in this case or any other,",
+  "so never name the speaker (or 'The Protagonist') there. Minting the invented",
+  "thing is the failure this rule exists to prevent. This is not a 'when in",
+  "doubt' case: the player has already told you the claim is false, so there is",
+  "no doubt to resolve in favor of accepting.",
+  "",
   "For every fact set: kind (world_fact | cast_fact | faction | location |",
   "thread | backstory); content (the fact, stated cleanly in third person);",
   "entity_name ONLY when the fact is about a nameable catalog entity",
@@ -393,10 +422,12 @@ async function retireAndReplaceCriticalFact(
 export type CorrectionTargetKind = "critical_fact" | "entity";
 
 /**
- * Normalized-hint floor for binding a CRITICAL FACT (audit finding). Bidirectional
- * containment plus a degenerate hint ("the") matched an arbitrary live record
- * and retired it. Entity binding needs no floor — it is identity-key EQUALITY,
- * and real catalog names are short ("Ed", "Jet").
+ * Normalized-hint floor for binding by CONTAINMENT (audit finding).
+ * Bidirectional containment plus a degenerate hint ("the") matched an arbitrary
+ * live record and retired it. It guards both containment paths: the critical
+ * fact, and (since M3R4 B3) the entity's quoted-dossier-line fallback. Binding
+ * by NAME is exempt — that is identity-key EQUALITY, and real catalog names are
+ * short ("Ed", "Jet").
  */
 const CORRECTION_HINT_MIN_CHARS = 12;
 
@@ -421,9 +452,11 @@ export type CorrectionOutcome =
  * one retire-and-replace, one envelope — not a second correction dialect.
  *
  * Resolution is deliberate and unclever: a critical fact binds by
- * normalized-containment on the record's own words, an entity by identity key.
- * An unresolvable target writes NOTHING and returns the reason — the caller
- * says it plainly rather than guessing at which line the player meant. A
+ * normalized-containment on the record's own words; an entity binds by identity
+ * key, or — failing that — by a quoted dossier line that matches ONE dossier
+ * and clears the hint floor. An unresolvable or AMBIGUOUS target writes NOTHING
+ * and returns the reason — the caller says it plainly rather than guessing at
+ * which line the player meant, which is the whole point of the floor. A
  * failed entity revision likewise files nothing (the story channel falls back
  * to APPEND so a new fact is never lost, but appending a correction beside the
  * error is exactly the failure a correction exists to undo).
@@ -525,21 +558,57 @@ export async function applyRecordCorrection(
   // A hint either NAMES the entity or QUOTES the wrong line of its dossier —
   // the player says whichever they have to hand. Name first, then the block.
   const byName = key ? rows.find((e) => identityKey(e.name) === key) : undefined;
-  const target = byName ?? rows.find((e) => normalizedContains(e.block, hint));
+
+  let target: (typeof rows)[number] | undefined = byName;
+  /**
+   * A QUOTED line is handed to the revise judgment as the line being retired —
+   * that is what keeps a correction surgical, and what the revise's own sanity
+   * gate reads as the one line allowed to disappear. A hint that merely named
+   * the entity supersedes nothing: guessing which line the player meant is the
+   * silent-guess failure this channel exists to avoid.
+   */
+  let supersedes: string | undefined;
+
   if (!target) {
-    return { filed: false, reason: `no catalog entity matches "${hint}"` };
+    // The QUOTE fallback earns the critical-fact path's discipline (M3R4 B3;
+    // first-match/no-floor was flagged at the M3R2 C4 fix and deliberately
+    // left). NAME binding needs no floor — it is identity-key EQUALITY, and
+    // real catalog names are short ("Ed", "Jet") — but containment matches in
+    // EITHER direction, so a short quote sits inside essentially every dossier
+    // and the write on the other side REWRITES whatever it lands on.
+    if (normalizeForMatch(hint).length < CORRECTION_HINT_MIN_CHARS) {
+      return {
+        filed: false,
+        reason: `"${hint}" is too short to name a record — name the entity, or quote the exact dossier line as it stands`,
+      };
+    }
+    // ALL matches, not the first: the select has no ORDER BY, so binding to
+    // whichever row Postgres happened to return first made the revision depend
+    // on physical row order. An ambiguous hint is the same failure as an
+    // unmatched one — the engine does not know which dossier the player meant,
+    // and says so.
+    const matches = rows.filter((e) => normalizedContains(e.block, hint));
+    const only = matches.length === 1 ? matches[0] : undefined;
+    if (!only) {
+      return {
+        filed: false,
+        reason:
+          matches.length === 0
+            ? `no catalog entity matches "${hint}"`
+            : `"${hint}" matches ${matches.length} catalog dossiers — name the entity, or quote the exact line as it stands so the right one can be found`,
+      };
+    }
+    target = only;
+    // The same uniqueness rule INSIDE the block: a quote matching several lines
+    // names none of them. Rather than retire a first-match guess, supersedes
+    // stays empty and the revise works from the whole block — where every line
+    // keeps its sanity-gate protection.
+    const lineMatches = target.block
+      .split("\n")
+      .map((l) => l.trim())
+      .filter((l) => l.length > 0 && normalizedContains(l, hint));
+    supersedes = lineMatches.length === 1 ? lineMatches[0] : undefined;
   }
-  // A QUOTED line is handed to the revise judgment as the line being retired —
-  // that is what keeps a correction surgical, and what the revise's own sanity
-  // gate reads as the one line allowed to disappear. A hint that merely named
-  // the entity supersedes nothing: guessing which line the player meant is the
-  // silent-guess failure this channel exists to avoid.
-  const supersedes = byName
-    ? undefined
-    : target.block
-        .split("\n")
-        .map((l) => l.trim())
-        .find((l) => l.length > 0 && normalizedContains(l, hint));
   try {
     const { revisedBlock } = await reviseBlock(selection, {
       campaignId: args.campaignId,

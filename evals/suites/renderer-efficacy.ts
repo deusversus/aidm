@@ -185,6 +185,8 @@ async function narrate(system: string): Promise<Draw> {
     const { done } = streamNarration({
       name: "eval_renderer_efficacy",
       selection: DEV_TIER_SELECTION,
+      // Harness spend, not play (M3R4 B3).
+      phase: "harness",
       system: [{ type: "text", text: system }],
       messages: [{ role: "user", content: SCENE }],
       maxTokens: 900,
@@ -210,7 +212,7 @@ type Sheet = { scores: Map<AxisName, number> } | { unproven: string } | { failed
 
 async function score(sample: string, axes: AxisName[], name: string): Promise<Sheet> {
   try {
-    const rows = await scoreAxes(DEV_TIER_SELECTION, { sample, axes, name });
+    const rows = await scoreAxes(DEV_TIER_SELECTION, { sample, axes, name, phase: "harness" });
     return { scores: new Map(rows.map((r) => [r.axis as AxisName, r.score])) };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

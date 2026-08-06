@@ -148,6 +148,26 @@ export interface CoverageGateInputs {
   /** Carried for the record the gate reports against; no rule reads it yet. */
   pagesFetched: number;
   /**
+   * Voice cards the run actually shipped (M3R4 B3). Undefined = the caller is
+   * not offering the pair this gate needs.
+   *
+   * NOT because a cached row lacks the cards (audit correction): a legacy row
+   * DOES carry `ip_mechanics.voice_cards`, and counting them there would be
+   * free. What that row cannot reconstruct is `castMaterialPresent` — the
+   * AniList main cast, the extracted quotes, the searched harvest are inputs to
+   * the run, none of them stored. Zero cards without knowing whether there was
+   * anything to build them FROM is indistinguishable from an honest cast-less
+   * absence, so the cached path passes neither input and the gate sits out,
+   * exactly as the text floor does there.
+   */
+  voiceCardCount?: number;
+  /**
+   * The run HAD cast material: an AniList main cast, extracted quotes, or a
+   * searched characters harvest. Only then is an empty voice organ a DEFECT;
+   * a genuinely cast-less source shipping no cards is an honest absence.
+   */
+  castMaterialPresent?: boolean;
+  /**
    * The caller has the profile's MECHANICS but not the page text behind them
    * (M3R3 C3 audit): the cached legacy path, where a stored row carries
    * genre/power_system/stat_mapping and nothing else. The text floor would
@@ -193,6 +213,16 @@ export function coverageGates(inputs: CoverageGateInputs): {
   if (!inputs.skipTextFloor && inputs.contentChars < GROUNDABLE_TEXT_FLOOR_CHARS) {
     defects.push(
       `DEFECT: under ${GROUNDABLE_TEXT_FLOOR_CHARS} characters of groundable source text — the profile is recall wearing a trench coat`,
+    );
+  }
+  // The voice organ (M2R4/M2R5 starvation, gated M3R4 B3). Zero cards passed
+  // silently for two milestones: every reader tolerates an empty array, the
+  // "no character quotes" gap fires identically for eight recall cards and for
+  // none, and nothing anywhere counted them. A cast the run could see plus an
+  // empty voice organ means the KA invents how every character speaks.
+  if (inputs.castMaterialPresent === true && inputs.voiceCardCount === 0) {
+    defects.push(
+      "DEFECT: the run had cast material and produced ZERO voice cards — the profile's voice organ is empty and every character's speech would be improvised",
     );
   }
   return { defective: defects.length > 0, defects };

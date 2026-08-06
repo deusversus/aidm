@@ -580,10 +580,11 @@ export async function researchTitle(
   // character. A search "characters" page carries the whole cast under a
   // single synthetic title, so extracting from it would lump every voice
   // under one pseudo-name and mint a voice card literally called
-  // "<Title> — characters (web research)". Its prose still reaches the corpus
-  // and is retrievable at play; voice falls back to the AniList main-cast
-  // gap-fill below, and a cast-less Level B profile honestly derives the
-  // "no character quotes" gap instead of faking a speaker.
+  // "<Title> — characters (web research)". Excluded from the SPEAKER KEYING
+  // only: since M3R4 B3 that page's prose also feeds the card synthesis, as
+  // unattributed corpus (voiceCorpusPages below), on top of staying retrievable
+  // at play. It reaches the voice organ; it is simply never credited as a
+  // speaker, so a Level B profile builds cards from it without faking one.
   for (const page of wikiOnly(byType("characters"))) {
     const quotes = extractQuotes(page.text);
     if (quotes.length > 0) {
@@ -591,10 +592,20 @@ export async function researchTitle(
       quoteSourcePages.push(page);
     }
   }
+  /**
+   * The starvation repair (M2R4/M2R5 carry, M3R4 B3): the searched characters
+   * page is excluded from the speaker-keyed block above for good reason, and
+   * that exclusion was ALSO starving the card synthesis — a Level-B profile
+   * (synthetic identity, `characters: { edges: [] }`, no wiki) hit
+   * `quotes = {} && gapFill = []` and shipped ZERO voice cards in silence,
+   * with the harvest M3R3 added for exactly this material sitting unread in
+   * the corpus. It goes in as unattributed prose, never as a speaker.
+   */
+  const voiceCorpusPages = byType("characters").filter((p) => (p.origin ?? "wiki") !== "wiki");
   const gapFill = mainCast.filter((n) => !quotesByCharacter[n]);
   const voiceCards =
-    Object.keys(quotesByCharacter).length > 0 || gapFill.length > 0
-      ? await synthesizeVoiceCards(quotesByCharacter, gapFill)
+    Object.keys(quotesByCharacter).length > 0 || gapFill.length > 0 || voiceCorpusPages.length > 0
+      ? await synthesizeVoiceCards(quotesByCharacter, gapFill, voiceCorpusPages)
       : [];
 
   // Lore/items pages are the stat organ whatever fetched them — a searched
@@ -793,6 +804,10 @@ export async function researchTitle(
   // field_pages either. The search prose grounds the corpus, not this field.
   const settingPages = wikiOnly([...byType("locations"), ...byType("factions")]);
   const quotedCharacterPages = byType("characters").filter((p) => quotesByCharacter[p.title]);
+  // What actually fed the voice organ: the speaker-keyed quote pages, plus the
+  // unattributed cast corpus when that is what the cards had to read (M3R4 B3).
+  // Empty ⇒ the cards are pure gap-fill recall, and the label says so.
+  const voiceFeedPages = [...quotedCharacterPages, ...voiceCorpusPages];
   const contentChars = pages.reduce((n, p) => n + p.text.length, 0);
   // M3R3 C2: an organ's label follows the ORIGIN of the pages that fed it.
   // Wiki wins a mixed feed (the canon page is the stronger claim); a purely
@@ -813,7 +828,7 @@ export async function researchTitle(
       settingSource: organSource(settingPages),
       statMappingSource: statsCanonical ? organSource(lorePages) : null,
       powerSystemSource: powerSystemGrounded ? organSource(techniquePages) : null,
-      voiceSource: quoteCharacters > 0 ? organSource(quotedCharacterPages) : null,
+      voiceSource: voiceCards.length > 0 ? organSource(voiceFeedPages) : null,
     }),
     // An ungrounded power system is not absent — it is recall, and says so.
     // (An ungrounded stat mapping IS absent: it was replaced by the default
@@ -825,7 +840,9 @@ export async function researchTitle(
     ...(powerSystemGrounded ? { power_system: organPages(techniquePages, "power_system") } : {}),
     ...(statsCanonical ? { stat_mapping: organPages(lorePages, "stats") } : {}),
     ...(settingPages.length > 0 ? { world_setting: organPages(settingPages, "world") } : {}),
-    ...(quoteCharacters > 0 ? { voice_cards: organPages(quotedCharacterPages, "characters") } : {}),
+    ...(voiceCards.length > 0 && voiceFeedPages.length > 0
+      ? { voice_cards: organPages(voiceFeedPages, "characters") }
+      : {}),
   };
   // The method ladder, widest grounding first: a synthetic identity is
   // web_search whatever else fired; search-fed pages make an AniList profile
@@ -857,6 +874,14 @@ export async function researchTitle(
     statsCanonical,
     contentChars,
     pagesFetched: pages.length,
+    // The voice organ (M3R4 B3): zero cards is a defect only when the run HAD
+    // cast material to build them from. A genuinely cast-less source shipping
+    // no cards is an honest absence, not a break.
+    voiceCardCount: voiceCards.length,
+    castMaterialPresent:
+      mainCast.length > 0 ||
+      Object.keys(quotesByCharacter).length > 0 ||
+      voiceCorpusPages.length > 0,
   });
   const trust = deriveTrust({
     startYear: newestStartYear,

@@ -2,12 +2,12 @@ import * as schema from "@/lib/db/schema";
 import { callJudgment, callProbe } from "@/lib/llm/calls";
 import { EMBEDDING_DIMENSIONS } from "@/lib/llm/embedding-config";
 import { embedTexts } from "@/lib/llm/voyage";
-import { bebopContract } from "@/lib/renderer/__tests__/fixtures";
+import { RED_SASH_ASSERTION, bebopContract } from "@/lib/renderer/__tests__/fixtures";
 import { and, eq, isNull } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { CANON_MATCH_DISTANCE, ingestAssertion, renderDossier } from "../ingest";
+import { CANON_MATCH_DISTANCE, EXTRACTOR_SYSTEM, ingestAssertion, renderDossier } from "../ingest";
 
 /**
  * Universal ingestion (§5.4, §6.5) against real Postgres with a scripted
@@ -1188,6 +1188,51 @@ describe.skipIf(!url)("Universal ingestion (real Postgres, scripted extractor)",
     expect(master?.entityType).toBe("thread");
     const state = (master?.state ?? {}) as { relationships?: Record<string, string> };
     expect(state.relationships?.["13"]).toContain("related to The Gaunt Warden");
+  });
+
+  // --- The Red Sash class (M1-soak carry, repaired M3R4 B3) ------------------
+  // Soak beat 5 minted a faction INSIDE quoted dialogue and the extractor never
+  // surfaced it as a world claim: EXTRACTOR_SYSTEM said "capture the world facts
+  // their words assert" and nothing more, so a line of in-character speech read
+  // as performance — something the character DOES — rather than authorship. The
+  // clause below is the repair; these two assertions are its pin.
+
+  it("the Red Sash miss: the extractor is told in-character speech is still authorship", () => {
+    // The clause, and the miss itself as its worked example — if either goes,
+    // dialogue-embedded claims go quiet again and no other test notices.
+    expect(EXTRACTOR_SYSTEM).toContain("IN-CHARACTER SPEECH IS STILL AUTHORSHIP");
+    expect(EXTRACTOR_SYSTEM).toContain("Red Sash dockworkers' syndicate runs these piers");
+    // The posture ladder is untouched: ACCEPT still the default, no REJECT.
+    expect(EXTRACTOR_SYSTEM).toContain("When in doubt, accept. There is no REJECT.");
+  });
+
+  it("the Red Sash miss: the quoted assertion reaches the extractor whole and mints the faction", async () => {
+    if (!db) throw new Error("unreachable");
+    armExtractor([
+      {
+        kind: "faction",
+        entity_name: "The Red Sash",
+        content: "The Red Sash is a dockworkers' syndicate that runs the piers.",
+        posture: "accept",
+      },
+    ]);
+
+    const res = await ingestAssertion(db, campaignId, 5, RED_SASH_ASSERTION, { profileIds: [] });
+
+    // Nothing pre-filters or unquotes the dialogue on the way in — the extractor
+    // sees the player's line verbatim, quotation marks and action tail included.
+    expect(extractorPrompt()).toContain(RED_SASH_ASSERTION);
+
+    const [faction] = await db
+      .select()
+      .from(schema.entities)
+      .where(
+        and(eq(schema.entities.campaignId, campaignId), eq(schema.entities.name, "The Red Sash")),
+      );
+    expect(faction?.entityType).toBe("faction");
+    expect(faction?.provenance).toBe("player_assertion");
+    expect(Number(faction?.confidence)).toBeCloseTo(1);
+    expect(res.writes.some((w) => w.kind === "entity_created")).toBe(true);
   });
 
   // --- M2 C3: correction semantics — player word cleans the record ----------

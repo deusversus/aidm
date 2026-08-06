@@ -372,6 +372,36 @@ describe("coverageGates (M3R3 C3, L4)", () => {
     // flag still fail on zero groundable text.
     expect(coverageGates({ ...legacyClean, skipTextFloor: false }).defective).toBe(true);
   });
+
+  /**
+   * The voice organ (M2R4/M2R5 starvation, gated M3R4 B3). Zero cards shipped
+   * silently for two milestones — no reader minded, no gap named it, nothing
+   * counted them.
+   */
+  it("cast material + ZERO voice cards → defective, named out loud", () => {
+    const g = coverageGates({ ...clean, castMaterialPresent: true, voiceCardCount: 0 });
+    expect(g.defective).toBe(true);
+    expect(g.defects).toHaveLength(1);
+    expect(g.defects[0]).toContain("ZERO voice cards");
+  });
+
+  it("one card is enough to clear it — the gate counts presence, never quality", () => {
+    expect(
+      coverageGates({ ...clean, castMaterialPresent: true, voiceCardCount: 1 }).defective,
+    ).toBe(false);
+  });
+
+  it("a genuinely cast-less source shipping no cards is an honest absence, not a defect", () => {
+    expect(
+      coverageGates({ ...clean, castMaterialPresent: false, voiceCardCount: 0 }).defective,
+    ).toBe(false);
+  });
+
+  it("a caller that cannot see the cards (the cached legacy row) never trips it", () => {
+    // Both inputs absent — the gate sits out exactly as the text floor does.
+    expect(coverageGates({ ...clean, castMaterialPresent: true }).defective).toBe(false);
+    expect(coverageGates({ ...clean, voiceCardCount: 0 }).defective).toBe(false);
+  });
 });
 
 describe("deriveTrust defect + grounding plumbing (M3R3 C3)", () => {

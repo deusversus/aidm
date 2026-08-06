@@ -12,6 +12,7 @@ import {
 import { CLASSIFY, PROSE_COMPOSER, STRUCTURED_RICH } from "@/lib/llm/budgets";
 import { callJudgment, callProbe, streamNarration } from "@/lib/llm/calls";
 import { DEV_TIER_SELECTION, TierSelection } from "@/lib/llm/tiers";
+import type { ModelCallPhase } from "@/lib/observability/meter";
 import { KA_TOOLS } from "@/lib/turn/tools";
 import {
   BOOTH_CORRECTIONS_MAX,
@@ -811,10 +812,13 @@ export async function comprehendOverride(
   campaignId: string,
   turnNumber: number,
   text: string,
+  /** Play is the default; the channel-routing eval passes "harness" so its
+   *  measurement rows never file as a turn's cost (M3R4 B3). */
+  phase: ModelCallPhase = "turn",
 ): Promise<OverrideComprehension> {
   return callJudgment(selection, {
     name: "override_comprehension",
-    phase: "turn",
+    phase,
     schema: OverrideComprehension,
     campaignId,
     turnNumber,

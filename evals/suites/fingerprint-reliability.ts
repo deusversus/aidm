@@ -79,6 +79,8 @@ export const fingerprintReliability: Suite = {
             sample: exemplar.text,
             axes: [axis],
             name: `reliability_${axis}_${i + 1}`,
+            // Harness spend, not play (M3R4 B3).
+            phase: "harness",
           });
         } catch (err) {
           failures.push(`${axis}: scorer threw on repeat ${i + 1} — ${err}`);

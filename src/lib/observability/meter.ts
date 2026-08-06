@@ -34,10 +34,18 @@ export type ModelCallPhase =
   | "tts"
   /**
    * Spend the HARNESS made, not the engine: the soak's synthetic player, the
-   * exit gauge's classifier. Named because the alternatives both lie — the
-   * N=50 soak left 48 turn-less probe rows in "(unattributed)" (we knew
-   * exactly why they were spent), and a turn number would have filed a
-   * simulated player's typing as the cost of play.
+   * exit gauge's classifier, and the EVAL SUITES (M3R4 B3 — every live suite
+   * under evals/suites, which drive the real prompts to measure them). Named
+   * because the alternatives both lie — the N=50 soak left 48 turn-less probe
+   * rows in "(unattributed)" (we knew exactly why they were spent), and a turn
+   * number would have filed a simulated player's typing as the cost of play.
+   *
+   * The eval case is the sharper one: a suite's rows carry a THROWAWAY
+   * campaign's id, and `model_calls.campaign_id` is `on delete set null`, so
+   * they outlive the campaign the run deletes and keep polluting the global
+   * per-turn baseline forever. Every gauge asks the phase FIRST for exactly
+   * this reason (soak-lib `attributeSpend`, cache-gauge's phase table), so a
+   * suite may keep an informative turn number and still bucket honestly.
    */
   | "harness";
 

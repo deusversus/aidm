@@ -29,6 +29,9 @@ import type { Suite, SuiteResult } from "../types";
  * mid-campaign turns); the probe never classifies context-free in play.
  *
  * ~$0.01/run on Haiku; metered cost summed from model_calls and printed.
+ * Every call here carries `phase: "harness"` (M3R4 B3): a suite's spend is
+ * measurement, and `campaignId` is on-delete-set-null, so rows filed as "turn"
+ * outlive their throwaway campaign and pollute the global per-turn baseline.
  */
 
 const CHANNELS = new Set(["META_FEEDBACK", "OVERRIDE_COMMAND", "OP_COMMAND"]);
@@ -228,6 +231,12 @@ export const channelRouting: Suite = {
                 schema: IntentOutput,
                 campaignId,
                 turnNumber: i + 1,
+                // The turn number is kept for forensics (which specimen paid
+                // for which row); `phase` is what buckets, and this is a
+                // MEASUREMENT, not play. campaignId is on-delete-set-null, so
+                // without it these rows outlive the throwaway campaign below
+                // and inflate the global per-turn baseline forever (M3R4 B3).
+                phase: "harness",
                 system: INTENT_SYSTEM,
                 prompt: buildIntentPrompt({
                   worldFrame: frames[cs.frame],
@@ -278,7 +287,7 @@ export const channelRouting: Suite = {
       // ~25%-misroute input) must BOUNCE, and a real keyword-less override
       // must extract a standing restatement.
       const bounce = await probe(() =>
-        comprehendOverride(DEV_TIER_SELECTION, campaignId, 90, SPECIMEN),
+        comprehendOverride(DEV_TIER_SELECTION, campaignId, 90, SPECIMEN, "harness"),
       );
       details.push(
         `floor: specimen → contains_standing_rule=${bounce.contains_standing_rule} scope=${bounce.scope}`,
@@ -294,6 +303,7 @@ export const channelRouting: Suite = {
           campaignId,
           91,
           "From now on, keep combat scenes short and don't ever describe gore in detail.",
+          "harness",
         ),
       );
       details.push(
@@ -314,6 +324,7 @@ export const channelRouting: Suite = {
           campaignId,
           92,
           "New rule for you as narrator: my character's dreams are always prophetic.",
+          "harness",
         ),
       );
       details.push(

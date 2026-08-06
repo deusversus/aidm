@@ -719,6 +719,173 @@ describe.skipIf(!url)("Booth corrections channel (real Postgres, scripted models
     warn.mockRestore();
   });
 
+  // --- The ENTITY quote fallback gets the same floor (M3R4 B3) --------------
+  // Flagged at the M3R2 C4 fix and deliberately left: a hint that isn't a
+  // catalog NAME fell through to `rows.find(block contains hint)` — first match,
+  // no floor, no ORDER BY. Two dossiers containing the same stock phrase, or a
+  // three-character hint, could rewrite an arbitrary entity.
+
+  /** A second lived-in dossier that shares one line with Casimir's. */
+  async function seedSecondEntity(campaignId: string, name: string): Promise<string> {
+    if (!db) throw new Error("unreachable");
+    const block = [
+      "- A fence who never asks where a thing came from.",
+      "- Keeps a standing debt with the Ashen Circle.",
+    ].join("\n");
+    const [ent] = await db
+      .insert(schema.entities)
+      .values({
+        campaignId,
+        name,
+        entityType: "npc",
+        block,
+        turnId: 0,
+        provenance: "sz_resolution",
+        confidence: 1,
+      })
+      .returning({ id: schema.entities.id });
+    if (!ent) throw new Error("entity seed failed");
+    await db.insert(schema.entityVersions).values({
+      entityId: ent.id,
+      version: 1,
+      block,
+      turnId: 0,
+      provenance: "sz_resolution",
+      confidence: 1,
+    });
+    return ent.id;
+  }
+
+  it("entity quote: a UNIQUE dossier line binds, and rides in as the line being retired", async () => {
+    if (!db) throw new Error("unreachable");
+    const campaignId = await makeCampaign();
+    const ent = await seedEntity(campaignId);
+    await seedSecondEntity(campaignId, "Odile Vance");
+    scriptJudgment({ revise: { revised_block: REVISED_BLOCK } });
+
+    const outcome = await applyRecordCorrection(db, SELECTION, {
+      campaignId,
+      turnNumber: 21,
+      targetKind: "entity",
+      // Casimir's line and no one else's.
+      targetHint: "He fell at the siege of Duncairn.",
+      correctedContent: "Casimir Thoss survived the siege of Duncairn.",
+    });
+
+    expect(outcome.filed).toBe(true);
+    const [row] = await db.select().from(schema.entities).where(eq(schema.entities.id, ent));
+    expect(row?.block).toBe(REVISED_BLOCK);
+    const reviseCall = mockJudgment.mock.calls.find(
+      (c) => (c[1] as { name?: string })?.name === "block_revise",
+    );
+    expect(String((reviseCall?.[1] as { prompt?: string })?.prompt)).toContain(
+      "THE LINE BEING RETIRED",
+    );
+  });
+
+  it("entity quote: a line living in TWO dossiers files nothing — never the first row Postgres returns", async () => {
+    if (!db) throw new Error("unreachable");
+    const campaignId = await makeCampaign();
+    const ent = await seedEntity(campaignId);
+    const other = await seedSecondEntity(campaignId, "Odile Vance");
+    scriptJudgment({ revise: { revised_block: REVISED_BLOCK } });
+
+    const outcome = await applyRecordCorrection(db, SELECTION, {
+      campaignId,
+      turnNumber: 22,
+      targetKind: "entity",
+      // Both dossiers carry this line verbatim.
+      targetHint: "Keeps a standing debt with the Ashen Circle.",
+      correctedContent: "The debt to the Ashen Circle was settled years ago.",
+    });
+
+    expect(outcome.filed).toBe(false);
+    if (outcome.filed) throw new Error("unreachable");
+    expect(outcome.reason).toContain("matches 2 catalog dossiers");
+    expect(outcome.reason).toContain("quote the exact line as it stands");
+    // Neither dossier moved, and the revise was never paid for.
+    for (const id of [ent, other]) {
+      const [row] = await db.select().from(schema.entities).where(eq(schema.entities.id, id));
+      expect(row?.block).not.toBe(REVISED_BLOCK);
+      expect(await versionsFor(id)).toHaveLength(1);
+    }
+    expect(judgmentCalls("block_revise")).toBe(0);
+  });
+
+  it("entity quote: a hint matching NOTHING files nothing and says so", async () => {
+    if (!db) throw new Error("unreachable");
+    const campaignId = await makeCampaign();
+    const ent = await seedEntity(campaignId);
+    scriptJudgment({ revise: { revised_block: REVISED_BLOCK } });
+
+    const outcome = await applyRecordCorrection(db, SELECTION, {
+      campaignId,
+      turnNumber: 23,
+      targetKind: "entity",
+      targetHint: "She was crowned at the Winterfair.",
+      correctedContent: "Nothing of the sort ever happened.",
+    });
+
+    expect(outcome.filed).toBe(false);
+    if (outcome.filed) throw new Error("unreachable");
+    expect(outcome.reason).toContain("no catalog entity matches");
+    expect(await versionsFor(ent)).toHaveLength(1);
+    expect(judgmentCalls("block_revise")).toBe(0);
+  });
+
+  it("entity quote: a SHORT hint that is not a catalog name is refused on length alone", async () => {
+    if (!db) throw new Error("unreachable");
+    const campaignId = await makeCampaign();
+    const ent = await seedEntity(campaignId);
+    scriptJudgment({ revise: { revised_block: REVISED_BLOCK } });
+
+    const outcome = await applyRecordCorrection(db, SELECTION, {
+      campaignId,
+      turnNumber: 24,
+      targetKind: "entity",
+      targetHint: "the", // inside every dossier ever written
+      correctedContent: "Something else entirely.",
+    });
+
+    expect(outcome.filed).toBe(false);
+    if (outcome.filed) throw new Error("unreachable");
+    expect(outcome.reason).toContain("too short to name a record");
+    const [row] = await db.select().from(schema.entities).where(eq(schema.entities.id, ent));
+    expect(row?.block).toBe(SEEDED_BLOCK);
+    expect(judgmentCalls("block_revise")).toBe(0);
+  });
+
+  it("entity NAME binding keeps its exemption: a short catalog name still resolves", async () => {
+    if (!db) throw new Error("unreachable");
+    const campaignId = await makeCampaign();
+    const [ent] = await db
+      .insert(schema.entities)
+      .values({
+        campaignId,
+        name: "Jet",
+        entityType: "npc",
+        block: SEEDED_BLOCK,
+        turnId: 0,
+        provenance: "sz_resolution",
+        confidence: 1,
+      })
+      .returning({ id: schema.entities.id });
+    if (!ent) throw new Error("entity seed failed");
+    scriptJudgment({ revise: { revised_block: REVISED_BLOCK } });
+
+    const outcome = await applyRecordCorrection(db, SELECTION, {
+      campaignId,
+      turnNumber: 25,
+      targetKind: "entity",
+      targetHint: "Jet", // 3 chars — identity-key EQUALITY, never containment
+      correctedContent: "Jet survived the siege of Duncairn.",
+    });
+
+    expect(outcome.filed).toBe(true);
+    const [row] = await db.select().from(schema.entities).where(eq(schema.entities.id, ent.id));
+    expect(row?.block).toBe(REVISED_BLOCK);
+  });
+
   it("a degenerate hint is refused on length alone — it would have matched anything", async () => {
     if (!db) throw new Error("unreachable");
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});

@@ -19,8 +19,11 @@ import { mergeEntities } from "./merge";
  * protagonist connection" vs "Path-Crossing with Lloyd").
  *
  * Two-stage per §14 risk-6 discipline: an embedding candidate FILTER (cheap,
- * generous) feeds a "same entity?" probe that DECIDES. Above MERGE_AUTO the
- * pair merges automatically (provenance merge:janitor); in the suggest band
+ * generous) feeds a "same entity?" probe that DECIDES. The filter reads two
+ * vectors — the NAME, and (M3R4 B3) name + block head for the pairs whose
+ * wording shares nothing but whose meaning does. Above MERGE_AUTO the pair
+ * merges automatically, provenance naming the tier that offered it
+ * (merge:janitor / merge:janitor:semantic); in the suggest band
  * it becomes a MergeSuggestion for the player (player word owns ambiguity);
  * below, silence. Runs failure-isolated at session close beside the Sakkan
  * sample; the mint-time resolver reuses pairLikelySame for its guard.
@@ -28,6 +31,32 @@ import { mergeEntities } from "./merge";
 
 /** Cosine distance ceiling for the candidate filter — generous; the probe decides. */
 export const MERGE_CANDIDATE_MAX_DISTANCE = 0.35;
+/**
+ * The SEMANTIC candidate tier (the M2 C1 deferral, landed M3R4 B3). The
+ * verdict has always been semantic — `pairLikelySame` is a judged "same
+ * in-fiction entity?" call, prompted with the doctrine — but the FILTER in
+ * front of it embedded NAMES ALONE, so a pair that shares a meaning and no
+ * wording ("the Red Sash syndicate" / "the dockworkers' syndicate") was never
+ * offered to it. The second vector reads name + block head: what the entity IS,
+ * not only what it is called.
+ *
+ * It cannot cost anything the name tier was already spending. Name candidates
+ * keep their priority and their cheapest-first order; semantic ones fill only
+ * the probe budget the name tier LEFT OVER, so the review's ceiling is the same
+ * MERGE_MAX_PROBE_PAIRS it always was.
+ *
+ * THE NUMBER IS BORROWED AND KNOWN-PERMISSIVE (M3R4 B3 audit R2a). 0.35 was
+ * measured against the NAME tier's distance distribution; dossier-head vectors
+ * share a campaign's domain vocabulary, so their distances run systematically
+ * SMALLER and the same ceiling is, as a candidacy net, wider by construction.
+ * That is the intended posture and not a merge bar: this constant controls
+ * CANDIDATE VOLUME only, the PROBE decides, and every merge it leads to carries
+ * provenance and is rewindable. It stays untuned until a run measures it — the
+ * probe log below is what a soak reads to tune it from data.
+ */
+export const MERGE_SEMANTIC_MAX_DISTANCE = 0.35;
+/** Block head that joins the name in the semantic candidate vector. */
+const SEMANTIC_VECTOR_BLOCK_CHARS = 300;
 /** Probe confidence at/above which the janitor merges without asking. */
 export const MERGE_AUTO_CONFIDENCE = 0.9;
 /** Probe confidence at/above which an ambiguous pair is surfaced as a suggestion. */
@@ -191,14 +220,48 @@ export async function reviewCatalog(
     a: CatalogRow;
     b: CatalogRow;
     distance: number;
+    /** Which filter offered the pair — carried to the merge's provenance so a bad auto-merge is attributable. */
+    tier: "name" | "semantic";
   }
   const candidates: Candidate[] = [];
+  /** Pairs the NAME vector never brought forward, offered by meaning instead. */
+  const semantic: Candidate[] = [];
+  /** name + block head: what the entity IS, for the pairs its name hides. */
+  const meaningText = (e: CatalogRow) =>
+    `${e.name} — ${e.block.slice(0, SEMANTIC_VECTOR_BLOCK_CHARS).trim()}`.trim();
   for (const group of byType.values()) {
     if (group.length < 2) continue;
+    const embedOpts = {
+      inputType: "query" as const,
+      patience: "interactive" as const,
+      campaignId,
+      turnNumber,
+    };
     const embeddings = await embedTexts(
       group.map((e) => e.name),
-      { inputType: "query", patience: "interactive", campaignId, turnNumber },
+      embedOpts,
     );
+    // SEQUENCED, not concurrent (M3R4 B3 audit R1). Two reasons, both about
+    // the new tier costing the shipped one nothing:
+    //  · TPM — a 128-entity group's meaning texts run ~10K tokens, which is the
+    //    whole keyless-tier minute budget; firing it alongside the name request
+    //    burst-fails a pair the name filter alone would have handled. The
+    //    janitor is a background close-time actor with no latency to protect,
+    //    so the wait is free.
+    //  · ISOLATION — a rejection here used to reject the Promise.all, which
+    //    aborted reviewCatalog entirely and (via session.ts's catch) turned the
+    //    whole hygiene pass into a silent no-op. Degrade instead: an empty
+    //    vector list leaves every `meanings[i]` undefined, the loop below
+    //    already skips those, and the name tier reviews untouched.
+    const meanings = await embedTexts(group.map(meaningText), embedOpts).catch((err) => {
+      console.warn("[janitor] meaning embed failed — the NAME tier reviews alone this close", {
+        campaignId,
+        entityType: group[0]?.entityType,
+        groupSize: group.length,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return [] as number[][];
+    });
     for (let i = 0; i < group.length; i++) {
       const ei = embeddings[i];
       const gi = group[i];
@@ -208,16 +271,31 @@ export async function reviewCatalog(
         const gj = group[j];
         if (!ej || !gj) continue;
         const distance = 1 - cosineSimilarity(ei, ej);
-        if (distance < MERGE_CANDIDATE_MAX_DISTANCE) candidates.push({ a: gi, b: gj, distance });
+        if (distance < MERGE_CANDIDATE_MAX_DISTANCE) {
+          candidates.push({ a: gi, b: gj, distance, tier: "name" });
+          continue;
+        }
+        // Different names — ask whether they mean the same thing.
+        const mi = meanings[i];
+        const mj = meanings[j];
+        if (!mi || !mj) continue;
+        const meaningDistance = 1 - cosineSimilarity(mi, mj);
+        if (meaningDistance < MERGE_SEMANTIC_MAX_DISTANCE) {
+          semantic.push({ a: gi, b: gj, distance: meaningDistance, tier: "semantic" });
+        }
       }
     }
   }
 
   candidates.sort((p, q) => p.distance - q.distance);
-  const toProbe = candidates.slice(0, MERGE_MAX_PROBE_PAIRS);
-  if (candidates.length > MERGE_MAX_PROBE_PAIRS) {
+  semantic.sort((p, q) => p.distance - q.distance);
+  // Name candidates first, always: the semantic tier claims leftover budget and
+  // never displaces a pair the shipped filter already found.
+  const ranked = [...candidates, ...semantic];
+  const toProbe = ranked.slice(0, MERGE_MAX_PROBE_PAIRS);
+  if (ranked.length > MERGE_MAX_PROBE_PAIRS) {
     console.warn(
-      `[janitor] ${candidates.length} merge candidates exceed the ${MERGE_MAX_PROBE_PAIRS}-probe cap — reviewing the ${MERGE_MAX_PROBE_PAIRS} nearest, ${candidates.length - MERGE_MAX_PROBE_PAIRS} deferred to next close`,
+      `[janitor] ${ranked.length} merge candidates (${candidates.length} by name, ${semantic.length} by meaning) exceed the ${MERGE_MAX_PROBE_PAIRS}-probe cap — reviewing the ${MERGE_MAX_PROBE_PAIRS} nearest, ${ranked.length - MERGE_MAX_PROBE_PAIRS} deferred to next close`,
     );
   }
 
@@ -234,6 +312,23 @@ export async function reviewCatalog(
       a: { id: cand.a.id, name: cand.a.name, entityType: cand.a.entityType, block: cand.a.block },
       b: { name: cand.b.name, block: cand.b.block },
     });
+    // MEASUREMENT, not a fault (M3R4 B3 audit R2b) — on the janitor's only
+    // logging channel so a soak captures it beside the rest. The semantic
+    // tier's ceiling was set by borrowing the name tier's number; these lines
+    // are the distance/verdict distribution that lets the next soak TUNE it,
+    // rather than the constant staying a vibe forever.
+    if (cand.tier === "semantic") {
+      console.warn("[janitor] semantic-tier pair probed (threshold measurement)", {
+        campaignId,
+        turnNumber,
+        entityType: cand.a.entityType,
+        a: cand.a.name,
+        b: cand.b.name,
+        meaningDistance: Number(cand.distance.toFixed(4)),
+        same: verdict.same,
+        confidence: verdict.confidence,
+      });
+    }
     if (!verdict.same) continue;
 
     const { survivor, dupe } = chooseSurvivor(cand.a, cand.b);
@@ -242,7 +337,11 @@ export async function reviewCatalog(
         campaignId,
         survivorId: survivor.id,
         dupeId: dupe.id,
-        provenance: "merge:janitor",
+        // ATTRIBUTION (M3R4 B3 audit R2c): "merge:janitor" alone could not tell
+        // a name-tier merge from a semantic-tier one, so a bad auto-merge from
+        // the permissive new filter was indistinguishable in the record from
+        // one the shipped filter made. The tier rides the provenance envelope.
+        provenance: cand.tier === "semantic" ? "merge:janitor:semantic" : "merge:janitor",
         turnId: turnNumber,
       });
       consumed.add(dupe.id);

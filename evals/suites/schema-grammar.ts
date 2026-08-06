@@ -213,6 +213,10 @@ export const schemaGrammar: Suite = {
           schema,
           campaignId: campaignId as string,
           turnNumber: 1,
+          // The canary is measurement: `phase` buckets it, the turn number stays
+          // for forensics (M3R4 B3 — campaignId is on-delete-set-null, so a
+          // "turn" row here outlives its throwaway campaign forever).
+          phase: "harness",
           maxTokens: 700,
           system: "Grammar canary. Emit a minimal valid object; empty arrays, empty strings.",
           prompt: "Emit the minimal object.",
@@ -236,6 +240,7 @@ export const schemaGrammar: Suite = {
           tools: KA_TOOLS,
           campaignId: campaignId as string,
           turnNumber: 1,
+          phase: "harness",
         });
         await run.done();
         record("KA_TOOLS (strict tool shape)", tag, "pass");
