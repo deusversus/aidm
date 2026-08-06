@@ -33,6 +33,7 @@
     "grounding:check": "tsx scripts/grounding-check.ts",
     "research": "tsx --env-file=.env.local scripts/research.ts",
     "soak": "tsx --env-file=.env.local scripts/soak.ts",
+    "ab-effort": "tsx --env-file=.env.local scripts/ab-effort.ts",
     "langfuse:latest": "tsx --env-file=.env.local scripts/langfuse-latest.ts",
     "env:parity": "tsx --env-file=.env.local scripts/env-parity.ts",
     "drift-soak": "tsx --env-file=.env.local scripts/drift-soak.ts"
