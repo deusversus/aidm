@@ -2,7 +2,7 @@ import type { Db } from "@/lib/db";
 import { callProbe, streamNarration } from "@/lib/llm/calls";
 import { Conte } from "@/lib/types/conte";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { TRAILER_DEMAND, runKeyAnimator } from "../ka";
+import { TRAILER_DEMAND, TRAILER_FORCE, runKeyAnimator } from "../ka";
 import { KA_TOOLS } from "../tools";
 
 /**
@@ -164,12 +164,40 @@ describe("the trailer ladder (§5.7)", () => {
     expect(secondPayload[1]?.role).toBe("assistant");
     expect(secondPayload[2]?.role).toBe("user");
     expect(secondPayload[2]?.content).toBe(TRAILER_DEMAND);
-    // No prose is wanted, so the trailer is demanded outright.
-    expect(second?.toolChoice).toEqual({ type: "tool", name: "commit_scene" });
+    // The ASK carries the scene round's own posture — no forced tool_choice.
+    // Posture rides the MESSAGES cache key and Block 3 lives in messages
+    // (M3R2 C2), so forcing here re-wrote the whole window (M3R4; see
+    // TRAILER_POSTURES). The demand still exists — it just goes second.
+    expect(second?.toolChoice).toBeUndefined();
     // The tool array and the effort stay the KA's — both ride the cache key.
     expect(JSON.stringify(second?.tools)).toBe(JSON.stringify(KA_TOOLS));
     expect(second?.effort).toBe("high");
     expect(JSON.stringify(second?.system)).toBe(JSON.stringify(kaArgs().system));
+  });
+
+  it("the ask lands nothing → the forced demand runs, on the SAME conversation", async () => {
+    let round = 0;
+    const sent: unknown[][] = [];
+    mockStream.mockImplementation((opts: { messages: unknown[] }) => {
+      sent.push(JSON.parse(JSON.stringify(opts.messages)));
+      round += 1;
+      // 1: the scene, no trailer. 2: the warm ask, still no trailer. 3: forced.
+      return round <= 2 ? proseOnly() : kaRound([commitBlock("t3")], "tool_use");
+    });
+
+    const result = await runKeyAnimator(noDb, kaArgs());
+
+    expect(mockStream).toHaveBeenCalledTimes(3);
+    expect(mockProbe).not.toHaveBeenCalled();
+    expect(result.trailerSource).toBe("continuation");
+    expect(result.sidecar).toEqual(SIDECAR);
+    // The escalation is the ONLY difference: same messages, forced posture.
+    expect(mockStream.mock.calls[1]?.[0]?.toolChoice).toBeUndefined();
+    expect(mockStream.mock.calls[2]?.[0]?.toolChoice).toEqual(TRAILER_FORCE);
+    expect(JSON.stringify(sent[2])).toBe(JSON.stringify(sent[1]));
+    // The ask's unusable answer is never appended — no orphaned tool_use, and
+    // the demand replays a conversation the API has already accepted once.
+    expect(result.prose).toBe("The tray went up at 20:11.");
   });
 
   it("cap exhaustion: the continuation never replays an already-answered turn", async () => {
@@ -224,7 +252,8 @@ describe("the trailer ladder (§5.7)", () => {
 
     const result = await runKeyAnimator(noDb, kaArgs());
 
-    expect(mockStream).toHaveBeenCalledTimes(2);
+    // The scene, the warm ask, the forced demand — then the net.
+    expect(mockStream).toHaveBeenCalledTimes(3);
     expect(mockProbe).toHaveBeenCalledTimes(1);
     expect(result.trailerSource).toBe("probe");
     expect(result.trailerFallback).toBe(true);

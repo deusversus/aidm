@@ -1,0 +1,2748 @@
+
+> aidm@0.0.1 soak C:\Users\admin\Downloads\aidm_v4
+> tsx --env-file=.env.local scripts/soak.ts "--" "--turns=50"
+
+=== PRICE ESTIMATE — 50 turns at DEV tiers ===
+narration claude-sonnet-5 · judgment claude-haiku-4-5 · probe claude-haiku-4-5
+tier mix (measured, 54 pooled soak turns): douga 4% (warm $0.1206 / cold $0.2745) · genga 68% (warm $0.1341 / cold $0.2880) · sakuga 28% (warm $0.3066 / cold $0.5460)
+non-narration per turn (measured, M2): $0.0490
+cache: 44 warm turn(s) · 6 cold (2 sitting open(s) + 4 compaction reset(s))
+  all-warm floor      $11.6798
+  EXPECTED            $12.7468
+  all-cold ceiling    $20.5718
+  (of which session composers: $0.1368 over 2 sitting(s))
+the model carries §10.8's p95 thinking allowances — a deliberate OVER-model
+(budget-assertions.ts); the M2 record's measured mean was $0.33/turn at a
+sakuga-heavy mix on pre-M2R5 caching. Treat floor..EXPECTED as the band.
+
+SPEND IS GATED BY THE USER: this run is not authorized until the user approves
+this number. `--dry-run` is the only unattended execution (zero model calls).
+
+[soak] LIVE run · campaign 439ad090-2bc2-4c39-afda-103e2b952ddb
+[soak] pilot session opened (session 1, pilot=true)
+[sidecar] commit_scene over its emission ceiling — clamped, scene kept { source: 'native', over: [ 'notable_beats=6' ] }
+[sidecar] commit_scene over its emission ceiling — clamped, scene kept { source: 'native', over: [ 'notable_beats=6' ] }
+[soak] step 1 · turn 1 · genga · complete · narration $0.1185 · ttft 102228ms
+[ka] commit_scene trailer missing — asking once more {
+  campaignId: '439ad090-2bc2-4c39-afda-103e2b952ddb',
+  turnNumber: 2,
+  stopReason: 'end_turn'
+}
+[sidecar] commit_scene over its emission ceiling — clamped, scene kept { source: 'native', over: [ 'notable_beats=4' ] }
+[sidecar] commit_scene over its emission ceiling — clamped, scene kept { source: 'native', over: [ 'notable_beats=4' ] }
+[soak] step 2 · turn 2 · douga · complete · narration $0.0916 · ttft 36506ms
+[sidecar] commit_scene over its emission ceiling — clamped, scene kept { source: 'native', over: [ 'notable_beats=4' ] }
+[sidecar] commit_scene over its emission ceiling — clamped, scene kept { source: 'native', over: [ 'notable_beats=4' ] }
+[soak] step 3 · turn 3 · douga · complete · narration $0.0522 · ttft 24153ms
+[ka] commit_scene trailer missing — asking once more {
+  campaignId: '439ad090-2bc2-4c39-afda-103e2b952ddb',
+  turnNumber: 4,
+  stopReason: 'end_turn'
+}
+[sidecar] commit_scene over its emission ceiling — clamped, scene kept { source: 'native', over: [ 'notable_beats=5' ] }
+[sidecar] commit_scene over its emission ceiling — clamped, scene kept { source: 'native', over: [ 'notable_beats=5' ] }
+[soak] step 4 · turn 4 · douga · complete · narration $0.0939 · ttft 36187ms
+[sidecar] commit_scene over its emission ceiling — clamped, scene kept { source: 'native', over: [ 'notable_beats=4' ] }
+[sidecar] commit_scene over its emission ceiling — clamped, scene kept { source: 'native', over: [ 'notable_beats=4' ] }
+[soak] step 5 · turn 5 · genga · complete · narration $0.1008 · ttft 55856ms
+[sidecar] commit_scene over its emission ceiling — clamped, scene kept { source: 'native', over: [ 'notable_beats=4' ] }
+[sidecar] commit_scene over its emission ceiling — clamped, scene kept { source: 'native', over: [ 'notable_beats=4' ] }
+[director] seed adjudication failed (turn 6) — batch skipped: AnthropicError: Failed to parse structured output: Error: Failed to parse structured output: [
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      0,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      1,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      2,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      3,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      4,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  }
+]
+Validation issues:
+  - verdicts.0.verdict: Invalid option: expected one of "mention"|"payoff"|"conflict"|"extend"|"none"
+  - verdicts.1.verdict: Invalid option: expected one of "mention"|"payoff"|"conflict"|"extend"|"none"
+  - verdicts.2.verdict: Invalid option: expected one of "mention"|"payoff"|"conflict"|"extend"|"none"
+  - verdicts.3.verdict: Invalid option: expected one of "mention"|"payoff"|"conflict"|"extend"|"none"
+  - verdicts.4.verdict: Invalid option: expected one of "mention"|"payoff"|"conflict"|"extend"|"none"
+    at parseOutputFormat (C:\Users\admin\Downloads\aidm_v4\node_modules\.pnpm\@anthropic-ai+sdk@0.90.0_zod@4.3.6\node_modules\@anthropic-ai\sdk\src\lib\parser.ts:123:11)
+    at <anonymous> (C:\Users\admin\Downloads\aidm_v4\node_modules\.pnpm\@anthropic-ai+sdk@0.90.0_zod@4.3.6\node_modules\@anthropic-ai\sdk\src\lib\parser.ts:84:30)
+    at Array.map (<anonymous>)
+    at parseMessage (C:\Users\admin\Downloads\aidm_v4\node_modules\.pnpm\@anthropic-ai+sdk@0.90.0_zod@4.3.6\node_modules\@anthropic-ai\sdk\src\lib\parser.ts:81:102)
+    at maybeParseMessage (C:\Users\admin\Downloads\aidm_v4\node_modules\.pnpm\@anthropic-ai+sdk@0.90.0_zod@4.3.6\node_modules\@anthropic-ai\sdk\src\lib\parser.ts:71:10)
+    at MessageStream._MessageStream_addStreamEvent (C:\Users\admin\Downloads\aidm_v4\node_modules\.pnpm\@anthropic-ai+sdk@0.90.0_zod@4.3.6\node_modules\@anthropic-ai\sdk\src\lib\MessageStream.ts:497:26)
+    at MessageStream._createMessage (C:\Users\admin\Downloads\aidm_v4\node_modules\.pnpm\@anthropic-ai+sdk@0.90.0_zod@4.3.6\node_modules\@anthropic-ai\sdk\src\lib\MessageStream.ts:209:29)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+[director] episode_close with blank required text — dropped { campaignId: '439ad090-2bc2-4c39-afda-103e2b952ddb' }
+[soak] step 6 · turn 6 · douga · complete · narration $0.0769 · ttft 36345ms
+[sidecar] commit_scene over its emission ceiling — clamped, scene kept { source: 'native', over: [ 'notable_beats=4' ] }
+[sidecar] commit_scene over its emission ceiling — clamped, scene kept { source: 'native', over: [ 'notable_beats=4' ] }
+[soak] step 7 · turn 7 · genga · complete · narration $0.1109 · ttft 56496ms
+[scale] dropped unknown context modifier kind "tactical" (Module 12)
+[scale] dropped unknown context modifier kind "ensemble" (Module 12)
+[ka] commit_scene trailer missing — asking once more {
+  campaignId: '439ad090-2bc2-4c39-afda-103e2b952ddb',
+  turnNumber: 8,
+  stopReason: 'end_turn'
+}
+[sidecar] commit_scene over its emission ceiling — clamped, scene kept { source: 'native', over: [ 'notable_beats=4' ] }
+[sidecar] commit_scene over its emission ceiling — clamped, scene kept { source: 'native', over: [ 'notable_beats=4' ] }
+[soak] step 8 · turn 8 · sakuga · complete · narration $0.2241 · ttft 110198ms · FAIL(1)
+[soak] pinned a passage from turn 8
+[sidecar] commit_scene over its emission ceiling — clamped, scene kept { source: 'native', over: [ 'notable_beats=4' ] }
+[sidecar] commit_scene over its emission ceiling — clamped, scene kept { source: 'native', over: [ 'notable_beats=4' ] }
+[director] seed adjudication failed (turn 9) — batch skipped: AnthropicError: Failed to parse structured output: Error: Failed to parse structured output: [
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      0,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      1,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      2,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      3,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      4,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      5,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      6,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  }
+]
+Validation issues:
+  - verdicts.0.verdict: Invalid option: expected one of "mention"|"payoff"|"conflict"|"extend"|"none"
+  - verdicts.1.verdict: Invalid option: expected one of "mention"|"payoff"|"conflict"|"extend"|"none"
+  - verdicts.2.verdict: Invalid option: expected one of "mention"|"payoff"|"conflict"|"extend"|"none"
+  - verdicts.3.verdict: Invalid option: expected one of "mention"|"payoff"|"conflict"|"extend"|"none"
+  - verdicts.4.verdict: Invalid option: expected one of "mention"|"payoff"|"conflict"|"extend"|"none"
+  ... and 2 more issue(s)
+    at parseOutputFormat (C:\Users\admin\Downloads\aidm_v4\node_modules\.pnpm\@anthropic-ai+sdk@0.90.0_zod@4.3.6\node_modules\@anthropic-ai\sdk\src\lib\parser.ts:123:11)
+    at <anonymous> (C:\Users\admin\Downloads\aidm_v4\node_modules\.pnpm\@anthropic-ai+sdk@0.90.0_zod@4.3.6\node_modules\@anthropic-ai\sdk\src\lib\parser.ts:84:30)
+    at Array.map (<anonymous>)
+    at parseMessage (C:\Users\admin\Downloads\aidm_v4\node_modules\.pnpm\@anthropic-ai+sdk@0.90.0_zod@4.3.6\node_modules\@anthropic-ai\sdk\src\lib\parser.ts:81:102)
+    at maybeParseMessage (C:\Users\admin\Downloads\aidm_v4\node_modules\.pnpm\@anthropic-ai+sdk@0.90.0_zod@4.3.6\node_modules\@anthropic-ai\sdk\src\lib\parser.ts:71:10)
+    at MessageStream._MessageStream_addStreamEvent (C:\Users\admin\Downloads\aidm_v4\node_modules\.pnpm\@anthropic-ai+sdk@0.90.0_zod@4.3.6\node_modules\@anthropic-ai\sdk\src\lib\MessageStream.ts:497:26)
+    at MessageStream._createMessage (C:\Users\admin\Downloads\aidm_v4\node_modules\.pnpm\@anthropic-ai+sdk@0.90.0_zod@4.3.6\node_modules\@anthropic-ai\sdk\src\lib\MessageStream.ts:209:29)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+[director] episode_close with blank required text — dropped { campaignId: '439ad090-2bc2-4c39-afda-103e2b952ddb' }
+[soak] step 9 · turn 9 · sakuga · complete · narration $0.0791 · ttft 44336ms
+[sidecar] commit_scene over its emission ceiling — clamped, scene kept { source: 'native', over: [ 'notable_beats=4' ] }
+[sidecar] commit_scene over its emission ceiling — clamped, scene kept { source: 'native', over: [ 'notable_beats=4' ] }
+[soak] step 10 · turn 10 · genga · complete · narration $0.0739 · ttft 38514ms
+[sidecar] commit_scene over its emission ceiling — clamped, scene kept { source: 'native', over: [ 'notable_beats=4' ] }
+[sidecar] commit_scene over its emission ceiling — clamped, scene kept { source: 'native', over: [ 'notable_beats=4' ] }
+[soak] step 11 · turn 11 · genga · complete · narration $0.0887 · ttft 59198ms
+[sidecar] commit_scene over its emission ceiling — clamped, scene kept { source: 'native', over: [ 'notable_beats=4' ] }
+[sidecar] commit_scene over its emission ceiling — clamped, scene kept { source: 'native', over: [ 'notable_beats=4' ] }
+[director] episode_close with blank required text — dropped { campaignId: '439ad090-2bc2-4c39-afda-103e2b952ddb' }
+[session] taste note over budget — dropped, memo kept {
+  campaignId: '439ad090-2bc2-4c39-afda-103e2b952ddb',
+  length: 251,
+  limit: 240
+}
+[soak] step 12 · turn 12 · douga · complete · narration $0.1629 · ttft 102831ms
+[soak] step 13 · turn 13 · genga · channel · narration $0.0000 · ttft —ms
+[soak] step 14 · turn 14 · sakuga · complete · narration $0.0865 · ttft 59476ms
+[soak] step 15 · turn 15 · genga · channel · narration $0.0218 · ttft 8048ms
+[ka] commit_scene trailer missing — asking once more {
+  campaignId: '439ad090-2bc2-4c39-afda-103e2b952ddb',
+  turnNumber: 16,
+  stopReason: 'end_turn'
+}
+[sidecar] commit_scene over its emission ceiling — clamped, scene kept { source: 'native', over: [ 'notable_beats=4' ] }
+[sidecar] commit_scene over its emission ceiling — clamped, scene kept { source: 'native', over: [ 'notable_beats=4' ] }
+[director] episode_close with blank required text — dropped { campaignId: '439ad090-2bc2-4c39-afda-103e2b952ddb' }
+[soak] step 16 · turn 16 · douga · complete · narration $0.1468 · ttft 30449ms · FAIL(1)
+[layout] degrade ladder fired: skip_validation_retry at 8745ms (turn 17)
+[ka] commit_scene trailer missing — asking once more {
+  campaignId: '439ad090-2bc2-4c39-afda-103e2b952ddb',
+  turnNumber: 17,
+  stopReason: 'end_turn'
+}
+[sidecar] commit_scene over its emission ceiling — clamped, scene kept { source: 'native', over: [ 'notable_beats=4' ] }
+[sidecar] commit_scene over its emission ceiling — clamped, scene kept { source: 'native', over: [ 'notable_beats=4' ] }
+[soak] step 17 · turn 17 · douga · complete · narration $0.2514 · ttft 141316ms
+[ka] commit_scene trailer missing — asking once more {
+  campaignId: '439ad090-2bc2-4c39-afda-103e2b952ddb',
+  turnNumber: 18,
+  stopReason: 'end_turn'
+}
+[sidecar] commit_scene over its emission ceiling — clamped, scene kept { source: 'native', over: [ 'notable_beats=4' ] }
+[sidecar] commit_scene over its emission ceiling — clamped, scene kept { source: 'native', over: [ 'notable_beats=4' ] }
+[soak] step 18 · turn 18 · genga · complete · narration $0.1100 · ttft 49601ms
+[ka] commit_scene trailer missing — asking once more {
+  campaignId: '439ad090-2bc2-4c39-afda-103e2b952ddb',
+  turnNumber: 19,
+  stopReason: 'end_turn'
+}
+[director] seed adjudication failed (turn 19) — batch skipped: AnthropicError: Failed to parse structured output: Error: Failed to parse structured output: [
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      0,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      1,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      2,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      3,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      4,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      5,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      6,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      7,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      8,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      9,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      10,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  }
+]
+Validation issues:
+  - verdicts.0.verdict: Invalid option: expected one of "mention"|"payoff"|"conflict"|"extend"|"none"
+  - verdicts.1.verdict: Invalid option: expected one of "mention"|"payoff"|"conflict"|"extend"|"none"
+  - verdicts.2.verdict: Invalid option: expected one of "mention"|"payoff"|"conflict"|"extend"|"none"
+  - verdicts.3.verdict: Invalid option: expected one of "mention"|"payoff"|"conflict"|"extend"|"none"
+  - verdicts.4.verdict: Invalid option: expected one of "mention"|"payoff"|"conflict"|"extend"|"none"
+  ... and 6 more issue(s)
+    at parseOutputFormat (C:\Users\admin\Downloads\aidm_v4\node_modules\.pnpm\@anthropic-ai+sdk@0.90.0_zod@4.3.6\node_modules\@anthropic-ai\sdk\src\lib\parser.ts:123:11)
+    at <anonymous> (C:\Users\admin\Downloads\aidm_v4\node_modules\.pnpm\@anthropic-ai+sdk@0.90.0_zod@4.3.6\node_modules\@anthropic-ai\sdk\src\lib\parser.ts:84:30)
+    at Array.map (<anonymous>)
+    at parseMessage (C:\Users\admin\Downloads\aidm_v4\node_modules\.pnpm\@anthropic-ai+sdk@0.90.0_zod@4.3.6\node_modules\@anthropic-ai\sdk\src\lib\parser.ts:81:102)
+    at maybeParseMessage (C:\Users\admin\Downloads\aidm_v4\node_modules\.pnpm\@anthropic-ai+sdk@0.90.0_zod@4.3.6\node_modules\@anthropic-ai\sdk\src\lib\parser.ts:71:10)
+    at MessageStream._MessageStream_addStreamEvent (C:\Users\admin\Downloads\aidm_v4\node_modules\.pnpm\@anthropic-ai+sdk@0.90.0_zod@4.3.6\node_modules\@anthropic-ai\sdk\src\lib\MessageStream.ts:497:26)
+    at MessageStream._createMessage (C:\Users\admin\Downloads\aidm_v4\node_modules\.pnpm\@anthropic-ai+sdk@0.90.0_zod@4.3.6\node_modules\@anthropic-ai\sdk\src\lib\MessageStream.ts:209:29)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+[director] episode_close with blank required text — dropped { campaignId: '439ad090-2bc2-4c39-afda-103e2b952ddb' }
+[director] evolution_proposal emitted with no open season gate — dropped { campaignId: '439ad090-2bc2-4c39-afda-103e2b952ddb', turnNumber: 19 }
+[soak] step 19 · turn 19 · douga · complete · narration $0.1081 · ttft 34114ms
+[soak] step 20 · turn 20 · douga · complete · narration $0.0711 · ttft 34336ms
+[sidecar] commit_scene over its emission ceiling — clamped, scene kept { source: 'native', over: [ 'notable_beats=4' ] }
+[sidecar] commit_scene over its emission ceiling — clamped, scene kept { source: 'native', over: [ 'notable_beats=4' ] }
+[soak] step 21 · turn 21 · sakuga · complete · narration $0.1267 · ttft 85914ms
+[director] seed adjudication failed (turn 22) — batch skipped: AnthropicError: Failed to parse structured output: Error: Failed to parse structured output: [
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      0,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      1,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      2,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      3,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      4,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      5,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      6,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      7,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      8,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      9,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      10,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      11,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  }
+]
+Validation issues:
+  - verdicts.0.verdict: Invalid option: expected one of "mention"|"payoff"|"conflict"|"extend"|"none"
+  - verdicts.1.verdict: Invalid option: expected one of "mention"|"payoff"|"conflict"|"extend"|"none"
+  - verdicts.2.verdict: Invalid option: expected one of "mention"|"payoff"|"conflict"|"extend"|"none"
+  - verdicts.3.verdict: Invalid option: expected one of "mention"|"payoff"|"conflict"|"extend"|"none"
+  - verdicts.4.verdict: Invalid option: expected one of "mention"|"payoff"|"conflict"|"extend"|"none"
+  ... and 7 more issue(s)
+    at parseOutputFormat (C:\Users\admin\Downloads\aidm_v4\node_modules\.pnpm\@anthropic-ai+sdk@0.90.0_zod@4.3.6\node_modules\@anthropic-ai\sdk\src\lib\parser.ts:123:11)
+    at <anonymous> (C:\Users\admin\Downloads\aidm_v4\node_modules\.pnpm\@anthropic-ai+sdk@0.90.0_zod@4.3.6\node_modules\@anthropic-ai\sdk\src\lib\parser.ts:84:30)
+    at Array.map (<anonymous>)
+    at parseMessage (C:\Users\admin\Downloads\aidm_v4\node_modules\.pnpm\@anthropic-ai+sdk@0.90.0_zod@4.3.6\node_modules\@anthropic-ai\sdk\src\lib\parser.ts:81:102)
+    at maybeParseMessage (C:\Users\admin\Downloads\aidm_v4\node_modules\.pnpm\@anthropic-ai+sdk@0.90.0_zod@4.3.6\node_modules\@anthropic-ai\sdk\src\lib\parser.ts:71:10)
+    at MessageStream._MessageStream_addStreamEvent (C:\Users\admin\Downloads\aidm_v4\node_modules\.pnpm\@anthropic-ai+sdk@0.90.0_zod@4.3.6\node_modules\@anthropic-ai\sdk\src\lib\MessageStream.ts:497:26)
+    at MessageStream._createMessage (C:\Users\admin\Downloads\aidm_v4\node_modules\.pnpm\@anthropic-ai+sdk@0.90.0_zod@4.3.6\node_modules\@anthropic-ai\sdk\src\lib\MessageStream.ts:209:29)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+[soak] step 22 · turn 22 · sakuga · complete · narration $0.0938 · ttft 68270ms
+[ka] commit_scene trailer missing — asking once more {
+  campaignId: '439ad090-2bc2-4c39-afda-103e2b952ddb',
+  turnNumber: 23,
+  stopReason: 'end_turn'
+}
+[sidecar] commit_scene over its emission ceiling — clamped, scene kept { source: 'native', over: [ 'notable_beats=4' ] }
+[sidecar] commit_scene over its emission ceiling — clamped, scene kept { source: 'native', over: [ 'notable_beats=4' ] }
+[soak] step 23 · turn 23 · genga · complete · narration $0.2104 · ttft 84267ms
+[ka] commit_scene trailer missing — asking once more {
+  campaignId: '439ad090-2bc2-4c39-afda-103e2b952ddb',
+  turnNumber: 24,
+  stopReason: 'end_turn'
+}
+[sidecar] commit_scene over its emission ceiling — clamped, scene kept { source: 'native', over: [ 'notable_beats=4' ] }
+[sidecar] commit_scene over its emission ceiling — clamped, scene kept { source: 'native', over: [ 'notable_beats=4' ] }
+[session] taste note over budget — dropped, memo kept {
+  campaignId: '439ad090-2bc2-4c39-afda-103e2b952ddb',
+  length: 273,
+  limit: 240
+}
+[soak] step 24 · turn 24 · genga · complete · narration $0.3431 · ttft 89409ms · FAIL(2)
+[ka] commit_scene trailer missing — asking once more {
+  campaignId: '439ad090-2bc2-4c39-afda-103e2b952ddb',
+  turnNumber: 25,
+  stopReason: 'end_turn'
+}
+[sidecar] commit_scene over its emission ceiling — clamped, scene kept { source: 'native', over: [ 'notable_beats=4' ] }
+[sidecar] commit_scene over its emission ceiling — clamped, scene kept { source: 'native', over: [ 'notable_beats=4' ] }
+[director] episode_close with blank required text — dropped { campaignId: '439ad090-2bc2-4c39-afda-103e2b952ddb' }
+[director] evolution_proposal emitted with no open season gate — dropped { campaignId: '439ad090-2bc2-4c39-afda-103e2b952ddb', turnNumber: 25 }
+[soak] step 25 · turn 25 · sakuga · complete · narration $0.1734 · ttft 82597ms
+[soak] midpoint: session closed (yokoku yes) → reopened (recap no)
+[soak] no open sitting before this turn — opening one
+[director] seed adjudication failed (turn 25) — batch skipped: AnthropicError: Failed to parse structured output: Error: Failed to parse structured output: [
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      0,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      1,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      2,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      3,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      4,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      5,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      6,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      7,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  }
+]
+Validation issues:
+  - verdicts.0.verdict: Invalid option: expected one of "mention"|"payoff"|"conflict"|"extend"|"none"
+  - verdicts.1.verdict: Invalid option: expected one of "mention"|"payoff"|"conflict"|"extend"|"none"
+  - verdicts.2.verdict: Invalid option: expected one of "mention"|"payoff"|"conflict"|"extend"|"none"
+  - verdicts.3.verdict: Invalid option: expected one of "mention"|"payoff"|"conflict"|"extend"|"none"
+  - verdicts.4.verdict: Invalid option: expected one of "mention"|"payoff"|"conflict"|"extend"|"none"
+  ... and 3 more issue(s)
+    at parseOutputFormat (C:\Users\admin\Downloads\aidm_v4\node_modules\.pnpm\@anthropic-ai+sdk@0.90.0_zod@4.3.6\node_modules\@anthropic-ai\sdk\src\lib\parser.ts:123:11)
+    at <anonymous> (C:\Users\admin\Downloads\aidm_v4\node_modules\.pnpm\@anthropic-ai+sdk@0.90.0_zod@4.3.6\node_modules\@anthropic-ai\sdk\src\lib\parser.ts:84:30)
+    at Array.map (<anonymous>)
+    at parseMessage (C:\Users\admin\Downloads\aidm_v4\node_modules\.pnpm\@anthropic-ai+sdk@0.90.0_zod@4.3.6\node_modules\@anthropic-ai\sdk\src\lib\parser.ts:81:102)
+    at maybeParseMessage (C:\Users\admin\Downloads\aidm_v4\node_modules\.pnpm\@anthropic-ai+sdk@0.90.0_zod@4.3.6\node_modules\@anthropic-ai\sdk\src\lib\parser.ts:71:10)
+    at MessageStream._MessageStream_addStreamEvent (C:\Users\admin\Downloads\aidm_v4\node_modules\.pnpm\@anthropic-ai+sdk@0.90.0_zod@4.3.6\node_modules\@anthropic-ai\sdk\src\lib\MessageStream.ts:497:26)
+    at MessageStream._createMessage (C:\Users\admin\Downloads\aidm_v4\node_modules\.pnpm\@anthropic-ai+sdk@0.90.0_zod@4.3.6\node_modules\@anthropic-ai\sdk\src\lib\MessageStream.ts:209:29)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+[soak] sitting 2 opened mid-run (coverage guard)
+[ka] commit_scene trailer missing — asking once more {
+  campaignId: '439ad090-2bc2-4c39-afda-103e2b952ddb',
+  turnNumber: 26,
+  stopReason: 'end_turn'
+}
+[soak] step 26 · turn 26 · genga · complete · narration $0.1658 · ttft 14746ms · FAIL(1)
+[sidecar] commit_scene over its emission ceiling — clamped, scene kept { source: 'native', over: [ 'notable_beats=4' ] }
+[sidecar] commit_scene over its emission ceiling — clamped, scene kept { source: 'native', over: [ 'notable_beats=4' ] }
+[soak] step 27 · turn 27 · sakuga · complete · narration $0.1315 · ttft 87390ms
+[ka] commit_scene trailer missing — asking once more {
+  campaignId: '439ad090-2bc2-4c39-afda-103e2b952ddb',
+  turnNumber: 28,
+  stopReason: 'end_turn'
+}
+[sidecar] commit_scene over its emission ceiling — clamped, scene kept { source: 'native', over: [ 'notable_beats=4' ] }
+[sidecar] commit_scene over its emission ceiling — clamped, scene kept { source: 'native', over: [ 'notable_beats=4' ] }
+[director] seed adjudication failed (turn 28) — batch skipped: AnthropicError: Failed to parse structured output: Error: Failed to parse structured output: [
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      0,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      1,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      2,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      3,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      4,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      5,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      6,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      7,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      8,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      9,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  }
+]
+Validation issues:
+  - verdicts.0.verdict: Invalid option: expected one of "mention"|"payoff"|"conflict"|"extend"|"none"
+  - verdicts.1.verdict: Invalid option: expected one of "mention"|"payoff"|"conflict"|"extend"|"none"
+  - verdicts.2.verdict: Invalid option: expected one of "mention"|"payoff"|"conflict"|"extend"|"none"
+  - verdicts.3.verdict: Invalid option: expected one of "mention"|"payoff"|"conflict"|"extend"|"none"
+  - verdicts.4.verdict: Invalid option: expected one of "mention"|"payoff"|"conflict"|"extend"|"none"
+  ... and 5 more issue(s)
+    at parseOutputFormat (C:\Users\admin\Downloads\aidm_v4\node_modules\.pnpm\@anthropic-ai+sdk@0.90.0_zod@4.3.6\node_modules\@anthropic-ai\sdk\src\lib\parser.ts:123:11)
+    at <anonymous> (C:\Users\admin\Downloads\aidm_v4\node_modules\.pnpm\@anthropic-ai+sdk@0.90.0_zod@4.3.6\node_modules\@anthropic-ai\sdk\src\lib\parser.ts:84:30)
+    at Array.map (<anonymous>)
+    at parseMessage (C:\Users\admin\Downloads\aidm_v4\node_modules\.pnpm\@anthropic-ai+sdk@0.90.0_zod@4.3.6\node_modules\@anthropic-ai\sdk\src\lib\parser.ts:81:102)
+    at maybeParseMessage (C:\Users\admin\Downloads\aidm_v4\node_modules\.pnpm\@anthropic-ai+sdk@0.90.0_zod@4.3.6\node_modules\@anthropic-ai\sdk\src\lib\parser.ts:71:10)
+    at MessageStream._MessageStream_addStreamEvent (C:\Users\admin\Downloads\aidm_v4\node_modules\.pnpm\@anthropic-ai+sdk@0.90.0_zod@4.3.6\node_modules\@anthropic-ai\sdk\src\lib\MessageStream.ts:497:26)
+    at MessageStream._createMessage (C:\Users\admin\Downloads\aidm_v4\node_modules\.pnpm\@anthropic-ai+sdk@0.90.0_zod@4.3.6\node_modules\@anthropic-ai\sdk\src\lib\MessageStream.ts:209:29)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+[director] evolution_proposal emitted with no open season gate — dropped { campaignId: '439ad090-2bc2-4c39-afda-103e2b952ddb', turnNumber: 28 }
+[soak] step 28 · turn 28 · genga · complete · narration $0.1611 · ttft 57877ms
+[sidecar] commit_scene over its emission ceiling — clamped, scene kept { source: 'native', over: [ 'notable_beats=4' ] }
+[sidecar] commit_scene over its emission ceiling — clamped, scene kept { source: 'native', over: [ 'notable_beats=4' ] }
+[soak] step 29 · turn 29 · genga · complete · narration $0.0897 · ttft 38442ms
+[sidecar] commit_scene over its emission ceiling — clamped, scene kept { source: 'native', over: [ 'notable_beats=4' ] }
+[sidecar] commit_scene over its emission ceiling — clamped, scene kept { source: 'native', over: [ 'notable_beats=4' ] }
+[soak] step 30 · turn 30 · genga · complete · narration $0.1684 · ttft 71194ms
+[ka] commit_scene trailer missing — asking once more {
+  campaignId: '439ad090-2bc2-4c39-afda-103e2b952ddb',
+  turnNumber: 31,
+  stopReason: 'end_turn'
+}
+[director] seed adjudication failed (turn 31) — batch skipped: AnthropicError: Failed to parse structured output: Error: Failed to parse structured output: [
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      0,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      1,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      2,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      3,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      4,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      5,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      6,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      7,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      8,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      9,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  }
+]
+Validation issues:
+  - verdicts.0.verdict: Invalid option: expected one of "mention"|"payoff"|"conflict"|"extend"|"none"
+  - verdicts.1.verdict: Invalid option: expected one of "mention"|"payoff"|"conflict"|"extend"|"none"
+  - verdicts.2.verdict: Invalid option: expected one of "mention"|"payoff"|"conflict"|"extend"|"none"
+  - verdicts.3.verdict: Invalid option: expected one of "mention"|"payoff"|"conflict"|"extend"|"none"
+  - verdicts.4.verdict: Invalid option: expected one of "mention"|"payoff"|"conflict"|"extend"|"none"
+  ... and 5 more issue(s)
+    at parseOutputFormat (C:\Users\admin\Downloads\aidm_v4\node_modules\.pnpm\@anthropic-ai+sdk@0.90.0_zod@4.3.6\node_modules\@anthropic-ai\sdk\src\lib\parser.ts:123:11)
+    at <anonymous> (C:\Users\admin\Downloads\aidm_v4\node_modules\.pnpm\@anthropic-ai+sdk@0.90.0_zod@4.3.6\node_modules\@anthropic-ai\sdk\src\lib\parser.ts:84:30)
+    at Array.map (<anonymous>)
+    at parseMessage (C:\Users\admin\Downloads\aidm_v4\node_modules\.pnpm\@anthropic-ai+sdk@0.90.0_zod@4.3.6\node_modules\@anthropic-ai\sdk\src\lib\parser.ts:81:102)
+    at maybeParseMessage (C:\Users\admin\Downloads\aidm_v4\node_modules\.pnpm\@anthropic-ai+sdk@0.90.0_zod@4.3.6\node_modules\@anthropic-ai\sdk\src\lib\parser.ts:71:10)
+    at MessageStream._MessageStream_addStreamEvent (C:\Users\admin\Downloads\aidm_v4\node_modules\.pnpm\@anthropic-ai+sdk@0.90.0_zod@4.3.6\node_modules\@anthropic-ai\sdk\src\lib\MessageStream.ts:497:26)
+    at MessageStream._createMessage (C:\Users\admin\Downloads\aidm_v4\node_modules\.pnpm\@anthropic-ai+sdk@0.90.0_zod@4.3.6\node_modules\@anthropic-ai\sdk\src\lib\MessageStream.ts:209:29)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+[g2] director cycle failed (turn 31) — skipped daily, next trigger ≤8 turns: AnthropicError: Failed to parse structured output: Error: Failed to parse structured output: [
+  {
+    "code": "invalid_value",
+    "values": [
+      "scenes",
+      "episodes"
+    ],
+    "path": [
+      "arc_plan",
+      "budget",
+      "unit"
+    ],
+    "message": "Invalid option: expected one of \"scenes\"|\"episodes\""
+  }
+]
+Validation issues:
+  - arc_plan.budget.unit: Invalid option: expected one of "scenes"|"episodes"
+    at parseOutputFormat (C:\Users\admin\Downloads\aidm_v4\node_modules\.pnpm\@anthropic-ai+sdk@0.90.0_zod@4.3.6\node_modules\@anthropic-ai\sdk\src\lib\parser.ts:123:11)
+    at <anonymous> (C:\Users\admin\Downloads\aidm_v4\node_modules\.pnpm\@anthropic-ai+sdk@0.90.0_zod@4.3.6\node_modules\@anthropic-ai\sdk\src\lib\parser.ts:84:30)
+    at Array.map (<anonymous>)
+    at parseMessage (C:\Users\admin\Downloads\aidm_v4\node_modules\.pnpm\@anthropic-ai+sdk@0.90.0_zod@4.3.6\node_modules\@anthropic-ai\sdk\src\lib\parser.ts:81:102)
+    at maybeParseMessage (C:\Users\admin\Downloads\aidm_v4\node_modules\.pnpm\@anthropic-ai+sdk@0.90.0_zod@4.3.6\node_modules\@anthropic-ai\sdk\src\lib\parser.ts:71:10)
+    at MessageStream._MessageStream_addStreamEvent (C:\Users\admin\Downloads\aidm_v4\node_modules\.pnpm\@anthropic-ai+sdk@0.90.0_zod@4.3.6\node_modules\@anthropic-ai\sdk\src\lib\MessageStream.ts:497:26)
+    at MessageStream._createMessage (C:\Users\admin\Downloads\aidm_v4\node_modules\.pnpm\@anthropic-ai+sdk@0.90.0_zod@4.3.6\node_modules\@anthropic-ai\sdk\src\lib\MessageStream.ts:209:29)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+[soak] step 31 · turn 31 · sakuga · complete · narration $0.1659 · ttft 79308ms
+[soak] step 32 · turn 32 · sakuga · complete · narration $0.1309 · ttft 76871ms
+[soak] step 33 · turn 33 · sakuga · complete · narration $0.2490 · ttft 113622ms
+[soak] rewound to turn 31 (37 writes tombstoned) — re-climbing
+[layout] degrade ladder fired: skip_validation_retry at 8299ms (turn 32)
+[sidecar] commit_scene over its emission ceiling — clamped, scene kept { source: 'native', over: [ 'notable_beats=4' ] }
+[sidecar] commit_scene over its emission ceiling — clamped, scene kept { source: 'native', over: [ 'notable_beats=4' ] }
+[soak] step 34 · turn 32 · douga · complete · narration $0.0862 · ttft 44751ms
+[sidecar] commit_scene over its emission ceiling — clamped, scene kept { source: 'native', over: [ 'notable_beats=4' ] }
+[sidecar] commit_scene over its emission ceiling — clamped, scene kept { source: 'native', over: [ 'notable_beats=4' ] }
+[soak] step 35 · turn 33 · douga · complete · narration $0.1624 · ttft 26519ms
+[sidecar] commit_scene over its emission ceiling — clamped, scene kept { source: 'native', over: [ 'notable_beats=5' ] }
+[sidecar] commit_scene over its emission ceiling — clamped, scene kept { source: 'native', over: [ 'notable_beats=5' ] }
+[director] seed adjudication failed (turn 34) — batch skipped: AnthropicError: Failed to parse structured output: Error: Failed to parse structured output: [
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      0,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      1,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      2,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      3,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      4,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      5,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      6,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      7,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      8,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      9,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  }
+]
+Validation issues:
+  - verdicts.0.verdict: Invalid option: expected one of "mention"|"payoff"|"conflict"|"extend"|"none"
+  - verdicts.1.verdict: Invalid option: expected one of "mention"|"payoff"|"conflict"|"extend"|"none"
+  - verdicts.2.verdict: Invalid option: expected one of "mention"|"payoff"|"conflict"|"extend"|"none"
+  - verdicts.3.verdict: Invalid option: expected one of "mention"|"payoff"|"conflict"|"extend"|"none"
+  - verdicts.4.verdict: Invalid option: expected one of "mention"|"payoff"|"conflict"|"extend"|"none"
+  ... and 5 more issue(s)
+    at parseOutputFormat (C:\Users\admin\Downloads\aidm_v4\node_modules\.pnpm\@anthropic-ai+sdk@0.90.0_zod@4.3.6\node_modules\@anthropic-ai\sdk\src\lib\parser.ts:123:11)
+    at <anonymous> (C:\Users\admin\Downloads\aidm_v4\node_modules\.pnpm\@anthropic-ai+sdk@0.90.0_zod@4.3.6\node_modules\@anthropic-ai\sdk\src\lib\parser.ts:84:30)
+    at Array.map (<anonymous>)
+    at parseMessage (C:\Users\admin\Downloads\aidm_v4\node_modules\.pnpm\@anthropic-ai+sdk@0.90.0_zod@4.3.6\node_modules\@anthropic-ai\sdk\src\lib\parser.ts:81:102)
+    at maybeParseMessage (C:\Users\admin\Downloads\aidm_v4\node_modules\.pnpm\@anthropic-ai+sdk@0.90.0_zod@4.3.6\node_modules\@anthropic-ai\sdk\src\lib\parser.ts:71:10)
+    at MessageStream._MessageStream_addStreamEvent (C:\Users\admin\Downloads\aidm_v4\node_modules\.pnpm\@anthropic-ai+sdk@0.90.0_zod@4.3.6\node_modules\@anthropic-ai\sdk\src\lib\MessageStream.ts:497:26)
+    at MessageStream._createMessage (C:\Users\admin\Downloads\aidm_v4\node_modules\.pnpm\@anthropic-ai+sdk@0.90.0_zod@4.3.6\node_modules\@anthropic-ai\sdk\src\lib\MessageStream.ts:209:29)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+[director] evolution_proposal emitted with no open season gate — dropped { campaignId: '439ad090-2bc2-4c39-afda-103e2b952ddb', turnNumber: 34 }
+[soak] step 36 · turn 34 · sakuga · complete · narration $0.1019 · ttft 62536ms
+[ka] commit_scene trailer missing — asking once more {
+  campaignId: '439ad090-2bc2-4c39-afda-103e2b952ddb',
+  turnNumber: 35,
+  stopReason: 'end_turn'
+}
+[sidecar] commit_scene over its emission ceiling — clamped, scene kept { source: 'native', over: [ 'notable_beats=4' ] }
+[sidecar] commit_scene over its emission ceiling — clamped, scene kept { source: 'native', over: [ 'notable_beats=4' ] }
+[soak] step 37 · turn 35 · genga · complete · narration $0.2773 · ttft 68397ms · FAIL(1)
+[sidecar] commit_scene over its emission ceiling — clamped, scene kept { source: 'native', over: [ 'notable_beats=5' ] }
+[sidecar] commit_scene over its emission ceiling — clamped, scene kept { source: 'native', over: [ 'notable_beats=5' ] }
+[soak] step 38 · turn 36 · sakuga · complete · narration $0.1126 · ttft 67698ms
+[sidecar] commit_scene over its emission ceiling — clamped, scene kept { source: 'native', over: [ 'notable_beats=4' ] }
+[sidecar] commit_scene over its emission ceiling — clamped, scene kept { source: 'native', over: [ 'notable_beats=4' ] }
+[director] seed adjudication failed (turn 37) — batch skipped: AnthropicError: Failed to parse structured output: Error: Failed to parse structured output: [
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      0,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      1,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      2,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      3,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      4,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      5,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      6,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      7,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      8,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      9,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      10,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      11,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      12,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      13,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  }
+]
+Validation issues:
+  - verdicts.0.verdict: Invalid option: expected one of "mention"|"payoff"|"conflict"|"extend"|"none"
+  - verdicts.1.verdict: Invalid option: expected one of "mention"|"payoff"|"conflict"|"extend"|"none"
+  - verdicts.2.verdict: Invalid option: expected one of "mention"|"payoff"|"conflict"|"extend"|"none"
+  - verdicts.3.verdict: Invalid option: expected one of "mention"|"payoff"|"conflict"|"extend"|"none"
+  - verdicts.4.verdict: Invalid option: expected one of "mention"|"payoff"|"conflict"|"extend"|"none"
+  ... and 9 more issue(s)
+    at parseOutputFormat (C:\Users\admin\Downloads\aidm_v4\node_modules\.pnpm\@anthropic-ai+sdk@0.90.0_zod@4.3.6\node_modules\@anthropic-ai\sdk\src\lib\parser.ts:123:11)
+    at <anonymous> (C:\Users\admin\Downloads\aidm_v4\node_modules\.pnpm\@anthropic-ai+sdk@0.90.0_zod@4.3.6\node_modules\@anthropic-ai\sdk\src\lib\parser.ts:84:30)
+    at Array.map (<anonymous>)
+    at parseMessage (C:\Users\admin\Downloads\aidm_v4\node_modules\.pnpm\@anthropic-ai+sdk@0.90.0_zod@4.3.6\node_modules\@anthropic-ai\sdk\src\lib\parser.ts:81:102)
+    at maybeParseMessage (C:\Users\admin\Downloads\aidm_v4\node_modules\.pnpm\@anthropic-ai+sdk@0.90.0_zod@4.3.6\node_modules\@anthropic-ai\sdk\src\lib\parser.ts:71:10)
+    at MessageStream._MessageStream_addStreamEvent (C:\Users\admin\Downloads\aidm_v4\node_modules\.pnpm\@anthropic-ai+sdk@0.90.0_zod@4.3.6\node_modules\@anthropic-ai\sdk\src\lib\MessageStream.ts:497:26)
+    at MessageStream._createMessage (C:\Users\admin\Downloads\aidm_v4\node_modules\.pnpm\@anthropic-ai+sdk@0.90.0_zod@4.3.6\node_modules\@anthropic-ai\sdk\src\lib\MessageStream.ts:209:29)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+[director] evolution_proposal emitted with no open season gate — dropped { campaignId: '439ad090-2bc2-4c39-afda-103e2b952ddb', turnNumber: 37 }
+[soak] step 39 · turn 37 · douga · complete · narration $0.0908 · ttft 39766ms
+[sidecar] commit_scene over its emission ceiling — clamped, scene kept { source: 'native', over: [ 'notable_beats=5' ] }
+[sidecar] commit_scene over its emission ceiling — clamped, scene kept { source: 'native', over: [ 'notable_beats=5' ] }
+[soak] step 40 · turn 38 · genga · complete · narration $0.0961 · ttft 47976ms
+[sidecar] commit_scene over its emission ceiling — clamped, scene kept { source: 'native', over: [ 'notable_beats=4' ] }
+[sidecar] commit_scene over its emission ceiling — clamped, scene kept { source: 'native', over: [ 'notable_beats=4' ] }
+[soak] step 41 · turn 39 · douga · complete · narration $0.0940 · ttft 41437ms
+[director] seed adjudication failed (turn 40) — batch skipped: AnthropicError: Failed to parse structured output: Error: Failed to parse structured output: [
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      0,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      1,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      2,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      3,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      4,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      5,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      6,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      7,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      8,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      9,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      10,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      11,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  }
+]
+Validation issues:
+  - verdicts.0.verdict: Invalid option: expected one of "mention"|"payoff"|"conflict"|"extend"|"none"
+  - verdicts.1.verdict: Invalid option: expected one of "mention"|"payoff"|"conflict"|"extend"|"none"
+  - verdicts.2.verdict: Invalid option: expected one of "mention"|"payoff"|"conflict"|"extend"|"none"
+  - verdicts.3.verdict: Invalid option: expected one of "mention"|"payoff"|"conflict"|"extend"|"none"
+  - verdicts.4.verdict: Invalid option: expected one of "mention"|"payoff"|"conflict"|"extend"|"none"
+  ... and 7 more issue(s)
+    at parseOutputFormat (C:\Users\admin\Downloads\aidm_v4\node_modules\.pnpm\@anthropic-ai+sdk@0.90.0_zod@4.3.6\node_modules\@anthropic-ai\sdk\src\lib\parser.ts:123:11)
+    at <anonymous> (C:\Users\admin\Downloads\aidm_v4\node_modules\.pnpm\@anthropic-ai+sdk@0.90.0_zod@4.3.6\node_modules\@anthropic-ai\sdk\src\lib\parser.ts:84:30)
+    at Array.map (<anonymous>)
+    at parseMessage (C:\Users\admin\Downloads\aidm_v4\node_modules\.pnpm\@anthropic-ai+sdk@0.90.0_zod@4.3.6\node_modules\@anthropic-ai\sdk\src\lib\parser.ts:81:102)
+    at maybeParseMessage (C:\Users\admin\Downloads\aidm_v4\node_modules\.pnpm\@anthropic-ai+sdk@0.90.0_zod@4.3.6\node_modules\@anthropic-ai\sdk\src\lib\parser.ts:71:10)
+    at MessageStream._MessageStream_addStreamEvent (C:\Users\admin\Downloads\aidm_v4\node_modules\.pnpm\@anthropic-ai+sdk@0.90.0_zod@4.3.6\node_modules\@anthropic-ai\sdk\src\lib\MessageStream.ts:497:26)
+    at MessageStream._createMessage (C:\Users\admin\Downloads\aidm_v4\node_modules\.pnpm\@anthropic-ai+sdk@0.90.0_zod@4.3.6\node_modules\@anthropic-ai\sdk\src\lib\MessageStream.ts:209:29)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+[director] episode_close with blank required text — dropped { campaignId: '439ad090-2bc2-4c39-afda-103e2b952ddb' }
+[soak] step 42 · turn 40 · genga · complete · narration $0.1059 · ttft 61131ms
+[sidecar] commit_scene over its emission ceiling — clamped, scene kept { source: 'native', over: [ 'notable_beats=4' ] }
+[sidecar] commit_scene over its emission ceiling — clamped, scene kept { source: 'native', over: [ 'notable_beats=4' ] }
+[soak] step 43 · turn 41 · genga · complete · narration $0.0646 · ttft 17488ms
+[sidecar] commit_scene over its emission ceiling — clamped, scene kept { source: 'native', over: [ 'notable_beats=5' ] }
+[sidecar] commit_scene over its emission ceiling — clamped, scene kept { source: 'native', over: [ 'notable_beats=5' ] }
+[soak] step 44 · turn 42 · sakuga · complete · narration $0.1665 · ttft 43762ms
+[sidecar] commit_scene over its emission ceiling — clamped, scene kept { source: 'native', over: [ 'notable_beats=5' ] }
+[sidecar] commit_scene over its emission ceiling — clamped, scene kept { source: 'native', over: [ 'notable_beats=5' ] }
+[director] seed adjudication failed (turn 43) — batch skipped: AnthropicError: Failed to parse structured output: Error: Failed to parse structured output: [
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      0,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      1,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      2,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      3,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      4,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      5,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      6,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      7,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      8,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      9,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      10,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      11,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  }
+]
+Validation issues:
+  - verdicts.0.verdict: Invalid option: expected one of "mention"|"payoff"|"conflict"|"extend"|"none"
+  - verdicts.1.verdict: Invalid option: expected one of "mention"|"payoff"|"conflict"|"extend"|"none"
+  - verdicts.2.verdict: Invalid option: expected one of "mention"|"payoff"|"conflict"|"extend"|"none"
+  - verdicts.3.verdict: Invalid option: expected one of "mention"|"payoff"|"conflict"|"extend"|"none"
+  - verdicts.4.verdict: Invalid option: expected one of "mention"|"payoff"|"conflict"|"extend"|"none"
+  ... and 7 more issue(s)
+    at parseOutputFormat (C:\Users\admin\Downloads\aidm_v4\node_modules\.pnpm\@anthropic-ai+sdk@0.90.0_zod@4.3.6\node_modules\@anthropic-ai\sdk\src\lib\parser.ts:123:11)
+    at <anonymous> (C:\Users\admin\Downloads\aidm_v4\node_modules\.pnpm\@anthropic-ai+sdk@0.90.0_zod@4.3.6\node_modules\@anthropic-ai\sdk\src\lib\parser.ts:84:30)
+    at Array.map (<anonymous>)
+    at parseMessage (C:\Users\admin\Downloads\aidm_v4\node_modules\.pnpm\@anthropic-ai+sdk@0.90.0_zod@4.3.6\node_modules\@anthropic-ai\sdk\src\lib\parser.ts:81:102)
+    at maybeParseMessage (C:\Users\admin\Downloads\aidm_v4\node_modules\.pnpm\@anthropic-ai+sdk@0.90.0_zod@4.3.6\node_modules\@anthropic-ai\sdk\src\lib\parser.ts:71:10)
+    at MessageStream._MessageStream_addStreamEvent (C:\Users\admin\Downloads\aidm_v4\node_modules\.pnpm\@anthropic-ai+sdk@0.90.0_zod@4.3.6\node_modules\@anthropic-ai\sdk\src\lib\MessageStream.ts:497:26)
+    at MessageStream._createMessage (C:\Users\admin\Downloads\aidm_v4\node_modules\.pnpm\@anthropic-ai+sdk@0.90.0_zod@4.3.6\node_modules\@anthropic-ai\sdk\src\lib\MessageStream.ts:209:29)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+[director] evolution_proposal emitted with no open season gate — dropped { campaignId: '439ad090-2bc2-4c39-afda-103e2b952ddb', turnNumber: 43 }
+[soak] step 45 · turn 43 · genga · complete · narration $0.0933 · ttft 40908ms
+[sidecar] commit_scene over its emission ceiling — clamped, scene kept { source: 'native', over: [ 'notable_beats=5' ] }
+[sidecar] commit_scene over its emission ceiling — clamped, scene kept { source: 'native', over: [ 'notable_beats=5' ] }
+[soak] step 46 · turn 44 · douga · complete · narration $0.1464 · ttft 77354ms
+[ka] commit_scene trailer missing — asking once more {
+  campaignId: '439ad090-2bc2-4c39-afda-103e2b952ddb',
+  turnNumber: 45,
+  stopReason: 'end_turn'
+}
+[sidecar] commit_scene over its emission ceiling — clamped, scene kept { source: 'native', over: [ 'notable_beats=5' ] }
+[sidecar] commit_scene over its emission ceiling — clamped, scene kept { source: 'native', over: [ 'notable_beats=5' ] }
+[soak] step 47 · turn 45 · genga · complete · narration $0.2562 · ttft 41014ms · FAIL(1)
+[sidecar] commit_scene over its emission ceiling — clamped, scene kept { source: 'native', over: [ 'notable_beats=4' ] }
+[sidecar] commit_scene over its emission ceiling — clamped, scene kept { source: 'native', over: [ 'notable_beats=4' ] }
+[director] seed adjudication failed (turn 46) — batch skipped: AnthropicError: Failed to parse structured output: Error: Failed to parse structured output: [
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      0,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      1,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      2,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      3,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      4,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      5,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      6,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      7,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      8,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      9,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      10,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      11,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      12,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  }
+]
+Validation issues:
+  - verdicts.0.verdict: Invalid option: expected one of "mention"|"payoff"|"conflict"|"extend"|"none"
+  - verdicts.1.verdict: Invalid option: expected one of "mention"|"payoff"|"conflict"|"extend"|"none"
+  - verdicts.2.verdict: Invalid option: expected one of "mention"|"payoff"|"conflict"|"extend"|"none"
+  - verdicts.3.verdict: Invalid option: expected one of "mention"|"payoff"|"conflict"|"extend"|"none"
+  - verdicts.4.verdict: Invalid option: expected one of "mention"|"payoff"|"conflict"|"extend"|"none"
+  ... and 8 more issue(s)
+    at parseOutputFormat (C:\Users\admin\Downloads\aidm_v4\node_modules\.pnpm\@anthropic-ai+sdk@0.90.0_zod@4.3.6\node_modules\@anthropic-ai\sdk\src\lib\parser.ts:123:11)
+    at <anonymous> (C:\Users\admin\Downloads\aidm_v4\node_modules\.pnpm\@anthropic-ai+sdk@0.90.0_zod@4.3.6\node_modules\@anthropic-ai\sdk\src\lib\parser.ts:84:30)
+    at Array.map (<anonymous>)
+    at parseMessage (C:\Users\admin\Downloads\aidm_v4\node_modules\.pnpm\@anthropic-ai+sdk@0.90.0_zod@4.3.6\node_modules\@anthropic-ai\sdk\src\lib\parser.ts:81:102)
+    at maybeParseMessage (C:\Users\admin\Downloads\aidm_v4\node_modules\.pnpm\@anthropic-ai+sdk@0.90.0_zod@4.3.6\node_modules\@anthropic-ai\sdk\src\lib\parser.ts:71:10)
+    at MessageStream._MessageStream_addStreamEvent (C:\Users\admin\Downloads\aidm_v4\node_modules\.pnpm\@anthropic-ai+sdk@0.90.0_zod@4.3.6\node_modules\@anthropic-ai\sdk\src\lib\MessageStream.ts:497:26)
+    at MessageStream._createMessage (C:\Users\admin\Downloads\aidm_v4\node_modules\.pnpm\@anthropic-ai+sdk@0.90.0_zod@4.3.6\node_modules\@anthropic-ai\sdk\src\lib\MessageStream.ts:209:29)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+[soak] step 48 · turn 46 · genga · complete · narration $0.1137 · ttft 52736ms
+[sidecar] commit_scene over its emission ceiling — clamped, scene kept { source: 'native', over: [ 'notable_beats=5' ] }
+[sidecar] commit_scene over its emission ceiling — clamped, scene kept { source: 'native', over: [ 'notable_beats=5' ] }
+[soak] step 49 · turn 47 · genga · complete · narration $0.1214 · ttft 54256ms
+[ka] commit_scene trailer missing — asking once more {
+  campaignId: '439ad090-2bc2-4c39-afda-103e2b952ddb',
+  turnNumber: 48,
+  stopReason: 'end_turn'
+}
+[sidecar] commit_scene over its emission ceiling — clamped, scene kept { source: 'native', over: [ 'notable_beats=4' ] }
+[sidecar] commit_scene over its emission ceiling — clamped, scene kept { source: 'native', over: [ 'notable_beats=4' ] }
+[session] taste note over budget — dropped, memo kept {
+  campaignId: '439ad090-2bc2-4c39-afda-103e2b952ddb',
+  length: 250,
+  limit: 240
+}
+[soak] step 50 · turn 48 · genga · complete · narration $0.2454 · ttft 55205ms
+[sidecar] commit_scene over its emission ceiling — clamped, scene kept { source: 'native', over: [ 'notable_beats=5' ] }
+[sidecar] commit_scene over its emission ceiling — clamped, scene kept { source: 'native', over: [ 'notable_beats=5' ] }
+[director] seed adjudication failed (turn 49) — batch skipped: AnthropicError: Failed to parse structured output: Error: Failed to parse structured output: [
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      0,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      1,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      2,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      3,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      4,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      5,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      6,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      7,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      8,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      9,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      10,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      11,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  },
+  {
+    "code": "invalid_value",
+    "values": [
+      "mention",
+      "payoff",
+      "conflict",
+      "extend",
+      "none"
+    ],
+    "path": [
+      "verdicts",
+      12,
+      "verdict"
+    ],
+    "message": "Invalid option: expected one of \"mention\"|\"payoff\"|\"conflict\"|\"extend\"|\"none\""
+  }
+]
+Validation issues:
+  - verdicts.0.verdict: Invalid option: expected one of "mention"|"payoff"|"conflict"|"extend"|"none"
+  - verdicts.1.verdict: Invalid option: expected one of "mention"|"payoff"|"conflict"|"extend"|"none"
+  - verdicts.2.verdict: Invalid option: expected one of "mention"|"payoff"|"conflict"|"extend"|"none"
+  - verdicts.3.verdict: Invalid option: expected one of "mention"|"payoff"|"conflict"|"extend"|"none"
+  - verdicts.4.verdict: Invalid option: expected one of "mention"|"payoff"|"conflict"|"extend"|"none"
+  ... and 8 more issue(s)
+    at parseOutputFormat (C:\Users\admin\Downloads\aidm_v4\node_modules\.pnpm\@anthropic-ai+sdk@0.90.0_zod@4.3.6\node_modules\@anthropic-ai\sdk\src\lib\parser.ts:123:11)
+    at <anonymous> (C:\Users\admin\Downloads\aidm_v4\node_modules\.pnpm\@anthropic-ai+sdk@0.90.0_zod@4.3.6\node_modules\@anthropic-ai\sdk\src\lib\parser.ts:84:30)
+    at Array.map (<anonymous>)
+    at parseMessage (C:\Users\admin\Downloads\aidm_v4\node_modules\.pnpm\@anthropic-ai+sdk@0.90.0_zod@4.3.6\node_modules\@anthropic-ai\sdk\src\lib\parser.ts:81:102)
+    at maybeParseMessage (C:\Users\admin\Downloads\aidm_v4\node_modules\.pnpm\@anthropic-ai+sdk@0.90.0_zod@4.3.6\node_modules\@anthropic-ai\sdk\src\lib\parser.ts:71:10)
+    at MessageStream._MessageStream_addStreamEvent (C:\Users\admin\Downloads\aidm_v4\node_modules\.pnpm\@anthropic-ai+sdk@0.90.0_zod@4.3.6\node_modules\@anthropic-ai\sdk\src\lib\MessageStream.ts:497:26)
+    at MessageStream._createMessage (C:\Users\admin\Downloads\aidm_v4\node_modules\.pnpm\@anthropic-ai+sdk@0.90.0_zod@4.3.6\node_modules\@anthropic-ai\sdk\src\lib\MessageStream.ts:209:29)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+[soak] step 51 · turn 49 · sakuga · complete · narration $0.1148 · ttft 59762ms
+[pacer] probe failed (turn 50) — no beat this scene {
+  model: 'claude-haiku-4-5',
+  error: 'Failed to parse structured output: Error: Failed to parse structured output: [\n' +
+    '  {\n' +
+    '    "code": "invalid_value",\n' +
+    '    "values": [\n' +
+    '      "setup",\n' +
+    '      "rising",\n' +
+    '      "escalation",\n' +
+    '      "climax",\n' +
+    '      "falling",\n' +
+    '      "resolution"\n' +
+    '    ],\n' +
+    '    "path": [\n' +
+    '      "phase_transition"\n' +
+    '    ],\n' +
+    '    "message": "Invalid option: expected one of \\"setup\\"|\\"rising\\"|\\"escalation\\"|\\"climax\\"|\\"falling\\"|\\"resolution\\""\n' +
+    '  }\n' +
+    ']\n' +
+    'Validation issues:\n' +
+    '  - phase_transition: Invalid option: expected one of "setup"|"rising"|"escalation"|"climax"|"falling"|"resolution"'
+}
+[pacer] no beat (turn 50) — the continuity channel is dark { model: 'claude-haiku-4-5', timeboxMs: 14000, waitedMs: 3613 }
+[sidecar] commit_scene over its emission ceiling — clamped, scene kept { source: 'native', over: [ 'notable_beats=4' ] }
+[sidecar] commit_scene over its emission ceiling — clamped, scene kept { source: 'native', over: [ 'notable_beats=4' ] }
+[soak] step 52 · turn 50 · genga · complete · narration $0.2022 · ttft 94125ms
+
+[soak] report → C:\Users\admin\Downloads\aidm_v4\docs\retros\soak-50turn.md
+
+=== SOAK SUMMARY ===
+turns reached: 50 · steps: 52 · total spend $9.2466
+event mix: 11/12 landed (missing: session close + reopen)
+assertion failures: 7
+  coverage: turns 1..50: 50 metered, 0 unmetered
+  coverage: metering coverage CERTIFIED — every played turn carries an assertion
+  sittings: 2 sitting(s); 1 closed (#1:explicit); open now: #2
+  sittings: every completed turn played inside a sitting — session-lifecycle coverage CERTIFIED
+  projected/session @ claude-sonnet-5: $3.4752
+  projected/session @ claude-opus-5: $5.1261
+  projected/session @ claude-fable-5: $9.2535
+[soak] campaign 439ad090-2bc2-4c39-afda-103e2b952ddb KEPT (the report + golden seeds reference it).

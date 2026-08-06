@@ -11,6 +11,7 @@ import type {
   Message,
   MessageParam,
   TextBlockParam,
+  ToolChoice,
 } from "@anthropic-ai/sdk/resources/messages/messages";
 import type { LadderStep } from "./degrade";
 import { KA_TOOLS, executeGetTurnNarrative, executeRecallScene, executeSearchLore } from "./tools";
@@ -227,6 +228,32 @@ export const TRAILER_DEMAND =
   "The scene is written. Now call commit_scene with its sidecar — nothing else.";
 
 /**
+ * The continuation round's two postures, tried in order (M3R4).
+ *
+ * POSTURE RIDES THE MESSAGES CACHE KEY — measured on the wire, N=50 soak,
+ * 2026-08-05. The older note here was half right: `tool_choice` is NOT part of
+ * the tools/system cache key. It IS part of the MESSAGES key, and M3R2 C2
+ * moved Block 3 — the entire verbatim exchange window — out of `system` and
+ * into `messages`. So the forced round could not read the prefix the scene
+ * round had just cached: it fell back to the system tier and RE-WROTE the
+ * whole window at the 1h 2x rate, into a second, parallel cache lineage that
+ * only other forced rounds could ever read. Turn 35 of the soak, on the wire:
+ * the scene round read 24,111 and wrote 1,173; the forced round read 8,464 and
+ * re-created 16,930. Across the run 17 follow-ups re-created 115,408 tokens —
+ * $0.66 of pure waste, and the 7 WITHIN-turn assertion failures §10.8 raised.
+ * (Research round-trips never had the problem: they hold `auto` and read the
+ * prefix byte-perfectly — turn 8's research round read exactly 14,572, the
+ * 13,245 + 1,327 the scene round had cached.)
+ *
+ * So: the ASK first, at the scene round's own posture — same bytes, same
+ * posture, whole prefix warm. The forced DEMAND is unchanged and still runs,
+ * but only when the warm ask comes back empty. The §5.7 guarantee is intact;
+ * what changed is which rung is reached for first.
+ */
+export const TRAILER_FORCE: ToolChoice = { type: "tool", name: "commit_scene" };
+const TRAILER_POSTURES: readonly (ToolChoice | undefined)[] = [undefined, TRAILER_FORCE];
+
+/**
  * Run Phase B: stream prose, execute budgeted research round-trips, end on
  * the commit_scene trailer (or reconstruct it via probe). The prior
  * exchanges ARE the message list (M3R2 C2): the conversation opens with the
@@ -409,12 +436,15 @@ export async function runKeyAnimator(
   // why: every prose round ended `end_turn` with no tool_use block at all.
   // The model is not emitting a malformed trailer or forgetting mid-scene; it
   // treats the scene's last line as the end of its turn. So ask once more, on
-  // the same conversation — the whole 29k prefix is warm, tool_choice is not
-  // part of the tools/system cache key, and no prose is wanted, so the trailer
-  // can simply be demanded. This is still the KA's own record: same context,
-  // same model, same scene in view. The probe reconstruction below stays as
-  // the net it was designed to be — now beneath a cheap accurate ask instead
-  // of directly under the drop.
+  // the same conversation — the whole 29k prefix is warm and no prose is
+  // wanted, so the trailer can simply be asked for. This is still the KA's own
+  // record: same context, same model, same scene in view. The probe
+  // reconstruction below stays as the net it was designed to be — now beneath
+  // a cheap accurate ask instead of directly under the drop.
+  //
+  // The ask runs at the scene round's own tool posture first and escalates to
+  // the forced `commit_scene` only if it lands nothing — see TRAILER_POSTURES
+  // for the wire measurement that ordering exists for.
   let sidecar: CommitScene | null = null;
   let trailerSource: TrailerSource = "none";
   if (lastMessage) {
@@ -453,36 +483,48 @@ export async function runKeyAnimator(
       content:
         pending.length > 0 ? [...pending, { type: "text", text: TRAILER_DEMAND }] : TRAILER_DEMAND,
     });
-    try {
-      const { done } = streamNarration({
-        name: "ka_trailer",
-        selection: args.selection,
-        system: args.system,
-        messages,
-        maxTokens: STRUCTURED_SMALL,
-        // The SAME effort as the scene round, deliberately: effort rides the
-        // cache key (M2R5), so a cheaper setting here would write a second
-        // full prefix to save a few thinking tokens.
-        effort: args.effort,
-        tools: KA_TOOLS,
-        toolChoice: { type: "tool", name: "commit_scene" },
-        campaignId: args.campaignId,
-        turnNumber: args.turnNumber,
-      });
-      const result = await done();
-      costUsd += result.costUsd;
-      fallbackUsed = fallbackUsed || result.fallbackUsed;
-      sidecar = extractCommitScene(result.message);
-      if (sidecar) trailerSource = "continuation";
-    } catch (err) {
-      // Never fatal: the continuation is an improvement on the net, not a
-      // replacement for it. A rejected forced tool_choice, a stream failure,
-      // a refusal — all fall through to the probe exactly as before.
-      console.warn("[ka] trailer continuation failed — falling through to the probe", {
-        campaignId: args.campaignId,
-        turnNumber: args.turnNumber,
-        error: err instanceof Error ? err.message : String(err),
-      });
+    // Both postures replay the SAME `messages` — an unusable answer from the
+    // ask is never appended, so the demand's request stays byte-identical to
+    // the ask's and no tool_use is left orphaned for the API to 400 on.
+    for (const toolChoice of TRAILER_POSTURES) {
+      try {
+        const { done } = streamNarration({
+          name: "ka_trailer",
+          selection: args.selection,
+          system: args.system,
+          messages,
+          maxTokens: STRUCTURED_SMALL,
+          // The SAME effort as the scene round, deliberately: effort rides the
+          // cache key (M2R5), so a cheaper setting here would write a second
+          // full prefix to save a few thinking tokens.
+          effort: args.effort,
+          tools: KA_TOOLS,
+          // Absent on the first pass — the scene round's own posture, so the
+          // whole prefix reads warm (TRAILER_POSTURES).
+          ...(toolChoice ? { toolChoice } : {}),
+          campaignId: args.campaignId,
+          turnNumber: args.turnNumber,
+        });
+        const result = await done();
+        costUsd += result.costUsd;
+        fallbackUsed = fallbackUsed || result.fallbackUsed;
+        sidecar = extractCommitScene(result.message);
+        if (sidecar) {
+          trailerSource = "continuation";
+          break;
+        }
+      } catch (err) {
+        // Never fatal: the continuation is an improvement on the net, not a
+        // replacement for it. A rejected forced tool_choice, a stream failure,
+        // a refusal — all fall through (to the next posture, then the probe)
+        // exactly as before.
+        console.warn("[ka] trailer continuation failed — falling through", {
+          campaignId: args.campaignId,
+          turnNumber: args.turnNumber,
+          forced: toolChoice !== undefined,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
     }
   }
 

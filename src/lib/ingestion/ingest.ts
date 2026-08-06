@@ -24,7 +24,7 @@ import { STRUCTURED_SMALL } from "@/lib/llm/budgets";
 import { callJudgment, callProbe } from "@/lib/llm/calls";
 import { DEV_TIER_SELECTION, TierSelection } from "@/lib/llm/tiers";
 import { cosineSimilarity, embedTexts } from "@/lib/llm/voyage";
-import type { CanonCastMode, TimelineMode } from "@/lib/types/premise";
+import { type CanonCastMode, HARD_LINE_PREFIX, type TimelineMode } from "@/lib/types/premise";
 import { VoiceCard } from "@/lib/types/profile";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
@@ -348,15 +348,31 @@ async function nextEntityVersion(db: Db | Tx, entityId: string): Promise<number>
  * in-place mutation the rewind sweep can't see, so without it a rewind past
  * the correction took the replacement and left the original retired.
  */
+/** Any near-miss of the canonical prefix ("HARD LINE (absolute):x", odd case)
+ *  — stripped before the canonical form is applied so it is never doubled and
+ *  a malformed variant can't slip both the guard and every prefixed reader. */
+const NEAR_HARD_LINE_PREFIX = /^hard line \(absolute\):\s*/i;
+
 async function retireAndReplaceCriticalFact(
   db: Db,
   args: {
     campaignId: string;
-    row: { id: string; category: string };
+    row: { id: string; category: string; content: string };
     content: string;
     envelope: WriteEnvelope;
   },
-): Promise<{ id: string } | null> {
+): Promise<{ id: string; content: string } | null> {
+  // The record's own convention survives correction (M3R2 C4 + Bible audit):
+  // a hard line's prefix is the RECORD's marker, never player prose — the
+  // player says what the line should SAY, not what register the record keeps
+  // it in. BOTH correction channels (the booth's pen, story-channel
+  // ingestion) route through here, so the inheritance lives here, once —
+  // an inherited-at-one-call-site version let the story channel write a
+  // hard line bare, dropping it out of the Bible read and the pen's
+  // absolute register in the same stroke.
+  const content = args.row.content.startsWith(HARD_LINE_PREFIX)
+    ? `${HARD_LINE_PREFIX}${args.content.trim().replace(NEAR_HARD_LINE_PREFIX, "")}`
+    : args.content;
   await db
     .update(criticalFacts)
     .set({ tombstonedAt: new Date(), retiredAtTurn: args.envelope.turnId })
@@ -365,11 +381,11 @@ async function retireAndReplaceCriticalFact(
     .insert(criticalFacts)
     .values({
       campaignId: args.campaignId,
-      content: args.content,
+      content,
       category: args.row.category,
       ...args.envelope,
     })
-    .returning({ id: criticalFacts.id });
+    .returning({ id: criticalFacts.id, content: criticalFacts.content });
   return replacement ?? null;
 }
 
@@ -478,6 +494,10 @@ export async function applyRecordCorrection(
             : `"${hint}" matches ${matches.length} live records — quote the exact line as it stands so the right one can be found`,
       };
     }
+    // Prefix inheritance lives INSIDE retireAndReplaceCriticalFact (Bible
+    // audit F1): both correction channels route through it, and an
+    // inherited-at-this-call-site version left the story channel writing
+    // hard lines bare.
     const replacement = await retireAndReplaceCriticalFact(db, {
       campaignId: args.campaignId,
       row: target,
@@ -487,7 +507,14 @@ export async function applyRecordCorrection(
     if (!replacement) {
       return { filed: false, reason: "the replacement record failed to write" };
     }
-    return { filed: true, kind: "critical_fact_replaced", id: replacement.id, recordText: content };
+    return {
+      filed: true,
+      kind: "critical_fact_replaced",
+      id: replacement.id,
+      // What the record NOW READS — the responder quotes this out loud, so it
+      // carries the inherited prefix rather than the extractor's bare line.
+      recordText: replacement.content,
+    };
   }
 
   const key = identityKey(hint);

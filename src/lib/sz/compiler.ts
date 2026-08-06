@@ -19,6 +19,7 @@ import { OpeningStatePackage } from "@/lib/types/opening";
 import {
   Canonicality,
   DirectiveGrant,
+  HARD_LINE_PREFIX,
   type PremiseComponents,
   PremiseContract,
   PresentationVocabulary,
@@ -1757,7 +1758,7 @@ export async function compileSessionZero(
         `Finitude: ${contract.finitude} — only the player may change this.`,
         `Death physics: ${contract.intensity.death_physics}`,
         `Lethality posture: ${contract.intensity.lethality_posture}`,
-        ...contract.intensity.hard_lines.map((l) => `HARD LINE (absolute): ${l}`),
+        ...contract.intensity.hard_lines.map((l) => `${HARD_LINE_PREFIX}${l}`),
         ...(contract.intensity.control_key
           ? [`Control key (player-cut): ${contract.intensity.control_key.circumstances}`]
           : []),

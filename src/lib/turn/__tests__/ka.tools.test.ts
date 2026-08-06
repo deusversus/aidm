@@ -207,11 +207,14 @@ describe("the research budget is enforced in the loop, not in the tool array", (
 
     const result = await runKeyAnimator(noDb, kaArgs({ kaResearchCalls: 0 }));
 
-    // budget 0 → cap of two SCENE rounds. The third call is the §5.7 trailer
-    // continuation (M3 C1), which is bounded at exactly one and cannot ask for
-    // research — tool_choice forces commit_scene — so the cap still holds.
-    expect(mockStream).toHaveBeenCalledTimes(3);
-    expect(mockStream.mock.calls[2]?.[0].toolChoice).toEqual({
+    // budget 0 → cap of two SCENE rounds. Calls 3 and 4 are the §5.7 trailer
+    // continuation's two postures (M3R4: the warm ask, then the forced
+    // demand). It is bounded at exactly two and executes NO research whatever
+    // the model asks for — the continuation loop reads commit_scene or moves
+    // on — so the spin guard still holds, one round wider than before.
+    expect(mockStream).toHaveBeenCalledTimes(4);
+    expect(mockStream.mock.calls[2]?.[0].toolChoice).toBeUndefined();
+    expect(mockStream.mock.calls[3]?.[0].toolChoice).toEqual({
       type: "tool",
       name: "commit_scene",
     });

@@ -1,7 +1,9 @@
 import { composeBible } from "@/lib/bible/bible";
 import * as schema from "@/lib/db/schema";
+import { applyRecordCorrection } from "@/lib/ingestion/ingest";
+import type { TierSelection } from "@/lib/llm/tiers";
 import { bebopContract } from "@/lib/renderer/__tests__/fixtures";
-import type { PremiseContract } from "@/lib/types/premise";
+import { HARD_LINE_PREFIX, type PremiseContract } from "@/lib/types/premise";
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
@@ -9,11 +11,24 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 /**
  * The Series Bible composer (§9.1, C9) against real Postgres. No model calls
- * anywhere — the composition is pure layer reads. Covers the reveal gate, the
- * entityType grouping with dismissed/tombstoned exclusion, the player-minted
- * badge, the world-facts category filter (sz_fact + promoted, minus contract
- * and demoted), and hard lines surfacing from the intensity contract.
+ * anywhere — the composition is pure layer reads, and the one correction filed
+ * here takes the critical_fact path, which is deterministic (the model only
+ * enters on the entity/dossier path). Covers the reveal gate, the entityType
+ * grouping with dismissed/tombstoned exclusion, the player-minted badge, the
+ * world-facts category filter (sz_fact + promoted, minus contract and demoted),
+ * and hard lines read from the LIVE record with the archive as fallback.
  */
+
+/** The 2026-08-03 record, in shape: the line as stored, and as the player meant it. */
+const INVERTED_LINE = `no "nah id win" energy — the protagonist never shrugs off a real threat`;
+const CORRECTED_LINE = `the protagonist keeps "nah id win" energy — unshaken before a real threat`;
+
+/** Never used: the critical_fact correction path makes no model call. */
+const SELECTION: TierSelection = {
+  narration: "claude-sonnet-5",
+  judgment: "claude-haiku-4-5",
+  probe: "claude-haiku-4-5",
+};
 
 const url = process.env.DATABASE_URL;
 if (!url) console.warn("[bible] DATABASE_URL not set — skipping real-DB suite");
@@ -43,6 +58,17 @@ describe.skipIf(!url)("composeBible (real Postgres)", () => {
     if (!c) throw new Error("campaign insert failed");
     campaignIds.push(c.id);
     return c.id;
+  }
+
+  /** The SZ compiler's own shape for a hard line: a contract row at turn 0. */
+  async function seedHardLine(campaignId: string, line: string): Promise<void> {
+    if (!db) throw new Error("unreachable");
+    await db.insert(schema.criticalFacts).values({
+      campaignId,
+      content: `${HARD_LINE_PREFIX}${line}`,
+      category: "contract",
+      ...envelope(0, "sz_resolution"),
+    });
   }
 
   async function completeTurn(campaignId: string, turnNumber = 1): Promise<void> {
@@ -272,8 +298,11 @@ describe.skipIf(!url)("composeBible (real Postgres)", () => {
     expect(bible?.evolutions[0]?.content).toContain("making a wake");
   });
 
-  it("surfaces hard lines from the intensity contract", async () => {
+  it("FALLBACK: with no live hard-line rows the archive copy still shows", async () => {
     if (!db) throw new Error("unreachable");
+    // No critical_facts at all — the shape of a campaign whose contract
+    // predates the M1 C3 mint (2026-07-07), or one whose rows are gone. A page
+    // section with real content behind it is never silently blanked.
     const campaignId = await makeCampaign({
       intensity: {
         death_physics: "death is real, sudden, and cheap",
@@ -293,5 +322,80 @@ describe.skipIf(!url)("composeBible (real Postgres)", () => {
     expect(bible?.premise.deathPhysics).toBe("death is real, sudden, and cheap");
     expect(bible?.premise.lethalityPosture).toBe("losses stay lost");
     expect(bible?.premise.controlKey).toBe("when the bloodrage takes hold");
-  });
+  }, 20_000);
+
+  it("reads hard lines from the LIVE record, not the signed contract's copy", async () => {
+    if (!db) throw new Error("unreachable");
+    // The archive says one thing; the record — the rows the pen actually reads
+    // — says another. The bible is the campaign AS PLAYED.
+    const campaignId = await makeCampaign({
+      intensity: {
+        death_physics: "death is real",
+        lethality_posture: "losses stay lost",
+        hard_lines: ["the stale archive line"],
+      },
+    });
+    await completeTurn(campaignId);
+    await seedHardLine(campaignId, "no harm to children on screen");
+    await seedHardLine(campaignId, "no sexual violence");
+    // Contract rows that are NOT hard lines stay out of the section (the
+    // compiler mints the whole intensity contract under one category), and a
+    // retired row is invisible exactly like any other tombstoned write.
+    await db.insert(schema.criticalFacts).values([
+      {
+        campaignId,
+        content: "Death physics: death is real",
+        category: "contract",
+        ...envelope(0, "sz_resolution"),
+      },
+      {
+        campaignId,
+        content: `${HARD_LINE_PREFIX}a line retired long ago`,
+        category: "contract",
+        tombstonedAt: new Date(),
+        retiredAtTurn: 4,
+        ...envelope(0, "sz_resolution"),
+      },
+    ]);
+
+    const bible = await composeBible(db, campaignId);
+    // Ordered turnId then content; the prefix is stripped for display.
+    expect(bible?.premise.hardLines).toEqual([
+      "no harm to children on screen",
+      "no sexual violence",
+    ]);
+    expect(bible?.premise.hardLines.join()).not.toContain("stale archive");
+    // And the contract rows never leak into the world-facts section.
+    expect(bible?.worldFacts).toEqual([]);
+  }, 20_000);
+
+  it("THE FOUNDING INCIDENT, on the bible page: a corrected hard line shows corrected", async () => {
+    if (!db) throw new Error("unreachable");
+    // 2026-08-03: the record held a hard line INVERTED, the player said so in
+    // the booth, M3R2 C4 gave that a pen. Before the 2026-08-05 ruling the
+    // bible rendered the contract's untouched copy — so the page went on
+    // showing the player the exact wrong line they had just fixed, forever.
+    const campaignId = await makeCampaign({
+      intensity: {
+        death_physics: "death is real",
+        lethality_posture: "losses stay lost",
+        hard_lines: [INVERTED_LINE],
+      },
+    });
+    await completeTurn(campaignId);
+    await seedHardLine(campaignId, INVERTED_LINE);
+
+    const outcome = await applyRecordCorrection(db, SELECTION, {
+      campaignId,
+      turnNumber: 12,
+      targetKind: "critical_fact",
+      targetHint: `${HARD_LINE_PREFIX}${INVERTED_LINE}`,
+      correctedContent: `${HARD_LINE_PREFIX}${CORRECTED_LINE}`,
+    });
+    expect(outcome.filed).toBe(true);
+
+    const bible = await composeBible(db, campaignId);
+    expect(bible?.premise.hardLines).toEqual([CORRECTED_LINE]);
+    expect(bible?.premise.hardLines.join()).not.toContain("never shrugs off");
+  }, 20_000);
 });

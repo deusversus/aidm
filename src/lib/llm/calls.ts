@@ -732,10 +732,13 @@ export async function prewarmPrefix(
       model,
       max_tokens: 0,
       // No tool_choice: {type:"tool"|"any"} — those are rejected alongside
-      // max_tokens=0, and tool_choice does not enter the tools/system cache
-      // key, so the KA's `auto` costs that prefix nothing. (The MESSAGES
-      // tier — where Block 3 lives post-C2 — keys on message bytes, which
-      // the exchangeMessages param reproduces verbatim.)
+      // max_tokens=0. Absent is also the RIGHT posture, not merely the legal
+      // one: tool_choice stays out of the tools/system key but rides the
+      // MESSAGES key (measured 2026-08-05), and Block 3 lives in messages
+      // post-C2, so a pre-warm that forced a tool would write a window entry
+      // the KA's `auto` round could never read. The exchangeMessages param
+      // reproduces the message bytes verbatim; this leaves the posture
+      // matching too.
       ...(tools.length > 0 ? { tools } : {}),
       system,
       // The documented pre-warm form keeps a placeholder user turn — an empty
@@ -806,8 +809,14 @@ export interface NarrationOptions extends CallContext {
    * the KA's tool ARRAY (so its prefix matches the KA's cache entry, §5.6)
    * while staying structurally unable to call one; `{type:"tool"}` forces the
    * §5.7 trailer on the continuation round, where no prose is wanted.
-   * tool_choice is not part of the tools/system cache key, so neither costs
-   * the prefix anything.
+   *
+   * IT IS NOT FREE (measured on the wire, N=50 soak, 2026-08-05). tool_choice
+   * is outside the tools/system cache key — that much was always true — but it
+   * is INSIDE the messages key, and since M3R2 C2 the verbatim exchange window
+   * lives in `messages`. A caller that changes posture mid-conversation reads
+   * the system tier and re-writes the whole window at the 1h 2x rate. Hold the
+   * posture constant across a conversation's calls, or price the change (see
+   * turn/ka.ts TRAILER_POSTURES for what it cost the trailer round).
    */
   toolChoice?: ToolChoice;
 }

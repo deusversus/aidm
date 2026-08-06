@@ -1,13 +1,17 @@
 import { describe, expect, it } from "vitest";
 import {
   type CallRow,
+  type SoakCampaignRow,
   type TurnRecord,
+  assertSoakCampaign,
   buildSoakPlan,
   coldOpensFor,
   droppedOps,
   estimateRunPrice,
   meteringCoverage,
   partitionAttempts,
+  planWindow,
+  resumePlan,
 } from "../scripts/soak-lib";
 import { COMPACTION_KEEP_TAIL, COMPACTION_TRIGGER_EXCHANGES } from "../src/lib/blocks/compaction";
 import { DEV_TIER_SELECTION } from "../src/lib/llm/tiers";
@@ -174,6 +178,121 @@ describe("buildSoakPlan (the 100-turn mode)", () => {
   it("rejects a nonsense N", () => {
     expect(() => buildSoakPlan(0, 8, 2)).toThrow();
     expect(() => buildSoakPlan(1.5, 8, 2)).toThrow();
+  });
+});
+
+describe("planWindow (story turns vs channel turns — the N=50 gate miss)", () => {
+  // The live shape: the beat plan schedules an /override at 13 and a booth
+  // exchange at 15. Both consume a turn number and write no scene, so a plan
+  // that walked turn NUMBERS to 50 banked 48 completed story turns and the
+  // §10.3 suites skipped the run they exist to grade (2026-08-05).
+  const soakChannels = (turn: number): boolean => turn === 13 || turn === 15;
+
+  it("reaches N STORY turns by spending more turn numbers than N", () => {
+    const win = planWindow(0, 50, soakChannels);
+    expect(win.storySteps).toBe(50);
+    expect(win.channelSteps).toBe(2);
+    expect(win.steps).toBe(52);
+    expect(win.steps).toBeGreaterThan(50);
+    expect(win.windowEnd).toBe(52);
+  });
+
+  it("the old counting is exactly the 48 the gate saw", () => {
+    // Walking 50 turn NUMBERS with two channel beats among them.
+    const storyIn50Numbers = 50 - [13, 15].filter((n) => n <= 50).length;
+    expect(storyIn50Numbers).toBe(48);
+    expect(planWindow(0, 48, soakChannels).windowEnd).toBe(50);
+  });
+
+  it("a window past the scripted specials schedules no channel steps", () => {
+    const win = planWindow(50, 2, soakChannels);
+    expect(win).toMatchObject({ storySteps: 2, channelSteps: 0, steps: 2, windowEnd: 52 });
+  });
+
+  it("a plan with no channel beats is one step per story turn", () => {
+    expect(planWindow(0, 30, () => false)).toMatchObject({ steps: 30, windowEnd: 30 });
+  });
+
+  it("the plan sizes its step ceiling for the channel beats it schedules", () => {
+    const bare = buildSoakPlan(50, 8, 2);
+    const withChannels = buildSoakPlan(50, 8, 2, 2);
+    expect(bare.turns).toBe(50);
+    expect(withChannels.channelBeats).toBe(2);
+    expect(withChannels.plannedSteps).toBe(52);
+    expect(withChannels.maxSteps).toBe(bare.maxSteps + 2);
+    expect(withChannels.maxSteps).toBeGreaterThanOrEqual(withChannels.plannedSteps);
+  });
+});
+
+describe("resumePlan (--campaign= arithmetic)", () => {
+  const soakChannels = (turn: number): boolean => turn === 13 || turn === 15;
+
+  it("48 banked story turns against a target of 50 plays exactly 2", () => {
+    // The live campaign: 50 turn numbers issued, 48 of them completed scenes.
+    const plan = resumePlan(48, 50, 50, soakChannels);
+    expect(plan.toPlay).toBe(2);
+    expect(plan.window.storySteps).toBe(2);
+    expect(plan.window.channelSteps).toBe(0);
+    expect(plan.window.windowEnd).toBe(52);
+    expect(plan.startTurn).toBe(50);
+  });
+
+  it("a campaign already at (or past) the target plays nothing", () => {
+    expect(resumePlan(50, 50, 52, soakChannels).toPlay).toBe(0);
+    expect(resumePlan(64, 50, 70, soakChannels).toPlay).toBe(0);
+    expect(resumePlan(50, 50, 52, soakChannels).window.steps).toBe(0);
+  });
+
+  it("carries scheduled channel beats when the window still contains them", () => {
+    // A run abandoned at turn 10 resumes into the /override and booth beats.
+    const plan = resumePlan(10, 20, 10, soakChannels);
+    expect(plan.toPlay).toBe(10);
+    expect(plan.window.channelSteps).toBe(2);
+    expect(plan.window.steps).toBe(12);
+  });
+
+  it("prices only the incremental turns, and states the split", () => {
+    const two = estimateRunPrice(2, DEV_TIER_SELECTION, 1, 0);
+    const fifty = estimateRunPrice(50, DEV_TIER_SELECTION, 2, 2);
+    expect(two.expectedUsd).toBeLessThan(fifty.expectedUsd / 10);
+    expect(fifty.steps).toBe(52);
+    expect(fifty.channelUsd).toBeGreaterThan(0);
+    expect(fifty.lines[0]).toContain("2 scheduled channel step(s)");
+    // Channel steps cost something, but nowhere near a scene.
+    expect(fifty.channelUsd).toBeLessThan(estimateRunPrice(1, DEV_TIER_SELECTION, 0).expectedUsd);
+  });
+});
+
+describe("assertSoakCampaign (--campaign= refuses what is not a soak)", () => {
+  const id = "439ad090-2bc2-4c39-afda-103e2b952ddb";
+  const soak: SoakCampaignRow = {
+    id,
+    title: "M1 Soak — Cowboy Bebop",
+    status: "active",
+    openingPackage: { director_inputs: {} },
+  };
+
+  it("accepts the soak campaign the gate itself would discover", () => {
+    const verdict = assertSoakCampaign(soak, id);
+    expect(verdict.ok).toBe(true);
+  });
+
+  it("refuses a campaign that does not exist", () => {
+    const verdict = assertSoakCampaign(undefined, id);
+    expect(verdict.ok).toBe(false);
+    if (!verdict.ok) expect(verdict.reason).toContain("does not exist");
+  });
+
+  it("refuses the PLAYER's campaign — live turns are never written into it", () => {
+    const verdict = assertSoakCampaign({ ...soak, title: "The Long Way Home" }, id);
+    expect(verdict.ok).toBe(false);
+    if (!verdict.ok) expect(verdict.reason).toContain("REFUSING");
+  });
+
+  it("refuses an untitled, an inactive, and an un-seeded campaign", () => {
+    expect(assertSoakCampaign({ ...soak, title: null }, id).ok).toBe(false);
+    expect(assertSoakCampaign({ ...soak, status: "archived" }, id).ok).toBe(false);
+    expect(assertSoakCampaign({ ...soak, openingPackage: null }, id).ok).toBe(false);
   });
 });
 

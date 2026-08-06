@@ -292,6 +292,37 @@ describe.skipIf(!url)("Booth corrections channel (real Postgres, scripted models
     expect(live?.retiredAtTurn).toBeNull();
   });
 
+  it("the replacement INHERITS the retired line's register when the gate drops the prefix", async () => {
+    if (!db) throw new Error("unreachable");
+    const campaignId = await makeCampaign();
+    await seedHardLine(campaignId);
+    // The gate is TOLD "a hard line stays 'HARD LINE (absolute): ...'" and is
+    // not held to it — free text from a model. A bare replacement is still a
+    // live critical fact (the pen sees it), but it stops reading as absolute
+    // and drops out of the Series Bible's hard-lines section, which finds them
+    // BY the prefix. The record's register is the record's, not player prose.
+    scriptJudgment({
+      gate: {
+        player_states_record_is_wrong: true,
+        target_kind: "critical_fact",
+        target_hint: INVERTED_HARD_LINE,
+        record_text: `the protagonist keeps "nah id win" energy`,
+      },
+    });
+
+    await runBoothExchange(db, campaignId, 21, PLAYER_WORDS, () => {});
+
+    const [live] = await liveFactsFor(campaignId);
+    expect(live?.content).toBe(`HARD LINE (absolute): the protagonist keeps "nah id win" energy`);
+    expect(live?.category).toBe("contract");
+    // Inherited, never doubled: a gate that DID keep the register is untouched.
+    expect(live?.content.match(/HARD LINE/g)).toHaveLength(1);
+    // And what the responder is told to quote is what the record now reads.
+    expect(responderFrame()).toContain(
+      `FILED — the record now reads: "HARD LINE (absolute): the protagonist keeps`,
+    );
+  }, 20_000);
+
   it("the responder is told the write LANDED before it speaks — the acknowledgement names the record", async () => {
     if (!db) throw new Error("unreachable");
     const campaignId = await makeCampaign();

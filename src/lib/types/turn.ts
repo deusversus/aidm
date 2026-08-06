@@ -171,8 +171,22 @@ export const TURN_CONTRACTS: Record<TurnTier, TurnContract> = {
     kaResearchCalls: 0,
     outputBudgetTokens: 900,
     promptBudgetTokens: 30_000,
-    ttftTargetMs: 3_000,
-    totalTargetMs: 10_000,
+    // FLAT-HIGH-ERA NUMBERS, and they look absurd on purpose. 3,000/10,000
+    // were written when douga ran effort "low"; the §3 flatten (2026-08-01)
+    // put the trivial tier on "high", and the N=50 soak (2026-08-05) measured
+    // what that means: across 14 douga turns, TTFT p90 102.8s and total p90
+    // 132.5s, with TTFT tracking thinking almost linearly (≈ 8s + thinking/84
+    // tok/s — the wait IS the reasoning, not latency to fix). Against the dead
+    // 3s target every one of those turns flagged twice: 28 of the run's 101
+    // latency flags were unactionable BY CONSTRUCTION, which is worse than no
+    // target at all — a tripwire that always fires stops being read.
+    // Set at p90 + ~15%: in the measured run these flag exactly one turn
+    // (turn 17, 141s/162s), which is what a tripwire is supposed to do.
+    // THESE REVERT IF DOUGA'S EFFORT DOES. The §3 amendment is user-ruled and
+    // flat high stands until a blind A/B says otherwise; a douga-at-low ruling
+    // would put the old 3s/10s back within a run.
+    ttftTargetMs: 120_000,
+    totalTargetMs: 160_000,
     validationRetry: false,
     effort: "high",
   },

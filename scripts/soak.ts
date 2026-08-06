@@ -18,6 +18,16 @@
  *   pnpm soak -- --dry-run        prints the plan, seeds + tears down, ZERO model calls
  *   pnpm soak -- --capture-golden LIVE run, then writes §10.7 golden-turn seeds
  *   pnpm soak -- --cleanup        LIVE run, then deletes the soak campaign
+ *   pnpm soak -- --campaign=<id> --turns=50
+ *                                 RESUME an existing soak campaign: plays only the
+ *                                 STORY turns it is short of the target and appends
+ *                                 a "## Resume" section to the run's report.
+ *
+ * `--turns=N` is a STORY-turn target, not a turn-number count: a channel beat
+ * (a booth exchange, an `/override`) consumes a turn number and writes no
+ * scene. The N=50 gate run of 2026-08-05 played 50 numbered turns with two
+ * channel beats among them and banked 48 completed story turns — one gate short
+ * of §10.3's floor, so flywheel-prospective SKIPPED the run it exists to grade.
  *
  * Standing directive: DEV traffic runs Sonnet/Haiku (DEV_TIER_SELECTION);
  * NO automated run ever calls Fable. A hard guard at startup exits loudly if
@@ -26,7 +36,7 @@
  * arithmetic on measured usage, never an API call.)
  */
 
-import { mkdirSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { compactionWatermark, epochEventCount } from "@/lib/blocks/compaction";
 import { settleG2IfPending } from "@/lib/compositor/g2";
@@ -42,10 +52,11 @@ import { rewindCampaign } from "@/lib/turn/rewind";
 import { TurnInProgressError } from "@/lib/turn/runtime";
 import { OpeningStatePackage } from "@/lib/types/opening";
 import type { TurnTier } from "@/lib/types/turn";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, gte } from "drizzle-orm";
 import jsYaml from "js-yaml";
 import { z } from "zod";
 import { BUDGET_ASSUMPTIONS } from "../evals/suites/budget-assertions";
+import { MIN_SOAK_TURNS } from "../evals/suites/flywheel-prospective";
 import {
   BEBOP_OSP,
   type MeteringCoverage,
@@ -54,17 +65,22 @@ import {
   type SpendAttribution,
   type TurnRecord,
   type TurnRun,
+  assertSoakCampaign,
   attributeSpend,
   buildSoakPlan,
+  countStoryTurns,
   dbNow,
   droppedOps,
   estimateRunPrice,
   fmtUsd,
   guardNoFable,
+  maxTurnNumber,
   meterSettledTurn,
   meterTurn,
   meteringCoverage,
   openSittingNumber,
+  planWindow,
+  resumePlan,
   runOneTurn,
   sessionCoverage,
   waitForRowTerminal,
@@ -78,8 +94,9 @@ const DRY_RUN = process.argv.includes("--dry-run");
 const CAPTURE_GOLDEN = process.argv.includes("--capture-golden");
 const CLEANUP = process.argv.includes("--cleanup");
 
-/** `--turns=N` (default 30, the M1 shape). The M3 gate runs 100 (§10.3 asks
- *  50–100; the M2 gate ran 24 against that letter — a recorded discrepancy). */
+/** `--turns=N` (default 30, the M1 shape) — a STORY-turn target. The M3 gate
+ *  runs 100 (§10.3 asks 50–100; the M2 gate ran 24 against that letter — a
+ *  recorded discrepancy). */
 function parseTurns(argv: string[]): number {
   const flag = argv.find((a) => a.startsWith("--turns="));
   if (!flag) return 30;
@@ -91,10 +108,32 @@ function parseTurns(argv: string[]): number {
   return n;
 }
 
-const TARGET_TURNS = parseTurns(process.argv);
+/** `--campaign=<uuid>` resumes an existing soak campaign instead of seeding a
+ *  fresh one — the path back from a run that landed short of its story target. */
+function parseCampaign(argv: string[]): string | null {
+  const flag = argv.find((a) => a.startsWith("--campaign="));
+  if (!flag) return null;
+  const id = flag.slice("--campaign=".length).trim();
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+    console.error(`[soak] FATAL: --campaign must be a campaign uuid (got '${id}')`);
+    process.exit(1);
+  }
+  return id;
+}
 
-/** How many turns a nominal play sitting is, for the spend projection. */
-const SESSIONS = 2;
+const TARGET_TURNS = parseTurns(process.argv);
+const RESUME_CAMPAIGN = parseCampaign(process.argv);
+
+if (RESUME_CAMPAIGN && CLEANUP) {
+  // --cleanup deletes the campaign it ran. On a resume that campaign is the
+  // gate's own record — the thing the resume exists to complete.
+  console.error("[soak] FATAL: --cleanup with --campaign would delete the campaign being resumed");
+  process.exit(1);
+}
+
+/** How many turns a nominal play sitting is, for the spend projection. A resume
+ *  opens exactly one sitting for the turns it adds. */
+const SESSIONS = RESUME_CAMPAIGN ? 1 : 2;
 // ---------------------------------------------------------------------------
 // The Opening State Package (§8) — a full handoff artifact, envelopes and all.
 // Modeled on src/lib/sz/__tests__/compiler.integration.test.ts's STUB_OSP but
@@ -112,6 +151,10 @@ const SOAK_OSP = BEBOP_OSP;
 interface ScriptedBeat {
   input: string;
   label: string;
+  /** A CHANNEL beat: routed to the booth / override responder, not the pen. It
+   *  consumes a turn number and produces no scene, so it never counts toward
+   *  the story-turn target the §10.3 gate reads. */
+  channel?: true;
 }
 
 const SCRIPTED: Record<number, ScriptedBeat> = {
@@ -136,22 +179,40 @@ const SCRIPTED: Record<number, ScriptedBeat> = {
   },
   13: {
     label: "OVERRIDE_COMMAND",
+    channel: true,
     input:
       "/override From here on, keep the body count low — I want captures, not kills, unless there's no other way.",
   },
   15: {
     label: "META_FEEDBACK (booth)",
+    channel: true,
     input:
       "Hey — out of character for a second: can we lean harder into the noir mood? More smoke and silence, less banter.",
   },
 };
+
+/** The scheduled channel beats, by turn number — what `planWindow` walks past. */
+const CHANNEL_BEATS = new Set(
+  Object.entries(SCRIPTED)
+    .filter(([, beat]) => beat.channel === true)
+    .map(([turn]) => Number(turn)),
+);
+const isChannelBeat = (turn: number): boolean => CHANNEL_BEATS.has(turn);
 
 /** Ops fire AFTER the intended turn lands, once each. The pin rides the combat
  *  special, so it keeps that special's turn; the midpoint and the rewind are
  *  structural and scale with N (buildSoakPlan). */
 const PIN_AFTER_TURN = 8;
 const REWIND_DEPTH = 2;
-const PLAN: SoakPlan = buildSoakPlan(TARGET_TURNS, PIN_AFTER_TURN, REWIND_DEPTH);
+/** The fresh run's window: N story turns plus whatever channel beats the plan
+ *  schedules among the turn numbers it walks through to reach them. */
+const FRESH_WINDOW = planWindow(0, TARGET_TURNS, isChannelBeat);
+const PLAN: SoakPlan = buildSoakPlan(
+  TARGET_TURNS,
+  PIN_AFTER_TURN,
+  REWIND_DEPTH,
+  FRESH_WINDOW.channelSteps,
+);
 
 function opsAfter(turn: number): string[] {
   const ops: string[] = [];
@@ -490,20 +551,21 @@ async function captureGolden(db: Db, campaignId: string): Promise<string[]> {
 // The plan description (dry-run + report header).
 // ---------------------------------------------------------------------------
 
-function describePlan(): string {
+function describePlan(fromTurn = 0, storyToPlay = PLAN.turns): string {
+  const win = planWindow(fromTurn, storyToPlay, isChannelBeat);
   const lines: string[] = [];
   lines.push(
-    `soak — ${PLAN.turns}-turn scripted beat plan (DEV tiers: narration=${DEV_TIER_SELECTION.narration}, judgment=${DEV_TIER_SELECTION.judgment}, probe=${DEV_TIER_SELECTION.probe})`,
+    `soak — ${storyToPlay}-STORY-turn scripted beat plan (DEV tiers: narration=${DEV_TIER_SELECTION.narration}, judgment=${DEV_TIER_SELECTION.judgment}, probe=${DEV_TIER_SELECTION.probe})`,
   );
   lines.push(
-    `target ${PLAN.turns} turns · specials scripted at their own turns, gaps persona-driven (one probe/turn) · pin after ${PLAN.pinAfter} · session close/reopen after ${PLAN.midpointAfter} · rewind of ${PLAN.rewindDepth} after ${PLAN.rewindAfter}`,
+    `target ${storyToPlay} story turn(s) + ${win.channelSteps} scheduled channel step(s) = ${win.steps} submission(s), turns ${fromTurn + 1}..${win.windowEnd} · specials scripted at their own turns, gaps persona-driven (one probe/turn) · pin after ${PLAN.pinAfter} · session close/reopen after ${PLAN.midpointAfter} · rewind of ${PLAN.rewindDepth} after ${PLAN.rewindAfter}`,
   );
   const unreachable = Object.keys(SCRIPTED)
     .map(Number)
-    .filter((n) => n > PLAN.turns);
+    .filter((n) => n > win.windowEnd || n <= fromTurn);
   if (unreachable.length > 0) {
     lines.push(
-      `NOTE: specials at turn(s) ${unreachable.join(", ")} never fire at N=${PLAN.turns} — the event mix will be short by design`,
+      `NOTE: specials at turn(s) ${unreachable.join(", ")} do not fire in this window — the event mix will be short by design`,
     );
   }
   // The structural ops scale with N and a small N genuinely drops some of them.
@@ -516,11 +578,11 @@ function describePlan(): string {
     );
   }
   lines.push("");
-  const width = String(PLAN.turns).length;
-  for (let n = 1; n <= PLAN.turns; n++) {
+  const width = String(win.windowEnd).length;
+  for (let n = fromTurn + 1; n <= win.windowEnd; n++) {
     const s = SCRIPTED[n];
     const desc = s
-      ? `${s.label} — ${s.input}`
+      ? `${s.label}${s.channel ? " [CHANNEL — consumes a turn number, no scene]" : ""} — ${s.input}`
       : "persona — probe-driven laconic bounty-hunter move";
     lines.push(`  turn ${String(n).padStart(width, " ")}  ${desc}`);
     for (const op of opsAfter(n)) lines.push(`          ↳ op: ${op}`);
@@ -532,30 +594,27 @@ function describePlan(): string {
 // Report
 // ---------------------------------------------------------------------------
 
-function buildReport(
-  campaignId: string,
-  records: TurnRecord[],
-  checklist: ChecklistItem[],
-  spend: SpendAttribution,
-  coverage: MeteringCoverage,
-  sessions: SessionCoverage,
-): string {
-  const out: string[] = [];
-  out.push(`# Soak Report — ${PLAN.turns}-turn run`);
-  out.push("");
-  out.push(`Generated: ${new Date().toISOString()}`);
-  out.push("");
-  out.push(
-    `Campaign id: \`${campaignId}\` — **KEPT** for reference${CLEANUP ? " (but --cleanup will delete it after this report)" : " (pass --cleanup to delete)"}.`,
-  );
-  out.push("");
-  out.push(
-    `Tier selection (DEV): narration=\`${DEV_TIER_SELECTION.narration}\`, judgment=\`${DEV_TIER_SELECTION.judgment}\`, probe=\`${DEV_TIER_SELECTION.probe}\`. Fable guard: **PASS** (no Fable in any tier).`,
-  );
-  out.push("");
+/** What the invocation actually submitted, split the way the gate counts. */
+interface RunTally {
+  /** Completed STORY turns the CAMPAIGN holds at run end — the §10.3 quantity. */
+  storyTurns: number;
+  /** Channel steps this invocation submitted: turn numbers spent, no scenes. */
+  channelSteps: number;
+  /** Submissions this invocation made (story + channel + re-climb). */
+  steps: number;
+}
 
-  out.push("## Per-turn table");
-  out.push("");
+/** The §10.3 floor, stated against what the campaign now holds. Every report
+ *  says it out loud: the N=50 run's 48 story turns read as a full run in the
+ *  report while the gate suites silently skipped. */
+function gateLine(tally: RunTally): string {
+  const met = tally.storyTurns >= MIN_SOAK_TURNS;
+  return `- Completed STORY turns in the campaign: **${tally.storyTurns}** vs the §10.3 gate floor of ${MIN_SOAK_TURNS} (flywheel-prospective \`MIN_SOAK_TURNS\`) — ${met ? "**MET**" : "**NOT MET — the gate suites will SKIP**"}. This invocation submitted ${tally.steps} step(s), of which ${tally.channelSteps} channel turn(s) consumed a turn number without writing a scene.`;
+}
+
+/** The per-turn table both the fresh report and the resume section print. */
+function turnTableLines(records: TurnRecord[]): string[] {
+  const out: string[] = [];
   out.push(
     "| step | turn | tier | served model | attempts | narration $ | turn $ | cacheRead frac | TTFT ms | total ms | flags |",
   );
@@ -578,6 +637,40 @@ function buildReport(
       `| ${r.step} | ${r.turnNumber} | ${r.tier} | ${r.servedModel} | ${attempts} | ${fmtUsd(r.narrationUsd)} | ${fmtUsd(r.turnUsd)} | ${frac} | ${ttft} | ${total} | ${flags} |`,
     );
   }
+  return out;
+}
+
+function buildReport(
+  campaignId: string,
+  records: TurnRecord[],
+  checklist: ChecklistItem[],
+  spend: SpendAttribution,
+  coverage: MeteringCoverage,
+  sessions: SessionCoverage,
+  tally: RunTally,
+): string {
+  const out: string[] = [];
+  out.push(`# Soak Report — ${PLAN.turns}-story-turn run`);
+  out.push("");
+  out.push(`Generated: ${new Date().toISOString()}`);
+  out.push("");
+  out.push(
+    `Campaign id: \`${campaignId}\` — **KEPT** for reference${CLEANUP ? " (but --cleanup will delete it after this report)" : " (pass --cleanup to delete)"}.`,
+  );
+  out.push("");
+  out.push(
+    `Tier selection (DEV): narration=\`${DEV_TIER_SELECTION.narration}\`, judgment=\`${DEV_TIER_SELECTION.judgment}\`, probe=\`${DEV_TIER_SELECTION.probe}\`. Fable guard: **PASS** (no Fable in any tier).`,
+  );
+  out.push("");
+
+  out.push("## Story-turn count (the §10.3 gate quantity)");
+  out.push("");
+  out.push(gateLine(tally));
+  out.push("");
+
+  out.push("## Per-turn table");
+  out.push("");
+  out.push(...turnTableLines(records));
   out.push("");
 
   // The two coverage statements the M2 retro had to reconstruct by hand.
@@ -597,7 +690,7 @@ function buildReport(
 
   out.push("## Totals + spend attribution");
   out.push("");
-  const estimate = estimateRunPrice(PLAN.turns, DEV_TIER_SELECTION, SESSIONS);
+  const estimate = estimateRunPrice(PLAN.turns, DEV_TIER_SELECTION, SESSIONS, PLAN.channelBeats);
   out.push(
     `- Pre-run estimate (the number the run was authorized against): ${fmtUsd(estimate.warmFloorUsd)} floor · ${fmtUsd(estimate.expectedUsd)} expected · ${fmtUsd(estimate.coldCeilingUsd)} all-cold ceiling`,
   );
@@ -607,7 +700,13 @@ function buildReport(
     `- Session/harness overhead (persona probes, pre-warm, startup, recap/yokoku/memo): ${fmtUsd(spend.overheadUsd)}`,
   );
   out.push(
-    `- Measured within-turn cache-read fraction (mean): ${spend.avgCacheReadFrac === null ? "n/a" : spend.avgCacheReadFrac.toFixed(2)} vs the ${BUDGET_ASSUMPTIONS.assumedCacheHitRate} assumption (§5.6)`,
+    // TURN-TO-TURN, not within-turn: this mean is built from each turn's FIRST
+    // narration call (soak-lib's `firstNarration`), which is the only call that
+    // can prove the inter-turn prefix read. The within-turn read is a separate
+    // meter — the §5.6 guaranteed-read floor in the failures list. The old
+    // label read as if this number graded both, and it graded neither of the
+    // 17 broken follow-ups the N=50 run actually contained.
+    `- Measured turn-to-turn cache-read fraction (mean of each turn's FIRST narration call): ${spend.avgCacheReadFrac === null ? "n/a" : spend.avgCacheReadFrac.toFixed(2)} vs the ${BUDGET_ASSUMPTIONS.assumedCacheHitRate} assumption (§5.6)`,
   );
   out.push(`- Turns per session (measured): ${spend.turnsPerSession}`);
   out.push("");
@@ -651,37 +750,196 @@ function buildReport(
   return out.join("\n");
 }
 
+/**
+ * The INCREMENTAL report a `--campaign=` resume appends. The original report is
+ * a record of the run that produced it and is never regenerated — and the gate
+ * suites read the DATABASE, not this file, so the section's job is to tell a
+ * reader what a later invocation added and whether the campaign now clears the
+ * §10.3 floor.
+ */
+function buildResumeReport(
+  campaignId: string,
+  records: TurnRecord[],
+  checklist: ChecklistItem[],
+  coverage: MeteringCoverage,
+  sessions: SessionCoverage,
+  tally: RunTally,
+  ctx: RunContext,
+  incrementalUsd: number,
+  sittingNote: string,
+): string {
+  const out: string[] = [];
+  const played = records.filter((r) => r.status === "complete").length;
+  out.push("");
+  out.push(`## Resume ${new Date().toISOString().slice(0, 10)} — +${played} story turn(s)`);
+  out.push("");
+  out.push(
+    `Appended by \`pnpm soak -- --campaign=${campaignId} --turns=${PLAN.turns}\` at ${new Date().toISOString()}. The report above is the original run's and is untouched.`,
+  );
+  out.push("");
+  out.push(
+    `- Before: **${ctx.existingStory}** completed story turn(s), highest turn number ${ctx.startTurn}. Short of the ${PLAN.turns}-story-turn target by ${ctx.toPlay}.`,
+  );
+  const turnNumbers = records.map((r) => r.turnNumber);
+  const span =
+    turnNumbers.length > 0
+      ? `${Math.min(...turnNumbers)}..${Math.max(...turnNumbers)}`
+      : "none — the loop played nothing";
+  out.push(
+    `- Played: ${records.length} submission(s) over turn(s) ${span} — ${played} story, ${records.filter((r) => r.status === "channel").length} channel.`,
+  );
+  out.push(`- Sitting: ${sittingNote}`);
+  out.push(
+    `- Incremental spend (every model call this invocation made): **${fmtUsd(incrementalUsd)}**`,
+  );
+  out.push(gateLine(tally));
+  out.push("");
+
+  out.push("### Per-turn table (resumed turns only)");
+  out.push("");
+  out.push(...turnTableLines(records));
+  out.push("");
+
+  out.push("### Assertion coverage (§10.8, resumed turns)");
+  out.push("");
+  for (const line of coverage.lines) out.push(`- ${line}`);
+  out.push("");
+  out.push("### Session-lifecycle coverage (§9.4, campaign-wide)");
+  out.push("");
+  for (const line of sessions.lines) out.push(`- ${line}`);
+  out.push("");
+
+  // The tier rows read THIS invocation's records; every other row is a
+  // campaign-wide query. A two-turn resume that never draws a sakuga is not a
+  // coverage miss, and the heading must not let it read as one.
+  out.push("### Event-mix checklist (tier rows: the resumed turns only; the rest campaign-wide)");
+  out.push("");
+  for (const c of checklist) out.push(`- ${c.ok ? "[x]" : "[ ]"} ${c.label} — ${c.detail}`);
+  out.push("");
+
+  const allFailures = records.flatMap((r) => r.failures);
+  const allFlags = records.flatMap((r) => r.flags.map((f) => `turn ${r.turnNumber}: ${f}`));
+  out.push(`### Assertion failures (${allFailures.length})`);
+  if (allFailures.length === 0) out.push("- none — every metered assertion held.");
+  else for (const f of allFailures) out.push(`- ${f}`);
+  out.push("");
+  out.push(`### Waste-flags (${allFlags.length}) — §5.5: surfaced for review, never hard-fails`);
+  if (allFlags.length === 0) out.push("- none.");
+  else for (const f of allFlags) out.push(`- ${f}`);
+  out.push("");
+
+  out.push("### Beat plan (the resumed window)");
+  out.push("");
+  out.push("```");
+  out.push(describePlan(ctx.startTurn, ctx.toPlay));
+  out.push("```");
+  out.push("");
+
+  return out.join("\n");
+}
+
 // ---------------------------------------------------------------------------
 // The live run
 // ---------------------------------------------------------------------------
 
-async function liveRun(db: Db, campaignId: string): Promise<void> {
+/** Where this invocation starts and how much of the target it owes. */
+interface RunContext {
+  /** True when `--campaign=` pointed the harness at an existing soak. */
+  resume: boolean;
+  /** The highest turn number already issued — play continues at +1. */
+  startTurn: number;
+  /** Completed story turns the campaign already holds. */
+  existingStory: number;
+  /** Story turns this invocation must play to reach the target. */
+  toPlay: number;
+  /** The turn-number window those story turns + scheduled channel beats span. */
+  window: ReturnType<typeof planWindow>;
+}
+
+/** Everything this invocation spent on the campaign, bounded on the DATABASE
+ *  clock — `attributeSpend` reads the campaign's whole history, which on a
+ *  resume would bill the original run to the resumed turns. */
+async function spendSince(db: Db, campaignId: string, since: Date): Promise<number> {
+  const rows = await db
+    .select({ costUsd: schema.modelCalls.costUsd })
+    .from(schema.modelCalls)
+    .where(
+      and(eq(schema.modelCalls.campaignId, campaignId), gte(schema.modelCalls.createdAt, since)),
+    );
+  return rows.reduce((sum, r) => sum + Number(r.costUsd), 0);
+}
+
+async function liveRun(db: Db, campaignId: string, ctx: RunContext): Promise<void> {
   const records: TurnRecord[] = [];
   const artifacts: RunArtifacts = { session2Opened: false };
-  const coldTurns = new Set<number>([1]); // pilot is cold; session-2 first turn added below
+  const coldTurns = new Set<number>();
   let lastWatermark = 0;
   let lastEpochEvents = 0;
+  const invocationSince = await dbNow(db);
 
-  // Open the pilot sitting: Director startup + Settei rebuild + pre-warm.
-  const opened = await openSession(db, campaignId);
+  // Open the sitting. `resume: true` steps past the "closed explicitly, just
+  // now" guard: the resumed turns MUST play inside a real sitting (M2 hole #4),
+  // and a no-op open would leave every one of them outside the window.
+  const opened = ctx.resume
+    ? await openSession(db, campaignId, { resume: true })
+    : await openSession(db, campaignId);
+  // The first turn after a NEWLY-opened sitting reads a cold prefix — but a
+  // resume into a still-open sitting (opened:false fires only under the 30-min
+  // idle guard, strictly inside the 1h cache TTL) is genuinely WARM, and
+  // pre-marking it cold would relabel a §5.6 zero-read regression as an
+  // expected cold turn (review NIT, 2026-08-05). Known narrow edge, accepted:
+  // a sitting opened but never played, resumed <30min later with the last real
+  // turn >1h old, reads cold under a warm mark — that shape needs a played-turn
+  // gap the harness's own plans never schedule.
+  if (opened.opened) coldTurns.add(ctx.startTurn + 1);
+  const sittingNote = opened.opened
+    ? `sitting #${opened.sessionNumber} opened for the resumed turns`
+    : `sitting #${opened.sessionNumber} was already open and carried the resumed turns`;
   console.log(
-    `[soak] pilot session opened (session ${opened.sessionNumber}, pilot=${opened.pilot})`,
+    ctx.resume
+      ? `[soak] resume: ${sittingNote}`
+      : `[soak] pilot session opened (session ${opened.sessionNumber}, pilot=${opened.pilot})`,
   );
 
-  let turnNumber = 0;
+  let turnNumber = ctx.startTurn;
   let step = 0;
   let tail = SOAK_OSP.director_inputs.opening_situation;
+  if (ctx.resume) {
+    // The persona picks the scene back up where the run left it. Seeding a
+    // resume from the OPENING situation would have it walk back to the noodle
+    // stand fifty turns in — a continuity break inside the very campaign the
+    // §6.8 flywheel suites are about to grade.
+    const [last] = await db
+      .select({ narration: schema.turns.narration })
+      .from(schema.turns)
+      .where(and(eq(schema.turns.campaignId, campaignId), eq(schema.turns.status, "complete")))
+      .orderBy(desc(schema.turns.turnNumber))
+      .limit(1);
+    if (last?.narration?.trim()) tail = last.narration;
+  }
   let didPin = false;
   let didMidpoint = false;
   let didRewind = false;
   let combatPassage = "";
-  const MAX_STEPS = PLAN.maxSteps; // re-climb headroom + safety
+  // A resume plays a short window; PLAN.maxSteps is sized for a whole run. Both
+  // carry headroom for an unscripted turn the classifier routes to a channel.
+  const MAX_STEPS = ctx.resume ? ctx.window.steps + 6 : PLAN.maxSteps;
 
   // The report writes NO MATTER HOW the loop ends (soak crash #1 lost run
   // data to an unhandled throw): abort reasons land in the report instead.
+  let storyTurns = ctx.existingStory;
   let abort: string | null = null;
   try {
-    while (turnNumber < PLAN.turns && step < MAX_STEPS) {
+    while (step < MAX_STEPS) {
+      // The target is completed STORY turns — what §10.3 counts, and what a
+      // channel turn does not advance. Read from the database each pass so a
+      // rewind's deleted spine rows subtract themselves and a resume starts
+      // from the truth. (Found live 2026-08-05: a --turns=50 run played 50
+      // NUMBERED turns, two of them booth/override channel turns, and banked 48
+      // scenes — one short of the floor, so flywheel-prospective and
+      // seed-integrity skipped the run they exist to feed.)
+      storyTurns = await countStoryTurns(db, campaignId);
+      if (storyTurns >= PLAN.turns) break;
       const intended = turnNumber + 1;
       const scripted = SCRIPTED[intended];
 
@@ -804,7 +1062,14 @@ async function liveRun(db: Db, campaignId: string): Promise<void> {
         const closed = await closeSession(db, campaignId, "explicit");
         artifacts.yokoku = closed.yokoku;
         await settleG2IfPending(db, campaignId);
-        const reopened = await openSession(db, campaignId);
+        // RESUME, deliberately (N=50 soak, event-mix miss): the M2R R3 guard
+        // refuses a reopen inside the idle window after an EXPLICIT close —
+        // correctly, since a player reloading the page must not burn a whole
+        // open sequence. The scripted midpoint is the deliberate resume that
+        // guard exists to require, and without the flag the run reported
+        // "session close + reopen" as an uncovered event: session 2 opened
+        // later, from the coverage guard, with no recap.
+        const reopened = await openSession(db, campaignId, { resume: true });
         artifacts.session2Opened = reopened.opened;
         artifacts.recap = reopened.recap;
         coldTurns.add(turnNumber + 1); // session 2's first turn is cold again
@@ -830,26 +1095,69 @@ async function liveRun(db: Db, campaignId: string): Promise<void> {
   // Final drain so the checklist reads a settled world.
   await settleG2IfPending(db, campaignId).catch(() => {});
 
+  storyTurns = await countStoryTurns(db, campaignId);
+  const tally: RunTally = {
+    storyTurns,
+    channelSteps: records.filter((r) => r.status === "channel").length,
+    steps: step,
+  };
   const checklist = await buildChecklist(db, campaignId, records, artifacts);
   const spend = await attributeSpend(db, campaignId, records, SESSIONS);
-  const coverage = meteringCoverage(records, turnNumber);
+  // A resume claims only the turns it played (§10.8 coverage is per invocation).
+  const coverage = meteringCoverage(records, turnNumber, ctx.startTurn + 1);
   const sessions = await sessionCoverage(db, campaignId);
-  let report = buildReport(campaignId, records, checklist, spend, coverage, sessions);
-  if (abort) {
-    report += `\n## ABORTED\n\n${abort}\n`;
-    console.error(`[soak] ABORTED: ${abort}`);
-  }
 
   // Named by N: a 100-turn M3 gate run must never overwrite the M1 retro that
-  // records a different run at a different depth.
+  // records a different run at a different depth. A resume APPENDS — the
+  // original report describes the run that produced it, and the gate suites
+  // read the database, not this file.
   const reportPath = join(process.cwd(), "docs", "retros", `soak-${PLAN.turns}turn.md`);
-  writeFileSync(reportPath, report);
-  console.log(`\n[soak] report → ${reportPath}`);
+  if (ctx.resume) {
+    const incrementalUsd = await spendSince(db, campaignId, invocationSince);
+    let section = buildResumeReport(
+      campaignId,
+      records,
+      checklist,
+      coverage,
+      sessions,
+      tally,
+      ctx,
+      incrementalUsd,
+      sittingNote,
+    );
+    if (abort) {
+      section += `\n### ABORTED\n\n${abort}\n`;
+      console.error(`[soak] ABORTED: ${abort}`);
+    }
+    const target = existsSync(reportPath)
+      ? reportPath
+      : join(process.cwd(), "docs", "retros", `soak-${PLAN.turns}turn-resume.md`);
+    if (target === reportPath) {
+      appendFileSync(target, section);
+    } else {
+      writeFileSync(
+        target,
+        `# Soak Resume Report — ${PLAN.turns}-story-turn target\n\nNo \`soak-${PLAN.turns}turn.md\` existed to append to; this file carries the incremental record.\n${section}`,
+      );
+    }
+    console.log(`\n[soak] resume report appended → ${target}`);
+  } else {
+    let report = buildReport(campaignId, records, checklist, spend, coverage, sessions, tally);
+    if (abort) {
+      report += `\n## ABORTED\n\n${abort}\n`;
+      console.error(`[soak] ABORTED: ${abort}`);
+    }
+    writeFileSync(reportPath, report);
+    console.log(`\n[soak] report → ${reportPath}`);
+  }
 
   // Console summary.
   const misses = checklist.filter((c) => !c.ok);
   const failures = records.flatMap((r) => r.failures);
   console.log("\n=== SOAK SUMMARY ===");
+  console.log(
+    `story turns banked: ${storyTurns}/${PLAN.turns} (§10.3 floor ${MIN_SOAK_TURNS} — ${storyTurns >= MIN_SOAK_TURNS ? "MET" : "NOT MET"}) · channel steps this run: ${tally.channelSteps}`,
+  );
   console.log(
     `turns reached: ${turnNumber} · steps: ${step} · total spend ${fmtUsd(spend.totalUsd)}`,
   );
@@ -872,12 +1180,83 @@ async function liveRun(db: Db, campaignId: string): Promise<void> {
 // main
 // ---------------------------------------------------------------------------
 
+/**
+ * `--campaign=<uuid>`: verify, do the arithmetic, price ONLY the turns this
+ * invocation adds, then play them. Every read here is a database read — the
+ * price still prints before the first model call, which is the rule the
+ * standing gate is actually about.
+ */
+async function resumeMain(campaignId: string): Promise<void> {
+  if (!process.env.DATABASE_URL) {
+    console.error("[soak] FATAL: --campaign needs DATABASE_URL — the campaign lives in the DB");
+    process.exit(1);
+  }
+  const db = getDb();
+  const [row] = await db
+    .select({
+      id: schema.campaigns.id,
+      title: schema.campaigns.title,
+      status: schema.campaigns.status,
+      openingPackage: schema.campaigns.openingPackage,
+    })
+    .from(schema.campaigns)
+    .where(eq(schema.campaigns.id, campaignId));
+  const verdict = assertSoakCampaign(row, campaignId);
+  if (!verdict.ok) {
+    console.error(`[soak] FATAL: ${verdict.reason}`);
+    process.exit(1);
+  }
+
+  const existingStory = await countStoryTurns(db, campaignId);
+  const startTurn = await maxTurnNumber(db, campaignId);
+  const { toPlay, window } = resumePlan(existingStory, PLAN.turns, startTurn, isChannelBeat);
+  console.log(
+    `[soak] resume · campaign ${campaignId} ("${verdict.row.title}") holds ${existingStory} completed story turn(s) at max turn number ${startTurn}`,
+  );
+  console.log(
+    `[soak] resume · target ${PLAN.turns} → ${toPlay} story turns to play (${window.channelSteps} scheduled channel step(s); turn numbers ${startTurn + 1}..${window.windowEnd}) · §10.3 floor ${MIN_SOAK_TURNS}`,
+  );
+  if (toPlay === 0) {
+    console.log(
+      `[soak] resume: nothing to play — the campaign already carries ${existingStory} ≥ ${PLAN.turns} completed story turns. No sitting opened, no spend.`,
+    );
+    return;
+  }
+
+  // Prices only the INCREMENTAL turns.
+  const estimate = estimateRunPrice(toPlay, DEV_TIER_SELECTION, SESSIONS, window.channelSteps);
+  for (const line of estimate.lines) console.log(line);
+  console.log("");
+  console.log(describePlan(startTurn, toPlay));
+  console.log("");
+
+  if (DRY_RUN) {
+    console.log(
+      "[dry-run] resume arithmetic printed — ZERO model calls, no sitting opened, no turns submitted, campaign untouched.",
+    );
+    return;
+  }
+
+  const ctx: RunContext = { resume: true, startTurn, existingStory, toPlay, window };
+  try {
+    await liveRun(db, campaignId, ctx);
+  } finally {
+    await flushLangfuse();
+    console.log(`[soak] campaign ${campaignId} KEPT (a resume never deletes what it resumed).`);
+  }
+}
+
 async function main(): Promise<void> {
   guardNoFable(DEV_TIER_SELECTION);
 
+  if (RESUME_CAMPAIGN) {
+    await resumeMain(RESUME_CAMPAIGN);
+    return;
+  }
+
   // The price BEFORE anything else, dry-run included: the user prices a run and
   // then authorizes it, never the other way round (§0.9 / the standing gate).
-  const estimate = estimateRunPrice(PLAN.turns, DEV_TIER_SELECTION, SESSIONS);
+  const estimate = estimateRunPrice(PLAN.turns, DEV_TIER_SELECTION, SESSIONS, PLAN.channelBeats);
   for (const line of estimate.lines) console.log(line);
   console.log("");
 
@@ -904,8 +1283,15 @@ async function main(): Promise<void> {
   const db = getDb();
   const { playerId, campaignId } = await seed(db);
   console.log(`[soak] LIVE run · campaign ${campaignId}`);
+  const ctx: RunContext = {
+    resume: false,
+    startTurn: 0,
+    existingStory: 0,
+    toPlay: PLAN.turns,
+    window: FRESH_WINDOW,
+  };
   try {
-    await liveRun(db, campaignId);
+    await liveRun(db, campaignId, ctx);
   } finally {
     await flushLangfuse();
     if (CLEANUP) {

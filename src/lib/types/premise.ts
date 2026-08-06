@@ -201,6 +201,18 @@ export const IntensityContract = z.object({
 
 export type IntensityContract = z.infer<typeof IntensityContract>;
 
+/**
+ * How a hard line is written into the LIVE record (§6 layer 9): the player's
+ * line, under this prefix. Critical facts reach the pen as a flat list of
+ * inviolable constraints, so the prefix is what tells every reader — the KA,
+ * the Series Bible, a booth correction — that THIS one is absolute, no dice.
+ *
+ * Shared because three subsystems depend on the exact string and drifting them
+ * apart is silent: the SZ compiler writes it, the Bible finds hard lines BY it
+ * (§9.1), and a correction's replacement inherits it (ingest.ts).
+ */
+export const HARD_LINE_PREFIX = "HARD LINE (absolute): ";
+
 // ---------------------------------------------------------------------------
 // Display directives (§8, M3-DG) — the KA's diegetic display grammar
 // ---------------------------------------------------------------------------

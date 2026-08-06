@@ -2,7 +2,7 @@ import type { Db } from "@/lib/db";
 import { notTombstoned } from "@/lib/db/helpers";
 import { campaigns, criticalFacts, entities, turns } from "@/lib/db/schema";
 import { EVOLUTION_CATEGORY } from "@/lib/types/direction";
-import { PremiseContract, type WorldComponent } from "@/lib/types/premise";
+import { HARD_LINE_PREFIX, PremiseContract, type WorldComponent } from "@/lib/types/premise";
 import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 
 /**
@@ -34,6 +34,7 @@ export interface BibleComposition {
     finitude: string;
     worldName?: string;
     powerSystem?: string;
+    /** The LIVE hard lines, prefix stripped — see `readHardLines`. */
     hardLines: string[];
     deathPhysics?: string;
     lethalityPosture?: string;
@@ -79,6 +80,79 @@ function worldLabel(world: WorldComponent): string | undefined {
 }
 
 /**
+ * A layer-9 critical fact as the composer reads it.
+ */
+interface FactRow {
+  content: string;
+  category: string;
+  provenance: string;
+  turnId: number;
+}
+
+/**
+ * Hard lines, from the LIVE record (ratified 2026-08-05) — not from the
+ * contract's own `intensity.hard_lines` copy, which is what this read replaced.
+ *
+ * They exist twice by design. The signed contract (§8) is the ARCHIVE: what the
+ * player and the studio agreed at Session Zero, untouched forever (§13.4 keeps
+ * it that way — only tiers and suggestion_affordance are writable post-compile).
+ * The critical_facts rows minted at compile are the RECORD: what the pen
+ * actually reads every turn, and the thing a booth correction retires and
+ * replaces (M3R2 C4). Rendering the archive on the Bible page meant a player
+ * who corrected an inverted hard line — the 2026-08-03 founding incident — kept
+ * being shown the exact wrong line they had just fixed, with no path by which
+ * it could ever change. The Bible tells the truth about the campaign AS PLAYED
+ * (its own charter, M2R R4's review gate); a second displayed copy that
+ * corrections cannot reach is not a second view, it is a lie with a nicer font.
+ *
+ * The query shape, and why each clause is or isn't there:
+ *   - category "contract" + the `HARD_LINE_PREFIX` — the compiler mints the
+ *     whole intensity contract under one category (finitude, death physics,
+ *     lethality, control key ride along); the prefix is what makes a row a hard
+ *     line. `ingest.ts` keeps a corrected replacement wearing it.
+ *   - notTombstoned — the ONLY liveness filter needed. A retire-and-replace
+ *     tombstones the retired row in place (retiredAtTurn is the rewind anchor,
+ *     not a read filter), so a `retiredAtTurn IS NULL` clause would be both
+ *     redundant and wrong: it would hide replacement rows on a re-correction.
+ *   - demotedAt — inert here, kept only because it rides the shared read. §6.3
+ *     is promoted-only (director.ts): a contract row came from the player, has
+ *     no semantic copy to fall back to, and is explicitly never demotable.
+ *
+ * Order: turnId, then the ARCHIVE's authored order, then content. All original
+ * mints share turnId 0 (SZ_ROW), so a bare content tiebreak rendered the
+ * player's lines ALPHABETICALLY while the fallback kept their authored order —
+ * the two paths disagreed on the same campaign (audit F3). The archive is in
+ * scope and its index is exactly the authored order, so turn-0 rows recover
+ * it; corrected lines carry the correction's turn and sort last (the record's
+ * own chronology); rows the archive no longer names fall back to content.
+ */
+function readHardLines(facts: FactRow[], contract: PremiseContract): string[] {
+  const authored = new Map(contract.intensity.hard_lines.map((l, i) => [l.trim(), i]));
+  const rank = (line: string) => authored.get(line) ?? Number.MAX_SAFE_INTEGER;
+  const live = facts
+    .filter((f) => f.category === "contract" && f.content.startsWith(HARD_LINE_PREFIX))
+    .map((f) => ({ turnId: f.turnId, line: f.content.slice(HARD_LINE_PREFIX.length).trim() }))
+    .filter((f) => f.line.length > 0)
+    .sort(
+      (a, b) => a.turnId - b.turnId || rank(a.line) - rank(b.line) || a.line.localeCompare(b.line),
+    )
+    .map((f) => f.line);
+  if (live.length > 0) return live;
+  // The fallback (never silently blank a section with real content behind it),
+  // presented as-is with no staleness marker — all-or-nothing is the ruled
+  // shape. The zero case is NOT legacy-only (audit F2): post-C4 corrections
+  // always leave a live line (retire-and-replace + the rewind's retire
+  // anchor), but rows retired before `retiredAtTurn` existed have no anchor —
+  // live data holds one such campaign (86135b1f, checked 2026-08-05: the
+  // founding incident's hand-SQL retirement + a rewind killed both rows, the
+  // archive is the only copy left, and it carries the INVERTED line). That
+  // record needs repair, not another code path; what this line guarantees is
+  // that a player whose live rows are gone still sees lines rather than a
+  // silently empty section.
+  return contract.intensity.hard_lines;
+}
+
+/**
  * Compose the Bible from the live layers: campaign row (contract), entities
  * catalog (active, not tombstoned, grouped by entityType; dismissed cast
  * excluded), critical facts (not demoted, not tombstoned). Returns null when
@@ -107,6 +181,34 @@ export async function composeBible(db: Db, campaignId: string): Promise<BibleCom
     .limit(1);
   const revealed = Boolean(firstComplete);
 
+  // One read for every critical-fact consumer on this page — hard lines
+  // (premise section), world facts, and retoolings — split below by category.
+  // It runs BEFORE the reveal gate because the hard lines are scalar: the
+  // premise essentials compose either side of the cold open, and only the
+  // lived layers are withheld.
+  const facts: FactRow[] = await db
+    .select({
+      content: criticalFacts.content,
+      category: criticalFacts.category,
+      provenance: criticalFacts.provenance,
+      turnId: criticalFacts.turnId,
+    })
+    .from(criticalFacts)
+    .where(
+      and(
+        eq(criticalFacts.campaignId, campaignId),
+        isNull(criticalFacts.demotedAt),
+        notTombstoned(criticalFacts),
+        // "contract" rows are read for the hard lines and then EXCLUDED from
+        // world facts below — the premise section carries the intensity
+        // contract (M2R R4). "evolution" rides along and splits out too: a
+        // retooling is the premise's own history, not a fact about the world
+        // (§7.1, M3 C4).
+        inArray(criticalFacts.category, ["contract", "sz_fact", "promoted", EVOLUTION_CATEGORY]),
+      ),
+    )
+    .orderBy(asc(criticalFacts.turnId), asc(criticalFacts.content));
+
   const scalar = {
     revealed,
     title: campaign.title,
@@ -115,9 +217,16 @@ export async function composeBible(db: Db, campaignId: string): Promise<BibleCom
       finitude: contract.finitude,
       worldName: worldLabel(contract.active.world),
       powerSystem: contract.active.world.power_system?.name,
-      hardLines: contract.intensity.hard_lines,
+      hardLines: readHardLines(facts, contract),
       // §9.1 review gate (M2R R4): the intensity contract the player set at
       // SZ is theirs to see — it was collected, enforced, and shown nowhere.
+      // These three still read the ARCHIVE. The 2026-08-05 ruling names hard
+      // lines, and they are the line the booth actually gets corrected (the
+      // founding incident); the compiler mints these three as contract rows
+      // too, so a correction COULD retire one and this display would go stale
+      // the same way. Moving them takes a decision, not a patch — each carries
+      // its own mint label ("Death physics: …") that a live read would have to
+      // parse, and the ledger is closed to unratified mechanism.
       deathPhysics: contract.intensity.death_physics,
       lethalityPosture: contract.intensity.lethality_posture,
       controlKey: contract.intensity.control_key?.circumstances,
@@ -164,28 +273,6 @@ export async function composeBible(db: Db, campaignId: string): Promise<BibleCom
     turnId: r.turnId,
   });
 
-  const facts = await db
-    .select({
-      content: criticalFacts.content,
-      category: criticalFacts.category,
-      provenance: criticalFacts.provenance,
-      turnId: criticalFacts.turnId,
-    })
-    .from(criticalFacts)
-    .where(
-      and(
-        eq(criticalFacts.campaignId, campaignId),
-        isNull(criticalFacts.demotedAt),
-        notTombstoned(criticalFacts),
-        // "contract" rows are excluded here because the premise section above
-        // carries them (finitude + the full intensity contract as of M2R R4).
-        // "evolution" rows ride along but split out below: a retooling is the
-        // premise's own history, not a fact about the world (§7.1, M3 C4).
-        inArray(criticalFacts.category, ["sz_fact", "promoted", EVOLUTION_CATEGORY]),
-      ),
-    )
-    .orderBy(asc(criticalFacts.turnId));
-
   return {
     ...scalar,
     cast: rows.filter((r) => r.entityType === "npc").map(toEntry),
@@ -193,7 +280,7 @@ export async function composeBible(db: Db, campaignId: string): Promise<BibleCom
     locations: rows.filter((r) => r.entityType === "location").map(toEntry),
     threads: rows.filter((r) => r.entityType === "thread").map(toEntry),
     worldFacts: facts
-      .filter((f) => f.category !== EVOLUTION_CATEGORY)
+      .filter((f) => f.category === "sz_fact" || f.category === "promoted")
       .map((f) => ({
         content: f.content,
         provenance: f.provenance,

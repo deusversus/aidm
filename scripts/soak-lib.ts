@@ -771,6 +771,8 @@ export async function sessionCoverage(db: Db, campaignId: string): Promise<Sessi
 // ---------------------------------------------------------------------------
 
 export interface SoakPlan {
+  /** The STORY-turn target: turns the pen wrote a scene for (`status='complete'`).
+   *  Channel turns are NOT part of it — see `planWindow`. */
   turns: number;
   /** Ops keyed to turn numbers. Specials keep their scripted turns; the
    *  structural ops scale with the run so a 100-turn plan is not a 30-turn
@@ -779,11 +781,21 @@ export interface SoakPlan {
   midpointAfter: number;
   rewindAfter: number;
   rewindDepth: number;
+  /** Channel beats (booth/override) the beat plan schedules inside the window:
+   *  each consumes a turn NUMBER and produces no scene. */
+  channelBeats: number;
+  /** Turn submissions the plan implies — story target + scheduled channel beats. */
+  plannedSteps: number;
   maxSteps: number;
 }
 
 /** Pure: the same N always yields the same plan (the dry-run prints it). */
-export function buildSoakPlan(turns: number, pinAfter: number, rewindDepth: number): SoakPlan {
+export function buildSoakPlan(
+  turns: number,
+  pinAfter: number,
+  rewindDepth: number,
+  channelBeats = 0,
+): SoakPlan {
   if (!Number.isInteger(turns) || turns < 1) {
     throw new Error(`[soak] --turns must be a positive integer (got ${turns})`);
   }
@@ -810,8 +822,140 @@ export function buildSoakPlan(turns: number, pinAfter: number, rewindDepth: numb
     midpointAfter,
     rewindAfter,
     rewindDepth,
-    maxSteps: turns + rewindDepth + 6,
+    channelBeats,
+    plannedSteps: turns + channelBeats,
+    // Every submission the run can make: the story target, the channel beats
+    // that consume a turn number without producing one, the rewind's re-climb,
+    // and headroom for an unscripted turn the classifier routes to a channel.
+    maxSteps: turns + channelBeats + rewindDepth + 6,
   };
+}
+
+/**
+ * Walk the turn NUMBERS a run will consume to reach `storyToPlay` story turns.
+ *
+ * A channel beat (a booth exchange, an `/override`) takes a turn number and
+ * writes no scene, so `--turns=50` over a plan with two channel beats is 52
+ * submissions and 50 completed story turns. The N=50 gate run (2026-08-05)
+ * played 50 NUMBERED turns instead and banked 48 — one short of §10.3's floor,
+ * which made flywheel-prospective skip the very run it exists to grade. The
+ * loop targets what this counts.
+ */
+export function planWindow(
+  startTurn: number,
+  storyToPlay: number,
+  isChannelBeat: (turn: number) => boolean,
+): { steps: number; storySteps: number; channelSteps: number; windowEnd: number } {
+  let turn = startTurn;
+  let storySteps = 0;
+  let channelSteps = 0;
+  // A predicate that answered true forever would never finish the walk; the
+  // scripted plan cannot do that, but a bad predicate must not hang a run.
+  const ceiling = startTurn + storyToPlay * 2 + 64;
+  while (storySteps < storyToPlay && turn < ceiling) {
+    turn += 1;
+    if (isChannelBeat(turn)) channelSteps += 1;
+    else storySteps += 1;
+  }
+  return { steps: storySteps + channelSteps, storySteps, channelSteps, windowEnd: turn };
+}
+
+export interface ResumePlan {
+  existingStory: number;
+  storyTarget: number;
+  /** Story turns this invocation owes the target — never negative. */
+  toPlay: number;
+  startTurn: number;
+  window: ReturnType<typeof planWindow>;
+}
+
+/**
+ * What a `--campaign=` resume owes: the story turns the target is short of, and
+ * the turn-number window they span. A campaign already at or past the target
+ * plays nothing (`toPlay: 0`) rather than topping up to a rounder number.
+ */
+export function resumePlan(
+  existingStory: number,
+  storyTarget: number,
+  startTurn: number,
+  isChannelBeat: (turn: number) => boolean,
+): ResumePlan {
+  const toPlay = Math.max(0, storyTarget - existingStory);
+  return {
+    existingStory,
+    storyTarget,
+    toPlay,
+    startTurn,
+    window: planWindow(startTurn, toPlay, isChannelBeat),
+  };
+}
+
+/**
+ * Completed STORY turns banked for a campaign — the exact quantity the §10.3
+ * gate reads (`evals/suites/flywheel-prospective.ts` counts `status='complete'`
+ * turn rows). Channel turns carry `status='channel'` and never count. Read from
+ * the database rather than tallied in memory so a rewind's deleted spine rows
+ * (§6.7) subtract themselves and a resumed invocation starts from the truth.
+ */
+export async function countStoryTurns(db: Db, campaignId: string): Promise<number> {
+  const [row] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(schema.turns)
+    .where(and(eq(schema.turns.campaignId, campaignId), eq(schema.turns.status, "complete")));
+  return row?.n ?? 0;
+}
+
+/** The highest turn number the campaign has issued — where a resume continues. */
+export async function maxTurnNumber(db: Db, campaignId: string): Promise<number> {
+  const [row] = await db
+    .select({ n: sql<number>`coalesce(max(${schema.turns.turnNumber}), 0)::int` })
+    .from(schema.turns)
+    .where(eq(schema.turns.campaignId, campaignId));
+  return row?.n ?? 0;
+}
+
+/** The shape `--campaign=` accepts: enough of the row to prove it is a soak. */
+export interface SoakCampaignRow {
+  id: string;
+  title: string | null;
+  status: string;
+  openingPackage: unknown;
+}
+
+/**
+ * `--campaign=<uuid>` writes LIVE turns into an existing campaign. The dev
+ * database also holds the player's own campaigns, so the resume path refuses
+ * anything that is not demonstrably a soak: a soak-shaped title (the same
+ * `%soak%` match the gate's auto-discovery uses), an active status, and an
+ * Opening State Package to have been seeded from. Pure — the caller reads the
+ * row and does the exiting.
+ */
+export function assertSoakCampaign(
+  row: SoakCampaignRow | undefined,
+  campaignId: string,
+): { ok: true; row: SoakCampaignRow } | { ok: false; reason: string } {
+  if (!row) {
+    return { ok: false, reason: `campaign ${campaignId} does not exist in this database` };
+  }
+  if (!row.title || !/soak/i.test(row.title)) {
+    return {
+      ok: false,
+      reason: `campaign ${campaignId} is titled '${row.title ?? "(untitled)"}' — not a soak campaign (the title must match /soak/i, the same match the §10.3 gate discovers by). REFUSING to play live turns into a campaign that may be the player's.`,
+    };
+  }
+  if (row.status !== "active") {
+    return {
+      ok: false,
+      reason: `campaign ${campaignId} is '${row.status}', not active — a closed or archived run is not resumable`,
+    };
+  }
+  if (!row.openingPackage || typeof row.openingPackage !== "object") {
+    return {
+      ok: false,
+      reason: `campaign ${campaignId} carries no Opening State Package — it was never seeded as a soak run`,
+    };
+  }
+  return { ok: true, row };
 }
 
 /**
@@ -838,21 +982,41 @@ export function droppedOps(plan: SoakPlan): string[] {
 }
 
 /**
- * Measured tier mix, pooled over the two recorded soaks (M1's 30 turns: 27
- * genga / 3 sakuga; M2's 24: 10 genga / 12 sakuga / 2 douga) = 54 turns. Both
- * predate the §3 flat-high ruling and C9's douga calibration, so this is an
- * interim prior for PRICING only — the first 100-turn run re-baselines it, the
- * same way the thinking allowances re-baseline (budget-assertions.ts).
+ * Measured tier mix — RE-BASELINED on the N=50 flat-high soak (2026-08-05),
+ * the first run to postdate BOTH the §3 flatten and C9's douga calibration.
+ * 14 douga / 22 genga / 12 sakuga across the 48 STORY turns the campaign
+ * banked (the two turns the rewind un-happened are counted as the douga they
+ * were re-climbed as, not the sakuga they were tombstoned from — the mix has
+ * to describe what survives, since that is what the campaign was priced for).
+ *
+ * The douga share went 4% → 29%, and that is the calibration landing, not
+ * noise: C9 (2026-07-18) found douga STRUCTURALLY unreachable — the intent
+ * probe's emitted floor was 0.2 against a <0.2 threshold, so zero douga turns
+ * existed in a 39-turn corpus — and moved the threshold to <0.3 while teaching
+ * the probe anchors toward 0.1-0.2. The prior pool (M1's 30 turns, M2's 24)
+ * measured the tier as it was before that fix could bite. Genga stayed the
+ * plurality; sakuga fell 28% → 25%.
+ *
+ * PRICING only, and n=1 — a second run either confirms this or replaces it.
  */
 export const MEASURED_TIER_MIX: Record<TurnTier, number> = {
-  douga: 0.04,
-  genga: 0.68,
-  sakuga: 0.28,
+  douga: 0.29,
+  genga: 0.46,
+  sakuga: 0.25,
 };
 
 /** Judgment + probe + G2 spend per turn: the M2 record's mean of (turn $ −
  *  narration $) over its 24 metered turns at DEV tiers ($0.0492). */
 export const MEASURED_NON_NARRATION_USD = 0.049;
+
+/**
+ * What one CHANNEL step costs: a booth exchange or an `/override` routes to a
+ * responder, not to the pen, and the N=50 run's two channel turns measured
+ * $0.0022 (override, turn 13) and $0.0240 (booth, turn 15) — mean $0.0131.
+ * Pricing them as story turns would inflate the banner by an order of
+ * magnitude; leaving them out would under-state a run that submits them.
+ */
+export const MEASURED_CHANNEL_STEP_USD = 0.013;
 
 /** Session-open/close composers: recap, yokoku, director memo, voice journal. */
 const SESSION_COMPOSER_CALLS = 4;
@@ -886,7 +1050,13 @@ export function coldOpensFor(
 }
 
 export interface RunPriceEstimate {
+  /** STORY turns priced — what the run is targeting. */
   turns: number;
+  /** Channel beats scheduled inside the window (booth/override responders). */
+  channelSteps: number;
+  /** Submissions implied: story turns + channel steps. */
+  steps: number;
+  channelUsd: number;
   narrationModel: string;
   coldTurns: number;
   warmTurns: number;
@@ -909,6 +1079,7 @@ export function estimateRunPrice(
   turns: number,
   selection: TierSelection,
   sessions: number,
+  channelSteps = 0,
 ): RunPriceEstimate {
   const model = selection.narration;
   let warmPerTurn = MEASURED_NON_NARRATION_USD;
@@ -939,30 +1110,41 @@ export function estimateRunPrice(
     cache_read_input_tokens: prefix,
   });
   const sessionOverheadUsd = perComposer * SESSION_COMPOSER_CALLS * sessions;
+  // Channel steps are submissions the run makes and pays for, at responder
+  // prices rather than pen prices. Their effect on the COMPACTION cadence is
+  // deliberately unmodeled (they write no exchange the window carries), which
+  // leaves the cold-turn count keyed to story turns as before.
+  const channelUsd = channelSteps * MEASURED_CHANNEL_STEP_USD;
 
-  const warmFloorUsd = turns * warmPerTurn + sessionOverheadUsd;
-  const expectedUsd = warmTurns * warmPerTurn + coldTurns * coldPerTurn + sessionOverheadUsd;
-  const coldCeilingUsd = turns * coldPerTurn + sessionOverheadUsd;
+  const warmFloorUsd = turns * warmPerTurn + sessionOverheadUsd + channelUsd;
+  const expectedUsd =
+    warmTurns * warmPerTurn + coldTurns * coldPerTurn + sessionOverheadUsd + channelUsd;
+  const coldCeilingUsd = turns * coldPerTurn + sessionOverheadUsd + channelUsd;
 
   const lines = [
-    `=== PRICE ESTIMATE — ${turns} turns at DEV tiers ===`,
+    `=== PRICE ESTIMATE — ${turns} STORY turn(s) + ${channelSteps} scheduled channel step(s) = ${turns + channelSteps} submission(s), at DEV tiers ===`,
     `narration ${model} · judgment ${selection.judgment} · probe ${selection.probe}`,
-    `tier mix (measured, 54 pooled soak turns): ${mixLines.join(" · ")}`,
+    `tier mix (measured, 48 story turns — N=50 flat-high soak 2026-08-05): ${mixLines.join(" · ")}`,
     `non-narration per turn (measured, M2): ${fmtUsd(MEASURED_NON_NARRATION_USD)}`,
+    `channel steps (booth/override — consume a turn number, write no scene): ${channelSteps} × ${fmtUsd(MEASURED_CHANNEL_STEP_USD)} = ${fmtUsd(channelUsd)}`,
     `cache: ${warmTurns} warm turn(s) · ${coldTurns} cold (${sessions} sitting open(s) + ${cold.compactions} compaction reset(s))`,
     `  all-warm floor      ${fmtUsd(warmFloorUsd)}`,
     `  EXPECTED            ${fmtUsd(expectedUsd)}`,
     `  all-cold ceiling    ${fmtUsd(coldCeilingUsd)}`,
     `  (of which session composers: ${fmtUsd(sessionOverheadUsd)} over ${sessions} sitting(s))`,
-    "the model carries §10.8's p95 thinking allowances — a deliberate OVER-model",
-    "(budget-assertions.ts); the M2 record's measured mean was $0.33/turn at a",
-    "sakuga-heavy mix on pre-M2R5 caching. Treat floor..EXPECTED as the band.",
+    "the model carries §10.8's p95 thinking allowances AND every research round-trip",
+    "the tier contracts — a deliberate OVER-model (budget-assertions.ts). The N=50",
+    "run (2026-08-05) measured $0.180/turn all-in at DEV tiers, well under its own",
+    "EXPECTED. Treat floor..EXPECTED as the band, and expect to land beneath it.",
     "",
     "SPEND IS GATED BY THE USER: this run is not authorized until the user approves",
     "this number. `--dry-run` is the only unattended execution (zero model calls).",
   ];
   return {
     turns,
+    channelSteps,
+    steps: turns + channelSteps,
+    channelUsd,
     narrationModel: model,
     coldTurns,
     warmTurns,

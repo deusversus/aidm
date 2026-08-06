@@ -6,11 +6,27 @@ describe("TURN_CONTRACTS (§5.1 table)", () => {
     const { douga, genga, sakuga } = TURN_CONTRACTS;
     expect(douga.outputBudgetTokens).toBeLessThan(genga.outputBudgetTokens);
     expect(genga.outputBudgetTokens).toBeLessThan(sakuga.outputBudgetTokens);
-    expect(douga.ttftTargetMs).toBeLessThan(genga.ttftTargetMs);
-    expect(genga.ttftTargetMs).toBeLessThan(sakuga.ttftTargetMs);
-    expect(douga.totalTargetMs).toBeLessThan(genga.totalTargetMs);
-    expect(genga.totalTargetMs).toBeLessThan(sakuga.totalTargetMs);
     expect(genga.promptBudgetTokens).toBeLessThanOrEqual(sakuga.promptBudgetTokens);
+  });
+
+  it("latency targets are MEASURED, and douga's no longer ladders (flat-high)", () => {
+    const { genga, sakuga } = TURN_CONTRACTS;
+    // The ladder held while douga ran effort "low". The §3 flatten put the
+    // trivial tier on "high", and the N=50 soak (2026-08-05) measured the
+    // consequence: douga TTFT p90 102.8s against genga's ~92s — at flat high
+    // a trivial prompt gives adaptive thinking nothing to converge on, so the
+    // SHALLOWEST tier waits longest. Asserting douga < genga would now assert
+    // a target that is known-false, which is how the old 3s target survived
+    // long enough to make 28 of one run's 101 latency flags unactionable.
+    // Genga < sakuga still ladders and stays asserted; douga is graded against
+    // its own measured distribution (types/turn.ts), not against its siblings.
+    expect(genga.ttftTargetMs).toBeLessThan(sakuga.ttftTargetMs);
+    expect(genga.totalTargetMs).toBeLessThan(sakuga.totalTargetMs);
+    // The one ordering that is structural rather than empirical: a turn cannot
+    // finish before it starts streaming.
+    for (const c of Object.values(TURN_CONTRACTS)) {
+      expect(c.ttftTargetMs).toBeLessThan(c.totalTargetMs);
+    }
   });
 
   it("douga is the no-machinery tier: no retrieval, no consultants, no research", () => {
