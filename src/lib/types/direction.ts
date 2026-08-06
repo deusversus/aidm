@@ -168,6 +168,24 @@ export function parseCandidates(raw: unknown): SeedCandidate[] {
 }
 
 export const SEED_VERDICTS = ["mention", "payoff", "conflict", "extend", "none"] as const;
+export type SeedVerdictKind = (typeof SEED_VERDICTS)[number];
+
+/**
+ * The verdict vocabulary, taken as a lean string and normalized here (M3R4
+ * R-1). ENUM VOCABULARY IS NOT GRAMMAR — measured against the SDK's
+ * `transformJSONSchema`, a `z.enum` is demoted to `type: "string"` plus a
+ * `{enum: [...]}` DESCRIPTION, so the model is advised, never constrained.
+ * ADJUDICATOR_SYSTEM spells the verdicts as prose capitals ("MENTION — the
+ * scene genuinely surfaced this seed") and the model answered in kind: 13 of
+ * 18 adjudication calls in the N=50 soak died on `"MENTION"` vs `"mention"`,
+ * taking every other verdict in the batch with them. Case is not a judgment
+ * error and must never cost a batch — trim, lowercase, and let anything still
+ * unrecognized fall to `none`, the verdict that does nothing.
+ */
+export function normalizeSeedVerdict(raw: string): SeedVerdictKind {
+  const token = raw.trim().toLowerCase();
+  return (SEED_VERDICTS as readonly string[]).includes(token) ? (token as SeedVerdictKind) : "none";
+}
 
 /**
  * One verdict from the batched adjudication (§7.6). NO RANGE BOUNDS — same
@@ -179,7 +197,11 @@ export const SEED_VERDICTS = ["mention", "payoff", "conflict", "extend", "none"]
 export const SeedVerdict = z.object({
   /** Index into the rendered under-review list; out-of-range refs drop engine-side. */
   seed_ref: z.number().int(),
-  verdict: z.enum(SEED_VERDICTS),
+  /** Lean by design — see {@link normalizeSeedVerdict}. The description IS the
+   *  model's only statement of the vocabulary, so it names the exact tokens. */
+  verdict: z
+    .string()
+    .describe('one of: "mention" | "payoff" | "conflict" | "extend" | "none" (lowercase)'),
   /** 0-1; clamped engine-side. */
   confidence: z.number(),
   /** One sentence from the evidence naming why. */
@@ -188,6 +210,9 @@ export const SeedVerdict = z.object({
   new_window_to: z.number().int().optional(),
 });
 export type SeedVerdict = z.infer<typeof SeedVerdict>;
+
+/** A verdict after {@link normalizeSeedVerdict} — what the engine acts on. */
+export type AdjudicatedVerdict = Omit<SeedVerdict, "verdict"> & { verdict: SeedVerdictKind };
 
 export const SeedAdjudication = z.object({ verdicts: z.array(SeedVerdict) });
 export type SeedAdjudication = z.infer<typeof SeedAdjudication>;
@@ -639,7 +664,7 @@ export type DirectorSeedOp = z.infer<typeof DirectorSeedOp>;
  * Always-emitted arrays are REQUIRED (the model writes [] explicitly).
  *
  * NO LENGTH OR RANGE BOUNDS HERE (M3, after the 2026-08-01 live diagnosis).
- * The same grammar that enforces types and enums STRIPS `minItems`/`maxItems`/
+ * The same grammar that enforces types STRIPS `minItems`/`maxItems`/
  * `minimum`/`maximum` — they are validated client-side only. A `.max(5)` on
  * director_notes could therefore never stop the model from writing six; it
  * could only fail the parse, burn callStructured's one corrective retry, and
@@ -647,8 +672,17 @@ export type DirectorSeedOp = z.infer<typeof DirectorSeedOp>;
  * surplus advisory note. The ceilings are real and they stay: they are stated
  * in the dossier's task list (the model's actual constraint) and applied by
  * `clampDirectorOutput` in direction/director.ts before anything is written.
- * Enums (`ArcShape`, `PacerPhase`, op kinds) and `.int()` ARE grammar-native —
- * never strip those.
+ *
+ * CORRECTION (M3R4 R-1, measured against the installed SDK): the line that used
+ * to stand here — "Enums (`ArcShape`, `PacerPhase`, op kinds) and `.int()` ARE
+ * grammar-native" — is only half true. `.int()` survives (it becomes
+ * `type: "integer"`), but `transformJSONSchema` demotes every `enum` to
+ * `type: "string"` with the vocabulary folded into the DESCRIPTION, so enum
+ * vocabulary is advice at EVERY level, exactly like the bounds above. The enums
+ * here still stand: the dossier spells them in the schema's own case and
+ * `clampDirectorOutput` guards the writes. The two that actually leaked — the
+ * seed verdict and the Pacer's phase — are lean strings with engine-side
+ * normalizers.
  */
 export const DirectorOutput = z.object({
   /** Investigation digest — internal, never player-facing (axiom 2). */
@@ -842,7 +876,20 @@ export const PacerDirective = z.object({
   foreshadowing_hint: z.string().optional(),
   strength: z.enum(["suggestion", "strong", "override"]),
   pacing_note: z.string().optional(),
-  /** Engine-facing: recorded as an arc event for the Director; never applied. */
-  phase_transition: PacerPhase.optional(),
+  /**
+   * Engine-facing: recorded as an arc event for the Director; never applied.
+   *
+   * Lean by design (M3R4 R-1), same law as the seed verdict: the vocabulary is
+   * description text rather than grammar, and the Pacer's system prompt names
+   * phases only in running prose ("Force transition to rising", "STALL GATE").
+   * Turn 50 of the N=50 soak died here on an out-of-vocabulary phase, taking
+   * the whole beat with it — a suggestion the Director is free to ignore cost
+   * the scene its continuity channel. `normalizePhase` (turn/pacer.ts) drops
+   * anything unrecognized to "no transition suggested".
+   */
+  phase_transition: z
+    .string()
+    .optional()
+    .describe(`one of: ${PACER_PHASES.join(" | ")} (lowercase); omit when no transition is due`),
 });
 export type PacerDirective = z.infer<typeof PacerDirective>;

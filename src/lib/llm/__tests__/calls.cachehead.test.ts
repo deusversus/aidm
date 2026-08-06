@@ -92,7 +92,7 @@ describe("callStructured cacheHead — off by default", () => {
 
     // Everything else — model, max_tokens, output_config (format + effort) —
     // is identical, so opting in cannot silently move another dial. The format
-    // is compared serialized: zodOutputFormat mints a fresh object per call,
+    // is compared serialized: jsonSchemaFormat mints a fresh object per call,
     // so identity comparison would fail on the helper, not on the request.
     expect(Object.keys(cached).sort()).toEqual(Object.keys(bare).sort());
     expect(cached.model).toBe(bare.model);

@@ -8,6 +8,7 @@ import {
   PHASE_GATES,
   type PacerArcState,
   PacerDirective,
+  type PacerPhase,
   TENSION_CLIMAX_SUGGEST,
 } from "@/lib/types/direction";
 import { TURN_CONTRACTS, type TurnTier } from "@/lib/types/turn";
@@ -162,8 +163,9 @@ export interface PacerResult {
   pacingNote?: string;
   /** Target phase suggested this turn (model or tension rule). Recorded as an
    *  arc event by the integrator — never applied to state (§7 pacer suggests,
-   *  director disposes). */
-  phaseTransition?: string;
+   *  director disposes). In-vocabulary by construction: the model's word passes
+   *  {@link normalizePhase}, and the tension rule's is a literal. */
+  phaseTransition?: PacerPhase;
   timedOut: boolean;
 }
 // §3's "escalation beats run ≥ high" guard moved to triage (C9): the tier
@@ -209,6 +211,24 @@ function normalizeStrength(value: unknown): Strength {
   return value === "override" || value === "strong" || value === "suggestion"
     ? value
     : "suggestion";
+}
+
+/**
+ * The phase clamp (M3R4 R-1). `phase_transition` is a lean string in the
+ * schema because enum vocabulary reaches the model as DESCRIPTION text, never
+ * as grammar (llm/calls.ts `jsonSchemaFormat`), and this system prompt names
+ * the phases only inside running prose ("Force transition to rising") — turn 50
+ * of the N=50 soak emitted an out-of-vocabulary phase and the whole beat died
+ * on parse, so the scene lost its continuity channel over a SUGGESTION the
+ * Director is free to ignore. Case and stray punctuation normalize; anything
+ * still unrecognized becomes the safe default, which here is `undefined` —
+ * exactly the state the field carries when the model correctly declines to
+ * suggest a transition.
+ */
+export function normalizePhase(value: string | undefined): PacerPhase | undefined {
+  if (value === undefined) return undefined;
+  const token = value.trim().toLowerCase();
+  return (PACER_PHASES as readonly string[]).includes(token) ? (token as PacerPhase) : undefined;
 }
 
 export function buildPrompt(input: PacerInput): string {
@@ -328,7 +348,7 @@ export async function runPacer(
   // --- Strength: model proposes, the stall table disposes (axiom 3) ---------
   const proposed = normalizeStrength(directive.strength);
   let strength: Strength = "suggestion";
-  let phaseTransition: string | undefined;
+  let phaseTransition: PacerPhase | undefined;
 
   if (arc) {
     strength = proposed;
@@ -353,9 +373,15 @@ export async function runPacer(
     }
 
     // Model's transition suggestion (never applied to state; a no-op self-
-    // transition is dropped).
-    if (directive.phase_transition && directive.phase_transition !== arc.phase) {
-      phaseTransition = directive.phase_transition;
+    // transition is dropped). Normalized first — see normalizePhase. An
+    // out-of-vocabulary word notes itself (the file's clamp idiom) so a model
+    // systematically inventing phases is visible, never a silent no-op.
+    const suggested = normalizePhase(directive.phase_transition);
+    if (directive.phase_transition !== undefined && suggested === undefined) {
+      notes.push(`phase suggestion dropped (out of vocabulary): "${directive.phase_transition}"`);
+    }
+    if (suggested && suggested !== arc.phase) {
+      phaseTransition = suggested;
     }
 
     // v3 rule: high tension outside climax forces at least "strong" + a climax

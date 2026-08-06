@@ -5,10 +5,13 @@ import { STRUCTURED_RICH } from "@/lib/llm/budgets";
 import { callJudgment } from "@/lib/llm/calls";
 import { DEV_TIER_SELECTION, TierSelection } from "@/lib/llm/tiers";
 import {
+  type AdjudicatedVerdict,
   SEED_ADJUDICATION_CAPS,
   SEED_ADJUDICATION_MIN_CONFIDENCE,
+  SEED_VERDICTS,
   SeedAdjudication,
   type SeedVerdict,
+  normalizeSeedVerdict,
 } from "@/lib/types/direction";
 import { and, desc, eq } from "drizzle-orm";
 import {
@@ -69,28 +72,51 @@ function clip(text: string, max = 240): string {
 
 /**
  * Apply the ceilings the schema can no longer carry (types/direction.ts: the
- * strict-output grammar strips `minimum`/`maximum`/`maxItems`). Out-of-range
- * refs drop, duplicates keep the first verdict, confidences pin to [0,1], and
- * the batch itself is capped at one verdict per rendered seed. The batch
- * always survives — a surplus or malformed verdict must never cost the other
- * seeds their adjudication.
+ * strict-output grammar strips `minimum`/`maximum`/`maxItems`, and the enum
+ * VOCABULARY along with them). Out-of-range refs drop, duplicates keep the
+ * first verdict, confidences pin to [0,1], the verdict word is normalized to
+ * the lowercase vocabulary (unknown → `none`, warned, M3R4 R-1), and the batch itself
+ * is capped at one verdict per rendered seed. The batch always survives — a
+ * surplus, mis-cased or malformed verdict must never cost the other seeds
+ * their adjudication.
  */
-export function clampAdjudication(verdicts: SeedVerdict[], renderedCount: number): SeedVerdict[] {
+export function clampAdjudication(
+  verdicts: SeedVerdict[],
+  renderedCount: number,
+): AdjudicatedVerdict[] {
   const seen = new Set<number>();
-  const kept: SeedVerdict[] = [];
+  const kept: AdjudicatedVerdict[] = [];
   let dropped = 0;
+  const outOfVocab: string[] = [];
   for (const v of verdicts) {
     if (v.seed_ref < 0 || v.seed_ref >= renderedCount || seen.has(v.seed_ref)) {
       dropped++;
       continue;
     }
     seen.add(v.seed_ref);
-    kept.push({ ...v, confidence: Math.min(1, Math.max(0, v.confidence)) });
+    const verdict = normalizeSeedVerdict(v.verdict);
+    // A CASE fix is bookkeeping; a word the vocabulary does not hold is a
+    // silent no-op on a seed the judge meant to act on. It reads as "none"
+    // either way, so without this line a model systematically answering
+    // "resolve" looks exactly like a model that found nothing.
+    if (!(SEED_VERDICTS as readonly string[]).includes(v.verdict.trim().toLowerCase())) {
+      outOfVocab.push(`seed ${v.seed_ref}: "${v.verdict}"`);
+    }
+    kept.push({
+      ...v,
+      verdict,
+      confidence: Math.min(1, Math.max(0, v.confidence)),
+    });
     if (kept.length >= renderedCount) break;
   }
   if (dropped > 0) {
     console.warn(
       `[adjudication] dropped ${dropped} out-of-range/duplicate verdict(s) — batch kept`,
+    );
+  }
+  if (outOfVocab.length > 0) {
+    console.warn(
+      `[adjudication] ${outOfVocab.length} out-of-vocabulary verdict(s) normalized to "none" — ${outOfVocab.join(", ")}`,
     );
   }
   return kept;

@@ -4,6 +4,7 @@ import { CommitScene, clampCommitScene } from "@/lib/types/sidecar";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import type {
   ContentBlockParam,
+  JSONOutputFormat,
   Message,
   MessageCreateParamsNonStreaming,
   MessageParam,
@@ -183,6 +184,38 @@ async function createStreamed(params: MessageCreateParamsNonStreaming): Promise<
   return getAnthropic().messages.stream(params).finalMessage();
 }
 
+/**
+ * The output format actually sent: `zodOutputFormat`'s JSON schema WITHOUT the
+ * SDK's auto-parse hook (M3R4 R-1).
+ *
+ * The hook is not a wire field — `parse` is a function, so `JSON.stringify` of
+ * the request is byte-for-byte identical with or without it. What it is, is a
+ * switch INSIDE the SDK: `maybeParseMessage` keys on `'parse' in format`
+ * (sdk/src/lib/parser.ts:53) and, when it is there, zod-validates the
+ * accumulated text during STREAM ACCUMULATION (MessageStream.ts:497 →
+ * parser.ts:84) and throws `AnthropicError` out of `finalMessage()`.
+ *
+ * That throw landed in the transport catch below — BEFORE `recordModelCall`,
+ * BEFORE the manual parse — which made the corrective retry underneath dead
+ * code for every schema violation, and billed every violating call without ever
+ * metering it. Measured, N=50 soak (2026-08-05): 13 seed adjudications and one
+ * Pacer beat died at parser.ts:84, zero corrective retries fired, zero ledger
+ * rows written. Without the hook, `finalMessage()` returns the raw Message and
+ * the manual parse below is the only validator — which is the whole point,
+ * because it is the one that can retry and the one that meters first.
+ *
+ * NOTE ON GRAMMAR (measured against SDK 0.90's `transformJSONSchema`): the
+ * transform DEMOTES `enum` to `type: "string"` plus a description carrying
+ * `{enum: [...]}`. Enum vocabulary is therefore ADVISORY at every level — not
+ * merely "nested enums aren't enforced" — so a prompt that spells the values in
+ * another case beats the schema every time. See `SEED_VERDICTS` /
+ * `PACER_PHASES` normalization in types/direction.ts.
+ */
+function jsonSchemaFormat<T>(schema: ZodType<T>): JSONOutputFormat {
+  const { type, schema: jsonSchema } = zodOutputFormat(schema);
+  return { type, schema: jsonSchema };
+}
+
 async function callStructured<T>(
   tier: "judgment" | "probe",
   selection: TierSelection,
@@ -310,34 +343,49 @@ async function callStructured<T>(
     }
   }
 
-  const generation = trace?.generation({ name: opts.name, model, input: opts.prompt });
-  const started = Date.now();
-
   const params: MessageCreateParamsNonStreaming = {
     model,
     max_tokens: effectiveCap,
     ...(system ? { system } : {}),
     messages,
     output_config: {
-      format: zodOutputFormat(opts.schema),
+      format: jsonSchemaFormat(opts.schema),
       ...(opts.effort && caps?.effortControl ? { effort: opts.effort } : {}),
     },
     ...(caps?.adaptiveThinking ? { thinking: { type: "adaptive" } } : {}),
   };
 
-  // create() + manual parse, NOT messages.parse(): parse() throws on a
-  // truncated/unparseable response BEFORE usage is readable, and a billed
-  // call that never reaches the ledger breaks the choke-point promise.
+  // Manual parse, never the SDK's: any auto-parse (messages.parse(), or a
+  // format carrying the zod `parse` hook — see jsonSchemaFormat) throws on a
+  // truncated/unparseable response BEFORE usage is readable, and a billed call
+  // that never reaches the ledger breaks the choke-point promise.
   //
   // On a VALIDATION failure, one corrective retry (M1 soak): the API's
-  // strict output guarantees the grammar, not every zod constraint — a
-  // nested enum leaked an out-of-vocabulary value and killed a hard-core
-  // combat call, and a Director cycle died the same way. The model sees its
-  // own violation and re-emits once. Every attempt is metered; a second
-  // failure throws (the caller's degrade path owns it).
+  // strict output guarantees the JSON shape, not every zod constraint — enum
+  // vocabulary in particular is description text, not grammar (jsonSchemaFormat),
+  // so an out-of-vocabulary value killed a hard-core combat call and a Director
+  // cycle the same way. The model sees its own violation and re-emits once.
+  // EVERY attempt is metered — success, retry, and the second failure alike —
+  // because recordModelCall fires the moment a Message exists, above any
+  // refusal/truncation/parse branch; a second failure then throws (the caller's
+  // degrade path owns it).
   let attemptMessages = params.messages;
   let attemptCap = effectiveCap;
   for (let attempt = 0; attempt < 2; attempt++) {
+    // ONE GENERATION PER BILLED ATTEMPT (M3R4 R-1), matching the ledger row for
+    // row. A single span opened outside this loop ended with only the LAST
+    // attempt's usage, so Langfuse reported one call where the meter reported
+    // two and the retry's spend was invisible in the trace. Summing the usage
+    // into one span would have fixed the total and kept the retry hidden; a
+    // span per attempt is also the idiom the rest of this file already uses
+    // (the investigation rounds above, callSearch's resumes) and the only one
+    // the trace tree renders — trace.generation() hangs every span off the
+    // root, so `pnpm langfuse:latest` prints attempts as adjacent rows.
+    const generation = trace?.generation({
+      name: attempt === 0 ? opts.name : `${opts.name}_retry`,
+      model,
+      input: attempt === 0 ? opts.prompt : attemptMessages,
+    });
     const attemptStarted = Date.now();
     let message: Message;
     try {
@@ -348,10 +396,24 @@ async function callStructured<T>(
       });
     } catch (err) {
       const statusMessage = err instanceof Error ? err.message : String(err);
+      // The last billed-but-unmetered path in the structured call: the
+      // transport can fail AFTER the model produced (and billed) output, and
+      // usage never reaches the client, so no ledger row can be written. It
+      // cannot be metered — but it must never be silent. Same discipline as
+      // streamNarration's stream catch.
+      console.error(
+        "[calls] transport failed — usage unavailable, a billed ledger row may be lost",
+        {
+          name: opts.name,
+          model,
+          attempt: attempt + 1,
+          error: statusMessage,
+        },
+      );
       generation?.end({
         level: "ERROR",
         statusMessage,
-        metadata: { latencyMs: Date.now() - started },
+        metadata: { latencyMs: Date.now() - attemptStarted },
       });
       throw err;
     }

@@ -18,6 +18,7 @@ import {
   beatShapeToken,
   buildPrompt,
   buildSystem,
+  normalizePhase,
   pacerTimeboxFor,
   repeatedBeatShape,
   runPacer,
@@ -319,6 +320,54 @@ describe("runPacer — phase transition (suggested, never applied)", () => {
       makeInput({ arcState: makeArc({ phase: "rising", turnsInPhase: 2 }) }),
     );
     expect(res.phaseTransition).toBeUndefined();
+  });
+
+  // M3R4 R-1: the field is a lean string because enum vocabulary reaches the
+  // model as description text, never as grammar. Turn 50 of the N=50 soak lost
+  // its whole beat to an out-of-vocabulary phase.
+  it("normalizes case and stray whitespace — the schema's spelling, not the model's", async () => {
+    arm({ strength: "suggestion", phase_transition: "  ESCALATION " });
+    const res = await runPacer(
+      DEV_TIER_SELECTION,
+      makeInput({ arcState: makeArc({ phase: "rising", turnsInPhase: 2 }) }),
+    );
+    expect(res.phaseTransition).toBe("escalation");
+  });
+
+  it("a mis-cased self-transition still reads as the no-op it is", async () => {
+    arm({ strength: "suggestion", phase_transition: "Rising" });
+    const res = await runPacer(
+      DEV_TIER_SELECTION,
+      makeInput({ arcState: makeArc({ phase: "rising", turnsInPhase: 2 }) }),
+    );
+    expect(res.phaseTransition).toBeUndefined();
+  });
+
+  it("an out-of-vocabulary phase drops the SUGGESTION, never the beat", async () => {
+    arm({ strength: "strong", beat_classification: "standoff", phase_transition: "denouement" });
+    const res = await runPacer(
+      DEV_TIER_SELECTION,
+      makeInput({ arcState: makeArc({ phase: "rising", turnsInPhase: 2 }) }),
+    );
+    expect(res.phaseTransition).toBeUndefined();
+    expect(res.timedOut).toBe(false);
+    expect(res.beat?.beat_classification).toBe("standoff");
+  });
+});
+
+describe("normalizePhase (M3R4 R-1 clamp)", () => {
+  it("accepts every phase in the vocabulary, in any case", () => {
+    for (const phase of PACER_PHASES) {
+      expect(normalizePhase(phase)).toBe(phase);
+      expect(normalizePhase(phase.toUpperCase())).toBe(phase);
+    }
+  });
+
+  it("junk and absence both mean 'no transition suggested'", () => {
+    expect(normalizePhase(undefined)).toBeUndefined();
+    expect(normalizePhase("")).toBeUndefined();
+    expect(normalizePhase("climax!")).toBeUndefined();
+    expect(normalizePhase("rising action")).toBeUndefined();
   });
 });
 
