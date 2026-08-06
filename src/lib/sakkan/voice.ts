@@ -146,7 +146,7 @@ export function buildVoiceChecklistPrompt(patterns: VoicePatterns, sample: strin
 }
 
 /**
- * Run the voice checklist through the traced trio (judgment tier). Returns one
+ * Run the voice checklist through the traced calls (judgment tier). Returns one
  * read per REQUESTED dimension — unknown or duplicated names the model invents
  * are dropped, and a dimension it silently skips simply has no read this
  * sample (never evidence, exactly like a missing axis score).

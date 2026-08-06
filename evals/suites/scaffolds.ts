@@ -35,7 +35,7 @@ export const scaffolds: Suite[] = [
   scaffold(
     "flywheel-round-trip",
     "M1",
-    "§6.8 the M1 gate is IMPLEMENTED as a vitest integration suite, not an eval-harness suite: src/lib/turn/__tests__/flywheel.integration.test.ts drives the real turn loop (real Postgres, scripted trio) with one named test per layer — nine layers + the §6.9 player profile — each proving writer→reader by surfacing planted content through the layer's reader. This scaffold stays skipped and points there",
+    "§6.8 the M1 gate is IMPLEMENTED as a vitest integration suite, not an eval-harness suite: src/lib/turn/__tests__/flywheel.integration.test.ts drives the real turn loop (real Postgres, scripted model calls) with one named test per layer — nine layers + the §6.9 player profile — each proving writer→reader by surfacing planted content through the layer's reader. This scaffold stays skipped and points there",
   ),
   // §6.8 — LIVE at M3 C5: prospective surfacing, adjudicated over a soaked
   // campaign's rows. It skips (never fails) with its own reason until one

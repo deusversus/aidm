@@ -91,7 +91,7 @@ export function buildAttributionPrompt(input: AttributionInput): string {
   ].join("\n");
 }
 
-/** Run the blind gate-trip attribution read through the traced trio (judgment tier). */
+/** Run the blind gate-trip attribution read through the traced calls (judgment tier). */
 export async function attributeDrift(
   selection: TierSelection,
   input: AttributionInput & { campaignId?: string; turnNumber?: number; phase?: ModelCallPhase },

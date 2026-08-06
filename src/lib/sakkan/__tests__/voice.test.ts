@@ -118,7 +118,7 @@ describe("buildVoiceChecklistPrompt (pure, blind by construction)", () => {
 });
 
 describe("judgeVoice (judgment tier, STRUCTURED_SMALL budget)", () => {
-  it("calls the traced judgment trio with the checklist prompt and the right budget", async () => {
+  it("calls the traced judgment call with the checklist prompt and the right budget", async () => {
     mockJudgment.mockReset();
     mockJudgment.mockResolvedValueOnce({
       dimensions: VOICE_DIMENSIONS.map((name, i) => ({

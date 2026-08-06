@@ -57,3 +57,6 @@ reference/aidm_v3/
 # eval harness output — regenerated per run
 evals/latest.json
 scripts/soak-run.log
+
+# raw soak transcripts — the retro in docs/retros/ is the record, not the log
+soak*.log

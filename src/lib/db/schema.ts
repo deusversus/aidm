@@ -178,7 +178,8 @@ export const modelCalls = pgTable(
     tier: text().notNull(),
     /**
      * Which lifecycle the spend belongs to (M3 C1): turn | session_open |
-     * session_close | prewarm | director_cycle | sz | suggestion | tts.
+     * session_close | prewarm | director_cycle | sz | booth | research |
+     * suggestion | tts | harness (llm/observability/meter.ts owns the list).
      * Nullable by design — rows written before the column report as
      * "(unattributed)" in the gauge rather than being counted as play.
      */

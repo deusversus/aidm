@@ -669,7 +669,7 @@ function buildReport(
   out.push("");
   out.push(`- Soak engine spend (all model calls, this campaign): **${fmtUsd(spend.totalUsd)}**`);
   out.push(
-    `- Attributed to turns: ${fmtUsd(spend.attributedUsd)} · overhead: ${fmtUsd(spend.overheadUsd)}`,
+    `- Attributed to turns: ${fmtUsd(spend.attributedUsd)} · session overhead: ${fmtUsd(spend.overheadUsd)} · harness (\`phase='harness'\` — measurement, never play): ${fmtUsd(spend.harnessUsd)}`,
   );
   out.push("");
   out.push("| narration tier | projected $/turn | projected $/session |");

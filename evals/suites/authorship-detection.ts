@@ -80,7 +80,7 @@ export const authorshipDetection: Suite = {
       };
     }
 
-    // Throwaway campaign so the traced trio's campaignId FK holds and the meter
+    // Throwaway campaign so the traced calls' campaignId FK holds and the meter
     // rows are summable. Campaign deletes first, then player (players FK has no cascade); model_calls
     // rows survive with campaignId set null — so we sum BEFORE cleanup.
     const db = getDb();

@@ -135,7 +135,7 @@ The soak proves the engine, never the experience (M1 retro). Any change a player
 
 ## Substrate disciplines (v5-specific; violations are defects)
 
-- **Every model call flows through the traced trio** in `src/lib/llm/` (from C4): `streamNarration` / `callJudgment` / `callProbe`. No raw SDK calls elsewhere; if it isn't traced and metered, it doesn't ship.
+- **Every model call flows through the four traced calls** in `src/lib/llm/` (C4, plus `callSearch` at M3R3 C2): `streamNarration` / `callJudgment` / `callProbe` / `callSearch`. No raw SDK calls elsewhere; if it isn't traced and metered, it doesn't ship.
 - **`EMBEDDING_DIMENSIONS = 1024` is frozen.** Changing it is a re-embed migration, by design.
 - **Block 3 is append-only between compaction events.** Never add a mutation path to the block store; a sliding window silently destroys prefix caching (§5.6).
 - **Every layer-table write carries `{turn_id, provenance, confidence, tombstoned_at}`.** Reads go through the `notTombstoned()` helper — it's the rewind substrate.

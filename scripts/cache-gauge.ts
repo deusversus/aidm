@@ -330,9 +330,10 @@ async function main(): Promise<void> {
     costUsd: num(r.costUsd),
   }));
 
-  // The phase column is additive and lands with its own migration; until the
-  // operator applies it the gauge still has a job to do, so a missing column
-  // costs the phase table and nothing else.
+  // The phase column and its query both ship (drizzle/0010, GROUP BY repaired
+  // at M3R2 C5), so this is no longer a "pending migration" path: a throw in
+  // here is a real fault, and it costs the phase table and nothing else — the
+  // tier/model ledger above is the gauge's main job and still prints.
   const rawPhases = await selectPhases(db, since);
 
   const phases: PhaseRow[] = rawPhases.map((p) => ({
@@ -419,10 +420,13 @@ async function selectPhases(
       // which is exactly the "(unattributed)" bucket.
       .groupBy(schema.modelCalls.phase);
   } catch (err) {
+    // Since the M3R2 C5 GROUP BY repair this catch is a REAL error path — the
+    // column and the query both ship. It used to advise "run the pending
+    // migration", which sent every reader chasing a migration that had
+    // already landed.
     console.warn(
-      `\n[cache-gauge] phase table skipped — ${err instanceof Error ? err.message : String(err)}`,
+      `\n[cache-gauge] phase table skipped — ${err instanceof Error ? err.message : String(err)}\n`,
     );
-    console.warn("[cache-gauge] run the pending migration to see spend by phase.\n");
     return [];
   }
 }

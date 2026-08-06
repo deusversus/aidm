@@ -27,7 +27,8 @@ import type { Suite, SuiteResult } from "../types";
  * SAMPLES=2 cannot statistically support the >0.5 bar (the landing baseline
  * was 0.5 exactly, so P(false red)=25%/run by construction); a bigger N
  * waits for the funded-soak era. Metered
- * through the traced trio; a meter row is best-effort (never blocks the call).
+ * through the traced calls (lib/llm); a meter row is best-effort (never blocks
+ * the call).
  */
 
 // Narration AND judgment at Sonnet; probe stays DEV-Haiku. Never Fable.

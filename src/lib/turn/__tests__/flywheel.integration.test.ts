@@ -30,7 +30,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
  * would read, the block the assembler renders, the tool's return, the dossier
  * the Director reads, the conductor's system prompt — never the DB row alone.
  *
- * Real Postgres; the model trio + Voyage are mocked (never a live model call).
+ * Real Postgres; the traced model calls + Voyage are mocked (never a live model call).
  * The KA runs its real tool loop over a scripted `streamNarration`. Basis-vector
  * (one-hot) embeddings make semantic/canon ranking deterministic: every planted
  * fact and every query maps to the same unit vector, so cosine distance is 0.

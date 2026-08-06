@@ -64,7 +64,7 @@ describe("buildAttributionPrompt (pure, blind by construction)", () => {
 });
 
 describe("attributeDrift (judgment tier, CLASSIFY budget)", () => {
-  it("calls the traced judgment trio with the blind prompt and the right budget/schema", async () => {
+  it("calls the traced judgment call with the blind prompt and the right budget/schema", async () => {
     mockJudgment.mockResolvedValueOnce({
       driver: "player_driven",
       evidence: "the player kept it one evening",

@@ -13,6 +13,7 @@ import { notTombstoned } from "@/lib/db/helpers";
 import * as schema from "@/lib/db/schema";
 import { type UsageStats, estimateCostUsd } from "@/lib/llm/pricing";
 import { TIER_MENUS, type TierSelection } from "@/lib/llm/tiers";
+import type { ModelCallPhase } from "@/lib/observability/meter";
 import { MAX_PLAY_VIEW_REWIND } from "@/lib/turn/rewind";
 import { type TurnEvent, attachToTurn, executeTurn, submitTurn } from "@/lib/turn/runtime";
 import { TURN_CONTRACTS, type TurnTier } from "@/lib/types/turn";
@@ -28,6 +29,8 @@ export const CACHE_READ_FLOOR = 0.5;
 /** A narration row written as the connection dropped can land after the turn
  *  settles; the metering re-reads once before calling a row LOST (M2 turn 24). */
 export const LEDGER_SETTLE_MS = 2_000;
+/** Typed so a rename of the meter's member breaks the build, not the report. */
+const HARNESS_PHASE: ModelCallPhase = "harness";
 
 export function fmtUsd(v: number): string {
   return `$${v.toFixed(4)}`;
@@ -1219,6 +1222,15 @@ export interface SpendAttribution {
   totalUsd: number;
   attributedUsd: number;
   overheadUsd: number;
+  /**
+   * What the HARNESS spent measuring, not what the engine spent playing
+   * (`phase='harness'`): the synthetic player's probes, the exit gauge's
+   * classifier. Its own bucket because neither of the other two is honest —
+   * a gauge row carries the turn number it MEASURED, so it would ride
+   * `attributedUsd` and inflate every per-turn baseline read out of it, while
+   * calling it session overhead would bill the run for work no player causes.
+   */
+  harnessUsd: number;
   turnsPerSession: number;
   avgNonNarrationUsd: number;
   avgCacheReadFrac: number | null;
@@ -1231,17 +1243,28 @@ export async function attributeSpend(
   records: TurnRecord[],
   sessions: number,
 ): Promise<SpendAttribution> {
+  // One read, three buckets. The phase is asked FIRST: a harness row's turn
+  // number is the turn it measured, not the turn that paid for it. A NULL phase
+  // (every row written before M3 C1, including the N=50 run's persona probes)
+  // keeps the pure turn-number split it has always had — turn-less, so overhead.
   const all = await db
-    .select({ costUsd: schema.modelCalls.costUsd })
+    .select({
+      costUsd: schema.modelCalls.costUsd,
+      turnNumber: schema.modelCalls.turnNumber,
+      phase: schema.modelCalls.phase,
+    })
     .from(schema.modelCalls)
     .where(eq(schema.modelCalls.campaignId, campaignId));
-  const totalUsd = all.reduce((sum, r) => sum + Number(r.costUsd), 0);
 
-  const attributed = await db
-    .select({ costUsd: schema.modelCalls.costUsd })
-    .from(schema.modelCalls)
-    .where(and(eq(schema.modelCalls.campaignId, campaignId), gte(schema.modelCalls.turnNumber, 1)));
-  const attributedUsd = attributed.reduce((sum, r) => sum + Number(r.costUsd), 0);
+  let totalUsd = 0;
+  let attributedUsd = 0;
+  let harnessUsd = 0;
+  for (const r of all) {
+    const usd = Number(r.costUsd);
+    totalUsd += usd;
+    if (r.phase === HARNESS_PHASE) harnessUsd += usd;
+    else if (r.turnNumber !== null && r.turnNumber >= 1) attributedUsd += usd;
+  }
 
   const story = records.filter((r) => r.narrationUsage !== null && r.status === "complete");
   const turnsPerSession = Math.max(1, Math.round(story.length / sessions));
@@ -1285,7 +1308,8 @@ export async function attributeSpend(
   return {
     totalUsd,
     attributedUsd,
-    overheadUsd: totalUsd - attributedUsd,
+    overheadUsd: totalUsd - attributedUsd - harnessUsd,
+    harnessUsd,
     turnsPerSession,
     avgNonNarrationUsd,
     avgCacheReadFrac,

@@ -252,6 +252,11 @@ async function personaMove(campaignId: string, tail: string): Promise<string> {
         system: PERSONA_SYSTEM,
         prompt: `The scene so far ends:\n\n${tail.slice(-500)}\n\nWrite your next move.`,
         campaignId,
+        // No turn number ON PURPOSE — this is the player's typing, not the
+        // engine's work — so the phase has to be stated or the row lands
+        // "(unattributed)" (48 of them on the N=50 run) and the retro's
+        // harness-overhead line has to be reconstructed by subtraction.
+        phase: "harness",
         // deliberate smoke-size: the soak's synthetic player persona, not a budget class.
         maxTokens: 200,
       });
@@ -697,7 +702,12 @@ function buildReport(
   out.push(`- Soak engine spend (all model calls, this campaign): **${fmtUsd(spend.totalUsd)}**`);
   out.push(`- Attributed to turns 1..N: ${fmtUsd(spend.attributedUsd)}`);
   out.push(
-    `- Session/harness overhead (persona probes, pre-warm, startup, recap/yokoku/memo): ${fmtUsd(spend.overheadUsd)}`,
+    `- Session overhead (pre-warm, startup, recap/yokoku/memo): ${fmtUsd(spend.overheadUsd)}`,
+  );
+  out.push(
+    // Printed even at zero: the gauge principle is that nothing leaves the
+    // total silently, and the three lines above must still sum to it.
+    `- Harness spend (\`phase='harness'\` — the synthetic player's probes, the exit gauge's classifier): ${fmtUsd(spend.harnessUsd)} — measurement, not play, and excluded from both lines above`,
   );
   out.push(
     // TURN-TO-TURN, not within-turn: this mean is built from each turn's FIRST

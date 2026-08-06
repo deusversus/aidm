@@ -16,9 +16,9 @@
  *   pnpm tsx scripts/exit-gauge.ts <campaignId> [n]   (n = last N turns, default 12)
  *
  * DEV tiers only — the probe is Haiku (never Fable; the repo law the soaks
- * hold). One probe per turn, traced + metered through the standard trio
- * (callProbe); ~cents per run. Point it only at a campaign you're willing to
- * spend a few probe calls against — the orchestrator runs it deliberately.
+ * hold). One probe per turn, traced + metered through the standard traced
+ * calls (callProbe); ~cents per run. Point it only at a campaign you're willing
+ * to spend a few probe calls against — the orchestrator runs it deliberately.
  */
 
 import { type Db, getDb } from "@/lib/db";
@@ -294,6 +294,10 @@ async function main(): Promise<void> {
           maxTokens: CLASSIFY,
           campaignId,
           turnNumber: current.turnNumber,
+          // The turn number is the SUBJECT of the measurement, not the payer:
+          // without this the gauge's own classifier rides the "turn" bucket
+          // and inflates every per-turn cost baseline read out of it.
+          phase: "harness",
         });
         rows.push({ turnNumber: current.turnNumber, c });
         console.log(

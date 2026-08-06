@@ -5,7 +5,7 @@ import { type UsageStats, estimateCostUsd } from "@/lib/llm/pricing";
 /**
  * The cost meter (blueprint §3): every model call — Anthropic, Voyage,
  * later media — lands one row in model_calls with cache accounting. The
- * traced call trio (llm/calls.ts) and the Voyage client are the only
+ * four traced calls (llm/calls.ts) and the Voyage client are the only
  * callers; nothing else in the codebase talks to a model API.
  *
  * A meter write failure is logged LOUDLY but never fails the model call
@@ -31,7 +31,15 @@ export type ModelCallPhase =
   | "booth"
   | "research"
   | "suggestion"
-  | "tts";
+  | "tts"
+  /**
+   * Spend the HARNESS made, not the engine: the soak's synthetic player, the
+   * exit gauge's classifier. Named because the alternatives both lie — the
+   * N=50 soak left 48 turn-less probe rows in "(unattributed)" (we knew
+   * exactly why they were spent), and a turn number would have filed a
+   * simulated player's typing as the cost of play.
+   */
+  | "harness";
 
 export interface ModelCallRecord {
   provider: "anthropic" | "voyage";

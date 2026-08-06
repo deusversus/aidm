@@ -92,7 +92,7 @@ export async function embedTexts(texts: string[], opts: EmbedOptions = {}): Prom
     latencyMs,
     campaignId: opts.campaignId,
     turnNumber: opts.turnNumber,
-    // Same law as the Anthropic trio (M3 C1): a turn number is turn-scope
+    // Same law as the traced Anthropic calls (M3 C1): a turn number is turn-scope
     // evidence; an embed with neither stays honestly unattributed.
     phase: opts.phase ?? (opts.turnNumber !== undefined ? "turn" : undefined),
     traceId: trace?.id,

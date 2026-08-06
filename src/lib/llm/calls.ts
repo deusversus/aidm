@@ -739,6 +739,17 @@ export async function prewarmPrefix(
       // the KA's `auto` round could never read. The exchangeMessages param
       // reproduces the message bytes verbatim; this leaves the posture
       // matching too.
+      //
+      // PROVEN on the wire, N=50 soak (2026-08-05, model_calls): all three
+      // pre-warm writes of the run — 5,647 / 23,445 / 24,505 tokens — were
+      // read WHOLE by the next narration call (cache_read equal to the warm
+      // write, zero re-creation), the 5,647 by turn 1's KA itself. So the
+      // parity this comment argued for is measured, not merely reasoned.
+      // One gap remains, and it is spec rather than evidence: the pre-warm
+      // sends NO tool_choice while streamNarration always sends an explicit
+      // {type:"auto"}. Every measurement says absent and auto key
+      // identically; nothing documented guarantees it. If a future pre-warm
+      // starts writing entries the KA re-creates, look here first.
       ...(tools.length > 0 ? { tools } : {}),
       system,
       // The documented pre-warm form keeps a placeholder user turn — an empty
