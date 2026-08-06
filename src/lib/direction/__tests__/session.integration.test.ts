@@ -223,9 +223,22 @@ describe.skipIf(!url)("Session lifecycle (real Postgres, scripted models)", () =
     mockStream.mockImplementation((opts: any) => {
       if (opts.name === "recap") return narr("Previously, the crew chased a ghost across Mars.");
       if (opts.name === "yokoku") return narr("Next time — smoke, and a door left open.");
+      if (opts.name === "stinger") return narr("A gloved hand turns the sign to CLOSED.");
       throw new Error(`unscripted stream ${opts.name}`);
     });
   });
+
+  /** The prompt a composer actually sent — the frame is the LAST message, and
+   *  its content may be a block array (M3R2 C2 threads the exchange ahead). */
+  function promptFor(name: string): string | undefined {
+    const call = mockStream.mock.calls.find((c) => (c[0] as { name?: string })?.name === name);
+    if (!call) return undefined;
+    const msgs = (call[0] as { messages?: { content?: unknown }[] })?.messages ?? [];
+    const last = msgs.at(-1)?.content;
+    return Array.isArray(last)
+      ? last.map((b) => (b as { text?: string }).text ?? "").join("")
+      : String(last ?? "");
+  }
 
   // -------------------------------------------------------------------------
 
@@ -428,6 +441,193 @@ describe.skipIf(!url)("Session lifecycle (real Postgres, scripted models)", () =
     expect(row?.directorMemo).toBeNull(); // the failure
     expect(row?.voiceJournal).toBe("Held the cool a beat longer.");
     expect(row?.yokoku).toBe("Next time — smoke, and a door left open.");
+  });
+
+  // ------------------------------------------------------------------------
+  // §8's post-credits stinger (M3R4 B4). Two deterministic gates before any
+  // spend — the premise granted one at SZ, and there is an episode behind the
+  // close — then the pen's own SKIP. The device wardrobe is the display
+  // grammar's (M3-DG §2–3), never the occasion's.
+
+  function stingerCampaign(
+    directives: { name: "letter" | "window" | "memory"; skin: string }[] = [],
+  ) {
+    return {
+      premiseContract: bebopContract({
+        presentation_vocabulary: { grants: ["bare prose"], directives, stinger_allowed: true },
+      }),
+    };
+  }
+
+  it("no stinger where the premise never granted one: no call, no row, no spend", async () => {
+    if (!db) throw new Error("unreachable");
+    // The Bebop fixture is the common case — stinger_allowed false.
+    const campaignId = await makeCampaign();
+    await insertTurn(campaignId, 1, "A confession lands.");
+    await insertSession(campaignId, 1);
+
+    const result = await closeSession(db, campaignId, "explicit");
+
+    expect(result.stinger).toBeUndefined();
+    expect(promptFor("stinger")).toBeUndefined();
+    const [row] = await sessionsFor(campaignId);
+    expect(row?.stinger).toBeNull();
+    // The rest of the close is untouched.
+    expect(row?.yokoku).toBe("Next time — smoke, and a door left open.");
+  });
+
+  it("a granted stinger composes, persists, and wears ONLY this premise's devices", async () => {
+    if (!db) throw new Error("unreachable");
+    const campaignId = await makeCampaign(
+      stingerCampaign([{ name: "letter", skin: "a bounty fax, thermal and smudged" }]),
+    );
+    await insertTurn(campaignId, 1, "A confession lands.");
+    await insertSession(campaignId, 1);
+
+    const result = await closeSession(db, campaignId, "explicit");
+
+    expect(result.stinger).toBe("A gloved hand turns the sign to CLOSED.");
+    const [row] = await sessionsFor(campaignId);
+    expect(row?.stinger).toBe("A gloved hand turns the sign to CLOSED.");
+
+    const prompt = promptFor("stinger") ?? "";
+    expect(prompt).toContain("AFTER the credits");
+    // The grammar's device discipline: the granted device with its own skin,
+    // the universal `memory` marking — and nothing else on the rack.
+    expect(prompt).toContain("`letter` — a bounty fax, thermal and smudged");
+    expect(prompt).toContain("`memory`");
+    expect(prompt).toContain("ONLY what this premise was granted");
+    for (const ungranted of ["`window`", "`readout`", "`comms`", "`title`"]) {
+      expect(prompt).not.toContain(ungranted);
+    }
+    // The tease it must stand beside rides with it, and it reads the sitting
+    // it is closing (the exchange threads ahead of the frame).
+    expect(prompt).toContain("do NOT restate it");
+    expect(prompt).toContain("Next time — smoke, and a door left open.");
+    const call = mockStream.mock.calls.find((c) => (c[0] as { name?: string })?.name === "stinger");
+    expect(((call?.[0] as { messages?: unknown[] })?.messages ?? []).length).toBeGreaterThan(1);
+  });
+
+  it("a premise granted no chrome gets a plain-prose stinger (the grammar's floor)", async () => {
+    if (!db) throw new Error("unreachable");
+    const campaignId = await makeCampaign(stingerCampaign());
+    await insertTurn(campaignId, 1, "A confession lands.");
+    await insertSession(campaignId, 1);
+
+    await closeSession(db, campaignId, "explicit");
+
+    const prompt = promptFor("stinger") ?? "";
+    expect(prompt).toContain("granted no display chrome");
+    expect(prompt).toContain("plain prose");
+    for (const device of ["`window`", "`readout`", "`comms`", "`title`", "`letter`"]) {
+      expect(prompt).not.toContain(device);
+    }
+    // The universal marking survives even here — the legibility law is universal.
+    expect(prompt).toContain("`memory`");
+  });
+
+  it("a memory-only premise gets a rack, not a plain-prose contradiction", async () => {
+    if (!db) throw new Error("unreachable");
+    // `memory` is granted at every table, so a premise whose ONLY grant is
+    // memory has a wardrobe one device wide — the floor sentence would name
+    // the device and deny it in the same breath.
+    const campaignId = await makeCampaign(
+      stingerCampaign([{ name: "memory", skin: "a jazz record's hiss under the frame" }]),
+    );
+    await insertTurn(campaignId, 1, "A confession lands.");
+    await insertSession(campaignId, 1);
+
+    await closeSession(db, campaignId, "explicit");
+
+    const prompt = promptFor("stinger") ?? "";
+    expect(prompt).toContain("ONLY what this premise was granted");
+    expect(prompt).toContain("`memory` — a jazz record's hiss under the frame");
+    expect(prompt).not.toContain("granted no display chrome");
+    expect(prompt).not.toContain("so the stinger is plain prose");
+    // No dangling separator where the granted-device list is empty.
+    expect(prompt).not.toContain("as in play — ·");
+    for (const ungranted of ["`window`", "`readout`", "`comms`", "`title`", "`letter`"]) {
+      expect(prompt).not.toContain(ungranted);
+    }
+  });
+
+  it("SKIP is the pen's own 'this close did not earn one' — nothing persisted", async () => {
+    if (!db) throw new Error("unreachable");
+    const campaignId = await makeCampaign(stingerCampaign());
+    await insertTurn(campaignId, 1, "A confession lands.");
+    await insertSession(campaignId, 1);
+    // biome-ignore lint/suspicious/noExplicitAny: harness spans generic signatures
+    mockStream.mockImplementation((opts: any) => {
+      if (opts.name === "stinger") return narr("SKIP");
+      if (opts.name === "yokoku") return narr("Next time — smoke, and a door left open.");
+      return narr("(unused)");
+    });
+
+    const result = await closeSession(db, campaignId, "explicit");
+
+    expect(result.stinger).toBeUndefined();
+    const [row] = await sessionsFor(campaignId);
+    expect(row?.stinger).toBeNull();
+    // Independent artifacts: the declined stinger never costs the tease.
+    expect(row?.yokoku).toBe("Next time — smoke, and a door left open.");
+  });
+
+  it("a sitting with no play behind it never stings (the close-moment gate)", async () => {
+    if (!db) throw new Error("unreachable");
+    const campaignId = await makeCampaign(stingerCampaign());
+    await insertSession(campaignId, 1);
+
+    const result = await closeSession(db, campaignId, "explicit");
+
+    expect(result.stinger).toBeUndefined();
+    expect(promptFor("stinger")).toBeUndefined();
+  });
+
+  it("a just-ended sitting rehydrates with its stinger beside the tease", async () => {
+    if (!db) throw new Error("unreachable");
+    const campaignId = await makeCampaign(stingerCampaign());
+    await insertTurn(campaignId, 1);
+    await db
+      .update(schema.turns)
+      .set({ completedAt: new Date(Date.now() - 10 * 60 * 1000) })
+      .where(eq(schema.turns.campaignId, campaignId));
+    await insertSession(campaignId, 1, {
+      openedAt: new Date(Date.now() - 20 * 60 * 1000),
+      closedAt: new Date(Date.now() - 2 * 60 * 1000),
+      closeTrigger: "explicit",
+      yokoku: "Next time — smoke, and a door left open.",
+      stinger: "A gloved hand turns the sign to CLOSED.",
+    });
+
+    const result = await openSession(db, campaignId);
+
+    expect(result.closedRecently).toBe(true);
+    expect(result.yokoku).toBe("Next time — smoke, and a door left open.");
+    expect(result.stinger).toBe("A gloved hand turns the sign to CLOSED.");
+  });
+
+  it("the prior sitting's stinger rides the recap prompt — the plant gets picked up", async () => {
+    if (!db) throw new Error("unreachable");
+    const campaignId = await makeCampaign(stingerCampaign());
+    await insertTurn(campaignId, 1, "The bounty slipped away again.");
+    await db
+      .update(schema.turns)
+      .set({ completedAt: new Date(Date.now() - 65 * 60 * 1000) })
+      .where(eq(schema.turns.campaignId, campaignId));
+    await insertSession(campaignId, 1, {
+      openedAt: new Date(Date.now() - 60 * 60 * 1000),
+      closedAt: new Date(Date.now() - 40 * 60 * 1000),
+      closeTrigger: "idle_timeout",
+      yokoku: "Next time: the debt comes due.",
+      stinger: "In an empty office, a red light starts blinking.",
+    });
+
+    await openSession(db, campaignId);
+
+    const prompt = promptFor("recap") ?? "";
+    expect(prompt).toContain("The beat after last session's credits");
+    expect(prompt).toContain("In an empty office, a red light starts blinking.");
+    expect(prompt).toContain("never a debt");
   });
 
   it("rollingCheckpoint on cadence refreshes the memo in place (stays open)", async () => {

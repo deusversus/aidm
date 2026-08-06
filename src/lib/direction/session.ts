@@ -33,7 +33,7 @@ import {
   SetteiSnapshot,
 } from "@/lib/types/direction";
 import { PencilMark, activeMarks } from "@/lib/types/marks";
-import { PremiseContract } from "@/lib/types/premise";
+import { type DirectiveGrant, PremiseContract } from "@/lib/types/premise";
 import type { MessageParam, TextBlockParam } from "@anthropic-ai/sdk/resources/messages/messages";
 import { and, asc, desc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
@@ -52,7 +52,9 @@ import { z } from "zod";
  * Spotlight Debt / Carry Forward), voice journal (judgment tier, ≤300
  * words, second person), yokoku (NARRATION tier — player-facing §9.4
  * next-episode tease: vibe-promise, never events, premise-rendered,
- * skippable where the premise wouldn't).
+ * skippable where the premise wouldn't), stinger (NARRATION tier — §8's
+ * post-credits beat, composed ONLY where the premise granted one at SZ and
+ * skippable when this close didn't earn it; M3R4 B4).
  *
  * Recap (§9.3): narration tier, premise-rendered (style, length, even
  * EXISTENCE are authorial judgment — the model may decline to recap);
@@ -74,6 +76,9 @@ export interface OpenSessionResult {
   closedRecently?: boolean;
   /** The closed session's yokoku, re-surfaced with the closed state. */
   yokoku?: string;
+  /** And its stinger, where the premise granted one (M3R4 B4) — the beat
+   *  after the credits survives a reload exactly as the tease does. */
+  stinger?: string;
 }
 
 /**
@@ -142,6 +147,7 @@ export async function openSession(
         pilot: false,
         closedRecently: true,
         ...(latestSession.yokoku ? { yokoku: latestSession.yokoku } : {}),
+        ...(latestSession.stinger ? { stinger: latestSession.stinger } : {}),
       };
     }
   }
@@ -309,9 +315,9 @@ export async function closeSession(
   db: Db,
   campaignId: string,
   trigger: "explicit" | "idle_timeout" | "rolling_checkpoint",
-): Promise<{ yokoku?: string }> {
+): Promise<{ yokoku?: string; stinger?: string }> {
   const open = await openSessionRow(db, campaignId);
-  if (!open) return { yokoku: undefined };
+  if (!open) return { yokoku: undefined, stinger: undefined };
 
   const [campaign] = await db.select().from(campaigns).where(eq(campaigns.id, campaignId));
   const tier = resolveTier(campaign?.tierModels);
@@ -323,6 +329,7 @@ export async function closeSession(
   let directorMemo: string | undefined;
   let voiceJournal: string | undefined;
   let yokoku: string | undefined;
+  let stinger: string | undefined;
   let tasteNote: string | undefined;
   try {
     const composed = await composeMemo(db, campaignId, tier, currentMaxTurn, "session_close");
@@ -350,6 +357,23 @@ export async function closeSession(
     yokoku = await composeYokoku(db, campaignId, tier, currentMaxTurn);
   } catch (err) {
     logComposerFailure("yokoku", campaignId, err);
+  }
+  // §8's post-credits stinger (M3R4 B4), on TWO gates before a token is spent:
+  // the premise granted one at SZ, and there is an episode behind this close to
+  // sting (the same currentMaxTurn floor the Sakkan and janitor stand on — a
+  // sitting with no play has nothing to plant after its credits). Everything
+  // past those gates is the pen's judgment: it may reply SKIP. Failure-isolated
+  // like its siblings; a stinger is the last thing allowed to cost a close.
+  const parsedContract = PremiseContract.safeParse(campaign?.premiseContract);
+  const vocabulary = parsedContract.success
+    ? parsedContract.data.presentation_vocabulary
+    : undefined;
+  if (currentMaxTurn > 0 && vocabulary?.stinger_allowed) {
+    try {
+      stinger = await composeStinger(db, campaignId, tier, vocabulary.directives, yokoku);
+    } catch (err) {
+      logComposerFailure("stinger", campaignId, err);
+    }
   }
   // §4.5 cadence: the Sakkan samples at every session close. Failure-isolated
   // like the composers (and the module's trust rule already never throws on
@@ -380,10 +404,11 @@ export async function closeSession(
       ...(directorMemo !== undefined ? { directorMemo } : {}),
       ...(voiceJournal !== undefined ? { voiceJournal } : {}),
       ...(yokoku !== undefined ? { yokoku } : {}),
+      ...(stinger !== undefined ? { stinger } : {}),
     })
     .where(eq(sessionRecords.id, open.id));
 
-  return { yokoku };
+  return { yokoku, stinger };
 }
 
 /**
@@ -671,7 +696,7 @@ async function composeRecap(
       // sibling" — the prior sitting's yokoku finally reaches its sibling
       // (M2R R3; on the idle_timeout path this is the tease's ONLY surface).
       db
-        .select({ yokoku: sessionRecords.yokoku })
+        .select({ yokoku: sessionRecords.yokoku, stinger: sessionRecords.stinger })
         .from(sessionRecords)
         .where(
           and(
@@ -739,6 +764,18 @@ async function composeRecap(
     );
     parts.push("");
   }
+  // M3R4 B4: the plant reaches the one surface that can pick it up. A stinger
+  // is "a seed planted after the episode-close beat" (§8) — a plant nobody ever
+  // reads is decoration, and the cold open is exactly where the last thing the
+  // player saw belongs. Available, never owed: the recap is not a debt ledger.
+  if (priorClosed?.stinger) {
+    parts.push("## The beat after last session's credits (the stinger)");
+    parts.push(priorClosed.stinger);
+    parts.push(
+      "This is the last thing the player saw. What it planted is available to you — picking it up now is a choice, never a debt, and the recap never explains it.",
+    );
+    parts.push("");
+  }
   // §6.9: taste notes as light priors — the premise always outranks them.
   const taste = ((playerRow?.profile as { taste?: string[] } | null)?.taste ?? []).slice(-3);
   if (taste.length > 0) {
@@ -803,6 +840,104 @@ async function composeYokoku(
   // the window left blocks.system and the yokoku silently went blind).
   return collectNarration(
     "yokoku",
+    tier,
+    blocks.system,
+    parts.join("\n"),
+    campaignId,
+    "session_close",
+    blocks.exchangeMessages,
+  );
+}
+
+/**
+ * The display grammar's device rule, stated for the close path (M3-DG §2–3).
+ *
+ * A stinger gets NO wardrobe of its own: it may wear only the devices THIS
+ * premise was granted, plus the universal `memory` marking, and a premise that
+ * granted no chrome gets a stinger in plain prose. That is the same law
+ * `renderPresentationGrants` teaches Block 1 and `resolveDirective` enforces on
+ * the surface (an ungranted fence degrades to the plain offset channel) — and
+ * it is built from the SAME grant list, so the charter and this line can never
+ * disagree about what is on the rack. Devices are chosen by the grammar, never
+ * by the occasion.
+ */
+function stingerWardrobe(directives: DirectiveGrant[]): string {
+  const granted = directives.filter((d) => d.name !== "memory");
+  const memory = directives.find((d) => d.name === "memory");
+  // The universal marking, skinned where the premise skinned it — the one
+  // device available even ungranted (M3-DG resolved Q2).
+  const memoryLine = memory?.skin
+    ? `\`memory\` — ${memory.skin}`
+    : "`memory` — available at every table, even unskinned: mark any not-now / not-real passage";
+  // Plain prose is the floor only where the premise granted NOTHING. A
+  // memory-only premise still has a rack — one device wide — and telling the
+  // pen "the stinger is plain prose" while handing it `memory` in the same
+  // breath is a sentence that argues with itself.
+  if (directives.length === 0) {
+    return `DEVICES: this premise granted no display chrome, so the stinger is plain prose — never invent a device for it. The one standing exception is the universal marking: ${memoryLine}.`;
+  }
+  const rack = [
+    ...granted.map((d) => `\`${d.name}\`${d.skin ? ` — ${d.skin}` : ""}`),
+    memoryLine,
+  ].join(" · ");
+  return `DEVICES: a stinger may wear ONLY what this premise was granted, written as a fenced block whose info string is its name, exactly as in play — ${rack}. Anything else is not on this rack, and plain prose is always right.`;
+}
+
+/**
+ * §8 stinger — the post-credits beat, narration tier, player-facing, composed
+ * only where the table granted one (M3R4 B4).
+ *
+ * The yokoku PROMISES; the stinger SHOWS. It plays after the episode has
+ * already ended, plants something the story could pick up later (the register's
+ * own gloss: "post-credits seed plant"), and is allowed to explain nothing. It
+ * reads the sitting it is closing through the same conversation turns the pen
+ * writes in — the M3R2 C2 lesson the yokoku learned the hard way — and it reads
+ * the tease that just played so the two never say the same thing twice.
+ *
+ * This composer writes no prose: it shapes the request and the pen writes every
+ * word, exactly like the recap and the yokoku.
+ */
+async function composeStinger(
+  db: Db,
+  campaignId: string,
+  tier: TierSelection,
+  directives: DirectiveGrant[],
+  yokoku: string | undefined,
+): Promise<string | undefined> {
+  const blocks = await assembleForCampaign(db, campaignId);
+  if (!blocks) return undefined;
+
+  const arc = await getActiveArc(db, campaignId);
+
+  const parts: string[] = [
+    "You are composing the stinger — the short scene that plays AFTER the credits, once this episode is already over. Player-facing prose in the story's own established voice.",
+    "",
+    "WHAT A STINGER IS: ONE beat, 1–3 sentences. It SHOWS rather than promises — a face nobody has been introduced to, an object where it should not be, a consequence landing somewhere else entirely, a small quiet echo of what just happened. It plants something this story could pick up later, and it is allowed to explain nothing.",
+    "",
+    "WHAT IT IS NOT: not a summary, not a preview, not a continuation of the scene that just closed — the episode has ENDED. It never asks the player to act, never acts on their behalf, and never states what it means.",
+    "",
+    "Not every episode earns one, and a stinger with nothing to plant is decoration. If this close would be better served by simply ending — or if this premise, for all it allows one, would not do a stinger HERE — reply with exactly SKIP and nothing else.",
+    "",
+    stingerWardrobe(directives),
+    "",
+  ];
+  if (yokoku) {
+    parts.push("## The preview that just played (the yokoku) — do NOT restate it");
+    parts.push(yokoku);
+    parts.push("The stinger stands beside the tease; it never repeats or explains it.");
+    parts.push("");
+  }
+  if (arc) {
+    parts.push(
+      "## Where the story is pointed (the Director's plan — for your instinct only, never to state)",
+    );
+    parts.push(`${arc.name} — phase ${arc.phase}. Dramatic question: ${arc.dramaticQuestion}`);
+    parts.push("");
+  }
+  parts.push("Now write the stinger.");
+
+  return collectNarration(
+    "stinger",
     tier,
     blocks.system,
     parts.join("\n"),

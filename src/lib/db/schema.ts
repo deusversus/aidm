@@ -585,6 +585,12 @@ export const sessionRecords = pgTable(
     directorMemo: text(),
     voiceJournal: text(),
     yokoku: text(),
+    /** §8 post-credits stinger (M3R4 B4) — NULL on every table that did not
+     *  grant one, and on every close that judged this episode didn't earn it.
+     *  Persisted for the same two reasons the yokoku is: a reload after an
+     *  explicit close re-serves it instead of eating the paid composition, and
+     *  the next sitting's recap reads what the last one planted. */
+    stinger: text(),
     /** §9.3 recap persisted at open (M2R R3) — a reload during or just after
      *  the long open sequence must not eat the paid "previously on". */
     recap: text(),

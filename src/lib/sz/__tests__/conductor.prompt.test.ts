@@ -81,6 +81,30 @@ describe("conductor system prompt spec (SV2 — the voice)", () => {
     expect(ObservationKind.options).toContain("presentation_directive");
   });
 
+  it("the stinger is asked as taste, anchored yes/no, and never as a feature (M3R4 B4)", () => {
+    const beat = CONDUCTOR_SYSTEM.slice(
+      CONDUCTOR_SYSTEM.indexOf("- the stinger:"),
+      CONDUCTOR_SYSTEM.indexOf("- suggestion affordance:"),
+    );
+    expect(beat.length).toBeGreaterThan(0);
+    expect(beat).toContain("after the credits");
+    // Taste, offered only where the premise earns the question — the display
+    // devices' own discipline, not a form field.
+    expect(beat).toContain("as TASTE");
+    expect(beat).toContain("only where the premise makes it a real question");
+    // The compiler reads the ANSWER first (resolveObservations' anchor).
+    expect(beat).toContain('BEGIN with exactly "yes" or "no"');
+    expect(beat).toContain("no stinger is the table's default");
+    expect(ObservationKind.options).toContain("stinger");
+    // And the ITINERARY itself knows the beat exists (bounded slice — the
+    // conductor navigates by it, so a beat missing there is never reached).
+    const itinerary = CONDUCTOR_SYSTEM.slice(
+      CONDUCTOR_SYSTEM.indexOf("THE ITINERARY"),
+      CONDUCTOR_SYSTEM.indexOf("THE AUDITION"),
+    );
+    expect(itinerary).toContain("whether this show does a stinger");
+  });
+
   it("THE LAW CHANNEL routes an off-instrument resolution to premise_law (M2R6)", () => {
     expect(CONDUCTOR_SYSTEM).toContain("THE LAW CHANNEL");
     expect(CONDUCTOR_SYSTEM).toContain('"premise_law"');

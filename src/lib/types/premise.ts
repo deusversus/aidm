@@ -288,14 +288,19 @@ export const PresentationVocabulary = z.object({
   recap_posture: z.string().optional(),
   /** SUPERSEDED by `grants`, same reasoning as recap_posture (§9.4). */
   yokoku_posture: z.string().optional(),
-  /** PENDING the stinger commit. §8 lists the post-credits stinger in the
-   *  presentation vocabulary; M3-display-grammar sized the mechanism as "its
-   *  own small commit AFTER this plan lands — a close-path artifact beside
-   *  the yokoku, using the wardrobe this plan builds" (resolved 2026-07-20,
-   *  item 4). That is still the plan of record; the wardrobe it waited on now
-   *  exists. Until that commit gives it BOTH a writer (an SZ presentation
-   *  beat that can grant it) and a reader (a composeStinger on the close
-   *  path), this stays inert and false on every contract. */
+  /** §8's post-credits stinger — the short beat AFTER the episode has closed:
+   *  a face nobody was introduced to, a consequence landing elsewhere, a quiet
+   *  echo. LANDED M3R4 B4 with both halves the whole-shape rule owes it: the
+   *  writer is the conductor's stinger beat (kind "stinger", anchored yes/no,
+   *  compiled here), the reader is `composeStinger` on the session-close path
+   *  beside the yokoku — wearing only the devices this premise was granted
+   *  (M3-DG's device discipline; plain prose where it granted none).
+   *
+   *  UNLAYERED, like its `grants`/`directives` siblings: the canonical/active
+   *  split covers the five premise COMPONENTS, and the presentation vocabulary
+   *  is a table decision, not a measured axis — nothing arc-overrides whether
+   *  this show does a thing after the credits. False on every table that never
+   *  asked, which is most of them. */
   stinger_allowed: z.boolean().default(false),
   /** PENDING its own commit, deliberately: M3-display-grammar deferred chip
    *  skinning "once chips have usage data" — the data is the gate, not the

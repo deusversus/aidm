@@ -340,6 +340,9 @@ export function PlayView({
   // §9.4 session lifecycle: recap opens the sitting, yokoku closes it.
   const [recap, setRecap] = useState<string | null>(null);
   const [yokoku, setYokoku] = useState<string | null>(null);
+  // §8 post-credits stinger (M3R4 B4) — only ever set where the premise
+  // granted one and the close judged this episode earned it.
+  const [stinger, setStinger] = useState<string | null>(null);
   const [sessionClosed, setSessionClosed] = useState(false);
   const [closing, setClosing] = useState(false);
   // A deep-tier KA can think for minutes before prose streams (sakuga on
@@ -718,6 +721,7 @@ export function PlayView({
           recap?: string;
           closedRecently?: boolean;
           yokoku?: string;
+          stinger?: string;
         };
         if (body.recap) setRecap(body.recap);
         // M2R R3: a just-ended sitting rehydrates as ended — tease intact,
@@ -727,6 +731,7 @@ export function PlayView({
           setSessionClosed(true);
           setChips([]);
           if (body.yokoku) setYokoku(body.yokoku);
+          if (body.stinger) setStinger(body.stinger);
         }
       } catch (err) {
         console.warn("session open failed", err);
@@ -749,6 +754,7 @@ export function PlayView({
         const body = (await res.json()) as { recap?: string };
         setSessionClosed(false);
         setYokoku(null);
+        setStinger(null);
         if (body.recap) setRecap(body.recap);
       } else {
         setPinNotice("Couldn't open the next sitting — try again.");
@@ -769,8 +775,9 @@ export function PlayView({
         body: JSON.stringify({ trigger: "explicit" }),
       });
       if (res.ok) {
-        const body = (await res.json()) as { yokoku?: string };
+        const body = (await res.json()) as { yokoku?: string; stinger?: string };
         if (body.yokoku) setYokoku(body.yokoku);
+        if (body.stinger) setStinger(body.stinger);
         setSessionClosed(true);
       } else {
         setPinNotice("Couldn't close the session — try again.");
@@ -1886,6 +1893,22 @@ export function PlayView({
               directives={displayDirectives}
               text={yokoku}
               className="text-sm italic leading-7 text-muted-foreground [&_em]:not-italic"
+            />
+          </div>
+        )}
+        {/* §8's stinger plays LAST — after the tease, the way it plays after
+            the credits. Upright, not italic: the yokoku promises, the stinger
+            is a scene. Rendered through NarrationProse so a granted device
+            keeps its chrome here exactly as it does mid-episode. */}
+        {stinger && (
+          <div data-close="stinger" className="border-l-2 border-border pl-4">
+            <p className="mb-1 text-[10px] uppercase tracking-widest text-muted-foreground/60">
+              after the credits
+            </p>
+            <NarrationProse
+              directives={displayDirectives}
+              text={stinger}
+              className="text-sm leading-7 text-muted-foreground"
             />
           </div>
         )}

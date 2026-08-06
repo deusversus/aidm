@@ -46,5 +46,5 @@ export const STRUCTURED_RICH = 12_000;
  */
 export const LOOPED_LARGE = 24_000;
 
-/** Player-facing prose composers — recap, yokoku, booth responder, SZ conductor. */
+/** Player-facing prose composers — recap, yokoku, stinger, booth responder, SZ conductor. */
 export const PROSE_COMPOSER = 12_000;

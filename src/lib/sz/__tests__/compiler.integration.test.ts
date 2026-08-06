@@ -325,6 +325,43 @@ describe("suggestion affordance resolution (anchored, never guessed from prose)"
   });
 });
 
+describe("stinger resolution (M3R4 B4 — anchored yes/no, never guessed from prose)", () => {
+  it("reads the ANSWER, not the prose around it", () => {
+    expect(
+      resolveObservations([obs("stinger", "yes — a last shot of the empty apartment, always")])
+        .stingerAllowed,
+    ).toBe(true);
+    expect(
+      resolveObservations([obs("stinger", "no — when the episode ends he wants it ENDED")])
+        .stingerAllowed,
+    ).toBe(false);
+    // Both words in the sentence, neither anchored: unread, never a coin flip.
+    const ambiguous = resolveObservations([
+      obs("stinger", "he said maybe yes, maybe no — depends on the episode"),
+    ]);
+    expect(ambiguous.stingerAllowed).toBeUndefined();
+    expect(ambiguous.parseFailures.some((d) => d.includes("ambiguous stinger answer"))).toBe(true);
+  });
+
+  it("latest wins, and a later readable answer clears the stale note", () => {
+    const changed = resolveObservations([
+      obs("stinger", "yes — he loves the post-credits thing"),
+      obs("stinger", "no, actually — he'd rather the credits be the end"),
+    ]);
+    expect(changed.stingerAllowed).toBe(false);
+    const repaired = resolveObservations([
+      obs("stinger", "hmm, sort of?"),
+      obs("stinger", "yes — one image, no explanation"),
+    ]);
+    expect(repaired.stingerAllowed).toBe(true);
+    expect(repaired.parseFailures).toHaveLength(0);
+  });
+
+  it("a table that was never asked resolves to nothing (the contract's inert false)", () => {
+    expect(resolveObservations([obs("presentation", "bare prose")]).stingerAllowed).toBeUndefined();
+  });
+});
+
 describe("control key declination (§7.5 — no key exists unless the player cuts one)", () => {
   it("an anchored decline compiles to NO key — never a cut key wearing a refusal", () => {
     const r = resolveObservations([
@@ -1361,6 +1398,61 @@ describe.skipIf(!url)("SZ compiler (real Postgres)", () => {
     }
   });
 
+  it("a granted stinger compiles onto the contract; a declined one compiles to false (M3R4 B4)", async () => {
+    if (!db) throw new Error("unreachable");
+    const compileWith = async (answer: string, title: string) => {
+      if (!db) throw new Error("unreachable");
+      const draft: ConductorDraft = {
+        transcript: [],
+        observations: [...SCRIPTED_OBSERVATIONS, obs("stinger", answer)],
+        profileIds: ["test_sz_profile"],
+        readyToCompile: true,
+      };
+      const [campaign] = await db
+        .insert(schema.campaigns)
+        .values({ playerId, title, status: "draft", szTranscript: draft })
+        .returning();
+      if (!campaign) throw new Error("insert failed");
+      try {
+        const result = await compileSessionZero(db, campaign.id, {
+          ospSynthesizer: async () => STUB_OSP,
+          ingestor: async () => ({ writes: [], flags: [] }),
+        });
+        expect(result.gaps).toEqual([]);
+        // Read back off the PERSISTED contract, not just the return value —
+        // the close path reads the row, so that is the copy that matters.
+        const [row] = await db
+          .select()
+          .from(schema.campaigns)
+          .where(eq(schema.campaigns.id, campaign.id));
+        const stored = (row?.premiseContract as { presentation_vocabulary?: unknown })
+          ?.presentation_vocabulary as { stinger_allowed?: boolean; directives?: unknown[] };
+        return { result, stored };
+      } finally {
+        await db.delete(schema.campaigns).where(eq(schema.campaigns.id, campaign.id));
+      }
+    };
+
+    const granted = await compileWith(
+      "yes — one image after the credits, never explained",
+      "stinger granted fixture",
+    );
+    expect(granted.result.contract.presentation_vocabulary.stinger_allowed).toBe(true);
+    expect(granted.stored.stinger_allowed).toBe(true);
+    // The grant rides BESIDE the device wardrobe, never instead of it.
+    expect(granted.result.contract.presentation_vocabulary.directives).toContainEqual({
+      name: "readout",
+      skin: "the bounty terminal",
+    });
+
+    const declined = await compileWith(
+      "no — when the credits roll he wants it over",
+      "stinger declined fixture",
+    );
+    expect(declined.result.contract.presentation_vocabulary.stinger_allowed).toBe(false);
+    expect(declined.stored.stinger_allowed).toBe(false);
+  });
+
   it("the China Shop table compiles WHOLE: gloss placed, law carved into layer 9 AND Block 1", async () => {
     if (!db) throw new Error("unreachable");
     const LAW_CLAUSE = "There is no cost to Kami's power and no loss of control.";
@@ -2085,6 +2177,9 @@ describe.skipIf(!url)("SZ compiler (real Postgres)", () => {
     expect(result.contract.presentation_vocabulary.grants).toContain(
       "bare prose; episode-title cards only",
     );
+    // M3R4 B4: this table was never asked about a stinger, so it lands inert —
+    // the close path composes nothing and spends nothing.
+    expect(result.contract.presentation_vocabulary.stinger_allowed).toBe(false);
 
     const [campaign] = await db
       .select()

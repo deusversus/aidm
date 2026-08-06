@@ -12,7 +12,8 @@ export const dynamic = "force-dynamic";
 /**
  * Close the current play sitting (§9.4). Only the "explicit" trigger is
  * accepted from the client — idle_timeout and rolling_checkpoint are
- * engine-internal. Returns the yokoku (next-episode tease) when composed.
+ * engine-internal. Returns the yokoku (next-episode tease) and, where the
+ * premise granted one, the stinger (§8's post-credits beat) when composed.
  */
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();

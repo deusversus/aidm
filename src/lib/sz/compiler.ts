@@ -104,6 +104,14 @@ export interface ResolvedObservations {
    * prose grants stay in `presentationGrants`.
    */
   directiveGrants: z.infer<typeof DirectiveGrant>[];
+  /**
+   * M3R4 B4: §8's post-credits stinger, granted or declined at the same
+   * presentation beat. Undefined = the table never asked — which compiles to
+   * the contract's inert `false`, exactly as a never-asked table has always
+   * behaved. A recorded "no" resolves to false for the same reason the
+   * declined control key is recorded: so nobody re-asks.
+   */
+  stingerAllowed?: boolean;
   suggestionAffordance?: z.infer<typeof SuggestionAffordance>;
   tierSelection?: TierSelection;
   /**
@@ -492,6 +500,23 @@ export function resolveObservations(observations: Observation[]): ResolvedObserv
             `unparseable presentation directive: ${obs.content.slice(0, 80)}`,
           );
         }
+        break;
+      }
+      case "stinger": {
+        // Anchored-first, the finitude/control-key discipline: "yes" and "no"
+        // are everyday prose ("no, they'd rather it just ended" leads with the
+        // answer; "I'd say yes, but no chrome" does not), so only the LEADING
+        // word decides. Latest wins — a player who changes their mind gets
+        // their newest word. Anything unanchored stays UNREAD rather than
+        // guessed: the default is no stinger, and a silently granted one is a
+        // beat playing after the credits that the table never asked for.
+        const anchored = /^\s*["'“‘]?(yes|no)\b/i.exec(obs.content);
+        if (anchored) resolved.stingerAllowed = anchored[1]?.toLowerCase() === "yes";
+        else
+          cannotRead(
+            "stinger",
+            `ambiguous stinger answer (safe default applied — no stinger compiled): ${obs.content.slice(0, 80)}`,
+          );
         break;
       }
       case "suggestion_affordance": {
@@ -1698,6 +1723,9 @@ export async function compileSessionZero(
       presentation_vocabulary: PresentationVocabulary.parse({
         grants: resolved.presentationGrants,
         directives: resolved.directiveGrants,
+        // M3R4 B4: unasked and declined both compile to false — the close path
+        // composes a stinger only for a table that said yes.
+        stinger_allowed: resolved.stingerAllowed ?? false,
       }),
       finitude: resolved.finitude,
       intensity: {

@@ -1,0 +1,1 @@
+ALTER TABLE "session_records" ADD COLUMN "stinger" text;
