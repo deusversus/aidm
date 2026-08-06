@@ -12,6 +12,13 @@ import type { Suite, SuiteResult } from "../types";
  *
  * All numbers are tunable defaults (§5.1 doctrine) — first-pass ceilings,
  * asserted so a change is a diff, not a drift.
+ *
+ * THE LATENCY HALF OF §10.8 LIVES IN `TURN_CONTRACTS` (types/turn.ts):
+ * `ttftTargetMs` / `totalTargetMs` per tier, asserted per turn by the soak
+ * harness (scripts/soak-lib.ts). All three tiers were re-baselined against the
+ * N=50 flat-high soak — douga at the M3 close (60c799b), genga and sakuga at
+ * M3R4 B1 — with the measured distributions inline there. This file owns the
+ * dollars and the cache assumption; that one owns the clock.
  */
 
 export const BUDGET_ASSUMPTIONS = {

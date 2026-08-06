@@ -177,7 +177,7 @@ export const TURN_CONTRACTS: Record<TurnTier, TurnContract> = {
     // what that means: across 14 douga turns, TTFT p90 102.8s and total p90
     // 132.5s, with TTFT tracking thinking almost linearly (≈ 8s + thinking/84
     // tok/s — the wait IS the reasoning, not latency to fix). Against the dead
-    // 3s target every one of those turns flagged twice: 28 of the run's 101
+    // 3s target every one of those turns flagged twice: 28 of the run's 105
     // latency flags were unactionable BY CONSTRUCTION, which is worse than no
     // target at all — a tripwire that always fires stops being read.
     // Set at p90 + ~15%: in the measured run these flag exactly one turn
@@ -199,8 +199,24 @@ export const TURN_CONTRACTS: Record<TurnTier, TurnContract> = {
     kaResearchCalls: 2,
     outputBudgetTokens: 1_800,
     promptBudgetTokens: 30_000,
-    ttftTargetMs: 8_000,
-    totalTargetMs: 35_000,
+    // RE-BASELINED from the N=50 soak (2026-08-05), the same measurement and
+    // the same arithmetic that moved douga above (p90 + ~15%, rounded). 8s/35s
+    // were aspirational M1-era markers that no genga turn has ever met: across
+    // 26 genga narration steps the run measured
+    //   TTFT  (N=25, one re-anchored step never observed its first token):
+    //         p50 55.2s · p90 89.4s · p95 94.1s · max 102.2s
+    //   TOTAL (N=26): p50 81.4s · p90 120.5s · p95 122.0s · max 132.5s
+    // and flagged 25 of 25 TTFTs and 24 of 26 totals — 49 of the run's 105
+    // latency flags, unactionable BY CONSTRUCTION against a dead letter (77 of
+    // them were, counting sakuga's 28 below). A tripwire that always fires
+    // stops being read, which is worse than no tripwire.
+    // MEASURED ON SONNET (the soak runs DEV_TIER_SELECTION — Fable narration
+    // is player-facing spend, never automated). These are therefore
+    // Sonnet-measured numbers standing in for the tier; a Fable-served genga
+    // turn is unmeasured and would very likely sit slower, so this is the
+    // conservative direction to be wrong in.
+    ttftTargetMs: 105_000,
+    totalTargetMs: 140_000,
     validationRetry: false,
     effort: "high",
   },
@@ -213,8 +229,27 @@ export const TURN_CONTRACTS: Record<TurnTier, TurnContract> = {
     kaResearchCalls: 4,
     outputBudgetTokens: 3_000,
     promptBudgetTokens: 45_000,
-    ttftTargetMs: 15_000,
-    totalTargetMs: 60_000,
+    // RE-BASELINED from the same N=50 soak, and the N IS SMALL — say it beside
+    // every number. Across 14 sakuga narration steps:
+    //   TTFT  (N=14): p50 68.3s · p90 110.2s · p95 113.6s (= max)
+    //   TOTAL (N=14): p50 93.4s · p90 125.9s · p95 145.6s (= max)
+    // The old 15s/60s flagged all 14 turns twice — 28 more dead-letter flags,
+    // which with genga's 49 is 77 of the run's 105 retired by this re-baseline.
+    // p90 + ~15% lands at 126.7s / 144.8s; both round UP (130s / 150s) rather
+    // than down, deliberately: fourteen samples do not support fitting a
+    // ceiling to the tail, and §0's rule is that a budget catches waste and
+    // never trims deliberate depth — a target that fails a legitimately deep
+    // sakuga turn is trimming depth. At these numbers the measured run flags
+    // nothing, which is the honest consequence of calibrating to p90 on a
+    // short tail; the tripwire's job here is the REGRESSION, not the run it
+    // was calibrated from.
+    // MEASURED ON SONNET (DEV_TIER_SELECTION), like genga's above — and sakuga
+    // is the tier most likely to be served by Fable in real play, so these
+    // stand in for a Fable distribution nobody has measured yet. They move
+    // when a Fable-served sakuga turn is measured, the same condition the
+    // 16k thinking allowance waits on (evals/suites/budget-assertions.ts).
+    ttftTargetMs: 130_000,
+    totalTargetMs: 150_000,
     validationRetry: true,
     effort: "high",
   },

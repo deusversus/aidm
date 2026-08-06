@@ -1,7 +1,8 @@
 import type { Suite, SuiteResult } from "../types";
 import { controlKey } from "./control-key";
 import { fingerprintReliability } from "./fingerprint-reliability";
-import { MIN_SOAK_TURNS, flywheelProspective } from "./flywheel-prospective";
+import { flywheelProspective } from "./flywheel-prospective";
+import { seedIntegrity } from "./seed-integrity";
 
 /**
  * §10 suites that gate later milestones — scaffolded now (axiom 8: the
@@ -42,11 +43,13 @@ export const scaffolds: Suite[] = [
   // exists — the suite states the depth it needs rather than grading a run
   // that cannot carry the claim.
   flywheelProspective,
-  scaffold(
-    "seed-integrity",
-    "M3",
-    `§10.5 payoff windows + organic-detection recall need the seed engine in anger. NEEDS a soaked campaign of ≥ ${MIN_SOAK_TURNS} turns (§10.3's letter; the M2 gate ran 24 — docs/retros/M2-drift-soak.md): run \`pnpm soak -- --turns=${MIN_SOAK_TURNS}\` or deeper, then re-run with FLYWHEEL_CAMPAIGN_ID=<campaign uuid>. Until then nothing is measured — this is NOT a pass`,
-  ),
+  // §10.5 — LIVE at M3R4 B1: payoff windows, dependency orphans and the
+  // organic/declared recall spot-check, graded over the same soaked campaign.
+  // It was a `scaffold(...)` stub until now, and the stub LIED by implication:
+  // its skip text told the reader to re-run with a campaign id once a soak
+  // existed, as if the grading machinery were waiting behind that flag. It was
+  // never written (M3 close, 60c799b, recorded it UNBUILT). Now it is.
+  seedIntegrity,
   scaffold(
     "golden-regression",
     "M1",

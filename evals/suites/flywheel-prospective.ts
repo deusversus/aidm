@@ -448,10 +448,20 @@ async function loadInput(campaignId: string): Promise<FlywheelInput> {
 
 type CandidateCampaign = { id: string; title: string; played: number };
 
-/** Env id first; else the deepest soak-looking campaign (the drift-soak pattern). */
-async function resolveCampaignId(): Promise<{ id: string; how: string } | null> {
-  const fromEnv = process.env.FLYWHEEL_CAMPAIGN_ID?.trim();
-  if (fromEnv) return { id: fromEnv, how: "FLYWHEEL_CAMPAIGN_ID" };
+/**
+ * Env id first; else the deepest soak-looking campaign (the drift-soak pattern).
+ * SHARED: §10.5's seed-integrity suite grades the same soaked run and must
+ * discover it the same way — one resolver, one --ci guard, one definition of
+ * "qualifying". `envKeys` are tried in order so a suite can offer its own name
+ * and still honor the shared one.
+ */
+export async function resolveSoakCampaign(
+  envKeys: readonly string[] = ["FLYWHEEL_CAMPAIGN_ID"],
+): Promise<{ id: string; how: string } | null> {
+  for (const key of envKeys) {
+    const fromEnv = process.env[key]?.trim();
+    if (fromEnv) return { id: fromEnv, how: key };
+  }
   // Auto-discovery is a convenience for the integrator at his own machine. The
   // dev database also holds the PLAYER's campaigns, and a CI job must never
   // grade a campaign nobody pointed it at — under --ci the id is required.
@@ -507,10 +517,14 @@ export const flywheelProspective: Suite = {
     let input: FlywheelInput;
     let how: string;
     try {
-      const target = await resolveCampaignId();
+      const target = await resolveSoakCampaign();
       if (!target) {
+        // Same two silences as seed-integrity: under --ci discovery never runs,
+        // so "none found" would claim a search that didn't happen.
         return skip(
-          `NEEDS a soaked campaign of ≥ ${MIN_SOAK_TURNS} turns; none found (no FLYWHEEL_CAMPAIGN_ID, no soak-titled campaign) — ${HOW_TO_SOAK}`,
+          process.argv.includes("--ci")
+            ? `NEEDS a soaked campaign of ≥ ${MIN_SOAK_TURNS} turns and none was NAMED (no FLYWHEEL_CAMPAIGN_ID). Under --ci discovery is not attempted at all — no campaign was looked for, so this is not evidence that none exists. Name one, or run without --ci against a soaked dev DB; ${HOW_TO_SOAK}`
+            : `NEEDS a soaked campaign of ≥ ${MIN_SOAK_TURNS} turns; none found (no FLYWHEEL_CAMPAIGN_ID, and discovery matched no soak-titled campaign) — ${HOW_TO_SOAK}`,
         );
       }
       how = target.how;
