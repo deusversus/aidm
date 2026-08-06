@@ -49,7 +49,7 @@ export function ShelfActions({ campaignId, status }: { campaignId: string; statu
 
   return (
     <div className="flex shrink-0 items-center gap-1">
-      {error && <span className="text-[10px] text-red-500">{error}</span>}
+      {error && <span className="text-[10px] text-danger">{error}</span>}
       {canArchive && (
         <button type="button" onClick={() => act("archive")} disabled={busy} className={btn}>
           Archive

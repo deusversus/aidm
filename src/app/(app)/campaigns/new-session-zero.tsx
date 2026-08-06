@@ -32,7 +32,7 @@ export function NewSessionZeroButton() {
       >
         {busy ? "Opening the studio…" : "Begin Session Zero"}
       </button>
-      {error && <p className="text-xs text-red-500">{error}</p>}
+      {error && <p className="text-xs text-danger">{error}</p>}
     </div>
   );
 }

@@ -263,7 +263,7 @@ export function SzChat({
             </ul>
           </div>
         )}
-        {error && <p className="text-xs text-red-500">{error}</p>}
+        {error && <p className="text-xs text-danger">{error}</p>}
         {queued && (
           <p className="text-right text-xs italic text-muted-foreground">
             queued — sends when the conductor finishes: “{queued}”

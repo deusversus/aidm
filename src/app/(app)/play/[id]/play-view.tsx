@@ -2,6 +2,7 @@
 
 import { fetchWithAuthRetry } from "@/lib/client/fetch-with-auth";
 import { plainProse } from "@/lib/client/plain-prose";
+import { DEFAULT_THEME, type Theme, isTheme } from "@/lib/theme";
 import type { DirectiveGrant } from "@/lib/types/premise";
 import Link from "next/link";
 import { Fragment, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
@@ -166,6 +167,11 @@ const TIER_LABELS: Record<TierKey, string> = {
   probe: "Probe — the quick checks",
 };
 
+const THEME_OPTIONS: { value: Theme; label: string; note: string }[] = [
+  { value: "dark", label: "Dark", note: "the default — pale prose on a dark page" },
+  { value: "light", label: "Light", note: "dark prose on a pale page" },
+];
+
 const AFFORDANCE_OPTIONS: { value: string; label: string; note: string }[] = [
   { value: "default_on", label: "Always", note: "suggested moves appear at each decision point" },
   { value: "on_request_only", label: "On request", note: "only when you ask for them" },
@@ -196,7 +202,7 @@ function RetakeSlate({
   return (
     <div
       data-retake="slate"
-      className="space-y-2 rounded-md border border-red-900/40 bg-red-950/20 px-3 py-2"
+      className="space-y-2 rounded-md border border-danger-border bg-danger-bg px-3 py-2"
     >
       <p className="text-xs leading-5 text-muted-foreground">
         <span className="font-medium uppercase tracking-widest text-foreground/90">Retake</span>{" "}
@@ -337,6 +343,11 @@ export function PlayView({
   const [voiceSource, setVoiceSource] = useState<"library" | "curated" | null>(null);
   const [voiceId, setVoiceId] = useState(ttsVoiceId);
   const [previewing, setPreviewing] = useState(false);
+  // M3R4 B5 reading theme: player-scoped, so its truth is what the root layout
+  // already stamped on <html> — read from the DOM after mount rather than
+  // threading a second copy through props (server render has no document).
+  const [theme, setTheme] = useState<Theme>(DEFAULT_THEME);
+  const [themeNotice, setThemeNotice] = useState<string | null>(null);
   // §9.4 session lifecycle: recap opens the sitting, yokoku closes it.
   const [recap, setRecap] = useState<string | null>(null);
   const [yokoku, setYokoku] = useState<string | null>(null);
@@ -379,6 +390,11 @@ export function PlayView({
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [exchanges, streamText, staging, chips, assertion]);
+
+  useEffect(() => {
+    const stamped = document.documentElement.dataset.theme;
+    if (isTheme(stamped)) setTheme(stamped);
+  }, []);
 
   useEffect(() => {
     if (!busy) {
@@ -1077,6 +1093,7 @@ export function PlayView({
   const toggleSettings = () => {
     const next = !settingsOpen;
     setSettingsOpen(next);
+    if (!next) setThemeNotice(null);
     if (next && !settingsLoaded) {
       setSettingsLoaded(true);
       void loadSettings();
@@ -1126,6 +1143,47 @@ export function PlayView({
     }
     setSettingsBusy(false);
     return ok;
+  };
+
+  // The theme applies to the live DOM first — a reading preference that waited
+  // on a round-trip would feel broken — and persists player-scoped behind it.
+  // Both exits then adopt the RECORD, never the request: on success the route
+  // echoes what the row now holds and that is what paints; on failure the paint
+  // reverts. The drawer can never show a preference the record didn't take.
+  const chooseTheme = async (next: Theme) => {
+    if (next === theme) return;
+    const previous = theme;
+    document.documentElement.dataset.theme = next;
+    setTheme(next);
+    setThemeNotice(null);
+    setSettingsBusy(true);
+    let recorded: Theme | null = null;
+    try {
+      const res = await fetchWithAuthRetry("/api/player/theme", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ theme: next }),
+      });
+      if (res.ok) {
+        const body = (await res.json().catch(() => null)) as { theme?: unknown } | null;
+        // A 200 whose body we can't read still means the write landed; fall
+        // back to the requested value rather than reverting a good save.
+        recorded = isTheme(body?.theme) ? body.theme : next;
+      }
+    } catch {
+      // Fall through to the revert below.
+    }
+    const applied = recorded ?? previous;
+    document.documentElement.dataset.theme = applied;
+    setTheme(applied);
+    if (!recorded) {
+      // The toggle lives in the drawer, so the failure has to be legible in the
+      // drawer — the composer footer is off-screen from here (§C10).
+      setThemeNotice("Couldn't save the theme — it's been put back. Try again.");
+      setPinNotice("Couldn't save the theme — try again.");
+      setTimeout(() => setPinNotice(null), 4_000);
+    }
+    setSettingsBusy(false);
   };
 
   // Narration is player-facing voice: the handoff warning gates the change
@@ -1387,8 +1445,8 @@ export function PlayView({
                   {TIER_COST_FRAMING.narration[narrationConfirm ?? tiers.narration] ?? ""}
                 </p>
                 {narrationConfirm && (
-                  <div className="space-y-2 rounded-md border border-amber-900/40 bg-amber-950/20 px-3 py-2">
-                    <p className="text-[11px] leading-5 text-amber-200/90">
+                  <div className="space-y-2 rounded-md border border-warning-border bg-warning-bg px-3 py-2">
+                    <p className="text-[11px] leading-5 text-warning">
                       Studio handoff: the prompt cache rebuilds cold and the voice may shift —
                       change the writer to {friendlyModel(narrationConfirm)}?
                     </p>
@@ -1532,6 +1590,39 @@ export function PlayView({
               </p>
             </div>
           )}
+
+          <div className="space-y-1">
+            <p className="text-xs font-medium text-muted-foreground">Reading theme</p>
+            <div className="flex flex-wrap gap-2">
+              {THEME_OPTIONS.map((o) => (
+                <button
+                  key={o.value}
+                  type="button"
+                  disabled={settingsBusy}
+                  onClick={() => void chooseTheme(o.value)}
+                  className={`rounded-md border px-3 py-1 text-xs disabled:opacity-50 ${
+                    theme === o.value
+                      ? "border-foreground bg-muted text-foreground"
+                      : "border-border text-muted-foreground hover:bg-muted"
+                  }`}
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
+            {themeNotice && (
+              <output
+                data-theme-notice=""
+                className="block rounded-md border border-danger-border bg-danger-bg px-3 py-2 text-[11px] leading-5 text-danger"
+              >
+                {themeNotice}
+              </output>
+            )}
+            <p className="text-[11px] text-muted-foreground/60">
+              {THEME_OPTIONS.find((o) => o.value === theme)?.note ?? ""} · yours, not this
+              campaign's — it follows you everywhere.
+            </p>
+          </div>
         </div>
       )}
 
@@ -1612,7 +1703,7 @@ export function PlayView({
           const isTarget = retakeMode && e.kind !== "channel" && retakeTargetSet.has(e.turnNumber);
           const beyond = retakeMode && beyondRetakeHorizon(exchanges, e.turnNumber);
           const tone = unwinding
-            ? "-mx-3 rounded-md bg-red-950/10 px-3 py-2 opacity-50 ring-1 ring-red-900/30 transition-opacity"
+            ? "-mx-3 rounded-md bg-danger-bg/60 px-3 py-2 opacity-50 ring-1 ring-danger-border/70 transition-opacity"
             : retakeMode && !isTarget
               ? "opacity-40 transition-opacity"
               : "";
@@ -1772,7 +1863,7 @@ export function PlayView({
                 </details>
               )}
               {assertion.clarify && (
-                <p className="rounded-md border border-amber-900/40 bg-amber-950/20 px-3 py-2 text-xs text-amber-200/90">
+                <p className="rounded-md border border-warning-border bg-warning-bg px-3 py-2 text-xs text-warning">
                   The studio needs a beat of clarity: {assertion.clarify}
                 </p>
               )}
@@ -1808,7 +1899,7 @@ export function PlayView({
           </div>
         )}
         {error && (
-          <div className="rounded-md border border-red-900/40 bg-red-950/20 px-3 py-2 text-sm">
+          <div className="rounded-md border border-danger-border bg-danger-bg px-3 py-2 text-sm">
             <p>{error.message}</p>
             {error.turnId && (
               <button

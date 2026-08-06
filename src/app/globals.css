@@ -1,19 +1,57 @@
 @import "tailwindcss";
 
+/*
+ * Dark is the BASE, and that is the honest default: the previous file declared
+ * a light base with a dark override nested inside `@media (prefers-color-scheme: dark)`
+ * INSIDE `@theme` — Tailwind v4 hoists that block out of the media query, so the
+ * dark values always won and the light theme never rendered once (M3R4 B5).
+ *
+ * Light is now an explicit override selected by `data-theme="light"` on <html>.
+ * It works at runtime because plain `@theme` (never `@theme inline`) emits the
+ * tokens as custom properties on `:root` and compiles utilities to
+ * `var(--color-*)` — re-declaring the same properties under a
+ * higher-specificity selector repaints every utility with no rebuild. The old
+ * block could not switch at runtime under any circumstance: it was hoisted away
+ * before the browser ever saw a media query.
+ */
 @theme {
+  --color-background: oklch(0.12 0 0);
+  --color-foreground: oklch(0.98 0 0);
+  --color-muted: oklch(0.18 0 0);
+  --color-muted-foreground: oklch(0.65 0 0);
+  --color-border: oklch(0.22 0 0);
+  /* Semantic accents (M3R4 B5): the error/warning surfaces used to be hardcoded
+     red-950/amber-200 — dark-only values that were illegible the moment a light
+     theme could actually render.
+     These dark values are not new colors: each is the OLD composite this commit
+     replaces, measured over the 0.12 page, so the swap is pure plumbing and dark
+     renders exactly as it always has. Where one token replaced several old
+     utilities, it matches the most visible one and the fainter uses keep their
+     old ratio via an alpha suffix (bg-danger-bg/60, ring-danger-border/70). */
+  --color-danger: oklch(0.637 0.237 25); /* was text-red-500 */
+  --color-danger-bg: oklch(0.148 0.018 26); /* was bg-red-950/20 */
+  --color-danger-border: oklch(0.23 0.056 26); /* was border-red-900/40 */
+  --color-warning: oklch(0.87 0.11 85); /* was text-amber-200/90 */
+  --color-warning-bg: oklch(0.152 0.015 46); /* was bg-amber-950/20 */
+  --color-warning-border: oklch(0.247 0.05 49); /* was border-amber-900/40 */
+}
+
+/* Native widgets (selects, scrollbars, focus rings) follow the chosen theme. */
+:root {
+  color-scheme: dark;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
   --color-background: oklch(0.99 0 0);
   --color-foreground: oklch(0.15 0 0);
   --color-muted: oklch(0.96 0 0);
   --color-muted-foreground: oklch(0.45 0 0);
   --color-border: oklch(0.9 0 0);
-}
-
-@media (prefers-color-scheme: dark) {
-  @theme {
-    --color-background: oklch(0.12 0 0);
-    --color-foreground: oklch(0.98 0 0);
-    --color-muted: oklch(0.18 0 0);
-    --color-muted-foreground: oklch(0.65 0 0);
-    --color-border: oklch(0.22 0 0);
-  }
+  --color-danger: oklch(0.5 0.2 25);
+  --color-danger-bg: oklch(0.96 0.03 25);
+  --color-danger-border: oklch(0.84 0.08 25);
+  --color-warning: oklch(0.45 0.11 70);
+  --color-warning-bg: oklch(0.97 0.05 90);
+  --color-warning-border: oklch(0.83 0.1 85);
 }

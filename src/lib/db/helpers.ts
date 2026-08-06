@@ -1,5 +1,6 @@
 import type { Db } from "@/lib/db";
 import { players } from "@/lib/db/schema";
+import { DEFAULT_THEME, type Theme, themeFromProfile } from "@/lib/theme";
 import { type SQL, eq, isNull, sql } from "drizzle-orm";
 import type { PgColumn } from "drizzle-orm/pg-core";
 
@@ -54,4 +55,40 @@ export async function appendPlayerTaste(
       )`,
     })
     .where(eq(players.id, playerId));
+}
+
+/**
+ * The §6.9 reading preference (M3R4 B5). Same atomic-jsonb discipline as the
+ * taste append and for the same reason: the profile is player-scoped and other
+ * writers (SZ compile, session close, booth close) append to it concurrently —
+ * a read-modify-write full replacement would clobber their notes.
+ */
+export async function setPlayerTheme(
+  db: Pick<Db, "update">,
+  playerId: string,
+  theme: Theme,
+): Promise<void> {
+  await db
+    .update(players)
+    .set({
+      profile: sql`jsonb_set(
+        coalesce(${players.profile}, '{}'::jsonb),
+        '{theme}',
+        ${JSON.stringify(theme)}::jsonb
+      )`,
+    })
+    .where(eq(players.id, playerId));
+}
+
+/**
+ * The read side (root layout + the settings drawer's source of truth). A player
+ * with no row yet — the webhook hasn't fired, a fresh local session — reads as
+ * the default rather than erroring: the theme is never worth a 500.
+ */
+export async function readPlayerTheme(db: Pick<Db, "select">, playerId: string): Promise<Theme> {
+  const [row] = await db
+    .select({ profile: players.profile })
+    .from(players)
+    .where(eq(players.id, playerId));
+  return row ? themeFromProfile(row.profile) : DEFAULT_THEME;
 }
