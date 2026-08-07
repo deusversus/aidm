@@ -7,7 +7,13 @@ import { and, eq, isNull } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { CANON_MATCH_DISTANCE, EXTRACTOR_SYSTEM, ingestAssertion, renderDossier } from "../ingest";
+import {
+  CANON_MATCH_DISTANCE,
+  EXTRACTOR_SYSTEM,
+  IngestionExtraction,
+  ingestAssertion,
+  renderDossier,
+} from "../ingest";
 
 /**
  * Universal ingestion (§5.4, §6.5) against real Postgres with a scripted
@@ -1616,5 +1622,40 @@ describe("renderDossier protagonist grouping (M2R R4 — the C4 fix pattern)", (
       2,
     );
     expect(dossier.indexOf("THE PLAYER'S PROTAGONIST")).toBeGreaterThan(-1);
+  });
+});
+
+/**
+ * Posture casing (M3R4 R-2). Enum vocabulary reaches the model as DESCRIPTION
+ * text, never grammar — and EXTRACTOR_SYSTEM used to spell one of these values
+ * "FLAG". `posture` is required inside a required array, so one mis-cased word
+ * failed the WHOLE extraction: every other fact in the player's assertion went
+ * with it, the corrective retry burned, and layout's catch swallowed the rest.
+ */
+describe("IngestionExtraction — posture normalization", () => {
+  const fact = (posture: string) => ({
+    kind: "faction",
+    content: "The Red Sash runs the piers.",
+    posture,
+  });
+
+  it("takes the prompt's own capitals as the posture they plainly are", () => {
+    const parsed = IngestionExtraction.parse({
+      facts: [fact("FLAG"), fact("Clarify"), fact(" accept ")],
+    });
+    expect(parsed.facts.map((f) => f.posture)).toEqual(["flag", "clarify", "accept"]);
+  });
+
+  it("a word the vocabulary does not hold falls to accept, loudly — never a lost assertion", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const parsed = IngestionExtraction.parse({ facts: [fact("reject"), fact("accept")] });
+    expect(parsed.facts.map((f) => f.posture)).toEqual(["accept", "accept"]);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("out-of-vocabulary posture"));
+    warn.mockRestore();
+  });
+
+  it("the extractor prose spells the vocabulary in the schema's own case", () => {
+    expect(EXTRACTOR_SYSTEM).not.toContain("FLAG never blocks");
+    expect(EXTRACTOR_SYSTEM).toContain('"accept", "clarify", "flag"');
   });
 });

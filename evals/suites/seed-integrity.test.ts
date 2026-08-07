@@ -1,9 +1,11 @@
+import { DIRECTOR_MAX_INTERVAL } from "@/lib/types/direction";
 import { describe, expect, it } from "vitest";
 import {
   type SeedIntegrityInput,
   type SeedLedgerRow,
   analyzeSeedIntegrity,
   classifySeed,
+  deriveCycleTolerance,
   windowOf,
 } from "./seed-integrity";
 
@@ -34,12 +36,21 @@ function seed(over: Partial<SeedLedgerRow> = {}): SeedLedgerRow {
   };
 }
 
+/**
+ * A run's Director-cycle turns, shaped like the N=50 soak's: DIRECTOR_MIN_
+ * TURNS_BETWEEN (3) plus event triggers, never the DIRECTOR_MAX_INTERVAL
+ * backstop. Widest gap 4, so the settlement tolerance this run earns is 3 —
+ * not the constant's 7.
+ */
+const CYCLE_TURNS = [0, 3, 6, 10, 13, 17, 20, 24, 27, 31, 35, 38, 42, 46, 50];
+
 function input(over: Partial<SeedIntegrityInput> = {}): SeedIntegrityInput {
   return {
     campaignId: "camp",
     lastTurn: 52,
     playedTurns: 50,
     sweptTurns: 50,
+    cycleTurns: CYCLE_TURNS,
     seeds: [],
     declared: [],
     ...over,
@@ -113,12 +124,109 @@ describe("analyzeSeedIntegrity — §10.5's three clauses", () => {
     expect(out.probes.every((p) => p.verdict === "pass")).toBe(true);
   });
 
-  it("a late payoff fails the window clause and names the overrun", () => {
+  /**
+   * The cycle tolerance (M3R4 R-2, re-derived by the R-2 audit). A payoff is
+   * SETTLED by the §7.6 batched adjudicator, which only runs on Director-cycle
+   * turns — so a payoff landing on the page the turn after a window shuts
+   * cannot be RECORDED until the next cycle fires. Lateness inside that gap is
+   * the cadence, not the ledger rotting; lateness beyond it is still a miss.
+   *
+   * The bound comes from the RUN, not from DIRECTOR_MAX_INTERVAL: that constant
+   * is the nothing-happened backstop (8), while the real spacing is
+   * DIRECTOR_MIN_TURNS_BETWEEN plus event triggers, measured at 4 on the soak.
+   * Grading against the constant would have granted a 7-turn amnesty no run
+   * ever earned.
+   */
+  const window30 = { from: 15, to: 30 };
+  const tolerance = deriveCycleTolerance(CYCLE_TURNS).tolerance;
+
+  it("derives the tolerance from the run's widest observed cycle gap, minus one", () => {
+    expect(tolerance).toBe(3);
+    expect(tolerance).toBeLessThan(DIRECTOR_MAX_INTERVAL - 1);
+    expect(deriveCycleTolerance(CYCLE_TURNS).source).toContain("widest gap 4");
+  });
+
+  it("a payoff late by the cycle tolerance PASSES — that lateness is structure", () => {
     const run = healthy();
-    run.seeds[0] = seed({ id: "a", status: "resolved", resolvedTurn: 34 });
+    run.seeds[0] = seed({
+      id: "a",
+      status: "resolved",
+      payoffWindow: window30,
+      resolvedTurn: window30.to + tolerance,
+    });
+    const out = analyzeSeedIntegrity(run);
+    expect(verdictOf(out, "payoff-window")).toBe("pass");
+    expect(out.probes[0]?.detail).toContain(`1 late within the ${tolerance}-turn cycle tolerance`);
+    // The reader is told what was graded and WHERE THE NUMBER CAME FROM, not
+    // just the grade.
+    expect(out.probes[0]?.detail).toContain("this run's OWN cadence");
+    expect(out.probes[0]?.detail).toContain("widest gap 4");
+  });
+
+  it("one turn past the tolerance FAILS the window clause and names the overrun", () => {
+    const run = healthy();
+    run.seeds[0] = seed({
+      id: "a",
+      status: "resolved",
+      payoffWindow: window30,
+      resolvedTurn: window30.to + tolerance + 1,
+    });
     const out = analyzeSeedIntegrity(run);
     expect(verdictOf(out, "payoff-window")).toBe("fail");
-    expect(out.probes[0]?.detail).toContain("4 turn(s) past");
+    expect(out.probes[0]?.detail).toContain(`${tolerance + 1} turn(s) past`);
+    expect(out.probes[0]?.detail).toContain("1 late BEYOND it");
+  });
+
+  /**
+   * The fallback, pinned. A run with no recoverable cycle history cannot have
+   * its cadence measured, so the backstop constant stands in — and the output
+   * SAYS it is standing in, because a tolerance nobody observed must never read
+   * like one that was.
+   */
+  it("falls back to DIRECTOR_MAX_INTERVAL−1 when the run has no cycle history, and names it", () => {
+    expect(deriveCycleTolerance([]).tolerance).toBe(DIRECTOR_MAX_INTERVAL - 1);
+    expect(deriveCycleTolerance([12]).tolerance).toBe(DIRECTOR_MAX_INTERVAL - 1);
+    expect(deriveCycleTolerance([12]).source).toContain("FALLBACK DIRECTOR_MAX_INTERVAL−1");
+
+    const run = healthy();
+    run.cycleTurns = [];
+    run.seeds[0] = seed({
+      id: "a",
+      status: "resolved",
+      payoffWindow: window30,
+      resolvedTurn: window30.to + DIRECTOR_MAX_INTERVAL - 1,
+    });
+    const out = analyzeSeedIntegrity(run);
+    expect(verdictOf(out, "payoff-window")).toBe("pass");
+    expect(out.probes[0]?.detail).toContain("FALLBACK DIRECTOR_MAX_INTERVAL−1");
+    // …and the fallback is not a wider amnesty in disguise: one past it fails.
+    run.seeds[0] = seed({
+      id: "a",
+      status: "resolved",
+      payoffWindow: window30,
+      resolvedTurn: window30.to + DIRECTOR_MAX_INTERVAL,
+    });
+    expect(verdictOf(analyzeSeedIntegrity(run), "payoff-window")).toBe("fail");
+  });
+
+  it("the run's own cadence is STRICTER than the constant — the 4-late artifact still fails", () => {
+    // Late by 4: inside DIRECTOR_MAX_INTERVAL−1's amnesty, outside this run's.
+    const run = healthy();
+    run.seeds[0] = seed({
+      id: "a",
+      status: "resolved",
+      payoffWindow: window30,
+      resolvedTurn: window30.to + 4,
+    });
+    expect(verdictOf(analyzeSeedIntegrity(run), "payoff-window")).toBe("fail");
+  });
+
+  it("the tolerance never launders an EXPIRED seed — that probe is untouched", () => {
+    // The 13-rotted finding stands: an unpaid seed the run outlived is a miss
+    // no matter how the cadence lands.
+    const run = healthy();
+    run.seeds[1] = seed({ id: "b", payoffWindow: { from: 15, to: 51 } }); // lastTurn 52
+    expect(verdictOf(analyzeSeedIntegrity(run), "no expired-unpaid")).toBe("fail");
   });
 
   it("an early payoff fails too — the window is a contract in both directions", () => {

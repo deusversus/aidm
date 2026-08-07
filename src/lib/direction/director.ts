@@ -9,7 +9,7 @@ import {
   sessionRecords,
 } from "@/lib/db/schema";
 import { LOOPED_LARGE } from "@/lib/llm/budgets";
-import { callJudgment } from "@/lib/llm/calls";
+import { callJudgment, isTransportFailure } from "@/lib/llm/calls";
 import { DEV_TIER_SELECTION, TierSelection } from "@/lib/llm/tiers";
 import { gaugeTrend, playerDrivenTrend } from "@/lib/sakkan/sakkan";
 import {
@@ -389,7 +389,30 @@ export async function runDirectorCycle(
   // adjudication is a skipped batch (the next cycle re-renders the same
   // pending candidates), never a lost Director cycle.
   try {
-    await adjudicateSeeds(db, campaignId, turnNumber);
+    const adjudication = await adjudicateSeeds(db, campaignId, turnNumber);
+    // The result was computed and DROPPED here until M3R4 R-2 — so "did the
+    // adjudicator ever promote a mention? ever push a window?" could only be
+    // re-derived from seed rows a later cycle may already have overwritten.
+    // Surgical jsonb, same idiom as the attempt stamp above: it must survive a
+    // cycle that dies after this point, and the wholesale save below spreads a
+    // FRESHLY loaded state, so this write rides through it untouched.
+    if (adjudication.reviewed > 0) {
+      const summary = {
+        at_turn: turnNumber,
+        reviewed: adjudication.reviewed,
+        mentions: adjudication.mentions,
+        payoffs: adjudication.payoffs,
+        conflicts: adjudication.conflicts,
+        window_adjustments: adjudication.windowAdjustments,
+        low_confidence: adjudication.lowConfidence,
+      };
+      await db
+        .update(campaigns)
+        .set({
+          directionState: sql`jsonb_set(coalesce(${campaigns.directionState}, '{}'::jsonb), '{last_adjudication}', ${JSON.stringify(summary)}::jsonb)`,
+        })
+        .where(eq(campaigns.id, campaignId));
+    }
   } catch (err) {
     console.warn(`[director] seed adjudication failed (turn ${turnNumber}) — batch skipped:`, err);
   }
@@ -583,6 +606,11 @@ export async function runDirectorCycle(
     // Director's only way to give a seed more room was a near-duplicate plant
     // — which is why the audit found seeds that could never leave the ledger.
     'Seed ops: "plant" (description, expected_payoff, optional window and dependencies), "resolve" and "abandon" (seed_description), and "adjust_window" — give a seed still worth keeping a LATER payoff_window_to instead of planting it again under a new description. Never re-plant a seed that already exists; push its window out or let it go on purpose. Payoffs the story lands on its own are resolved for you between cycles — plan the ones it has not.',
+    // The CLOSING state is derived, not stored (§7.6, M3R4 R-2): a seed used to
+    // be silent until it was already OVERDUE, so every push arrived after the
+    // promise broke — 13 of 19 seeds expired un-pushed across the N=50 soak and
+    // adjust_window was never used once.
+    `A seed marked CLOSING in the ledger has a window shutting within ${DIRECTOR_MAX_INTERVAL} turns and your cycles run at most that far apart — treat each one as yours to decide NOW: move it toward its payoff this arc, adjust_window it to a turn you can honestly reach, or abandon it on purpose. Quote its description EXACTLY as the ledger prints it in seed_description; that string is how the op finds the seed.`,
     // The ceilings the schema cannot carry (types/direction.ts): stated here
     // because this text IS the constraint the model writes against. Anything
     // beyond a ceiling is silently dropped engine-side — say the best ones.
@@ -750,7 +778,18 @@ export async function runDirectorCycle(
       if (op.op === "plant") {
         await plantSeed(db, campaignId, turnNumber, op, DIRECTOR_PROVENANCE);
       } else {
-        await settleSeed(db, campaignId, turnNumber, op);
+        // settleSeed's note is the ONLY report that a settle matched nothing —
+        // and it was discarded here (M3R4 R-2). A resolve/abandon/adjust_window
+        // whose description missed every open seed then looked, from every
+        // record the engine keeps, exactly like a cycle that chose not to act.
+        const settled = await settleSeed(db, campaignId, turnNumber, op);
+        if (settled.note) {
+          console.warn(`[director] seed op ${op.op} — ${settled.note}`, {
+            campaignId,
+            turnNumber,
+            matched: settled.seedId ?? null,
+          });
+        }
       }
     } catch (err) {
       console.warn(`[director] seed op ${op.op} failed — skipped, cycle kept`, {
@@ -1014,25 +1053,97 @@ export async function directorStartup(db: Db, campaignId: string): Promise<void>
     ...learnedSection,
     "",
     "## Your task",
-    `Plan the OPENING ARC. Name it (IP-appropriate, evocative), set phase to Setup, give it a dramatic_question descending from the spark, its shape and a budget within tolerance of the prior. Then: at most ${DIRECTOR_CAPS.cold_open_constraints} cold_open_constraints and at most ${DIRECTOR_CAPS.scene_shape_notes} scene_shape_notes for the writer's first scene — surplus entries are discarded, not read. Do NOT restate the forbidden opening moves — those pass through as hard constraints, verbatim.`,
+    // "phase" is a lowercase PacerPhase, and the prose used to say "Setup"
+    // (M3R4 R-2). Enum vocabulary reaches the model as DESCRIPTION text, never
+    // as grammar (types/direction.ts) — so a prompt that spells a value in
+    // another case beats the schema, which is exactly how 13 of 18 seed
+    // adjudications died in the N=50 soak. This one never fired only because
+    // models usually emit lowercase; the casing was a live campaign-open fatal
+    // waiting on a coin flip.
+    `Plan the OPENING ARC. Name it (IP-appropriate, evocative), set phase to "setup" (lowercase, exactly as written), give it a dramatic_question descending from the spark, its shape and a budget within tolerance of the prior. Then: at most ${DIRECTOR_CAPS.cold_open_constraints} cold_open_constraints and at most ${DIRECTOR_CAPS.scene_shape_notes} scene_shape_notes for the writer's first scene — surplus entries are discarded, not read. Do NOT restate the forbidden opening moves — those pass through as hard constraints, verbatim.`,
   ].join("\n");
 
-  const plan = await callJudgment(selection, {
-    name: "director_startup",
-    schema: StartupPlan,
-    campaignId,
-    turnNumber: 0,
-    phase: "director_cycle",
-    maxTokens: LOOPED_LARGE,
-    effort: "high",
-    system: directorPersona(contract),
-    prompt: dossier,
-  });
+  // The pilot plan DEGRADES BY FAILURE CLASS; it does not take the campaign
+  // with it (M3R4 R-2, scoped by the R-2 audit).
+  //
+  // VALIDATION (schema / grammar / refusal) — the class that killed 13
+  // adjudications and a whole Director cycle in the N=50 soak — degrades. That
+  // failure already spent calls.ts's one corrective retry and lost; retrying
+  // the open would only lose again, and uncaught it propagated through
+  // session.ts's open, which deletes the claimed session row: the player's
+  // FIRST open would simply fail, and keep failing, with no campaign to play.
+  // The scaffold above already landed, so what the degrade owes downstream is
+  // exactly what a plan supplies: an active arc row (Layout reads arc name and
+  // phase), a phase_state, and a pilot_plan carrying the OSP's hard
+  // constraints — which come from Session Zero, not from this call.
+  //
+  // TRANSPORT still fails HARD (rethrown below). calls.ts never retries that
+  // class, but the PLAYER can, and a retry is exactly what fixes a 429 or a
+  // dropped socket — so the M3R2 C1 delete-on-fail contract is preserved for
+  // the one class where failing hard buys something. Degrading there would
+  // spend a campaign's single pilot plan on a network blip.
+  let plan: z.infer<typeof StartupPlan>;
+  let degraded: { flag: string; reason: string } | undefined;
+  try {
+    plan = await callJudgment(selection, {
+      name: "director_startup",
+      schema: StartupPlan,
+      campaignId,
+      turnNumber: 0,
+      phase: "director_cycle",
+      maxTokens: LOOPED_LARGE,
+      effort: "high",
+      system: directorPersona(contract),
+      prompt: dossier,
+    });
+  } catch (err) {
+    // The wire, not the plan: nothing was judged, so there is nothing to
+    // degrade to a prior — the open fails and the player's retry gets the
+    // pilot they paid for.
+    if (isTransportFailure(err)) throw err;
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("[director] startup plan failed — opening arc DEGRADED to the genre prior", {
+      campaignId,
+      error: msg,
+    });
+    degraded = {
+      reason: msg,
+      flag: `Your pilot plan could not be filed (${msg.slice(0, 140)}) — this campaign opened on the genre-prior arc below, not one you planned. Re-plan it in this cycle: name the arc, set its dramatic question against the spark, and give the writer the cold open it never got.`,
+    };
+    plan = StartupPlan.parse({
+      arc: {
+        name: "Opening Movement",
+        // The spark is the campaign's own question; the OSP's suggestion is the
+        // Session-Zero conductor's reading of it. Either is the player's
+        // material — never invented here.
+        dramatic_question:
+          osp.director_inputs.suggested_first_arc_question.trim() || contract.spark,
+        shape: contract.active.framing.arc_shape,
+        budget: budgetPrior,
+        phase: "setup",
+        payoff_contract: [],
+        status: "active",
+      },
+      cold_open_constraints: [],
+      scene_shape_notes: [],
+    });
+  }
 
   const { arcId } = await applyArcPlan(db, campaignId, 0, plan.arc);
 
   const newState: DirectionState = {
     ...state,
+    // The degrade is DURABLE, not a console line (the session.ts idiom), and
+    // it is written TWICE on purpose: pending_flags reaches the very next
+    // Director dossier — the cycle that can repair the plan — but that channel
+    // is consumed and cleared by that same cycle, so by turn ~3 nothing would
+    // remain to diagnose from. startup_degraded is the copy that stays.
+    ...(degraded
+      ? {
+          pending_flags: [...state.pending_flags, degraded.flag],
+          startup_degraded: { at_turn: 0, reason: degraded.reason },
+        }
+      : {}),
     tension_level: 0.2,
     phase_state: { arc_id: arcId, phase: plan.arc.phase, entered_at_turn: 0 },
     scene_shape: {

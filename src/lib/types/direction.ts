@@ -112,6 +112,19 @@ export const SEED_CONVERGENCE_SIMILARITY = 0.7;
 export const SEED_CONVERGENCE_MAX_PAIRS = 5;
 
 /**
+ * The dossier renders a seed's description WHOLE, bounded only at a size no
+ * real description reaches (M3R4 R-2; the N=50 soak's 19 descriptions ran
+ * 48–250 chars, averaging 125 — two of the nineteen came in under 77). The
+ * 60-char truncation this replaces cut 18 of those 19 and left an ellipsis
+ * behind — and the Director, speaking prose, quoted the
+ * truncation back in `seed_description`, which `bestMatch`'s bidirectional
+ * containment could never match against the stored text. `resolve`, `abandon`
+ * and `adjust_window` all settle through that match: the ledger's whole settle
+ * channel was addressing seeds by a name the ledger did not hold.
+ */
+export const SEED_DESCRIPTION_RENDER_CHARS = 400;
+
+/**
  * Candidate entries kept per seed row. The sweep appends one per matching
  * turn; the ledger must not grow a per-turn tail over a 100-turn season, so
  * the oldest fall off. Adjudicated entries stay (convergence reads the whole
@@ -131,16 +144,59 @@ export const SEED_ADJUDICATION_MIN_CONFIDENCE = 0.6;
 /**
  * The §7.6 cost law made structural: the batched call renders ONLY seeds under
  * review — pending candidates, callback-ready seeds carrying an expected
- * payoff, and overdue conflict-suspects — never the ledger. These are the
- * per-bucket ceilings; the ledger may hold a hundred seeds and the call still
- * costs the same.
+ * payoff, CLOSING seeds one interval from their window, and overdue
+ * conflict-suspects — never the ledger. These are the per-bucket ceilings; the
+ * ledger may hold a hundred seeds and the call still costs the same.
  */
 export const SEED_ADJUDICATION_CAPS = {
   candidates: 12,
   callback_ready: 8,
   conflict_suspects: 6,
-  /** Narrated fragments rendered as the shared evidence window. */
-  evidence_turns: 12,
+  /**
+   * Seeds whose payoff window shuts within one DIRECTOR_MAX_INTERVAL (M3R4
+   * R-2). A seed was silent until it was already broken; this bucket puts it
+   * in front of the adjudicator while `extend` can still save it.
+   */
+  closing: 6,
+  /**
+   * Turns rendered as the shared evidence window (recency tail). SIX, not
+   * twelve (M3R4 R-2 audit). The tail is what the NON-candidate seeds —
+   * CLOSING, callback-ready, overdue — are judged on, and at twelve the total
+   * budget below was exhausted after ~6.8 whole scenes: the tail's older half
+   * degraded to its 149-char fragment, which is the 4%-of-a-page evidence this
+   * whole revision exists to end. The tradeoff, stated: candidate-named scenes
+   * still take the budget FIRST and are unaffected; the tail is now half as
+   * BROAD and renders whole far more often; evidence_total_chars is unchanged.
+   */
+  evidence_turns: 6,
+  /**
+   * Candidate turns rendered PER SEED (M3R4 R-2). The organic sweep can name
+   * up to SEED_MAX_CANDIDATES turns for one seed; the judge needs the scenes
+   * where the thread most recently surfaced, not its whole history — three is
+   * the newest hit plus enough context to read it as a thread rather than a
+   * coincidence, and it is what keeps a busy seed from eating the budget below.
+   */
+  evidence_turns_per_seed: 3,
+  /**
+   * Chars of ACTUAL narration rendered per scene. Measured on the N=50 soak:
+   * mean narration 3,525 chars, and 38 of the 52 recorded scenes (73%) fit
+   * under this whole — the remaining 14 clip, and clip late. (The predecessor
+   * rendered `narratedFragment` clipped to 240 — ~4% of a page — and then asked
+   * the judge whether the seed surfaced on it.)
+   */
+  evidence_scene_chars: 4000,
+  /**
+   * The batch's whole evidence budget. ~24k chars ≈ 6k input tokens ≈ $0.018
+   * per cycle at the Sonnet judgment tier — THIS BLOCK ALONE, not the call.
+   * The under-review block bills on top (up to 32 seeds at the per-bucket caps
+   * above, ~700 rendered chars each ≈ 22k more), as does high-effort output, so
+   * a real adjudication cycle costs 2–4× the figure above. Cycles run every ≥3
+   * turns, and the §7.6 cost law still holds at any multiple: cost scales with
+   * CANDIDATES (bounded by those caps), never with ledger size. Scenes are
+   * filled newest-first; whatever the budget cannot hold falls back to its
+   * short fragment and then to a stated omission, never to a silent drop.
+   */
+  evidence_total_chars: 24000,
 } as const;
 
 /**
@@ -167,6 +223,16 @@ export function parseCandidates(raw: unknown): SeedCandidate[] {
   return out;
 }
 
+/**
+ * The SETTLE vocabulary. `mention` is still here, and still acted on, but it is
+ * no longer what this slot ASKS for (M3R4 R-2): the mention question moved to
+ * its own array below, because a candidate-bearing seed almost always also
+ * wears `callback-ready` or `overdue` in the same line — so one verdict slot
+ * made MENTION compete with PAYOFF and CONFLICT for a seed that plainly
+ * deserved both answers, and the strict-about-payoff instruction settled the
+ * contest. Kept in the vocabulary so a model that answers the old way still
+ * lands its mention instead of falling silently to `none`.
+ */
 export const SEED_VERDICTS = ["mention", "payoff", "conflict", "extend", "none"] as const;
 export type SeedVerdictKind = (typeof SEED_VERDICTS)[number];
 
@@ -199,9 +265,7 @@ export const SeedVerdict = z.object({
   seed_ref: z.number().int(),
   /** Lean by design — see {@link normalizeSeedVerdict}. The description IS the
    *  model's only statement of the vocabulary, so it names the exact tokens. */
-  verdict: z
-    .string()
-    .describe('one of: "mention" | "payoff" | "conflict" | "extend" | "none" (lowercase)'),
+  verdict: z.string().describe('one of: "payoff" | "conflict" | "extend" | "none" (lowercase)'),
   /** 0-1; clamped engine-side. */
   confidence: z.number(),
   /** One sentence from the evidence naming why. */
@@ -214,7 +278,47 @@ export type SeedVerdict = z.infer<typeof SeedVerdict>;
 /** A verdict after {@link normalizeSeedVerdict} — what the engine acts on. */
 export type AdjudicatedVerdict = Omit<SeedVerdict, "verdict"> & { verdict: SeedVerdictKind };
 
-export const SeedAdjudication = z.object({ verdicts: z.array(SeedVerdict) });
+/**
+ * The MENTION question, asked in its own slot (M3R4 R-2). The organic sweep's
+ * candidates are a COSINE GUESS — "this scene reads like that seed" — and only
+ * a reader of the page can say whether the thread actually surfaced. One
+ * finding per seed: `surfaced` yes/no, and the turn whose scene shows it.
+ *
+ * Lean string, not a boolean: the same grammar law that demotes enums leaves a
+ * `boolean` intact, but the SOAK evidence is that this judge answers in the
+ * prompt's own words, and "yes"/"no" is what the question asks for. Normalized
+ * by {@link mentionSurfaced}; anything unrecognized reads as NO — the answer
+ * that does nothing.
+ */
+export const SeedMentionFinding = z.object({
+  /** Index into the rendered under-review list; out-of-range refs drop engine-side. */
+  seed_ref: z.number().int(),
+  surfaced: z.string().describe('"yes" or "no" (lowercase)'),
+  /** The turn whose scene shows it; 0 when nothing surfaced. */
+  turn: z.number().int(),
+  /** 0-1; clamped engine-side. */
+  confidence: z.number(),
+  /** The phrase on the page that surfaced it — not a paraphrase of the seed. */
+  evidence: z.string(),
+});
+export type SeedMentionFinding = z.infer<typeof SeedMentionFinding>;
+
+/** The answers this question actually holds; anything else is out of vocabulary. */
+export const MENTION_ANSWERS = ["yes", "no", "y", "n", "true", "false"] as const;
+
+/** "yes" → true; everything else, including silence, → false (the no-op answer). */
+export function mentionSurfaced(raw: string): boolean {
+  const token = raw.trim().toLowerCase();
+  return token === "yes" || token === "y" || token === "true";
+}
+
+/** A mention finding after normalization — what the engine acts on. */
+export type AdjudicatedMention = Omit<SeedMentionFinding, "surfaced"> & { surfaced: boolean };
+
+export const SeedAdjudication = z.object({
+  verdicts: z.array(SeedVerdict),
+  mentions: z.array(SeedMentionFinding),
+});
 export type SeedAdjudication = z.infer<typeof SeedAdjudication>;
 
 // --- Arc model (§7.3) ---------------------------------------------------------
@@ -490,6 +594,45 @@ export const DirectionState = z.object({
   /** Ingestion FLAGs routed to the Director (layout writes, dailies consume). */
   pending_flags: z.array(z.string()).default([]),
   /**
+   * The campaign opened WITHOUT the pilot plan it asked for (M3R4 R-2 audit).
+   *
+   * The degrade's other channel is pending_flags, and pending_flags is
+   * CONSUMED AND CLEARED by the next Director cycle — so by turn ~3 the only
+   * trace that a campaign's opening arc was the genre prior rather than a plan
+   * would be a console line in a log nobody keeps. This is the durable copy:
+   * written with the degrade, never auto-cleared. A pilot happens once, so
+   * "how this campaign opened" is standing fact, not a pending item — the
+   * honest smallest rule is that nothing clears it. Rewind never touches it
+   * either: startup is turn 0 and no rewind goes below that. Engine-only.
+   */
+  startup_degraded: z
+    .object({
+      at_turn: z.number().int().nonnegative(),
+      /** The failing call's own message, as the open saw it. */
+      reason: z.string(),
+    })
+    .optional(),
+  /**
+   * The last batched adjudication's compact record (M3R4 R-2). AdjudicationResult
+   * was computed, returned, and DROPPED at the call site — so the only way to
+   * ask "did the §7.6 adjudicator ever promote a mention, ever push a window?"
+   * was to re-derive it from seed rows and hope no later cycle had overwritten
+   * the evidence. Written surgically the moment the batch returns, so it
+   * survives a cycle that dies afterwards; the next diagnosis reads it from
+   * rows. Engine-only; never player-facing.
+   */
+  last_adjudication: z
+    .object({
+      at_turn: z.number().int().nonnegative(),
+      reviewed: z.number().int().nonnegative(),
+      mentions: z.number().int().nonnegative(),
+      payoffs: z.number().int().nonnegative(),
+      conflicts: z.number().int().nonnegative(),
+      window_adjustments: z.number().int().nonnegative(),
+      low_confidence: z.number().int().nonnegative(),
+    })
+    .optional(),
+  /**
    * §6.5 janitor output (M2 C1): ambiguous near-duplicate pairs the machine
    * won't auto-merge — surfaced to the player in the notes panel, resolved
    * only by player word (accept → merge:player, dismiss → dropped). Cleared
@@ -553,6 +696,12 @@ export function rewindDirectionState(state: DirectionState, toTurn: number): Dir
       : {}),
     accumulated_epicness: 0,
     arc_events: [],
+    // The adjudication record is evidence ABOUT turns: one taken on a turn the
+    // rewind just un-wrote describes verdicts against scenes that no longer
+    // happened (M3R4 R-2).
+    ...(state.last_adjudication && state.last_adjudication.at_turn > toTurn
+      ? { last_adjudication: undefined }
+      : {}),
     // Suggestions referencing un-happened turns die with the dead timeline;
     // their entity ids may point at rows the rewind sweep just tombstoned.
     merge_suggestions: state.merge_suggestions.filter((s) => s.at_turn <= toTurn),

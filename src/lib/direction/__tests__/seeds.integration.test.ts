@@ -2,9 +2,11 @@ import * as schema from "@/lib/db/schema";
 import { EMBEDDING_DIMENSIONS } from "@/lib/llm/embedding-config";
 import { bebopContract } from "@/lib/renderer/__tests__/fixtures";
 import {
+  DIRECTOR_MAX_INTERVAL,
   DirectorArcPlan,
   DirectorSeedOp,
   ORGANIC_CANDIDATE_THRESHOLD,
+  SEED_ADJUDICATION_CAPS,
   SEED_ADJUDICATION_MIN_CONFIDENCE,
   type SeedAdjudication,
   parseCandidates,
@@ -518,6 +520,94 @@ describe.skipIf(!url)("Direction: arcs + seeds (real Postgres)", () => {
       expect(miss.note).toBeTruthy();
     });
 
+    /**
+     * The settle channel's own repair (M3R4 R-2). The dossier used to print
+     * every description clipped to 60 chars with an ellipsis, and the Director
+     * settles by quoting that line back — so `bestMatch`'s containment test was
+     * being handed a string the ledger did not hold. The 19 descriptions in the
+     * N=50 soak ran 48–250 chars (mean 125): 18 of the 19 were clipped.
+     */
+    it("settles a REAL-LENGTH description — the dossier prints it whole, the op matches it", async () => {
+      if (!db) throw new Error("unreachable");
+      const campaignId = await makeCampaign();
+      const long =
+        "the courier's second ledger, sewn into the lining of her coat, and the three names written in it that nobody has said aloud since the crossing";
+      expect(long.length).toBeGreaterThan(60);
+      const planted = await plantSeed(db, campaignId, 1, seedOp({ description: long }), "director");
+
+      const dossier = await seedDossier(db, campaignId, 4);
+      expect(dossier).toContain(long);
+
+      const settled = await settleSeed(
+        db,
+        campaignId,
+        5,
+        seedOp({ op: "resolve", seed_description: long }),
+      );
+      expect(settled.seedId).toBe(planted.seedId);
+      expect(settled.note).toBeUndefined();
+    });
+
+    it("a clipped-with-ellipsis quote still lands — the belt under the dossier fix", async () => {
+      if (!db) throw new Error("unreachable");
+      const campaignId = await makeCampaign();
+      const long =
+        "the debt owed to the harbourmaster, which he has never named out loud and never once forgotten";
+      const planted = await plantSeed(db, campaignId, 1, seedOp({ description: long }), "director");
+
+      // Exactly what the old 60-char dossier rendering handed the Director.
+      const clipped = `${long.slice(0, 59)}…`;
+      const settled = await settleSeed(
+        db,
+        campaignId,
+        6,
+        seedOp({ op: "abandon", seed_description: clipped }),
+      );
+      expect(settled.seedId).toBe(planted.seedId);
+      const [row] = await db.select().from(schema.seeds).where(eq(schema.seeds.id, planted.seedId));
+      expect(row?.status).toBe("abandoned");
+    });
+
+    it("marks CLOSING seeds in the dossier and names the three ways out", async () => {
+      if (!db) throw new Error("unreachable");
+      const campaignId = await makeCampaign();
+      const at = 12;
+      await plantSeed(
+        db,
+        campaignId,
+        1,
+        seedOp({
+          description: "the promise made at the dock",
+          payoff_window_from: 2,
+          payoff_window_to: at + DIRECTOR_MAX_INTERVAL,
+        }),
+        "director",
+      );
+      await plantSeed(
+        db,
+        campaignId,
+        1,
+        seedOp({
+          description: "the letter that has not arrived",
+          payoff_window_from: 2,
+          payoff_window_to: at + DIRECTOR_MAX_INTERVAL + 1,
+        }),
+        "director",
+      );
+
+      const dossier = await seedDossier(db, campaignId, at);
+      const closingLine = dossier
+        .split("\n")
+        .find((l) => l.includes("the promise made at the dock"));
+      expect(closingLine).toContain("CLOSING");
+      const notYet = dossier.split("\n").find((l) => l.includes("the letter that has not arrived"));
+      expect(notYet).not.toContain("CLOSING");
+      expect(dossier).toContain("1 CLOSING");
+      expect(dossier).toContain("adjust_window");
+      // CLOSING is not OVERDUE: nothing is broken yet, so no tension bump.
+      expect(dossier).not.toContain("overdue → tension");
+    });
+
     it("seedDossier renders open seeds with counts and stays compact", async () => {
       if (!db) throw new Error("unreachable");
       const campaignId = await makeCampaign();
@@ -853,14 +943,24 @@ describe.skipIf(!url)("Direction: arcs + seeds (real Postgres)", () => {
       return { candidate, ready, overdue, untouched };
     }
 
-    function scriptVerdicts(verdicts: SeedAdjudication["verdicts"]): void {
+    /** Script the batch's TWO answers (M3R4 R-2): the settle verdicts and the
+     *  mention findings. Both arrays are required by the schema, so a fixture
+     *  that omits one is not a shape the parse could ever hand the engine. */
+    function scriptAdjudication(emit: Partial<SeedAdjudication>): void {
+      const payload: SeedAdjudication = {
+        verdicts: emit.verdicts ?? [],
+        mentions: emit.mentions ?? [],
+      };
       // biome-ignore lint/suspicious/noExplicitAny: harness spans generic signatures
       mockJudgment.mockImplementation((_s: any, opts: any) =>
         opts.name === "seed_adjudication"
-          ? (Promise.resolve({ verdicts }) as never)
+          ? (Promise.resolve(payload) as never)
           : (Promise.reject(new Error(`unscripted judgment ${opts.name}`)) as never),
       );
     }
+
+    const scriptVerdicts = (verdicts: SeedAdjudication["verdicts"]): void =>
+      scriptAdjudication({ verdicts });
 
     it("renders only seeds under review — cost scales with candidates, not ledger size", async () => {
       if (!db) throw new Error("unreachable");
@@ -962,6 +1062,222 @@ describe.skipIf(!url)("Direction: arcs + seeds (real Postgres)", () => {
       const hedged = rows.find((r) => r.id === candidate.seedId);
       expect(hedged?.status).toBe("planted");
       expect(hedged?.resolvedBy).toBeNull();
+    });
+
+    /**
+     * QUESTION ONE, reachable (M3R4 R-2). The soak's adjudicator never once
+     * chose "mention": the verdict competed with payoff and conflict for a
+     * single slot on seeds that wore callback-ready and overdue tags in the
+     * same line, and it was judging 240-char fragments of 3,525-char scenes.
+     * These prove the WIRE — that a mention finding reaches the row. Whether a
+     * live judge now says yes is a soak question, not a deterministic one.
+     */
+    it("a mention finding records the mention — the question has its own slot now", async () => {
+      if (!db) throw new Error("unreachable");
+      const campaignId = await makeCampaign();
+      const { candidate } = await ledger(campaignId);
+      const review = await seedsUnderReview(db, campaignId, 11);
+      const ref = review.findIndex((r) => r.seed.id === candidate.seedId);
+
+      scriptAdjudication({
+        // The SETTLE answer is "none" — nothing ended — and the mention still lands.
+        verdicts: [{ seed_ref: ref, verdict: "none", confidence: 0.9, evidence: "not settled" }],
+        mentions: [
+          {
+            seed_ref: ref,
+            surfaced: "YES",
+            turn: 10,
+            confidence: 0.9,
+            evidence: "he sets the poster down and says the name",
+          },
+        ],
+      });
+      const result = await adjudicateSeeds(db, campaignId, 11);
+      expect(result.mentions).toBe(1);
+
+      const [row] = await db
+        .select()
+        .from(schema.seeds)
+        .where(eq(schema.seeds.id, candidate.seedId));
+      expect(row?.mentionCount).toBe(1);
+      expect(row?.status).toBe("confirmed");
+      expect(row?.urgency).toBeCloseTo(0.6, 3);
+      expect(parseCandidates(row?.candidates).every((c) => c.adj)).toBe(true);
+    });
+
+    it("surfaced=no writes nothing, and a hedged finding is recorded but not acted on", async () => {
+      if (!db) throw new Error("unreachable");
+      const campaignId = await makeCampaign();
+      const { candidate } = await ledger(campaignId);
+      const review = await seedsUnderReview(db, campaignId, 11);
+      const ref = review.findIndex((r) => r.seed.id === candidate.seedId);
+
+      scriptAdjudication({
+        mentions: [{ seed_ref: ref, surfaced: "no", turn: 0, confidence: 0.95, evidence: "mood" }],
+      });
+      expect((await adjudicateSeeds(db, campaignId, 11)).mentions).toBe(0);
+
+      scriptAdjudication({
+        mentions: [
+          {
+            seed_ref: 0,
+            surfaced: "yes",
+            turn: 10,
+            confidence: SEED_ADJUDICATION_MIN_CONFIDENCE - 0.1,
+            evidence: "maybe",
+          },
+        ],
+      });
+      // The candidates were spent by the first batch, so re-render before the
+      // second: the cost law means a spent candidate never returns.
+      const after = await adjudicateSeeds(db, campaignId, 12);
+      expect(after.mentions).toBe(0);
+
+      const [row] = await db
+        .select()
+        .from(schema.seeds)
+        .where(eq(schema.seeds.id, candidate.seedId));
+      expect(row?.mentionCount).toBe(0);
+      expect(row?.status).toBe("planted");
+    });
+
+    it("a seed answered in BOTH slots is credited ONCE", async () => {
+      if (!db) throw new Error("unreachable");
+      const campaignId = await makeCampaign();
+      const { candidate } = await ledger(campaignId);
+      const review = await seedsUnderReview(db, campaignId, 11);
+      const ref = review.findIndex((r) => r.seed.id === candidate.seedId);
+
+      scriptAdjudication({
+        // The legacy verdict word is still in the vocabulary, and still acts —
+        // but it must not double-count a seed the mention slot already credited.
+        verdicts: [{ seed_ref: ref, verdict: "mention", confidence: 0.9, evidence: "e" }],
+        mentions: [{ seed_ref: ref, surfaced: "yes", turn: 10, confidence: 0.9, evidence: "e" }],
+      });
+      const result = await adjudicateSeeds(db, campaignId, 11);
+      expect(result.mentions).toBe(1);
+
+      const [row] = await db
+        .select()
+        .from(schema.seeds)
+        .where(eq(schema.seeds.id, candidate.seedId));
+      expect(row?.mentionCount).toBe(1);
+    });
+
+    it("renders the ACTUAL narration of a candidate's scene, not a summary fragment", async () => {
+      if (!db) throw new Error("unreachable");
+      const campaignId = await makeCampaign();
+      await ledger(campaignId);
+      scriptAdjudication({});
+      await adjudicateSeeds(db, campaignId, 11);
+
+      const prompt = String(mockJudgment.mock.calls[0]?.[1]?.prompt);
+      expect(prompt).toContain("### turn 10");
+      expect(prompt).toContain("He set the bounty poster down and said the name out loud.");
+      // The fragment is what the judge USED to get — 4% of the page.
+      expect(prompt).not.toContain("He finally let himself say the name.");
+      // …and the seed line points at the scene the mention question is about.
+      expect(prompt).toContain("candidate scenes 10");
+      expect(prompt).toContain("QUESTION ONE");
+    });
+
+    it("bounds the evidence: a long scene clips, an unaffordable one degrades to its fragment", async () => {
+      if (!db) throw new Error("unreachable");
+      const campaignId = await makeCampaign();
+      await ledger(campaignId);
+      const caps = SEED_ADJUDICATION_CAPS;
+      // Enough whole scenes to overrun the batch budget, each longer than one
+      // scene may be — so both bounds are exercised by the same fixture.
+      const sceneCount = Math.ceil(caps.evidence_total_chars / caps.evidence_scene_chars) + 2;
+      for (let i = 0; i < sceneCount; i++) {
+        await db.insert(schema.episodicRecords).values({
+          campaignId,
+          turnNumber: 20 + i,
+          playerInput: "onward",
+          narration: `SCENEHEAD${i} ${"the rain kept on. ".repeat(400)} SCENETAIL${i}`,
+          narratedFragment: `fragment ${i}`,
+          turnId: 20 + i,
+          provenance: "chronicler_g1",
+          confidence: 1,
+        });
+      }
+
+      scriptAdjudication({});
+      await adjudicateSeeds(db, campaignId, 40);
+      const prompt = String(mockJudgment.mock.calls[0]?.[1]?.prompt);
+      const evidence = prompt.split("## Seeds under review")[0] ?? "";
+      expect(evidence.length).toBeLessThanOrEqual(caps.evidence_total_chars + 2000);
+      // The newest scene is rendered and CLIPPED; its tail did not fit.
+      expect(prompt).toContain(`SCENEHEAD${sceneCount - 1}`);
+      expect(prompt).not.toContain(`SCENETAIL${sceneCount - 1}`);
+      // The recency tail reaches back evidence_turns scenes and no further —
+      // anything older is not fetched at all, so it cannot appear in any form.
+      expect(prompt).not.toContain("SCENEHEAD0");
+      expect(prompt).not.toContain("fragment 0");
+      // The OLDEST scene the tail does reach is the one the budget could not
+      // hold whole: it falls back to its summary fragment — present, and
+      // honestly labelled as a fragment — never silently absent, never unbounded.
+      const oldestInTail = sceneCount - caps.evidence_turns;
+      expect(prompt).toContain("only this scene's summary fragment fit the evidence budget");
+      expect(prompt).not.toContain(`SCENEHEAD${oldestInTail}`);
+      expect(prompt).toContain(`fragment ${oldestInTail}`);
+      // And the scene a candidate names is rendered FIRST out of the budget,
+      // whatever else is competing for it (§7.6: the mention question is about
+      // those scenes).
+      expect(prompt).toContain("He set the bounty poster down and said the name out loud.");
+    });
+
+    it("puts a CLOSING seed in front of the adjudicator, tagged for the push-out", async () => {
+      if (!db) throw new Error("unreachable");
+      const campaignId = await makeCampaign();
+      const at = 12;
+      const closing = await plantSeed(
+        db,
+        campaignId,
+        1,
+        seedOp({
+          description: "the promise made at the dock",
+          payoff_window_from: 2,
+          payoff_window_to: at + DIRECTOR_MAX_INTERVAL,
+        }),
+        "director",
+      );
+      await plantSeed(
+        db,
+        campaignId,
+        1,
+        seedOp({
+          description: "the letter that has not arrived",
+          payoff_window_from: 2,
+          payoff_window_to: at + DIRECTOR_MAX_INTERVAL + 1,
+        }),
+        "director",
+      );
+
+      const review = await seedsUnderReview(db, campaignId, at);
+      expect(review.map((r) => r.seed.id)).toEqual([closing.seedId]);
+      expect(review[0]?.closing).toBe(true);
+
+      // …and the push-out it is offered actually moves the window.
+      scriptAdjudication({
+        verdicts: [
+          {
+            seed_ref: 0,
+            verdict: "extend",
+            confidence: 0.9,
+            evidence: "alive, not reached",
+            new_window_to: at + 25,
+          },
+        ],
+      });
+      const result = await adjudicateSeeds(db, campaignId, at);
+      expect(result.windowAdjustments).toBe(1);
+      const prompt = String(mockJudgment.mock.calls[0]?.[1]?.prompt);
+      expect(prompt).toContain("CLOSING");
+
+      const [row] = await db.select().from(schema.seeds).where(eq(schema.seeds.id, closing.seedId));
+      expect(row?.payoffWindow).toEqual({ from: 2, to: at + 25 });
+      expect(row?.status).toBe("planted");
     });
 
     it("an empty under-review set costs nothing — no judged call at all", async () => {

@@ -1,13 +1,21 @@
 import { EMBEDDING_DIMENSIONS } from "@/lib/llm/embedding-config";
 import {
+  DIRECTOR_MAX_INTERVAL,
   ORGANIC_CANDIDATE_THRESHOLD,
   SEED_CONVERGENCE_MAX_PAIRS,
   SEED_CONVERGENCE_SIMILARITY,
   SEED_MAX_TURNS_TO_PAYOFF,
+  SEED_MIN_TURNS_TO_PAYOFF,
   parseCandidates,
 } from "@/lib/types/direction";
 import { describe, expect, it } from "vitest";
-import { type SeedRow, adjustedWindow, convergenceCandidates, pendingCandidates } from "../seeds";
+import {
+  type SeedRow,
+  adjustedWindow,
+  convergenceCandidates,
+  isClosing,
+  pendingCandidates,
+} from "../seeds";
 
 /**
  * The DB-less half of the §7.6 seed ledger (M3 C2): the push-out's window
@@ -76,6 +84,41 @@ describe("adjustedWindow (the adjust_window push-out, §7.6)", () => {
   it("moves `from` only when the caller names it, and keeps `to` at or past it", () => {
     expect(adjustedWindow(current, 5, 12, undefined)).toEqual({ from: 12, to: 20 });
     expect(adjustedWindow(current, 5, 30, 25)).toEqual({ from: 30, to: 30 });
+  });
+});
+
+describe("isClosing (§7.6 CLOSING — derived from the window + the cadence)", () => {
+  const at = 20;
+  const closes = (to: number) => seed({ payoffWindow: { from: 1, to } });
+
+  it("a window shutting exactly one Director interval out is CLOSING", () => {
+    // The boundary IS the contract: one interval is the longest the Director
+    // can go without a cycle, so this is the last cycle guaranteed to see it.
+    expect(isClosing(closes(at + DIRECTOR_MAX_INTERVAL), at)).toBe(true);
+  });
+
+  it("one turn further out is NOT closing — another cycle is owed first", () => {
+    expect(isClosing(closes(at + DIRECTOR_MAX_INTERVAL + 1), at)).toBe(false);
+  });
+
+  it("a window shutting on this very turn is still closing, not yet overdue", () => {
+    expect(isClosing(closes(at), at)).toBe(true);
+  });
+
+  it("a window already past is OVERDUE, and overdue is a different object", () => {
+    expect(isClosing(closes(at - 1), at)).toBe(false);
+  });
+
+  it("defaults the window off the plant turn, exactly as windowOf does", () => {
+    const planted = seed({ plantedTurn: 4, payoffWindow: null });
+    const shutsAt = 4 + SEED_MAX_TURNS_TO_PAYOFF;
+    expect(isClosing(planted, shutsAt - DIRECTOR_MAX_INTERVAL)).toBe(true);
+    expect(isClosing(planted, shutsAt - DIRECTOR_MAX_INTERVAL - 1)).toBe(false);
+    // Guard the fixture: a default window must be wider than one interval, or
+    // this test would be asserting that every fresh plant is born closing.
+    expect(SEED_MAX_TURNS_TO_PAYOFF - SEED_MIN_TURNS_TO_PAYOFF).toBeGreaterThan(
+      DIRECTOR_MAX_INTERVAL,
+    );
   });
 });
 

@@ -103,14 +103,40 @@ const nullableOptionalString = z.preprocess(
 
 const FactKind = z.enum(["world_fact", "cast_fact", "faction", "location", "thread", "backstory"]);
 type FactKind = z.infer<typeof FactKind>;
-const Posture = z.enum(["accept", "clarify", "flag"]);
+const POSTURES = ["accept", "clarify", "flag"] as const;
+const Posture = z.enum(POSTURES);
+
+/**
+ * Posture case-normalization (M3R4 R-2, the R-1 idiom). Enum vocabulary reaches
+ * the model as DESCRIPTION text, never as grammar — so the prose is the real
+ * constraint, and EXTRACTOR_SYSTEM used to spell one of these values as "FLAG".
+ * What a mismatch cost here is worse than a dropped field: `posture` is
+ * required inside a required array, so ONE mis-cased word failed the whole
+ * `IngestionExtraction` parse, took every other fact in the assertion with it,
+ * burned the corrective retry, and then threw into layout's catch — where the
+ * player's world-building simply vanished behind a console line.
+ *
+ * Case is not an editorial judgment. A word the vocabulary does not hold falls
+ * to `accept`, warned: §5.4's own doctrine is "when in doubt, accept — there is
+ * no REJECT", so accept is the honest default, and the warn is what keeps a
+ * model systematically answering some fourth word from looking like agreement.
+ * A non-string posture is left alone to fail the parse: that is malformation,
+ * not casing.
+ */
+function normalizePosture(raw: unknown): unknown {
+  if (typeof raw !== "string") return raw;
+  const token = raw.trim().toLowerCase();
+  if ((POSTURES as readonly string[]).includes(token)) return token;
+  console.warn(`[ingestion] out-of-vocabulary posture "${raw}" — read as "accept"`);
+  return "accept";
+}
 
 const ExtractedFact = z.object({
   kind: FactKind,
   /** Present when the fact is ABOUT a nameable catalog entity (faction/npc/location/thread). */
   entity_name: nullableOptionalString,
   content: z.string(),
-  posture: Posture,
+  posture: z.preprocess(normalizePosture, Posture),
   /** CLARIFY: the single question to ask. FLAG: the craft concern. ACCEPT: omitted. */
   posture_reason: nullableOptionalString,
   /**
@@ -223,7 +249,8 @@ export const EXTRACTOR_SYSTEM = [
   "  concern for the Director — tier-inflation (a power spike that breaks the",
   "  world's scale), convenience (a too-tidy solution), or mystery-",
   "  foreclosure (closing a question the story was living inside). Set",
-  "  posture_reason to the concern. FLAG never blocks the write.",
+  "  posture_reason to the concern. A flag never blocks the write.",
+  'Write posture in lowercase, exactly as spelled here: "accept", "clarify", "flag".',
   "",
   "When in doubt, accept. There is no REJECT.",
 ].join(" ");

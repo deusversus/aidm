@@ -212,8 +212,15 @@ export async function openSession(
     // live grammar-400 campaign meant NO session opened for 20 hours: no
     // recap, no Settei rebuild, no prewarm, and every mount 500'd. A sitting
     // without its review is degraded; a sitting that cannot start is dead.
-    // The pilot STARTUP still fails hard — turn 1 without its plan must
-    // retry, exactly as the delete-on-fail contract below intends.
+    //
+    // The pilot STARTUP now splits the same way, by FAILURE CLASS (M3R4 R-2):
+    // a TRANSPORT failure still fails hard — nothing was judged, the player's
+    // retry gets the plan, and the delete-on-fail contract below is exactly
+    // what makes that retry clean. A VALIDATION failure (schema / grammar /
+    // refusal) degrades inside directorStartup instead: calls.ts already spent
+    // its corrective retry on that class, so failing hard would only mean a
+    // campaign that can never be opened at all. The degrade is durably noted
+    // on direction_state.startup_degraded, not just flagged for one cycle.
     if (isPilot) {
       await directorStartup(db, campaignId);
     } else {

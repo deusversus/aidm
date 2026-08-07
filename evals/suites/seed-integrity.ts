@@ -1,12 +1,13 @@
 import { getDb } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import {
+  DIRECTOR_MAX_INTERVAL,
   SEED_MAX_CANDIDATES,
   SEED_MAX_TURNS_TO_PAYOFF,
   SEED_MIN_TURNS_TO_PAYOFF,
   parseCandidates,
 } from "@/lib/types/direction";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import type { Suite, SuiteResult } from "../types";
 import { MIN_SOAK_TURNS, resolveSoakCampaign } from "./flywheel-prospective";
 
@@ -83,6 +84,14 @@ export interface SeedIntegrityInput {
   playedTurns: number;
   /** Turns whose G2 marked `seed_sweep` done — the organic path's denominator. */
   sweptTurns: number;
+  /**
+   * The turn numbers on which a Director cycle ACTUALLY fired in this run
+   * (§7.1 cadence, as it happened rather than as it is bounded). This is the
+   * spacing that decides how late a settled payoff can be recorded — see
+   * {@link deriveCycleTolerance}. Empty when the run predates phase
+   * attribution or the meter rows are gone.
+   */
+  cycleTurns: number[];
   seeds: SeedLedgerRow[];
   declared: DeclaredEvent[];
 }
@@ -157,6 +166,50 @@ export function classifySeed(seed: SeedLedgerRow, lastTurn: number): SeedFate {
   return lastTurn > w.to ? "expired_unpaid" : "open_in_window";
 }
 
+/**
+ * The settlement-lag tolerance, derived from the run's OWN cadence.
+ *
+ * A payoff is SETTLED by the §7.6 batched adjudicator, and that batch runs only
+ * on Director-cycle turns — so a payoff that lands on the page the turn after
+ * its window shuts cannot be RECORDED until the next cycle fires. The maximum
+ * structural lateness is therefore the widest gap between consecutive cycle
+ * turns, minus one.
+ *
+ * DIRECTOR_MAX_INTERVAL is deliberately NOT that number. It is the
+ * nothing-has-happened BACKSTOP — the cycle fires far sooner in practice, on
+ * DIRECTOR_MIN_TURNS_BETWEEN (3) plus event triggers, and the N=50 soak's widest
+ * measured gap was 4. Grading against 8 would have granted a 7-turn amnesty this
+ * run's cadence never earned, and the suite would have been measuring the
+ * constant rather than the ledger. So the tolerance is read off the cycle turns
+ * the run actually recorded; the constant survives only as the FALLBACK for a
+ * run whose cycle history is missing, and the output says so when it is used.
+ */
+export function deriveCycleTolerance(cycleTurns: number[]): {
+  tolerance: number;
+  source: string;
+} {
+  const turns = [...new Set(cycleTurns.filter((t) => Number.isInteger(t) && t >= 0))].sort(
+    (a, b) => a - b,
+  );
+  if (turns.length < 2) {
+    return {
+      tolerance: DIRECTOR_MAX_INTERVAL - 1,
+      source: `FALLBACK DIRECTOR_MAX_INTERVAL−1: this run recorded ${turns.length} Director-cycle turn(s), too few to measure a gap — the backstop constant stands in for a cadence nobody observed`,
+    };
+  }
+  let maxGap = 0;
+  for (let i = 1; i < turns.length; i += 1) {
+    const prev = turns[i - 1];
+    const next = turns[i];
+    if (prev === undefined || next === undefined) continue;
+    maxGap = Math.max(maxGap, next - prev);
+  }
+  return {
+    tolerance: Math.max(0, maxGap - 1),
+    source: `this run's OWN cadence: ${turns.length} Director-cycle turns (model_calls phase='director_cycle'), widest gap ${maxGap} turn(s), minus 1`,
+  };
+}
+
 /** Stored dependency ids (jsonb string[]), guarded like every other jsonb read. */
 function depsOf(seed: SeedLedgerRow): string[] {
   return Array.isArray(seed.dependencies)
@@ -206,23 +259,38 @@ export function analyzeSeedIntegrity(input: SeedIntegrityInput): SeedIntegrityAn
   details.push(`fates: ${histogram}`);
 
   // --- Probe 1: payoffs land INSIDE their windows (§10.5 clause 1) ----------
+  // WITH CYCLE TOLERANCE (M3R4 R-2), derived from THIS RUN's cadence rather
+  // than from the backstop constant — see deriveCycleTolerance. Grading late
+  // settlement as rot measures the cadence, not the discipline (the N=50
+  // soak's "4 late payoffs" were entirely this artifact); grading it against a
+  // constant the run never ran at would measure nothing at all. Lateness
+  // BEYOND the derived tolerance is still a miss, and the expired-unpaid probe
+  // below — the one that found 13 rotted seeds — is untouched by any of this.
+  const { tolerance: CYCLE_TOLERANCE, source: toleranceSource } = deriveCycleTolerance(
+    input.cycleTurns,
+  );
   const settled = [...of("paid_in_window"), ...of("paid_early"), ...of("paid_late")];
   const early = of("paid_early");
   const late = of("paid_late");
+  const overBy = (s: SeedLedgerRow) => (s.resolvedTurn ?? 0) - windowOf(s).to;
+  const withinCadence = late.filter((s) => overBy(s) <= CYCLE_TOLERANCE);
+  const rotLate = late.filter((s) => overBy(s) > CYCLE_TOLERANCE);
   // Deterministic tie-break on id, the direction/seeds.ts idiom (:83-88): the
   // feeding select carries no ORDER BY of its own guarantee, and two seeds can
   // sit equally far past their windows — the named exemplar must not flip
   // run-to-run, or the same ledger prints two different failure strings.
-  const worstLate = late
-    .map((s) => ({ s, over: (s.resolvedTurn ?? 0) - windowOf(s).to }))
+  const worstLate = rotLate
+    .map((s) => ({ s, over: overBy(s) }))
     .sort((a, b) => b.over - a.over || a.s.id.localeCompare(b.s.id))[0];
+  const tolerance = `settlement happens only on Director-cycle turns, so lateness ≤ ${CYCLE_TOLERANCE} turn(s) is cadence, not rot — derived from ${toleranceSource}`;
   probes.push({
     name: "payoff-window discipline",
-    verdict: settled.length === 0 ? "unproven" : early.length + late.length === 0 ? "pass" : "fail",
+    verdict:
+      settled.length === 0 ? "unproven" : early.length + rotLate.length === 0 ? "pass" : "fail",
     detail:
       settled.length === 0
-        ? "no seed in this ledger was ever settled — there is no payoff to grade against a window"
-        : `${settled.length} settled: ${of("paid_in_window").length} inside the window, ${early.length} early, ${late.length} late${
+        ? `no seed in this ledger was ever settled — there is no payoff to grade against a window (the ${CYCLE_TOLERANCE}-turn cycle tolerance would have come from ${toleranceSource})`
+        : `${settled.length} settled: ${of("paid_in_window").length} inside the window, ${early.length} early, ${withinCadence.length} late within the ${CYCLE_TOLERANCE}-turn cycle tolerance (${tolerance}), ${rotLate.length} late BEYOND it${
             worstLate
               ? ` (worst: "${short(worstLate.s.description)}" window ${windowOf(worstLate.s).from}-${windowOf(worstLate.s).to}, paid turn ${worstLate.s.resolvedTurn} — ${worstLate.over} turn(s) past)`
               : ""
@@ -500,12 +568,31 @@ async function loadInput(campaignId: string): Promise<SeedIntegrityInput> {
     // ledger's exemplars and detail strings are read as a fixed record.
     .orderBy(schema.seeds.id);
 
+  // The run's OWN Director cadence (M3R4 R-2 audit). The meter is the only row
+  // source that records WHEN a cycle fired — direction_state keeps just the
+  // last one, and turns.checkpoints marks the trigger, not the firing. Every
+  // cycle-scoped call (the startup plan, the two emit halves, the investigation
+  // rounds, the batched adjudication) files under phase='director_cycle' at the
+  // cycle's own turn number, so DISTINCT turn number is the cycle history.
+  const cycleRows = await db
+    .selectDistinct({ turnNumber: schema.modelCalls.turnNumber })
+    .from(schema.modelCalls)
+    .where(
+      and(
+        eq(schema.modelCalls.campaignId, campaignId),
+        eq(schema.modelCalls.phase, "director_cycle"),
+      ),
+    );
+
   const { lastTurn, playedTurns, sweptTurns, declared } = readTurns(turnRows);
   return {
     campaignId,
     lastTurn,
     playedTurns,
     sweptTurns,
+    cycleTurns: cycleRows
+      .map((r) => r.turnNumber)
+      .filter((t): t is number => typeof t === "number"),
     declared,
     seeds: seedRows.map(({ tombstonedAt, ...row }) => ({
       ...row,

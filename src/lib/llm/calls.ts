@@ -185,6 +185,43 @@ async function createStreamed(params: MessageCreateParamsNonStreaming): Promise<
 }
 
 /**
+ * The FAILURE-CLASS marker (M3R4 R-2). This file already treats the two classes
+ * differently — a VALIDATION failure gets one corrective retry, a TRANSPORT
+ * failure is rethrown un-retried — but both reached the caller as a bare Error,
+ * so a degrade path could only guess which one it was holding. The distinction
+ * decides whether retrying HELPS: a caller that degrades on a transport blip
+ * spends an irreplaceable one-shot (the pilot plan) on a network hiccup, and a
+ * caller that rethrows a schema failure hands the player a permanent 500.
+ *
+ * A non-enumerable own property, set on the error the SDK already threw: it
+ * survives the rethrow, serializes to nothing, and adds no wrapper for a
+ * `.message` test upstream to miss. Deliberately NOT a message-regex idiom like
+ * evals' TRANSPORT — that one reads strings because it never sees this throw
+ * site; here we do, so we can say it rather than infer it.
+ */
+const TRANSPORT_MARK = "llmTransportFailure";
+
+function markTransport(err: unknown): unknown {
+  if (typeof err === "object" && err !== null && Object.isExtensible(err)) {
+    Object.defineProperty(err, TRANSPORT_MARK, {
+      value: true,
+      enumerable: false,
+      configurable: true,
+    });
+  }
+  return err;
+}
+
+/** True when the throw came from the wire, not from what the model emitted. */
+export function isTransportFailure(err: unknown): boolean {
+  return (
+    typeof err === "object" &&
+    err !== null &&
+    (err as Record<string, unknown>)[TRANSPORT_MARK] === true
+  );
+}
+
+/**
  * The output format actually sent: `zodOutputFormat`'s JSON schema WITHOUT the
  * SDK's auto-parse hook (M3R4 R-1).
  *
@@ -284,7 +321,7 @@ async function callStructured<T>(
           statusMessage,
           metadata: { latencyMs: Date.now() - invStarted },
         });
-        throw err;
+        throw markTransport(err);
       }
       const invLatency = Date.now() - invStarted;
       await recordModelCall({
@@ -415,7 +452,7 @@ async function callStructured<T>(
         statusMessage,
         metadata: { latencyMs: Date.now() - attemptStarted },
       });
-      throw err;
+      throw markTransport(err);
     }
     const latencyMs = Date.now() - attemptStarted;
 

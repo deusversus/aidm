@@ -1,6 +1,6 @@
 import * as schema from "@/lib/db/schema";
 import { LOOPED_LARGE } from "@/lib/llm/budgets";
-import { callJudgment } from "@/lib/llm/calls";
+import { callJudgment, isTransportFailure } from "@/lib/llm/calls";
 import { EMBEDDING_DIMENSIONS } from "@/lib/llm/embedding-config";
 import { bebopContract } from "@/lib/renderer/__tests__/fixtures";
 import { fetchCritical } from "@/lib/turn/retrieval";
@@ -1110,5 +1110,161 @@ describe.skipIf(!url)("Director (real Postgres, scripted model)", () => {
     ]);
     expect(state.pilot_plan?.consumed).toBe(false);
     expect(state.pilot_plan?.first_arc_question).toBe("Do they collect, or does it collect them?");
+  });
+
+  /**
+   * The campaign open stops being fatal (M3R4 R-2). directorStartup had no
+   * catch, and session.ts deletes the claimed session row when the open throws
+   * — so one structured-output failure (the class that killed 13 adjudications
+   * and a whole Director cycle in the N=50 soak) meant a campaign that could
+   * not be opened at all, on the player's very first sitting.
+   */
+  it("a failing startup plan DEGRADES the campaign open — it never kills it", async () => {
+    if (!db) throw new Error("unreachable");
+    const campaignId = await makeCampaign({ openingPackage: ospFixture() });
+    vi.mocked(arcs.applyArcPlan).mockResolvedValue({ arcId: "arc-open", phaseChanged: true });
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    mockJudgment.mockRejectedValue(
+      new Error("director_startup: structured output failed to parse (stop_reason=end_turn)"),
+    );
+
+    await expect(directorStartup(db, campaignId)).resolves.toBeUndefined();
+
+    // An arc still exists for Layout to read, planned off the genre prior and
+    // the player's own spark — never invented.
+    expect(vi.mocked(arcs.applyArcPlan)).toHaveBeenCalledWith(
+      expect.anything(),
+      campaignId,
+      0,
+      expect.objectContaining({
+        phase: "setup",
+        budget: { unit: "episodes", target: 3, tolerance: 1 },
+        dramatic_question: "Do they collect, or does it collect them?",
+      }),
+    );
+
+    const state = await loadDirectionState(db, campaignId);
+    expect(state.phase_state).toEqual({ arc_id: "arc-open", phase: "setup", entered_at_turn: 0 });
+    // The OSP's hard constraints survive: they never came from the failed call.
+    expect(state.pilot_plan?.forbidden_opening_moves).toEqual(FORBIDDEN);
+    expect(state.pilot_plan?.opening_pov).toBe("Spike Spiegel");
+    expect(state.pilot_plan?.cold_open_constraints).toEqual([]);
+    // The degrade is DURABLE and reaches the very cycle that can repair it…
+    expect(state.pending_flags.some((f) => f.includes("pilot plan could not be filed"))).toBe(true);
+    // …and OUTLIVES it. pending_flags is consumed and cleared by that cycle, so
+    // without this second copy the only trace that this campaign opened on the
+    // genre prior would be gone by turn ~3 (R-2 audit).
+    expect(state.startup_degraded).toEqual({
+      at_turn: 0,
+      reason: "director_startup: structured output failed to parse (stop_reason=end_turn)",
+    });
+    expect(error).toHaveBeenCalled();
+    error.mockRestore();
+  });
+
+  /**
+   * …but ONLY the validation class (R-2 audit). calls.ts retries validation
+   * failures once and rethrows transport ones un-retried — so transport is the
+   * class where retrying still helps, and the retry that helps is the PLAYER's.
+   * Degrading here would spend a campaign's single pilot plan on a dropped
+   * socket; failing hard preserves M3R2 C1's delete-on-fail contract for
+   * exactly the failure it was written for.
+   */
+  it("a TRANSPORT failure still fails the open HARD — the player's retry is the fix", async () => {
+    if (!db) throw new Error("unreachable");
+    const campaignId = await makeCampaign({ openingPackage: ospFixture() });
+    vi.mocked(arcs.applyArcPlan).mockResolvedValue({ arcId: "arc-open", phaseChanged: true });
+
+    // The marker calls.ts sets at the throw site; both ends are pinned together
+    // in llm/__tests__/calls.structured.test.ts.
+    const transport = Object.defineProperty(new Error("fetch failed"), "llmTransportFailure", {
+      value: true,
+      enumerable: false,
+    });
+    expect(isTransportFailure(transport)).toBe(true);
+    mockJudgment.mockRejectedValue(transport);
+
+    await expect(directorStartup(db, campaignId)).rejects.toThrow("fetch failed");
+
+    // Nothing was planned and nothing was degraded INTO: no arc, no note.
+    expect(vi.mocked(arcs.applyArcPlan)).not.toHaveBeenCalled();
+    const state = await loadDirectionState(db, campaignId);
+    expect(state.startup_degraded).toBeUndefined();
+    expect(state.pending_flags).toEqual([]);
+    expect(state.pilot_plan).toBeUndefined();
+  });
+
+  /**
+   * The §7.6 adjudication's own record (M3R4 R-2): AdjudicationResult was
+   * computed and dropped at the call site, so "did the adjudicator ever promote
+   * a mention, ever push a window?" could only be re-derived from seed rows a
+   * later cycle may already have overwritten.
+   */
+  it("persists the batched adjudication's counts into DirectionState", async () => {
+    if (!db) throw new Error("unreachable");
+    const campaignId = await makeCampaign();
+    vi.mocked(adjudication.adjudicateSeeds).mockResolvedValueOnce({
+      reviewed: 5,
+      mentions: 2,
+      payoffs: 1,
+      conflicts: 0,
+      windowAdjustments: 1,
+      lowConfidence: 1,
+    });
+    armDirectorEmits(directorOutput());
+
+    await runDirectorCycle(db, campaignId, 12);
+
+    const state = await loadDirectionState(db, campaignId);
+    expect(state.last_adjudication).toEqual({
+      at_turn: 12,
+      reviewed: 5,
+      mentions: 2,
+      payoffs: 1,
+      conflicts: 0,
+      window_adjustments: 1,
+      low_confidence: 1,
+    });
+  });
+
+  it("records nothing when no seed was under review — an empty batch is not an event", async () => {
+    if (!db) throw new Error("unreachable");
+    const campaignId = await makeCampaign();
+    vi.mocked(adjudication.adjudicateSeeds).mockResolvedValueOnce({
+      reviewed: 0,
+      mentions: 0,
+      payoffs: 0,
+      conflicts: 0,
+      windowAdjustments: 0,
+      lowConfidence: 0,
+    });
+    armDirectorEmits(directorOutput());
+
+    await runDirectorCycle(db, campaignId, 12);
+    expect((await loadDirectionState(db, campaignId)).last_adjudication).toBeUndefined();
+  });
+
+  it("logs a settle that matched NOTHING — the note was discarded until R-2", async () => {
+    if (!db) throw new Error("unreachable");
+    const campaignId = await makeCampaign();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.mocked(seeds.settleSeed).mockResolvedValue({
+      note: 'settleSeed: no open seed matched "the debt at the harbour"',
+    });
+    armDirectorEmits(
+      directorOutput({
+        seed_ops: [
+          { op: "resolve", seed_description: "the debt at the harbour", dependencies: [] },
+        ],
+      }),
+    );
+
+    await runDirectorCycle(db, campaignId, 12);
+
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining("no open seed matched"),
+      expect.objectContaining({ campaignId, turnNumber: 12, matched: null }),
+    );
+    warn.mockRestore();
   });
 });

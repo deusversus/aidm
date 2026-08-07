@@ -1,4 +1,4 @@
-import { callJudgment } from "@/lib/llm/calls";
+import { callJudgment, isTransportFailure } from "@/lib/llm/calls";
 import { DEV_TIER_SELECTION } from "@/lib/llm/tiers";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { type ParseableMessageCreateParams, maybeParseMessage } from "@anthropic-ai/sdk/lib/parser";
@@ -157,6 +157,66 @@ describe("callStructured — the corrective retry is live again", () => {
       expect.objectContaining({ name: "seed_adjudication", attempt: 1 }),
     );
     error.mockRestore();
+  });
+});
+
+/**
+ * The FAILURE-CLASS marker (M3R4 R-2). This file already retries one class and
+ * rethrows the other; until now both left as bare Errors, so a caller's degrade
+ * path could not tell "the wire dropped" from "the model emitted nonsense" —
+ * and the two want opposite handling. directorStartup is the first reader: it
+ * degrades a campaign open on validation (retrying would only lose again) and
+ * fails hard on transport (the player's retry is what fixes it).
+ */
+describe("callStructured — the transport/validation class reaches the caller", () => {
+  it("marks a transport throw so a degrade path can rethrow it un-retried", async () => {
+    createMock.mockRejectedValueOnce(new Error("fetch failed"));
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const thrown = await call().then(
+      () => undefined,
+      (e: unknown) => e,
+    );
+    expect(isTransportFailure(thrown)).toBe(true);
+    // The mark rides the SDK's own error, un-wrapped: a caller reading
+    // `.message` sees exactly what it saw before.
+    expect((thrown as Error).message).toBe("fetch failed");
+    // …and it is not enumerable, so nothing that serializes an error grows a field.
+    expect(Object.keys(thrown as object)).not.toContain("llmTransportFailure");
+    // One attempt: transport is never retried here.
+    expect(createMock).toHaveBeenCalledTimes(1);
+    error.mockRestore();
+  });
+
+  it("leaves a VALIDATION failure unmarked — that one already spent its retry", async () => {
+    createMock
+      .mockResolvedValueOnce(assistantMessage(VIOLATION))
+      .mockResolvedValueOnce(assistantMessage(VIOLATION));
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    const thrown = await call().then(
+      () => undefined,
+      (e: unknown) => e,
+    );
+    expect(isTransportFailure(thrown)).toBe(false);
+    expect((thrown as Error).message).toMatch(/failed to parse/i);
+    warn.mockRestore();
+  });
+
+  it("a refusal is not transport either — retrying a decline changes nothing", async () => {
+    createMock.mockResolvedValueOnce(assistantMessage(VALID, "refusal"));
+    const thrown = await call().then(
+      () => undefined,
+      (e: unknown) => e,
+    );
+    expect(isTransportFailure(thrown)).toBe(false);
+  });
+
+  it("says no to everything that was never marked", () => {
+    expect(isTransportFailure(new Error("connection reset"))).toBe(false);
+    expect(isTransportFailure("ECONNRESET")).toBe(false);
+    expect(isTransportFailure(null)).toBe(false);
+    expect(isTransportFailure(undefined)).toBe(false);
   });
 });
 

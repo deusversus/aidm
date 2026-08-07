@@ -3,6 +3,7 @@ import { notTombstoned } from "@/lib/db/helpers";
 import { seeds } from "@/lib/db/schema";
 import { cosineSimilarity, embedTexts } from "@/lib/llm/voyage";
 import {
+  DIRECTOR_MAX_INTERVAL,
   type DirectorSeedOp,
   ORGANIC_CANDIDATE_THRESHOLD,
   OVERDUE_TENSION_BUMP,
@@ -10,6 +11,7 @@ import {
   SEED_CONVERGENCE_MAX_PAIRS,
   SEED_CONVERGENCE_SIMILARITY,
   SEED_DEFAULT_URGENCY,
+  SEED_DESCRIPTION_RENDER_CHARS,
   SEED_MAX_CANDIDATES,
   SEED_MAX_TURNS_TO_PAYOFF,
   SEED_MENTION_URGENCY_BUMP,
@@ -69,9 +71,21 @@ function embeddingOf(seed: SeedRow): number[] | undefined {
  * matches if its description contains the query or the query contains it;
  * ties break toward the closest length. The Director speaks prose, so
  * containment is how a spoken reference lands on a stored seed.
+ *
+ * The trailing ellipsis is STRIPPED first (M3R4 R-2, belt): anything that
+ * renders a seed under a length bound leaves one behind, and a quoted "…"
+ * defeats containment in BOTH directions — the stored text does not contain
+ * the ellipsis, and the clipped quote does not contain the stored text. The
+ * dossier no longer truncates (SEED_DESCRIPTION_RENDER_CHARS), so this is the
+ * second line of defence, not the first: convergence pairs and dependency
+ * lines are still rendered short, and the Director may quote either.
  */
 function bestMatch(rows: SeedRow[], query: string): SeedRow | undefined {
-  const q = query.trim().toLowerCase();
+  const q = query
+    .trim()
+    .replace(/(…|\.{3})$/, "")
+    .trim()
+    .toLowerCase();
   if (!q) return undefined;
   const matches = rows.filter((r) => {
     const d = r.description.trim().toLowerCase();
@@ -83,8 +97,8 @@ function bestMatch(rows: SeedRow[], query: string): SeedRow | undefined {
   // to a different seed run-to-run (C7 audit; crash-replay stays idempotent).
   matches.sort(
     (a, b) =>
-      Math.abs(a.description.length - query.length) -
-        Math.abs(b.description.length - query.length) || a.id.localeCompare(b.id),
+      Math.abs(a.description.length - q.length) - Math.abs(b.description.length - q.length) ||
+      a.id.localeCompare(b.id),
   );
   return matches[0];
 }
@@ -361,6 +375,24 @@ export async function callbackReadySeeds(
   return ready;
 }
 
+/**
+ * CLOSING (§7.6, M3R4 R-2): an open seed whose payoff window shuts within ONE
+ * Director interval — so THIS cycle is plausibly the last one that can still
+ * act on it. Derived from the window the ledger already stores and the cadence
+ * constant the Director already runs on; nothing new is recorded anywhere.
+ *
+ * The failure mode it answers, measured on the N=50 soak: a seed was silent in
+ * every channel until `currentTurn > window.to`, at which point it was already
+ * OVERDUE — the promise was broken before anyone was asked about it. 13 of 19
+ * seeds expired un-pushed, `adjust_window` was never used once, and no seed was
+ * ever abandoned on purpose. A promise that can still be kept, pushed, or let
+ * go deliberately is a different object from one the story has already run past.
+ */
+export function isClosing(seed: SeedCore | SeedRow, currentTurn: number): boolean {
+  const { to } = windowOf(seed);
+  return to >= currentTurn && to - currentTurn <= DIRECTOR_MAX_INTERVAL;
+}
+
 /** Open seeds past their window's `to` (v3 get_overdue_seeds). */
 export async function overdueSeeds(
   db: Db,
@@ -537,14 +569,17 @@ export interface SeedUnderReview {
   pending: SeedCandidate[];
   callbackReady: boolean;
   overdue: boolean;
+  /** Its window shuts within one Director interval — see {@link isClosing}. */
+  closing: boolean;
 }
 
 /**
  * The ONLY seeds the batched call renders (§7.6: "cost scales with candidates,
  * never with ledger size"): seeds carrying un-adjudicated candidates, seeds
- * that are callback-ready AND carry an expected payoff to judge against, and
- * overdue seeds as conflict-suspects. Each bucket is capped; a seed in two
- * buckets appears once, wearing both tags.
+ * that are callback-ready AND carry an expected payoff to judge against,
+ * CLOSING seeds whose window shuts within one Director interval, and overdue
+ * seeds as conflict-suspects. Each bucket is capped; a seed in several buckets
+ * appears once, wearing every tag it earned.
  */
 export async function seedsUnderReview(
   db: Db,
@@ -565,6 +600,22 @@ export async function seedsUnderReview(
       .slice(0, SEED_ADJUDICATION_CAPS.conflict_suspects)
       .map((s) => s.id),
   );
+  // The push-out's own bucket (M3R4 R-2): `extend` is the verdict that saves a
+  // promise, and it was only ever offered on seeds already broken.
+  const closing = new Set(
+    open
+      .filter((s) => isClosing(s, currentTurn))
+      // Id tiebreak, this file's own idiom (:83-88): seeds planted in one op
+      // share a window AND a default urgency, so without it the 6-cap boundary
+      // is decided by row order Postgres never promised — the same ledger would
+      // put a different seed in front of the adjudicator run to run.
+      .sort(
+        (a, b) =>
+          windowOf(a).to - windowOf(b).to || b.urgency - a.urgency || a.id.localeCompare(b.id),
+      )
+      .slice(0, SEED_ADJUDICATION_CAPS.closing)
+      .map((s) => s.id),
+  );
   const withCandidates = open
     .map((seed) => ({ seed, pending: pendingCandidates(seed) }))
     .filter((x) => x.pending.length > 0)
@@ -573,12 +624,15 @@ export async function seedsUnderReview(
   const candidateIds = new Map(withCandidates.map((x) => [x.seed.id, x.pending]));
 
   return open
-    .filter((s) => candidateIds.has(s.id) || ready.has(s.id) || overdue.has(s.id))
+    .filter(
+      (s) => candidateIds.has(s.id) || ready.has(s.id) || overdue.has(s.id) || closing.has(s.id),
+    )
     .map((seed) => ({
       seed,
       pending: candidateIds.get(seed.id) ?? [],
       callbackReady: ready.has(seed.id),
       overdue: overdue.has(seed.id),
+      closing: closing.has(seed.id),
     }));
 }
 
@@ -615,6 +669,7 @@ export async function seedDossier(
   const lines: string[] = [`SEED LEDGER (turn ${currentTurn})`];
   // Cap open lines so the dossier stays ~30 lines for the Director prompt.
   let overdueCount = 0;
+  let closingCount = 0;
   for (const seed of open.slice(0, 28)) {
     const w = windowOf(seed);
     const unmet = depsOf(seed)
@@ -625,15 +680,28 @@ export async function seedDossier(
     // OVERDUE is marked per line, not just counted in the tension note: the
     // Director reads this ledger through get_seed_ledger too, and a seed the
     // story has run past is a different object than one still in its window.
+    // CLOSING is the state BEFORE that (M3R4 R-2) — the last cycle at which a
+    // push, a payoff or a deliberate abandonment is still keeping a promise
+    // rather than apologizing for one.
     const late = currentTurn > w.to;
+    const closing = !late && isClosing(seed, currentTurn);
     if (late) overdueCount++;
+    if (closing) closingCount++;
+    const marker = late ? " OVERDUE" : closing ? ` CLOSING (shuts in ${w.to - currentTurn})` : "";
+    // The description is rendered WHOLE (M3R4 R-2): the Director settles seeds
+    // by quoting this line back, and a truncation it quotes matches nothing.
     lines.push(
-      `- "${trunc(seed.description)}" [${seed.status}] urgency ${seed.urgency.toFixed(2)} ` +
-        `window ${w.from}-${w.to}${late ? " OVERDUE" : ""} mentions ${seed.mentionCount} ${deps}`,
+      `- "${trunc(seed.description, SEED_DESCRIPTION_RENDER_CHARS)}" [${seed.status}] urgency ${seed.urgency.toFixed(2)} ` +
+        `window ${w.from}-${w.to}${marker} mentions ${seed.mentionCount} ${deps}`,
     );
   }
   if (open.length > 28) lines.push(`- …and ${open.length - 28} more open`);
   lines.push(`(${resolved} resolved, ${abandoned} abandoned)`);
+  if (closingCount > 0) {
+    lines.push(
+      `${closingCount} CLOSING — their windows shut within ${DIRECTOR_MAX_INTERVAL} turns, and your cycles run at most that far apart, so this is plausibly your LAST cycle on them. Decide now, while the promise can still be kept: pay it, push it out with adjust_window (name the turn), or abandon it on purpose. Silence is the one answer that breaks it.`,
+    );
+  }
   if (overdueCount > 0) {
     lines.push(
       `${overdueCount} overdue → tension +${overdueTensionBump(overdueCount).toFixed(2)} (cap 1.0): pay them, escalate them, push the window out with adjust_window, or abandon them on purpose.`,
